@@ -2,7 +2,6 @@
 #include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/filters/http/ext_proc/matching_utils.h"
 
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
@@ -51,16 +50,21 @@ TEST_F(ExpressionManagerTest, InvalidExpression) {
       EnvoyException);
 }
 
-TEST_F(ExpressionManagerTest, ComplexExpressionWithSourceInfo) {
-  // Create a complex expression that would test source info handling
+TEST_F(ExpressionManagerTest, RepeatedMatchers) {
   Protobuf::RepeatedPtrField<std::string> request_matchers;
-  request_matchers.Add("request.headers.contains('x-test') && "
-                       "request.headers['x-test'].startsWith('value')");
-
-  // This should create successfully without throwing
+  request_matchers.Add("true");
+  request_matchers.Add("true");
   auto builder = Filters::Common::Expr::getBuilder(context_);
   ExpressionManager test_manager(builder, context_.local_info_, request_matchers, {});
   EXPECT_TRUE(test_manager.hasRequestExpr());
+}
+
+TEST_F(ExpressionManagerTest, EvaluateAttributesEmpty) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto activation = Filters::Common::Expr::createActivation(&context_.local_info_, stream_info,
+                                                            nullptr, nullptr, nullptr);
+  auto result = ExpressionManager::evaluateAttributes(*activation, {});
+  EXPECT_TRUE(result.fields().empty());
 }
 
 #else

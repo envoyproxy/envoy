@@ -121,7 +121,6 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
 #endif
 
   streamInfo().filterState()->setData(SconeStateKey, std::make_shared<SconeState>(),
-                                      StreamInfo::FilterState::StateType::Mutable,
                                       StreamInfo::FilterState::LifeSpan::Connection);
 }
 
@@ -207,13 +206,6 @@ std::unique_ptr<quic::QuicSpdyClientStream> EnvoyQuicClientSession::CreateClient
 
 quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::QuicStreamId /*id*/) {
   // Envoy doesn't support server initiated stream.
-  return nullptr;
-}
-
-quic::QuicSpdyStream*
-EnvoyQuicClientSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
-  // Envoy doesn't support server push.
-  IS_ENVOY_BUG("unexpectes server push call");
   return nullptr;
 }
 

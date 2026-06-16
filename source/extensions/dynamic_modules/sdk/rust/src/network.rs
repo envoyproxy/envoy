@@ -6,6 +6,7 @@ use crate::{
   NEW_NETWORK_FILTER_CONFIG_FUNCTION,
 };
 use mockall::*;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 /// The trait that represents the Envoy network filter configuration.
 /// This is used in [`NewNetworkFilterConfigFunction`] to pass the Envoy filter configuration
@@ -29,6 +30,45 @@ pub trait EnvoyNetworkFilterConfig {
     &mut self,
     name: &str,
   ) -> Result<EnvoyHistogramId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Increment the counter with the given id from the config context.
+  ///
+  /// Unlike [`EnvoyNetworkFilter::increment_counter`], this does not require a per-connection
+  /// filter and can be called outside of the connection lifecycle, for example from a scheduled
+  /// background task.
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of the gauge with the given id from the config context.
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase the gauge with the given id from the config context.
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease the gauge with the given id from the config context.
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in the histogram with the given id from the config context.
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
   /// Create a new implementation of the [`EnvoyNetworkFilterConfigScheduler`] trait.
   ///
@@ -277,7 +317,11 @@ pub trait EnvoyNetworkFilter {
 
   /// Get the string-typed dynamic metadata value with the given namespace and key value.
   /// Returns None if the metadata is not found or is the wrong type.
-  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<String>;
+  fn get_dynamic_metadata_string<'a>(
+    &'a self,
+    namespace: &str,
+    key: &str,
+  ) -> Option<EnvoyBuffer<'a>>;
 
   /// Set the number-typed dynamic metadata value with the given namespace and key value.
   /// Returns true if the operation is successful.
@@ -404,15 +448,15 @@ pub trait EnvoyNetworkFilter {
 
   /// Get the upstream host address and port if an upstream host is selected.
   /// Returns None if no upstream host is set or the address is not an IP.
-  fn get_upstream_host_address(&self) -> Option<(String, u32)>;
+  fn get_upstream_host_address<'a>(&'a self) -> Option<(EnvoyBuffer<'a>, u32)>;
 
   /// Get the upstream host hostname if an upstream host is selected.
   /// Returns None if no upstream host is set or hostname is empty.
-  fn get_upstream_host_hostname(&self) -> Option<String>;
+  fn get_upstream_host_hostname<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
 
   /// Get the upstream host cluster name if an upstream host is selected.
   /// Returns None if no upstream host is set.
-  fn get_upstream_host_cluster(&self) -> Option<String>;
+  fn get_upstream_host_cluster<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
 
   /// Check if an upstream host has been selected for this connection.
   fn has_upstream_host(&self) -> bool;
@@ -676,6 +720,90 @@ impl EnvoyNetworkFilterConfig for EnvoyNetworkFilterConfigImpl {
     Ok(EnvoyHistogramId(id))
   }
 
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_config_increment_counter(
+        self.raw, id, value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_config_set_gauge(self.raw, id, value)
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_config_increment_gauge(self.raw, id, value)
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_config_decrement_gauge(self.raw, id, value)
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_config_record_histogram_value(
+        self.raw, id, value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
   fn new_config_scheduler(&self) -> impl EnvoyNetworkFilterConfigScheduler + 'static {
     unsafe {
       let scheduler_ptr =
@@ -713,24 +841,20 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       return (Vec::new(), 0);
     }
 
-    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null_mut(),
-        length: 0,
-      };
-      size
-    ];
-    unsafe {
+    let mut buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
+    let ok = unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
         self.raw,
-        buffers.as_mut_ptr(),
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
-    let envoy_buffers: Vec<EnvoyBuffer> = buffers
-      .iter()
-      .map(|s| unsafe { EnvoyBuffer::new_from_raw(s.ptr as *const _, s.length) })
-      .collect();
-    (envoy_buffers, total_length)
+    if !ok {
+      return (Vec::new(), 0);
+    }
+    unsafe {
+      buffers.set_len(size);
+    }
+    (buffers, total_length)
   }
 
   fn get_write_buffer_chunks(&mut self) -> (Vec<EnvoyBuffer<'_>>, usize) {
@@ -747,24 +871,20 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       return (Vec::new(), 0);
     }
 
-    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null_mut(),
-        length: 0,
-      };
-      size
-    ];
-    unsafe {
+    let mut buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
+    let ok = unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
         self.raw,
-        buffers.as_mut_ptr(),
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
-    let envoy_buffers: Vec<EnvoyBuffer> = buffers
-      .iter()
-      .map(|s| unsafe { EnvoyBuffer::new_from_raw(s.ptr as *const _, s.length) })
-      .collect();
-    (envoy_buffers, total_length)
+    if !ok {
+      return (Vec::new(), 0);
+    }
+    unsafe {
+      buffers.set_len(size);
+    }
+    (buffers, total_length)
   }
 
   fn drain_read_buffer(&mut self, length: usize) {
@@ -885,13 +1005,9 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     if !result || address.length == 0 || address.ptr.is_null() {
       return (String::new(), 0);
     }
-    let address = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const _,
-        address.length,
-      ))
-    };
-    (address.to_string(), port)
+    let address =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
+    (address.into_owned(), port)
   }
 
   fn get_local_address(&self) -> (String, u32) {
@@ -910,13 +1026,9 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     if !result || address.length == 0 || address.ptr.is_null() {
       return (String::new(), 0);
     }
-    let address = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const _,
-        address.length,
-      ))
-    };
-    (address.to_string(), port)
+    let address =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
+    (address.into_owned(), port)
   }
 
   fn is_ssl(&self) -> bool {
@@ -990,34 +1102,20 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       return Vec::new();
     }
 
-    let mut sans_buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null(),
-        length: 0,
-      };
-      size
-    ];
+    let mut sans_buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
     let ok = unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(
         self.raw,
-        sans_buffers.as_mut_ptr(),
+        sans_buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if !ok {
       return Vec::new();
     }
-
+    unsafe {
+      sans_buffers.set_len(size);
+    }
     sans_buffers
-      .iter()
-      .take(size)
-      .map(|buf| {
-        if !buf.ptr.is_null() && buf.length > 0 {
-          unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const _, buf.length) }
-        } else {
-          EnvoyBuffer::default()
-        }
-      })
-      .collect()
   }
 
   fn get_ssl_dns_sans(&self) -> Vec<EnvoyBuffer<'_>> {
@@ -1027,34 +1125,20 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       return Vec::new();
     }
 
-    let mut sans_buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null(),
-        length: 0,
-      };
-      size
-    ];
+    let mut sans_buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
     let ok = unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(
         self.raw,
-        sans_buffers.as_mut_ptr(),
+        sans_buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if !ok {
       return Vec::new();
     }
-
+    unsafe {
+      sans_buffers.set_len(size);
+    }
     sans_buffers
-      .iter()
-      .take(size)
-      .map(|buf| {
-        if !buf.ptr.is_null() && buf.length > 0 {
-          unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const _, buf.length) }
-        } else {
-          EnvoyBuffer::default()
-        }
-      })
-      .collect()
   }
 
   fn get_ssl_subject(&self) -> Option<EnvoyBuffer<'_>> {
@@ -1147,7 +1231,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     }
   }
 
-  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<String> {
+  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -1161,13 +1245,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       )
     };
     if success && !result.ptr.is_null() && result.length > 0 {
-      let value_str = unsafe {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          result.ptr as *const _,
-          result.length,
-        ))
-      };
-      Some(value_str.to_string())
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
     } else {
       None
     }
@@ -1303,7 +1381,9 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       )
     };
     if success && !result.ptr.is_null() && result.length > 0 {
-      let slice = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+      let slice = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(result.ptr as *const u8, result.length)
+      };
       Some(slice.to_vec())
     } else {
       None
@@ -1344,8 +1424,11 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
           abi::envoy_dynamic_module_type_socket_option_value_type::Bytes => {
             if !opt.byte_value.ptr.is_null() && opt.byte_value.length > 0 {
               let bytes = unsafe {
-                std::slice::from_raw_parts(opt.byte_value.ptr as *const u8, opt.byte_value.length)
-                  .to_vec()
+                crate::ffi_helpers::slice_from_raw_or_empty(
+                  opt.byte_value.ptr as *const u8,
+                  opt.byte_value.length,
+                )
+                .to_vec()
               };
               SocketOptionValue::Bytes(bytes)
             } else {
@@ -1513,7 +1596,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     }
   }
 
-  fn get_upstream_host_address(&self) -> Option<(String, u32)> {
+  fn get_upstream_host_address(&self) -> Option<(EnvoyBuffer<'_>, u32)> {
     let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null_mut(),
       length: 0,
@@ -1529,16 +1612,13 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     if !result || address.length == 0 || address.ptr.is_null() {
       return None;
     }
-    let address_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const _,
-        address.length,
-      ))
-    };
-    Some((address_str.to_string(), port))
+    Some((
+      unsafe { EnvoyBuffer::new_from_raw(address.ptr as *const u8, address.length) },
+      port,
+    ))
   }
 
-  fn get_upstream_host_hostname(&self) -> Option<String> {
+  fn get_upstream_host_hostname(&self) -> Option<EnvoyBuffer<'_>> {
     let mut hostname = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null_mut(),
       length: 0,
@@ -1552,16 +1632,10 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     if !result || hostname.length == 0 || hostname.ptr.is_null() {
       return None;
     }
-    let hostname_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        hostname.ptr as *const _,
-        hostname.length,
-      ))
-    };
-    Some(hostname_str.to_string())
+    Some(unsafe { EnvoyBuffer::new_from_raw(hostname.ptr as *const u8, hostname.length) })
   }
 
-  fn get_upstream_host_cluster(&self) -> Option<String> {
+  fn get_upstream_host_cluster(&self) -> Option<EnvoyBuffer<'_>> {
     let mut cluster_name = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null_mut(),
       length: 0,
@@ -1575,13 +1649,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     if !result || cluster_name.length == 0 || cluster_name.ptr.is_null() {
       return None;
     }
-    let cluster_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        cluster_name.ptr as *const _,
-        cluster_name.length,
-      ))
-    };
-    Some(cluster_str.to_string())
+    Some(unsafe { EnvoyBuffer::new_from_raw(cluster_name.ptr as *const u8, cluster_name.length) })
   }
 
   fn has_upstream_host(&self) -> bool {
@@ -1653,22 +1721,26 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_config_new(
   name: abi::envoy_dynamic_module_type_envoy_buffer,
   config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_network_filter_config_module_ptr {
-  let mut envoy_filter_config = EnvoyNetworkFilterConfigImpl::new(envoy_filter_config_ptr);
-  let name_str = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-      name.ptr as *const _,
-      name.length,
-    ))
-  };
-  let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
-  init_network_filter_config(
-    &mut envoy_filter_config,
-    name_str,
-    config_slice,
-    NEW_NETWORK_FILTER_CONFIG_FUNCTION
-      .get()
-      .expect("NEW_NETWORK_FILTER_CONFIG_FUNCTION must be set"),
-  )
+  catch_unwind(AssertUnwindSafe(|| {
+    let mut envoy_filter_config = EnvoyNetworkFilterConfigImpl::new(envoy_filter_config_ptr);
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
+    };
+    init_network_filter_config(
+      &mut envoy_filter_config,
+      name_str.as_ref(),
+      config_slice,
+      NEW_NETWORK_FILTER_CONFIG_FUNCTION
+        .get()
+        .expect("NEW_NETWORK_FILTER_CONFIG_FUNCTION must be set"),
+    )
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_network_filter_config_new", panic);
+    std::ptr::null()
+  })
 }
 
 pub(crate) fn init_network_filter_config<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkFilter>(
@@ -1692,10 +1764,18 @@ pub(crate) fn init_network_filter_config<EC: EnvoyNetworkFilterConfig, ENF: Envo
 pub unsafe extern "C" fn envoy_dynamic_module_on_network_filter_config_destroy(
   filter_config_ptr: abi::envoy_dynamic_module_type_network_filter_config_module_ptr,
 ) {
-  drop_wrapped_c_void_ptr!(
-    filter_config_ptr,
-    NetworkFilterConfig<EnvoyNetworkFilterImpl>
-  );
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    drop_wrapped_c_void_ptr!(
+      filter_config_ptr,
+      NetworkFilterConfig<EnvoyNetworkFilterImpl>
+    );
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_network_filter_config_destroy",
+      panic,
+    );
+  });
 }
 
 /// # Safety
@@ -1707,12 +1787,18 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_network_filter_new(
   filter_config_ptr: abi::envoy_dynamic_module_type_network_filter_config_module_ptr,
   envoy_filter_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
 ) -> abi::envoy_dynamic_module_type_network_filter_module_ptr {
-  let mut envoy_filter = EnvoyNetworkFilterImpl::new(envoy_filter_ptr);
-  let filter_config = {
-    let raw = filter_config_ptr as *const *const dyn NetworkFilterConfig<EnvoyNetworkFilterImpl>;
-    &**raw
-  };
-  envoy_dynamic_module_on_network_filter_new_impl(&mut envoy_filter, filter_config)
+  catch_unwind(AssertUnwindSafe(|| {
+    let mut envoy_filter = EnvoyNetworkFilterImpl::new(envoy_filter_ptr);
+    let filter_config = {
+      let raw = filter_config_ptr as *const *const dyn NetworkFilterConfig<EnvoyNetworkFilterImpl>;
+      &**raw
+    };
+    envoy_dynamic_module_on_network_filter_new_impl(&mut envoy_filter, filter_config)
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_network_filter_new", panic);
+    std::ptr::null()
+  })
 }
 
 pub(crate) fn envoy_dynamic_module_on_network_filter_new_impl(
@@ -1728,9 +1814,18 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_new_connection(
   envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_network_filter_module_ptr,
 ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
-  let filter = filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>;
-  let filter = unsafe { &mut *filter };
-  filter.on_new_connection(&mut EnvoyNetworkFilterImpl::new(envoy_ptr))
+  catch_unwind(AssertUnwindSafe(|| {
+    let filter = filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>;
+    let filter = unsafe { &mut *filter };
+    filter.on_new_connection(&mut EnvoyNetworkFilterImpl::new(envoy_ptr))
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_network_filter_new_connection",
+      panic,
+    );
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::StopIteration
+  })
 }
 
 #[no_mangle]
@@ -1740,13 +1835,19 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_read(
   data_length: usize,
   end_stream: bool,
 ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
-  let filter = filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>;
-  let filter = unsafe { &mut *filter };
-  filter.on_read(
-    &mut EnvoyNetworkFilterImpl::new(envoy_ptr),
-    data_length,
-    end_stream,
-  )
+  catch_unwind(AssertUnwindSafe(|| {
+    let filter = filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>;
+    let filter = unsafe { &mut *filter };
+    filter.on_read(
+      &mut EnvoyNetworkFilterImpl::new(envoy_ptr),
+      data_length,
+      end_stream,
+    )
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_network_filter_read", panic);
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::StopIteration
+  })
 }
 
 #[no_mangle]
@@ -1756,13 +1857,19 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_write(
   data_length: usize,
   end_stream: bool,
 ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
-  let filter = filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>;
-  let filter = unsafe { &mut *filter };
-  filter.on_write(
-    &mut EnvoyNetworkFilterImpl::new(envoy_ptr),
-    data_length,
-    end_stream,
-  )
+  catch_unwind(AssertUnwindSafe(|| {
+    let filter = filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>;
+    let filter = unsafe { &mut *filter };
+    filter.on_write(
+      &mut EnvoyNetworkFilterImpl::new(envoy_ptr),
+      data_length,
+      end_stream,
+    )
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_network_filter_write", panic);
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::StopIteration
+  })
 }
 
 #[no_mangle]
@@ -1771,17 +1878,27 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_event(
   filter_ptr: abi::envoy_dynamic_module_type_network_filter_module_ptr,
   event: abi::envoy_dynamic_module_type_network_connection_event,
 ) {
-  let filter = filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>;
-  let filter = unsafe { &mut *filter };
-  filter.on_event(&mut EnvoyNetworkFilterImpl::new(envoy_ptr), event);
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let filter = filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>;
+    let filter = unsafe { &mut *filter };
+    filter.on_event(&mut EnvoyNetworkFilterImpl::new(envoy_ptr), event);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_network_filter_event", panic);
+  });
 }
 
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_network_filter_destroy(
   filter_ptr: abi::envoy_dynamic_module_type_network_filter_module_ptr,
 ) {
-  let _ =
-    unsafe { Box::from_raw(filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>) };
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let _ =
+      unsafe { Box::from_raw(filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>) };
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_network_filter_destroy", panic);
+  });
 }
 
 #[no_mangle]
@@ -1798,15 +1915,14 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_network_filter_http_callout_don
   body_chunks: *const abi::envoy_dynamic_module_type_envoy_buffer,
   body_chunks_size: usize,
 ) {
-  let filter = filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>;
-  let filter = unsafe { &mut *filter };
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let filter = filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>;
+    let filter = unsafe { &mut *filter };
 
-  // Convert headers to Vec<(EnvoyBuffer, EnvoyBuffer)>.
-  let header_vec = if headers.is_null() || headers_size == 0 {
-    Vec::new()
-  } else {
-    let headers_slice = unsafe { std::slice::from_raw_parts(headers, headers_size) };
-    headers_slice
+    // Convert headers to Vec<(EnvoyBuffer, EnvoyBuffer)>.
+    let headers_slice =
+      unsafe { crate::ffi_helpers::slice_from_raw_or_empty(headers, headers_size) };
+    let header_vec: Vec<(EnvoyBuffer, EnvoyBuffer)> = headers_slice
       .iter()
       .map(|h| {
         (
@@ -1814,27 +1930,30 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_network_filter_http_callout_don
           unsafe { EnvoyBuffer::new_from_raw(h.value_ptr as *const _, h.value_length) },
         )
       })
-      .collect()
-  };
+      .collect();
 
-  // Convert body chunks to Vec<EnvoyBuffer>.
-  let body_vec = if body_chunks.is_null() || body_chunks_size == 0 {
-    Vec::new()
-  } else {
-    let chunks_slice = unsafe { std::slice::from_raw_parts(body_chunks, body_chunks_size) };
-    chunks_slice
+    // Convert body chunks to Vec<EnvoyBuffer>.
+    let chunks_slice =
+      unsafe { crate::ffi_helpers::slice_from_raw_or_empty(body_chunks, body_chunks_size) };
+    let body_vec: Vec<EnvoyBuffer> = chunks_slice
       .iter()
       .map(|c| unsafe { EnvoyBuffer::new_from_raw(c.ptr as *const _, c.length) })
-      .collect()
-  };
+      .collect();
 
-  filter.on_http_callout_done(
-    &mut EnvoyNetworkFilterImpl::new(envoy_ptr),
-    callout_id,
-    result,
-    header_vec,
-    body_vec,
-  );
+    filter.on_http_callout_done(
+      &mut EnvoyNetworkFilterImpl::new(envoy_ptr),
+      callout_id,
+      result,
+      header_vec,
+      body_vec,
+    );
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_network_filter_http_callout_done",
+      panic,
+    );
+  });
 }
 
 #[no_mangle]
@@ -1843,9 +1962,14 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_scheduled(
   filter_ptr: abi::envoy_dynamic_module_type_network_filter_module_ptr,
   event_id: u64,
 ) {
-  let filter = filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>;
-  let filter = unsafe { &mut *filter };
-  filter.on_scheduled(&mut EnvoyNetworkFilterImpl::new(envoy_ptr), event_id);
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let filter = filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>;
+    let filter = unsafe { &mut *filter };
+    filter.on_scheduled(&mut EnvoyNetworkFilterImpl::new(envoy_ptr), event_id);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_network_filter_scheduled", panic);
+  });
 }
 
 #[no_mangle]
@@ -1853,11 +1977,19 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_config_scheduled(
   filter_config_ptr: abi::envoy_dynamic_module_type_network_filter_config_module_ptr,
   event_id: u64,
 ) {
-  let filter_config = {
-    let raw = filter_config_ptr as *const *const dyn NetworkFilterConfig<EnvoyNetworkFilterImpl>;
-    unsafe { &**raw }
-  };
-  filter_config.on_config_scheduled(event_id);
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let filter_config = {
+      let raw = filter_config_ptr as *const *const dyn NetworkFilterConfig<EnvoyNetworkFilterImpl>;
+      unsafe { &**raw }
+    };
+    filter_config.on_config_scheduled(event_id);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_network_filter_config_scheduled",
+      panic,
+    );
+  });
 }
 
 #[no_mangle]
@@ -1865,9 +1997,17 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_above_write_buffer_high
   envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_network_filter_module_ptr,
 ) {
-  let filter = filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>;
-  let filter = unsafe { &mut *filter };
-  filter.on_above_write_buffer_high_watermark(&mut EnvoyNetworkFilterImpl::new(envoy_ptr));
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let filter = filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>;
+    let filter = unsafe { &mut *filter };
+    filter.on_above_write_buffer_high_watermark(&mut EnvoyNetworkFilterImpl::new(envoy_ptr));
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_network_filter_above_write_buffer_high_watermark",
+      panic,
+    );
+  });
 }
 
 #[no_mangle]
@@ -1875,7 +2015,15 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_below_write_buffer_low_
   envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_network_filter_module_ptr,
 ) {
-  let filter = filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>;
-  let filter = unsafe { &mut *filter };
-  filter.on_below_write_buffer_low_watermark(&mut EnvoyNetworkFilterImpl::new(envoy_ptr));
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let filter = filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>;
+    let filter = unsafe { &mut *filter };
+    filter.on_below_write_buffer_low_watermark(&mut EnvoyNetworkFilterImpl::new(envoy_ptr));
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark",
+      panic,
+    );
+  });
 }

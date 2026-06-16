@@ -23,7 +23,6 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/resources.h"
@@ -99,12 +98,12 @@ public:
 
   struct ExpectedMessage {
     std::string type_url;
-    std::vector<std::string> resource_names_subscribe = {};
-    std::vector<std::string> resource_names_unsubscribe = {};
+    std::vector<std::string> resource_names_subscribe;
+    std::vector<std::string> resource_names_unsubscribe;
     std::string nonce = "";
     Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok;
     std::string error_message = "";
-    std::map<std::string, std::string> initial_resource_versions = {};
+    std::map<std::string, std::string> initial_resource_versions;
     Grpc::MockAsyncStream* async_stream = nullptr;
     bool with_node = true;
   };

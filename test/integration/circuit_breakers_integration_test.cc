@@ -2,6 +2,8 @@
 
 #include "test/integration/http_protocol_integration.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -51,13 +53,13 @@ TEST_P(CircuitBreakersIntegrationTest, CircuitBreakersWithOutlierDetection) {
 
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
 
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_pending_active", 0);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_pending_active", Eq(0));
 
   ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ("503", response->headers().getStatusValue());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_503", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_503", Ge(1));
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_active_overflow")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_pending_overflow")->value(), 0);
@@ -98,13 +100,13 @@ TEST_P(CircuitBreakersIntegrationTest, CircuitBreakerRuntime) {
 
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
 
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_pending_active", 0);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_pending_active", Eq(0));
 
   ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ("503", response->headers().getStatusValue());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_503", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_503", Ge(1));
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_active_overflow")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_pending_overflow")->value(), 0);
@@ -167,13 +169,13 @@ TEST_P(CircuitBreakersIntegrationTest, CircuitBreakerRuntimeProto) {
 
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
 
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_pending_active", 0);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_pending_active", Eq(0));
 
   ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ("503", response->headers().getStatusValue());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_503", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_503", Ge(1));
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_active_overflow")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_pending_overflow")->value(), 0);

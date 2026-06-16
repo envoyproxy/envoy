@@ -57,6 +57,7 @@ private:
 
 using MetricStoreSharedPtr = std::shared_ptr<MetricStore>;
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 struct httpConfigInternal;
 
 class SecretReader {
@@ -350,10 +351,10 @@ public:
 private:
   friend class TestFilter;
 
-  bool hasDestroyed() {
-    Thread::LockGuard lock(mutex_);
-    return has_destroyed_;
-  };
+  // Lock-free destroy check. The flag is set once, with release ordering, by onDestroy() on the
+  // worker thread; concurrent off-thread cgo callers do an acquire load to detect destruction
+  // without taking mutex_. See header note on has_destroyed_ below.
+  bool hasDestroyed() { return has_destroyed_.load(std::memory_order_acquire); };
   const StreamInfo::StreamInfo& streamInfo() const { return decoding_state_.streamInfo(); }
   StreamInfo::StreamInfo& streamInfo() { return decoding_state_.streamInfo(); }
   bool isThreadSafe() { return decoding_state_.isThreadSafe(); };
@@ -410,14 +411,48 @@ private:
 
   Event::Dispatcher* dispatcher_;
 
-  // lock for has_destroyed_/etc, to avoid race between envoy c thread and go thread (when calling
-  // back from go).
+  // mutex_ has two distinct roles:
+  //
+  // 1. Serialises off-thread Go callers that write to req_->strValue (getStringValue,
+  //    getDynamicMetadata, getStringFilterState, getStringProperty, getSecret) so that
+  //    concurrent goroutines do not corrupt the per-request scratch buffer.
+  //
+  // 2. Stalls onDestroy() against off-thread CAPI methods that inline-dereference
+  //    Envoy-owned objects whose lifetime is tied to the parent stream rather than to the
+  //    Filter (getHeader, copyHeaders, copyTrailers, getIntegerValue). The Filter itself is
+  //    kept alive across any cgo call by the shared_ptr taken at the cgo wrapper layer
+  //    (see cgo.cc), but the stream's HeaderMap / TrailerMap / StreamInfo are not. The
+  //    fence is two-sided: those off-thread CAPI methods hold mutex_ across their
+  //    dereference, and onDestroy() re-acquires mutex_ once before letting the worker
+  //    thread return. The worker therefore blocks on mutex_ until every in-flight
+  //    off-thread reader has unwound, which prevents it from progressing into
+  //    deferredDelete(stream) (and the eventual stream / header-map free) while a Go
+  //    goroutine is still mid-deref. The atomic flag alone is not sufficient for this:
+  //    once onDestroy has set it the off-thread caller can already be past its own check
+  //    and committed to the deref, so the lock acquisition in onDestroy is what actually
+  //    serialises the two sides.
+  //
+  // The bare destroy-flag check (`if (hasDestroyed()) return CAPIFilterIsDestroy;`) does
+  // NOT require this mutex; see has_destroyed_ below. CAPI methods whose only Envoy-side
+  // work is either Filter-owned (e.g. doDataList buffers) or runs on the worker thread
+  // (via dispatcher.post or under isThreadSafe()) do not need to take mutex_ at all.
   Thread::MutexBasicLockable mutex_{};
-  bool has_destroyed_ ABSL_GUARDED_BY(mutex_){false};
+  // Set exactly once by onDestroy() while holding mutex_ (acq_rel exchange), read lock-free
+  // by hasDestroyed() (acquire load) from any thread. Concurrent cgo callers from Go bail
+  // out with CAPIFilterIsDestroy as soon as they observe the store. The Filter itself is
+  // kept alive across any cgo call by the shared_ptr taken at the cgo wrapper layer (see
+  // cgo.cc), so observing a false-then-true transition during a call is benign for
+  // Filter-owned state. For Envoy-stream-owned state, the lock-free observation is not
+  // sufficient on its own: see the role-2 explanation on mutex_ above for how the
+  // worker-stall fence (mutex_ acquired in onDestroy() and across the off-thread deref)
+  // closes the lifetime gap.
+  std::atomic<bool> has_destroyed_{false};
 };
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 struct httpConfigInternal : httpConfig {
   std::weak_ptr<FilterConfig> config_;
+  // NOLINTNEXTLINE(readability-identifier-naming)
   httpConfigInternal(std::weak_ptr<FilterConfig> c) { config_ = c; }
   std::weak_ptr<FilterConfig> weakFilterConfig() { return config_; }
 };

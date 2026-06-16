@@ -77,6 +77,11 @@ absl::StatusOr<std::string> TcmallocProfiler::tcmallocHeapProfile() {
   return tcmalloc::Marshal(profile);
 }
 
+absl::StatusOr<std::string> TcmallocProfiler::tcmallocPeakHeapProfile() {
+  auto profile = tcmalloc::MallocExtension::SnapshotCurrent(tcmalloc::ProfileType::kPeakHeap);
+  return tcmalloc::Marshal(profile);
+}
+
 absl::Status TcmallocProfiler::startAllocationProfile() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   if (alloc_profiler != nullptr) {
@@ -111,6 +116,11 @@ namespace Profiler {
 absl::StatusOr<std::string> TcmallocProfiler::tcmallocHeapProfile() {
   return absl::Status(absl::StatusCode::kUnimplemented,
                       "Heap profile is not implemented in current build");
+}
+
+absl::StatusOr<std::string> TcmallocProfiler::tcmallocPeakHeapProfile() {
+  return absl::Status(absl::StatusCode::kUnimplemented,
+                      "Peak heap profile is not implemented in current build");
 }
 
 absl::Status TcmallocProfiler::startAllocationProfile() {

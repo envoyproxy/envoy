@@ -9,6 +9,7 @@
 
 use crate::{abi, EnvoyBuffer};
 use std::ffi::c_void;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
 // -----------------------------------------------------------------------------
@@ -117,6 +118,65 @@ impl ConfigContext {
     } else {
       None
     }
+  }
+
+  /// Increment a counter by the given value from the config context.
+  ///
+  /// Unlike [`MetricsContext::increment_counter`], this can be called outside of a log event, for
+  /// example from a scheduled background task.
+  pub fn increment_counter(&self, handle: CounterHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_increment_counter(
+        self.envoy_ptr,
+        handle.id,
+        value,
+      )
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  }
+
+  /// Set a gauge to the given value from the config context.
+  pub fn set_gauge(&self, handle: GaugeHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_set_gauge(self.envoy_ptr, handle.id, value)
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  }
+
+  /// Increment a gauge by the given value from the config context.
+  pub fn increment_gauge(&self, handle: GaugeHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_increment_gauge(
+        self.envoy_ptr,
+        handle.id,
+        value,
+      )
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  }
+
+  /// Decrement a gauge by the given value from the config context.
+  pub fn decrement_gauge(&self, handle: GaugeHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_decrement_gauge(
+        self.envoy_ptr,
+        handle.id,
+        value,
+      )
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  }
+
+  /// Record a value in a histogram from the config context.
+  pub fn record_histogram(&self, handle: HistogramHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_record_histogram_value(
+        self.envoy_ptr,
+        handle.id,
+        value,
+      )
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
   }
 
   /// Get the raw Envoy pointer. Used internally.
@@ -635,8 +695,10 @@ impl LogContext {
   /// * `key` - The key within the filter namespace (e.g., "rbac_policy").
   ///
   /// # Returns
-  /// The string value if it exists, None otherwise.
-  /// Note: Only string values are currently supported.
+  /// The string value if it exists and is string-typed, None otherwise. Use
+  /// [`get_dynamic_metadata_number`](Self::get_dynamic_metadata_number) or
+  /// [`get_dynamic_metadata_bool`](Self::get_dynamic_metadata_bool) for number- and bool-typed
+  /// values.
   pub fn get_dynamic_metadata(&self, filter_name: &str, key: &str) -> Option<EnvoyBuffer<'_>> {
     let filter_buf = abi::envoy_dynamic_module_type_module_buffer {
       ptr: filter_name.as_ptr() as *const _,
@@ -659,6 +721,70 @@ impl LogContext {
       )
     } {
       Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
+    } else {
+      None
+    }
+  }
+
+  /// Get a number value from dynamic metadata.
+  ///
+  /// # Arguments
+  /// * `filter_name` - The filter namespace (e.g., "envoy.filters.http.dynamic_module").
+  /// * `key` - The key within the filter namespace (e.g., "handshake_state").
+  ///
+  /// # Returns
+  /// The number value if it exists and is number-typed, None otherwise.
+  pub fn get_dynamic_metadata_number(&self, filter_name: &str, key: &str) -> Option<f64> {
+    let filter_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: filter_name.as_ptr() as *const _,
+      length: filter_name.len(),
+    };
+    let key_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let mut result: f64 = 0.0;
+    if unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_number(
+        self.envoy_ptr,
+        filter_buf,
+        key_buf,
+        &mut result,
+      )
+    } {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  /// Get a bool value from dynamic metadata.
+  ///
+  /// # Arguments
+  /// * `filter_name` - The filter namespace (e.g., "envoy.filters.http.dynamic_module").
+  /// * `key` - The key within the filter namespace (e.g., "tls_enabled").
+  ///
+  /// # Returns
+  /// The bool value if it exists and is bool-typed, None otherwise.
+  pub fn get_dynamic_metadata_bool(&self, filter_name: &str, key: &str) -> Option<bool> {
+    let filter_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: filter_name.as_ptr() as *const _,
+      length: filter_name.len(),
+    };
+    let key_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let mut result: bool = false;
+    if unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_bool(
+        self.envoy_ptr,
+        filter_buf,
+        key_buf,
+        &mut result,
+      )
+    } {
+      Some(result)
     } else {
       None
     }
@@ -1159,37 +1285,21 @@ impl LogContext {
       return Vec::new();
     }
 
-    let mut headers = vec![
-      abi::envoy_dynamic_module_type_envoy_http_header {
-        key_ptr: ptr::null_mut(),
-        key_length: 0,
-        value_ptr: ptr::null_mut(),
-        value_length: 0,
-      };
-      count
-    ];
-
+    let mut headers: Vec<(EnvoyBuffer, EnvoyBuffer)> = Vec::with_capacity(count);
     let success = unsafe {
       abi::envoy_dynamic_module_callback_access_logger_get_headers(
         self.envoy_ptr,
         header_type,
-        headers.as_mut_ptr(),
+        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
       )
     };
-
     if !success {
       return Vec::new();
     }
-
+    unsafe {
+      headers.set_len(count);
+    }
     headers
-      .iter()
-      .map(|h| unsafe {
-        (
-          EnvoyBuffer::new_from_raw(h.key_ptr as *const u8, h.key_length),
-          EnvoyBuffer::new_from_raw(h.value_ptr as *const u8, h.value_length),
-        )
-      })
-      .collect()
   }
 
   /// Helper to retrieve an `EnvoyBuffer` from an ABI callback.
@@ -1225,28 +1335,20 @@ impl LogContext {
       return Vec::new();
     }
 
-    let mut buffers = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: ptr::null_mut(),
-        length: 0,
-      };
-      count
-    ];
-
-    if !unsafe { data_cb(self.envoy_ptr, buffers.as_mut_ptr()) } {
+    let mut buffers: Vec<EnvoyBuffer> = Vec::with_capacity(count);
+    if !unsafe {
+      data_cb(
+        self.envoy_ptr,
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+      )
+    } {
       return Vec::new();
     }
-
+    unsafe {
+      buffers.set_len(count);
+    }
+    buffers.retain(|buf| !buf.as_slice().is_empty());
     buffers
-      .iter()
-      .filter_map(|buf| {
-        if buf.ptr.is_null() || buf.length == 0 {
-          None
-        } else {
-          Some(unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const u8, buf.length) })
-        }
-      })
-      .collect()
   }
 }
 
@@ -1276,24 +1378,31 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_config_new(
   name: abi::envoy_dynamic_module_type_envoy_buffer,
   config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> *const c_void {
-  // The name and config originate from protobuf string/bytes fields, so they are valid
-  // UTF-8 and within bounds when received here. Mirrors the http filter FFI entry point.
-  let name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-    name.ptr as *const _,
-    name.length,
-  ));
-  let config_bytes = std::slice::from_raw_parts(config.ptr as *const _, config.length);
-  let ctx = ConfigContext::new(config_envoy_ptr);
+  catch_unwind(AssertUnwindSafe(|| {
+    // SAFETY: `name` is a protobuf string (UTF-8 by contract) and `config` is opaque bytes.
+    // The helpers additionally tolerate `(nullptr, 0)` empty inputs, and `str_lossy_from_raw`
+    // substitutes `U+FFFD` for any malformed UTF-8 rather than triggering UB.
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_bytes = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
+    };
+    let ctx = ConfigContext::new(config_envoy_ptr);
 
-  envoy_dynamic_module_on_access_logger_config_new_impl(
-    &ctx,
-    name_str,
-    config_bytes,
-    crate::NEW_ACCESS_LOGGER_CONFIG_FUNCTION
-      .get()
-      .expect("NEW_ACCESS_LOGGER_CONFIG_FUNCTION must be set"),
-    config_envoy_ptr,
-  )
+    envoy_dynamic_module_on_access_logger_config_new_impl(
+      &ctx,
+      name_str.as_ref(),
+      config_bytes,
+      crate::NEW_ACCESS_LOGGER_CONFIG_FUNCTION
+        .get()
+        .expect("NEW_ACCESS_LOGGER_CONFIG_FUNCTION must be set"),
+      config_envoy_ptr,
+    )
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_access_logger_config_new", panic);
+    ptr::null()
+  })
 }
 
 /// Testable wrapper for [`envoy_dynamic_module_on_access_logger_config_new`].
@@ -1325,7 +1434,15 @@ pub fn envoy_dynamic_module_on_access_logger_config_new_impl(
 pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_config_destroy(
   config_ptr: *const c_void,
 ) {
-  drop(Box::from_raw(config_ptr as *mut AccessLoggerConfigHandle));
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    drop(Box::from_raw(config_ptr as *mut AccessLoggerConfigHandle));
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_access_logger_config_destroy",
+      panic,
+    );
+  });
 }
 
 /// # Safety
@@ -1337,10 +1454,16 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_new(
   config_ptr: *const c_void,
   logger_envoy_ptr: *mut c_void,
 ) -> *const c_void {
-  let handle = &*(config_ptr as *const AccessLoggerConfigHandle);
-  let metrics = MetricsContext::new(handle.config_envoy_ptr);
-  let logger: Box<dyn AccessLogger> = handle.inner.create_logger(metrics, logger_envoy_ptr);
-  crate::wrap_into_c_void_ptr!(logger)
+  catch_unwind(AssertUnwindSafe(|| {
+    let handle = &*(config_ptr as *const AccessLoggerConfigHandle);
+    let metrics = MetricsContext::new(handle.config_envoy_ptr);
+    let logger: Box<dyn AccessLogger> = handle.inner.create_logger(metrics, logger_envoy_ptr);
+    crate::wrap_into_c_void_ptr!(logger)
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_access_logger_new", panic);
+    ptr::null()
+  })
 }
 
 /// # Safety
@@ -1353,10 +1476,15 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_log(
   logger_ptr: *mut c_void,
   log_type: abi::envoy_dynamic_module_type_access_log_type,
 ) {
-  let logger = &mut *(logger_ptr as *mut Box<dyn AccessLogger>);
-  let access_log_type = AccessLogType::from_abi(log_type);
-  let ctx = LogContext::new(envoy_ptr, access_log_type);
-  logger.log(&ctx);
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let logger = &mut *(logger_ptr as *mut Box<dyn AccessLogger>);
+    let access_log_type = AccessLogType::from_abi(log_type);
+    let ctx = LogContext::new(envoy_ptr, access_log_type);
+    logger.log(&ctx);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_access_logger_log", panic);
+  });
 }
 
 /// # Safety
@@ -1365,7 +1493,12 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_log(
 /// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_destroy(logger_ptr: *mut c_void) {
-  crate::drop_wrapped_c_void_ptr!(logger_ptr, AccessLogger);
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    crate::drop_wrapped_c_void_ptr!(logger_ptr, AccessLogger);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_access_logger_destroy", panic);
+  });
 }
 
 /// # Safety
@@ -1374,8 +1507,13 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_destroy(logger_pt
 /// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_flush(logger_ptr: *mut c_void) {
-  let logger = &mut *(logger_ptr as *mut Box<dyn AccessLogger>);
-  logger.flush();
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let logger = &mut *(logger_ptr as *mut Box<dyn AccessLogger>);
+    logger.flush();
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_access_logger_flush", panic);
+  });
 }
 
 /// Declare access-logger entry points for a single user-supplied config type.
@@ -1458,12 +1596,20 @@ macro_rules! declare_access_logger {
           Err(_) => ::std::option::Option::None,
         }
       }
-      $crate::set_factory_once!(
-        $crate::NEW_ACCESS_LOGGER_CONFIG_FUNCTION,
-        __single_access_logger_factory as $crate::NewAccessLoggerConfigFunction,
-        "NEW_ACCESS_LOGGER_CONFIG_FUNCTION"
-      );
-      $crate::abi::envoy_dynamic_modules_abi_version.as_ptr() as *const ::std::os::raw::c_char
+      match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+        $crate::set_factory_once!(
+          $crate::NEW_ACCESS_LOGGER_CONFIG_FUNCTION,
+          __single_access_logger_factory as $crate::NewAccessLoggerConfigFunction,
+          "NEW_ACCESS_LOGGER_CONFIG_FUNCTION"
+        );
+        $crate::abi::envoy_dynamic_modules_abi_version.as_ptr() as *const ::std::os::raw::c_char
+      })) {
+        ::std::result::Result::Ok(v) => v,
+        ::std::result::Result::Err(payload) => {
+          $crate::log_ffi_panic("envoy_dynamic_module_on_program_init", payload);
+          ::std::ptr::null()
+        },
+      }
     }
   };
 }

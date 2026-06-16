@@ -742,7 +742,6 @@ TEST_P(ClusterManagerLifecycleTest, DynamicAddRemove) {
   Http::ConnectionPool::Instance::IdleCb idle_cb;
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(cp));
   EXPECT_CALL(*cp, addIdleCallback(_)).WillOnce(SaveArg<0>(&idle_cb));
-  EXPECT_CALL(*cp, setLifetimeCallbacks(_, _));
   EXPECT_EQ(
       cp,
       HttpPoolDataPeer::getPool(
@@ -1237,6 +1236,10 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionsOnHealthFailure) {
         .WillOnce(Return(connection2));
     conn_info2 = cluster_manager_->getThreadLocalCluster("some_cluster")->tcpConn(nullptr);
   }
+
+  // Exercise the no-op watermark callbacks of the TCP connection container.
+  connection1->runHighWatermarkCallbacks();
+  connection1->runLowWatermarkCallbacks();
 
   // Order of these calls is implementation dependent, so can't sequence them!
   EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush, _));
@@ -1942,7 +1945,6 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolDestroyWithDraining) {
   Http::ConnectionPool::Instance::IdleCb drained_cb;
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(mock_cp));
   EXPECT_CALL(*mock_cp, addIdleCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
-  EXPECT_CALL(*mock_cp, setLifetimeCallbacks(_, _));
   EXPECT_CALL(*mock_cp, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
 
   MockTcpConnPoolWithDestroy* mock_tcp = new NiceMock<MockTcpConnPoolWithDestroy>();

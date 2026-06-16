@@ -8,7 +8,7 @@
 #include "envoy/type/v3/token_bucket.pb.h"
 #include "envoy/type/v3/token_bucket.pb.validate.h"
 
-#include "source/common/config/subscription_base.h"
+#include "source/common/config/resource_type_helper.h"
 #include "source/common/init/target_impl.h"
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 
@@ -126,7 +126,7 @@ public:
         scope_(factory_context.scope().createScope("local_ratelimit_discovery")),
         fallback_always_deny_limiter_(std::make_shared<AlwaysDenyLocalRateLimiter>()) {}
 
-  class TokenBucketSubscription : Config::SubscriptionBase<envoy::type::v3::TokenBucket> {
+  class TokenBucketSubscription : public Config::SubscriptionCallbacks {
   public:
     explicit TokenBucketSubscription(RateLimiterProviderSingleton& parent,
                                      absl::string_view resource_name);
@@ -159,7 +159,8 @@ public:
     absl::flat_hash_map<intptr_t, SetRateLimiterCb> setters_;
     absl::optional<envoy::type::v3::TokenBucket> config_;
     std::weak_ptr<LocalRateLimiterImpl> limiter_;
-    size_t token_bucket_config_hash_;
+    const Config::ResourceTypeHelper<envoy::type::v3::TokenBucket> resource_type_helper_;
+    size_t token_bucket_config_hash_{0};
   };
 
   Server::Configuration::ServerFactoryContext& factory_context_;

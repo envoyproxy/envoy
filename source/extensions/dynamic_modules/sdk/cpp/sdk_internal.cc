@@ -10,6 +10,7 @@
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
 #include "sdk.h"
+#include "sdk_internal_common.h"
 
 namespace Envoy {
 namespace DynamicModules {
@@ -146,75 +147,13 @@ using ResponseHeaders = HeaderMapImpl<envoy_dynamic_module_type_http_header_type
 using ResponseTrailers = HeaderMapImpl<envoy_dynamic_module_type_http_header_type_ResponseTrailer>;
 
 // Scheduler implementation
-template <bool IsConfigScheduler> class SchedulerImplBase : public Scheduler {
-public:
-  SchedulerImplBase(void* host_ptr) : scheduler_ptr_(newScheduler(host_ptr)) {}
-
-  void schedule(std::function<void()> func) override {
-    uint64_t task_id = 0;
-
-    // Lock to protect access to tasks_ and next_task_id_ manually
-    {
-      std::lock_guard<std::mutex> lock(mutex_);
-      task_id = next_task_id_++;
-      tasks_[task_id] = std::move(func);
-    }
-
-    commitScheduler(scheduler_ptr_, task_id);
-  }
-
-  void onScheduled(uint64_t task_id) {
-    std::function<void()> func;
-
-    {
-      // Lock to protect access to tasks_ manually
-      std::lock_guard<std::mutex> lock(mutex_);
-      auto it = tasks_.find(task_id);
-      if (it != tasks_.end()) {
-        func = std::move(it->second);
-        tasks_.erase(it);
-      }
-    }
-
-    if (func) {
-      func();
-    }
-  }
-
-  ~SchedulerImplBase() override { deleteScheduler(scheduler_ptr_); }
-
-private:
-  static void* newScheduler(void* host_ptr) {
-    if constexpr (IsConfigScheduler) {
-      return envoy_dynamic_module_callback_http_filter_config_scheduler_new(host_ptr);
-    } else {
-      return envoy_dynamic_module_callback_http_filter_scheduler_new(host_ptr);
-    }
-  }
-  static void deleteScheduler(void* scheduler_ptr) {
-    if constexpr (IsConfigScheduler) {
-      envoy_dynamic_module_callback_http_filter_config_scheduler_delete(scheduler_ptr);
-    } else {
-      envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler_ptr);
-    }
-  }
-  static void commitScheduler(void* scheduler_ptr, uint64_t task_id) {
-    if constexpr (IsConfigScheduler) {
-      envoy_dynamic_module_callback_http_filter_config_scheduler_commit(scheduler_ptr, task_id);
-    } else {
-      envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler_ptr, task_id);
-    }
-  }
-
-  void* scheduler_ptr_{};
-
-  std::mutex mutex_;
-  uint64_t next_task_id_{1}; // 0 is reserved.
-  std::map<uint64_t, std::function<void()>> tasks_;
-};
-
-using SchedulerImpl = SchedulerImplBase<false>;
-using ConfigSchedulerImpl = SchedulerImplBase<true>;
+using SchedulerImpl = SchedulerImplBase<envoy_dynamic_module_callback_http_filter_scheduler_new,
+                                        envoy_dynamic_module_callback_http_filter_scheduler_commit,
+                                        envoy_dynamic_module_callback_http_filter_scheduler_delete>;
+using ConfigSchedulerImpl =
+    SchedulerImplBase<envoy_dynamic_module_callback_http_filter_config_scheduler_new,
+                      envoy_dynamic_module_callback_http_filter_config_scheduler_commit,
+                      envoy_dynamic_module_callback_http_filter_config_scheduler_delete>;
 
 std::optional<std::string_view> bufferViewToOptionalStringView(const BufferView& value,
                                                                bool found) {
@@ -295,7 +234,7 @@ public:
       : host_plugin_ptr_(host_plugin_ptr), child_span_ptr_(child_span_ptr),
         span_ptr_(reinterpret_cast<envoy_dynamic_module_type_span_envoy_ptr>(child_span_ptr)) {}
 
-  ~ChildSpanImpl() override { finish(); }
+  ~ChildSpanImpl() override { finishImpl(); }
 
   void setTag(std::string_view key, std::string_view value) override {
     envoy_dynamic_module_callback_http_span_set_tag(
@@ -359,7 +298,10 @@ public:
     return std::make_unique<ChildSpanImpl>(host_plugin_ptr_, child);
   }
 
-  void finish() override {
+  void finish() override { finishImpl(); }
+
+private:
+  void finishImpl() {
     if (child_span_ptr_ == nullptr) {
       return;
     }
@@ -367,8 +309,6 @@ public:
     child_span_ptr_ = nullptr;
     span_ptr_ = nullptr;
   }
-
-private:
   const envoy_dynamic_module_type_http_filter_envoy_ptr host_plugin_ptr_;
   envoy_dynamic_module_type_child_span_module_ptr child_span_ptr_;
   envoy_dynamic_module_type_span_envoy_ptr span_ptr_;
@@ -1020,6 +960,60 @@ public:
             tags_keys.size(), &metric_id));
     return {metric_id, result};
   }
+
+  MetricsResult recordHistogramValue(MetricID id, uint64_t value,
+                                     std::span<const BufferView> tags_values) override {
+    return static_cast<MetricsResult>(
+        envoy_dynamic_module_callback_http_filter_config_record_histogram_value(
+            host_config_ptr_, id,
+            const_cast<envoy_dynamic_module_type_module_buffer*>(
+                reinterpret_cast<const envoy_dynamic_module_type_module_buffer*>(
+                    tags_values.data())),
+            tags_values.size(), value));
+  }
+
+  MetricsResult setGaugeValue(MetricID id, uint64_t value,
+                              std::span<const BufferView> tags_values) override {
+    return static_cast<MetricsResult>(envoy_dynamic_module_callback_http_filter_config_set_gauge(
+        host_config_ptr_, id,
+        const_cast<envoy_dynamic_module_type_module_buffer*>(
+            reinterpret_cast<const envoy_dynamic_module_type_module_buffer*>(tags_values.data())),
+        tags_values.size(), value));
+  }
+
+  MetricsResult incrementGaugeValue(MetricID id, uint64_t value,
+                                    std::span<const BufferView> tags_values) override {
+    return static_cast<MetricsResult>(
+        envoy_dynamic_module_callback_http_filter_config_increment_gauge(
+            host_config_ptr_, id,
+            const_cast<envoy_dynamic_module_type_module_buffer*>(
+                reinterpret_cast<const envoy_dynamic_module_type_module_buffer*>(
+                    tags_values.data())),
+            tags_values.size(), value));
+  }
+
+  MetricsResult decrementGaugeValue(MetricID id, uint64_t value,
+                                    std::span<const BufferView> tags_values) override {
+    return static_cast<MetricsResult>(
+        envoy_dynamic_module_callback_http_filter_config_decrement_gauge(
+            host_config_ptr_, id,
+            const_cast<envoy_dynamic_module_type_module_buffer*>(
+                reinterpret_cast<const envoy_dynamic_module_type_module_buffer*>(
+                    tags_values.data())),
+            tags_values.size(), value));
+  }
+
+  MetricsResult incrementCounterValue(MetricID id, uint64_t value,
+                                      std::span<const BufferView> tags_values) override {
+    return static_cast<MetricsResult>(
+        envoy_dynamic_module_callback_http_filter_config_increment_counter(
+            host_config_ptr_, id,
+            const_cast<envoy_dynamic_module_type_module_buffer*>(
+                reinterpret_cast<const envoy_dynamic_module_type_module_buffer*>(
+                    tags_values.data())),
+            tags_values.size(), value));
+  }
+
   bool logEnabled(LogLevel level) override {
     return envoy_dynamic_module_callback_log_enabled(
         static_cast<envoy_dynamic_module_type_log_level>(level));

@@ -9,12 +9,8 @@
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
-#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/factory_context.h"
-#include "test/mocks/thread_local/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
@@ -64,7 +60,7 @@ public:
   }
 
   ~DnsCacheImplTest() override {
-    if (dns_cache_.get()) {
+    if (dns_cache_) {
       dns_cache_.reset();
       EXPECT_EQ(0, TestUtility::findGauge(context_.store_, "dns_cache.foo.num_hosts")->value());
     }

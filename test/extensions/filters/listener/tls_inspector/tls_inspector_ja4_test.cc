@@ -7,17 +7,14 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gtest/gtest.h"
 
 using testing::_;
 using testing::Eq;
-using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
-using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;

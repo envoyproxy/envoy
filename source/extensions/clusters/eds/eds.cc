@@ -29,8 +29,7 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
                                ClusterFactoryContext& cluster_context,
                                absl::Status& creation_status)
     : BaseDynamicClusterImpl(cluster, cluster_context, creation_status),
-      Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-          cluster_context.messageValidationVisitor(), "cluster_name"),
+      resource_type_helper_(cluster_context.messageValidationVisitor(), "cluster_name"),
       local_info_(cluster_context.serverFactoryContext().localInfo()),
       eds_resources_cache_(
           cluster_context.serverFactoryContext().clusterManager().edsResourcesCache()) {
@@ -44,13 +43,13 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
   } else {
     initialize_phase_ = InitializePhase::Secondary;
   }
-  const auto resource_name = getResourceName();
+  const auto resource_name = resource_type_helper_.getResourceName();
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.xdstp_based_config_singleton_subscriptions")) {
     subscription_ = THROW_OR_RETURN_VALUE(
         cluster_context.serverFactoryContext().xdsManager().subscribeToSingletonResource(
             edsServiceName(), eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(),
-            *this, resource_decoder_, {}),
+            *this, resource_type_helper_.resourceDecoder(), {}),
         Config::SubscriptionPtr);
   } else {
     subscription_ = THROW_OR_RETURN_VALUE(
@@ -58,7 +57,8 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
             .clusterManager()
             .subscriptionFactory()
             .subscriptionFromConfigSource(eds_config, Grpc::Common::typeUrl(resource_name),
-                                          info_->statsScope(), *this, resource_decoder_, {}),
+                                          info_->statsScope(), *this,
+                                          resource_type_helper_.resourceDecoder(), {}),
         Config::SubscriptionPtr);
   }
 }
@@ -204,27 +204,31 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
     return absl::OkStatus();
   }
   if (resources.size() != 1) {
-    return absl::InvalidArgumentError(
-        fmt::format("Unexpected EDS resource length: {}", resources.size()));
+    const auto msg = fmt::format("Unexpected EDS resource length: {}", resources.size());
+    ENVOY_LOG(warn, "eds: cluster '{}' config rejected: {}", edsServiceName(), msg);
+    return absl::InvalidArgumentError(msg);
   }
 
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
       dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
           resources[0].get().resource());
   if (cluster_load_assignment.cluster_name() != edsServiceName()) {
-    return absl::InvalidArgumentError(fmt::format("Unexpected EDS cluster (expecting {}): {}",
-                                                  edsServiceName(),
-                                                  cluster_load_assignment.cluster_name()));
+    const auto msg = fmt::format("Unexpected EDS cluster (expecting {}): {}", edsServiceName(),
+                                 cluster_load_assignment.cluster_name());
+    ENVOY_LOG(warn, "eds: cluster '{}' config rejected: {}", edsServiceName(), msg);
+    return absl::InvalidArgumentError(msg);
   }
   // Validate that each locality doesn't have both LEDS and endpoints defined.
   // TODO(adisuissa): This is only needed for the API v3 support. In future major versions
   // the oneof definition will take care of it.
   for (const auto& locality : cluster_load_assignment.endpoints()) {
     if (locality.has_leds_cluster_locality_config() && locality.lb_endpoints_size() > 0) {
-      return absl::InvalidArgumentError(fmt::format(
+      const auto msg = fmt::format(
           "A ClusterLoadAssignment for cluster {} cannot include both LEDS (resource: {}) and a "
           "list of endpoints.",
-          edsServiceName(), locality.leds_cluster_locality_config().leds_collection_name()));
+          edsServiceName(), locality.leds_cluster_locality_config().leds_collection_name());
+      ENVOY_LOG(warn, "eds: cluster '{}' config rejected: {}", edsServiceName(), msg);
+      return absl::InvalidArgumentError(msg);
     }
   }
 

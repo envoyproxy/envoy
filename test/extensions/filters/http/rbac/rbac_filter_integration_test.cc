@@ -594,6 +594,7 @@ typed_config:
 )EOF";
 
 using RBACIntegrationTest = HttpProtocolIntegrationTest;
+using testing::Eq;
 
 // TODO(#26236): Fix test suite for HTTP/3.
 INSTANTIATE_TEST_SUITE_P(
@@ -1728,8 +1729,8 @@ typed_config:
     // Load the CDS cluster and wait for it to initialize.
     cds_helper_.setCds({cluster_});
     HttpIntegrationTest::initialize();
-    test_server_->waitForCounterEq("cluster_manager.cluster_added", 1);
-    test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+    test_server_->waitForCounter("cluster_manager.cluster_added", Eq(1));
+    test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
   }
 
   CdsHelper cds_helper_;

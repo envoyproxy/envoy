@@ -10,8 +10,9 @@
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.h"
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/registry.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -273,19 +274,21 @@ typed_config:
   }
 
   void verifyStats() {
-    test_server_->waitForCounterEq("udp.foo.downstream_sess_rx_bytes", ds_rx_bytes_);
-    test_server_->waitForCounterEq("udp.foo.downstream_sess_rx_datagrams", expected_datagrams_);
-    test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_tx_bytes_total", us_tx_bytes_);
-    test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tx_datagrams", expected_datagrams_);
+    test_server_->waitForCounter("udp.foo.downstream_sess_rx_bytes", Eq(ds_rx_bytes_));
+    test_server_->waitForCounter("udp.foo.downstream_sess_rx_datagrams", Eq(expected_datagrams_));
+    test_server_->waitForCounter("cluster.cluster_0.upstream_cx_tx_bytes_total", Eq(us_tx_bytes_));
+    test_server_->waitForCounter("cluster.cluster_0.udp.sess_tx_datagrams",
+                                 Eq(expected_datagrams_));
 
-    test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_rx_bytes_total", us_rx_bytes_);
-    test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams", expected_datagrams_);
+    test_server_->waitForCounter("cluster.cluster_0.upstream_cx_rx_bytes_total", Eq(us_rx_bytes_));
+    test_server_->waitForCounter("cluster.cluster_0.udp.sess_rx_datagrams",
+                                 Eq(expected_datagrams_));
 
-    test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_bytes", ds_tx_bytes_);
-    test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_datagrams", expected_datagrams_);
+    test_server_->waitForCounter("udp.foo.downstream_sess_tx_bytes", Eq(ds_tx_bytes_));
+    test_server_->waitForCounter("udp.foo.downstream_sess_tx_datagrams", Eq(expected_datagrams_));
 
-    test_server_->waitForCounterEq("udp.foo.downstream_sess_total", total_sessions_);
-    test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", active_sessions_);
+    test_server_->waitForCounter("udp.foo.downstream_sess_total", Eq(total_sessions_));
+    test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(active_sessions_));
   }
 
   void requestResponseWithListenerAddress(const Network::Address::Instance& listener_address,
@@ -313,7 +316,7 @@ typed_config:
 
   void sendDataVerifyResults(uint32_t bytes_drained) {
     test_server_->waitUntilListenersReady();
-    test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+    test_server_->waitForGauge("listener_manager.workers_started", Ge(1));
     EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 
     const uint32_t port = lookupPort(port_name_);
@@ -336,7 +339,7 @@ typed_config:
 
     // The new datagram is expected to create a session that will be destroyed, since the session
     // filter configuration is missing. Expect that the follow stat will increase.
-    test_server_->waitForCounterGe("udp.foo.session_filter_config_missing", 1);
+    test_server_->waitForCounter("udp.foo.session_filter_config_missing", Ge(1));
     total_sessions_ += 1;
     verifyStats();
   }
@@ -415,19 +418,19 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, BasicSuccess) {
   addDynamicFilter(filter_name_, false);
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send 1st config update to have filter drain 5 bytes of data.
   sendXdsResponse(filter_name_, "1", 5);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", Ge(1));
   sendDataVerifyResults(5);
 
   // Send 2nd config update to have filter drain 3 bytes of data.
   sendXdsResponse(filter_name_, "2", 3);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", 2);
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", Ge(2));
   sendDataVerifyResults(3);
 }
 
@@ -437,25 +440,25 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
   addDynamicFilter(filter_name_, false, false);
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send 1st config update with TTL 1s, and have the filter drain 5 bytes of data.
   sendXdsResponse(filter_name_, "1", 5, true);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", Ge(1));
   sendDataVerifyResults(5);
 
   // Wait for configuration expired.
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", 2);
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", Ge(2));
 
   sendDataExpectSessionFailure();
 
   // Reinstate the configuration.
   sendXdsResponse(filter_name_, "1", 3);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", 3);
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", Ge(3));
   sendDataVerifyResults(3);
 }
 
@@ -465,18 +468,18 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWithDefau
   addDynamicFilter(filter_name_, false);
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send 1st config update with TTL 1s, and have the filter drain 5 bytes of data.
   sendXdsResponse(filter_name_, "1", 5, true);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", Ge(1));
   sendDataVerifyResults(5);
 
   // Wait for configuration expired. The default filter will be installed.
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", 2);
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", Ge(2));
 
   // Start a new session. The default filter drains 2 bytes.
   sendDataVerifyResults(default_bytes_to_drain_);
@@ -488,13 +491,13 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, BasicFailWithDefault) {
   addDynamicFilter(filter_name_, false, true);
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send config update with invalid config (bytes_to_drain needs to be <= 20).
   sendXdsResponse(filter_name_, "1", 21);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_fail", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_fail", Ge(1));
 
   // The default filter will be used. Start a UDP session. The default filter drain 2 bytes.
   sendDataVerifyResults(default_bytes_to_drain_);
@@ -506,13 +509,13 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
   addDynamicFilter(filter_name_, false, false);
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send config update with invalid config (bytes_to_drain needs to be <= 20).
   sendXdsResponse(filter_name_, "1", 21);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_fail", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_fail", Ge(1));
 
   sendDataExpectSessionFailure();
 }
@@ -523,15 +526,15 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
   addDynamicFilter(filter_name_, true);
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
 
   // Send data without send config update.
   sendDataVerifyResults(default_bytes_to_drain_);
 
   // Send update should cause a different response.
   sendXdsResponse(filter_name_, "1", 3);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", Ge(1));
   sendDataVerifyResults(3);
 }
 
@@ -541,15 +544,15 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, BasicWithoutWarmingConfigFai
   addDynamicFilter(filter_name_, true);
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
 
   // Send data without send config update.
   sendDataVerifyResults(default_bytes_to_drain_);
 
   // Send config update with invalid config (drain_bytes has to be <= 21).
   sendXdsResponse(filter_name_, "1", 21);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_fail", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_fail", Ge(1));
   sendDataVerifyResults(default_bytes_to_drain_);
 }
 
@@ -559,7 +562,7 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, BasicWithoutWarmingNoDefault
   addDynamicFilter(filter_name_, true, false);
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
 
   // No default configuration and no warming, expect new session to fail due to missing config.
   sendDataExpectSessionFailure();
@@ -572,12 +575,12 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameName) {
   addDynamicFilter(filter_name_, false);
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   sendXdsResponse(filter_name_, "1", 3);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", Ge(1));
 
   // Each filter drain 3 bytes.
   sendDataVerifyResults(6);
@@ -591,26 +594,26 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentNam
   addDynamicFilter("bar", false, true, false, true);
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send 1st config update.
   sendXdsResponse("foo", "1", 3);
   sendXdsResponse("bar", "1", 4, false, true);
-  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.foo.config_reload",
-                                 1);
-  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.bar.config_reload",
-                                 1);
+  test_server_->waitForCounter("extension_config_discovery.udp_session_filter.foo.config_reload",
+                               Ge(1));
+  test_server_->waitForCounter("extension_config_discovery.udp_session_filter.bar.config_reload",
+                               Ge(1));
   // The two filters drain 3 + 4  bytes.
   sendDataVerifyResults(7);
 
   // Send 2nd config update.
   sendXdsResponse("foo", "2", 4);
   sendXdsResponse("bar", "2", 5, false, true);
-  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.foo.config_reload",
-                                 2);
-  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.bar.config_reload",
-                                 2);
+  test_server_->waitForCounter("extension_config_discovery.udp_session_filter.foo.config_reload",
+                               Ge(2));
+  test_server_->waitForCounter("extension_config_discovery.udp_session_filter.bar.config_reload",
+                               Ge(2));
   // The two filters drain 4 + 5  bytes.
   sendDataVerifyResults(9);
 }
@@ -624,12 +627,12 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, TwoDynamicTwoStaticFilterMix
   addStaticFilter("foobar", 2);
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   sendXdsResponse(filter_name_, "1", 3);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", Ge(1));
   // filter drain 3 + 2 + 3 + 2 bytes.
   sendDataVerifyResults(10);
 }
@@ -643,12 +646,12 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, DynamicStaticFilterMixedDiff
   addDynamicFilter(filter_name_, false);
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   sendXdsResponse(filter_name_, "1", 2);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", Ge(1));
   // filter drain 2 + 2 + 2 + 2 bytes.
   sendDataVerifyResults(8);
 }
@@ -660,13 +663,13 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) 
   addDynamicFilter(filter_name_, false);
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send 1st config update to have network filter drain 5 bytes of data.
   sendXdsResponse(filter_name_, "1", 5);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", Ge(1));
 
   // Verify ECDS config dump are working correctly.
   BufferingStreamDecoderPtr response;
@@ -707,16 +710,16 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, ConfigDumpWithFilterConfigRe
   addDynamicFilter(filter_name_, false, false);
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send config update with TTL 1s.
   sendXdsResponse(filter_name_, "1", 5, true);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", Ge(1));
   // Wait for configuration expired.
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", 2);
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", Ge(2));
 
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("200", request("admin", "GET", "/config_dump?resource=ecds_filters", response));
@@ -737,15 +740,15 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameFilterTy
   addDynamicFilter("bar", false, true, false, true);
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   sendXdsResponse("foo", "1", 3);
   sendXdsResponse("bar", "1", 4, false, true);
-  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.foo.config_reload",
-                                 1);
-  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.bar.config_reload",
-                                 1);
+  test_server_->waitForCounter("extension_config_discovery.udp_session_filter.foo.config_reload",
+                               Ge(1));
+  test_server_->waitForCounter("extension_config_discovery.udp_session_filter.bar.config_reload",
+                               Ge(1));
 
   // Verify ECDS config dump are working correctly.
   BufferingStreamDecoderPtr response;
@@ -790,15 +793,15 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest,
   addDynamicFilter("bar", false, true, false, true);
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   sendXdsResponse("foo", "1", 3);
   sendXdsResponse("bar", "1", 4, false, true);
-  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.foo.config_reload",
-                                 1);
-  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.bar.config_reload",
-                                 1);
+  test_server_->waitForCounter("extension_config_discovery.udp_session_filter.foo.config_reload",
+                               Ge(1));
+  test_server_->waitForCounter("extension_config_discovery.udp_session_filter.bar.config_reload",
+                               Ge(1));
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("200",
             request("admin", "GET", "/config_dump?resource=ecds_filters&name_regex=.a.", response));
@@ -824,17 +827,17 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, ConfigUpdateDoesNotApplyToEx
   addDynamicFilter(filter_name_, false);
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send config update to have filter drain 5 bytes of data.
   uint32_t bytes_to_drain = 5;
   sendXdsResponse(filter_name_, "1", bytes_to_drain);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", Ge(1));
 
   test_server_->waitUntilListenersReady();
-  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+  test_server_->waitForGauge("listener_manager.workers_started", Ge(1));
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 
   const uint32_t port = lookupPort(port_name_);
@@ -867,8 +870,8 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, ConfigUpdateDoesNotApplyToEx
 
   // Send 2nd config update to have filter drain 3 bytes of data.
   sendXdsResponse(filter_name_, "2", 3);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", 2);
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", Ge(2));
 
   // Using the same client to send another datagram. It should not create a new session, and the
   // number of bytes drained should not change, as the new configuration does not apply to the

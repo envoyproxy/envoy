@@ -4,6 +4,7 @@
 
 #include "source/common/common/json_escape_string.h"
 #include "source/common/common/logger.h"
+#include "source/common/version/version_string.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
@@ -173,6 +174,10 @@ public:
         ->add_flag<CustomFlagFormatter::ExtractedMessage>(
             CustomFlagFormatter::ExtractedMessage::Placeholder)
         .set_pattern(pattern);
+    formatter
+        ->add_flag<CustomFlagFormatter::EnvoyVersion>(
+            CustomFlagFormatter::EnvoyVersion::Placeholder)
+        .set_pattern(pattern);
     logger_->set_formatter(std::move(formatter));
     logger_->set_level(spdlog::level::info);
 
@@ -238,6 +243,18 @@ TEST_P(LoggerCustomFlagsTest, LogMessageWithTagsAndExtractTags) {
   expectLogMessage("%*", "[Tags: \"key\":\"val\"] mes\"] sge4", ",\"key\":\"val\"");
 }
 
+TEST_P(LoggerCustomFlagsTest, LogMessageWithEnvoyVersion) {
+  // Sanity-check the version string before using it as expected output: it must be non-empty
+  // and follow the slash-separated format produced by envoyVersionString().
+  const std::string& version = envoyVersionString();
+  EXPECT_FALSE(version.empty());
+  EXPECT_NE(version.find('/'), std::string::npos);
+
+  // %N emits the Envoy version string from envoyVersionString().
+  expectLogMessage("%N %v", "hello", absl::StrCat(version, " hello"));
+  expectLogMessage("%v", "hello", "hello");
+}
+
 class NamedLogTest : public Loggable<Id::assert>, public testing::Test {};
 
 TEST_F(NamedLogTest, NamedLogsAreSentToSink) {
@@ -259,6 +276,42 @@ TEST_F(NamedLogTest, NamedLogsAreSentToSink) {
   }));
   EXPECT_CALL(sink, logWithStableName("misc_event", "debug", "misc", "log"));
   ENVOY_LOG_EVENT_TO_LOGGER(Registry::getLog(Id::misc), debug, "misc_event", "log");
+}
+
+TEST_F(NamedLogTest, FineGrainNamedLogsAreSentToSink) {
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+
+  Registry::setLogLevel(spdlog::level::info);
+
+  // Enable fine grain logging.
+  Context::enableFineGrainLogger();
+  EXPECT_TRUE(Context::useFineGrainLogger());
+
+  // Set fine grain level to DEBUG.
+  Context::changeAllLogLevels(spdlog::level::debug);
+
+  EXPECT_CALL(sink, log(_, _));
+  EXPECT_CALL(sink, logWithStableName("test_event", "debug", "assert", "test log 1"));
+  ENVOY_LOG_EVENT(debug, "test_event", "test log 1");
+
+  Context::disableFineGrainLogger();
+}
+
+TEST_F(NamedLogTest, FineGrainTaggedLogsAreSentToSink) {
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+
+  Registry::setLogLevel(spdlog::level::info);
+
+  // Enable fine grain logging.
+  Context::enableFineGrainLogger();
+
+  // Set fine grain level to DEBUG.
+  Context::changeAllLogLevels(spdlog::level::debug);
+
+  EXPECT_CALL(sink, log(_, _));
+  ENVOY_TAGGED_LOG(debug, (std::map<std::string, std::string>{{"key", "val"}}), "test log");
+
+  Context::disableFineGrainLogger();
 }
 
 TEST(LoggerTest, LogWithLogDetails) {
@@ -866,6 +919,24 @@ TEST(TaggedLogTest, TestTaggedLogWithJsonFormatMultipleJFlags) {
 
   ClassForTaggedLog object;
   object.logTaggedMessageWithPreCreatedTags();
+}
+
+TEST(LoggerContextTest, getFineGrainLogFormatAndLevel) {
+  Envoy::Thread::MutexBasicLockable lock;
+  Context logging_context{spdlog::level::warn, "[[%n]] %v", lock, false};
+  Context::enableFineGrainLogger();
+
+  EXPECT_EQ(Context::getFineGrainLogFormat(), "[[%n]] %v");
+  EXPECT_EQ(Context::getFineGrainDefaultLevel(), spdlog::level::warn);
+  EXPECT_TRUE(Context::useFineGrainLogger());
+}
+
+TEST(LoggerRegistryTest, initializedAndSinkPattern) {
+  // Exercise Registry::initialized()
+  EXPECT_TRUE(Registry::initialized());
+
+  // Exercise DelegatingLogSink::set_pattern
+  Registry::getSink()->set_pattern("%v");
 }
 
 } // namespace

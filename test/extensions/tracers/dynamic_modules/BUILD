@@ -19,6 +19,7 @@ envoy_cc_test(
     deps = [
         "//source/common/stats:custom_stat_namespaces_lib",
         "//source/extensions/tracers/dynamic_modules:config",
+        "//test/extensions/dynamic_modules:util",
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:test_runtime_lib",

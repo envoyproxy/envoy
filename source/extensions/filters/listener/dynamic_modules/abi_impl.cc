@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 
 #include "envoy/network/listen_socket.h"
@@ -48,7 +49,7 @@ bool envoy_dynamic_module_callback_listener_filter_drain_buffer(
     return false;
   }
 
-  buffer->drain(length);
+  buffer->drain(std::min<size_t>(length, buffer->rawSlice().len_));
   return true;
 }
 
@@ -781,7 +782,6 @@ bool envoy_dynamic_module_callback_listener_filter_set_filter_state(
 
   // TODO(wbpcode): check whether the key already exists and whether overwriting is allowed.
   callbacks->filterState().setData(key_str, std::make_shared<Router::StringAccessorImpl>(value_str),
-                                   StreamInfo::FilterState::StateType::ReadOnly,
                                    StreamInfo::FilterState::LifeSpan::Connection);
   return true;
 }
@@ -980,6 +980,9 @@ envoy_dynamic_module_callback_listener_filter_config_define_counter(
     envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer name, size_t* counter_id_ptr) {
   auto* config = static_cast<DynamicModuleListenerFilterConfig*>(config_envoy_ptr);
+  if (config->stat_creation_frozen_) {
+    return envoy_dynamic_module_type_metrics_result_Frozen;
+  }
   Stats::StatName main_stat_name =
       config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
   Stats::Counter& c = Stats::Utility::counterFromStatNames(*config->stats_scope_, {main_stat_name});
@@ -1005,6 +1008,9 @@ envoy_dynamic_module_callback_listener_filter_config_define_gauge(
     envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer name, size_t* gauge_id_ptr) {
   auto* config = static_cast<DynamicModuleListenerFilterConfig*>(config_envoy_ptr);
+  if (config->stat_creation_frozen_) {
+    return envoy_dynamic_module_type_metrics_result_Frozen;
+  }
   Stats::StatName main_stat_name =
       config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
   Stats::Gauge& g = Stats::Utility::gaugeFromStatNames(*config->stats_scope_, {main_stat_name},
@@ -1056,6 +1062,9 @@ envoy_dynamic_module_callback_listener_filter_config_define_histogram(
     envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer name, size_t* histogram_id_ptr) {
   auto* config = static_cast<DynamicModuleListenerFilterConfig*>(config_envoy_ptr);
+  if (config->stat_creation_frozen_) {
+    return envoy_dynamic_module_type_metrics_result_Frozen;
+  }
   Stats::StatName main_stat_name =
       config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
   Stats::Histogram& h = Stats::Utility::histogramFromStatNames(
@@ -1070,6 +1079,71 @@ envoy_dynamic_module_callback_listener_filter_record_histogram_value(
     uint64_t value) {
   auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
   auto histogram = filter->getFilterConfig().getHistogramById(id);
+  if (!histogram.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  histogram->recordValue(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_increment_counter(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleListenerFilterConfig*>(config_envoy_ptr);
+  auto counter = config->getCounterById(id);
+  if (!counter.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  counter->add(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_increment_gauge(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleListenerFilterConfig*>(config_envoy_ptr);
+  auto gauge = config->getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->add(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_decrement_gauge(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleListenerFilterConfig*>(config_envoy_ptr);
+  auto gauge = config->getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->sub(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_set_gauge(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleListenerFilterConfig*>(config_envoy_ptr);
+  auto gauge = config->getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->set(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_record_histogram_value(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleListenerFilterConfig*>(config_envoy_ptr);
+  auto histogram = config->getHistogramById(id);
   if (!histogram.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }

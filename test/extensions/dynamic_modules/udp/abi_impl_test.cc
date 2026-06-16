@@ -28,6 +28,8 @@ public:
 
     filter_config_ = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
         proto_config, std::move(dynamic_module.value()), *stats_.rootScope());
+    // Re-open stat creation so tests can call `define_*` from the test thread.
+    filter_config_->stat_creation_frozen_ = false;
 
     filter_ = std::make_shared<DynamicModuleUdpListenerFilter>(callbacks_, filter_config_, 1);
   }
@@ -582,6 +584,90 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, GetWorkerIndex) {
   uint32_t worker_index =
       envoy_dynamic_module_callback_udp_listener_filter_get_worker_index(filterPtr());
   EXPECT_EQ(1u, worker_index);
+}
+
+// Verifies the constructor auto-freezes stat creation so `define_*` returns `Frozen` after init.
+TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, MetricsFrozenAfterInit) {
+  filter_config_->stat_creation_frozen_ = true;
+  envoy_dynamic_module_type_module_buffer name = {const_cast<char*>("frozen_counter"), 14};
+  size_t out_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_udp_listener_filter_config_define_counter(
+                static_cast<void*>(filter_config_.get()), name, &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_udp_listener_filter_config_define_gauge(
+                static_cast<void*>(filter_config_.get()), name, &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_udp_listener_filter_config_define_histogram(
+                static_cast<void*>(filter_config_.get()), name, &out_id));
+}
+
+// Verifies metrics can be operated from the filter config context (outside the datagram
+// processing lifecycle), mirroring the per-filter operate callbacks.
+TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, ConfigStatsOperate) {
+  void* config = static_cast<void*>(filter_config_.get());
+
+  size_t counter_id = 0;
+  envoy_dynamic_module_type_module_buffer counter_name = {const_cast<char*>("cfg_counter"), 11};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_udp_listener_filter_config_define_counter(
+                config, counter_name, &counter_id));
+  size_t gauge_id = 0;
+  envoy_dynamic_module_type_module_buffer gauge_name = {const_cast<char*>("cfg_gauge"), 9};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_udp_listener_filter_config_define_gauge(
+                config, gauge_name, &gauge_id));
+  size_t histogram_id = 0;
+  envoy_dynamic_module_type_module_buffer histogram_name = {const_cast<char*>("cfg_histogram"), 13};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_udp_listener_filter_config_define_histogram(
+                config, histogram_name, &histogram_id));
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_udp_listener_filter_config_increment_counter(
+                config, counter_id, 7));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_udp_listener_filter_config_increment_gauge(config,
+                                                                                     gauge_id, 10));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_udp_listener_filter_config_decrement_gauge(config,
+                                                                                     gauge_id, 3));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_udp_listener_filter_config_record_histogram_value(
+                config, histogram_id, 42));
+
+  // The UDP listener filter config scope includes the filter name (set to "test_filter" in the
+  // fixture), so stats are namespaced as "dynamicmodulescustom.test_filter.<name>".
+  EXPECT_EQ(7, stats_.counterFromString("dynamicmodulescustom.test_filter.cfg_counter").value());
+  EXPECT_EQ(7, stats_
+                   .gaugeFromString("dynamicmodulescustom.test_filter.cfg_gauge",
+                                    Stats::Gauge::ImportMode::Accumulate)
+                   .value());
+
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_udp_listener_filter_config_set_gauge(config, gauge_id, 100));
+  EXPECT_EQ(100, stats_
+                     .gaugeFromString("dynamicmodulescustom.test_filter.cfg_gauge",
+                                      Stats::Gauge::ImportMode::Accumulate)
+                     .value());
+
+  const size_t invalid_id = 9999;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_udp_listener_filter_config_increment_counter(
+                config, invalid_id, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_udp_listener_filter_config_increment_gauge(
+                config, invalid_id, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_udp_listener_filter_config_decrement_gauge(
+                config, invalid_id, 1));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_udp_listener_filter_config_set_gauge(config, invalid_id, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_udp_listener_filter_config_record_histogram_value(
+                config, invalid_id, 1));
 }
 
 } // namespace DynamicModules

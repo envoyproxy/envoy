@@ -15,7 +15,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//contrib/hyperscan/matching/input_matchers/source:config",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
     ],
 )
 

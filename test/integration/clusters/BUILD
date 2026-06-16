@@ -33,7 +33,6 @@ envoy_cc_test_library(
         "//source/server:transport_socket_config_lib",
         "//test/common/upstream:utility_lib",
         "//test/integration/load_balancers:custom_lb_policy",
-        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

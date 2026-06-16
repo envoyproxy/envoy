@@ -144,6 +144,7 @@ paths:
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/server/drain_manager_impl.cc
     - source/common/router/rds_impl.cc
+    - source/common/router/static_route_provider_impl.cc
     - source/server/hot_restarting_parent.cc
     - source/common/io/io_uring_worker_impl.cc
     - source/common/event/file_event_impl.cc
@@ -182,11 +183,13 @@ paths:
     - source/extensions/filters/http/ext_authz
     - source/extensions/filters/http/ext_proc
     - source/extensions/filters/http/file_system_buffer
+    - source/extensions/filters/http/filter_chain/filter.cc
     - source/extensions/filters/http/gcp_authn
     - source/extensions/filters/http/grpc_field_extraction
     - source/extensions/filters/http/grpc_json_reverse_transcoder
     - source/extensions/filters/http/grpc_json_transcoder
     - source/extensions/filters/http/grpc_stats
+    - source/extensions/filters/http/header_mutation/config.cc
     - source/extensions/filters/http/health_check
     - source/extensions/filters/http/json_to_metadata
     - source/extensions/filters/http/jwt_authn
@@ -395,6 +398,8 @@ paths:
     - test/extensions/common/wasm/wasm_test.cc
     - test/extensions/dynamic_modules/test_data/cpp/http_integration_test.cc
     - test/extensions/dynamic_modules/test_data/cpp/http.cc
+    - test/extensions/dynamic_modules/test_data/cpp/listener_integration_test.cc
+    - test/extensions/dynamic_modules/test_data/cpp/network_integration_test.cc
     - test/extensions/stats_sinks/wasm/wasm_stat_sink_test.cc
     - test/test_common/wasm_base.h
 

@@ -1194,6 +1194,22 @@ TEST_F(AuthenticatorJwtCacheTest, TestCacheHit) {
   EXPECT_TRUE(TestUtility::protoEqual(out_extracted_data_, expected_payload));
 }
 
+// Test: ExtractOnlyWithoutValidation config can be set and cleared.
+TEST_F(AuthenticatorTest, ExtractOnlyVerificationHeaderConfig) {
+  envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation config;
+
+  // By default, the header name is empty, signaling the filter to use the default.
+  EXPECT_TRUE(config.verification_status_header().empty());
+
+  // A custom header name can be set.
+  config.set_verification_status_header("x-custom-jwt-status");
+  EXPECT_EQ(config.verification_status_header(), "x-custom-jwt-status");
+
+  // Clearing reverts to default behavior.
+  config.clear_verification_status_header();
+  EXPECT_TRUE(config.verification_status_header().empty());
+}
+
 } // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters

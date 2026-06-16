@@ -11,7 +11,6 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
@@ -373,6 +372,22 @@ TEST_P(DynamicModuleHttpLanguageTests, DynamicMetadataCallbacks) {
   key = ns_res_header->second.fields().find("key");
   ASSERT_NE(key, ns_res_header->second.fields().end());
   EXPECT_EQ(key->second.number_value(), 123);
+  // Multiple string entries set in one namespace via the batch setter. The batch SDK wrapper is
+  // Rust-only, so scope these assertions to the rust parameterization like the other language
+  // guards in the dynamic_modules integration tests.
+  if (GetParam() == "rust") {
+    auto ns_req_header_batch = metadata.filter_metadata().find("ns_req_header_batch");
+    ASSERT_NE(ns_req_header_batch, metadata.filter_metadata().end());
+    auto batch_k1 = ns_req_header_batch->second.fields().find("k1");
+    ASSERT_NE(batch_k1, ns_req_header_batch->second.fields().end());
+    EXPECT_EQ(batch_k1->second.string_value(), "v1");
+    auto batch_k2 = ns_req_header_batch->second.fields().find("k2");
+    ASSERT_NE(batch_k2, ns_req_header_batch->second.fields().end());
+    EXPECT_EQ(batch_k2->second.string_value(), "v2");
+    // The empty batch must not have created a namespace.
+    EXPECT_EQ(metadata.filter_metadata().find("ns_req_header_batch_empty"),
+              metadata.filter_metadata().end());
+  }
   auto ns_req_body = metadata.filter_metadata().find("ns_req_body");
   ASSERT_NE(ns_req_body, metadata.filter_metadata().end());
   key = ns_req_body->second.fields().find("key");
@@ -2884,6 +2899,79 @@ TEST(DynamicModulesTest, StartHttpStreamCannotCreateRequest) {
   EXPECT_EQ(stream_id, 0);
 
   // Clean up.
+  filter->onDestroy();
+}
+
+// Verifies that the decode and encode continue states are tracked independently. A request body
+// that returns Continue marks only the decode direction as continued, so a paused encode phase can
+// still be resumed via continueEncoding(). A single shared flag used to suppress this resume.
+TEST(DynamicModulesTest, PerDirectionContinueDecodeDoesNotBlockEncode) {
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+  EXPECT_TRUE(dynamic_module.ok());
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          "filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+          *stats_scope, context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_scope->symbolTable(), 0);
+  filter->initializeInModuleFilter();
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
+
+  // A request body chunk returns Continue, marking only the decode direction as continued.
+  Buffer::OwnedImpl data;
+  EXPECT_EQ(FilterDataStatus::Continue, filter->decodeData(data, false));
+
+  // The encode direction was never continued, so it must still be resumable. A repeat
+  // continueDecoding() stays a no-op because the decode direction is already continued.
+  EXPECT_CALL(decoder_callbacks, continueDecoding()).Times(0);
+  EXPECT_CALL(encoder_callbacks, continueEncoding());
+  filter->continueDecoding();
+  filter->continueEncoding();
+
+  filter->onDestroy();
+}
+
+// The symmetric case. A response body that returns Continue marks only the encode direction as
+// continued, so a paused decode phase can still be resumed via continueDecoding().
+TEST(DynamicModulesTest, PerDirectionContinueEncodeDoesNotBlockDecode) {
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+  EXPECT_TRUE(dynamic_module.ok());
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          "filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+          *stats_scope, context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_scope->symbolTable(), 0);
+  filter->initializeInModuleFilter();
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
+
+  // A response body chunk returns Continue, marking only the encode direction as continued.
+  Buffer::OwnedImpl data;
+  EXPECT_EQ(FilterDataStatus::Continue, filter->encodeData(data, false));
+
+  // The decode direction was never continued, so it must still be resumable. A repeat
+  // continueEncoding() stays a no-op because the encode direction is already continued.
+  EXPECT_CALL(encoder_callbacks, continueEncoding()).Times(0);
+  EXPECT_CALL(decoder_callbacks, continueDecoding());
+  filter->continueEncoding();
+  filter->continueDecoding();
+
   filter->onDestroy();
 }
 

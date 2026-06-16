@@ -124,7 +124,10 @@ envoy_cc_test_library(
 envoy_cc_test_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
-    hdrs = ["utility.h"],
+    hdrs = [
+        "enum_test_utils.h",
+        "utility.h",
+    ],
     deps = [
         ":file_system_for_test_lib",
         ":logging_lib",
@@ -155,6 +158,7 @@ envoy_cc_test_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks/stats:stats_mocks",
+        "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -174,10 +178,8 @@ envoy_cc_test_library(
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/init:init_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
@@ -350,7 +352,6 @@ envoy_cc_test_library(
     deps = [
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/common/wasm:wasm_lib",
-        "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
@@ -367,7 +368,10 @@ envoy_cc_test_library(
 envoy_basic_cc_library(
     name = "test_version_linkstamp",
     srcs = ["test_version_linkstamp.cc"],
-    deps = ["//source/common/version:version_suffix_default"],
+    deps = [
+        "//source/common/version:version_string_lib",
+        "//source/common/version:version_suffix_default",
+    ],
     alwayslink = 1,
 )
 

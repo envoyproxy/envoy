@@ -9,6 +9,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/utility.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_replace.h"
 #include "re2/re2.h"
@@ -372,6 +373,25 @@ const absl::flat_hash_map<absl::string_view, CommonDurationFormatter::TimePointG
            }
            return {};
          }},
+        {DownstreamConnectionBegin,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto downstream_timing = stream_info.downstreamTiming();
+           if (downstream_timing.has_value()) {
+             const auto connection_begin = downstream_timing->downstreamConnectionBegin();
+             if (connection_begin.has_value()) {
+               return connection_begin;
+             }
+           }
+           return stream_info.startTimeMonotonic();
+         }},
+        {DownstreamConnectionEnd,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto downstream_timing = stream_info.downstreamTiming();
+           if (downstream_timing.has_value()) {
+             return downstream_timing->downstreamConnectionEnd();
+           }
+           return {};
+         }},
         {UpstreamConnectStart,
          [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
            const auto upstream_info = stream_info.upstreamInfo();
@@ -601,15 +621,22 @@ UpstreamPeerCertVEndFormatter::UpstreamPeerCertVEndFormatter(absl::string_view f
                                    : absl::optional<SystemTime>();
                       })) {}
 
+absl::Status SystemTimeFormatter::checkConstructPreconditions(absl::string_view format) {
+  // Validate the input specifier here. The formatted string may be destined for a header, and
+  // should not contain invalid characters {NUL, LR, CF}.
+  if (RE2::PartialMatch(format, getSystemTimeFormatNewlinePattern())) {
+    return absl::InvalidArgumentError(
+        "Invalid header configuration. Format string contains newline.");
+  }
+  return absl::OkStatus();
+}
+
 SystemTimeFormatter::SystemTimeFormatter(absl::string_view format, TimeFieldExtractorPtr f,
                                          bool local_time)
     : date_formatter_(format, local_time), time_field_extractor_(std::move(f)),
       local_time_(local_time) {
-  // Validate the input specifier here. The formatted string may be destined for a header, and
-  // should not contain invalid characters {NUL, LR, CF}.
-  if (re2::RE2::PartialMatch(format, getSystemTimeFormatNewlinePattern())) {
-    throw EnvoyException("Invalid header configuration. Format string contains newline.");
-  }
+  // Sanity checking that pre-constructor validation was not skipped.
+  ASSERT(checkConstructPreconditions(format).ok());
 }
 
 absl::optional<std::string>
@@ -1646,6 +1673,16 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                        return connection_info.ciphersuiteString();
                                      });
                                }}},
+                             {"UPSTREAM_TLS_GROUP",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return absl::make_optional<std::string>(
+                                           connection_info.tlsGroupString());
+                                     });
+                               }}},
                              {"UPSTREAM_TLS_VERSION",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, absl::optional<size_t>) {
@@ -1662,6 +1699,25 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                      StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
                                      [](const Ssl::ConnectionInfo& connection_info) {
                                        return connection_info.sessionId();
+                                     });
+                               }}},
+                             {"UPSTREAM_SERVER_NAME",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> absl::optional<std::string> {
+                                       if (stream_info.upstreamInfo() &&
+                                           stream_info.upstreamInfo()->upstreamSslConnection() !=
+                                               nullptr) {
+                                         auto sni = stream_info.upstreamInfo()
+                                                        ->upstreamSslConnection()
+                                                        ->sni();
+                                         if (!sni.empty()) {
+                                           return std::string(sni);
+                                         }
+                                       }
+                                       return absl::nullopt;
                                      });
                                }}},
                              {"UPSTREAM_PEER_ISSUER",
@@ -2088,6 +2144,16 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                        return connection_info.ciphersuiteString();
                                      });
                                }}},
+                             {"DOWNSTREAM_TLS_GROUP",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return absl::make_optional<std::string>(
+                                           connection_info.tlsGroupString());
+                                     });
+                               }}},
                              {"DOWNSTREAM_TLS_VERSION",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, absl::optional<size_t>) {
@@ -2375,7 +2441,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"START_TIME",
                               {CommandSyntaxChecker::PARAMS_OPTIONAL,
                                [](absl::string_view format, absl::optional<size_t>) {
-                                 return std::make_unique<SystemTimeFormatter>(
+                                 return SystemTimeFormatter::make(
                                      format,
                                      std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
                                          [](const StreamInfo::StreamInfo& stream_info)
@@ -2386,7 +2452,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"START_TIME_LOCAL",
                               {CommandSyntaxChecker::PARAMS_OPTIONAL,
                                [](absl::string_view format, absl::optional<size_t>) {
-                                 return std::make_unique<SystemTimeFormatter>(
+                                 return SystemTimeFormatter::make(
                                      format,
                                      std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
                                          [](const StreamInfo::StreamInfo& stream_info)
@@ -2398,7 +2464,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"EMIT_TIME",
                               {CommandSyntaxChecker::PARAMS_OPTIONAL,
                                [](absl::string_view format, absl::optional<size_t>) {
-                                 return std::make_unique<SystemTimeFormatter>(
+                                 return SystemTimeFormatter::make(
                                      format,
                                      std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
                                          [](const StreamInfo::StreamInfo& stream_info)
@@ -2409,7 +2475,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"EMIT_TIME_LOCAL",
                               {CommandSyntaxChecker::PARAMS_OPTIONAL,
                                [](absl::string_view format, absl::optional<size_t>) {
-                                 return std::make_unique<SystemTimeFormatter>(
+                                 return SystemTimeFormatter::make(
                                      format,
                                      std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
                                          [](const StreamInfo::StreamInfo& stream_info)
@@ -2468,22 +2534,23 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"DOWNSTREAM_PEER_CERT_V_START",
                               {CommandSyntaxChecker::PARAMS_OPTIONAL,
                                [](absl::string_view format, absl::optional<size_t>) {
-                                 return std::make_unique<DownstreamPeerCertVStartFormatter>(format);
+                                 return makeTimeFormatter<DownstreamPeerCertVStartFormatter>(
+                                     format);
                                }}},
                              {"DOWNSTREAM_PEER_CERT_V_END",
                               {CommandSyntaxChecker::PARAMS_OPTIONAL,
                                [](absl::string_view format, absl::optional<size_t>) {
-                                 return std::make_unique<DownstreamPeerCertVEndFormatter>(format);
+                                 return makeTimeFormatter<DownstreamPeerCertVEndFormatter>(format);
                                }}},
                              {"UPSTREAM_PEER_CERT_V_START",
                               {CommandSyntaxChecker::PARAMS_OPTIONAL,
                                [](absl::string_view format, absl::optional<size_t>) {
-                                 return std::make_unique<UpstreamPeerCertVStartFormatter>(format);
+                                 return makeTimeFormatter<UpstreamPeerCertVStartFormatter>(format);
                                }}},
                              {"UPSTREAM_PEER_CERT_V_END",
                               {CommandSyntaxChecker::PARAMS_OPTIONAL,
                                [](absl::string_view format, absl::optional<size_t>) {
-                                 return std::make_unique<UpstreamPeerCertVEndFormatter>(format);
+                                 return makeTimeFormatter<UpstreamPeerCertVEndFormatter>(format);
                                }}},
                              {"ENVIRONMENT",
                               {CommandSyntaxChecker::PARAMS_REQUIRED |
@@ -2533,7 +2600,10 @@ public:
     THROW_IF_NOT_OK(Envoy::Formatter::CommandSyntaxChecker::verifySyntax(
         (*it).second.first, command, sub_command, max_length));
 
-    return (*it).second.second(sub_command, max_length);
+    StreamInfoFormatterResult result = (*it).second.second(sub_command, max_length);
+    THROW_IF_NOT_OK_REF(result.status());
+
+    return (std::move(result)).value();
   }
 };
 

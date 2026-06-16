@@ -12,7 +12,6 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/reverse_tunnel_reporting_service/reporter.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
@@ -476,7 +475,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, MissThresholdOneMarksDeadOnFirstInval
       UpstreamReverseConnectionSocketInterface cfg;
   cfg.set_stat_prefix("test_prefix");
   cfg.mutable_ping_failure_threshold()->set_value(1);
-  extension_.reset(new ReverseTunnelAcceptorExtension(*socket_interface_, context_, cfg));
+  extension_ = std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, cfg);
 
   // Provide dispatcher to thread local and set expectations for timers/file events.
   thread_local_.setDispatcher(&dispatcher_);

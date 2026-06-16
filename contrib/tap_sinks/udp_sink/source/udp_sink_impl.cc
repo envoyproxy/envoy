@@ -234,7 +234,7 @@ void UdpTapSink::UdpTapSinkHandle::handleSocketStreamedTraceForMultiEvents(
       src_repeated_events->DeleteSubrange(0, 1);
 
       // Check if the remaining original trace now fits within the size limit.
-      if (src_repeated_events->size() > 0 &&
+      if (!src_repeated_events->empty() &&
           static_cast<uint64_t>(trace->ByteSizeLong()) < max_size_of_each_sub_data) {
         doSubmitTrace(std::move(trace), format);
         return;
@@ -251,7 +251,7 @@ void UdpTapSink::UdpTapSinkHandle::handleSocketStreamedTraceForMultiEvents(
       submitTraceAndResetVariables(new_trace, format);
 
       // Send the original trace and return if its remaining size is within the allowed limit.
-      if (src_repeated_events->size() > 0 &&
+      if (!src_repeated_events->empty() &&
           static_cast<uint64_t>(trace->ByteSizeLong()) < max_size_of_each_sub_data) {
         doSubmitTrace(std::move(trace), format);
         return;

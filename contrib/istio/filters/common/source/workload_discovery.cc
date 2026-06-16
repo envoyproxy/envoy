@@ -7,7 +7,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/non_copyable.h"
-#include "source/common/config/subscription_base.h"
+#include "source/common/config/resource_type_helper.h"
 #include "source/common/grpc/common.h"
 #include "source/common/init/target_impl.h"
 
@@ -137,18 +137,18 @@ private:
     IdToAddress id_to_address_;
     AddressToWorkload address_to_workload_;
   };
-  class WorkloadSubscription : Config::SubscriptionBase<istio::workload::Workload> {
+  class WorkloadSubscription : Config::SubscriptionCallbacks {
   public:
     WorkloadSubscription(WorkloadMetadataProviderImpl& parent)
-        : Config::SubscriptionBase<istio::workload::Workload>(
-              parent.factory_context_.messageValidationVisitor(), "uid"),
-          parent_(parent) {
+        : parent_(parent),
+          resource_type_helper_(parent.factory_context_.messageValidationVisitor(), "uid") {
       subscription_ = THROW_OR_RETURN_VALUE(
           parent.factory_context_.clusterManager()
               .subscriptionFactory()
-              .subscriptionFromConfigSource(parent.config_source_,
-                                            Grpc::Common::typeUrl(getResourceName()),
-                                            *parent.scope_, *this, resource_decoder_, {}),
+              .subscriptionFromConfigSource(
+                  parent.config_source_,
+                  Grpc::Common::typeUrl(resource_type_helper_.getResourceName()), *parent.scope_,
+                  *this, resource_type_helper_.resourceDecoder(), {}),
           Config::SubscriptionPtr);
     }
     void start() { subscription_->start({}); }
@@ -197,6 +197,7 @@ private:
       // TODO: Potential issue with the expiration of the metadata.
     }
     WorkloadMetadataProviderImpl& parent_;
+    const Config::ResourceTypeHelper<istio::workload::Workload> resource_type_helper_;
     Config::SubscriptionPtr subscription_;
   };
 

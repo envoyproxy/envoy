@@ -29,9 +29,7 @@
 #include "source/common/quic/udp_gso_batch_writer.h"
 
 #include "test/common/network/udp_listener_impl_test_base.h"
-#include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
@@ -116,7 +114,7 @@ TEST_P(UdpListenerImplBatchWriterTest, SendData) {
     EXPECT_EQ(send_result.return_value_, payload.length());
 
     // Verify udp_packet_writer stats for batch writing
-    if (internal_buffer.length() == 0 ||       /* internal buffer is empty*/
+    if (internal_buffer.empty() ||             /* internal buffer is empty*/
         payload.compare(last_buffered) == 0) { /*len(payload) == gso_size*/
       pkts_to_send.emplace_back(payload);
       internal_buffer.append(payload);
@@ -144,7 +142,7 @@ TEST_P(UdpListenerImplBatchWriterTest, SendData) {
         total_bytes_sent += pkt.length();
       }
       pkts_to_send.clear();
-      if (last_buffered.length() != 0) {
+      if (!last_buffered.empty()) {
         pkts_to_send.emplace_back(last_buffered);
       }
       send_buffered_pkts = false;

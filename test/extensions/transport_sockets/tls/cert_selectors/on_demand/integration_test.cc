@@ -22,6 +22,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -260,8 +261,8 @@ protected:
   }
 
   void waitCertsRequested(uint32_t count) {
-    test_server_->waitForCounterEq(onDemandStat("cert_requested"), count,
-                                   TestUtility::DefaultTimeout, dispatcher_.get());
+    test_server_->waitForCounter(onDemandStat("cert_requested"), Eq(count),
+                                 TestUtility::DefaultTimeout, dispatcher_.get());
   }
 
   std::string onDemandStat(absl::string_view stat) {
@@ -295,8 +296,8 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithPrefetch) {
   }
   EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_requested"))->value());
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
-  test_server_->waitForCounterEq("sds.server.update_success", 1);
-  test_server_->waitForCounterEq(onDemandStat("cert_updated"), 1);
+  test_server_->waitForCounter("sds.server.update_success", Eq(1));
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(1));
   EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
 }
 
@@ -332,8 +333,8 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {
   }
   EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_requested"))->value());
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
-  test_server_->waitForCounterEq("sds.server.update_success", 1);
-  test_server_->waitForCounterEq(onDemandStat("cert_updated"), 1);
+  test_server_->waitForCounter("sds.server.update_success", Eq(1));
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(1));
   EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
 }
 
@@ -357,7 +358,7 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessSNI) {
   conn->sendAndReceiveTlsData("hello", "world");
   conn.reset();
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
-  test_server_->waitForCounterEq("sds.server.update_success", 1);
+  test_server_->waitForCounter("sds.server.update_success", Eq(1));
   EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
 }
 
@@ -385,8 +386,8 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessMixed) {
   }
   conn->sendAndReceiveTlsData("hello", "world");
   conn.reset();
-  test_server_->waitForCounterEq("sds.server.update_success", 1);
-  test_server_->waitForCounterEq("sds.server2.update_success", 1);
+  test_server_->waitForCounter("sds.server.update_success", Eq(1));
+  test_server_->waitForCounter("sds.server2.update_success", Eq(1));
   EXPECT_EQ(2, test_server_->gauge(onDemandStat("cert_active"))->value());
 }
 
@@ -400,7 +401,7 @@ TEST_P(OnDemandIntegrationTest, BasicFail) {
   createXdsConnection();
   waitSendSdsResponse("server", "", true);
   conn->waitForDisconnect();
-  test_server_->waitForGaugeEq(onDemandStat("cert_active"), 0);
+  test_server_->waitForGauge(onDemandStat("cert_active"), Eq(0));
 }
 
 TEST_P(OnDemandIntegrationTest, TwoPendingConnections) {
@@ -458,9 +459,8 @@ TEST_P(OnDemandIntegrationTest, ListenerConnectTimeout) {
   });
   setup();
   auto conn = createClientConnection();
-  test_server_->waitForCounterEq(
-      listenerStatPrefix("downstream_cx_transport_socket_connect_timeout"), 1,
-      TestUtility::DefaultTimeout, dispatcher_.get());
+  test_server_->waitForCounter(listenerStatPrefix("downstream_cx_transport_socket_connect_timeout"),
+                               Eq(1), TestUtility::DefaultTimeout, dispatcher_.get());
   conn->close();
   conn.reset();
   // SDS request is still outstanding, so we can respond to it, and it will be used later.
@@ -487,7 +487,7 @@ TEST_P(OnDemandIntegrationTest, SecretAddRemove) {
 
   // Remove.
   removeSecret(stream, "server");
-  test_server_->waitForGaugeEq(onDemandStat("cert_active"), 0);
+  test_server_->waitForGauge(onDemandStat("cert_active"), Eq(0));
 
   // Request again.
   auto conn2 = createClientConnection();
@@ -519,7 +519,7 @@ TEST_P(OnDemandIntegrationTest, SecretUpdate) {
 
   // Update with another valid secret.
   sendSecret(stream, "server", "server2");
-  test_server_->waitForCounterEq(onDemandStat("cert_updated"), 2);
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(2));
 
   auto conn2 = createClientConnection();
   conn2->waitForUpstreamConnection();
@@ -589,12 +589,12 @@ TEST_P(OnDemandIntegrationTest, ValidationContextUpdate) {
     conn->sendAndReceiveTlsData("hello", "world");
     conn.reset();
   }
-  test_server_->waitForCounterEq(onDemandStat("cert_updated"), 1);
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(1));
 
   // Send a wrong CA via validation SDS and open a new connection that fails.
   {
     sendSecret(*ca_stream, cacert(), upstream_selector_ ? "cacert" : "upstreamcacert");
-    test_server_->waitForCounterEq(onDemandStat("cert_updated"), 2);
+    test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(2));
     auto conn = createClientConnection();
     if (upstream_selector_) {
       conn->waitForUpstreamConnection();

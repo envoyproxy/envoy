@@ -10,6 +10,7 @@
 #include "source/common/http/header_map_impl.h"
 
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/enum_test_utils.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -66,7 +67,7 @@ TEST_F(CodeUtilityTest, GroupStrings) {
   EXPECT_EQ("3xx", CodeUtility::groupStringForResponseCode(Code::Found));
   EXPECT_EQ("4xx", CodeUtility::groupStringForResponseCode(Code::NotFound));
   EXPECT_EQ("5xx", CodeUtility::groupStringForResponseCode(Code::NotImplemented));
-  EXPECT_EQ("", CodeUtility::groupStringForResponseCode(static_cast<Code>(600)));
+  EXPECT_EQ("", CodeUtility::groupStringForResponseCode(uncheckedEnumCastForTest<Code>(600)));
 }
 
 TEST_F(CodeUtilityTest, NoCanary) {
@@ -209,13 +210,13 @@ TEST_F(CodeUtilityTest, All) {
       std::make_pair(Code::LoopDetected, "Loop Detected"),
       std::make_pair(Code::NotExtended, "Not Extended"),
       std::make_pair(Code::NetworkAuthenticationRequired, "Network Authentication Required"),
-      std::make_pair(static_cast<Code>(600), "Unknown")};
+      std::make_pair(uncheckedEnumCastForTest<Code>(600), "Unknown")};
 
   for (const auto& test_case : test_set) {
     EXPECT_EQ(test_case.second, CodeUtility::toString(test_case.first));
   }
 
-  EXPECT_EQ(std::string("Unknown"), CodeUtility::toString(static_cast<Code>(600)));
+  EXPECT_EQ(std::string("Unknown"), CodeUtility::toString(uncheckedEnumCastForTest<Code>(600)));
 }
 
 TEST_F(CodeUtilityTest, RequestVirtualCluster) {
