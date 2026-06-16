@@ -136,6 +136,27 @@ public:
                                                StatNameTagVectorOptConstRef tags) PURE;
 
   /**
+   * Re-materializes a Counter during hot restart stat merging from a fully-resolved stat name
+   * together with the tag-extracted name and tags captured from the parent process, WITHOUT
+   * re-deriving tags from the name. Counters created via counterFromStatNameWithTags inline their
+   * tag values into the name; the parent transmits the tag metadata so the child can re-create the
+   * counter with identical labels instead of letting the merge create it with empty tags, which
+   * would otherwise win the central-cache slot and permanently strip the programmatic tags. Stores
+   * that do not override this fall back to counterFromStatName(full_name), preserving legacy
+   * behavior (tags then survive only if recoverable from the name via stats_tags regexes).
+   * @param full_name the complete stat name (with inlined tag values) recovered from the parent,
+   *                  matching what the child independently creates for the same stat.
+   * @param tag_extracted_name the stat name with tag values removed.
+   * @param tags the tag name/value pairs.
+   * @return a counter within the scope's namespace.
+   */
+  virtual Counter& counterFromMergedStatName(const StatName& full_name,
+                                             const StatName& /*tag_extracted_name*/,
+                                             StatNameTagVectorOptConstRef /*tags*/) {
+    return counterFromStatName(full_name);
+  }
+
+  /**
    * TODO(#6667): this variant is deprecated: use counterFromStatName.
    * @param name The name, expressed as a string.
    * @return a counter within the scope's namespace.
@@ -162,6 +183,24 @@ public:
    */
   virtual Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                            Gauge::ImportMode import_mode) PURE;
+
+  /**
+   * Re-materializes a Gauge during hot restart stat merging from a fully-resolved stat name
+   * together with the tag-extracted name and tags captured from the parent process, WITHOUT
+   * re-deriving tags from the name. See counterFromMergedStatName for the rationale. Stores that do
+   * not override this fall back to gaugeFromStatName(full_name, import_mode).
+   * @param full_name the complete stat name (with inlined tag values) recovered from the parent.
+   * @param tag_extracted_name the stat name with tag values removed.
+   * @param tags the tag name/value pairs.
+   * @param import_mode Whether hot-restart should accumulate this value.
+   * @return a gauge within the scope's namespace.
+   */
+  virtual Gauge& gaugeFromMergedStatName(const StatName& full_name,
+                                         const StatName& /*tag_extracted_name*/,
+                                         StatNameTagVectorOptConstRef /*tags*/,
+                                         Gauge::ImportMode import_mode) {
+    return gaugeFromStatName(full_name, import_mode);
+  }
 
   /**
    * TODO(#6667): this variant is deprecated: use gaugeFromStatName.

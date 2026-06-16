@@ -586,13 +586,28 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
   // Determine the final name based on the prefix and the passed name.
   const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags,
                                              symbolTable());
-  return getOrCreateCounterBase(joiner);
+  return getOrCreateCounterBase(joiner.nameWithTags(), joiner.tagExtractedName(),
+                                joiner.effectiveTags());
+}
+
+Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromMergedStatName(
+    const StatName& full_name, const StatName& tag_extracted_name,
+    StatNameTagVectorOptConstRef tags) {
+  if (scopeRejectsAll()) {
+    return parent_.null_counter_;
+  }
+  // The merge scope has an empty prefix, and the parent transmits the fully-resolved name, the
+  // tag-extracted name, and the tags directly, so we bypass the TagStatNameJoiner (which would
+  // re-append the tag values to the name) and create the stat from these components as-is.
+  absl::optional<StatNameTagSpan> tag_span;
+  if (tags.has_value()) {
+    tag_span = StatNameTagSpan(tags->get());
+  }
+  return getOrCreateCounterBase(full_name, tag_extracted_name, tag_span);
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::getOrCreateCounterBase(
-    const TagUtility::TagStatNameJoiner& joiner) {
-  Stats::StatName final_stat_name = joiner.nameWithTags();
-
+    StatName final_stat_name, StatName tag_extracted_name, absl::optional<StatNameTagSpan> tags) {
   StatsMatcher::FastResult fast_reject_result = scopeFastRejects(final_stat_name);
   if (fast_reject_result == StatsMatcher::FastResult::Rejects) {
     return parent_.null_counter_;
@@ -610,8 +625,8 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::getOrCreateCounterBase(
 
   const CentralCacheEntrySharedPtr& central_cache = centralCacheNoThreadAnalysis();
   return safeMakeStat<Counter>(
-      final_stat_name, joiner.tagExtractedName(), joiner.effectiveTags(), central_cache->counters_,
-      fast_reject_result, central_cache->rejected_stats_,
+      final_stat_name, tag_extracted_name, tags, central_cache->counters_, fast_reject_result,
+      central_cache->rejected_stats_,
       [](Allocator& allocator, StatName name, StatName tag_extracted_name, StatNameTagSpan tags)
           -> CounterSharedPtr { return allocator.makeCounter(name, tag_extracted_name, tags); },
       tls_cache, tls_rejected_stats, parent_.null_counter_);
@@ -644,15 +659,29 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
   const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags,
                                              symbolTable());
 
-  return getOrCreateGaugeBase(joiner, import_mode);
+  return getOrCreateGaugeBase(joiner.nameWithTags(), joiner.tagExtractedName(),
+                              joiner.effectiveTags(), import_mode);
 }
 
-Gauge&
-ThreadLocalStoreImpl::ScopeImpl::getOrCreateGaugeBase(const TagUtility::TagStatNameJoiner& joiner,
-                                                      Gauge::ImportMode import_mode) {
+Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromMergedStatName(
+    const StatName& full_name, const StatName& tag_extracted_name,
+    StatNameTagVectorOptConstRef tags, Gauge::ImportMode import_mode) {
+  if (scopeRejectsAll() && import_mode != Gauge::ImportMode::HiddenAccumulate) {
+    return parent_.null_gauge_;
+  }
+  // See counterFromMergedStatName: bypass the joiner and create from the parent-supplied
+  // components directly so the programmatic tags survive hot restart.
+  absl::optional<StatNameTagSpan> tag_span;
+  if (tags.has_value()) {
+    tag_span = StatNameTagSpan(tags->get());
+  }
+  return getOrCreateGaugeBase(full_name, tag_extracted_name, tag_span, import_mode);
+}
 
-  StatName final_stat_name = joiner.nameWithTags();
-
+Gauge& ThreadLocalStoreImpl::ScopeImpl::getOrCreateGaugeBase(StatName final_stat_name,
+                                                             StatName tag_extracted_name,
+                                                             absl::optional<StatNameTagSpan> tags,
+                                                             Gauge::ImportMode import_mode) {
   StatsMatcher::FastResult fast_reject_result;
   if (import_mode != Gauge::ImportMode::HiddenAccumulate) {
     fast_reject_result = scopeFastRejects(final_stat_name);
@@ -673,8 +702,8 @@ ThreadLocalStoreImpl::ScopeImpl::getOrCreateGaugeBase(const TagUtility::TagStatN
 
   const CentralCacheEntrySharedPtr& central_cache = centralCacheNoThreadAnalysis();
   Gauge& gauge = safeMakeStat<Gauge>(
-      final_stat_name, joiner.tagExtractedName(), joiner.effectiveTags(), central_cache->gauges_,
-      fast_reject_result, central_cache->rejected_stats_,
+      final_stat_name, tag_extracted_name, tags, central_cache->gauges_, fast_reject_result,
+      central_cache->rejected_stats_,
       [import_mode](Allocator& allocator, StatName name, StatName tag_extracted_name,
                     StatNameTagSpan tags) -> GaugeSharedPtr {
         return allocator.makeGauge(name, tag_extracted_name, tags, import_mode);

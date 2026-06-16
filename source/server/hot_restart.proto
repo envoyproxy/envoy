@@ -78,6 +78,30 @@ message HotRestartMessage {
       // "a.b.c.d.e.f" to the span array [[0,0], [3,4]], where the [0,0] span
       // covers the "a", and the [3,4] span covers "d.e".
       map<string, RepeatedSpan> dynamics = 5;
+
+      // A single stat tag (name/value pair).
+      message Tag {
+        string name = 1;
+        string value = 2;
+      }
+      // Tag metadata for a stat created with programmatic tags (via *FromStatNameWithTags).
+      // Such stats inline their tag values into the fully qualified name, but the scope cannot
+      // recover the tag name/value pairs or the tag-extracted name from the name alone. Without
+      // this, the tags would be lost across hot restart: the merge re-creates the stat from the
+      // name with no tags, the tag values collapse into the metric name, and the labels go empty.
+      message TaggedMetric {
+        // The stat name with tag values removed; used as the metric name when exporting (e.g. to
+        // Prometheus).
+        string tag_extracted_name = 1;
+        // The tag name/value pairs.
+        repeated Tag tags = 2;
+      }
+      // Tag metadata for counters/gauges that carry programmatic tags, keyed by the same fully
+      // qualified stat name used in counter_deltas / gauges. Entries are absent for stats whose
+      // tags (if any) are recoverable from the name via stats_tags regexes, so the maps stay
+      // empty for deployments that don't use programmatic tags.
+      map<string, TaggedMetric> counter_tags = 6;
+      map<string, TaggedMetric> gauge_tags = 7;
     }
     oneof reply {
       // When this oneof is of the PassListenSocketReply type, there is a special

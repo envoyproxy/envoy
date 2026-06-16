@@ -302,8 +302,14 @@ private:
     // Stats::Scope
     Counter& counterFromStatNameWithTags(const StatName& name,
                                          StatNameTagVectorOptConstRef tags) override;
+    Counter& counterFromMergedStatName(const StatName& full_name,
+                                       const StatName& tag_extracted_name,
+                                       StatNameTagVectorOptConstRef tags) override;
     Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                      Gauge::ImportMode import_mode) override;
+    Gauge& gaugeFromMergedStatName(const StatName& full_name, const StatName& tag_extracted_name,
+                                   StatNameTagVectorOptConstRef tags,
+                                   Gauge::ImportMode import_mode) override;
     Histogram& histogramFromStatNameWithTags(const StatName& name,
                                              StatNameTagVectorOptConstRef tags,
                                              Histogram::Unit unit) override;
@@ -336,9 +342,10 @@ private:
       return textReadoutFromStatName(storage.statName());
     }
 
-    Counter& getOrCreateCounterBase(const TagUtility::TagStatNameJoiner& joiner);
-    Gauge& getOrCreateGaugeBase(const TagUtility::TagStatNameJoiner& joiner,
-                                Gauge::ImportMode import_mode);
+    Counter& getOrCreateCounterBase(StatName final_stat_name, StatName tag_extracted_name,
+                                    absl::optional<StatNameTagSpan> tags);
+    Gauge& getOrCreateGaugeBase(StatName final_stat_name, StatName tag_extracted_name,
+                                absl::optional<StatNameTagSpan> tags, Gauge::ImportMode import_mode);
     Histogram& getOrCreateHistogramBase(const TagUtility::TagStatNameJoiner& joiner,
                                         Histogram::Unit unit);
     TextReadout& getOrCreateTextReadoutBase(const TagUtility::TagStatNameJoiner& joiner);

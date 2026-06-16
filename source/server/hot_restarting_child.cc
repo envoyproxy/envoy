@@ -3,6 +3,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Server {
@@ -265,7 +266,34 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
       spans.push_back(Stats::DynamicSpan(span_proto.first(), span_proto.last()));
     }
   }
-  stat_merger_->mergeStats(stats_proto.counter_deltas(), stats_proto.gauges(), dynamics);
+
+  // Convert the protobuf tag metadata into the store-neutral structure StatMerger consumes, so the
+  // programmatic tags the parent recorded are re-applied to the merged stats. Gated by a runtime
+  // flag so the prior name-derived behavior can be restored; when disabled the maps stay empty and
+  // StatMerger falls back to deriving tags from the name.
+  const auto convert_tags =
+      [](const Protobuf::Map<std::string, HotRestartMessage::Reply::Stats::TaggedMetric>&
+             proto_tags) {
+        Stats::StatMerger::TagsMap tags_map;
+        for (const auto& iter : proto_tags) {
+          Stats::StatMerger::ParentTags& parent_tags = tags_map[iter.first];
+          parent_tags.tag_extracted_name_ = iter.second.tag_extracted_name();
+          parent_tags.tags_.reserve(iter.second.tags_size());
+          for (const auto& tag : iter.second.tags()) {
+            parent_tags.tags_.emplace_back(tag.name(), tag.value());
+          }
+        }
+        return tags_map;
+      };
+  Stats::StatMerger::TagsMap counter_tags;
+  Stats::StatMerger::TagsMap gauge_tags;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hot_restart_propagate_stat_tags")) {
+    counter_tags = convert_tags(stats_proto.counter_tags());
+    gauge_tags = convert_tags(stats_proto.gauge_tags());
+  }
+
+  stat_merger_->mergeStats(stats_proto.counter_deltas(), stats_proto.gauges(), dynamics,
+                           counter_tags, gauge_tags);
 }
 
 absl::Status HotRestartingChild::onSocketEventUdpForwarding() {
