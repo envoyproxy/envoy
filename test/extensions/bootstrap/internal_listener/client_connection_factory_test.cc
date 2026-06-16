@@ -67,9 +67,6 @@ public:
   std::shared_ptr<ThreadLocalRegistryImpl> registry_{std::make_shared<ThreadLocalRegistryImpl>()};
   ThreadLocal::MockInstance tls_allocator_;
   std::unique_ptr<ThreadLocal::TypedSlot<ThreadLocalRegistryImpl>> tls_slot_;
-  // The factory uses a static pointer owned by the bootstrap extension in production. Tests replace
-  // it with fixture-owned slots, so remember the previous value and put it back before the fixture
-  // releases its slot.
   ThreadLocal::TypedSlot<ThreadLocalRegistryImpl>* const original_registry_tls_slot_{
       Bootstrap::InternalListener::InternalClientConnectionFactory::registry_tls_slot_};
 
