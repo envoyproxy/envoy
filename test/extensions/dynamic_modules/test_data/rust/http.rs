@@ -243,6 +243,14 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
       std::str::from_utf8(downstream_addr.unwrap().as_slice()).unwrap(),
       "1.1.1.1:1234"
     );
+    let sni = envoy_filter.get_attribute_string(
+      abi::envoy_dynamic_module_type_attribute_id::ConnectionRequestedServerName,
+    );
+    assert!(sni.is_some());
+    assert_eq!(
+      std::str::from_utf8(sni.unwrap().as_slice()).unwrap(),
+      "example.com"
+    );
     let worker_index = envoy_filter.get_worker_index();
     assert_eq!(worker_index, 0);
 
