@@ -20,23 +20,33 @@ void appendStringToken(std::string& out, absl::string_view raw, uint64_t token_d
   }
 }
 
-// UTF-8 encode a Unicode code point and append it to `out`.
-void appendCodePoint(std::string& out, uint32_t code_point) {
+// UTF-8 encode a Unicode code point into buf (must be at least 4 bytes).
+// Returns the number of bytes written (1–4).
+size_t encodeCodePoint(uint8_t* buf, uint32_t code_point) {
   if (code_point < 0x80u) {
-    out += static_cast<char>(code_point);
+    buf[0] = static_cast<uint8_t>(code_point);
+    return 1;
   } else if (code_point < 0x800u) {
-    out += static_cast<char>(0xC0u | (code_point >> 6u));
-    out += static_cast<char>(0x80u | (code_point & 0x3Fu));
+    buf[0] = static_cast<uint8_t>(0xC0u | (code_point >> 6u));
+    buf[1] = static_cast<uint8_t>(0x80u | (code_point & 0x3Fu));
+    return 2;
   } else if (code_point < 0x10000u) {
-    out += static_cast<char>(0xE0u | (code_point >> 12u));
-    out += static_cast<char>(0x80u | ((code_point >> 6u) & 0x3Fu));
-    out += static_cast<char>(0x80u | (code_point & 0x3Fu));
+    buf[0] = static_cast<uint8_t>(0xE0u | (code_point >> 12u));
+    buf[1] = static_cast<uint8_t>(0x80u | ((code_point >> 6u) & 0x3Fu));
+    buf[2] = static_cast<uint8_t>(0x80u | (code_point & 0x3Fu));
+    return 3;
   } else {
-    out += static_cast<char>(0xF0u | (code_point >> 18u));
-    out += static_cast<char>(0x80u | ((code_point >> 12u) & 0x3Fu));
-    out += static_cast<char>(0x80u | ((code_point >> 6u) & 0x3Fu));
-    out += static_cast<char>(0x80u | (code_point & 0x3Fu));
+    buf[0] = static_cast<uint8_t>(0xF0u | (code_point >> 18u));
+    buf[1] = static_cast<uint8_t>(0x80u | ((code_point >> 12u) & 0x3Fu));
+    buf[2] = static_cast<uint8_t>(0x80u | ((code_point >> 6u) & 0x3Fu));
+    buf[3] = static_cast<uint8_t>(0x80u | (code_point & 0x3Fu));
+    return 4;
   }
+}
+
+void appendCodePoint(std::string& out, uint32_t code_point) {
+  uint8_t buf[4];
+  out.append(reinterpret_cast<char*>(buf), encodeCodePoint(buf, code_point));
 }
 
 } // namespace
@@ -70,27 +80,25 @@ WuffsJsonCursor::WuffsJsonCursor(Handler& handler, bool track_paths, int max_dep
 //                token_buf_ before the closing quote; the `continued` flag
 //                (token__continued) is true on all but the last segment.
 //                On the first token of a new value string (!in_string_chain_),
-//                openStringCapture is called — the handler inspects key+depth and
-//                returns a handler-owned buffer pointer (stored as string_target_), or
-//                nullptr to discard. Every subsequent STRING token for the same
-//                string appends to *string_target_ if non-null, or skips if nullptr —
-//                zero cost regardless of string length. On the last token
-//                (continued=false), closeStringCapture fires with the same string_target_.
+//                openStringCapture is called — returns true to receive content via
+//                onStringChunk, or false to discard at zero cost. COPY tokens deliver
+//                content to onStringChunk while string_chunk_active_ is true; DROP
+//                tokens (quote delimiters) are skipped. On the last token
+//                (continued=false), closeStringCapture fires if string_capturing_.
 //                Key strings bypass openStringCapture: they accumulate into the
-//                internal key_buffer_ buffer and fire onKey on completion.
-//                token_detail bits used by appendStringToken:
+//                internal key_buffer_ and fire onKey on completion.
+//                token_detail bits:
 //                  VBD__STRING__CONVERT_0_DST_1_SRC_DROP  — opening/closing quote
-//                  VBD__STRING__CONVERT_1_DST_1_SRC_COPY  — plain ASCII bytes
+//                  VBD__STRING__CONVERT_1_DST_1_SRC_COPY  — plain bytes (content)
 //                NOTE: backslash escapes do NOT arrive as STRING tokens — Wuffs
 //                emits them as UNICODE_CODE_POINT tokens (see below).
 //     UNICODE_CODE_POINT
-//                A decoded escape sequence (\n, \t, \uXXXX, …). token_detail holds the
-//                Unicode code point value directly. The token's length covers
-//                the raw escape bytes in the source (e.g. 2 bytes for "\n").
-//                Decoded to UTF-8 and appended to *string_target_ (same pointer
-//                openStringCapture returned); skipped silently if string_target_ is
-//                nullptr. in_string_chain_ is NOT updated here — its lifecycle is
-//                managed by the surrounding STRING tokens.
+//                A decoded escape sequence. token_detail holds the Unicode code
+//                point value directly. The token's length covers the raw escape
+//                bytes in the source. Encoded to UTF-8 in a stack buffer and
+//                delivered to onStringChunk if string_chunk_active_; skipped if not.
+//                in_string_chain_ is NOT updated here — its lifecycle is managed
+//                by the surrounding STRING tokens.
 //     NUMBER     A JSON number literal (integer or floating-point).
 //                Raw bytes forwarded to onNumber(key, raw, depth).
 //     LITERAL    One of: true, false, null.
@@ -111,11 +119,12 @@ WuffsJsonCursor::WuffsJsonCursor(Handler& handler, bool track_paths, int max_dep
 //   STRUCTURE           Object/array open or close        Manage depth_, is_dict_[],
 //   expecting_key_[];
 //                                                         record byte ranges for containers
-//   STRING              String content or quote delim     Gate on string_target_; DROP tokens skip,
-//                       (plain bytes only — no escapes)   COPY tokens append via appendStringToken
-//   UNICODE_CODE_POINT  Decoded backslash escape          Gate on string_target_; decode code point
-//   to
-//                       (\n, \t, \uXXXX, …)              UTF-8 and append via appendCodePoint
+//   STRING              String content or quote delim     Keys: appendStringToken to key_buffer_.
+//                       (plain bytes only — no escapes)   Values: COPY tokens -> onStringChunk if
+//                                                         string_chunk_active_; DROP tokens skipped.
+//   UNICODE_CODE_POINT  Decoded backslash escape          Keys: appendCodePoint to key_buffer_.
+//                                                         Values: encode to stack buf, onStringChunk
+//                                                         if string_chunk_active_.
 //   NUMBER              Numeric literal                   Forward raw bytes to onNumber
 //   LITERAL             true / false / null               Dispatch to onBoolean or onNull
 //
@@ -216,28 +225,39 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
       case WUFFS_BASE__TOKEN__VBC__STRING: {
         const absl::string_view raw = chunk.substr(token_start - chunk_base, token_len);
         if (!in_string_chain_) {
-          // First token of a new string: decide key vs. value and pick write target.
+          // First token of a new string: decide key vs. value.
           key_buffer_.clear();
           string_is_key_ = depth_ < kMaxTrackedDepth && is_dict_[depth_] && expecting_key_[depth_];
           if (string_is_key_) {
-            string_target_ = &key_buffer_;
             key_token_start_ = token_start;
           } else {
             // key_stack_[depth_] is always current here — onKey fired before this value.
             const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
                                                     ? absl::string_view(key_stack_[depth_])
                                                     : absl::string_view();
-            string_target_ = handler_.openStringCapture(value_key, depth_, token_start);
+            string_capturing_ = handler_.openStringCapture(value_key, depth_, token_start);
+            string_chunk_active_ = string_capturing_;
           }
         }
-        if (string_is_key_ &&
-            (token_detail & WUFFS_BASE__TOKEN__VBD__STRING__CONVERT_1_DST_1_SRC_COPY) &&
-            key_buffer_.size() + raw.size() > kMaxKeyBytes) {
-          return absl::InvalidArgumentError(
-              absl::StrCat("wuffs json: key exceeds ", kMaxKeyBytes, " bytes"));
-        }
-        if (string_target_ && token_len > 0) {
-          appendStringToken(*string_target_, raw, token_detail);
+        if (string_is_key_) {
+          if ((token_detail & WUFFS_BASE__TOKEN__VBD__STRING__CONVERT_1_DST_1_SRC_COPY) &&
+              key_buffer_.size() + raw.size() > kMaxKeyBytes) {
+            return absl::InvalidArgumentError(
+                absl::StrCat("wuffs json: key exceeds ", kMaxKeyBytes, " bytes"));
+          }
+          if (token_len > 0) {
+            appendStringToken(key_buffer_, raw, token_detail);
+          }
+        } else if (string_chunk_active_ &&
+                   (token_detail & WUFFS_BASE__TOKEN__VBD__STRING__CONVERT_1_DST_1_SRC_COPY) &&
+                   token_len > 0) {
+          // Only COPY tokens carry content; DROP tokens (quote delimiters) are skipped.
+          const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
+                                                  ? absl::string_view(key_stack_[depth_])
+                                                  : absl::string_view();
+          if (!handler_.onStringChunk(value_key, depth_, raw)) {
+            string_chunk_active_ = false;
+          }
         }
         in_string_chain_ = continued;
         if (!in_string_chain_) {
@@ -256,11 +276,11 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
               expecting_key_[depth_] = false;
             }
           } else {
-            if (string_target_) {
+            if (string_capturing_) {
               const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
                                                       ? absl::string_view(key_stack_[depth_])
                                                       : absl::string_view();
-              handler_.closeStringCapture(string_target_, value_key, depth_, body_src_pos_);
+              handler_.closeStringCapture(value_key, depth_, body_src_pos_);
             }
             if (depth_ >= 1 && depth_ < kMaxTrackedDepth) {
               if (is_dict_[depth_]) {
@@ -270,7 +290,8 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
               }
             }
           }
-          string_target_ = nullptr;
+          string_capturing_ = false;
+          string_chunk_active_ = false;
         }
         break;
       }
@@ -279,18 +300,29 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
       // with VBD = decoded code point. in_string_chain_ is managed by surrounding STRING
       // tokens so it is not updated here.
       case WUFFS_BASE__TOKEN__VBC__UNICODE_CODE_POINT: {
-        // token_len is source bytes (e.g. 6 for \uXXXX); actual write is 1-4 UTF-8 bytes.
+        // token_len is source bytes (e.g. 6 for \uXXXX); decoded write is 1-4 UTF-8 bytes.
         const uint32_t code_point = static_cast<uint32_t>(token_detail);
         const size_t utf8_len = (code_point < 0x80u)      ? 1u
                                 : (code_point < 0x800u)   ? 2u
                                 : (code_point < 0x10000u) ? 3u
                                                           : 4u;
-        if (string_is_key_ && key_buffer_.size() + utf8_len > kMaxKeyBytes) {
-          return absl::InvalidArgumentError(
-              absl::StrCat("wuffs json: key exceeds ", kMaxKeyBytes, " bytes"));
-        }
-        if (string_target_) {
-          appendCodePoint(*string_target_, code_point);
+        if (string_is_key_) {
+          if (key_buffer_.size() + utf8_len > kMaxKeyBytes) {
+            return absl::InvalidArgumentError(
+                absl::StrCat("wuffs json: key exceeds ", kMaxKeyBytes, " bytes"));
+          }
+          appendCodePoint(key_buffer_, code_point);
+        } else if (string_chunk_active_) {
+          // Encode to a stack buffer; the string_view is valid for this call only.
+          uint8_t buf[4];
+          encodeCodePoint(buf, code_point);
+          const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
+                                                  ? absl::string_view(key_stack_[depth_])
+                                                  : absl::string_view();
+          if (!handler_.onStringChunk(value_key, depth_,
+                                      absl::string_view(reinterpret_cast<char*>(buf), utf8_len))) {
+            string_chunk_active_ = false;
+          }
         }
         break;
       }

@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <string>
 
-#include "absl/base/nullability.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
@@ -62,22 +61,50 @@ namespace Json {
 //   onContainerOpen    (key="messages", is_dict=false, depth=2)  ← [
 //   onContainerOpen    (key="",         is_dict=true,  depth=3)  ← { (parent is array)
 //   onKey              ("role",                        depth=3)
-//   openStringCapture ("role",         depth=3, token_start)  → &buf or nullptr
-//   closeStringCapture   (&buf, "role",   depth=3, token_end)
+//   openStringCapture  ("role",  depth=3, token_start)  → true/false
+//   onStringChunk      ("role",  depth=3, "user")        ← if true; one call per chunk
+//   closeStringCapture ("role",  depth=3, token_end)     ← if true
 //   onContainerClose   (depth=3, ...)
 //   onContainerClose   (depth=2, ...)
 //   onContainerClose   (depth=1, ...)
 //
 // ── String value lifecycle ────────────────────────────────────────────────────
 //
-// At the start of a string value the cursor calls openStringCapture. The
-// handler returns a pointer to a handler-owned std::string buffer, and the
-// cursor appends decoded UTF-8 bytes to it across all tokens and feed() calls.
-// When the closing quote is seen, closeStringCapture fires and the buffer holds
-// the complete value. Return nullptr to discard the string at zero cost — the
-// cursor skips all accumulation and fires no further callbacks for that value.
+// At the start of a string value the cursor calls openStringCapture. Return
+// true to receive the content as decoded UTF-8 via onStringChunk — one call
+// per chunk across however many Wuffs tokens or feed() calls the string spans.
+// When the closing quote is seen, closeStringCapture fires with token_end.
+// Return false to discard at zero cost: no onStringChunk calls occur, no
+// allocation is made, and closeStringCapture is never called.
 //
-// Backslash escapes (\n, \t, \uXXXX, …) are decoded to UTF-8 transparently.
+// onStringChunk delivers fully decoded UTF-8; backslash escapes are converted
+// by the cursor before the call. Each chunk is a string_view valid only for
+// the duration of that call — copy if retention is needed.
+//
+// ── Fine-grained control inside large values ──────────────────────────────────
+//
+// onStringChunk returning bool enables chunk-level decisions within a single
+// string value, not just the all-or-nothing choice at openStringCapture:
+//
+//   Partial capture — accumulate up to a limit, then stop appending but keep
+//   returning true so the cursor continues parsing to the closing ":
+//     if (buf_.size() < kLimit) { buf_.append(chunk); }
+//     return true;
+//
+//   Early abort — stop chunk delivery entirely once a threshold is reached:
+//     return buf_.size() < kLimit;  // false stops further onStringChunk calls
+//
+//   Streaming without accumulation — process each chunk in place (e.g. hash,
+//   scan for keywords) without ever buffering the full value:
+//     hasher_.Update(chunk);
+//     return true;
+//
+// In all cases closeStringCapture still fires with token_end, so byte-range
+// information is available regardless of how the content was handled.
+//
+// For large values (e.g. message content) where decoding is unnecessary,
+// return false from openStringCapture and use onContainerOpen/Close byte
+// ranges on the parent container for zero-copy access to the raw JSON bytes.
 //
 // ── Container byte ranges ─────────────────────────────────────────────────────
 //
@@ -103,15 +130,21 @@ public:
   //
   //   openStringCapture(key, depth, token_start)
   //     Called at the start of every non-key string value chain.
-  //     Returns a handler-owned buffer for the cursor to write decoded UTF-8
-  //     into, or nullptr to discard this string at zero cost — no allocation,
-  //     no further callbacks for this value.
+  //     Return true to receive decoded content via onStringChunk, or false to
+  //     discard — no onStringChunk calls, no allocation, zero cost.
   //     `key` is the dict key for this value, or "" for array elements.
   //     `token_start` is the byte offset of the opening " in the body stream.
   //
-  //   closeStringCapture(target, key, depth, token_end)
-  //     Called when a non-key string chain completes. `target` is the same
-  //     pointer returned by openStringCapture(); it is never null here.
+  //   onStringChunk(key, depth, chunk)
+  //     Called for each decoded UTF-8 content chunk of a non-key string value.
+  //     `chunk` is valid only for the duration of this call; do not retain it.
+  //     Return true to keep receiving chunks, false to stop. If false, the
+  //     cursor stops delivering chunks but continues parsing to find the closing
+  //     "; closeStringCapture still fires.
+  //
+  //   closeStringCapture(key, depth, token_end)
+  //     Called when a non-key string chain completes (closing " seen).
+  //     Only fires if openStringCapture returned true for this string.
   //     `token_end` is the byte offset immediately past the closing ".
   //
   //   onKey(key, depth)
@@ -143,39 +176,35 @@ public:
   class Handler {
   public:
     virtual ~Handler() = default;
-    // Called once at the opening '"' of every non-key string value, before any
-    // content bytes are written. This is the routing decision point: the handler
-    // inspects `key` and `depth` and decides where — or whether — to capture the value.
+    // Called once at the opening '"' of every non-key string value chain.
+    // This is the routing decision point: the handler inspects `key` and `depth`
+    // and decides whether to capture this value.
     //
-    // Return a handler-owned std::string* buffer: the cursor appends all decoded
-    // UTF-8 bytes (plain text and backslash escapes) into that buffer across
-    // however many Wuffs tokens or feed() calls the string spans. When the
-    // closing '"' is seen, closeStringCapture fires with the same pointer and the
-    // buffer holds the complete value.
+    // Return true to receive content via onStringChunk. Return false to discard:
+    // no onStringChunk calls occur, no allocation is made, and closeStringCapture
+    // is never called — zero cost regardless of string size.
     //
-    // Return nullptr to discard: every subsequent STRING and UNICODE_CODE_POINT
-    // token for this string skips the write guard `if (string_target_)`, so no bytes
-    // are written, no allocation occurs, and closeStringCapture is never called —
-    // genuinely zero cost regardless of how large the string is.
-    //
-    // IMPORTANT — decoded UTF-8, not raw JSON bytes:
-    // The buffer receives fully decoded UTF-8. Wuffs never emits escape sequences
-    // as STRING tokens — it decodes them into UNICODE_CODE_POINT tokens and the
-    // cursor converts those to UTF-8 before appending (e.g. \n → 0x0A, \uXXXX →
-    // the corresponding UTF-8 byte sequence). This is correct for semantic use
-    // cases: routing decisions, keyword matching, logging. However, if you
-    // intend to re-serialize the captured value back to JSON, you must re-escape it.
-    // For verbatim forwarding of large string values (e.g. message content), prefer
-    // byte ranges via onContainerOpen/onContainerClose on the parent container —
-    // those capture raw JSON bytes from the original buffer without any decoding.
-    //
-    // `key`       — dict key immediately left of this value, or "" for array elements.
-    // `depth`     — nesting depth of this string value.
+    // `key`         — dict key immediately left of this value, or "" for array elements.
+    // `depth`       — nesting depth of this string value.
     // `token_start` — byte offset of the opening '"' in the body stream.
-    virtual std::string* absl_nullable openStringCapture(absl::string_view key, int depth,
-                                                         size_t token_start) = 0;
-    virtual void closeStringCapture(std::string* target, absl::string_view key, int depth,
-                                    size_t token_end) = 0;
+    virtual bool openStringCapture(absl::string_view key, int depth, size_t token_start) = 0;
+
+    // Called for each decoded UTF-8 content chunk of a non-key string value.
+    // Only called when openStringCapture returned true for this string.
+    //
+    // Chunks deliver fully decoded UTF-8: backslash escapes (\n, \uXXXX, etc.)
+    // are converted by the cursor before this call (e.g. \n -> 0x0A).
+    // `chunk` is valid only for the duration of this call — do not retain it.
+    //
+    // Return true to continue receiving chunks. Return false to stop: the cursor
+    // delivers no further chunks but continues parsing to find the closing '"';
+    // closeStringCapture still fires with token_end.
+    virtual bool onStringChunk(absl::string_view key, int depth, absl::string_view chunk) = 0;
+
+    // Called when a non-key string value chain completes (closing '"' seen).
+    // Only fires if openStringCapture returned true for this string.
+    // `token_end` is the byte offset immediately past the closing '"'.
+    virtual void closeStringCapture(absl::string_view key, int depth, size_t token_end) = 0;
     // `token_start` is the byte offset of the opening '"' of the key in the body
     // stream. Combined with the token_end delivered by the subsequent value
     // callback (closeStringCapture, onNumber, onBoolean, onNull, or
@@ -311,8 +340,9 @@ private:
   // argument from the deepest ExtractFieldSpec path rather than the static
   // default, tightening the DoS bound to exactly what the policy requires.
   bool string_is_key_{false};
+  bool string_capturing_{false};    // openStringCapture returned true for current value string
+  bool string_chunk_active_{false}; // onStringChunk hasn't returned false yet
   std::string key_buffer_;
-  std::string* string_target_{nullptr};
   size_t key_token_start_{0};
 };
 

@@ -27,18 +27,23 @@ struct CapturingHandler : WuffsJsonCursor::Handler {
   std::string pending_key_;
   std::string pending_str_;
 
-  std::string* openStringCapture(absl::string_view /*key*/, int depth,
-                                 size_t /*token_start*/) override {
+  bool openStringCapture(absl::string_view /*key*/, int depth, size_t /*token_start*/) override {
     if (depth == 1) {
       pending_str_.clear();
-      return &pending_str_;
+      return true;
     }
-    return nullptr;
+    return false;
   }
 
-  void closeStringCapture(std::string* target, absl::string_view /*key*/, int /*depth*/,
+  bool onStringChunk(absl::string_view /*key*/, int /*depth*/,
+                     absl::string_view chunk) override {
+    pending_str_.append(chunk);
+    return true;
+  }
+
+  void closeStringCapture(absl::string_view /*key*/, int /*depth*/,
                           size_t /*token_end*/) override {
-    fields.push_back({pending_key_, *target, {}, /*is_string=*/true});
+    fields.push_back({pending_key_, pending_str_, {}, /*is_string=*/true});
   }
 
   absl::Status onKey(absl::string_view key, int depth, size_t /*token_start*/) override {
@@ -98,10 +103,12 @@ struct ByteRangeHandler : WuffsJsonCursor::Handler {
   size_t first_key_start{kNotSet};
   size_t first_value_end{kNotSet};
 
-  std::string* openStringCapture(absl::string_view, int, size_t) override { return nullptr; }
-  void closeStringCapture(std::string*, absl::string_view, int, size_t token_end) override {
-    if (first_value_end == kNotSet)
+  bool openStringCapture(absl::string_view, int, size_t) override { return false; }
+  bool onStringChunk(absl::string_view, int, absl::string_view) override { return true; }
+  void closeStringCapture(absl::string_view, int, size_t token_end) override {
+    if (first_value_end == kNotSet) {
       first_value_end = token_end;
+    }
   }
   absl::Status onKey(absl::string_view, int, size_t token_start) override {
     if (first_key_start == kNotSet)
@@ -139,13 +146,18 @@ struct PathCapturingHandler : WuffsJsonCursor::Handler {
   std::vector<std::string> paths;
   std::string str_buf_;
 
-  std::string* openStringCapture(absl::string_view, int, size_t) override {
+  bool openStringCapture(absl::string_view, int, size_t) override {
     str_buf_.clear();
-    return &str_buf_;
+    return true;
   }
-  void closeStringCapture(std::string*, absl::string_view, int depth, size_t) override {
-    if (cursor)
+  bool onStringChunk(absl::string_view, int, absl::string_view chunk) override {
+    str_buf_.append(chunk);
+    return true;
+  }
+  void closeStringCapture(absl::string_view, int depth, size_t) override {
+    if (cursor) {
       paths.push_back(cursor->buildIndexedPath(depth));
+    }
   }
   absl::Status onKey(absl::string_view, int, size_t) override { return absl::OkStatus(); }
   absl::Status onNumber(absl::string_view, absl::string_view, int depth, size_t, size_t) override {
@@ -175,13 +187,15 @@ absl::Status parsePaths(absl::string_view json, PathCapturingHandler& h, bool pa
 
 // Same handler but records buildPatternPath instead of buildIndexedPath.
 struct PatternCapturingHandler : PathCapturingHandler {
-  void closeStringCapture(std::string*, absl::string_view, int depth, size_t) override {
-    if (cursor)
+  void closeStringCapture(absl::string_view, int depth, size_t) override {
+    if (cursor) {
       paths.push_back(cursor->buildPatternPath(depth));
+    }
   }
   absl::Status onNumber(absl::string_view, absl::string_view, int depth, size_t, size_t) override {
-    if (cursor)
+    if (cursor) {
       paths.push_back(cursor->buildPatternPath(depth));
+    }
     return absl::OkStatus();
   }
 };
