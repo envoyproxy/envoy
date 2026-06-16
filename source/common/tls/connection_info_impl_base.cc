@@ -2,7 +2,6 @@
 
 #include <openssl/stack.h>
 
-#include "source/common/common/base64.h"
 #include "source/common/common/hex.h"
 #include "source/common/http/utility.h"
 #include "source/common/tls/cert_validator/san_matcher.h"

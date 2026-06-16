@@ -202,7 +202,6 @@ EXTENSIONS = {
     "envoy.filters.http.mcp":                           "//source/extensions/filters/http/mcp:config",
     "envoy.filters.http.mcp_json_rest_bridge":          "//source/extensions/filters/http/mcp_json_rest_bridge:config",
     "envoy.filters.http.mcp_router":                    "//source/extensions/filters/http/mcp_router:config",
-    "envoy.filters.http.rfc9440_client_cert":           "//source/extensions/filters/http/rfc9440_client_cert:config",
     "envoy.filters.http.rate_limit_quota":              "//source/extensions/filters/http/rate_limit_quota:config",
     # Disabled by default. kill_request is not built into most prebuilt images.
     # For instructions for building with disabled-by-default filters enabled, see
