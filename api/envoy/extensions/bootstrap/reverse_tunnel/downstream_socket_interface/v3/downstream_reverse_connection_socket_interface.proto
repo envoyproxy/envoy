@@ -23,6 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // them as socket connections for downstream requests.
 message DownstreamReverseConnectionSocketInterface {
   // HTTP handshake settings for initiator envoy initiated reverse tunnels.
+  // [#next-free-field: 6]
   message HttpHandshakeConfig {
     // Request path used when issuing the HTTP reverse-connection handshake. Defaults to
     // "/reverse_connections/request".
