@@ -85,14 +85,11 @@ message LoadAwareLocality {
   google.protobuf.Duration weight_expiration_period = 7 [(validate.rules).duration = {gte {}}];
 
   // Whether to enable out-of-band utilization reporting collection from
-  // the endpoints. By default, in-band (per-request) utilization reporting
-  // is used.
-  // [#not-implemented-hide:]
+  // the endpoints. By default, per-request utilization reporting is used.
   google.protobuf.BoolValue enable_oob_load_report = 8;
 
   // Load reporting interval to request from the server. Note that the
   // server may not provide reports as frequently as the client requests.
   // Used only when enable_oob_load_report is true. Default is 10 seconds.
-  // [#not-implemented-hide:]
   google.protobuf.Duration oob_reporting_period = 9;
 }

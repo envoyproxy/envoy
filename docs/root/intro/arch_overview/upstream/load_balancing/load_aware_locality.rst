@@ -92,19 +92,37 @@ The policy is implemented as a ``ThreadAwareLoadBalancer``:
 - ORCA reports flow through per-host ``HostLbPolicyData`` slots shared
   with other ORCA consumers; see :ref:`ORCA data flow
   <load_aware_locality_orca_data_flow>` below for coexistence details.
+- When ``enable_oob_load_report`` is set, a cluster-level OOB manager runs
+  on the main-thread dispatcher and owns one ORCA gRPC streaming session
+  per host, reacting to membership updates to add and remove sessions. It
+  decodes reports into the same shared report handler that backs the
+  in-band path, so workers see OOB and in-band samples through the same
+  ``HostLbPolicyData`` slots.
 
 .. _load_aware_locality_orca_data_flow:
 
 ORCA data flow
 """"""""""""""
 
-Upstream endpoints must report ORCA utilization. The policy consumes
-in-band ORCA reports returned on the response headers or trailers of
-upstream responses, stored in per-host ``HostLbPolicyData`` slots.
-Out-of-band (OOB) gRPC reporting is a planned extension (see
-``enable_oob_load_report`` and ``oob_reporting_period`` in the proto);
-see :ref:`Caveats <load_aware_locality_caveats>` for the implications
-of in-band-only reporting today.
+Upstream endpoints must report ORCA utilization. The policy supports both
+in-band and out-of-band reporting modes:
+
+- **In-band (default).** ORCA reports returned on the response headers or
+  trailers of upstream responses. Sample rate is tied to the request rate
+  to each host, so probing (``remote_probe_fraction``) is required to keep
+  remote-locality data fresh.
+- **Out-of-band (OOB).** When ``enable_oob_load_report`` is set, the policy
+  opens a per-host ORCA gRPC stream and the endpoint pushes reports every
+  ``oob_reporting_period`` independent of request traffic. OOB reuses the
+  same central ORCA client as
+  :ref:`CSWRR <arch_overview_load_balancing_types_client_side_weighted_round_robin>`:
+  a cluster-level OOB manager owns one streaming session per host, reacts to
+  membership changes to add and remove sessions, and feeds every decoded
+  report into the shared ORCA report handler. Because OOB decouples sample
+  rate from request rate, ``remote_probe_fraction`` may safely be set to 0.
+
+Either way reports land in the same per-host ``HostLbPolicyData`` slots, so
+weight computation is identical regardless of reporting mode.
 
 Pairing this policy with
 :ref:`CSWRR <arch_overview_load_balancing_types_client_side_weighted_round_robin>`
@@ -339,13 +357,15 @@ Configuration parameters
        backends faster. Set to 0 s to disable expiration.
    * - ``enable_oob_load_report``
      - (unset / false)
-     - **Not yet implemented.** Reserved for enabling out-of-band ORCA
-       utilization reporting from upstream endpoints. Until OOB reporting
-       lands, only in-band reports on response headers/trailers are
-       consumed. See :ref:`Caveats <load_aware_locality_caveats>`.
+     - Enables out-of-band (OOB) ORCA utilization reporting. When set, the
+       policy opens a per-host ORCA gRPC stream and the endpoint pushes
+       reports on its own schedule rather than piggybacking on responses.
+       When unset, only in-band reports on response headers/trailers are
+       consumed. See :ref:`ORCA data flow
+       <load_aware_locality_orca_data_flow>`.
    * - ``oob_reporting_period``
      - 10 s
-     - **Not yet implemented.** Requested load-reporting interval used when
+     - Requested load-reporting interval, used only when
        ``enable_oob_load_report`` is true. The upstream may report less
        frequently than requested.
 
@@ -375,11 +395,12 @@ weight, computed from the same per-host ORCA data in a single tick pass.
 Caveats and known limitations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-- **In-band ORCA reports only.** ``enable_oob_load_report`` and
-  ``oob_reporting_period`` are reserved in the proto but not yet wired
-  up. Until OOB reporting lands, ``remote_probe_fraction`` must stay
-  above 0 so remote localities continue to produce fresh samples. Set
-  it to 0 only when cross-zone traffic must be strictly avoided.
+- **Probing is required with in-band reporting.** In the default in-band
+  mode, a locality only produces fresh ORCA samples when it receives
+  traffic, so ``remote_probe_fraction`` must stay above 0 to keep remote
+  localities reporting. Set it to 0 only when ``enable_oob_load_report``
+  is on (OOB streams report independently of traffic) or when cross-zone
+  traffic must be strictly avoided.
 - **Hash-based child policies.** Ring hash and Maglev build their hash
   structures from the host set they are given. With this policy, that set
   is the chosen locality's hosts, not the full cluster. The same request
@@ -414,8 +435,9 @@ Caveats and known limitations
   localities will alternate between fresh data and host-count fallback
   every few ticks. To avoid this, either reduce locality count, raise
   ``remote_probe_fraction``, raise ``weight_expiration_period`` to
-  tolerate longer gaps, or wait for OOB ORCA reporting (which decouples
-  sample rate from request rate entirely).
+  tolerate longer gaps, or enable OOB ORCA reporting via
+  ``enable_oob_load_report`` (which decouples sample rate from request
+  rate entirely).
 - **Variance-threshold oscillation.** Workloads sitting near the
   ``utilization_variance_threshold`` boundary can theoretically oscillate
   between snap-to-local and spillover modes across consecutive ticks.
