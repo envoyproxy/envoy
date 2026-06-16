@@ -81,8 +81,7 @@ public:
     vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
 
     plugin_ = std::make_shared<Extensions::Common::Wasm::Plugin>(
-        plugin_config, envoy::config::core::v3::TrafficDirection::INBOUND, local_info_,
-        &listener_metadata_);
+        plugin_config, envoy::config::core::v3::TrafficDirection::INBOUND, local_info_);
     plugin_->wasmConfig().allowedCapabilities() = allowed_capabilities_;
     // Passes ownership of root_context_.
     Extensions::Common::Wasm::createWasm(
@@ -116,7 +115,6 @@ public:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockServerLifecycleNotifier> lifecycle_notifier_;
-  envoy::config::core::v3::Metadata listener_metadata_;
   Context* root_context_ = nullptr; // Unowned.
   RemoteAsyncDataProviderPtr remote_data_provider_;
 
