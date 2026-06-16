@@ -225,7 +225,8 @@ TEST(OrcaHostLbPolicyDataTest, OnOrcaLoadReport_Success) {
   config.weight_update_period = std::chrono::milliseconds(1000);
 
   Event::SimulatedTimeSystem time_system;
-  time_system.setMonotonicTime(MonotonicTime(std::chrono::seconds(30)));
+  const MonotonicTime start_time = time_system.monotonicTime();
+  time_system.setMonotonicTime(start_time + std::chrono::seconds(30));
 
   auto handler = std::make_shared<OrcaLoadReportHandler>(config, time_system);
   OrcaHostLbPolicyData data(handler);
@@ -237,8 +238,8 @@ TEST(OrcaHostLbPolicyDataTest, OnOrcaLoadReport_Success) {
   Envoy::StreamInfo::MockStreamInfo mock_stream_info;
   EXPECT_EQ(data.onOrcaLoadReport(report, mock_stream_info), absl::OkStatus());
   EXPECT_EQ(data.weight_.load(), 2000);
-  EXPECT_EQ(data.non_empty_since_.load(), MonotonicTime(std::chrono::seconds(30)));
-  EXPECT_EQ(data.last_update_time_.load(), MonotonicTime(std::chrono::seconds(30)));
+  EXPECT_EQ(data.non_empty_since_.load(), start_time + std::chrono::seconds(30));
+  EXPECT_EQ(data.last_update_time_.load(), start_time + std::chrono::seconds(30));
 }
 
 TEST(OrcaHostLbPolicyDataTest, OnOrcaLoadReport_ErrorPreservesState) {
@@ -309,17 +310,18 @@ TEST_F(OrcaWeightManagerTest, UpdateWeightsOnHosts_AllValid) {
   auto manager = std::make_unique<OrcaWeightManager>(
       config_, priority_set_, time_system_, dispatcher_, [this]() { weights_updated_ = true; });
 
+  const MonotonicTime start_time = time_system_.monotonicTime();
   Upstream::HostVector hosts;
   for (int i = 0; i < 3; ++i) {
     auto host = makeWeightTrackingMockHost();
     host->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
         manager->reportHandler(), 40 + i,
-        /*non_empty_since=*/MonotonicTime(std::chrono::seconds(5)),
-        /*last_update_time=*/MonotonicTime(std::chrono::seconds(10))));
+        /*non_empty_since=*/start_time + std::chrono::seconds(5),
+        /*last_update_time=*/start_time + std::chrono::seconds(10)));
     hosts.push_back(host);
   }
 
-  time_system_.setMonotonicTime(MonotonicTime(std::chrono::seconds(30)));
+  time_system_.setMonotonicTime(start_time + std::chrono::seconds(30));
   bool updated = manager->updateWeightsOnHosts(hosts);
   EXPECT_TRUE(updated);
   EXPECT_EQ(hosts[0]->weight(), 40);
@@ -331,13 +333,14 @@ TEST_F(OrcaWeightManagerTest, UpdateWeightsOnHosts_Mixed) {
   auto manager = std::make_unique<OrcaWeightManager>(
       config_, priority_set_, time_system_, dispatcher_, [this]() { weights_updated_ = true; });
 
+  const MonotonicTime start_time = time_system_.monotonicTime();
   Upstream::HostVector hosts;
   // First host has valid weight.
   auto h1 = makeWeightTrackingMockHost();
   h1->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
       manager->reportHandler(), 42,
-      /*non_empty_since=*/MonotonicTime(std::chrono::seconds(5)),
-      /*last_update_time=*/MonotonicTime(std::chrono::seconds(10))));
+      /*non_empty_since=*/start_time + std::chrono::seconds(5),
+      /*last_update_time=*/start_time + std::chrono::seconds(10)));
   hosts.push_back(h1);
 
   // Other hosts have no data → default weight.
@@ -345,7 +348,7 @@ TEST_F(OrcaWeightManagerTest, UpdateWeightsOnHosts_Mixed) {
     hosts.push_back(makeWeightTrackingMockHost());
   }
 
-  time_system_.setMonotonicTime(MonotonicTime(std::chrono::seconds(30)));
+  time_system_.setMonotonicTime(start_time + std::chrono::seconds(30));
   bool updated = manager->updateWeightsOnHosts(hosts);
   EXPECT_TRUE(updated);
   EXPECT_EQ(hosts[0]->weight(), 42);
@@ -375,25 +378,26 @@ TEST_F(OrcaWeightManagerTest, UpdateWeightsOnHosts_EvenMedian) {
   auto manager = std::make_unique<OrcaWeightManager>(
       config_, priority_set_, time_system_, dispatcher_, [this]() { weights_updated_ = true; });
 
+  const MonotonicTime start_time = time_system_.monotonicTime();
   Upstream::HostVector hosts;
   auto h1 = makeWeightTrackingMockHost();
   h1->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
       manager->reportHandler(), 5,
-      /*non_empty_since=*/MonotonicTime(std::chrono::seconds(5)),
-      /*last_update_time=*/MonotonicTime(std::chrono::seconds(10))));
+      /*non_empty_since=*/start_time + std::chrono::seconds(5),
+      /*last_update_time=*/start_time + std::chrono::seconds(10)));
   hosts.push_back(h1);
 
   auto h2 = makeWeightTrackingMockHost();
   h2->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
       manager->reportHandler(), 42,
-      /*non_empty_since=*/MonotonicTime(std::chrono::seconds(5)),
-      /*last_update_time=*/MonotonicTime(std::chrono::seconds(10))));
+      /*non_empty_since=*/start_time + std::chrono::seconds(5),
+      /*last_update_time=*/start_time + std::chrono::seconds(10)));
   hosts.push_back(h2);
 
   // Third host has no data.
   hosts.push_back(makeWeightTrackingMockHost());
 
-  time_system_.setMonotonicTime(MonotonicTime(std::chrono::seconds(30)));
+  time_system_.setMonotonicTime(start_time + std::chrono::seconds(30));
   bool updated = manager->updateWeightsOnHosts(hosts);
   EXPECT_TRUE(updated);
   EXPECT_EQ(hosts[0]->weight(), 5);
@@ -498,18 +502,19 @@ TEST_F(OrcaWeightManagerTest, TimerCallback_UpdatesWeightsAndReenablesTimer) {
   auto status = manager->initialize();
   EXPECT_TRUE(status.ok());
 
+  const MonotonicTime start_time = time_system_.monotonicTime();
   // Set up hosts with valid weights so the callback fires on change.
   auto* host_set = priority_set_.getMockHostSet(0);
   Upstream::HostVector hosts;
   auto h1 = makeWeightTrackingMockHost();
   h1->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
       manager->reportHandler(), 100,
-      /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
-      /*last_update_time=*/MonotonicTime(std::chrono::seconds(50))));
+      /*non_empty_since=*/start_time + std::chrono::seconds(1),
+      /*last_update_time=*/start_time + std::chrono::seconds(50)));
   hosts.push_back(h1);
   host_set->hosts_ = hosts;
 
-  time_system_.setMonotonicTime(MonotonicTime(std::chrono::seconds(60)));
+  time_system_.setMonotonicTime(start_time + std::chrono::seconds(60));
 
   // Timer callback should: update weights, then re-enable timer.
   EXPECT_CALL(*timer, enableTimer(config_.weight_update_period, nullptr));
@@ -524,18 +529,19 @@ TEST_F(OrcaWeightManagerTest, UpdateWeightsOnMainThread_CallbackFiredOnChange) {
   auto manager = std::make_unique<OrcaWeightManager>(
       config_, priority_set_, time_system_, dispatcher_, [this]() { weights_updated_ = true; });
 
+  const MonotonicTime start_time = time_system_.monotonicTime();
   // Set up hosts with valid weights that differ from current weight.
   auto* host_set = priority_set_.getMockHostSet(0);
   Upstream::HostVector hosts;
   auto h1 = makeWeightTrackingMockHost(/*initial_weight=*/1);
   h1->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
       manager->reportHandler(), 200,
-      /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
-      /*last_update_time=*/MonotonicTime(std::chrono::seconds(50))));
+      /*non_empty_since=*/start_time + std::chrono::seconds(1),
+      /*last_update_time=*/start_time + std::chrono::seconds(50)));
   hosts.push_back(h1);
   host_set->hosts_ = hosts;
 
-  time_system_.setMonotonicTime(MonotonicTime(std::chrono::seconds(60)));
+  time_system_.setMonotonicTime(start_time + std::chrono::seconds(60));
 
   EXPECT_FALSE(weights_updated_);
   manager->updateWeightsOnMainThread();
@@ -548,13 +554,14 @@ TEST_F(OrcaWeightManagerTest, UpdateWeightsOnMainThread_NoCallbackWhenNoChange) 
   auto manager = std::make_unique<OrcaWeightManager>(
       config_, priority_set_, time_system_, dispatcher_, [this]() { weights_updated_ = true; });
 
+  const MonotonicTime start_time = time_system_.monotonicTime();
   // Hosts with no data — default weight is 1, same as initial.
   auto* host_set = priority_set_.getMockHostSet(0);
   Upstream::HostVector hosts;
   hosts.push_back(makeWeightTrackingMockHost(/*initial_weight=*/1));
   host_set->hosts_ = hosts;
 
-  time_system_.setMonotonicTime(MonotonicTime(std::chrono::seconds(60)));
+  time_system_.setMonotonicTime(start_time + std::chrono::seconds(60));
 
   manager->updateWeightsOnMainThread();
   // Default weight (1) equals initial weight (1), so no change → no callback.
@@ -566,13 +573,14 @@ TEST_F(OrcaWeightManagerTest, UpdateWeightsOnMainThread_MultiplePriorities) {
   auto manager = std::make_unique<OrcaWeightManager>(
       config_, priority_set_, time_system_, dispatcher_, [this]() { weights_updated_ = true; });
 
+  const MonotonicTime start_time = time_system_.monotonicTime();
   // Priority 0: host with valid weight.
   auto* host_set0 = priority_set_.getMockHostSet(0);
   auto h0 = makeWeightTrackingMockHost(/*initial_weight=*/1);
   h0->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
       manager->reportHandler(), 50,
-      /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
-      /*last_update_time=*/MonotonicTime(std::chrono::seconds(50))));
+      /*non_empty_since=*/start_time + std::chrono::seconds(1),
+      /*last_update_time=*/start_time + std::chrono::seconds(50)));
   host_set0->hosts_ = {h0};
 
   // Priority 1: host with valid weight.
@@ -580,11 +588,11 @@ TEST_F(OrcaWeightManagerTest, UpdateWeightsOnMainThread_MultiplePriorities) {
   auto h1 = makeWeightTrackingMockHost(/*initial_weight=*/1);
   h1->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
       manager->reportHandler(), 75,
-      /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
-      /*last_update_time=*/MonotonicTime(std::chrono::seconds(50))));
+      /*non_empty_since=*/start_time + std::chrono::seconds(1),
+      /*last_update_time=*/start_time + std::chrono::seconds(50)));
   host_set1->hosts_ = {h1};
 
-  time_system_.setMonotonicTime(MonotonicTime(std::chrono::seconds(60)));
+  time_system_.setMonotonicTime(start_time + std::chrono::seconds(60));
 
   manager->updateWeightsOnMainThread();
   EXPECT_TRUE(weights_updated_);
@@ -634,20 +642,21 @@ TEST_F(OrcaWeightManagerTest, OddMedian) {
   auto manager = std::make_unique<OrcaWeightManager>(
       config_, priority_set_, time_system_, dispatcher_, [this]() { weights_updated_ = true; });
 
+  const MonotonicTime start_time = time_system_.monotonicTime();
   Upstream::HostVector hosts;
   // 3 hosts with valid weights: 10, 20, 30 → median = 20.
   for (uint32_t w : {10u, 20u, 30u}) {
     auto h = makeWeightTrackingMockHost();
     h->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
         manager->reportHandler(), w,
-        /*non_empty_since=*/MonotonicTime(std::chrono::seconds(5)),
-        /*last_update_time=*/MonotonicTime(std::chrono::seconds(10))));
+        /*non_empty_since=*/start_time + std::chrono::seconds(5),
+        /*last_update_time=*/start_time + std::chrono::seconds(10)));
     hosts.push_back(h);
   }
   // 1 host with no data → gets median default.
   hosts.push_back(makeWeightTrackingMockHost());
 
-  time_system_.setMonotonicTime(MonotonicTime(std::chrono::seconds(30)));
+  time_system_.setMonotonicTime(start_time + std::chrono::seconds(30));
   bool updated = manager->updateWeightsOnHosts(hosts);
   EXPECT_TRUE(updated);
   EXPECT_EQ(hosts[0]->weight(), 10);

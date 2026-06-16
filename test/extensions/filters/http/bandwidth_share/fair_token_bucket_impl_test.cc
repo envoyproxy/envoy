@@ -18,12 +18,11 @@ auto IsBetween = [](uint64_t min, uint64_t max) {
 
 class ClientTest : public testing::Test {
   void SetUp() override {
-    // Avoid starting at time zero.
-    time_system_.setMonotonicTime(start_time_);
+    start_time_ = time_system_.monotonicTime();
   }
 
 protected:
-  MonotonicTime start_time_{std::chrono::seconds(5)};
+  MonotonicTime start_time_;
   Event::SimulatedTimeSystem time_system_;
   std::chrono::milliseconds time_to_next_token_;
   std::shared_ptr<Bucket> bucket_ = Bucket::create(1000, time_system_);

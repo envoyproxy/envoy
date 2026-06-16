@@ -75,13 +75,10 @@ public:
   }
 
   void setHostClientSideWeight(HostSharedPtr& host, uint32_t weight,
-                               long long non_empty_since_seconds,
-                               long long last_update_time_seconds) {
+                               MonotonicTime non_empty_since,
+                               MonotonicTime last_update_time) {
     auto client_side_data = std::make_unique<OrcaHostLbPolicyData>(
-        lb_->orca_weight_manager_->reportHandler(), weight, /*non_empty_since=*/
-        MonotonicTime(std::chrono::seconds(non_empty_since_seconds)),
-        /*last_update_time=*/
-        MonotonicTime(std::chrono::seconds(last_update_time_seconds)));
+        lb_->orca_weight_manager_->reportHandler(), weight, non_empty_since, last_update_time);
     host->addLbPolicyData(std::move(client_side_data));
   }
 
@@ -172,15 +169,16 @@ public:
 TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest,
        UpdateWeightsOnHostsAllHostsHaveClientSideWeights) {
   init(false);
+  const MonotonicTime start_time = simTime().monotonicTime();
   HostVector hosts = {
       makeTestHost(info_, "tcp://127.0.0.1:80"),
       makeTestHost(info_, "tcp://127.0.0.1:81"),
       makeTestHost(info_, "tcp://127.0.0.1:82"),
   };
-  simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(30)));
-  lb_->setHostClientSideWeight(hosts[0], 40, 5, 10);
-  lb_->setHostClientSideWeight(hosts[1], 41, 5, 10);
-  lb_->setHostClientSideWeight(hosts[2], 42, 5, 10);
+  simTime().setMonotonicTime(start_time + std::chrono::seconds(30));
+  lb_->setHostClientSideWeight(hosts[0], 40, start_time + std::chrono::seconds(5), start_time + std::chrono::seconds(10));
+  lb_->setHostClientSideWeight(hosts[1], 41, start_time + std::chrono::seconds(5), start_time + std::chrono::seconds(10));
+  lb_->setHostClientSideWeight(hosts[2], 42, start_time + std::chrono::seconds(5), start_time + std::chrono::seconds(10));
   // Setting client side weights should not change the host weights.
   EXPECT_EQ(hosts[0]->weight(), 1);
   EXPECT_EQ(hosts[1]->weight(), 1);
@@ -195,14 +193,15 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest,
 
 TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeightsOneHostHasClientSideWeight) {
   init(false);
+  const MonotonicTime start_time = simTime().monotonicTime();
   HostVector hosts = {
       makeTestHost(info_, "tcp://127.0.0.1:80"),
       makeTestHost(info_, "tcp://127.0.0.1:81"),
       makeTestHost(info_, "tcp://127.0.0.1:82"),
   };
-  simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(30)));
+  simTime().setMonotonicTime(start_time + std::chrono::seconds(30));
   // Set client side weight for one host.
-  lb_->setHostClientSideWeight(hosts[0], 42, 5, 10);
+  lb_->setHostClientSideWeight(hosts[0], 42, start_time + std::chrono::seconds(5), start_time + std::chrono::seconds(10));
   // Setting client side weights should not change the host weights.
   EXPECT_EQ(hosts[0]->weight(), 1);
   EXPECT_EQ(hosts[1]->weight(), 1);
@@ -217,16 +216,17 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeightsOneHostHasClie
 
 TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeightsDefaultIsOddMedianWeight) {
   init(false);
+  const MonotonicTime start_time = simTime().monotonicTime();
   HostVector hosts = {
       makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
       makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
       makeTestHost(info_, "tcp://127.0.0.1:84"),
   };
-  simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(30)));
+  simTime().setMonotonicTime(start_time + std::chrono::seconds(30));
   // Set client side weight for first three hosts.
-  lb_->setHostClientSideWeight(hosts[0], 5, 5, 10);
-  lb_->setHostClientSideWeight(hosts[1], 42, 5, 10);
-  lb_->setHostClientSideWeight(hosts[2], 5000, 5, 10);
+  lb_->setHostClientSideWeight(hosts[0], 5, start_time + std::chrono::seconds(5), start_time + std::chrono::seconds(10));
+  lb_->setHostClientSideWeight(hosts[1], 42, start_time + std::chrono::seconds(5), start_time + std::chrono::seconds(10));
+  lb_->setHostClientSideWeight(hosts[2], 5000, start_time + std::chrono::seconds(5), start_time + std::chrono::seconds(10));
   // Setting client side weights should not change the host weights.
   EXPECT_EQ(hosts[0]->weight(), 1);
   EXPECT_EQ(hosts[1]->weight(), 1);
@@ -246,15 +246,16 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeightsDefaultIsOddMe
 
 TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeightsDefaultIsEvenMedianWeight) {
   init(false);
+  const MonotonicTime start_time = simTime().monotonicTime();
   HostVector hosts = {
       makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
       makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
       makeTestHost(info_, "tcp://127.0.0.1:84"),
   };
-  simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(30)));
+  simTime().setMonotonicTime(start_time + std::chrono::seconds(30));
   // Set client side weight for first two hosts.
-  lb_->setHostClientSideWeight(hosts[0], 5, 5, 10);
-  lb_->setHostClientSideWeight(hosts[1], 42, 5, 10);
+  lb_->setHostClientSideWeight(hosts[0], 5, start_time + std::chrono::seconds(5), start_time + std::chrono::seconds(10));
+  lb_->setHostClientSideWeight(hosts[1], 42, start_time + std::chrono::seconds(5), start_time + std::chrono::seconds(10));
   // Setting client side weights should not change the host weights.
   EXPECT_EQ(hosts[0]->weight(), 1);
   EXPECT_EQ(hosts[1]->weight(), 1);
@@ -285,7 +286,8 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ChooseHostWithClientSideWei
   init(false);
 
   hostSet().runCallbacks({}, {});
-  simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(5)));
+  const MonotonicTime start_time = simTime().monotonicTime();
+  simTime().setMonotonicTime(start_time + std::chrono::seconds(5));
   Envoy::StreamInfo::MockStreamInfo mock_stream_info;
   for (const auto& host_ptr : hostSet().hosts_) {
     HostConstSharedPtr host = lb_->chooseHost(&lb_context_).host;
@@ -297,11 +299,11 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ChooseHostWithClientSideWei
     orca_load_report.set_application_utilization(0.5);
     EXPECT_EQ(host->typedLbPolicyData<OrcaHostLbPolicyData>()->onOrcaLoadReport(orca_load_report,
                                                                                 mock_stream_info),
-              absl::OkStatus());
+               absl::OkStatus());
     EXPECT_EQ(host->weight(), 1);
   }
   // Update weights on hosts.
-  simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(30)));
+  simTime().setMonotonicTime(start_time + std::chrono::seconds(30));
   lb_->updateWeightsOnMainThread();
   // All hosts have client side weights, so the weights should be updated.
   for (const auto& host_ptr : hostSet().hosts_) {
@@ -328,7 +330,8 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, RefreshWorkerLbWithPriority
 
 TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ProcessOrcaLoadReport_FirstReport) {
   init(false);
-  simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(30)));
+  const MonotonicTime start_time = simTime().monotonicTime();
+  simTime().setMonotonicTime(start_time + std::chrono::seconds(30));
 
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   orca_load_report.set_rps_fractional(1000);
@@ -338,16 +341,17 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ProcessOrcaLoadReport_First
   EXPECT_EQ(lb_->updateClientSideDataFromOrcaLoadReport(orca_load_report, *client_side_data),
             absl::OkStatus());
   // First report, so non_empty_since_ is updated.
-  EXPECT_EQ(client_side_data->non_empty_since_.load(), MonotonicTime(std::chrono::seconds(30)));
+  EXPECT_EQ(client_side_data->non_empty_since_.load(), start_time + std::chrono::seconds(30));
   // last_update_time_ is updated.
-  EXPECT_EQ(client_side_data->last_update_time_.load(), MonotonicTime(std::chrono::seconds(30)));
+  EXPECT_EQ(client_side_data->last_update_time_.load(), start_time + std::chrono::seconds(30));
   // weight_ is calculated based on the Orca report.
   EXPECT_EQ(client_side_data->weight_.load(), 2000);
 }
 
 TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ProcessOrcaLoadReport_Update) {
   init(false);
-  simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(30)));
+  const MonotonicTime start_time = simTime().monotonicTime();
+  simTime().setMonotonicTime(start_time + std::chrono::seconds(30));
 
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   orca_load_report.set_rps_fractional(1000);
@@ -355,21 +359,22 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ProcessOrcaLoadReport_Updat
 
   auto client_side_data = std::make_shared<OrcaHostLbPolicyData>(
       lb_->orcaLoadReportHandler(), 42,
-      /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
-      /*last_update_time=*/MonotonicTime(std::chrono::seconds(10)));
+      /*non_empty_since=*/start_time + std::chrono::seconds(1),
+      /*last_update_time=*/start_time + std::chrono::seconds(10));
   EXPECT_EQ(lb_->updateClientSideDataFromOrcaLoadReport(orca_load_report, *client_side_data),
             absl::OkStatus());
   // Not a first report, so non_empty_since_ is not updated.
-  EXPECT_EQ(client_side_data->non_empty_since_.load(), MonotonicTime(std::chrono::seconds(1)));
+  EXPECT_EQ(client_side_data->non_empty_since_.load(), start_time + std::chrono::seconds(1));
   // last_update_time_ is updated.
-  EXPECT_EQ(client_side_data->last_update_time_.load(), MonotonicTime(std::chrono::seconds(30)));
+  EXPECT_EQ(client_side_data->last_update_time_.load(), start_time + std::chrono::seconds(30));
   // weight_ is recalculated based on the Orca report.
   EXPECT_EQ(client_side_data->weight_.load(), 2000);
 }
 
 TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ProcessOrcaLoadReport_UpdateWithInvalidQps) {
   init(false);
-  simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(30)));
+  const MonotonicTime start_time = simTime().monotonicTime();
+  simTime().setMonotonicTime(start_time + std::chrono::seconds(30));
 
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   // QPS is 0, so the report is invalid.
@@ -378,13 +383,13 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ProcessOrcaLoadReport_Updat
 
   auto client_side_data = std::make_shared<OrcaHostLbPolicyData>(
       lb_->orcaLoadReportHandler(), 42,
-      /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
-      /*last_update_time=*/MonotonicTime(std::chrono::seconds(10)));
+      /*non_empty_since=*/start_time + std::chrono::seconds(1),
+      /*last_update_time=*/start_time + std::chrono::seconds(10));
   EXPECT_EQ(lb_->updateClientSideDataFromOrcaLoadReport(orca_load_report, *client_side_data),
             absl::InvalidArgumentError("QPS must be positive"));
   // None of the client side data is updated.
-  EXPECT_EQ(client_side_data->non_empty_since_.load(), MonotonicTime(std::chrono::seconds(1)));
-  EXPECT_EQ(client_side_data->last_update_time_.load(), MonotonicTime(std::chrono::seconds(10)));
+  EXPECT_EQ(client_side_data->non_empty_since_.load(), start_time + std::chrono::seconds(1));
+  EXPECT_EQ(client_side_data->last_update_time_.load(), start_time + std::chrono::seconds(10));
   EXPECT_EQ(client_side_data->weight_.load(), 42);
 }
 
