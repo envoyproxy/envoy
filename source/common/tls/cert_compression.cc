@@ -150,9 +150,10 @@ int compressCached(SSL* ssl, uint16_t alg,
                    absl::optional<std::string> (*compressor)(const uint8_t*, size_t), CBB* out,
                    const uint8_t* in, size_t in_len) {
   SSL_CTX* ssl_ctx = ssl != nullptr ? SSL_get_SSL_CTX(ssl) : nullptr;
-  auto* cache = ssl_ctx != nullptr ? static_cast<CompressedCertCache*>(
-                                         SSL_CTX_get_ex_data(ssl_ctx, sslCtxCacheIndex()))
-                                   : nullptr;
+  auto* cache =
+      ssl_ctx != nullptr
+          ? static_cast<CompressedCertCache*>(SSL_CTX_get_ex_data(ssl_ctx, sslCtxCacheIndex()))
+          : nullptr;
 
   // Compress directly when there's no cache to use (e.g. unit tests with a null
   // SSL) or the payload is too large to cache.
@@ -245,8 +246,7 @@ int CertCompression::decompressBrotli(SSL*, CRYPTO_BUFFER** out, size_t uncompre
 }
 
 int CertCompression::compressZlib(SSL* ssl, CBB* out, const uint8_t* in, size_t in_len) {
-  const int rc =
-      compressCached(ssl, TLSEXT_cert_compression_zlib, doZlibCompress, out, in, in_len);
+  const int rc = compressCached(ssl, TLSEXT_cert_compression_zlib, doZlibCompress, out, in, in_len);
   if (rc == SUCCESS) {
     ENVOY_LOG(trace, "Cert zlib compression successful");
   }
