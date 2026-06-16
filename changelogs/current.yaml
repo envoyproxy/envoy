@@ -91,6 +91,12 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: mcp
+  change: |
+    Added a ``NOOP`` value to the MCP filter :ref:`traffic_mode
+    <envoy_v3_api_field_extensions.filters.http.mcp.v3.Mcp.traffic_mode>` enum. In ``NOOP`` mode the
+    filter performs no inspection, attribute extraction, trace context propagation, or rejection; all
+    traffic is proxied as-is.
 - area: router
   change: |
     Added support for ``refreshRouteCluster`` on weighted cluster routes. When a filter calls
