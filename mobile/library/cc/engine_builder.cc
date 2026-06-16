@@ -213,6 +213,11 @@ EngineBuilder& EngineBuilder::setPerTryIdleTimeoutSeconds(int per_try_idle_timeo
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setRequestTimeoutMilliseconds(int request_timeout_ms) {
+  request_timeout_ms_ = request_timeout_ms;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::enableGzipDecompression(bool gzip_decompression_on) {
   gzip_decompression_filter_ = gzip_decompression_on;
   return *this;
@@ -520,7 +525,12 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   route->mutable_per_request_buffer_limit_bytes()->set_value(4096);
   auto* route_to = route->mutable_route();
   route_to->set_cluster_header("x-envoy-mobile-cluster");
-  route_to->mutable_timeout()->set_seconds(0);
+  if (request_timeout_ms_ > 0) {
+    route_to->mutable_timeout()->set_nanos((request_timeout_ms_ % 1000) * 1000000);
+    route_to->mutable_timeout()->set_seconds(request_timeout_ms_ / 1000);
+  } else {
+    route_to->mutable_timeout()->set_seconds(0);
+  }
   route_to->mutable_retry_policy()->mutable_per_try_idle_timeout()->set_seconds(
       per_try_idle_timeout_seconds_);
   auto* backoff = route_to->mutable_retry_policy()->mutable_retry_back_off();
