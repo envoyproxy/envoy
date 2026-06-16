@@ -424,10 +424,8 @@ TEST_P(AwsLambdaFilterIntegrationTest, ExcludeHeadersFromSigning) {
   // Verify excluded headers are still forwarded but not in signed headers
   EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-amzn-vpc-id")).empty());
   EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-amzn-trace-id")).empty());
-  EXPECT_FALSE(
-      upstream_request_->headers().get(Http::LowerCaseString("x-custom-exclude")).empty());
-  EXPECT_FALSE(
-      upstream_request_->headers().get(Http::LowerCaseString("x-custom-include")).empty());
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-custom-exclude")).empty());
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-custom-include")).empty());
 
   // Get the Authorization header to verify excluded headers are not in SignedHeaders
   auto auth_header = upstream_request_->headers().get(Http::LowerCaseString("authorization"));
@@ -493,8 +491,7 @@ TEST_P(AwsLambdaFilterIntegrationTest, IncludeHeadersInSigning) {
   EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("authorization")).empty());
 
   // Verify all headers are still forwarded
-  EXPECT_FALSE(
-      upstream_request_->headers().get(Http::LowerCaseString("x-custom-header")).empty());
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-custom-header")).empty());
   EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("user-agent")).empty());
   EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-other-header")).empty());
 

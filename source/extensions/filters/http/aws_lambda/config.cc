@@ -115,10 +115,12 @@ AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
       getCredentialsProvider(per_route_config.invoke_config(), server_context, region);
 
   const auto include_matcher_config = Extensions::Common::Aws::AwsSigningHeaderMatcherVector(
-      per_route_config.invoke_config().match_included_headers().begin(), per_route_config.invoke_config().match_included_headers().end());
+      per_route_config.invoke_config().match_included_headers().begin(),
+      per_route_config.invoke_config().match_included_headers().end());
 
   const auto exclude_matcher_config = Extensions::Common::Aws::AwsSigningHeaderMatcherVector(
-      per_route_config.invoke_config().match_excluded_headers().begin(), per_route_config.invoke_config().match_excluded_headers().end());
+      per_route_config.invoke_config().match_excluded_headers().begin(),
+      per_route_config.invoke_config().match_excluded_headers().end());
 
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       service_name, region, std::move(credentials_provider), server_context, exclude_matcher_config,
