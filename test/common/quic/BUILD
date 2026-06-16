@@ -422,6 +422,7 @@ envoy_cc_test(
 
 envoy_cc_test_library(
     name = "connection_id_matchers",
+    srcs = ["connection_id_matchers.cc"],
     hdrs = ["connection_id_matchers.h"],
     deps = ["//test/mocks/network:network_mocks"],
 )
