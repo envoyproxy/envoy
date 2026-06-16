@@ -86,6 +86,8 @@ struct ReverseConnectionSocketConfig {
   std::string src_tenant_id;  // Tenant identifier of local envoy instance.
   std::string request_path{
       std::string(ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH)};
+  std::vector<envoy::config::core::v3::HeaderValueOption>
+      additional_headers;       // Additional headers for the handshake request.
   bool use_http_upgrade{false}; // Negotiate handshake as HTTP/1.1 Upgrade -> 101.
   std::shared_ptr<const std::vector<HandshakeHeader>> handshake_headers;
   // TODO(basundhara-c): Add support for multiple remote clusters using the same
@@ -309,6 +311,13 @@ public:
    * @return reference to the configured HTTP handshake request path.
    */
   const std::string& requestPath() const { return config_.request_path; }
+
+  /**
+   * @return reference to the additional headers for the handshake request.
+   */
+  const std::vector<envoy::config::core::v3::HeaderValueOption>& additionalHeaders() const {
+    return config_.additional_headers;
+  }
 
   /**
    * @return whether the handshake is negotiated as an HTTP/1.1 Upgrade exchange.

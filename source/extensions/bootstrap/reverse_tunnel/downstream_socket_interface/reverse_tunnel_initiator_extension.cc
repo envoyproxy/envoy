@@ -42,20 +42,23 @@ ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
                            config.http_handshake().additional_headers().end()};
     use_http_upgrade_ = config.http_handshake().use_http_upgrade();
 
-    Server::GenericFactoryContextImpl formatter_context(context,
-                                                        context.messageValidationVisitor());
-    auto command_parsers = returnOrThrow(Formatter::SubstitutionFormatStringUtils::parseFormatters(
-        config.http_handshake().formatters(), formatter_context));
-    auto handshake_headers = std::make_shared<std::vector<HandshakeHeader>>();
-    handshake_headers->reserve(additional_headers_.size());
-    for (const auto& header : additional_headers_) {
-      auto value_formatter = returnOrThrow(
-          Formatter::FormatterImpl::create(header.header().value(), true, command_parsers));
-      handshake_headers->push_back(HandshakeHeader{Http::LowerCaseString(header.header().key()),
-                                                   header.append_action(),
-                                                   std::move(value_formatter)});
+    if (!config.http_handshake().formatters().empty()) {
+      Server::GenericFactoryContextImpl formatter_context(context,
+                                                          context.messageValidationVisitor());
+      auto command_parsers =
+          returnOrThrow(Formatter::SubstitutionFormatStringUtils::parseFormatters(
+              config.http_handshake().formatters(), formatter_context));
+      auto handshake_headers = std::make_shared<std::vector<HandshakeHeader>>();
+      handshake_headers->reserve(additional_headers_.size());
+      for (const auto& header : additional_headers_) {
+        auto value_formatter = returnOrThrow(
+            Formatter::FormatterImpl::create(header.header().value(), true, command_parsers));
+        handshake_headers->push_back(HandshakeHeader{Http::LowerCaseString(header.header().key()),
+                                                     header.append_action(),
+                                                     std::move(value_formatter)});
+      }
+      handshake_headers_ = std::move(handshake_headers);
     }
-    handshake_headers_ = std::move(handshake_headers);
   }
   // Instantiate access loggers from config.
   Server::GenericFactoryContextImpl generic_context(context, context.scope(),

@@ -149,32 +149,39 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
   headers->addCopy(cluster_hdr, std::string(cluster_id));
   headers->addCopy(tenant_hdr, std::string(tenant_id));
   headers->addCopy(upstream_cluster_hdr, cluster_name_);
-  const auto& handshake_headers = parent_.handshakeHeaders();
-  if (handshake_headers != nullptr && !handshake_headers->empty()) {
+  using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
+  const auto apply_header = [&headers](const Http::LowerCaseString& key, absl::string_view value,
+                                       HeaderValueOption::HeaderAppendAction action) {
+    switch (action) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
+      headers->addCopy(key, value);
+      break;
+    case HeaderValueOption::ADD_IF_ABSENT:
+      if (headers->get(key).empty()) {
+        headers->addCopy(key, value);
+      }
+      break;
+    case HeaderValueOption::OVERWRITE_IF_EXISTS:
+      if (!headers->get(key).empty()) {
+        headers->setCopy(key, value);
+      }
+      break;
+    case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
+      headers->setCopy(key, value);
+      break;
+    }
+  };
+
+  if (const auto& handshake_headers = parent_.handshakeHeaders(); handshake_headers != nullptr) {
     StreamInfo::StreamInfoImpl stream_info(connection_->dispatcher().timeSource(), nullptr,
                                            StreamInfo::FilterState::LifeSpan::Connection);
-    using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
     for (const auto& hdr : *handshake_headers) {
-      const std::string value = hdr.value_formatter->format({}, stream_info);
-      switch (hdr.append_action) {
-        PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-      case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-        headers->addCopy(hdr.key, value);
-        break;
-      case HeaderValueOption::ADD_IF_ABSENT:
-        if (headers->get(hdr.key).empty()) {
-          headers->addCopy(hdr.key, value);
-        }
-        break;
-      case HeaderValueOption::OVERWRITE_IF_EXISTS:
-        if (!headers->get(hdr.key).empty()) {
-          headers->setCopy(hdr.key, value);
-        }
-        break;
-      case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
-        headers->setCopy(hdr.key, value);
-        break;
-      }
+      apply_header(hdr.key, hdr.value_formatter->format({}, stream_info), hdr.append_action);
+    }
+  } else {
+    for (const auto& h : parent_.additionalHeaders()) {
+      apply_header(Http::LowerCaseString(h.header().key()), h.header().value(), h.append_action());
     }
   }
   headers->setContentLength(0);

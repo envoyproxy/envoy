@@ -581,6 +581,54 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeFormatterHeaders) {
   EXPECT_NE(encoded_request.find("authorization: Bearer TestFormatter"), std::string::npos);
 }
 
+// With formatters unset, additional_headers are applied literally including '%'
+// that would otherwise fail format-string parsing.
+TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeLiteralHeaders) {
+  auto mock_connection = getDeletableConn(dispatcher_);
+
+  EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, addReadFilter(_));
+  EXPECT_CALL(*mock_connection, connect());
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12345));
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+
+  auto mock_address = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1", 8080);
+  auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
+
+  EXPECT_CALL(*mock_connection, connectionInfoProvider())
+      .WillRepeatedly(Invoke([mock_address,
+                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+        static auto mock_provider =
+            std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
+        return *mock_provider;
+      }));
+
+  Buffer::OwnedImpl captured_buffer;
+  EXPECT_CALL(*mock_connection, write(_, _))
+      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+        captured_buffer.add(buffer);
+        buffer.drain(buffer.length());
+      }));
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  ReverseConnectionSocketConfig custom_config = createDefaultTestConfig();
+  envoy::config::core::v3::HeaderValueOption hdr;
+  hdr.mutable_header()->set_key("x-literal");
+  hdr.mutable_header()->set_value("100% literal");
+  custom_config.additional_headers.push_back(hdr);
+  // handshake_headers left null -> literal application path.
+  auto local_io_handle = createTestIOHandle(custom_config);
+
+  RCConnectionWrapper wrapper(*local_io_handle, std::move(mock_connection), mock_host,
+                              "test-cluster");
+
+  wrapper.connect("test-tenant", "test-cluster", "test-node");
+
+  const std::string encoded_request = captured_buffer.toString();
+  EXPECT_NE(encoded_request.find("x-literal: 100% literal"), std::string::npos);
+}
+
 // Test RCConnectionWrapper::connect() method with connection write failure.
 TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWriteFailure) {
   // Create a mock connection that fails to write.

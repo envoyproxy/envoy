@@ -217,6 +217,19 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeUnknownFormatterThrows) {
       "does_not_exist");
 }
 
+TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeHeadersLiteralWithoutFormatters) {
+  auto custom_config = config_;
+  auto* hdr = custom_config.mutable_http_handshake()->add_additional_headers();
+  hdr->mutable_header()->set_key("x-literal");
+  hdr->mutable_header()->set_value("100% literal");
+
+  auto custom_extension =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
+  EXPECT_EQ(custom_extension->handshakeHeaders(), nullptr);
+  ASSERT_EQ(custom_extension->handshakeAdditionalHeaders().size(), 1);
+  EXPECT_EQ(custom_extension->handshakeAdditionalHeaders()[0].header().value(), "100% literal");
+}
+
 TEST_F(ReverseTunnelInitiatorExtensionTest, OnServerInitialized) {
   // This should be a no-op.
   extension_->onServerInitialized(server_);

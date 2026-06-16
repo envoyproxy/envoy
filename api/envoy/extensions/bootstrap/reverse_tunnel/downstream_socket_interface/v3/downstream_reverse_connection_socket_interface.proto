@@ -36,8 +36,9 @@ message DownstreamReverseConnectionSocketInterface {
     // Defaults to ``false``.
     bool use_http_upgrade = 3;
 
-    // Formatter extensions available to substitution formatters in ``additional_headers``.
-    // See the formatter extensions documentation for details.
+    // Formatter extensions usable in ``additional_headers`` substitution. See the formatter
+    // extensions documentation for details. When set, ``additional_headers`` values are evaluated
+    // as substitution format strings; when empty, the values are sent literally.
     // [#extension-category: envoy.formatter]
     repeated config.core.v3.TypedExtensionConfig formatters = 4;
   }
