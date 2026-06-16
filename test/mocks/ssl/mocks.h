@@ -134,6 +134,7 @@ public:
   Ssl::HandshakerCapabilities capabilities_;
   std::string sni_{"default_sni.example.com"};
   std::string ciphers_{"RSA"};
+  std::string curves_{""};
   std::string alpn_{""};
   std::string sigalgs_{""};
   Network::Address::IpList iplist_;
@@ -182,6 +183,7 @@ public:
 
   Ssl::HandshakerCapabilities capabilities_;
   std::string ciphers_{"RSA"};
+  std::string curves_{""};
   std::string alpn_{""};
   std::string sigalgs_{""};
   Network::Address::IpList iplist_;
@@ -207,6 +209,7 @@ public:
   MOCK_METHOD(const std::string&, password, (), (const));
   MOCK_METHOD(const std::string&, passwordPath, (), (const));
   MOCK_METHOD(Envoy::Ssl::PrivateKeyMethodProviderSharedPtr, privateKeyMethod, (), (const));
+  MOCK_METHOD(const Envoy::Ssl::TlsParams*, tlsParams, (), (const));
 };
 
 class MockCertificateValidationContextConfig : public CertificateValidationContextConfig {

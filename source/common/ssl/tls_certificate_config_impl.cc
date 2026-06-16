@@ -4,9 +4,13 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/server/transport_socket_config.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/datasource.h"
+
+#include "absl/strings/str_join.h"
+#include "openssl/tls1.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -41,6 +45,27 @@ std::vector<uint8_t> maybeReadOcspStaple(const envoy::config::core::v3::DataSour
 
   return {staple.begin(), staple.end()};
 }
+
+unsigned tlsVersionFromProto(
+    const envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol& version,
+    unsigned default_version) {
+  switch (version) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO:
+    return default_version;
+  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0:
+    return TLS1_VERSION;
+  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_1:
+    return TLS1_1_VERSION;
+  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2:
+    return TLS1_2_VERSION;
+  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3:
+    return TLS1_3_VERSION;
+  }
+  IS_ENVOY_BUG("unexpected tls version provided");
+  return default_version;
+}
+
 } // namespace
 
 static const std::string INLINE_STRING = "<inline>";
@@ -124,6 +149,21 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
       creation_status = absl::InvalidArgumentError(
           fmt::format("Failed to load incomplete private key from path: {}", private_key_path_));
     }
+  }
+  if (config.has_tls_params()) {
+    using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+    const auto& p = config.tls_params();
+    tls_params_ = TlsParams{
+        .min_protocol_version = tlsVersionFromProto(p.tls_minimum_protocol_version(), 0),
+        .max_protocol_version = tlsVersionFromProto(p.tls_maximum_protocol_version(), 0),
+        .cipher_suites = absl::StrJoin(p.cipher_suites(), ":"),
+        .ecdh_curves = absl::StrJoin(p.ecdh_curves(), ":"),
+        .signature_algorithms = absl::StrJoin(p.signature_algorithms(), ":"),
+        .compliance_policy =
+            p.compliance_policies_size() > 0
+                ? absl::optional<TlsProto::CompliancePolicy>(p.compliance_policies(0))
+                : absl::nullopt,
+    };
   }
 }
 

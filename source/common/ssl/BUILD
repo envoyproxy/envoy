@@ -12,12 +12,16 @@ envoy_cc_library(
     name = "tls_certificate_config_impl_lib",
     srcs = ["tls_certificate_config_impl.cc"],
     hdrs = ["tls_certificate_config_impl.h"],
+    external_deps = ["ssl"],
     deps = [
         "//envoy/server:transport_socket_config_interface",
         "//envoy/ssl:tls_certificate_config_interface",
         "//envoy/ssl/private_key:private_key_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
