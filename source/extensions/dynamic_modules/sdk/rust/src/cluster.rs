@@ -152,8 +152,9 @@ pub trait EnvoyAsyncHostSelectionComplete: Send {
   );
 
   /// The request context `choose_host` received, or `None` when there was none (e.g. health-check
-  /// selections). Borrows the completion, so the view cannot outlive it or survive `complete`.
-  fn request_context<'a>(&'a self) -> Option<Box<dyn ClusterLbContext + 'a>>;
+  /// selections). The view's lifetime is tied to the completion, so it cannot outlive it or
+  /// survive `complete`.
+  fn request_context<'a>(&'a self) -> Option<ClusterLbContextRef<'a>>;
 }
 
 /// The module-side load balancer instance.
@@ -1795,36 +1796,39 @@ impl EnvoyAsyncHostSelectionComplete for EnvoyAsyncHostSelectionCompleteImpl {
     }
   }
 
-  fn request_context(&self) -> Option<Box<dyn ClusterLbContext + '_>> {
+  fn request_context(&self) -> Option<ClusterLbContextRef<'_>> {
     // A null context pointer mirrors choose_host's `None` (e.g. health-check selections).
     if self.raw_context.is_null() {
       return None;
     }
-    Some(Box::new(ClusterLbContextImpl::new(
-      self.raw_context,
-      self.raw_lb,
-    )))
+    Some(ClusterLbContextRef::new(self.raw_context, self.raw_lb))
   }
 }
 
-struct ClusterLbContextImpl {
+/// A view over a request's load-balancing context, valid only while the source it was obtained
+/// from is alive. Owns its handles like [`crate::EnvoyBuffer`]; the lifetime ties validity to that
+/// source rather than to any Rust-owned storage.
+#[derive(Clone, Copy)]
+pub struct ClusterLbContextRef<'a> {
   raw_context: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
   raw_lb: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _marker: std::marker::PhantomData<&'a ()>,
 }
 
-impl ClusterLbContextImpl {
-  fn new(
+impl ClusterLbContextRef<'_> {
+  pub(crate) fn new(
     raw_context: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
     raw_lb: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
   ) -> Self {
     Self {
       raw_context,
       raw_lb,
+      _marker: std::marker::PhantomData,
     }
   }
 }
 
-impl ClusterLbContext for ClusterLbContextImpl {
+impl ClusterLbContext for ClusterLbContextRef<'_> {
   fn compute_hash_key(&self) -> Option<u64> {
     let mut hash: u64 = 0;
     let ok = unsafe {
@@ -2135,7 +2139,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_destroy(
 }
 
 /// Wrapper that pairs a module-side load balancer with the Envoy-side LB pointer.
-/// The `lb_envoy_ptr` is needed by [`ClusterLbContextImpl::should_select_another_host`] to
+/// The `lb_envoy_ptr` is needed by [`ClusterLbContextRef::should_select_another_host`] to
 /// resolve host pointers from the priority set.
 struct ClusterLbWrapper {
   lb: Box<dyn ClusterLb>,
@@ -2198,10 +2202,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_choose_host(
     let context = if context_envoy_ptr.is_null() {
       None
     } else {
-      Some(ClusterLbContextImpl::new(
-        context_envoy_ptr,
-        wrapper.lb_envoy_ptr,
-      ))
+      Some(ClusterLbContextRef::new(context_envoy_ptr, wrapper.lb_envoy_ptr))
     };
 
     let async_completion = Box::new(EnvoyAsyncHostSelectionCompleteImpl {
