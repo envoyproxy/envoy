@@ -3549,6 +3549,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
   setup();
   setupFilterChain(1, 0);
   RequestHeaderMap* latched_headers = nullptr;
+  const MonotonicTime stream_start_time = test_time_.timeSystem().monotonicTime();
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
@@ -3694,7 +3695,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
   // With a gRPC timeout of 20ms, and 5ms used already when the route was
   // refreshed, set a timer for 15ms.
   {
-    test_time_.timeSystem().setMonotonicTime(MonotonicTime(std::chrono::milliseconds(5)));
+    test_time_.timeSystem().setMonotonicTime(stream_start_time + std::chrono::milliseconds(5));
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, grpcTimeoutHeaderMax())
         .Times(AnyNumber())
         .WillRepeatedly(Return(std::chrono::milliseconds(20)));
@@ -3710,7 +3711,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
   // With a gRPC timeout of 20ms, and 25ms used already when the route was
   // refreshed, set a timer for now (0ms)
   {
-    test_time_.timeSystem().setMonotonicTime(MonotonicTime(std::chrono::milliseconds(25)));
+    test_time_.timeSystem().setMonotonicTime(stream_start_time + std::chrono::milliseconds(25));
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, grpcTimeoutHeaderMax())
         .Times(AnyNumber())
         .WillRepeatedly(Return(std::chrono::milliseconds(20)));
