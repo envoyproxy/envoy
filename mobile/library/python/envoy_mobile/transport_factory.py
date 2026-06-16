@@ -49,7 +49,7 @@ class EnvoyTransportFactory:
 
     @classmethod
     def get_async_transport(
-        cls, builder: Optional[envoy_engine.EngineBuilder] = None
+        cls, builder: Optional[envoy_engine.EngineBuilder] = None, listener_name: str = ""
     ) -> AsyncEnvoyClientTransport:
         """Create an AsyncEnvoyClientTransport using the shared engine.
 
@@ -60,11 +60,11 @@ class EnvoyTransportFactory:
             An AsyncEnvoyClientTransport instance.
         """
         engine = cls.get_shared_engine(builder)
-        return AsyncEnvoyClientTransport(engine)
+        return AsyncEnvoyClientTransport(engine, listener_name)
 
     @classmethod
     def get_sync_transport(
-        cls, builder: Optional[envoy_engine.EngineBuilder] = None
+        cls, builder: Optional[envoy_engine.EngineBuilder] = None, listener_name: str = ""
     ) -> EnvoyClientTransport:
         """Create an EnvoyClientTransport using the shared engine.
 
@@ -75,4 +75,4 @@ class EnvoyTransportFactory:
             An EnvoyClientTransport instance.
         """
         engine = cls.get_shared_engine(builder)
-        return EnvoyClientTransport(engine)
+        return EnvoyClientTransport(engine, listener_name)

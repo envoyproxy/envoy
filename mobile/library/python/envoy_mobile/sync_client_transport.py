@@ -134,8 +134,9 @@ class SyncResponseHandler:
 
 
 class EnvoyClientTransport(httpx.BaseTransport):
-    def __init__(self, engine: envoy_engine.Engine) -> None:
+    def __init__(self, engine: envoy_engine.Engine, listener_name: str = "") -> None:
         self._engine = engine
+        self._listener_name = listener_name
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:
         # Map headers
@@ -146,7 +147,7 @@ class EnvoyClientTransport(httpx.BaseTransport):
         handler = SyncResponseHandler()
 
         # Start stream
-        proto = self._engine.stream_client().new_stream_prototype()
+        proto = self._engine.stream_client(self._listener_name).new_stream_prototype()
         stream = proto.start(
             on_headers=handler.on_headers,
             on_data=handler.on_data,

@@ -1,5 +1,7 @@
 #include "engine.h"
 
+#include <memory>
+
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "library/common/internal_engine.h"
@@ -31,8 +33,8 @@ Engine::~Engine() {
 // because they either require or will require a weak ptr
 // which can't be provided from inside of the constructor
 // because of how std::enable_shared_from_this works
-StreamClientSharedPtr Engine::streamClient() {
-  return std::make_shared<StreamClient>(shared_from_this());
+StreamClientSharedPtr Engine::streamClient(absl::string_view listener_name) {
+  return std::make_shared<StreamClient>(shared_from_this(), listener_name);
 }
 
 std::string Engine::dumpStats() { return engine_->dumpStats(); }
