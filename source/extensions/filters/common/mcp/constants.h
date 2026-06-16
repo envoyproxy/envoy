@@ -26,6 +26,7 @@ constexpr absl::string_view PARAMS_FIELD = "params";
 constexpr absl::string_view ARGUMENTS_FIELD = "arguments";
 constexpr absl::string_view ERROR_CODE_FIELD = "code";
 constexpr absl::string_view ERROR_MESSAGE_FIELD = "message";
+constexpr absl::string_view BACKEND_RESPONSE_CODE_FIELD = "backend_response_code";
 
 constexpr absl::string_view TYPE_FIELD = "type";
 constexpr absl::string_view TEXT_FIELD = "text";
