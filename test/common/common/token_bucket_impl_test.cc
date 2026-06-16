@@ -11,7 +11,9 @@ namespace Envoy {
 
 class TokenBucketImplTest : public testing::Test {
 protected:
+  TokenBucketImplTest() : start_time_(time_system_.monotonicTime()) {}
   Event::SimulatedTimeSystem time_system_;
+  MonotonicTime start_time_;
 };
 
 // Verifies TokenBucket initialization.
@@ -27,7 +29,7 @@ TEST_F(TokenBucketImplTest, MaxBucketSize) {
   TokenBucketImpl token_bucket{3, time_system_, 1};
 
   EXPECT_EQ(3, token_bucket.consume(3, false));
-  time_system_.setMonotonicTime(std::chrono::seconds(10));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::seconds(10));
   EXPECT_EQ(0, token_bucket.consume(4, false));
   EXPECT_EQ(3, token_bucket.consume(3, false));
 }
@@ -41,13 +43,13 @@ TEST_F(TokenBucketImplTest, Consume) {
 
   EXPECT_EQ(1, token_bucket.consume(1, false));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(999));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::milliseconds(999));
   EXPECT_EQ(0, token_bucket.consume(1, false));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(5999));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::milliseconds(5999));
   EXPECT_EQ(0, token_bucket.consume(6, false));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(6000));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::milliseconds(6000));
   EXPECT_EQ(6, token_bucket.consume(6, false));
   EXPECT_EQ(0, token_bucket.consume(1, false));
 }
@@ -57,11 +59,11 @@ TEST_F(TokenBucketImplTest, Refill) {
   TokenBucketImpl token_bucket{1, time_system_, 0.5};
   EXPECT_EQ(1, token_bucket.consume(1, false));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(500));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::milliseconds(500));
   EXPECT_EQ(0, token_bucket.consume(1, false));
-  time_system_.setMonotonicTime(std::chrono::milliseconds(1500));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::milliseconds(1500));
   EXPECT_EQ(0, token_bucket.consume(1, false));
-  time_system_.setMonotonicTime(std::chrono::milliseconds(2000));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::milliseconds(2000));
   EXPECT_EQ(1, token_bucket.consume(1, false));
 }
 
@@ -121,15 +123,17 @@ TEST_F(TokenBucketImplTest, YearlyMinRefillRate) {
   EXPECT_EQ(1, token_bucket.consume(1, false));
 
   // Less than a year should still have no tokens.
-  time_system_.setMonotonicTime(std::chrono::seconds(seconds_per_year - 1));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::seconds(seconds_per_year - 1));
   EXPECT_EQ(0, token_bucket.consume(1, false));
-  time_system_.setMonotonicTime(std::chrono::seconds(seconds_per_year));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::seconds(seconds_per_year));
   EXPECT_EQ(1, token_bucket.consume(1, false));
 }
 
 class AtomicTokenBucketImplTest : public testing::Test {
 protected:
+  AtomicTokenBucketImplTest() : start_time_(time_system_.monotonicTime()) {}
   Event::SimulatedTimeSystem time_system_;
+  MonotonicTime start_time_;
 };
 
 // Verifies TokenBucket initialization.
@@ -154,7 +158,7 @@ TEST_F(AtomicTokenBucketImplTest, MaxBucketSize) {
   EXPECT_EQ(3, token_bucket.remainingTokens());
 
   EXPECT_EQ(3, token_bucket.consume(3, false));
-  time_system_.setMonotonicTime(std::chrono::seconds(10));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::seconds(10));
   EXPECT_EQ(0, token_bucket.consume(4, false));
   EXPECT_EQ(3, token_bucket.consume(3, false));
 }
@@ -169,13 +173,13 @@ TEST_F(AtomicTokenBucketImplTest, Consume) {
   // consume() == consume(1, false)
   EXPECT_EQ(true, token_bucket.consume());
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(999));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::milliseconds(999));
   EXPECT_EQ(0, token_bucket.consume(1, false));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(5999));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::milliseconds(5999));
   EXPECT_EQ(0, token_bucket.consume(6, false));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(6000));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::milliseconds(6000));
   EXPECT_EQ(6, token_bucket.consume(6, false));
   EXPECT_EQ(0, token_bucket.consume(1, false));
 }
@@ -185,11 +189,11 @@ TEST_F(AtomicTokenBucketImplTest, Refill) {
   AtomicTokenBucketImpl token_bucket{1, time_system_, 0.5};
   EXPECT_EQ(1, token_bucket.consume(1, false));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(500));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::milliseconds(500));
   EXPECT_EQ(0, token_bucket.consume(1, false));
-  time_system_.setMonotonicTime(std::chrono::milliseconds(1500));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::milliseconds(1500));
   EXPECT_EQ(0, token_bucket.consume(1, false));
-  time_system_.setMonotonicTime(std::chrono::milliseconds(2000));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::milliseconds(2000));
   EXPECT_EQ(1, token_bucket.consume(1, false));
 }
 
@@ -222,9 +226,9 @@ TEST_F(AtomicTokenBucketImplTest, YearlyMinRefillRate) {
   EXPECT_EQ(1, token_bucket.consume(1, false));
 
   // Less than a year should still have no tokens.
-  time_system_.setMonotonicTime(std::chrono::seconds(seconds_per_year - 1));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::seconds(seconds_per_year - 1));
   EXPECT_EQ(0, token_bucket.consume(1, false));
-  time_system_.setMonotonicTime(std::chrono::seconds(seconds_per_year));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::seconds(seconds_per_year));
   EXPECT_EQ(1, token_bucket.consume(1, false));
 }
 

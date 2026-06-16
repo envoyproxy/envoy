@@ -10,6 +10,8 @@ namespace Envoy {
 
 class SharedTokenBucketImplTest : public testing::Test {
 protected:
+  SharedTokenBucketImplTest() : start_time_(time_system_.monotonicTime()) {}
+
   bool isMutexLocked(SharedTokenBucketImpl& token) {
     auto locked = token.mutex_.tryLock();
     if (locked) {
@@ -24,6 +26,7 @@ protected:
 
   Event::SimulatedTimeSystem time_system_;
   std::chrono::milliseconds time_to_next_token;
+  MonotonicTime start_time_;
 };
 
 // Verifies TokenBucket initialization.
@@ -39,7 +42,7 @@ TEST_F(SharedTokenBucketImplTest, MaxBucketSize) {
   SharedTokenBucketImpl token_bucket{3, time_system_, 1};
 
   EXPECT_EQ(3, token_bucket.consume(3, false, time_to_next_token));
-  time_system_.setMonotonicTime(std::chrono::seconds(10));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::seconds(10));
   EXPECT_EQ(0, token_bucket.consume(4, false, time_to_next_token));
   EXPECT_EQ(3, token_bucket.consume(3, false, time_to_next_token));
 }
@@ -53,13 +56,13 @@ TEST_F(SharedTokenBucketImplTest, Consume) {
 
   EXPECT_EQ(1, token_bucket.consume(1, false, time_to_next_token));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(999));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::milliseconds(999));
   EXPECT_EQ(0, token_bucket.consume(1, false, time_to_next_token));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(5999));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::milliseconds(5999));
   EXPECT_EQ(0, token_bucket.consume(6, false, time_to_next_token));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(6000));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::milliseconds(6000));
   EXPECT_EQ(6, token_bucket.consume(6, false, time_to_next_token));
   EXPECT_EQ(0, token_bucket.consume(1, false, time_to_next_token));
 }
@@ -69,11 +72,11 @@ TEST_F(SharedTokenBucketImplTest, Refill) {
   SharedTokenBucketImpl token_bucket{1, time_system_, 0.5};
   EXPECT_EQ(1, token_bucket.consume(1, false, time_to_next_token));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(500));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::milliseconds(500));
   EXPECT_EQ(0, token_bucket.consume(1, false, time_to_next_token));
-  time_system_.setMonotonicTime(std::chrono::milliseconds(1500));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::milliseconds(1500));
   EXPECT_EQ(0, token_bucket.consume(1, false, time_to_next_token));
-  time_system_.setMonotonicTime(std::chrono::milliseconds(2000));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::milliseconds(2000));
   EXPECT_EQ(1, token_bucket.consume(1, false, time_to_next_token));
 }
 
