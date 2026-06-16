@@ -1,9 +1,9 @@
 #include "source/extensions/common/aws/credential_provider_chains.h"
+#include "source/extensions/common/aws/credential_providers/instance_profile_credentials_provider.h"
 
 #include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
-#include "source/extensions/common/aws/credential_providers/instance_profile_credentials_provider.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"
 
@@ -577,8 +577,9 @@ TEST_F(CustomCredentialsProviderChainTest, AssumeRoleInnerChainSubscriptionsSetu
   EXPECT_EQ(1, chain.value()->getNumProviders());
 
   auto instance_profile_provider =
-      context_.singletonManager().getTyped<Envoy::Extensions::Common::Aws::InstanceProfileCredentialsProvider>(
-          "instance_profile_credentials_provider_singleton");
+      context_.singletonManager()
+          .getTyped<Envoy::Extensions::Common::Aws::InstanceProfileCredentialsProvider>(
+              "instance_profile_credentials_provider_singleton");
   ASSERT_NE(instance_profile_provider, nullptr);
 
   MetadataCredentialsProviderBaseFriend provider_friend(instance_profile_provider);
