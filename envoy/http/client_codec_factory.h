@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include "envoy/common/pure.h"
 #include "envoy/http/codec.h"
 
 namespace Envoy {

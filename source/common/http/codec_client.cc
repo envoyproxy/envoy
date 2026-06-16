@@ -292,58 +292,63 @@ CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& 
                                  const Network::TransportSocketOptionsConstSharedPtr& options,
                                  bool should_connect)
     : CodecClient(type, std::move(connection), host, dispatcher) {
-  switch (type) {
-  case CodecType::HTTP1: {
-    // If the transport socket indicates this is being proxied, inform the HTTP/1.1 codec. It will
-    // send fully qualified URLs iff the underlying transport is plaintext.
-    bool proxied = false;
-    if (options && options->http11ProxyInfo().has_value()) {
-      proxied = true;
+  bool create_default_invoked = false;
+  auto create_default_codec = [&]() -> ClientConnectionPtr {
+    RELEASE_ASSERT(!create_default_invoked,
+                   "upstream codec factory called create_default more than once");
+    create_default_invoked = true;
+    switch (type) {
+    case CodecType::HTTP1: {
+      // If the transport socket indicates this is being proxied, inform the HTTP/1.1 codec. It
+      // will send fully qualified URLs iff the underlying transport is plaintext.
+      bool proxied = false;
+      if (options && options->http11ProxyInfo().has_value()) {
+        proxied = true;
+      }
+      return std::make_unique<Http1::ClientConnectionImpl>(
+          *connection_, host->cluster().http1CodecStats(), *this,
+          host->cluster().httpProtocolOptions().http1Settings(),
+          host->cluster().maxResponseHeadersKb(), host->cluster().maxResponseHeadersCount(),
+          proxied);
     }
-    codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-        *connection_, host->cluster().http1CodecStats(), *this,
-        host->cluster().httpProtocolOptions().http1Settings(),
-        host->cluster().maxResponseHeadersKb(), host->cluster().maxResponseHeadersCount(), proxied);
-    break;
-  }
-  case CodecType::HTTP2:
-    codec_ = std::make_unique<Http2::ClientConnectionImpl>(
-        *connection_, *this, host->cluster().http2CodecStats(), random_generator,
-        host->cluster().httpProtocolOptions().http2Options(),
-        host->cluster().maxResponseHeadersKb().value_or(Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
-        host->cluster().maxResponseHeadersCount(), Http2::ProdNghttp2SessionFactory::get());
-    break;
-  case CodecType::HTTP3: {
+    case CodecType::HTTP2:
+      return std::make_unique<Http2::ClientConnectionImpl>(
+          *connection_, *this, host->cluster().http2CodecStats(), random_generator,
+          host->cluster().httpProtocolOptions().http2Options(),
+          host->cluster().maxResponseHeadersKb().value_or(Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
+          host->cluster().maxResponseHeadersCount(), Http2::ProdNghttp2SessionFactory::get());
+    case CodecType::HTTP3: {
 #ifdef ENVOY_ENABLE_QUIC
-    auto& quic_session = dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_);
-    codec_ = std::make_unique<Quic::QuicHttpClientConnectionImpl>(
-        quic_session, *this, host->cluster().http3CodecStats(),
-        host->cluster().httpProtocolOptions().http3Options(),
-        host->cluster().maxResponseHeadersKb().value_or(Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
-        host->cluster().maxResponseHeadersCount());
-    // Initialize the session after max request header size is changed in above http client
-    // connection creation.
-    quic_session.Initialize();
-    break;
+      auto& quic_session = dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_);
+      auto codec = std::make_unique<Quic::QuicHttpClientConnectionImpl>(
+          quic_session, *this, host->cluster().http3CodecStats(),
+          host->cluster().httpProtocolOptions().http3Options(),
+          host->cluster().maxResponseHeadersKb().value_or(Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
+          host->cluster().maxResponseHeadersCount());
+      // Initialize the session after max request header size is changed in above http client
+      // connection creation.
+      quic_session.Initialize();
+      return codec;
 #else
-    // Should be blocked by configuration checking at an earlier point.
-    PANIC("unexpected");
+      // Should be blocked by configuration checking at an earlier point.
+      PANIC("unexpected");
 #endif
-  }
-  }
+    }
+    }
+
+    PANIC("unexpected");
+  };
 
   // A per-cluster upstream codec factory (configured via typed_extension_protocol_options) may
   // decorate or replace the stock codec built above; create_default hands over that stock codec.
   if (auto factory = host->cluster().upstreamHttpClientCodecFactory(); factory.has_value()) {
-    codec_ = factory->createClientCodec(
-        Http::ClientCodecFactory::Context{type, *connection_, *this, host->cluster(),
-                                          random_generator},
-        [this]() {
-          RELEASE_ASSERT(codec_ != nullptr, "upstream codec factory called create_default "
-                                            "more than once");
-          return std::move(codec_);
-        });
+    codec_ = factory->createClientCodec(Http::ClientCodecFactory::Context{type, *connection_, *this,
+                                                                          host->cluster(),
+                                                                          random_generator},
+                                        create_default_codec);
     RELEASE_ASSERT(codec_ != nullptr, "upstream codec factory returned null client codec");
+  } else {
+    codec_ = create_default_codec();
   }
 
   if (should_connect) {

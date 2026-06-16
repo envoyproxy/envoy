@@ -1,5 +1,6 @@
 #include "source/common/upstream/upstream_impl.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <limits>
@@ -143,11 +144,19 @@ parseExtensionProtocolOptions(
 
 // Recovers a per-cluster upstream (client) codec factory from the parsed extension protocol
 // options: an options object that also implements Http::ClientCodecFactory is treated as the
-// factory. At most one is expected; the first match wins.
+// factory. At most one is expected.
 std::shared_ptr<const Http::ClientCodecFactory> findUpstreamHttpClientCodecFactory(
     const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>& options) {
+  std::vector<std::string> option_names;
+  option_names.reserve(options.size());
   for (const auto& entry : options) {
-    if (auto factory = std::dynamic_pointer_cast<const Http::ClientCodecFactory>(entry.second);
+    option_names.push_back(entry.first);
+  }
+  std::sort(option_names.begin(), option_names.end());
+
+  for (const auto& name : option_names) {
+    const auto& option = options.at(name);
+    if (auto factory = std::dynamic_pointer_cast<const Http::ClientCodecFactory>(option);
         factory != nullptr) {
       return factory;
     }
