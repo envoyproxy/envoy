@@ -19,12 +19,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.clusters.original_dst]
 
 // Configuration for the Original Destination cluster.
-//
-// .. warning::
-//
-//   This configuration should only be used with the Original Destination cluster type.
-//   The Original Destination cluster always provides its own load balancer, so
-//   ``lb_policy`` must be set to ``CLUSTER_PROVIDED``.
 message OriginalDstCluster {
   // When true, a HTTP header can be used to override the original dst address. The default header is
   // :ref:`x-envoy-original-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>`.
