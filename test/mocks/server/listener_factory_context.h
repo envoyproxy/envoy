@@ -28,6 +28,8 @@ public:
   MOCK_METHOD(Stats::Scope&, scope, ());
   MOCK_METHOD(Stats::Scope&, listenerScope, ());
   MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
+  MOCK_METHOD(bool, isQuic, (), (const));
+  MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(const Network::ListenerInfo&, listenerInfo, (), (const));
 

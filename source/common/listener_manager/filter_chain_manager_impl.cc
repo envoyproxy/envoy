@@ -77,7 +77,6 @@ public:
 PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
     Configuration::FactoryContext& parent_context, Init::Manager& init_manager)
     : parent_context_(parent_context), scope_(parent_context_.scope().createScope("")),
-      filter_chain_scope_(parent_context_.listenerScope().createScope("")),
       init_manager_(init_manager) {}
 
 bool PerFilterChainFactoryContextImpl::drainClose(Network::DrainDirection scope) const {
@@ -87,10 +86,6 @@ bool PerFilterChainFactoryContextImpl::drainClose(Network::DrainDirection scope)
 Network::DrainDecision& PerFilterChainFactoryContextImpl::drainDecision() { return *this; }
 
 Init::Manager& PerFilterChainFactoryContextImpl::initManager() { return init_manager_; }
-
-const Network::ListenerInfo& PerFilterChainFactoryContextImpl::listenerInfo() const {
-  return parent_context_.listenerInfo();
-}
 
 ProtobufMessage::ValidationVisitor& PerFilterChainFactoryContextImpl::messageValidationVisitor() {
   return parent_context_.messageValidationVisitor();
@@ -102,7 +97,13 @@ Configuration::ServerFactoryContext& PerFilterChainFactoryContextImpl::serverFac
   return parent_context_.serverFactoryContext();
 }
 
-Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() { return *filter_chain_scope_; }
+envoy::config::core::v3::TrafficDirection PerFilterChainFactoryContextImpl::direction() const {
+  return parent_context_.direction();
+}
+bool PerFilterChainFactoryContextImpl::isQuic() const { return parent_context_.isQuic(); }
+bool PerFilterChainFactoryContextImpl::shouldBypassOverloadManager() const {
+  return parent_context_.shouldBypassOverloadManager();
+}
 
 FilterChainManagerImpl::FilterChainManagerImpl(
     const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,

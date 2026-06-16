@@ -27,6 +27,13 @@ Stats::Scope& FactoryContextImplBase::listenerScope() { return *listener_scope_;
 const Network::ListenerInfo& FactoryContextImplBase::listenerInfo() const {
   return *listener_info_;
 }
+envoy::config::core::v3::TrafficDirection FactoryContextImplBase::direction() const {
+  return listener_info_->direction();
+}
+bool FactoryContextImplBase::isQuic() const { return listener_info_->isQuic(); }
+bool FactoryContextImplBase::shouldBypassOverloadManager() const {
+  return listener_info_->shouldBypassOverloadManager();
+}
 
 FactoryContextImpl::FactoryContextImpl(Server::Instance& server,
                                        Network::DrainDecision& drain_decision,

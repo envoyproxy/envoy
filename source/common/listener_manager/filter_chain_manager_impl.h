@@ -64,10 +64,11 @@ public:
   Network::DrainDecision& drainDecision() override;
   Init::Manager& initManager() override;
   Stats::Scope& scope() override;
-  const Network::ListenerInfo& listenerInfo() const override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
   Configuration::ServerFactoryContext& serverFactoryContext() override;
-  Stats::Scope& listenerScope() override;
+  envoy::config::core::v3::TrafficDirection direction() const override;
+  bool isQuic() const override;
+  bool shouldBypassOverloadManager() const override;
 
   void startDraining() override { is_draining_.store(true); }
 
@@ -75,8 +76,6 @@ private:
   Configuration::FactoryContext& parent_context_;
   // The scope that has empty prefix.
   Stats::ScopeSharedPtr scope_;
-  // filter_chain_scope_ has the same prefix as listener owners scope.
-  Stats::ScopeSharedPtr filter_chain_scope_;
   Init::Manager& init_manager_;
   std::atomic<bool> is_draining_{false};
 };

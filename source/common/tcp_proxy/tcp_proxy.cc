@@ -222,8 +222,7 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
       random_generator_(context.serverFactoryContext().api().randomGenerator()),
       regex_engine_(context.serverFactoryContext().regexEngine()),
       drain_decision_(context.drainDecision()),
-      drain_close_scope_(context.listenerInfo().direction() ==
-                                 envoy::config::core::v3::TrafficDirection::INBOUND
+      drain_close_scope_(context.direction() == envoy::config::core::v3::TrafficDirection::INBOUND
                              ? Network::DrainDirection::InboundOnly
                              : Network::DrainDirection::All),
       check_drain_close_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, check_drain_close, false)) {
