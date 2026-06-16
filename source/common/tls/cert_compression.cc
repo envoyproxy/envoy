@@ -5,7 +5,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
-#include "source/common/common/thread.h"
 
 #include "absl/base/thread_annotations.h"
 #include "absl/container/flat_hash_map.h"
@@ -31,20 +30,11 @@ void CertCompression::registerZlib(SSL_CTX*) {}
 
 namespace {
 
-// A compressed certificate chain together with a hash of the uncompressed chain
-// it was produced from. The hash lets us assert (in debug builds) that a cached
-// entry is only ever reused for the chain it was computed from.
 struct CachedCompressedCert {
   std::string compressed;
   std::string chain_hash;
 };
 
-// Per-certificate cache of compressed certificates, attached to the SSL_CTX so
-// it lives as long as the certificate/context. Keyed by TLS cert-compression
-// algorithm id: the client selects the algorithm (brotli or zlib), and Envoy
-// uses one certificate chain per SSL_CTX, so a slot per algorithm is enough.
-// This mirrors OpenSSL's per-algorithm array on the credential
-// (CERT_PKEY.comp_cert[]).
 struct CompressedCertCache {
   absl::Mutex mu;
   absl::flat_hash_map<uint16_t, CachedCompressedCert> by_alg ABSL_GUARDED_BY(mu);
@@ -70,17 +60,12 @@ int sslCtxCacheIndex() {
   }());
 }
 
-// Attaches an empty cache to the context if it doesn't have one yet. Called from
-// the registration path, which runs single-threaded during configuration before
-// any handshake.
 void ensureCompressedCertCache(SSL_CTX* ssl_ctx) {
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
   if (SSL_CTX_get_ex_data(ssl_ctx, sslCtxCacheIndex()) != nullptr) {
     return;
   }
   auto cache = std::make_unique<CompressedCertCache>();
   if (SSL_CTX_set_ex_data(ssl_ctx, sslCtxCacheIndex(), cache.get()) == 1) {
-    // Ownership transferred to the SSL_CTX; freed by freeCompressedCertCache.
     cache.release();
   }
 }
@@ -93,11 +78,6 @@ int writeToCbb(CBB* out, const std::string& data) {
   return CertCompression::SUCCESS;
 }
 
-// Compresses the certificate payload for `alg` and writes it to `out`, reusing
-// the per-context cached copy so the compression runs once per certificate
-// rather than once per handshake. BoringSSL only invokes the compression
-// callbacks during a handshake, with a valid SSL whose SSL_CTX had a cache
-// attached at registration, so both are required here.
 int compressCached(SSL* ssl, uint16_t alg,
                    absl::optional<std::string> (*compressor)(const uint8_t*, size_t), CBB* out,
                    const uint8_t* in, size_t in_len) {
@@ -106,22 +86,16 @@ int compressCached(SSL* ssl, uint16_t alg,
       SSL_CTX_get_ex_data(SSL_get_SSL_CTX(ssl), sslCtxCacheIndex()));
   ASSERT(cache != nullptr);
 
-  // Fast path: handshakes that hit the cache share a reader lock, so concurrent
-  // workers don't serialize on the steady-state lookup.
   {
     absl::ReaderMutexLock lock(&cache->mu);
     auto it = cache->by_alg.find(alg);
     if (it != cache->by_alg.end()) {
-      // There is one certificate chain per SSL_CTX, so a cached entry must
-      // correspond to the chain we were handed; verify in debug builds.
       ASSERT(certChainHash(in, in_len) == it->second.chain_hash,
              "compressed certificate cache hit for a different certificate chain");
       return writeToCbb(out, it->second.compressed);
     }
   }
 
-  // Slow path: compress without holding the lock, then store under the writer
-  // lock. try_emplace keeps a racing worker's entry if it got there first.
   absl::optional<std::string> compressed = compressor(in, in_len);
   if (!compressed.has_value()) {
     return CertCompression::FAILURE;
