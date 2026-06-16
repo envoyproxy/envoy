@@ -335,10 +335,15 @@ CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& 
   // A per-cluster upstream codec factory (configured via typed_extension_protocol_options) may
   // decorate or replace the stock codec built above; create_default hands over that stock codec.
   if (auto factory = host->cluster().upstreamHttpClientCodecFactory(); factory.has_value()) {
-    codec_ = factory->createClientCodec(Http::ClientCodecFactory::Context{type, *connection_, *this,
-                                                                          host->cluster(),
-                                                                          random_generator},
-                                        [this]() { return std::move(codec_); });
+    codec_ = factory->createClientCodec(
+        Http::ClientCodecFactory::Context{type, *connection_, *this, host->cluster(),
+                                          random_generator},
+        [this]() {
+          RELEASE_ASSERT(codec_ != nullptr, "upstream codec factory called create_default "
+                                            "more than once");
+          return std::move(codec_);
+        });
+    RELEASE_ASSERT(codec_ != nullptr, "upstream codec factory returned null client codec");
   }
 
   if (should_connect) {
