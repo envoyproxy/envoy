@@ -360,8 +360,8 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEvents) {
         }
       });
   builder_.setDisableDnsRefreshOnNetworkChange(false);
-  builder_.setLogLevel(Logger::Logger::debug);
-  Logger::Context::changeAllLogLevels(spdlog::level::debug);
+  builder_.setLogLevel(Logger::Logger::trace);
+  Logger::Context::changeAllLogLevels(spdlog::level::trace);
   initialize();
 
   // Set the network type to WIFI. This should trigger a network change.
