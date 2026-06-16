@@ -715,11 +715,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // Skip Filter and continue chain if a Passthrough header is matching.
   // Only increment counters here; do not modify request headers, as there may be
   // other instances of this filter configured that still need to process the request.
-  for (const auto& matcher : config_->passThroughMatchers()) {
-    if (matcher->matchesHeaders(headers)) {
-      config_->stats().oauth_passthrough_.inc();
-      return Http::FilterHeadersStatus::Continue;
-    }
+  if (Http::HeaderUtility::matchAnyHeader(headers, config_->passThroughMatchers())) {
+    config_->stats().oauth_passthrough_.inc();
+    return Http::FilterHeadersStatus::Continue;
   }
 
   if (!config_->requiredSecretsAvailable()) {
@@ -1551,21 +1549,11 @@ bool OAuth2Filter::shouldAllowFailed(const Http::RequestHeaderMap& headers) cons
     }
   }
 
-  for (const auto& matcher : config_->allowFailedMatchers()) {
-    if (matcher->matchesHeaders(headers)) {
-      return true;
-    }
-  }
-  return false;
+  return Http::HeaderUtility::matchAnyHeader(headers, config_->allowFailedMatchers());
 }
 
 bool OAuth2Filter::shouldDenyRedirect(const Http::RequestHeaderMap& headers) const {
-  for (const auto& matcher : config_->denyRedirectMatchers()) {
-    if (matcher->matchesHeaders(headers)) {
-      return true;
-    }
-  }
-  return false;
+  return Http::HeaderUtility::matchAnyHeader(headers, config_->denyRedirectMatchers());
 }
 
 void OAuth2Filter::continueWithFailedOAuth(const std::string& reason,

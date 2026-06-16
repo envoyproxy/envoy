@@ -336,6 +336,18 @@ public:
                            const std::vector<HeaderDataPtr>& config_headers);
 
   /**
+   * See if any of the headers specified in the config are present in a request.
+   * @param request_headers supplies the headers from the request.
+   * @param config_headers supplies the list of configured header conditions on which to match.
+   * @return bool true if any of the headers (and values) in the config_headers are found in the
+   *         request_headers. If no config_headers are specified, returns false.
+   */
+  static bool matchAnyHeader(const HeaderMap& request_headers,
+                             const std::vector<HeaderDataPtr>& config_headers);
+  static bool matchAnyHeader(const HeaderMap& request_headers,
+                             const std::vector<HeaderMatcherSharedPtr>& config_headers);
+
+  /**
    * Validates that a header value is valid, according to RFC 7230, section 3.2.
    * http://tools.ietf.org/html/rfc7230#section-3.2
    * @return bool true if the header values are valid, according to the aforementioned RFC.
