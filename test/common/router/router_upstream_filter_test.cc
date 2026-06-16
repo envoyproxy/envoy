@@ -165,6 +165,20 @@ TEST_F(RouterUpstreamFilterTest, UpstreamFilter) {
   auto headers = run();
   EXPECT_FALSE(headers.get(Http::LowerCaseString("x-header-to-add")).empty());
 }
+
+// The upstream filter chain inherits the connection manager's stat prefix (here "prefix").
+TEST_F(RouterUpstreamFilterTest, UpstreamFilterChainInheritsConnectionManagerStatScope) {
+  HttpFilter codec_filter;
+  codec_filter.set_name("envoy.filters.http.upstream_codec");
+  envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec upstream_codec_config;
+  codec_filter.mutable_typed_config()->PackFrom(upstream_codec_config);
+
+  init({codec_filter});
+
+  ASSERT_NE(nullptr, config_->upstream_ctx_);
+  EXPECT_EQ("prefix", config_->upstream_ctx_->scope().symbolTable().toString(
+                          config_->upstream_ctx_->scope().prefix()));
+}
 } // namespace
 } // namespace Router
 } // namespace Envoy

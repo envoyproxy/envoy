@@ -280,6 +280,8 @@ public:
   Http::Context& http_context_;
   Stats::StatName zone_name_;
   Stats::StatName empty_stat_name_;
+  // Declared before upstream_ctx_ so it outlives the context that references it.
+  Stats::ScopeSharedPtr upstream_filter_scope_;
   std::unique_ptr<Server::Configuration::UpstreamFactoryContext> upstream_ctx_;
   Http::FilterChainUtility::FilterFactoriesList upstream_http_filter_factories_;
 

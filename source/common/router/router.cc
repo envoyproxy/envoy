@@ -110,9 +110,12 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
     std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
         Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
             server_factory_ctx);
-    std::string prefix = context.scope().symbolTable().toString(context.scope().prefix());
+    // Scope the upstream filter chain to the connection manager's stat prefix so upstream filters
+    // emit stats with downstream context rather than at the root scope.
+    std::string prefix = context.scope().symbolTable().toString(stat_prefix);
+    upstream_filter_scope_ = context.scope().createScope(prefix);
     upstream_ctx_ = std::make_unique<Upstream::UpstreamFactoryContextImpl>(
-        server_factory_ctx, context.initManager(), context.scope());
+        server_factory_ctx, context.initManager(), *upstream_filter_scope_);
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
         helper(*filter_config_provider_manager, server_factory_ctx,
