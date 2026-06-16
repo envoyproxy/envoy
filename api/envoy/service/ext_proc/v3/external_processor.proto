@@ -6,9 +6,9 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
 import "envoy/type/v3/http_status.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
-import "google/protobuf/any.proto";
 
 import "xds/annotations/v3/status.proto";
 
@@ -160,7 +160,7 @@ message ProcessingRequest {
 //   the server must send back exactly one ``ProcessingResponse`` message.
 // * If it is set to ``FULL_DUPLEX_STREAMED``, the server must follow the API defined
 //   for this mode to send the ``ProcessingResponse`` messages.
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message ProcessingResponse {
   // The response type that is sent by the server.
   oneof response {
