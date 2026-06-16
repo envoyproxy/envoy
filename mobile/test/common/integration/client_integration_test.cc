@@ -85,12 +85,13 @@ public:
         forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
     // For H2 tests.
     Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
-    builder_.setLogLevel(Logger::Logger::info);
   }
 
   ~ClientIntegrationTest() override { Logger::Context::changeAllLogLevels(spdlog::level::info); }
 
   void initialize() override {
+    builder_.setLogLevel(log_level_);
+    Logger::Context::changeAllLogLevels(static_cast<spdlog::level::level_enum>(log_level_));
     builder_.enableWorkerThread(getUseWorkerThread());
     if (getUseWorkerThread()) {
       // Platform cert validation is disabled when using worker thread. The engine will use the
@@ -215,6 +216,7 @@ public:
   }
 
 protected:
+  Logger::Logger::Levels log_level_ = Logger::Logger::info;
   std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
   bool add_quic_hints_ = false;
   bool add_fake_dns_ = false;
@@ -310,8 +312,7 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
   builder_.setDnsResolver(dns_resolver_config);
 
   builder_.setDisableDnsRefreshOnFailure(true);
-  builder_.setLogLevel(Logger::Logger::debug);
-  Logger::Context::changeAllLogLevels(spdlog::level::debug);
+  log_level_ = Logger::Logger::debug;
   initialize();
 
   default_request_headers_.setHost("doesnotexist");
@@ -338,8 +339,7 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnNetworkChange) {
         }
       });
   builder_.setDisableDnsRefreshOnNetworkChange(true);
-  builder_.setLogLevel(Logger::Logger::debug);
-  Logger::Context::changeAllLogLevels(spdlog::level::debug);
+  log_level_ = Logger::Logger::debug;
   initialize();
 
   internalEngine()->onDefaultNetworkChanged(1);
@@ -360,8 +360,7 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEvents) {
         }
       });
   builder_.setDisableDnsRefreshOnNetworkChange(false);
-  builder_.setLogLevel(Logger::Logger::trace);
-  Logger::Context::changeAllLogLevels(spdlog::level::trace);
+  log_level_ = Logger::Logger::trace;
   initialize();
 
   // Set the network type to WIFI. This should trigger a network change.
@@ -422,8 +421,7 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEventsAndroid) {
         }
       });
   builder_.setDisableDnsRefreshOnNetworkChange(false);
-  builder_.setLogLevel(Logger::Logger::trace);
-  Logger::Context::changeAllLogLevels(spdlog::level::trace);
+  log_level_ = Logger::Logger::trace;
   initialize();
 
   // A new WIFI network appears and becomes the default network. Even though
