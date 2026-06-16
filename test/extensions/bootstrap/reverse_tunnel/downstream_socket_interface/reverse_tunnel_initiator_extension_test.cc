@@ -4,16 +4,21 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
 
+#include "test/common/formatter/command_extension.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -175,6 +180,54 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, AdditionalHeadersOverride) {
   EXPECT_EQ(headers[1].header().value(), "abc-def");
   EXPECT_EQ(headers[1].append_action(),
             envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeHeaderFormatters) {
+  Envoy::Formatter::TestCommandFactory factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(factory);
+
+  auto custom_config = config_;
+  auto* hdr = custom_config.mutable_http_handshake()->add_additional_headers();
+  hdr->mutable_header()->set_key("authorization");
+  hdr->mutable_header()->set_value("Bearer %COMMAND_EXTENSION()%");
+  auto* formatter = custom_config.mutable_http_handshake()->add_formatters();
+  formatter->set_name("envoy.formatter.TestFormatter");
+  formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue());
+
+  auto custom_extension =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
+  const auto& handshake_headers = custom_extension->handshakeHeaders();
+  ASSERT_NE(handshake_headers, nullptr);
+  ASSERT_EQ(handshake_headers->size(), 1);
+  EXPECT_EQ((*handshake_headers)[0].key.get(), "authorization");
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ((*handshake_headers)[0].value_formatter->format({}, stream_info),
+            "Bearer TestFormatter");
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeUnknownFormatterThrows) {
+  auto custom_config = config_;
+  auto* formatter = custom_config.mutable_http_handshake()->add_formatters();
+  formatter->set_name("envoy.formatter.does_not_exist");
+  formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue());
+
+  EXPECT_THROW_WITH_REGEX(
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config), EnvoyException,
+      "does_not_exist");
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeHeadersLiteralWithoutFormatters) {
+  auto custom_config = config_;
+  auto* hdr = custom_config.mutable_http_handshake()->add_additional_headers();
+  hdr->mutable_header()->set_key("x-literal");
+  hdr->mutable_header()->set_value("100% literal");
+
+  auto custom_extension =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
+  EXPECT_EQ(custom_extension->handshakeHeaders(), nullptr);
+  ASSERT_EQ(custom_extension->handshakeAdditionalHeaders().size(), 1);
+  EXPECT_EQ(custom_extension->handshakeAdditionalHeaders()[0].header().value(), "100% literal");
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, OnServerInitialized) {
