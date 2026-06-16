@@ -432,7 +432,7 @@ TEST_P(AwsLambdaFilterIntegrationTest, ExcludeHeadersFromSigning) {
   ASSERT_FALSE(auth_header.empty());
   std::string auth_value(auth_header[0]->value().getStringView());
 
-  // Verify that x-amzn headers and x-custom-exclude are not in SignedHeaders
+  // Verify that custom headers and x-custom-exclude are not in SignedHeaders
   EXPECT_THAT(auth_value, testing::Not(testing::HasSubstr("x-amzn-vpc-id")));
   EXPECT_THAT(auth_value, testing::Not(testing::HasSubstr("x-amzn-trace-id")));
   EXPECT_THAT(auth_value, testing::Not(testing::HasSubstr("x-custom-exclude")));
@@ -558,10 +558,10 @@ TEST_P(AwsLambdaFilterIntegrationTest, ExcludeHeadersUpstream) {
   // Verify that Authorization header is present
   EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("authorization")).empty());
 
-  // Verify x-amzn-vpc-id header is still forwarded
+  // Verify custom header is still forwarded
   EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-amzn-vpc-id")).empty());
 
-  // Get the Authorization header to verify x-amzn-vpc-id is not in SignedHeaders
+  // Get the Authorization header to verify custom header is not in SignedHeaders
   auto auth_header = upstream_request_->headers().get(Http::LowerCaseString("authorization"));
   ASSERT_FALSE(auth_header.empty());
   std::string auth_value(auth_header[0]->value().getStringView());
