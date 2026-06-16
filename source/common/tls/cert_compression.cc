@@ -5,6 +5,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
+#include "source/common/common/thread.h"
 
 #include "absl/base/thread_annotations.h"
 #include "absl/container/flat_hash_map.h"
@@ -12,6 +13,7 @@
 #include "absl/types/optional.h"
 #include "brotli/decode.h"
 #include "brotli/encode.h"
+#include "openssl/sha.h"
 #include "openssl/tls1.h"
 
 #define ZLIB_CONST
@@ -29,73 +31,13 @@ void CertCompression::registerZlib(SSL_CTX*) {}
 
 namespace {
 
-class ScopedZStream {
-public:
-  using CleanupFunc = int (*)(z_stream*);
-
-  ScopedZStream(z_stream& z, CleanupFunc cleanup) : z_(z), cleanup_(cleanup) {}
-  ~ScopedZStream() { cleanup_(&z_); }
-
-private:
-  z_stream& z_;
-  CleanupFunc cleanup_;
+// A compressed certificate chain together with a hash of the uncompressed chain
+// it was produced from. The hash lets us assert (in debug builds) that a cached
+// entry is only ever reused for the chain it was computed from.
+struct CachedCompressedCert {
+  std::string compressed;
+  std::string chain_hash;
 };
-
-constexpr size_t MaxCacheableCertBytes = 256 * 1024;
-
-absl::optional<std::string> doBrotliCompress(const uint8_t* in, size_t in_len) {
-  size_t encoded_size = BrotliEncoderMaxCompressedSize(in_len);
-  if (encoded_size == 0) {
-    IS_ENVOY_BUG("BrotliEncoderMaxCompressedSize returned 0");
-    return absl::nullopt;
-  }
-
-  std::string compressed(encoded_size, '\0');
-  if (BrotliEncoderCompress(BROTLI_DEFAULT_QUALITY, BROTLI_DEFAULT_WINDOW, BROTLI_MODE_GENERIC,
-                            in_len, in, &encoded_size,
-                            reinterpret_cast<uint8_t*>(compressed.data())) != BROTLI_TRUE) {
-    IS_ENVOY_BUG("Cert compression failure in BrotliEncoderCompress");
-    return absl::nullopt;
-  }
-
-  compressed.resize(encoded_size);
-  return compressed;
-}
-
-absl::optional<std::string> doZlibCompress(const uint8_t* in, size_t in_len) {
-  z_stream z = {};
-  // The deflateInit macro from zlib.h contains an old-style cast, so we need to suppress the
-  // warning for this call.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-  int rv = deflateInit(&z, Z_DEFAULT_COMPRESSION);
-#pragma GCC diagnostic pop
-  if (rv != Z_OK) {
-    IS_ENVOY_BUG(fmt::format("Cert compression failure in deflateInit: {}", rv));
-    return absl::nullopt;
-  }
-
-  ScopedZStream deleter(z, deflateEnd);
-
-  const auto upper_bound = deflateBound(&z, in_len);
-  std::string compressed(upper_bound, '\0');
-
-  z.next_in = in;
-  z.avail_in = in_len;
-  z.next_out = reinterpret_cast<uint8_t*>(compressed.data());
-  z.avail_out = upper_bound;
-
-  rv = deflate(&z, Z_FINISH);
-  if (rv != Z_STREAM_END) {
-    IS_ENVOY_BUG(fmt::format(
-        "Cert compression failure in deflate: {}, z.total_out {}, in_len {}, z.avail_in {}", rv,
-        z.avail_in, in_len, z.avail_in));
-    return absl::nullopt;
-  }
-
-  compressed.resize(z.total_out);
-  return compressed;
-}
 
 // Per-certificate cache of compressed certificates, attached to the SSL_CTX so
 // it lives as long as the certificate/context. Keyed by TLS cert-compression
@@ -105,8 +47,14 @@ absl::optional<std::string> doZlibCompress(const uint8_t* in, size_t in_len) {
 // (CERT_PKEY.comp_cert[]).
 struct CompressedCertCache {
   absl::Mutex mu;
-  absl::flat_hash_map<uint16_t, std::string> by_alg ABSL_GUARDED_BY(mu);
+  absl::flat_hash_map<uint16_t, CachedCompressedCert> by_alg ABSL_GUARDED_BY(mu);
 };
+
+std::string certChainHash(const uint8_t* in, size_t in_len) {
+  std::string hash(SHA256_DIGEST_LENGTH, '\0');
+  SHA256(in, in_len, reinterpret_cast<uint8_t*>(hash.data()));
+  return hash;
+}
 
 void freeCompressedCertCache(void* /*parent*/, void* ptr, CRYPTO_EX_DATA* /*ad*/, int /*index*/,
                              long /*argl*/, void* /*argp*/) {
@@ -123,8 +71,10 @@ int sslCtxCacheIndex() {
 }
 
 // Attaches an empty cache to the context if it doesn't have one yet. Called from
-// the (single-threaded) registration path, before any handshake runs.
+// the registration path, which runs single-threaded during configuration before
+// any handshake.
 void ensureCompressedCertCache(SSL_CTX* ssl_ctx) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   if (SSL_CTX_get_ex_data(ssl_ctx, sslCtxCacheIndex()) != nullptr) {
     return;
   }
@@ -145,25 +95,16 @@ int writeToCbb(CBB* out, const std::string& data) {
 
 // Compresses the certificate payload for `alg` and writes it to `out`, reusing
 // the per-context cached copy so the compression runs once per certificate
-// rather than once per handshake.
+// rather than once per handshake. BoringSSL only invokes the compression
+// callbacks during a handshake, with a valid SSL whose SSL_CTX had a cache
+// attached at registration, so both are required here.
 int compressCached(SSL* ssl, uint16_t alg,
                    absl::optional<std::string> (*compressor)(const uint8_t*, size_t), CBB* out,
                    const uint8_t* in, size_t in_len) {
-  SSL_CTX* ssl_ctx = ssl != nullptr ? SSL_get_SSL_CTX(ssl) : nullptr;
-  auto* cache =
-      ssl_ctx != nullptr
-          ? static_cast<CompressedCertCache*>(SSL_CTX_get_ex_data(ssl_ctx, sslCtxCacheIndex()))
-          : nullptr;
-
-  // Compress directly when there's no cache to use (e.g. unit tests with a null
-  // SSL) or the payload is too large to cache.
-  if (cache == nullptr || in_len > MaxCacheableCertBytes) {
-    const absl::optional<std::string> compressed = compressor(in, in_len);
-    if (!compressed.has_value()) {
-      return CertCompression::FAILURE;
-    }
-    return writeToCbb(out, *compressed);
-  }
+  ASSERT(ssl != nullptr);
+  auto* cache = static_cast<CompressedCertCache*>(
+      SSL_CTX_get_ex_data(SSL_get_SSL_CTX(ssl), sslCtxCacheIndex()));
+  ASSERT(cache != nullptr);
 
   // Fast path: handshakes that hit the cache share a reader lock, so concurrent
   // workers don't serialize on the steady-state lookup.
@@ -171,7 +112,11 @@ int compressCached(SSL* ssl, uint16_t alg,
     absl::ReaderMutexLock lock(&cache->mu);
     auto it = cache->by_alg.find(alg);
     if (it != cache->by_alg.end()) {
-      return writeToCbb(out, it->second);
+      // There is one certificate chain per SSL_CTX, so a cached entry must
+      // correspond to the chain we were handed; verify in debug builds.
+      ASSERT(certChainHash(in, in_len) == it->second.chain_hash,
+             "compressed certificate cache hit for a different certificate chain");
+      return writeToCbb(out, it->second.compressed);
     }
   }
 
@@ -182,8 +127,30 @@ int compressCached(SSL* ssl, uint16_t alg,
     return CertCompression::FAILURE;
   }
   absl::WriterMutexLock lock(&cache->mu);
-  auto it = cache->by_alg.try_emplace(alg, std::move(*compressed)).first;
-  return writeToCbb(out, it->second);
+  auto it =
+      cache->by_alg
+          .try_emplace(alg, CachedCompressedCert{std::move(*compressed), certChainHash(in, in_len)})
+          .first;
+  return writeToCbb(out, it->second.compressed);
+}
+
+absl::optional<std::string> doBrotliCompress(const uint8_t* in, size_t in_len) {
+  size_t encoded_size = BrotliEncoderMaxCompressedSize(in_len);
+  if (encoded_size == 0) {
+    IS_ENVOY_BUG("BrotliEncoderMaxCompressedSize returned 0");
+    return absl::nullopt;
+  }
+
+  std::string compressed(encoded_size, '\0');
+  if (BrotliEncoderCompress(BROTLI_DEFAULT_QUALITY, BROTLI_DEFAULT_WINDOW, BROTLI_MODE_GENERIC,
+                            in_len, in, &encoded_size,
+                            reinterpret_cast<uint8_t*>(compressed.data())) != BROTLI_TRUE) {
+    IS_ENVOY_BUG("Cert compression failure in BrotliEncoderCompress");
+    return absl::nullopt;
+  }
+
+  compressed.resize(encoded_size);
+  return compressed;
 }
 
 } // namespace
@@ -244,6 +211,57 @@ int CertCompression::decompressBrotli(SSL*, CRYPTO_BUFFER** out, size_t uncompre
   *out = decompressed_data.release();
   return SUCCESS;
 }
+
+namespace {
+
+class ScopedZStream {
+public:
+  using CleanupFunc = int (*)(z_stream*);
+
+  ScopedZStream(z_stream& z, CleanupFunc cleanup) : z_(z), cleanup_(cleanup) {}
+  ~ScopedZStream() { cleanup_(&z_); }
+
+private:
+  z_stream& z_;
+  CleanupFunc cleanup_;
+};
+
+absl::optional<std::string> doZlibCompress(const uint8_t* in, size_t in_len) {
+  z_stream z = {};
+  // The deflateInit macro from zlib.h contains an old-style cast, so we need to suppress the
+  // warning for this call.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+  int rv = deflateInit(&z, Z_DEFAULT_COMPRESSION);
+#pragma GCC diagnostic pop
+  if (rv != Z_OK) {
+    IS_ENVOY_BUG(fmt::format("Cert compression failure in deflateInit: {}", rv));
+    return absl::nullopt;
+  }
+
+  ScopedZStream deleter(z, deflateEnd);
+
+  const auto upper_bound = deflateBound(&z, in_len);
+  std::string compressed(upper_bound, '\0');
+
+  z.next_in = in;
+  z.avail_in = in_len;
+  z.next_out = reinterpret_cast<uint8_t*>(compressed.data());
+  z.avail_out = upper_bound;
+
+  rv = deflate(&z, Z_FINISH);
+  if (rv != Z_STREAM_END) {
+    IS_ENVOY_BUG(fmt::format(
+        "Cert compression failure in deflate: {}, z.total_out {}, in_len {}, z.avail_in {}", rv,
+        z.avail_in, in_len, z.avail_in));
+    return absl::nullopt;
+  }
+
+  compressed.resize(z.total_out);
+  return compressed;
+}
+
+} // namespace
 
 int CertCompression::compressZlib(SSL* ssl, CBB* out, const uint8_t* in, size_t in_len) {
   const int rc = compressCached(ssl, TLSEXT_cert_compression_zlib, doZlibCompress, out, in, in_len);
