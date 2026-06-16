@@ -121,10 +121,11 @@ WuffsJsonCursor::WuffsJsonCursor(Handler& handler, bool track_paths, int max_dep
 //                                                         record byte ranges for containers
 //   STRING              String content or quote delim     Keys: appendStringToken to key_buffer_.
 //                       (plain bytes only — no escapes)   Values: COPY tokens -> onStringChunk if
-//                                                         string_chunk_active_; DROP tokens skipped.
+//                                                         string_chunk_active_; DROP tokens
+//                                                         skipped.
 //   UNICODE_CODE_POINT  Decoded backslash escape          Keys: appendCodePoint to key_buffer_.
-//                                                         Values: encode to stack buf, onStringChunk
-//                                                         if string_chunk_active_.
+//                                                         Values: encode to stack buf,
+//                                                         onStringChunk if string_chunk_active_.
 //   NUMBER              Numeric literal                   Forward raw bytes to onNumber
 //   LITERAL             true / false / null               Dispatch to onBoolean or onNull
 //

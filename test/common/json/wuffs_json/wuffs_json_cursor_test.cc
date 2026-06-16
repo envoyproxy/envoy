@@ -35,14 +35,12 @@ struct CapturingHandler : WuffsJsonCursor::Handler {
     return false;
   }
 
-  bool onStringChunk(absl::string_view /*key*/, int /*depth*/,
-                     absl::string_view chunk) override {
+  bool onStringChunk(absl::string_view /*key*/, int /*depth*/, absl::string_view chunk) override {
     pending_str_.append(chunk);
     return true;
   }
 
-  void closeStringCapture(absl::string_view /*key*/, int /*depth*/,
-                          size_t /*token_end*/) override {
+  void closeStringCapture(absl::string_view /*key*/, int /*depth*/, size_t /*token_end*/) override {
     fields.push_back({pending_key_, pending_str_, {}, /*is_string=*/true});
   }
 

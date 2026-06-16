@@ -1084,7 +1084,7 @@ cc_library(
     # a header (declarations only) when included without WUFFS_IMPLEMENTATION,
     # and as a full implementation when WUFFS_IMPLEMENTATION is defined (done
     # in exactly one TU: wuffs_impl.c).  Listed as hdrs so dependent targets
-    # may #include it.
+    # may include it.
     textual_hdrs = ["release/c/wuffs-v0.4.c"],
     visibility = ["//visibility:public"],
     copts = ["-Wno-unused-function"],
