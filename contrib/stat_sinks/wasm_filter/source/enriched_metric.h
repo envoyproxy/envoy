@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -8,8 +9,6 @@
 #include "envoy/stats/stats.h"
 
 #include "source/common/stats/symbol_table.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -82,7 +81,7 @@ private:
   const Stats::Counter& original_;
   const Stats::TagVector& extra_tags_;
   const std::string& name_override_;
-  absl::optional<Stats::StatNameManagedStorage> override_stat_name_;
+  std::optional<Stats::StatNameManagedStorage> override_stat_name_;
 };
 
 // Wraps an existing Gauge with tag/name overrides.
@@ -142,7 +141,7 @@ private:
   const Stats::Gauge& original_;
   const Stats::TagVector& extra_tags_;
   const std::string& name_override_;
-  absl::optional<Stats::StatNameManagedStorage> override_stat_name_;
+  std::optional<Stats::StatNameManagedStorage> override_stat_name_;
 };
 
 // Wraps an existing ParentHistogram with tag/name overrides.
@@ -214,7 +213,7 @@ private:
   const Stats::ParentHistogram& original_;
   const Stats::TagVector& extra_tags_;
   const std::string& name_override_;
-  absl::optional<Stats::StatNameManagedStorage> override_stat_name_;
+  std::optional<Stats::StatNameManagedStorage> override_stat_name_;
 };
 
 // A standalone synthetic counter with stored name, value, and tags.

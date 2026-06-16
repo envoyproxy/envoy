@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "source/common/buffer/buffer_impl.h"
 
 #include "contrib/sip_proxy/filters/network/source/filters/filter.h"
@@ -51,7 +53,7 @@ private:
         : next_state_(next_state), filter_status_(filter_status) {};
 
     State next_state_;
-    absl::optional<FilterStatus> filter_status_;
+    std::optional<FilterStatus> filter_status_;
   };
 
   DecoderStatus transportBegin();

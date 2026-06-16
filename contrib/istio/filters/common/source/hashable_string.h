@@ -1,10 +1,10 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/common/hashable.h"
 
 #include "source/common/router/string_accessor_impl.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Istio {
@@ -15,7 +15,7 @@ public:
   HashableString(absl::string_view value);
 
   // Hashable
-  absl::optional<uint64_t> hash() const override;
+  std::optional<uint64_t> hash() const override;
 };
 
 } // namespace Common
