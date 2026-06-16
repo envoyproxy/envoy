@@ -1,12 +1,12 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/common/hashable.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/common/protobuf/protobuf.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Istio {
@@ -118,16 +118,16 @@ public:
         workload_type_(workload_type), identity_(identity), locality_region_(region),
         locality_zone_(zone) {}
 
-  absl::optional<uint64_t> hash() const override;
+  std::optional<uint64_t> hash() const override;
   Envoy::ProtobufTypes::MessagePtr serializeAsProto() const override;
   std::vector<std::pair<absl::string_view, absl::string_view>> serializeAsPairs() const;
-  absl::optional<std::string> serializeAsString() const override;
-  absl::optional<std::string> owner() const;
+  std::optional<std::string> serializeAsString() const override;
+  std::optional<std::string> owner() const;
   std::string identity() const;
   bool hasFieldSupport() const override { return true; }
   using Envoy::StreamInfo::FilterState::Object::FieldType;
   FieldType getField(absl::string_view) const override;
-  absl::optional<absl::string_view> field(absl::string_view field_name) const;
+  std::optional<absl::string_view> field(absl::string_view field_name) const;
   void setLabels(std::vector<std::pair<std::string, std::string>> labels) { labels_ = labels; }
   std::vector<std::pair<std::string, std::string>> getLabels() const { return labels_; }
   std::string baggage() const;
@@ -167,14 +167,13 @@ convertStructToWorkloadMetadata(const Envoy::Protobuf::Struct& metadata,
 std::unique_ptr<WorkloadMetadataObject>
 convertStructToWorkloadMetadata(const Envoy::Protobuf::Struct& metadata,
                                 const absl::flat_hash_set<std::string>& additional_labels,
-                                const absl::optional<envoy::config::core::v3::Locality> locality);
+                                const std::optional<envoy::config::core::v3::Locality> locality);
 
 // Convert endpoint metadata string to a metadata object.
 // Telemetry metadata is compressed into a semicolon separated string:
 // workload-name;namespace;canonical-service-name;canonical-service-revision;cluster-id.
 // Telemetry metadata is stored as a string under "istio", "workload" field path.
-absl::optional<WorkloadMetadataObject>
-convertEndpointMetadata(const std::string& endpoint_encoding);
+std::optional<WorkloadMetadataObject> convertEndpointMetadata(const std::string& endpoint_encoding);
 
 std::string serializeToStringDeterministic(const Envoy::Protobuf::Struct& metadata);
 

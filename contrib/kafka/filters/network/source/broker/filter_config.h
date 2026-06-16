@@ -1,9 +1,9 @@
 #pragma once
 
+#include <optional>
 #include <utility>
 
 #include "absl/container/flat_hash_set.h"
-#include "absl/types/optional.h"
 #include "contrib/envoy/extensions/filters/network/kafka_broker/v3/kafka_broker.pb.h"
 #include "contrib/envoy/extensions/filters/network/kafka_broker/v3/kafka_broker.pb.validate.h"
 
@@ -57,7 +57,7 @@ public:
   /**
    * Returns override address for a broker.
    */
-  virtual absl::optional<HostAndPort> findBrokerAddressOverride(const uint32_t broker_id) const;
+  virtual std::optional<HostAndPort> findBrokerAddressOverride(const uint32_t broker_id) const;
 
   /**
    * Returns what API keys are allowed.
