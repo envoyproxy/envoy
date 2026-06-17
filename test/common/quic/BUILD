@@ -6,6 +6,7 @@ load(
     "envoy_package",
     "envoy_proto_library",
     "envoy_select_enable_http3",
+    "envoy_select_enable_http_datagrams",
 )
 
 licenses(["notice"])  # Apache 2
@@ -143,6 +144,8 @@ envoy_cc_test(
         "@quiche//:quic_core_http_spdy_session_lib",
         "@quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
         "@quiche//:quic_test_tools_session_peer_lib",
+    ]) + envoy_select_enable_http_datagrams([
+        "//source/common/quic:web_transport_session_bridge_lib",
     ]),
 )
 
@@ -159,6 +162,7 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_connection_helper_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:stream_decoder_mock",
+        "//test/mocks/http:webtransport_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
@@ -190,6 +194,7 @@ envoy_cc_test(
         "//test/test_common:global_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "@quiche//:quic_test_tools_config_peer_lib",
         "@quiche//:quic_test_tools_stream_peer_lib",
         "@quiche//:quic_test_tools_server_session_base_peer",
@@ -408,6 +413,17 @@ envoy_cc_test(
         "//test/mocks/buffer:buffer_mocks",
         "//test/test_common:utility_lib",
         "@quiche//:quic_test_tools_test_utils_lib",
+    ]),
+)
+
+envoy_cc_test(
+    name = "web_transport_session_bridge_test",
+    srcs = envoy_select_enable_http3(["web_transport_session_bridge_test.cc"]),
+    rbe_pool = "6gig",
+    deps = envoy_select_enable_http3([
+        "//source/common/quic:web_transport_session_bridge_lib",
+        "//test/mocks/http:webtransport_mocks",
+        "@quiche//:quiche_common_capsule_lib",
     ]),
 )
 

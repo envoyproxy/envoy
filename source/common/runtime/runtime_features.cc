@@ -168,6 +168,10 @@ FALSE_RUNTIME_GUARD(envoy_restart_features_xds_failover_support);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_cache_set_ip_version_to_remove);
 // TODO(fredyw): evaluate and either make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_no_tcp_delay);
+// WebTransport over HTTP/3 is opt-in while it stabilizes. When disabled (the default), the QUIC
+// client and server sessions advertise no WebTransport versions, so WebTransport is never
+// negotiated (SupportsWebTransport() stays false).
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_support_web_transport);
 // TODO(danzh) re-enable it when the issue of preferring TCP over v6 rather than QUIC over v4 is
 // fixed.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http3_happy_eyeballs);

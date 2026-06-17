@@ -2821,6 +2821,30 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "web_transport_integration_test",
+    size = "large",
+    srcs = select({
+        "//bazel:disable_http3": [],
+        "//conditions:default": ["web_transport_integration_test.cc"],
+    }),
+    data = ["//test/config/integration/certs"],
+    rbe_pool = "6gig",
+    deps = envoy_select_enable_http3([
+        ":http_integration_lib",
+        ":http_protocol_integration_lib",
+        "//source/common/quic:active_quic_listener_lib",
+        "//source/common/quic:client_connection_factory_lib",
+        "//source/common/quic:quic_client_factory_lib",
+        "//source/common/quic:quic_server_factory_lib",
+        "//source/common/quic:quic_transport_socket_factory_lib",
+        "//test/test_common:utility_lib",
+        "@quiche//:quiche_common_buffer_allocator_lib",
+        "@quiche//:quiche_web_transport_web_transport_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ]),
+)
+
+envoy_cc_test(
     name = "original_ip_detection_integration_test",
     size = "large",
     srcs = [

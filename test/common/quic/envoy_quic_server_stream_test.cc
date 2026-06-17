@@ -103,8 +103,22 @@ public:
     // buffers data until the SETTINGS frame is received.
     quic::SettingsFrame settings;
     settings.values[quic::SETTINGS_H3_DATAGRAM] = 1;
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+    if (enableWebTransport()) {
+      // Advertise WebTransport locally and in the peer's SETTINGS so QUICHE negotiates WebTransport
+      // and creates a WebTransportHttp3 session for an extended-CONNECT ":protocol: webtransport"
+      // request (which makes EnvoyQuicServerStream::web_transport() non-null).
+      quic_session_.setLocallySupportedWebTransportVersions(
+          quic::kDefaultSupportedWebTransportVersions);
+      settings.values[quic::SETTINGS_WEBTRANS_DRAFT00] = 1;
+      settings.values[quic::SETTINGS_WEBTRANS_MAX_SESSIONS_DRAFT07] = 1;
+    }
+#endif
     EXPECT_TRUE(quic_session_.OnSettingsFrame(settings));
   }
+
+  // Overridden by the WebTransport fixture to negotiate WebTransport during SetUp().
+  virtual bool enableWebTransport() const { return false; }
 
   void TearDown() override {
     if (quic_connection_.connected()) {
@@ -155,6 +169,27 @@ public:
     Http::TestResponseHeaderMapImpl response_headers = {{":status", "200"},
                                                         {"capsule-protocol", "?1"}};
     quic_stream_->encodeHeaders(response_headers, close_send_stream);
+  }
+
+  // Sends a WebTransport extended-CONNECT request, leaving the stream open. After this QUICHE has
+  // created the stream's WebTransportHttp3 session (web_transport() is non-null). Returns the byte
+  // length consumed so callers can frame subsequent data at the right offset. Requires
+  // enableWebTransport() to be true.
+  size_t setUpWebTransportConnect() {
+    EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false));
+    quiche::HttpHeaderBlock request_headers;
+    request_headers[":authority"] = host_;
+    request_headers[":method"] = "CONNECT";
+    request_headers[":protocol"] = "webtransport";
+    request_headers[":path"] = "/";
+    request_headers[":scheme"] = "https";
+    std::string payload = spdyHeaderToHttp3StreamPayload(request_headers);
+    quic::QuicStreamFrame frame(stream_id_, /*fin=*/false, 0, payload);
+    quic_stream_->OnStreamFrame(frame);
+    EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
+    // QUICHE created the WebTransport session for the negotiated extended CONNECT.
+    EXPECT_TRUE(quic_stream_->webTransportSession().has_value());
+    return payload.length();
   }
 #endif
 
@@ -951,6 +986,75 @@ TEST_F(EnvoyQuicServerStreamTest, DecodeHttp3Datagram) {
   setUpCapsuleProtocol(true, false);
   EXPECT_CALL(stream_decoder_, decodeData(BufferString(capsule_fragment_), _));
   quic_session_.OnDatagramReceived(datagram_fragment_);
+}
+
+// A WebTransport CONNECT stream is header-only at the HTTP layer; trailers/METADATA/body are not
+// part of WebTransport. EnvoyQuicServerStream::resetIfWebTransport() resets such a stream so the
+// offending frame is never proxied upstream. (Body never reaches OnBodyAvailable because QUICHE
+// routes a WebTransport stream's DATA through its capsule parser, so the reachable receive-path
+// violations tested here are trailers and METADATA, which share the same resetIfWebTransport().)
+class EnvoyQuicServerStreamWebTransportTest : public EnvoyQuicServerStreamTest {
+protected:
+  bool enableWebTransport() const override { return true; }
+};
+
+TEST_F(EnvoyQuicServerStreamWebTransportTest, TrailersResetWebTransportStream) {
+  size_t offset = setUpWebTransportConnect();
+  // The trailers must be rejected (stream reset), not decoded and proxied.
+  EXPECT_CALL(stream_decoder_, decodeTrailers_(_)).Times(0);
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+  EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _)).Times(testing::AtMost(1));
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+  receiveTrailers(offset);
+}
+
+TEST_F(EnvoyQuicServerStreamWebTransportTest, MetadataResetsWebTransportStream) {
+  setUpWebTransportConnect();
+  // METADATA on a WebTransport CONNECT stream is a protocol violation: it must reset the stream
+  // rather than be decoded. Drive OnMetadataComplete directly with an empty (sub-limit) header
+  // list so the only relevant branch exercised is resetIfWebTransport("metadata").
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+  EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _)).Times(testing::AtMost(1));
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+  quic::QuicHeaderList header_list;
+  quic_stream_->OnMetadataComplete(/*frame_len=*/0, header_list);
+}
+
+// A valid WebTransport extended-CONNECT exposes the stream's WebTransport session through
+// webTransportSession(): it returns a value, that value is the stream itself (which implements the
+// Http::WebTransportSession interface), and its rawWebTransportSession() is the QUICHE session
+// QUICHE created for the CONNECT. This is the handle the upstream codec bridges to.
+TEST_F(EnvoyQuicServerStreamWebTransportTest, WebTransportSessionAvailableForWebTransportConnect) {
+  setUpWebTransportConnect();
+
+  OptRef<Http::WebTransportSession> session = quic_stream_->webTransportSession();
+  ASSERT_TRUE(session.has_value());
+  EXPECT_EQ(session.ptr(), static_cast<Http::WebTransportSession*>(quic_stream_));
+  ASSERT_NE(quic_stream_->web_transport(), nullptr);
+  EXPECT_EQ(session->rawWebTransportSession(), quic_stream_->web_transport());
+
+  // The stream is left open; TearDown closes the connection, which resets it.
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+}
+
+// A regular request (not an extended CONNECT) on a WebTransport-capable session is not a
+// WebTransport stream: QUICHE creates no WebTransport session, so webTransportSession() is empty.
+TEST_F(EnvoyQuicServerStreamWebTransportTest, NoWebTransportSessionForRegularRequest) {
+  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false));
+  quiche::HttpHeaderBlock request_headers;
+  request_headers[":authority"] = host_;
+  request_headers[":method"] = "GET";
+  request_headers[":path"] = "/";
+  request_headers[":scheme"] = "https";
+  std::string payload = spdyHeaderToHttp3StreamPayload(request_headers);
+  quic_stream_->OnStreamFrame(quic::QuicStreamFrame(stream_id_, /*fin=*/false, 0, payload));
+  EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
+
+  EXPECT_EQ(quic_stream_->web_transport(), nullptr);
+  EXPECT_FALSE(quic_stream_->webTransportSession().has_value());
+
+  // The stream is left open; TearDown closes the connection, which resets it.
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 #endif
 
