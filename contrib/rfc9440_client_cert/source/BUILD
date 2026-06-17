@@ -2,12 +2,12 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_extension_package",
+    "envoy_contrib_package",
 )
 
-licenses(["notice"])
+licenses(["notice"])  # Apache 2
 
-envoy_extension_package()
+envoy_contrib_package()
 
 envoy_cc_library(
     name = "rfc9440_client_cert_filter_lib",
