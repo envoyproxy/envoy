@@ -25,7 +25,7 @@ namespace Json {
 // resumption, escape sequence decoding — are hidden behind the Handler
 // interface; consumers see only clean, decoded events.
 //
-// ── Streaming model ──────────────────────────────────────────────────────────
+// Streaming model
 //
 // Call feed(chunk, closed) for each incoming chunk; set closed=true on the
 // final one to signal EOF. The Wuffs decoder is a class member that preserves
@@ -39,7 +39,7 @@ namespace Json {
 //     if (auto s = cursor.feed(c.data, c.is_last); !s.ok()) { /* error */ }
 //   }
 //
-// ── Depth and key model ───────────────────────────────────────────────────────
+// Depth and key model
 //
 // Every callback receives `depth` — the nesting level of the value or container
 // being reported. Depth starts at 0 before the root container.
@@ -68,7 +68,7 @@ namespace Json {
 //   onContainerClose   (depth=2, ...)
 //   onContainerClose   (depth=1, ...)
 //
-// ── String value lifecycle ────────────────────────────────────────────────────
+// String value lifecycle
 //
 // At the start of a string value the cursor calls openStringCapture. Return
 // true to receive the content as decoded UTF-8 via onStringChunk — one call
@@ -81,7 +81,7 @@ namespace Json {
 // by the cursor before the call. Each chunk is a string_view valid only for
 // the duration of that call — copy if retention is needed.
 //
-// ── Fine-grained control inside large values ──────────────────────────────────
+// Fine-grained control inside large values
 //
 // onStringChunk returning bool enables chunk-level decisions within a single
 // string value, not just the all-or-nothing choice at openStringCapture:
@@ -106,7 +106,7 @@ namespace Json {
 // return false from openStringCapture and use onContainerOpen/Close byte
 // ranges on the parent container for zero-copy access to the raw JSON bytes.
 //
-// ── Container byte ranges ─────────────────────────────────────────────────────
+// Container byte ranges
 //
 // onContainerOpen receives token_start — the byte offset of the opening { or [
 // in the original body stream. onContainerClose receives token_end — the offset
@@ -114,7 +114,7 @@ namespace Json {
 // range [token_start, token_end) suitable for zero-copy sub-range extraction when
 // the body is memory-mapped or stored contiguously.
 //
-// ── Path tracking ─────────────────────────────────────────────────────────────
+// Path tracking
 //
 // Construct with track_paths=true and call buildIndexedPath(depth) or
 // buildPatternPath(depth) from within any callback to obtain dot-notation

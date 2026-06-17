@@ -1,6 +1,10 @@
 #include "source/common/json/wuffs_json/wuffs_json_cursor.h"
 
+#include <string>
+
+#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Json {
@@ -62,7 +66,6 @@ WuffsJsonCursor::WuffsJsonCursor(Handler& handler, bool track_paths, int max_dep
 // to the Handler callbacks.
 //
 // Wuffs token model
-// ─────────────────
 // Each wuffs_base__token carries three fields used here:
 //
 //   token_category (value_base_category) — coarse token kind; the switch below:
@@ -112,9 +115,7 @@ WuffsJsonCursor::WuffsJsonCursor(Handler& handler, bool track_paths, int max_dep
 //        onContainerClose deliver token_start / token_end from this counter.
 //
 // VBC dispatch summary
-// ────────────────────
 //   VBC constant        Meaning                           Action
-//   ─────────────────   ──────────────────────────────   ──────────────────────────────────────────
 //   FILLER              Whitespace, commas, colons        Advance body_src_pos_; no other action
 //   STRUCTURE           Object/array open or close        Manage depth_, is_dict_[],
 //   expecting_key_[];
@@ -130,7 +131,6 @@ WuffsJsonCursor::WuffsJsonCursor(Handler& handler, bool track_paths, int max_dep
 //   LITERAL             true / false / null               Dispatch to onBoolean or onNull
 //
 // Outer loop suspension
-// ─────────────────────
 // decode_tokens returns one of three status classes:
 //   nullptr / note  Complete — document fully consumed; set wuffs_done_.
 //   short_read      token_buf_ drained before source_buf exhausted — need more
