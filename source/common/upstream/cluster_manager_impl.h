@@ -385,6 +385,9 @@ public:
   void drainConnections(DrainConnectionsHostPredicate predicate,
                         ConnectionPool::DrainBehavior drain_behavior) override;
 
+  void drainOrCloseConnPools(DrainConnectionsPoolPredicate predicate,
+                             ConnectionPool::DrainBehavior drain_behavior) override;
+
   absl::Status checkActiveStaticCluster(const std::string& cluster) override;
 
   // Upstream::MissingClusterNotifier
@@ -703,6 +706,9 @@ private:
     // be immediate.
     void drainOrCloseConnPools(const HostSharedPtr& host,
                                absl::optional<ConnectionPool::DrainBehavior> drain_behavior);
+
+    void drainOrCloseConnPools(DrainConnectionsPoolPredicate predicate,
+                               ConnectionPool::DrainBehavior behavior);
 
     void httpConnPoolIsIdle(HostConstSharedPtr host, ResourcePriority priority,
                             const std::vector<uint8_t>& hash_key);

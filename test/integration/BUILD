@@ -567,6 +567,7 @@ envoy_cc_test(
         "//source/common/protobuf",
         "//source/extensions/http/original_ip_detection/xff:config",
         "//test/config:v2_link_hacks",
+        "//test/mocks/network:network_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

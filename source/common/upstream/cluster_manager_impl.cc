@@ -1105,6 +1105,16 @@ void ClusterManagerImpl::drainConnections(DrainConnectionsHostPredicate predicat
       });
 }
 
+void ClusterManagerImpl::drainOrCloseConnPools(DrainConnectionsPoolPredicate predicate,
+                                               ConnectionPool::DrainBehavior drain_behavior) {
+  ENVOY_LOG_EVENT(debug, "drain_connections_by_pool_predicate",
+                  "drainOrCloseConnPools called with pool predicate");
+  tls_.runOnAllThreads(
+      [predicate, drain_behavior](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+        cluster_manager->drainOrCloseConnPools(predicate, drain_behavior);
+      });
+}
+
 absl::Status ClusterManagerImpl::checkActiveStaticCluster(const std::string& cluster) {
   const auto& it = active_clusters_.find(cluster);
   if (it == active_clusters_.end()) {
@@ -1906,6 +1916,54 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   // benefit given the healthy panic, locality, and priority calculations that take place.
   ASSERT(lb_factory_ != nullptr);
   lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
+}
+
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainOrCloseConnPools(
+    DrainConnectionsPoolPredicate predicate, ConnectionPool::DrainBehavior behavior) {
+  std::vector<HostConstSharedPtr> hosts;
+  hosts.reserve(host_http_conn_pool_map_.size());
+  for (const auto& [host, container] : host_http_conn_pool_map_) {
+    hosts.push_back(host);
+  }
+
+  for (const auto& host : hosts) {
+    const auto container = getHttpConnPoolsContainer(host);
+    if (container != nullptr) {
+      container->do_not_delete_ = true;
+      container->pools_->drainConnectionsIf(predicate, behavior);
+      container->do_not_delete_ = false;
+
+      if (container->pools_->empty()) {
+        host_http_conn_pool_map_.erase(host);
+      }
+    }
+  }
+
+  // Drain any matching TCP connection pool for the host.
+  std::vector<HostConstSharedPtr> tcp_hosts;
+  tcp_hosts.reserve(host_tcp_conn_pool_map_.size());
+  for (const auto& [host, container] : host_tcp_conn_pool_map_) {
+    tcp_hosts.push_back(host);
+  }
+
+  for (const auto& host : tcp_hosts) {
+    const auto container = host_tcp_conn_pool_map_.find(host);
+    if (container != host_tcp_conn_pool_map_.end()) {
+      // Draining pools or closing connections can cause pool deletion if it becomes
+      // idle. Copy `pools_` so that we aren't iterating through a container that
+      // gets mutated by callbacks deleting from it.
+      std::vector<Tcp::ConnectionPool::Instance*> pools;
+      for (const auto& pair : container->second.pools_) {
+        pools.push_back(pair.second.get());
+      }
+
+      for (auto* pool : pools) {
+        if (predicate(*pool)) {
+          pool->drainConnections(behavior);
+        }
+      }
+    }
+  }
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainOrCloseConnPools(
