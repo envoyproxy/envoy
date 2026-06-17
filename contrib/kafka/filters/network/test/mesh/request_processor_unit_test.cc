@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -50,7 +52,7 @@ public:
 
 class MockUpstreamKafkaConfiguration : public UpstreamKafkaConfiguration {
 public:
-  MOCK_METHOD(absl::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
+  MOCK_METHOD(std::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
               (const));
   MOCK_METHOD((std::pair<std::string, int32_t>), getAdvertisedAddress, (), (const));
 };
@@ -67,7 +69,7 @@ protected:
 
 TEST_F(RequestProcessorTest, ShouldProcessProduceRequest) {
   // given
-  const RequestHeader header = {PRODUCE_REQUEST_API_KEY, 0, 0, absl::nullopt};
+  const RequestHeader header = {PRODUCE_REQUEST_API_KEY, 0, 0, std::nullopt};
   const ProduceRequest data = {0, 0, {}};
   const auto message = std::make_shared<Request<ProduceRequest>>(header, data);
 
@@ -83,7 +85,7 @@ TEST_F(RequestProcessorTest, ShouldProcessProduceRequest) {
 
 TEST_F(RequestProcessorTest, ShouldProcessFetchRequest) {
   // given
-  const RequestHeader header = {FETCH_REQUEST_API_KEY, 0, 0, absl::nullopt};
+  const RequestHeader header = {FETCH_REQUEST_API_KEY, 0, 0, std::nullopt};
   const FetchRequest data = {0, 0, 0, {}};
   const auto message = std::make_shared<Request<FetchRequest>>(header, data);
 
@@ -99,7 +101,7 @@ TEST_F(RequestProcessorTest, ShouldProcessFetchRequest) {
 
 TEST_F(RequestProcessorTest, ShouldProcessListOffsetsRequest) {
   // given
-  const RequestHeader header = {LIST_OFFSETS_REQUEST_API_KEY, 0, 0, absl::nullopt};
+  const RequestHeader header = {LIST_OFFSETS_REQUEST_API_KEY, 0, 0, std::nullopt};
   const ListOffsetsRequest data = {0, {}};
   const auto message = std::make_shared<Request<ListOffsetsRequest>>(header, data);
 
@@ -115,8 +117,8 @@ TEST_F(RequestProcessorTest, ShouldProcessListOffsetsRequest) {
 
 TEST_F(RequestProcessorTest, ShouldProcessMetadataRequest) {
   // given
-  const RequestHeader header = {METADATA_REQUEST_API_KEY, 0, 0, absl::nullopt};
-  const MetadataRequest data = {absl::nullopt};
+  const RequestHeader header = {METADATA_REQUEST_API_KEY, 0, 0, std::nullopt};
+  const MetadataRequest data = {std::nullopt};
   const auto message = std::make_shared<Request<MetadataRequest>>(header, data);
 
   InFlightRequestSharedPtr capture = nullptr;
@@ -131,7 +133,7 @@ TEST_F(RequestProcessorTest, ShouldProcessMetadataRequest) {
 
 TEST_F(RequestProcessorTest, ShouldProcessApiVersionsRequest) {
   // given
-  const RequestHeader header = {API_VERSIONS_REQUEST_API_KEY, 0, 0, absl::nullopt};
+  const RequestHeader header = {API_VERSIONS_REQUEST_API_KEY, 0, 0, std::nullopt};
   const ApiVersionsRequest data = {};
   const auto message = std::make_shared<Request<ApiVersionsRequest>>(header, data);
 
@@ -147,7 +149,7 @@ TEST_F(RequestProcessorTest, ShouldProcessApiVersionsRequest) {
 
 TEST_F(RequestProcessorTest, ShouldHandleUnsupportedRequest) {
   // given
-  const RequestHeader header = {END_TXN_REQUEST_API_KEY, 0, 0, absl::nullopt};
+  const RequestHeader header = {END_TXN_REQUEST_API_KEY, 0, 0, std::nullopt};
   const EndTxnRequest data = {"", 0, 0, false};
   const auto message = std::make_shared<Request<EndTxnRequest>>(header, data);
 
@@ -157,7 +159,7 @@ TEST_F(RequestProcessorTest, ShouldHandleUnsupportedRequest) {
 
 TEST_F(RequestProcessorTest, ShouldHandleUnparseableRequest) {
   // given
-  const RequestHeader header = {42, 42, 42, absl::nullopt};
+  const RequestHeader header = {42, 42, 42, std::nullopt};
   const auto arg = std::make_shared<RequestParseFailure>(header);
 
   // when, then - exception gets thrown.

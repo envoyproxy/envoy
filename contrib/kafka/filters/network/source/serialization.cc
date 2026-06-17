@@ -1,5 +1,7 @@
 #include "contrib/kafka/filters/network/source/serialization.h"
 
+#include <optional>
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -193,9 +195,9 @@ uint32_t NullableCompactStringDeserializer::feed(absl::string_view& data) {
 NullableString NullableCompactStringDeserializer::get() const {
   const uint32_t original_data_len = length_buf_.get();
   if (NULL_COMPACT_STRING_LENGTH == original_data_len) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
-    return absl::make_optional(std::string(data_buf_.begin(), data_buf_.end()));
+    return std::make_optional(std::string(data_buf_.begin(), data_buf_.end()));
   }
 }
 
@@ -214,9 +216,9 @@ uint32_t NullableCompactBytesDeserializer::feed(absl::string_view& data) {
 NullableBytes NullableCompactBytesDeserializer::get() const {
   const uint32_t original_data_len = length_buf_.get();
   if (NULL_COMPACT_BYTES_LENGTH == original_data_len) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
-    return absl::make_optional(data_buf_);
+    return std::make_optional(data_buf_);
   }
 }
 

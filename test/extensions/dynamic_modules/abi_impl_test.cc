@@ -798,6 +798,12 @@ WEAK_STUB(AccessLoggerGetDownstreamTransportFailureReason,
 WEAK_STUB(AccessLoggerGetDynamicMetadata,
           envoy_dynamic_module_callback_access_logger_get_dynamic_metadata(nullptr, {nullptr, 0},
                                                                            {nullptr, 0}, nullptr))
+WEAK_STUB(AccessLoggerGetDynamicMetadataNumber,
+          envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_number(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(AccessLoggerGetDynamicMetadataBool,
+          envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_bool(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
 WEAK_STUB(AccessLoggerGetFilterState,
           envoy_dynamic_module_callback_access_logger_get_filter_state(nullptr, {nullptr, 0},
                                                                        nullptr))
@@ -1059,6 +1065,16 @@ WEAK_STUB(NetworkFilterConfigDefineHistogram,
                                                                                nullptr))
 WEAK_STUB(NetworkFilterRecordHistogramValue,
           envoy_dynamic_module_callback_network_filter_record_histogram_value(nullptr, 0, 0))
+WEAK_STUB(NetworkFilterConfigIncrementCounter,
+          envoy_dynamic_module_callback_network_filter_config_increment_counter(nullptr, 0, 0))
+WEAK_STUB(NetworkFilterConfigIncrementGauge,
+          envoy_dynamic_module_callback_network_filter_config_increment_gauge(nullptr, 0, 0))
+WEAK_STUB(NetworkFilterConfigDecrementGauge,
+          envoy_dynamic_module_callback_network_filter_config_decrement_gauge(nullptr, 0, 0))
+WEAK_STUB(NetworkFilterConfigSetGauge,
+          envoy_dynamic_module_callback_network_filter_config_set_gauge(nullptr, 0, 0))
+WEAK_STUB(NetworkFilterConfigRecordHistogramValue,
+          envoy_dynamic_module_callback_network_filter_config_record_histogram_value(nullptr, 0, 0))
 WEAK_STUB(ListenerFilterConfigDefineCounter,
           envoy_dynamic_module_callback_listener_filter_config_define_counter(nullptr, {nullptr, 0},
                                                                               nullptr))
@@ -1098,6 +1114,17 @@ WEAK_STUB(ListenerFilterRecordHistogramValue,
           envoy_dynamic_module_callback_listener_filter_record_histogram_value(nullptr, 0, 0))
 WEAK_STUB(ListenerFilterSetGauge,
           envoy_dynamic_module_callback_listener_filter_set_gauge(nullptr, 0, 0))
+WEAK_STUB(ListenerFilterConfigIncrementCounter,
+          envoy_dynamic_module_callback_listener_filter_config_increment_counter(nullptr, 0, 0))
+WEAK_STUB(ListenerFilterConfigIncrementGauge,
+          envoy_dynamic_module_callback_listener_filter_config_increment_gauge(nullptr, 0, 0))
+WEAK_STUB(ListenerFilterConfigDecrementGauge,
+          envoy_dynamic_module_callback_listener_filter_config_decrement_gauge(nullptr, 0, 0))
+WEAK_STUB(ListenerFilterConfigSetGauge,
+          envoy_dynamic_module_callback_listener_filter_config_set_gauge(nullptr, 0, 0))
+WEAK_STUB(ListenerFilterConfigRecordHistogramValue,
+          envoy_dynamic_module_callback_listener_filter_config_record_histogram_value(nullptr, 0,
+                                                                                      0))
 WEAK_STUB(UdpListenerFilterConfigDefineCounter,
           envoy_dynamic_module_callback_udp_listener_filter_config_define_counter(nullptr,
                                                                                   {nullptr, 0},
@@ -1120,6 +1147,17 @@ WEAK_STUB(UdpListenerFilterRecordHistogramValue,
           envoy_dynamic_module_callback_udp_listener_filter_record_histogram_value(nullptr, 0, 0))
 WEAK_STUB(UdpListenerFilterSetGauge,
           envoy_dynamic_module_callback_udp_listener_filter_set_gauge(nullptr, 0, 0))
+WEAK_STUB(UdpListenerFilterConfigIncrementCounter,
+          envoy_dynamic_module_callback_udp_listener_filter_config_increment_counter(nullptr, 0, 0))
+WEAK_STUB(UdpListenerFilterConfigIncrementGauge,
+          envoy_dynamic_module_callback_udp_listener_filter_config_increment_gauge(nullptr, 0, 0))
+WEAK_STUB(UdpListenerFilterConfigDecrementGauge,
+          envoy_dynamic_module_callback_udp_listener_filter_config_decrement_gauge(nullptr, 0, 0))
+WEAK_STUB(UdpListenerFilterConfigSetGauge,
+          envoy_dynamic_module_callback_udp_listener_filter_config_set_gauge(nullptr, 0, 0))
+WEAK_STUB(UdpListenerFilterConfigRecordHistogramValue,
+          envoy_dynamic_module_callback_udp_listener_filter_config_record_histogram_value(nullptr,
+                                                                                          0, 0))
 
 WEAK_STUB(NetworkFilterHttpCallout,
           envoy_dynamic_module_callback_network_filter_http_callout(nullptr, nullptr, {nullptr, 0},
@@ -1356,6 +1394,20 @@ WEAK_STUB(HttpFilterConfigDefineHistogram,
 WEAK_STUB(HttpFilterRecordHistogramValue,
           envoy_dynamic_module_callback_http_filter_record_histogram_value(nullptr, 0, nullptr, 0,
                                                                            0))
+WEAK_STUB(HttpFilterConfigIncrementCounter,
+          envoy_dynamic_module_callback_http_filter_config_increment_counter(nullptr, 0, nullptr, 0,
+                                                                             0))
+WEAK_STUB(HttpFilterConfigIncrementGauge,
+          envoy_dynamic_module_callback_http_filter_config_increment_gauge(nullptr, 0, nullptr, 0,
+                                                                           0))
+WEAK_STUB(HttpFilterConfigDecrementGauge,
+          envoy_dynamic_module_callback_http_filter_config_decrement_gauge(nullptr, 0, nullptr, 0,
+                                                                           0))
+WEAK_STUB(HttpFilterConfigSetGauge,
+          envoy_dynamic_module_callback_http_filter_config_set_gauge(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(HttpFilterConfigRecordHistogramValue,
+          envoy_dynamic_module_callback_http_filter_config_record_histogram_value(nullptr, 0,
+                                                                                  nullptr, 0, 0))
 WEAK_STUB(HttpGetHeader, envoy_dynamic_module_callback_http_get_header(
                              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader,
                              {nullptr, 0}, nullptr, 0, nullptr))
@@ -1588,6 +1640,33 @@ WEAK_STUB(ListenerFilterSetFilterState,
 WEAK_STUB(ListenerFilterGetFilterState,
           envoy_dynamic_module_callback_listener_filter_get_filter_state(nullptr, {nullptr, 0},
                                                                          nullptr))
+
+WEAK_STUB(FormatterGetAccessLogType,
+          envoy_dynamic_module_callback_formatter_get_access_log_type(nullptr))
+WEAK_STUB(FormatterGetAttributeBool,
+          envoy_dynamic_module_callback_formatter_get_attribute_bool(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
+WEAK_STUB(FormatterGetAttributeInt,
+          envoy_dynamic_module_callback_formatter_get_attribute_int(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
+WEAK_STUB(FormatterGetAttributeString,
+          envoy_dynamic_module_callback_formatter_get_attribute_string(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
+WEAK_STUB(FormatterGetDynamicMetadata,
+          envoy_dynamic_module_callback_formatter_get_dynamic_metadata(nullptr, {nullptr, 0},
+                                                                       {nullptr, 0}, nullptr))
+WEAK_STUB(FormatterGetHeaderValue,
+          envoy_dynamic_module_callback_formatter_get_header_value(
+              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},
+              nullptr, 0, nullptr))
+WEAK_STUB(FormatterGetHeaders,
+          envoy_dynamic_module_callback_formatter_get_headers(
+              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr))
+WEAK_STUB(FormatterGetHeadersSize,
+          envoy_dynamic_module_callback_formatter_get_headers_size(
+              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader))
+WEAK_STUB(FormatterGetLocalReplyBody,
+          envoy_dynamic_module_callback_formatter_get_local_reply_body(nullptr, nullptr))
 
 } // namespace
 } // namespace DynamicModules

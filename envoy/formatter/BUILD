@@ -24,7 +24,6 @@ envoy_cc_library(
     name = "substitution_formatter_interface",
     hdrs = [
         "substitution_formatter.h",
-        "substitution_formatter_base.h",
     ],
     deps = [
         ":http_formatter_context_interface",

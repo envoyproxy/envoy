@@ -84,7 +84,8 @@ void DynamicModuleHttpFilter::destroy() {
 FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap&, bool end_of_stream) {
   const envoy_dynamic_module_type_on_http_filter_request_headers_status status =
       config_->on_http_filter_request_headers_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
-  in_continue_ = status == envoy_dynamic_module_type_on_http_filter_request_headers_status_Continue;
+  decode_in_continue_ =
+      status == envoy_dynamic_module_type_on_http_filter_request_headers_status_Continue;
   return static_cast<FilterHeadersStatus>(status);
 };
 
@@ -93,27 +94,28 @@ FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance& chunk, bo
   const envoy_dynamic_module_type_on_http_filter_request_body_status status =
       config_->on_http_filter_request_body_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
   current_request_body_ = nullptr;
-  in_continue_ = status == envoy_dynamic_module_type_on_http_filter_request_body_status_Continue;
+  decode_in_continue_ =
+      status == envoy_dynamic_module_type_on_http_filter_request_body_status_Continue;
   return static_cast<FilterDataStatus>(status);
 };
 
 FilterTrailersStatus DynamicModuleHttpFilter::decodeTrailers(RequestTrailerMap&) {
   const envoy_dynamic_module_type_on_http_filter_request_trailers_status status =
       config_->on_http_filter_request_trailers_(thisAsVoidPtr(), in_module_filter_);
-  in_continue_ =
+  decode_in_continue_ =
       status == envoy_dynamic_module_type_on_http_filter_request_trailers_status_Continue;
   return static_cast<FilterTrailersStatus>(status);
 }
 
 FilterMetadataStatus DynamicModuleHttpFilter::decodeMetadata(MetadataMap&) {
-  in_continue_ = true;
+  decode_in_continue_ = true;
   return FilterMetadataStatus::Continue;
 }
 
 void DynamicModuleHttpFilter::decodeComplete() {}
 
 Filter1xxHeadersStatus DynamicModuleHttpFilter::encode1xxHeaders(ResponseHeaderMap&) {
-  in_continue_ = true;
+  encode_in_continue_ = true;
   return Filter1xxHeadersStatus::Continue;
 }
 
@@ -123,7 +125,7 @@ FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap&, b
   }
   const envoy_dynamic_module_type_on_http_filter_response_headers_status status =
       config_->on_http_filter_response_headers_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
-  in_continue_ =
+  encode_in_continue_ =
       status == envoy_dynamic_module_type_on_http_filter_response_headers_status_Continue;
   return static_cast<FilterHeadersStatus>(status);
 };
@@ -136,7 +138,8 @@ FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance& chunk, bo
   const envoy_dynamic_module_type_on_http_filter_response_body_status status =
       config_->on_http_filter_response_body_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
   current_response_body_ = nullptr;
-  in_continue_ = status == envoy_dynamic_module_type_on_http_filter_response_body_status_Continue;
+  encode_in_continue_ =
+      status == envoy_dynamic_module_type_on_http_filter_response_body_status_Continue;
   return static_cast<FilterDataStatus>(status);
 };
 
@@ -146,13 +149,13 @@ FilterTrailersStatus DynamicModuleHttpFilter::encodeTrailers(ResponseTrailerMap&
   }
   const envoy_dynamic_module_type_on_http_filter_response_trailers_status status =
       config_->on_http_filter_response_trailers_(thisAsVoidPtr(), in_module_filter_);
-  in_continue_ =
+  encode_in_continue_ =
       status == envoy_dynamic_module_type_on_http_filter_response_trailers_status_Continue;
   return static_cast<FilterTrailersStatus>(status);
 };
 
 FilterMetadataStatus DynamicModuleHttpFilter::encodeMetadata(MetadataMap&) {
-  in_continue_ = true;
+  encode_in_continue_ = true;
   return FilterMetadataStatus::Continue;
 }
 
@@ -281,16 +284,16 @@ void DynamicModuleHttpFilter::onScheduled(uint64_t event_id) {
 }
 
 void DynamicModuleHttpFilter::continueDecoding() {
-  if (decoder_callbacks_ && !in_continue_) {
+  if (decoder_callbacks_ && !decode_in_continue_) {
     decoder_callbacks_->continueDecoding();
-    in_continue_ = true;
+    decode_in_continue_ = true;
   }
 }
 
 void DynamicModuleHttpFilter::continueEncoding() {
-  if (encoder_callbacks_ && !in_continue_) {
+  if (encoder_callbacks_ && !encode_in_continue_) {
     encoder_callbacks_->continueEncoding();
-    in_continue_ = true;
+    encode_in_continue_ = true;
   }
 }
 

@@ -42,6 +42,24 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "abi_context_accessors_lib",
+    srcs = ["abi_context_accessors.cc"],
+    hdrs = ["abi_context_accessors.h"],
+    deps = [
+        "//envoy/common:optref_lib",
+        "//envoy/formatter:http_formatter_context_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:metadata_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/protobuf",
+        "//source/extensions/dynamic_modules/abi",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "abi_impl",
     srcs = ["abi_impl.cc"],
     deps = [

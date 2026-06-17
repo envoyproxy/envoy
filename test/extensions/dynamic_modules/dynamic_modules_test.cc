@@ -6,7 +6,6 @@
 #include "source/common/common/hex.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
-#include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
@@ -594,18 +593,6 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteAsyncReturnsAsyncState) {
 
 } // namespace
 
-// Reads a dynamic_modules.<leaf> counter tagged config_name=<name>. Re-creates the same tagged
-// counter (idempotent lookup), so it does not depend on how the store renders tags into a flat
-// name.
-uint64_t configLoadFailureValue(Stats::Scope& scope, absl::string_view leaf,
-                                absl::string_view config_name) {
-  Stats::StatNameDynamicPool pool(scope.symbolTable());
-  Stats::StatNameTagVector tags{{pool.add("config_name"), pool.add(config_name)}};
-  return Stats::Utility::counterFromElements(
-             scope, {Stats::DynamicName(DynamicModulesStatRoot), Stats::DynamicName(leaf)}, tags)
-      .value();
-}
-
 TEST(DynamicModuleStats, IncrementConfigLoadFailure) {
   Stats::IsolatedStoreImpl store;
   Stats::Scope& scope = *store.rootScope();
@@ -615,19 +602,19 @@ TEST(DynamicModuleStats, IncrementConfigLoadFailure) {
   // Repeated failures with the same config_name accumulate on one series.
   incrementLoadFailure(context, "my-filter", ModuleLoadErrorStat);
   incrementLoadFailure(context, "my-filter", ModuleLoadErrorStat);
-  EXPECT_EQ(2U, configLoadFailureValue(scope, ModuleLoadErrorStat, "my-filter"));
+  EXPECT_EQ(2U, failureCounter(scope, ModuleLoadErrorStat, "my-filter"));
 
   // Distinct leaves and distinct config_names are independent series.
-  EXPECT_EQ(0U, configLoadFailureValue(scope, RemoteFetchErrorStat, "my-filter"));
-  EXPECT_EQ(0U, configLoadFailureValue(scope, ModuleLoadErrorStat, "other"));
+  EXPECT_EQ(0U, failureCounter(scope, RemoteFetchErrorStat, "my-filter"));
+  EXPECT_EQ(0U, failureCounter(scope, ModuleLoadErrorStat, "other"));
 
   // An empty config_name falls back to "default".
   incrementLoadFailure(context, "", RemoteFetchErrorStat);
-  EXPECT_EQ(1U, configLoadFailureValue(scope, RemoteFetchErrorStat, "default"));
+  EXPECT_EQ(1U, failureCounter(scope, RemoteFetchErrorStat, "default"));
 
   // An absent context is a no-op (the context-less caller path).
   incrementLoadFailure(absl::nullopt, "my-filter", ModuleLoadErrorStat);
-  EXPECT_EQ(2U, configLoadFailureValue(scope, ModuleLoadErrorStat, "my-filter"));
+  EXPECT_EQ(2U, failureCounter(scope, ModuleLoadErrorStat, "my-filter"));
 }
 
 } // namespace DynamicModules

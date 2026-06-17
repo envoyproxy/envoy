@@ -5,9 +5,11 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/extensions/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/init/manager.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/stats/scope.h"
 
 #include "source/extensions/common/wasm/remote_async_datasource.h"
 
@@ -103,10 +105,20 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
  * @param load_globally if true, the dlopen will be called with RTLD_GLOBAL, so the loaded object
  * can share symbols with other dynamically loaded modules. This is useful for modules that need to
  * share symbols with other modules.
+ * @param context optional server-wide factory context. When provided and the module fails to load,
+ * the shared ``dynamic_modules.module_load_error`` counter (tagged with ``config_name``) is
+ * incremented, so every dynamic-module extension that loads by name reports load failures
+ * consistently without repeating the bookkeeping at each call site. Pass the server context
+ * (``ServerFactoryContext``), NOT a listener context — see incrementLoadFailure().
+ * @param stat_name the configured name of the extension instance using the module (e.g.
+ * ``filter_name``, ``transport_socket_name``); used as the ``config_name`` tag. Falls back to
+ * ``default`` if empty. Only used when ``context`` is provided.
  */
-absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
-                                                        const bool do_not_close,
-                                                        const bool load_globally = false);
+absl::StatusOr<DynamicModulePtr>
+newDynamicModuleByName(const absl::string_view module_name, const bool do_not_close,
+                       const bool load_globally = false,
+                       OptRef<Server::Configuration::CommonFactoryContext> context = {},
+                       absl::string_view stat_name = {});
 
 /**
  * Creates a new DynamicModule backed by symbols already present in the process binary (i.e.,
