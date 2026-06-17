@@ -804,6 +804,12 @@ func (f *StatsCallbacksConfigFactory) Create(h shared.HttpFilterConfigHandle, c 
 	ids.epVals, err = h.DefineHistogram("entrypoint_header_values", "entrypoint", "method")
 	assertEq(err, shared.MetricsSuccess, "h2")
 
+	// Emit a metric directly from the config context (no per-stream filter), exercising the
+	// config-scoped emission path. This would typically be done from a scheduled background task.
+	configTotal, err := h.DefineCounter("config_total")
+	assertEq(err, shared.MetricsSuccess, "c3")
+	assertEq(h.IncrementCounterValue(configTotal, 1), shared.MetricsSuccess, "c3i")
+
 	ids.headerToCount = parts[0]
 	ids.headerToSet = parts[1]
 

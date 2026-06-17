@@ -58,7 +58,7 @@ envoy_cc_library(
         "//source/common/common:callback_impl_lib",
         "//source/common/common:cleanup_lib",
         "//source/common/config:api_version_lib",
-        "//source/common/config:subscription_base_interface",
+        "//source/common/config:resource_type_helper_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:watched_directory_lib",
         "//source/common/init:target_lib",

@@ -18,7 +18,7 @@ namespace Http {
 class PrefixValue {
 public:
   const char* prefix() {
-    absl::WriterMutexLock lock(&m_);
+    absl::WriterMutexLock lock(m_);
     read_ = true;
     return prefix_.c_str();
   }
@@ -26,7 +26,7 @@ public:
   // The char* prefix is used directly, so must be available for the interval where prefix() may be
   // called.
   void setPrefix(const char* prefix) {
-    absl::WriterMutexLock lock(&m_);
+    absl::WriterMutexLock lock(m_);
     // The check for unchanged string is purely for integration tests - this
     // should not happen in production.
     RELEASE_ASSERT(!read_ || prefix_ == std::string(prefix),

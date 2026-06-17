@@ -28,7 +28,7 @@ TEST(CookieBasedSessionStateFactoryTest, EmptyCookieName) {
 
 TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
   Event::SimulatedTimeSystem time_simulator;
-  time_simulator.setMonotonicTime(std::chrono::seconds(1000));
+  time_simulator.setSystemTime(std::chrono::seconds(1000));
 
   {
     CookieBasedSessionStateProto config;
@@ -122,7 +122,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateProtoCookie) {
   config.mutable_cookie()->set_path("/path");
   config.mutable_cookie()->mutable_ttl()->set_seconds(5);
   Event::SimulatedTimeSystem time_simulator;
-  time_simulator.setMonotonicTime(std::chrono::seconds(1000));
+  time_simulator.setSystemTime(std::chrono::seconds(1000));
   CookieBasedSessionStateFactory factory(config, time_simulator);
 
   std::string cookie_content;
@@ -131,7 +131,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateProtoCookie) {
   cookie.set_expires(1005);
   cookie.SerializeToString(&cookie_content);
   // PROTO format - expired cookie
-  time_simulator.setMonotonicTime(std::chrono::seconds(1006));
+  time_simulator.setSystemTime(std::chrono::seconds(1006));
   Envoy::Http::TestRequestHeaderMapImpl request_headers = {
       {":path", "/path"},
       {"cookie",

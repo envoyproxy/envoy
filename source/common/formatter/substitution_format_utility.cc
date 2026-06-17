@@ -18,12 +18,12 @@ absl::Status CommandSyntaxChecker::verifySyntax(CommandSyntaxChecker::CommandSyn
                                                 absl::string_view command,
                                                 absl::string_view subcommand,
                                                 absl::optional<size_t> length) {
-  if ((flags == COMMAND_ONLY) && ((subcommand.length() != 0) || length.has_value())) {
+  if ((flags == COMMAND_ONLY) && ((!subcommand.empty()) || length.has_value())) {
     return absl::InvalidArgumentError(
         fmt::format("{} does not take any parameters or length", command));
   }
 
-  if ((flags & PARAMS_REQUIRED).any() && (subcommand.length() == 0)) {
+  if ((flags & PARAMS_REQUIRED).any() && (subcommand.empty())) {
     return absl::InvalidArgumentError(fmt::format("{} requires parameters", command));
   }
 

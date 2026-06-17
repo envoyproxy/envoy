@@ -67,7 +67,9 @@ public:
               (const));
   MOCK_METHOD(Http::HeaderTransforms, responseHeaderTransforms,
               (const StreamInfo::StreamInfo& stream_info, bool do_formatting), (const));
-  MOCK_METHOD(std::string, newUri, (const Http::RequestHeaderMap& headers), (const));
+  MOCK_METHOD(std::string, newUri,
+              (const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& stream_info),
+              (const));
   MOCK_METHOD(void, rewritePathHeader,
               (Http::RequestHeaderMap & headers, bool insert_envoy_original_path), (const));
   MOCK_METHOD(Http::Code, responseCode, (), (const));
@@ -162,6 +164,7 @@ public:
   const std::vector<ResetHeaderParserSharedPtr>& resetHeaders() const override {
     return reset_headers_;
   }
+  bool refreshClusterOnRetry() const override { return refresh_cluster_on_retry_; }
 
   std::chrono::milliseconds per_try_timeout_{0};
   std::chrono::milliseconds per_try_idle_timeout_{0};
@@ -175,6 +178,7 @@ public:
   absl::optional<std::chrono::milliseconds> max_interval_;
   std::vector<ResetHeaderParserSharedPtr> reset_headers_;
   std::chrono::milliseconds reset_max_interval_{300000};
+  bool refresh_cluster_on_retry_{false};
   std::vector<Upstream::RetryOptionsPredicateConstSharedPtr> retry_options_predicates_;
 };
 

@@ -2,11 +2,17 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_proto_library(
+    name = "upstream_mocks_proto",
+    srcs = ["upstream_mocks.proto"],
+)
 
 envoy_cc_mock(
     name = "cluster_info_mocks",
@@ -27,6 +33,7 @@ envoy_cc_mock(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/load_balancing_policies/round_robin:config",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -127,7 +134,6 @@ envoy_cc_mock(
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/secret:secret_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/tcp:tcp_mocks",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -172,6 +178,7 @@ envoy_cc_mock(
     name = "retry_priority_factory_mocks",
     hdrs = ["retry_priority_factory.h"],
     deps = [
+        ":upstream_mocks_proto_cc_proto",
         "//envoy/upstream:retry_interface",
         "//test/mocks/upstream:retry_priority_mocks",
     ],
@@ -259,7 +266,6 @@ envoy_cc_mock(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/quic:envoy_quic_network_observer_registry_factory_lib",
         "//source/common/singleton:manager_impl_lib",
-        "//test/mocks/secret:secret_mocks",
         "//test/test_common:thread_factory_for_test_lib",
     ],
 )

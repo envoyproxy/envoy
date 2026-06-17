@@ -56,7 +56,7 @@ public:
    * @return the union of all resource names and aliases (if any) received with the last VHDS
    * update.
    */
-  virtual const std::set<std::string>& resourceIdsInLastVhdsUpdate() PURE;
+  virtual const std::set<std::string>& resourceIdsInLastVhdsUpdate() const PURE;
 };
 
 using RouteConfigUpdatePtr = std::unique_ptr<RouteConfigUpdateReceiver>;

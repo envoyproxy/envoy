@@ -1,7 +1,6 @@
 #include "envoy/extensions/http/original_ip_detection/custom_header/v3/custom_header.pb.h"
 
 #include "test/integration/http_integration.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"

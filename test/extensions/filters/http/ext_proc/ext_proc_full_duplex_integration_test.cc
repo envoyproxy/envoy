@@ -26,7 +26,6 @@
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -169,7 +168,7 @@ TEST_P(ExtProcIntegrationTest,
     EXPECT_TRUE(request.has_request_body() || request.has_request_trailers());
     if (!request.has_request_trailers()) {
       // request_body is received
-      body_received = absl::StrCat(body_received, request.request_body().body());
+      absl::StrAppend(&body_received, request.request_body().body());
       total_req_body_msg++;
     } else {
       // request_trailer is received.
@@ -227,7 +226,7 @@ TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyDuplexStrea
     EXPECT_TRUE(request.has_request_body() || request.has_request_trailers());
     if (!request.has_request_trailers()) {
       // Buffer the entire body.
-      body_received = absl::StrCat(body_received, request.request_body().body());
+      absl::StrAppend(&body_received, request.request_body().body());
       total_req_body_msg++;
       // After receiving every 7 body chunks, the server sends back three body responses.
       if (total_req_body_msg % 7 == 0) {

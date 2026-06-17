@@ -746,7 +746,7 @@ TEST_P(UdpListenerImplTest, UdpGroReadLimit) {
     std::string payload(1024, (i % 2 == 0 ? 'a' : 'b'));
     client_data.push_back(payload);
     // The concatenated payload received from kernel supporting udp_gro
-    stacked_message = absl::StrCat(stacked_message, payload);
+    absl::StrAppend(&stacked_message, payload);
     // Actually send the packets to trigger I/O events on the listener.
     client_.write(payload, *send_to_addr_);
   }

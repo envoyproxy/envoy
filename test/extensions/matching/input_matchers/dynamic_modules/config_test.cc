@@ -3,7 +3,7 @@
 #include "source/extensions/matching/input_matchers/dynamic_modules/config.h"
 
 #include "test/extensions/dynamic_modules/util.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -28,6 +28,9 @@ public:
   DynamicModuleInputMatcherFactory factory_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
 };
+
+// Pull the shared dynamic-modules test helper into scope.
+using ::Envoy::Extensions::DynamicModules::failureCounter;
 
 TEST_F(DynamicModuleInputMatcherFactoryTest, FactoryName) {
   EXPECT_EQ("envoy.matching.matchers.dynamic_modules", factory_.name());
@@ -59,6 +62,39 @@ matcher_name: test_matcher
   EXPECT_NE(nullptr, factory_cb);
   auto matcher = factory_cb();
   EXPECT_NE(nullptr, matcher);
+
+  // The happy path emits no load-failure counters.
+  EXPECT_EQ(0U, failureCounter(context_.serverScope(), "module_load_error", "test_matcher"));
+  EXPECT_EQ(0U, failureCounter(context_.serverScope(), "config_init_error", "test_matcher"));
+}
+
+// Load the module via the ``module.local.filename`` data source instead of by name.
+TEST_F(DynamicModuleInputMatcherFactoryTest, ValidConfigWithLocalFile) {
+  envoy::extensions::matching::input_matchers::dynamic_modules::v3::DynamicModuleMatcher
+      proto_config;
+  proto_config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+      Extensions::DynamicModules::testSharedObjectPath("matcher_no_op", "c"));
+  proto_config.mutable_dynamic_module_config()->set_do_not_close(true);
+  proto_config.set_matcher_name("test_matcher");
+
+  auto factory_cb = factory_.createInputMatcherFactoryCb(proto_config, context_);
+  EXPECT_NE(nullptr, factory_cb);
+  auto matcher = factory_cb();
+  EXPECT_NE(nullptr, matcher);
+}
+
+// Remote module sources are not supported for input matchers (no init manager is wired up).
+TEST_F(DynamicModuleInputMatcherFactoryTest, RemoteSourceRejected) {
+  envoy::extensions::matching::input_matchers::dynamic_modules::v3::DynamicModuleMatcher
+      proto_config;
+  auto* remote = proto_config.mutable_dynamic_module_config()->mutable_module()->mutable_remote();
+  remote->mutable_http_uri()->set_uri("https://example.com/module.so");
+  remote->mutable_http_uri()->set_cluster("cluster_1");
+  remote->mutable_http_uri()->mutable_timeout()->set_seconds(5);
+  remote->set_sha256("abc123");
+  proto_config.set_matcher_name("test_matcher");
+
+  EXPECT_THROW(factory_.createInputMatcherFactoryCb(proto_config, context_), EnvoyException);
 }
 
 TEST_F(DynamicModuleInputMatcherFactoryTest, ValidConfigWithMatcherConfig) {
@@ -95,6 +131,8 @@ matcher_name: test_matcher
 
   EXPECT_THROW_WITH_REGEX(factory_.createInputMatcherFactoryCb(proto_config, context_),
                           EnvoyException, "Failed to load.*");
+
+  EXPECT_EQ(1U, failureCounter(context_.serverScope(), "module_load_error", "test_matcher"));
 }
 
 TEST_F(DynamicModuleInputMatcherFactoryTest, MissingConfigNew) {
@@ -111,6 +149,9 @@ matcher_name: test_matcher
 
   EXPECT_THROW_WITH_REGEX(factory_.createInputMatcherFactoryCb(proto_config, context_),
                           EnvoyException, "Failed to resolve symbol.*config_new");
+
+  // A missing ABI symbol is a module-level problem, counted as module_load_error.
+  EXPECT_EQ(1U, failureCounter(context_.serverScope(), "module_load_error", "test_matcher"));
 }
 
 TEST_F(DynamicModuleInputMatcherFactoryTest, MissingConfigDestroy) {
@@ -159,6 +200,31 @@ matcher_name: test_matcher
 
   EXPECT_THROW_WITH_REGEX(factory_.createInputMatcherFactoryCb(proto_config, context_),
                           EnvoyException, "Failed to initialize dynamic module matcher config");
+
+  // The module loads and resolves symbols, but on_matcher_config_new returns null, counted as
+  // config_init_error.
+  EXPECT_EQ(1U, failureCounter(context_.serverScope(), "config_init_error", "test_matcher"));
+  EXPECT_EQ(0U, failureCounter(context_.serverScope(), "module_load_error", "test_matcher"));
+}
+
+TEST_F(DynamicModuleInputMatcherFactoryTest, MalformedMatcherConfig) {
+  // The module loads and resolves symbols, but the matcher_config Any cannot be unpacked (which
+  // happens before on_matcher_config_new is called), counted as config_init_error. A malformed Any
+  // must be built programmatically.
+  envoy::extensions::matching::input_matchers::dynamic_modules::v3::DynamicModuleMatcher
+      proto_config;
+  proto_config.mutable_dynamic_module_config()->set_name("matcher_no_op");
+  proto_config.mutable_dynamic_module_config()->set_do_not_close(true);
+  proto_config.set_matcher_name("test_matcher");
+  auto* any = proto_config.mutable_matcher_config();
+  any->set_type_url("type.googleapis.com/google.protobuf.StringValue");
+  any->set_value("invalid_binary_data_that_cannot_be_unpacked_as_string_value");
+
+  EXPECT_THROW_WITH_REGEX(factory_.createInputMatcherFactoryCb(proto_config, context_),
+                          EnvoyException, "Failed to parse matcher config");
+
+  EXPECT_EQ(1U, failureCounter(context_.serverScope(), "config_init_error", "test_matcher"));
+  EXPECT_EQ(0U, failureCounter(context_.serverScope(), "module_load_error", "test_matcher"));
 }
 
 TEST_F(DynamicModuleInputMatcherFactoryTest, FactoryRegistration) {

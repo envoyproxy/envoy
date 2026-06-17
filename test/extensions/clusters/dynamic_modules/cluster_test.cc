@@ -1,16 +1,22 @@
+#include <atomic>
+#include <thread>
+
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
 
 #include "source/common/config/metadata.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
+#include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/dynamic_modules/util.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/connection.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
@@ -19,6 +25,7 @@
 #include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -36,12 +43,35 @@ public:
   }
 
   static size_t getHostMapSize(DynamicModuleCluster& cluster) {
-    absl::ReaderMutexLock lock(&cluster.host_map_lock_);
+    absl::ReaderMutexLock lock(cluster.host_map_lock_);
     return cluster.host_map_.size();
   }
 
   static void clearInModuleCluster(DynamicModuleCluster& cluster) {
     cluster.in_module_cluster_ = nullptr;
+  }
+
+  // Injects a pre-populated HttpCalloutCallback into the cluster's pending-callouts map under the
+  // given id, so the destructor's cancellation loop sees a pending entry.
+  static void injectPendingHttpCallout(DynamicModuleCluster& cluster, uint64_t callout_id,
+                                       Http::AsyncClient::Request* request) {
+    auto callback = std::make_unique<DynamicModuleCluster::HttpCalloutCallback>(
+        /*cluster=*/nullptr, callout_id);
+    callback->request_ = request;
+    cluster.http_callouts_.emplace(callout_id, std::move(callback));
+  }
+
+  // Simulates the module's on_cluster_lb_new returning nullptr after the LB has already been
+  // constructed: clears in_module_lb_ so chooseHost exercises the early-return path.
+  static void clearInModuleLb(DynamicModuleLoadBalancer& lb) { lb.in_module_lb_ = nullptr; }
+
+  // Sets the borrowed host vectors that back the member update host accessors. These are only
+  // populated by Envoy during an on_host_membership_update callback, so this lets the accessors
+  // be exercised deterministically from a unit test.
+  static void setMemberUpdateHosts(DynamicModuleLoadBalancer& lb, const Upstream::HostVector* added,
+                                   const Upstream::HostVector* removed) {
+    lb.hosts_added_ = added;
+    lb.hosts_removed_ = removed;
   }
 };
 
@@ -66,6 +96,11 @@ public:
     Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr, false);
     DynamicModuleClusterFactory factory;
     return factory.create(cluster_config, factory_context);
+  }
+
+  // Re-opens stat creation so tests can call `define_*` from the test thread.
+  static void unfreezeStatCreation(DynamicModuleClusterConfig& config) {
+    config.stat_creation_frozen_ = false;
   }
 
   std::string makeYamlConfig(const std::string& module_name,
@@ -119,8 +154,39 @@ bool addSimpleHosts(DynamicModuleCluster& cluster, const std::vector<std::string
 }
 
 // Test that creating a cluster with a valid no-op module succeeds.
+// Pull the shared dynamic-modules test helper into scope.
+using ::Envoy::Extensions::DynamicModules::failureCounter;
+
 TEST_F(DynamicModuleClusterTest, BasicCreation) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  EXPECT_NE(nullptr, result->first);
+  EXPECT_NE(nullptr, result->second);
+
+  // The happy path emits no load-failure counters.
+  EXPECT_EQ(0U, failureCounter(server_context_.serverScope(), "module_load_error", "test"));
+  EXPECT_EQ(0U, failureCounter(server_context_.serverScope(), "config_init_error", "test"));
+}
+
+// Test that creating a cluster by loading the module via ``module.local.filename`` succeeds.
+TEST_F(DynamicModuleClusterTest, BasicCreationWithLocalFile) {
+  const std::string yaml =
+      fmt::format(R"EOF(
+name: test_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+    dynamic_module_config:
+      module:
+        local:
+          filename: {}
+    cluster_name: test
+)EOF",
+                  Extensions::DynamicModules::testSharedObjectPath("cluster_no_op", "c"));
+  auto result = createCluster(yaml);
   ASSERT_TRUE(result.ok()) << result.status().message();
   EXPECT_NE(nullptr, result->first);
   EXPECT_NE(nullptr, result->second);
@@ -160,6 +226,8 @@ TEST_F(DynamicModuleClusterTest, MissingModule) {
   auto result = createCluster(makeYamlConfig("nonexistent_module"));
   ASSERT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module"));
+
+  EXPECT_EQ(1U, failureCounter(server_context_.serverScope(), "module_load_error", "test"));
 }
 
 // Test that on_cluster_config_new returning nullptr fails.
@@ -168,6 +236,10 @@ TEST_F(DynamicModuleClusterTest, ConfigNewFail) {
   ASSERT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("Failed to create in-module cluster configuration"));
+
+  // The module loads fine but its config creation fails, counted as config_init_error.
+  EXPECT_EQ(1U, failureCounter(server_context_.serverScope(), "config_init_error", "test"));
+  EXPECT_EQ(0U, failureCounter(server_context_.serverScope(), "module_load_error", "test"));
 }
 
 // Test that on_cluster_new returning nullptr fails.
@@ -176,6 +248,27 @@ TEST_F(DynamicModuleClusterTest, ClusterNewFail) {
   ASSERT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("Failed to create in-module cluster instance"));
+}
+
+// The cluster_config Any cannot be unpacked. This is parsed before the module is loaded, so it is
+// counted as config_init_error and module_load_error stays zero. A malformed Any must be built
+// programmatically because a cluster_config parsed from YAML is always valid.
+TEST_F(DynamicModuleClusterTest, MalformedClusterConfig) {
+  auto cluster = Upstream::parseClusterFromV3Yaml(makeYamlConfig("cluster_no_op"));
+  envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig cluster_config;
+  ASSERT_TRUE(cluster.cluster_type().typed_config().UnpackTo(&cluster_config));
+  auto* any = cluster_config.mutable_cluster_config();
+  any->set_type_url("type.googleapis.com/google.protobuf.StringValue");
+  any->set_value("invalid_binary_data_that_cannot_be_unpacked_as_string_value");
+  cluster.mutable_cluster_type()->mutable_typed_config()->PackFrom(cluster_config);
+
+  Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr, false);
+  DynamicModuleClusterFactory factory;
+  auto result = factory.create(cluster, factory_context);
+  ASSERT_FALSE(result.ok());
+
+  EXPECT_EQ(1U, failureCounter(server_context_.serverScope(), "config_init_error", "test"));
+  EXPECT_EQ(0U, failureCounter(server_context_.serverScope(), "module_load_error", "test"));
 }
 
 // Test batch host addition and removal via the public API.
@@ -253,6 +346,53 @@ TEST_F(DynamicModuleClusterTest, BatchRemoveMultipleHosts) {
   // Remove all three at once.
   EXPECT_EQ(3, cluster->removeHosts(hosts));
   EXPECT_EQ(0, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+}
+
+// Test that addresses already present in the host set are skipped on a subsequent batch.
+TEST_F(DynamicModuleClusterTest, DuplicateHostDetection) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Add two hosts.
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001", "127.0.0.1:10002"}, {1, 1}, hosts));
+  EXPECT_EQ(2, hosts.size());
+  EXPECT_EQ(2, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+  EXPECT_EQ(2, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+
+  // Add a batch with one existing address and one new address. Only the new one is created.
+  std::vector<Upstream::HostSharedPtr> hosts2;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10002", "127.0.0.1:10003"}, {1, 1}, hosts2));
+  EXPECT_EQ(1, hosts2.size());
+  EXPECT_EQ("127.0.0.1:10003", hosts2[0]->address()->asString());
+  EXPECT_EQ(3, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+  EXPECT_EQ(3, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+
+  // Capture the host-set partition identity before a no-op push. A rebuild would replace these
+  // shared_ptrs (partitionHosts allocates new vectors), so identity is a precise "did we rebuild"
+  // signal. Also subscribe a membership callback: a republish fires it even with a (0,0) diff.
+  const auto* hosts_ptr_before = cluster->prioritySet().hostSetsPerPriority()[0]->hostsPtr().get();
+  const auto* healthy_ptr_before =
+      cluster->prioritySet().hostSetsPerPriority()[0]->healthyHostsPtr().get();
+  int membership_updates = 0;
+  auto cb_handle = cluster->prioritySet().addMemberUpdateCb(
+      [&](const Upstream::HostVector&, const Upstream::HostVector&) { ++membership_updates; });
+
+  // A batch of only existing addresses adds nothing but still succeeds, and must not rebuild or
+  // republish the host set.
+  std::vector<Upstream::HostSharedPtr> hosts3;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001", "127.0.0.1:10003"}, {1, 1}, hosts3));
+  EXPECT_EQ(0, hosts3.size());
+  EXPECT_EQ(3, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+  EXPECT_EQ(3, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  // No rebuild: the partition shared_ptrs are unchanged and no membership callback fired.
+  EXPECT_EQ(hosts_ptr_before, cluster->prioritySet().hostSetsPerPriority()[0]->hostsPtr().get());
+  EXPECT_EQ(healthy_ptr_before,
+            cluster->prioritySet().hostSetsPerPriority()[0]->healthyHostsPtr().get());
+  EXPECT_EQ(0, membership_updates);
 }
 
 // Test that invalid addresses cause the entire batch to fail.
@@ -353,8 +493,7 @@ TEST_F(DynamicModuleClusterTest, LoadBalancerWithHosts) {
 
   auto lb_factory = talb->factory();
   ASSERT_NE(nullptr, lb_factory);
-  NiceMock<Upstream::MockPrioritySet> mock_ps;
-  auto lb = lb_factory->create({mock_ps});
+  auto lb = lb_factory->create({cluster->prioritySet()});
   ASSERT_NE(nullptr, lb);
 
   // Verify priority set access via the LB.
@@ -363,6 +502,20 @@ TEST_F(DynamicModuleClusterTest, LoadBalancerWithHosts) {
   const auto& ps = dm_lb->prioritySet();
   EXPECT_EQ(1, ps.hostSetsPerPriority().size());
   EXPECT_EQ(2, ps.hostSetsPerPriority()[0]->healthyHosts().size());
+}
+
+// prioritySet() answers host queries from the worker local set supplied at construction.
+TEST_F(DynamicModuleClusterTest, PrioritySetUsesWorkerLocalSet) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+
+  NiceMock<Upstream::MockPrioritySet> worker_ps;
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, worker_ps);
+
+  EXPECT_EQ(static_cast<const Upstream::PrioritySet*>(&worker_ps), &lb_instance->prioritySet());
+  EXPECT_NE(&cluster->prioritySet(), &lb_instance->prioritySet());
 }
 
 // Test that the cluster initializes with the Primary phase.
@@ -451,8 +604,7 @@ TEST_F(DynamicModuleClusterTest, LbAbiCallbacks) {
   auto& talb = result->second;
   EXPECT_TRUE(talb->initialize().ok());
   auto lb_factory = talb->factory();
-  NiceMock<Upstream::MockPrioritySet> mock_ps;
-  auto lb = lb_factory->create({mock_ps});
+  auto lb = lb_factory->create({cluster->prioritySet()});
   auto* dm_lb = dynamic_cast<DynamicModuleLoadBalancer*>(lb.get());
   ASSERT_NE(nullptr, dm_lb);
 
@@ -491,8 +643,7 @@ TEST_F(DynamicModuleClusterTest, LbHostInformationCallbacks) {
   auto& talb = result->second;
   EXPECT_TRUE(talb->initialize().ok());
   auto lb_factory = talb->factory();
-  NiceMock<Upstream::MockPrioritySet> mock_ps;
-  auto lb = lb_factory->create({mock_ps});
+  auto lb = lb_factory->create({cluster->prioritySet()});
   auto* dm_lb = dynamic_cast<DynamicModuleLoadBalancer*>(lb.get());
   ASSERT_NE(nullptr, dm_lb);
 
@@ -734,8 +885,7 @@ TEST_F(DynamicModuleClusterTest, LbHostInformationWithMetadataAndLocality) {
   auto& talb = result->second;
   EXPECT_TRUE(talb->initialize().ok());
   auto lb_factory = talb->factory();
-  NiceMock<Upstream::MockPrioritySet> mock_ps;
-  auto lb = lb_factory->create({mock_ps});
+  auto lb = lb_factory->create({cluster->prioritySet()});
   auto* dm_lb = dynamic_cast<DynamicModuleLoadBalancer*>(lb.get());
   ASSERT_NE(nullptr, dm_lb);
 
@@ -1173,6 +1323,116 @@ TEST_F(DynamicModuleClusterTest, OnScheduledDirect) {
   cluster->onScheduled(789);
 }
 
+// Test run_on_all_workers is safe to call with no payload published and allocates the slot
+// lazily.
+TEST_F(DynamicModuleClusterTest, RunOnAllWorkersIsSafeOnUnpopulatedSlot) {
+  auto result = createCluster(makeYamlConfig("cluster_run_on_all_workers"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_callback_cluster_run_on_all_workers(cluster.get(), /*event_id=*/42);
+  envoy_dynamic_module_callback_cluster_run_on_all_workers(cluster.get(), /*event_id=*/7);
+
+  cluster.reset();
+  result = absl::InternalError("cleanup");
+}
+
+// Test worker_slot_set / worker_slot_get round-trip and destroy on overwrite and teardown.
+TEST_F(DynamicModuleClusterTest, WorkerSlotSetGetAndDestroy) {
+  auto result = createCluster(makeYamlConfig("cluster_run_on_all_workers"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  auto module_handle = Envoy::Extensions::DynamicModules::newDynamicModule(
+      Envoy::Extensions::DynamicModules::testSharedObjectPath("cluster_run_on_all_workers", "c"),
+      /*do_not_close=*/true);
+  ASSERT_TRUE(module_handle.ok()) << module_handle.status().message();
+  using GetCountFn = size_t (*)();
+  auto get_destroy_count = module_handle.value()->getFunctionPointer<GetCountFn>(
+      "cluster_run_on_all_workers_test_get_destroy_count");
+  ASSERT_TRUE(get_destroy_count.ok()) << get_destroy_count.status().message();
+
+  // Publish payload1; the module's destroy hook will free() it.
+  uint64_t* payload1 = static_cast<uint64_t*>(std::malloc(sizeof(uint64_t)));
+  *payload1 = 0xABCD;
+  envoy_dynamic_module_callback_cluster_worker_slot_set(cluster.get(), payload1);
+  EXPECT_EQ(0u, (*get_destroy_count.value())());
+
+  void* observed = envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get());
+  ASSERT_NE(nullptr, observed);
+  EXPECT_EQ(0xABCDu, *static_cast<uint64_t*>(observed));
+
+  // Overwrite fires the destroy hook for payload1.
+  uint64_t* payload2 = static_cast<uint64_t*>(std::malloc(sizeof(uint64_t)));
+  *payload2 = 0xBEEF;
+  envoy_dynamic_module_callback_cluster_worker_slot_set(cluster.get(), payload2);
+  EXPECT_EQ(1u, (*get_destroy_count.value())());
+
+  observed = envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get());
+  ASSERT_NE(nullptr, observed);
+  EXPECT_EQ(0xBEEFu, *static_cast<uint64_t*>(observed));
+
+  // Teardown fires the destroy hook for payload2.
+  cluster.reset();
+  result = absl::InternalError("cleanup");
+  EXPECT_EQ(2u, (*get_destroy_count.value())());
+}
+
+// Test run_on_all_workers is a no-op when the module does not implement the worker event hook.
+// The cluster_no_op fixture intentionally omits envoy_dynamic_module_on_cluster_worker_event, so
+// on_cluster_worker_event_ is nullptr and the fan-out must early-return without allocating the
+// slot or scheduling any work.
+TEST_F(DynamicModuleClusterTest, RunOnAllWorkersIsNoOpWithoutWorkerEventHook) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_callback_cluster_run_on_all_workers(cluster.get(), /*event_id=*/42);
+
+  // Slot must remain unallocated when no worker event hook was registered.
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get()));
+}
+
+// Test worker_slot_get returns nullptr when the slot has never been allocated (no prior
+// worker_slot_set or run_on_all_workers call).
+TEST_F(DynamicModuleClusterTest, WorkerSlotGetReturnsNullptrBeforeAllocation) {
+  auto result = createCluster(makeYamlConfig("cluster_run_on_all_workers"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get()));
+}
+
+// Test worker_slot_get returns nullptr when the slot has been allocated (by run_on_all_workers)
+// but no payload has been published via worker_slot_set.
+TEST_F(DynamicModuleClusterTest, WorkerSlotGetReturnsNullptrWhenSlotAllocatedButEmpty) {
+  auto result = createCluster(makeYamlConfig("cluster_run_on_all_workers"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Allocates the slot via ensureWorkerSlot() but seeds it with a null-payload factory.
+  envoy_dynamic_module_callback_cluster_run_on_all_workers(cluster.get(), /*event_id=*/1);
+
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get()));
+}
+
+// Test cluster_get_name returns the cluster's CDS name from the cluster-side context.
+TEST_F(DynamicModuleClusterTest, ClusterGetNameReturnsCdsName) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_type_envoy_buffer buffer{nullptr, 0};
+  envoy_dynamic_module_callback_cluster_get_name(cluster.get(), &buffer);
+  EXPECT_EQ("test_cluster", absl::string_view(buffer.ptr, buffer.length));
+}
+
 // Test the DynamicModuleClusterHandle destructor dispatches to main thread.
 TEST_F(DynamicModuleClusterTest, HandleDestructorDispatchesToMainThread) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
@@ -1337,6 +1597,7 @@ TEST_F(DynamicModuleClusterTest, MetricsDefineAndIncrementCounter) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   // Define a scalar counter.
   size_t counter_id = 0;
@@ -1360,6 +1621,7 @@ TEST_F(DynamicModuleClusterTest, MetricsDefineAndUseGauge) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   // Define a scalar gauge.
   size_t gauge_id = 0;
@@ -1389,6 +1651,7 @@ TEST_F(DynamicModuleClusterTest, MetricsDefineAndRecordHistogram) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   // Define a scalar histogram.
   size_t histogram_id = 0;
@@ -1412,6 +1675,7 @@ TEST_F(DynamicModuleClusterTest, MetricsNotFoundForInvalidId) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   // Increment a counter that was never defined.
   EXPECT_EQ(
@@ -1445,6 +1709,7 @@ TEST_F(DynamicModuleClusterTest, MetricsCounterVecWithLabels) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   // Define a counter vec with two labels.
   size_t counter_id = 0;
@@ -1489,6 +1754,7 @@ TEST_F(DynamicModuleClusterTest, MetricsGaugeVecWithLabels) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   // Define a gauge vec.
   size_t gauge_id = 0;
@@ -1524,6 +1790,7 @@ TEST_F(DynamicModuleClusterTest, MetricsHistogramVecWithLabels) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   // Define a histogram vec.
   size_t histogram_id = 0;
@@ -1555,6 +1822,7 @@ TEST_F(DynamicModuleClusterTest, MetricsVecScalarIdConflictErrors) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   envoy_dynamic_module_type_module_buffer label_name = {const_cast<char*>("lbl"), strlen("lbl")};
 
@@ -1609,6 +1877,7 @@ TEST_F(DynamicModuleClusterTest, MetricsVecWrongLabelCount) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   // Define a gauge vec with one label.
   envoy_dynamic_module_type_module_buffer gauge_name = {const_cast<char*>("gwl"), strlen("gwl")};
@@ -1653,6 +1922,7 @@ TEST_F(DynamicModuleClusterTest, MetricsVecNotFoundWithLabels) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   envoy_dynamic_module_type_module_buffer label_val = {const_cast<char*>("val"), strlen("val")};
 
@@ -1892,8 +2162,7 @@ TEST_F(DynamicModuleClusterTest, LbContextShouldSelectAnotherHost) {
   auto& talb = result->second;
   EXPECT_TRUE(talb->initialize().ok());
   auto lb_factory = talb->factory();
-  NiceMock<Upstream::MockPrioritySet> mock_ps;
-  auto lb = lb_factory->create({mock_ps});
+  auto lb = lb_factory->create({cluster->prioritySet()});
   auto* dm_lb = dynamic_cast<DynamicModuleLoadBalancer*>(lb.get());
   ASSERT_NE(nullptr, dm_lb);
 
@@ -1919,8 +2188,7 @@ TEST_F(DynamicModuleClusterTest, LbContextShouldSelectAnotherHostReturnsFalse) {
   auto& talb = result->second;
   EXPECT_TRUE(talb->initialize().ok());
   auto lb_factory = talb->factory();
-  NiceMock<Upstream::MockPrioritySet> mock_ps;
-  auto lb = lb_factory->create({mock_ps});
+  auto lb = lb_factory->create({cluster->prioritySet()});
   auto* dm_lb = dynamic_cast<DynamicModuleLoadBalancer*>(lb.get());
   ASSERT_NE(nullptr, dm_lb);
 
@@ -1946,8 +2214,7 @@ TEST_F(DynamicModuleClusterTest, LbContextShouldSelectAnotherHostInvalidArgs) {
   auto& talb = result->second;
   EXPECT_TRUE(talb->initialize().ok());
   auto lb_factory = talb->factory();
-  NiceMock<Upstream::MockPrioritySet> mock_ps;
-  auto lb = lb_factory->create({mock_ps});
+  auto lb = lb_factory->create({cluster->prioritySet()});
   auto* dm_lb = dynamic_cast<DynamicModuleLoadBalancer*>(lb.get());
   ASSERT_NE(nullptr, dm_lb);
 
@@ -2101,6 +2368,231 @@ TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamConnectionSniNullResult) 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(
       context_ptr, nullptr));
+}
+
+namespace {
+
+// A filter state object that does not support serializeAsString — used to exercise the typed-get
+// "object does not support serialization" failure branch.
+class UnserializableFilterStateObject : public StreamInfo::FilterState::Object {};
+
+} // namespace
+
+// Test get_filter_state_bytes with nullptr context.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateBytesNullContext) {
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+      nullptr, key_buf, &result));
+}
+
+// Test get_filter_state_bytes with nullptr result.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateBytesNullResult) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+      context_ptr, key_buf, nullptr));
+}
+
+// Test get_filter_state_bytes when the request has no stream info.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateBytesNoStreamInfo) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(nullptr));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+      context_ptr, key_buf, &result));
+}
+
+// Test get_filter_state_bytes when the key is not present.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateBytesNotFound) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "missing";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+      context_ptr, key_buf, &result));
+}
+
+// Test get_filter_state_bytes happy path: producer stored a StringAccessor; cluster reads it.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateBytesFound) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filter_state_->setData("k", std::make_unique<Router::StringAccessorImpl>("v"));
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+      context_ptr, key_buf, &result));
+  EXPECT_EQ("v", absl::string_view(result.ptr, result.length));
+}
+
+// Test get_filter_state_typed with nullptr context.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNullContext) {
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+      nullptr, key_buf, &result));
+}
+
+// Test get_filter_state_typed with nullptr result.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNullResult) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+      context_ptr, key_buf, nullptr));
+}
+
+// Test get_filter_state_typed when the request has no stream info.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNoStreamInfo) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(nullptr));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+      context_ptr, key_buf, &result));
+}
+
+// Test get_filter_state_typed when the key is not present.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNotFound) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "missing";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+      context_ptr, key_buf, &result));
+}
+
+// Test get_filter_state_typed when the stored object does not support serialization.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNotSerializable) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filter_state_->setData("k", std::make_unique<UnserializableFilterStateObject>());
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+      context_ptr, key_buf, &result));
+}
+
+// Test get_filter_state_typed happy path: producer stored a serializable object; cluster reads it.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedFound) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filter_state_->setData("k", std::make_unique<Router::StringAccessorImpl>("typed-v"));
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+      context_ptr, key_buf, &result));
+  EXPECT_EQ("typed-v", absl::string_view(result.ptr, result.length));
+}
+
+// Test get_host_stat reads counters and gauges from the host's HostStats.
+TEST_F(DynamicModuleClusterTest, LbContextGetHostStat) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  NiceMock<Upstream::MockHost> host;
+  host.stats_.rq_active_.add(7);
+  host.stats_.cx_active_.add(3);
+  host.stats_.rq_total_.add(42);
+  ON_CALL(host, stats()).WillByDefault(testing::ReturnRef(host.stats_));
+  auto* host_ptr = static_cast<envoy_dynamic_module_type_cluster_host_envoy_ptr>(&host);
+
+  EXPECT_EQ(7, envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+                   context_ptr, host_ptr, envoy_dynamic_module_type_host_stat_RqActive));
+  EXPECT_EQ(3, envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+                   context_ptr, host_ptr, envoy_dynamic_module_type_host_stat_CxActive));
+  EXPECT_EQ(42, envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+                    context_ptr, host_ptr, envoy_dynamic_module_type_host_stat_RqTotal));
+
+  // Other counters/gauges weren't touched; they should read as 0.
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+                   context_ptr, host_ptr, envoy_dynamic_module_type_host_stat_RqError));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+                   context_ptr, host_ptr, envoy_dynamic_module_type_host_stat_CxConnectFail));
+}
+
+// Test get_host_stat with nullptr context or host returns 0.
+TEST_F(DynamicModuleClusterTest, LbContextGetHostStatNullPointers) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  NiceMock<Upstream::MockHost> host;
+  auto* host_ptr = static_cast<envoy_dynamic_module_type_cluster_host_envoy_ptr>(&host);
+
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+                   nullptr, host_ptr, envoy_dynamic_module_type_host_stat_RqActive));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+                   context_ptr, nullptr, envoy_dynamic_module_type_host_stat_RqActive));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+                   nullptr, nullptr, envoy_dynamic_module_type_host_stat_RqActive));
+}
+
+// Test that the index-based `get_host_stat` maps each stat enum to the matching `HostStats` field.
+TEST_F(DynamicModuleClusterTest, LbGetHostStatReadsValues) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001"}, {1}, hosts));
+  ASSERT_EQ(1, hosts.size());
+
+  // Distinct values per field so a mismatched enum mapping is caught.
+  auto& stats = hosts[0]->stats();
+  stats.cx_connect_fail_.add(1);
+  stats.cx_total_.add(2);
+  stats.rq_error_.add(3);
+  stats.rq_success_.add(4);
+  stats.rq_timeout_.add(5);
+  stats.rq_total_.add(6);
+  stats.cx_active_.add(7);
+  stats.rq_active_.add(8);
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+  auto* lb_ptr = static_cast<void*>(lb_instance.get());
+
+  EXPECT_EQ(1, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                   lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_CxConnectFail));
+  EXPECT_EQ(2, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                   lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_CxTotal));
+  EXPECT_EQ(3, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                   lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_RqError));
+  EXPECT_EQ(4, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                   lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_RqSuccess));
+  EXPECT_EQ(5, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                   lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_RqTimeout));
+  EXPECT_EQ(6, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                   lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_RqTotal));
+  EXPECT_EQ(7, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                   lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_CxActive));
+  EXPECT_EQ(8, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                   lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_RqActive));
 }
 
 // =================================================================================================
@@ -2901,6 +3393,125 @@ TEST_F(DynamicModuleClusterTest, LbMemberUpdateHostAddress) {
       lb_ptr, 0, true, nullptr));
 }
 
+// Test get_member_update_host returns the host pointers borrowed during a membership update.
+TEST_F(DynamicModuleClusterTest, LbMemberUpdateHostPointer) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+  auto* lb_ptr = static_cast<void*>(lb_instance.get());
+
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001", "127.0.0.1:10002", "127.0.0.1:10003"},
+                             {1, 1, 1}, hosts));
+  ASSERT_EQ(3, hosts.size());
+
+  // Outside a membership update callback the borrowed vectors are null.
+  EXPECT_EQ(nullptr,
+            envoy_dynamic_module_callback_cluster_lb_get_member_update_host(lb_ptr, 0, true));
+  EXPECT_EQ(nullptr,
+            envoy_dynamic_module_callback_cluster_lb_get_member_update_host(lb_ptr, 0, false));
+
+  // Simulate the vectors that Envoy borrows for the duration of the callback.
+  Upstream::HostVector added{hosts[0], hosts[1]};
+  Upstream::HostVector removed{hosts[2]};
+  DynamicModuleClusterTestPeer::setMemberUpdateHosts(*lb_instance, &added, &removed);
+
+  EXPECT_EQ(hosts[0].get(),
+            envoy_dynamic_module_callback_cluster_lb_get_member_update_host(lb_ptr, 0, true));
+  EXPECT_EQ(hosts[1].get(),
+            envoy_dynamic_module_callback_cluster_lb_get_member_update_host(lb_ptr, 1, true));
+  EXPECT_EQ(hosts[2].get(),
+            envoy_dynamic_module_callback_cluster_lb_get_member_update_host(lb_ptr, 0, false));
+
+  // Out-of-bounds index returns nullptr.
+  EXPECT_EQ(nullptr,
+            envoy_dynamic_module_callback_cluster_lb_get_member_update_host(lb_ptr, 2, true));
+  EXPECT_EQ(nullptr,
+            envoy_dynamic_module_callback_cluster_lb_get_member_update_host(lb_ptr, 1, false));
+
+  // Null load balancer returns nullptr.
+  EXPECT_EQ(nullptr,
+            envoy_dynamic_module_callback_cluster_lb_get_member_update_host(nullptr, 0, true));
+
+  // Once the callback ends the borrowed vectors are cleared and lookups return nullptr again.
+  DynamicModuleClusterTestPeer::setMemberUpdateHosts(*lb_instance, nullptr, nullptr);
+  EXPECT_EQ(nullptr,
+            envoy_dynamic_module_callback_cluster_lb_get_member_update_host(lb_ptr, 0, true));
+}
+
+// Test get_member_update_host_packed_address returns the packed IP/port during a membership update.
+TEST_F(DynamicModuleClusterTest, LbMemberUpdateHostPackedAddress) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+  auto* lb_ptr = static_cast<void*>(lb_instance.get());
+
+  // Distinctive octets so every byte position is pinned, and the upper twelve bytes must stay
+  // zeroed (no leftover from a previous v6 read), exercising the memset.
+  auto v4_host = Upstream::makeTestHost(cluster->info(), "tcp://1.2.3.4:10001");
+  // Distinctive bytes at both ends and the interior so a reversed/byte-swapped copy is caught.
+  auto v6_host = Upstream::makeTestHost(cluster->info(), "tcp://[2001:db8:1122:3344::1]:10002");
+  auto pipe_host = Upstream::makeTestHost(cluster->info(), "unix:///tmp/dynamic_modules_test");
+
+  envoy_dynamic_module_type_packed_address addr{};
+
+  // Outside a membership update callback the borrowed vectors are null, so the getter fails.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+      lb_ptr, 0, true, &addr));
+
+  Upstream::HostVector added{v4_host, v6_host};
+  Upstream::HostVector removed{pipe_host};
+  DynamicModuleClusterTestPeer::setMemberUpdateHosts(*lb_instance, &added, &removed);
+
+  // IPv6 host first: all sixteen bytes hold the address in network byte order. Reading it before
+  // the IPv4 host leaves non-zero bytes in the buffer, so the IPv4 read below must zero them.
+  ASSERT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+      lb_ptr, 1, true, &addr));
+  EXPECT_EQ(6, addr.family);
+  EXPECT_EQ(10002, addr.port);
+  const uint8_t expected_v6[16] = {0x20, 0x01, 0x0d, 0xb8, 0x11, 0x22, 0x33, 0x44,
+                                   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
+  for (size_t i = 0; i < 16; ++i) {
+    EXPECT_EQ(expected_v6[i], addr.address_bytes[i]) << "v6 byte " << i;
+  }
+
+  // IPv4 host: address in the first four bytes (network byte order), the upper twelve zeroed by the
+  // memset (which must clear the leftover IPv6 bytes above), port in host byte order.
+  ASSERT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+      lb_ptr, 0, true, &addr));
+  EXPECT_EQ(4, addr.family);
+  EXPECT_EQ(10001, addr.port);
+  const uint8_t expected_v4[16] = {1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  for (size_t i = 0; i < 16; ++i) {
+    EXPECT_EQ(expected_v4[i], addr.address_bytes[i]) << "v4 byte " << i;
+  }
+
+  // A pipe (non-IP) address returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+      lb_ptr, 0, false, &addr));
+
+  // Out-of-bounds index returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+      lb_ptr, 2, true, &addr));
+
+  // Null load balancer and null result return false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+      nullptr, 0, true, &addr));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+      lb_ptr, 0, true, nullptr));
+
+  // Once the callback ends the borrowed vectors are cleared and the getter fails again.
+  DynamicModuleClusterTestPeer::setMemberUpdateHosts(*lb_instance, nullptr, nullptr);
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+      lb_ptr, 0, true, &addr));
+}
+
 // Test hosts-per-locality is correctly maintained with locality-aware hosts.
 TEST_F(DynamicModuleClusterTest, HostsPerLocalityWithLocality) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
@@ -3251,6 +3862,305 @@ TEST_F(DynamicModuleClusterTest, LbRepeatedConstructTeardownWithUpdates) {
         Upstream::HostSetImpl::partitionHosts(all_hosts, Upstream::HostsPerLocalityImpl::empty()),
         {}, {hosts[1]}, {}, absl::nullopt, absl::nullopt);
   }
+}
+
+// =============================================================================
+// Off-main-thread guard tests for cluster ABI callbacks.
+// =============================================================================
+
+// Verifies that `cluster_add_hosts` is fail-closed when called off the main thread.
+TEST_F(DynamicModuleClusterTest, AddHostsOffMainThreadFailsClosed) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_type_module_buffer addr = {"127.0.0.1:10001", 15};
+  uint32_t weight = 1;
+  envoy_dynamic_module_type_module_buffer empty = {"", 0};
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
+  void* cluster_ptr = cluster.get();
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([&] {
+          EXPECT_FALSE(envoy_dynamic_module_callback_cluster_add_hosts(
+              cluster_ptr, 0, &addr, &weight, &empty, &empty, &empty, nullptr, 0, 1, &host_ptr));
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_cluster_add_hosts must be called on the main thread");
+}
+
+// Verifies that `cluster_remove_hosts` is fail-closed when called off the main thread.
+TEST_F(DynamicModuleClusterTest, RemoveHostsOffMainThreadFailsClosed) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptrs[1] = {nullptr};
+  void* cluster_ptr = cluster.get();
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([&] {
+          EXPECT_EQ(0u,
+                    envoy_dynamic_module_callback_cluster_remove_hosts(cluster_ptr, host_ptrs, 1));
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_cluster_remove_hosts must be called on the main thread");
+}
+
+// Verifies that `cluster_update_host_health` is fail-closed when called off the main thread.
+TEST_F(DynamicModuleClusterTest, UpdateHostHealthOffMainThreadFailsClosed) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  void* cluster_ptr = cluster.get();
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([&] {
+          EXPECT_FALSE(envoy_dynamic_module_callback_cluster_update_host_health(
+              cluster_ptr, nullptr, envoy_dynamic_module_type_host_health_Healthy));
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_cluster_update_host_health must be called on the main "
+      "thread");
+}
+
+// Verifies that `cluster_pre_init_complete` is a safe no-op when called off the main thread.
+TEST_F(DynamicModuleClusterTest, PreInitCompleteOffMainThreadFailsClosed) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  void* cluster_ptr = cluster.get();
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t(
+            [&] { envoy_dynamic_module_callback_cluster_pre_init_complete(cluster_ptr); });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_cluster_pre_init_complete must be called on the main thread");
+}
+
+// Verifies that `cluster_find_host_by_address` is fail-closed when called off the main thread.
+TEST_F(DynamicModuleClusterTest, FindHostByAddressOffMainThreadFailsClosed) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  void* cluster_ptr = cluster.get();
+  envoy_dynamic_module_type_module_buffer addr = {"127.0.0.1:10001", 15};
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([&] {
+          EXPECT_EQ(nullptr,
+                    envoy_dynamic_module_callback_cluster_find_host_by_address(cluster_ptr, addr));
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_cluster_find_host_by_address must be called on the main "
+      "thread");
+}
+
+// Verifies the factory auto-freezes stat creation so `define_*` returns `Frozen` after init.
+TEST_F(DynamicModuleClusterTest, MetricsFrozenAfterInit) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  auto* config = cluster->config().get();
+  EXPECT_TRUE(config->stat_creation_frozen_);
+
+  envoy_dynamic_module_type_module_buffer name = {const_cast<char*>("frozen_counter"), 14};
+  envoy_dynamic_module_type_module_buffer label = {const_cast<char*>("label"), 5};
+  size_t out_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_cluster_config_define_counter(config, name, nullptr, 0,
+                                                                        &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_cluster_config_define_counter(config, name, &label, 1,
+                                                                        &out_id));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Frozen,
+      envoy_dynamic_module_callback_cluster_config_define_gauge(config, name, nullptr, 0, &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_cluster_config_define_histogram(config, name, nullptr, 0,
+                                                                          &out_id));
+}
+
+// Drives concurrent labeled increments from multiple threads to verify no data race in the
+// shared `stat_name_pool_`. Run under `--config=tsan` to verify.
+TEST_F(DynamicModuleClusterTest, MetricsConcurrentIncrementCounterVecNoRace) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
+
+  envoy_dynamic_module_type_module_buffer name = {const_cast<char*>("race_counter"), 12};
+  envoy_dynamic_module_type_module_buffer label_names = {const_cast<char*>("status"), 6};
+  size_t counter_id = 0;
+  ASSERT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_config_define_counter(config, name, &label_names,
+                                                                        1, &counter_id));
+
+  constexpr int kNumThreads = 8;
+  constexpr int kIncrementsPerThread = 2000;
+
+  // Pre-warm the test scope's counter cache so workers only hit the cache. `TestScope` uses an
+  // unsynchronized map for counter caching that would otherwise race independently of the path
+  // under test.
+  for (int t = 0; t < kNumThreads; ++t) {
+    const std::string label_value_str = absl::StrCat("worker_", t);
+    envoy_dynamic_module_type_module_buffer label_value = {
+        const_cast<char*>(label_value_str.data()), label_value_str.size()};
+    ASSERT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+              envoy_dynamic_module_callback_cluster_config_increment_counter(config, counter_id,
+                                                                             &label_value, 1, 0));
+  }
+
+  std::vector<std::thread> threads;
+  threads.reserve(kNumThreads);
+  std::atomic<int> ready{0};
+  std::atomic<bool> go{false};
+  for (int t = 0; t < kNumThreads; ++t) {
+    threads.emplace_back([&, t]() {
+      const std::string label_value_str = absl::StrCat("worker_", t);
+      envoy_dynamic_module_type_module_buffer label_value = {
+          const_cast<char*>(label_value_str.data()), label_value_str.size()};
+      ready.fetch_add(1, std::memory_order_relaxed);
+      while (!go.load(std::memory_order_acquire)) {
+      }
+      for (int i = 0; i < kIncrementsPerThread; ++i) {
+        ASSERT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+                  envoy_dynamic_module_callback_cluster_config_increment_counter(
+                      config, counter_id, &label_value, 1, 1));
+      }
+    });
+  }
+  while (ready.load(std::memory_order_acquire) < kNumThreads) {
+  }
+  go.store(true, std::memory_order_release);
+  for (auto& th : threads) {
+    th.join();
+  }
+}
+
+// setHostData / getHostData return false when the priority is out of range.
+TEST_F(DynamicModuleClusterTest, SetGetHostDataPriorityOutOfRange) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+
+  // No priority has been populated, so any priority is out of range.
+  EXPECT_FALSE(lb_instance->setHostData(/*priority=*/5, /*index=*/0, /*data=*/123));
+
+  uintptr_t data = 0xAAA;
+  EXPECT_FALSE(lb_instance->getHostData(/*priority=*/5, /*index=*/0, &data));
+  // Output unchanged on the priority-out-of-range early return.
+  EXPECT_EQ(0xAAAu, data);
+}
+
+// updateHostHealth returns false when the supplied host is not present in any priority set.
+TEST_F(DynamicModuleClusterTest, UpdateHostHealthHostNotInAnyPriority) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Build a real host that is *not* part of any priority set. Reuse the cluster's own info object
+  // so the host is well-formed.
+  auto foreign_host = Upstream::makeTestHost(cluster->info(), "tcp://127.0.0.1:55555");
+  EXPECT_FALSE(
+      cluster->updateHostHealth(foreign_host, envoy_dynamic_module_type_host_health_Unhealthy));
+}
+
+// sendHttpCallout returns CannotCreateRequest synchronously when the module did not export
+// on_cluster_http_callout_done, since there is no path for the response to be delivered.
+TEST_F(DynamicModuleClusterTest, HttpCalloutRequestedWithoutDoneHook) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Strip the done hook to simulate a module that didn't implement it.
+  cluster->config()->on_cluster_http_callout_done_ = nullptr;
+
+  // No call to cluster_manager_.getThreadLocalCluster should occur — the early return fires first.
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster(_)).Times(0);
+
+  uint64_t callout_id = 0;
+  envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {":method", 7, "GET", 3},
+      {":path", 5, "/test", 5},
+      {"host", 4, "example.com", 11},
+  };
+  envoy_dynamic_module_type_module_buffer body = {nullptr, 0};
+  auto callout_result = envoy_dynamic_module_callback_cluster_http_callout(
+      cluster.get(), &callout_id, cluster_name, headers.data(), headers.size(), body, 5000);
+  EXPECT_EQ(callout_result, envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
+}
+
+// chooseHost returns {nullptr} synchronously when the LB has no in-module instance (i.e. the
+// module's on_cluster_lb_new returned null and in_module_lb_ remains unset).
+TEST_F(DynamicModuleClusterTest, ChooseHostShortCircuitsWhenInModuleLbIsNull) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+  DynamicModuleClusterTestPeer::clearInModuleLb(*lb_instance);
+
+  auto response = lb_instance->chooseHost(nullptr);
+  EXPECT_EQ(nullptr, response.host);
+  EXPECT_EQ(nullptr, response.cancelable);
+}
+
+// DynamicModuleClusterHandle destruction is a no-op when the wrapped cluster pointer is already
+// null (e.g. the handle was constructed from an empty shared_ptr).
+TEST_F(DynamicModuleClusterTest, HandleDestructorIsNoOpWhenClusterIsNull) {
+  // No dispatcher.post call should occur because the destructor returns early.
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+  { DynamicModuleClusterHandle handle(nullptr); }
+}
+
+// The cluster destructor cancels any pending HTTP callouts before clearing them.
+TEST_F(DynamicModuleClusterTest, DestructorCancelsPendingHttpCallouts) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Mock request whose cancel() we expect to be invoked when the cluster is destroyed.
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+  EXPECT_CALL(request, cancel());
+
+  DynamicModuleClusterTestPeer::injectPendingHttpCallout(*cluster, /*callout_id=*/42, &request);
+
+  cluster.reset();
+  // The thread-aware LB inside `result` still holds an internal handle to the cluster; reset it so
+  // the cluster is actually destroyed inside this test body, where the EXPECT_CALL is in scope.
+  result = absl::InternalError("cleanup");
 }
 
 } // namespace

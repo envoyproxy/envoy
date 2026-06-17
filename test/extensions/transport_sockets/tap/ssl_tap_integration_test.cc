@@ -1,5 +1,6 @@
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
@@ -8,6 +9,7 @@
 #include "test/common/tls/integration/ssl_integration_test_base.h"
 #include "test/extensions/common/tap/common.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace Ssl {
 
@@ -41,6 +43,8 @@ public:
     transport_socket->set_name("envoy.transport_sockets.tap");
     envoy::config::core::v3::TransportSocket raw_transport_socket;
     raw_transport_socket.set_name("envoy.transport_sockets.raw_buffer");
+    envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer_config;
+    raw_transport_socket.mutable_typed_config()->PackFrom(raw_buffer_config);
     envoy::extensions::transport_sockets::tap::v3::Tap tap_config =
         createTapConfig(raw_transport_socket);
     tap_config.mutable_transport_socket()->MergeFrom(raw_transport_socket);
@@ -145,7 +149,7 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
       *codec_client_->connection()->connectionInfoProvider().localAddress(),
       expected_remote_address);
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
   envoy::data::tap::v3::TraceWrapper trace;
   TestUtility::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace, *api_);
   // Validate general expected properties in the trace.
@@ -178,7 +182,7 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   EXPECT_EQ(256, response->body().size());
   checkStats();
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 2);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(2));
   TestUtility::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace, *api_);
   // Validate second connection ID.
   EXPECT_EQ(second_id, trace.socket_buffered_trace().trace_id());
@@ -225,7 +229,7 @@ TEST_P(SslTapIntegrationTest, TruncationWithMultipleDataFrames) {
 
   checkStats();
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
 
   envoy::data::tap::v3::TraceWrapper trace;
   TestUtility::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, id), trace, *api_);
@@ -252,7 +256,7 @@ TEST_P(SslTapIntegrationTest, RequestWithTextProto) {
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   checkStats();
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
   envoy::data::tap::v3::TraceWrapper trace;
   TestUtility::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace, *api_);
   // Test some obvious properties.
@@ -283,7 +287,7 @@ TEST_P(SslTapIntegrationTest, RequestWithJsonBodyAsStringUpstreamTap) {
   testRouterRequestAndResponseWithBody(512, 1024, false, false, &creator);
   checkStats();
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
   test_server_.reset();
 
   // This must be done after server shutdown so that connection pool connections are closed and
@@ -319,7 +323,7 @@ TEST_P(SslTapIntegrationTest, RequestWithStreamingUpstreamTap) {
   testRouterRequestAndResponseWithBody(512, 1024, false, false, &creator);
   checkStats();
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
   test_server_.reset();
 
   // This must be done after server shutdown so that connection pool connections are closed and
@@ -363,8 +367,8 @@ TEST_P(SslTapIntegrationTest, RequestWithStreamingDownstreamTapPegCounter) {
   testRouterRequestAndResponseWithBody(512, 1024, false, false, &creator);
   checkStats();
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-  test_server_->waitForCounterGe("transport.tap.tranTapPrefix.streamed_submit", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
+  test_server_->waitForCounter("transport.tap.tranTapPrefix.streamed_submit", Ge(1));
   test_server_.reset();
 
   // Restore the value.
@@ -394,8 +398,8 @@ TEST_P(SslTapIntegrationTest, RequestWithBuffedDownstreamTapPegCounter) {
   testRouterRequestAndResponseWithBody(512, 1024, false, false, &creator);
   checkStats();
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-  test_server_->waitForCounterGe("transport.tap.tranTapPrefix.buffered_submit", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
+  test_server_->waitForCounter("transport.tap.tranTapPrefix.buffered_submit", Ge(1));
   test_server_.reset();
 
   // Restore the value.

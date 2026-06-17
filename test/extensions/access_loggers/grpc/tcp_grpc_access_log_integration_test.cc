@@ -574,6 +574,10 @@ tcp_logs:
 TEST_P(TcpGrpcAccessLogIntegrationTest, SslTerminatedWithJA3) {
   setupTlsInspectorFilter(/*ssl_terminate=*/true,
                           /*enable_`ja3`_fingerprinting=*/true);
+  // The fingerprint includes the certificate compression extension, which is opt-in, so enable
+  // the runtime guard explicitly to keep the client hello deterministic.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
   initialize();
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setSni("sni");
@@ -640,6 +644,10 @@ tcp_logs:
 TEST_P(TcpGrpcAccessLogIntegrationTest, SslNotTerminated) {
   setupTlsInspectorFilter(/*ssl_terminate=*/false,
                           /*enable_`ja3`_fingerprinting=*/false);
+  // The forwarded client hello byte count includes the certificate compression extension, which
+  // is opt-in, so enable the runtime guard explicitly to keep the client hello deterministic.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
   initialize();
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setSni("sni");
@@ -692,6 +700,10 @@ tcp_logs:
 TEST_P(TcpGrpcAccessLogIntegrationTest, SslNotTerminatedWithJA3) {
   setupTlsInspectorFilter(/*ssl_terminate=*/false,
                           /*enable_`ja3`_fingerprinting=*/true);
+  // The fingerprint and forwarded byte count include the certificate compression extension, which
+  // is opt-in, so enable the runtime guard explicitly to keep the client hello deterministic.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
   initialize();
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setSni("sni");
@@ -747,6 +759,10 @@ tcp_logs:
 TEST_P(TcpGrpcAccessLogIntegrationTest, SslNotTerminatedWithJA3NoSNI) {
   setupTlsInspectorFilter(/*ssl_terminate=*/false,
                           /*enable_`ja3`_fingerprinting=*/true);
+  // The fingerprint and forwarded byte count include the certificate compression extension, which
+  // is opt-in, so enable the runtime guard explicitly to keep the client hello deterministic.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
   initialize();
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});

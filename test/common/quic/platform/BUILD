@@ -30,7 +30,6 @@ envoy_cc_test(
         "//test/common/buffer:utility_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/common/tls:ssl_test_utils",
-        "//test/mocks/api:api_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",

@@ -133,6 +133,10 @@ ConnectionManagerImpl::ConnectionManagerImpl(
           overload_manager.getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders)),
       hcm_ondata_creating_codec_(
           overload_manager.getLoadShedPoint(Server::LoadShedPointName::get().HcmCodecCreation)),
+      should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(
+          Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch)),
+      should_send_go_away_and_close_on_dispatch_(overload_manager.getLoadShedPoint(
+          Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch)),
       overload_stop_accepting_requests_ref_(
           overload_state_.getState(Server::OverloadActionNames::get().StopAcceptingRequests)),
       overload_disable_keepalive_ref_(
@@ -155,6 +159,13 @@ ConnectionManagerImpl::ConnectionManagerImpl(
   ENVOY_LOG_ONCE_IF(trace, hcm_ondata_creating_codec_ == nullptr,
                     "LoadShedPoint envoy.load_shed_points.hcm_ondata_creating_codec is not found. "
                     "Is it configured?");
+  ENVOY_LOG_ONCE_IF(trace, should_send_go_away_on_dispatch_ == nullptr,
+                    "LoadShedPoint envoy.load_shed_points.http2_server_go_away_on_dispatch is not "
+                    "found. Is it configured?");
+  ENVOY_LOG_ONCE_IF(
+      trace, should_send_go_away_and_close_on_dispatch_ == nullptr,
+      "LoadShedPoint envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch is not "
+      "found. Is it configured?");
 }
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
@@ -190,7 +201,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
         std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
             read_callbacks_->connection().connectionInfoProvider().remoteAddress(),
             read_callbacks_->connection().connectionInfoProvider().localAddress()}),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+        StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   if (config_->idleTimeout()) {
@@ -200,11 +211,11 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     connection_idle_timer_->enableTimer(config_->idleTimeout().value());
   }
 
-  if (config_->maxConnectionDuration()) {
+  if (auto max_connection_duration = config_->maxConnectionDuration(); max_connection_duration) {
     connection_duration_timer_ =
         dispatcher_->createScaledTimer(Event::ScaledTimerType::HttpDownstreamMaxConnectionTimeout,
                                        [this]() -> void { onConnectionDurationTimeout(); });
-    connection_duration_timer_->enableTimer(config_->maxConnectionDuration().value());
+    connection_duration_timer_->enableTimer(max_connection_duration.value());
   }
 
   read_callbacks_->connection().setDelayedCloseTimeout(config_->delayedCloseTimeout());
@@ -514,6 +525,20 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     createCodec(data);
   }
 
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_fix_goaway_loadshed_point")) {
+    if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
+        should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
+      sendGoAwayAndClose(/*graceful=*/false);
+      handleCodecOverloadError(
+          "Load shed point http2_server_go_away_and_close_on_dispatch triggered");
+      return Network::FilterStatus::StopIteration;
+    }
+    if (should_send_go_away_on_dispatch_ != nullptr &&
+        should_send_go_away_on_dispatch_->shouldShedLoad()) {
+      sendGoAwayAndClose(/*graceful=*/true);
+    }
+  }
+
   bool redispatch;
   do {
     redispatch = false;
@@ -662,6 +687,11 @@ void ConnectionManagerImpl::doConnectionClose(
 
     stats_.named_.downstream_cx_destroy_active_rq_.inc();
     user_agent_.onConnectionDestroy(event, true);
+    // Record the downstream connection end time point for COMMON_DURATION access logging.
+    for (auto& stream : streams_) {
+      stream->filter_manager_.streamInfo().downstreamTiming().onDownstreamConnectionEnd(
+          time_source_);
+    }
     // Note that resetAllStreams() does not actually write anything to the wire. It just resets
     // all upstream streams and their filter stacks. Thus, there are no issues around recursive
     // entry.
@@ -794,7 +824,7 @@ void ConnectionManagerImpl::onDrainTimeout() {
 }
 
 void ConnectionManagerImpl::sendGoAwayAndClose(bool graceful) {
-  ENVOY_CONN_LOG(trace, "connection manager sendGoAwayAndClose was triggerred from filters.",
+  ENVOY_CONN_LOG(trace, "connection manager sendGoAwayAndClose was triggered.",
                  read_callbacks_->connection());
   if (go_away_sent_) {
     return;
@@ -903,6 +933,10 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
   filter_manager_.streamInfo().setShouldSchemeMatchUpstream(
       connection_manager.config_->shouldSchemeMatchUpstream());
+
+  // Record the downstream connection begin time point for COMMON_DURATION access logging.
+  filter_manager_.streamInfo().downstreamTiming().setDownstreamConnectionBegin(
+      connection_manager_.read_callbacks_->connection().streamInfo().startTimeMonotonic());
 
   // TODO(chaoqin-li1123): can this be moved to the on demand filter?
   auto factory = Envoy::Config::Utility::getFactoryByName<RouteConfigUpdateRequesterFactory>(
@@ -1491,7 +1525,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     filter_manager_.streamInfo().filterState()->setData(
         Router::OriginalConnectPort::key(),
         std::make_unique<Router::OriginalConnectPort>(optional_port.value()),
-        StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
+        StreamInfo::FilterState::LifeSpan::Request);
   }
 
   if (!state_.is_internally_created_) { // Only sanitize headers on first pass.
@@ -2482,7 +2516,6 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
     StreamInfo::FilterStateSharedPtr filter_state) {
   ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   ResponseEncoder* response_encoder = response_encoder_;
-  response_encoder_ = nullptr;
 
   Buffer::InstancePtr request_data = std::make_unique<Buffer::OwnedImpl>();
   const auto& buffered_request_data = filter_manager_.bufferedRequestData();
@@ -2490,6 +2523,10 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   if (proxy_body) {
     request_data->move(*buffered_request_data);
   }
+
+  // Null after move(): draining the WatermarkBuffer may synchronously fire
+  // onDecoderFilterBelowWriteBufferLowWatermark which needs a valid encoder.
+  response_encoder_ = nullptr;
 
   response_encoder->getStream().removeCallbacks(*this);
 

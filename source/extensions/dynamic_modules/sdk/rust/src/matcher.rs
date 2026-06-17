@@ -5,7 +5,7 @@
 
 use crate::abi;
 use std::ffi::c_void;
-use std::{ptr, slice};
+use std::ptr;
 
 /// Read-only context for accessing HTTP matching data during match evaluation.
 ///
@@ -65,17 +65,9 @@ impl MatchContext {
       return None;
     }
 
-    let mut headers = vec![
-      abi::envoy_dynamic_module_type_envoy_http_header {
-        key_ptr: ptr::null_mut(),
-        key_length: 0,
-        value_ptr: ptr::null_mut(),
-        value_length: 0,
-      };
-      size
-    ];
-
-    let result = unsafe {
+    let mut headers: Vec<abi::envoy_dynamic_module_type_envoy_http_header> =
+      Vec::with_capacity(size);
+    let success = unsafe {
       abi::envoy_dynamic_module_callback_matcher_get_headers(
         self.envoy_ptr,
         header_type,
@@ -83,8 +75,11 @@ impl MatchContext {
       )
     };
 
-    if !result {
+    if !success {
       return None;
+    }
+    unsafe {
+      headers.set_len(size);
     }
 
     Some(
@@ -92,8 +87,8 @@ impl MatchContext {
         .iter()
         .map(|h| unsafe {
           (
-            slice::from_raw_parts(h.key_ptr as *const u8, h.key_length),
-            slice::from_raw_parts(h.value_ptr as *const u8, h.value_length),
+            crate::ffi_helpers::slice_from_raw_or_empty(h.key_ptr as *const u8, h.key_length),
+            crate::ffi_helpers::slice_from_raw_or_empty(h.value_ptr as *const u8, h.value_length),
           )
         })
         .collect(),
@@ -125,7 +120,7 @@ impl MatchContext {
       )
     } {
       unsafe {
-        Some(slice::from_raw_parts(
+        Some(crate::ffi_helpers::slice_from_raw_or_empty(
           result.ptr as *const u8,
           result.length,
         ))
@@ -205,26 +200,40 @@ macro_rules! declare_matcher {
       name: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
       config: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
     ) -> *const ::std::ffi::c_void {
-      let name_str = unsafe {
-        let slice = ::std::slice::from_raw_parts(name.ptr as *const u8, name.length);
-        ::std::str::from_utf8(slice).unwrap_or("")
-      };
-      let config_bytes =
-        unsafe { ::std::slice::from_raw_parts(config.ptr as *const u8, config.length) };
+      ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+        // Safe under `(nullptr, 0)` via `ffi_helpers`. The matcher name is used as a registry
+        // lookup key by user `MatcherConfig::new` implementations, so invalid UTF-8 must map to
+        // the empty string rather than being rewritten with `U+FFFD` substitutions; the latter
+        // would silently route invalid bytes to a different registry entry.
+        let name_slice = unsafe {
+          $crate::ffi_helpers::slice_from_raw_or_empty(name.ptr as *const u8, name.length)
+        };
+        let name_str: &str = ::std::str::from_utf8(name_slice).unwrap_or("");
+        let config_bytes = unsafe {
+          $crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
+        };
 
-      match <$config_type as $crate::matcher::MatcherConfig>::new(name_str, config_bytes) {
-        Ok(c) => Box::into_raw(Box::new(c)) as *const ::std::ffi::c_void,
-        Err(_) => ::std::ptr::null(),
-      }
+        match <$config_type as $crate::matcher::MatcherConfig>::new(name_str, config_bytes) {
+          Ok(c) => Box::into_raw(Box::new(c)) as *const ::std::ffi::c_void,
+          Err(_) => ::std::ptr::null(),
+        }
+      }))
+      .unwrap_or_else(|panic| {
+        $crate::log_ffi_panic("envoy_dynamic_module_on_matcher_config_new", panic);
+        ::std::ptr::null()
+      })
     }
 
     #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_matcher_config_destroy(
       config_ptr: *const ::std::ffi::c_void,
     ) {
-      unsafe {
+      let _ = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| unsafe {
         drop(Box::from_raw(config_ptr as *mut $config_type));
-      }
+      }))
+      .map_err(|panic| {
+        $crate::log_ffi_panic("envoy_dynamic_module_on_matcher_config_destroy", panic);
+      });
     }
 
     #[no_mangle]
@@ -232,9 +241,16 @@ macro_rules! declare_matcher {
       config_ptr: *const ::std::ffi::c_void,
       matcher_input_envoy_ptr: *mut ::std::ffi::c_void,
     ) -> bool {
-      let config = unsafe { &*(config_ptr as *const $config_type) };
-      let ctx = $crate::matcher::MatchContext::new(matcher_input_envoy_ptr);
-      config.on_matcher_match(&ctx)
+      ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+        let config = unsafe { &*(config_ptr as *const $config_type) };
+        let ctx = $crate::matcher::MatchContext::new(matcher_input_envoy_ptr);
+        config.on_matcher_match(&ctx)
+      }))
+      .unwrap_or_else(|panic| {
+        $crate::log_ffi_panic("envoy_dynamic_module_on_matcher_match", panic);
+        // Fail-closed: a panic during match evaluation must not look like "matched".
+        false
+      })
     }
   };
 }

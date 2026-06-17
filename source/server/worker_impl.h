@@ -68,6 +68,9 @@ public:
   void stopListener(Network::ListenerConfig& listener,
                     const Network::ExtraShutdownListenerOptions& options,
                     std::function<void()> completion) override;
+  void onFilterChainDrain(uint64_t listener_tag,
+                          const std::list<const Network::FilterChain*>& filter_chains) override;
+  void onListenerDrain(Network::ListenerConfig& listener) override;
 
 private:
   void threadRoutine(OptRef<GuardDog> guard_dog, const std::function<void()>& cb);

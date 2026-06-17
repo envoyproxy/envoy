@@ -42,9 +42,27 @@ public:
    */
   IoUringSocket& socket() const { return socket_; }
 
+  /**
+   * The provided buffer id reported by a `multishot` read completion, or -1 when the completion
+   * does not use a provided buffer. Populated by the io_uring implementation before the completion
+   * callback runs.
+   */
+  int32_t bufferId() const { return buffer_id_; }
+  void setBufferId(int32_t buffer_id) { buffer_id_ = buffer_id; }
+
+  /**
+   * Whether the io_uring will deliver more completions for this request, as with an armed
+   * `multishot` operation. When true the request is kept alive across completions. Populated by the
+   * io_uring implementation before the completion callback runs.
+   */
+  bool moreCompletions() const { return more_completions_; }
+  void setMoreCompletions(bool more_completions) { more_completions_ = more_completions; }
+
 private:
   RequestType type_;
   IoUringSocket& socket_;
+  int32_t buffer_id_{-1};
+  bool more_completions_{false};
 };
 
 /**
@@ -63,6 +81,34 @@ using CompletionCb = std::function<void(Request* user_data, int32_t result, bool
 using InjectedCompletionUserDataReleasor = std::function<void(Request* user_data)>;
 
 enum class IoUringResult { Ok, Busy, Failed };
+
+/**
+ * A pool of fixed-size buffers provided to the kernel for `multishot` reads. The kernel fills a
+ * buffer when data arrives and reports its id in the completion. The owner releases the buffer once
+ * the data has been consumed. Releasing a buffer after the io_uring is gone is a safe no-op.
+ */
+class IoUringBufferPool {
+public:
+  virtual ~IoUringBufferPool() = default;
+
+  /**
+   * Returns the memory address of the buffer with the given id.
+   */
+  virtual uint8_t* getBuffer(uint32_t buffer_id) PURE;
+
+  /**
+   * Returns the size in bytes of each buffer in the pool.
+   */
+  virtual uint32_t bufferSize() const PURE;
+
+  /**
+   * Hands a consumed buffer back to the kernel so it can be reused for a later read. The pointer
+   * must be the address previously returned by getBuffer.
+   */
+  virtual void releaseBuffer(const void* buffer) PURE;
+};
+
+using IoUringBufferPoolSharedPtr = std::shared_ptr<IoUringBufferPool>;
 
 /**
  * Abstract wrapper around `io_uring`.
@@ -94,6 +140,12 @@ public:
   virtual void forEveryCompletion(const CompletionCb& completion_cb) PURE;
 
   /**
+   * Returns true when the completion queue still holds entries. forEveryCompletion reaps a bounded
+   * batch per call, so the caller checks this to drain a larger burst on a later event loop pass.
+   */
+  virtual bool hasReadyCompletions() const PURE;
+
+  /**
    * Prepares an accept system call and puts it into the submission queue.
    * Returns IoUringResult::Failed in case the submission queue is full already
    * and IoUringResult::Ok otherwise.
@@ -117,6 +169,26 @@ public:
    */
   virtual IoUringResult prepareReadv(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
                                      off_t offset, Request* user_data) PURE;
+
+  /**
+   * Returns true if `multishot` reads backed by a provided buffer pool are available on this ring.
+   * When false the caller falls back to readv-based reads.
+   */
+  virtual bool isMultishotEnabled() const PURE;
+
+  /**
+   * Returns the provided buffer pool used for `multishot` reads, or nullptr when `multishot` reads
+   * are not available.
+   */
+  virtual IoUringBufferPoolSharedPtr bufferPool() PURE;
+
+  /**
+   * Prepares a `multishot` recv that draws buffers from the provided buffer pool and puts it into
+   * the submission queue. The kernel keeps delivering completions until the request is canceled,
+   * the connection ends or the buffer pool is exhausted. Returns IoUringResult::Failed when the
+   * submission queue is full already and IoUringResult::Ok otherwise.
+   */
+  virtual IoUringResult prepareReadMultishot(os_fd_t fd, Request* user_data) PURE;
 
   /**
    * Prepares a writev system call and puts it into the submission queue.
@@ -265,7 +337,8 @@ public:
   virtual void connect(const Network::Address::InstanceConstSharedPtr& address) PURE;
 
   /**
-   * Write data to the socket.
+   * Write data to the socket. When the socket is applying write backpressure the data is left in
+   * the buffer so the caller can retry after a write event is delivered.
    * @param data is going to write.
    */
   virtual void write(Buffer::Instance& data) PURE;
@@ -274,6 +347,8 @@ public:
    * Write data to the socket.
    * @param slices includes the data to write.
    * @param num_slice the number of slices.
+   * @return the number of bytes consumed, which is zero when the socket is applying write
+   * backpressure so the caller can retry after a write event is delivered.
    */
   virtual uint64_t write(const Buffer::RawSlice* slices, uint64_t num_slice) PURE;
 

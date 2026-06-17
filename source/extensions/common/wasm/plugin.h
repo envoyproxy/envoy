@@ -29,7 +29,7 @@ public:
 
 private:
   const envoy::extensions::wasm::v3::PluginConfig config_;
-  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_{};
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_;
   EnvironmentVariableMap envs_;
 };
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/network/address.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/stats/stats_macros.h"
@@ -20,7 +22,7 @@ struct WorkloadDiscoveryStats {
 class WorkloadMetadataProvider {
 public:
   virtual ~WorkloadMetadataProvider() = default;
-  virtual absl::optional<Istio::Common::WorkloadMetadataObject>
+  virtual std::optional<Istio::Common::WorkloadMetadataObject>
   getMetadata(const Network::Address::InstanceConstSharedPtr& address) PURE;
 };
 

@@ -3181,6 +3181,45 @@ filter_chains:
   checkStats(__LINE__, 1, 0, 1, 0, 0, 0, 0);
 }
 
+// Verify ListenerManagerImpl::drainListener fans out worker_->onListenerDrain at the start
+// of the drain sequence, before connections are closed.
+TEST_P(ListenerManagerImplTest, DrainListenerFansOutToWorker) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _));
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
+
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  worker_->callAddCompletion();
+
+  // ListenerManagerImpl::drainListener orders: stopListener, worker->onListenerDrain, then
+  // drain_manager->startDrainSequence. Override the AnyNumber() default from SetUp() so we
+  // assert worker->onListenerDrain is invoked exactly once.
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
+  EXPECT_CALL(*worker_, onListenerDrain(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
+  EXPECT_TRUE(manager_->removeListener("foo"));
+
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo->drain_manager_->drain_sequence_completion_();
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callRemovalCompletion();
+}
+
 TEST_P(ListenerManagerImplTest, RemoveListener) {
   InSequence s;
 
@@ -4202,17 +4241,17 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithFilterStateM
   auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
 
-  stream_info_.filterState()->setData(
-      "unknown_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+  stream_info_.filterState()->setData("unknown_key",
+                                      std::make_shared<Router::StringAccessorImpl>("unknown_value"),
+                                      StreamInfo::FilterState::LifeSpan::Connection);
 
   // Filter state set to a non-matching key - no match.
   filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
 
-  stream_info_.filterState()->setData(
-      "filter_state_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+  stream_info_.filterState()->setData("filter_state_key",
+                                      std::make_shared<Router::StringAccessorImpl>("unknown_value"),
+                                      StreamInfo::FilterState::LifeSpan::Connection);
 
   // Filter state set to a matching key but unknown value - no match.
   filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
@@ -4220,7 +4259,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithFilterStateM
 
   stream_info_.filterState()->setData(
       "filter_state_key", std::make_shared<Router::StringAccessorImpl>("filter_state_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   // Known filter state key and matching value - using 1st filter chain.
   filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
@@ -5351,18 +5390,18 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithFilterSta
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_EQ(filter_chain->name(), "foo");
 
-  stream_info_.filterState()->setData(
-      "unknown_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+  stream_info_.filterState()->setData("unknown_key",
+                                      std::make_shared<Router::StringAccessorImpl>("unknown_value"),
+                                      StreamInfo::FilterState::LifeSpan::Connection);
 
   // Filter state set to a non-matching key - no match.
   filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_EQ(filter_chain->name(), "foo");
 
-  stream_info_.filterState()->setData(
-      "filter_state_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+  stream_info_.filterState()->setData("filter_state_key",
+                                      std::make_shared<Router::StringAccessorImpl>("unknown_value"),
+                                      StreamInfo::FilterState::LifeSpan::Connection);
 
   // Filter state set to a matching key but unknown value - no match.
   filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
@@ -5371,7 +5410,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithFilterSta
 
   stream_info_.filterState()->setData(
       "filter_state_key", std::make_shared<Router::StringAccessorImpl>("filter_state_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   // Known filter state key and matching value - using 1st filter chain.
   filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);

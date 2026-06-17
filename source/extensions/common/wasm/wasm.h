@@ -154,8 +154,8 @@ using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
 
 class PluginHandleSharedPtrThreadLocal : public ThreadLocal::ThreadLocalObject {
 public:
-  PluginHandleSharedPtr handle{};
-  MonotonicTime last_load{};
+  PluginHandleSharedPtr handle;
+  MonotonicTime last_load;
 
   PluginHandleSharedPtrThreadLocal(PluginHandleSharedPtr h, MonotonicTime t = {})
       : handle(std::move(h)), last_load(t) {}
@@ -224,7 +224,7 @@ private:
   PluginSharedPtr plugin_;
   RemoteAsyncDataProviderPtr remote_data_provider_;
   const bool is_singleton_handle_{};
-  WasmHandleSharedPtr base_wasm_{};
+  WasmHandleSharedPtr base_wasm_;
   absl::variant<absl::monostate, SinglePluginHandle, ThreadLocalPluginHandle> plugin_handle_;
 };
 

@@ -1,5 +1,6 @@
 #include "test/integration/http_integration.h"
 
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -179,6 +180,54 @@ TEST_P(DirectResponseIntegrationTest, DefaultDirectResponseFileDoesNotUpdateBeyo
   response = getDirectBodyResponse();
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("dummy", response->body());
+}
+
+TEST_P(DirectResponseIntegrationTest, PathRewriteRedirectWithReqHeader) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        route->mutable_match()->set_prefix("/api/");
+        route->mutable_redirect()->set_path_rewrite("/new/%REQ(x-version)%");
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/api/resource"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"x-version", "v2"},
+  });
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("301", response->headers().getStatusValue());
+  EXPECT_EQ("http://host/new/v2", response->headers().getLocationValue());
+}
+
+TEST_P(DirectResponseIntegrationTest, PathRewriteRedirectWithDownstreamAddress) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        route->mutable_match()->set_prefix("/client/");
+        route->mutable_redirect()->set_path_rewrite(
+            "/routed/%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%");
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/client/request"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  });
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("301", response->headers().getStatusValue());
+  const std::string expected_ip = version_ == Network::Address::IpVersion::v4 ? "127.0.0.1" : "::1";
+  EXPECT_EQ(absl::StrCat("http://host/routed/", expected_ip),
+            response->headers().getLocationValue());
 }
 
 } // namespace Envoy

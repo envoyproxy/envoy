@@ -1,4 +1,5 @@
 #include <sys/resource.h>
+#include <memory>
 
 #include <atomic>
 
@@ -13,8 +14,9 @@
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
+#include "absl/types/optional.h"
 #include "gtest/gtest.h"
-#include "library/cc/engine_builder.h"
+#include "test/cc/engine_builder_test_shim.h"
 #include "library/common/api/external.h"
 #include "library/common/bridge//utility.h"
 #include "library/common/http/header_utility.h"
@@ -155,7 +157,7 @@ TEST_F(InternalEngineTest, AccessEngineAfterInitialization) {
 
   absl::Notification getClusterManagerInvoked;
   // Running engine functions should work because the engine is running
-  EXPECT_THAT(engine_->engine_->dumpStats(), testing::HasSubstr("runtime.load_success: 1\n"));
+  EXPECT_THAT(engine_->engine_->dumpStats(), testing::HasSubstr("runtime.load_success: 2\n"));
 
   engine_->terminate();
   ASSERT_TRUE(engine_->isTerminated());
@@ -445,9 +447,9 @@ TEST_F(InternalEngineTest, ThreadCreationFailed) {
   EngineTestContext test_context{};
   auto thread_factory = std::make_unique<Thread::MockPosixThreadFactory>();
   EXPECT_CALL(*thread_factory, createThread(_, _, false)).WillOnce(Return(ByMove(nullptr)));
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, {}, {}, {}, false,
-                         std::move(thread_factory)));
+  std::unique_ptr<InternalEngine> engine(new InternalEngine(
+      createDefaultEngineCallbacks(test_context), {}, {}, {}, {}, std::move(thread_factory)));
+  engine->disableDnsRefreshOnNetworkChange(false);
   Platform::EngineBuilder builder;
   envoy_status_t status = runEngine(engine, builder, LOG_LEVEL);
   EXPECT_EQ(status, ENVOY_FAILURE);
@@ -517,6 +519,91 @@ TEST_F(ThreadPriorityInternalEngineTest, SetOutOfRangeThreadPriority) {
   // could be system dependent, we just verify that the thread priority that gets set is not the
   // out-of-range one that we initialized the engine with.
   EXPECT_NE(actual_thread_priority, expected_thread_priority);
+}
+
+TEST_F(InternalEngineTest, MultipleListenersStream) {
+  TestServer test_server;
+  test_server.start(TestServerType::HTTP1_WITHOUT_TLS);
+
+  EngineTestContext test_context{};
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr,
+      /*event_tracker=*/nullptr, /*thread_priority=*/absl::nullopt,
+      /*high_watermark=*/absl::nullopt, /*enable_logger=*/true,
+      /*use_worker_thread=*/true);
+
+  Platform::EngineBuilder builder;
+  builder.enableWorkerThread(true);
+  auto bootstrap = builder.generateBootstrap();
+
+  // Add a second listener by cloning the first one and renaming it.
+  ASSERT_GT(bootstrap->static_resources().listeners_size(), 0);
+  auto* listener1 = bootstrap->mutable_static_resources()->mutable_listeners(0);
+  // Ensure it has the expected name.
+  ASSERT_EQ(listener1->name(), "base_api_listener");
+
+  auto* listener2 = bootstrap->mutable_static_resources()->add_listeners();
+  listener2->CopyFrom(*listener1);
+  listener2->set_name("second_api_listener");
+
+  // Run engine with mutated bootstrap.
+  auto options = std::make_shared<Envoy::OptionsImplBase>();
+  options->setConfigProto(std::move(bootstrap));
+  options->setLogLevel(static_cast<spdlog::level::level_enum>(LOG_LEVEL));
+  engine->run(std::move(options));
+
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
+
+  // Start stream on first listener.
+  {
+    absl::Notification on_complete_notification;
+    EnvoyStreamCallbacks stream_callbacks;
+    stream_callbacks.on_headers_ = [&](const Http::ResponseHeaderMap& headers,
+                                       bool /* end_stream */, envoy_stream_intel) {
+      EXPECT_EQ(headers.Status()->value().getStringView(), "200");
+    };
+    stream_callbacks.on_complete_ = [&](envoy_stream_intel, envoy_final_stream_intel) {
+      on_complete_notification.Notify();
+    };
+
+    envoy_stream_t stream = engine->initStream();
+    // Explicitly specify "base_api_listener"
+    engine->startStream(stream, std::move(stream_callbacks), false, "base_api_listener");
+
+    engine->sendHeaders(stream, createLocalhostRequestHeaders(test_server.getAddress()), false);
+    engine->sendData(stream, std::make_unique<Buffer::OwnedImpl>("request body"), false);
+    engine->sendTrailers(stream, Http::Utility::createRequestTrailerMapPtr());
+
+    ASSERT_TRUE(on_complete_notification.WaitForNotificationWithTimeout(absl::Seconds(10)));
+  }
+
+  // Start stream on second listener.
+  {
+    absl::Notification on_complete_notification;
+    EnvoyStreamCallbacks stream_callbacks;
+    stream_callbacks.on_headers_ = [&](const Http::ResponseHeaderMap& headers,
+                                       bool /* end_stream */, envoy_stream_intel) {
+      EXPECT_EQ(headers.Status()->value().getStringView(), "200");
+    };
+    stream_callbacks.on_complete_ = [&](envoy_stream_intel, envoy_final_stream_intel) {
+      on_complete_notification.Notify();
+    };
+
+    envoy_stream_t stream = engine->initStream();
+    // Explicitly specify "second_api_listener"
+    engine->startStream(stream, std::move(stream_callbacks), false, "second_api_listener");
+
+    engine->sendHeaders(stream, createLocalhostRequestHeaders(test_server.getAddress()), false);
+    engine->sendData(stream, std::make_unique<Buffer::OwnedImpl>("request body"), false);
+    engine->sendTrailers(stream, Http::Utility::createRequestTrailerMapPtr());
+
+    ASSERT_TRUE(on_complete_notification.WaitForNotificationWithTimeout(absl::Seconds(10)));
+  }
+
+  test_server.shutdown();
+  engine->terminate();
+
+  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
 }
 
 } // namespace Envoy

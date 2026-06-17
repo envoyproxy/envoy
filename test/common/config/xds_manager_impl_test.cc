@@ -251,15 +251,16 @@ TEST_P(XdsManagerImplTest, AdsReplacementPrimaryOnly) {
                             new_ads_config);
 
   Grpc::RawAsyncClientSharedPtr failover_client;
-  EXPECT_CALL(ads_mux, updateMuxSource(_, _, _, _, ProtoEq(new_ads_config)))
-      .WillOnce(Invoke([](Grpc::RawAsyncClientSharedPtr&& primary_async_client,
-                          Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope&,
-                          BackOffStrategyPtr&&,
-                          const envoy::config::core::v3::ApiConfigSource&) -> absl::Status {
-        EXPECT_NE(primary_async_client, nullptr);
-        EXPECT_EQ(failover_async_client, nullptr);
-        return absl::OkStatus();
-      }));
+  EXPECT_CALL(ads_mux, updateMuxSource(_, _, _, _, ProtoEq(new_ads_config), _))
+      .WillOnce(
+          Invoke([](Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+                    Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope&,
+                    BackOffStrategyPtr&&, const envoy::config::core::v3::ApiConfigSource&,
+                    std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>) -> absl::Status {
+            EXPECT_NE(primary_async_client, nullptr);
+            EXPECT_EQ(failover_async_client, nullptr);
+            return absl::OkStatus();
+          }));
   const auto res = xds_manager_impl_.setAdsConfigSource(new_ads_config);
   EXPECT_TRUE(res.ok());
 }
@@ -346,15 +347,16 @@ TEST_P(XdsManagerImplTest, AdsReplacementPrimaryAndFailover) {
                             new_ads_config);
 
   Grpc::RawAsyncClientSharedPtr failover_client;
-  EXPECT_CALL(ads_mux, updateMuxSource(_, _, _, _, ProtoEq(new_ads_config)))
-      .WillOnce(Invoke([](Grpc::RawAsyncClientSharedPtr&& primary_async_client,
-                          Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope&,
-                          BackOffStrategyPtr&&,
-                          const envoy::config::core::v3::ApiConfigSource&) -> absl::Status {
-        EXPECT_NE(primary_async_client, nullptr);
-        EXPECT_NE(failover_async_client, nullptr);
-        return absl::OkStatus();
-      }));
+  EXPECT_CALL(ads_mux, updateMuxSource(_, _, _, _, ProtoEq(new_ads_config), _))
+      .WillOnce(
+          Invoke([](Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+                    Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope&,
+                    BackOffStrategyPtr&&, const envoy::config::core::v3::ApiConfigSource&,
+                    std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>) -> absl::Status {
+            EXPECT_NE(primary_async_client, nullptr);
+            EXPECT_NE(failover_async_client, nullptr);
+            return absl::OkStatus();
+          }));
   const auto res = xds_manager_impl_.setAdsConfigSource(new_ads_config);
   EXPECT_TRUE(res.ok());
 }

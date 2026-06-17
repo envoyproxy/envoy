@@ -131,6 +131,7 @@ versioning guidelines:
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list but by default
   it is expected the multi-phase warn-by-default/fail-by-default is sufficient to warn users to move
   away from deprecated features.
+* Given their criticality, changing the default behavior of the ext_authz and ext_proc protocols is strictly forbidden.
 
 # Submitting a PR
 

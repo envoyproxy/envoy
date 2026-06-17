@@ -14,7 +14,7 @@
 #include "absl/strings/str_replace.h"
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
-#include "library/cc/engine_builder.h"
+#include "test/cc/engine_builder_test_shim.h"
 #include "library/common/api/external.h"
 #include "library/common/bridge//utility.h"
 
@@ -213,6 +213,17 @@ TEST(TestConfig, StreamIdleTimeout) {
   engine_builder.setStreamIdleTimeoutSeconds(42);
   bootstrap = engine_builder.generateBootstrap();
   EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("stream_idle_timeout { seconds: 42 }"));
+}
+
+TEST(TestConfig, RequestTimeout) {
+  EngineBuilder engine_builder;
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("timeout { }"));
+
+  engine_builder.setRequestTimeoutMilliseconds(42500);
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("timeout { seconds: 42 nanos: 500000000 }"));
 }
 
 TEST(TestConfig, PerTryIdleTimeout) {

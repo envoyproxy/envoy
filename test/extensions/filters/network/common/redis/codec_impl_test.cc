@@ -8,6 +8,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
 using testing::ContainerEq;
@@ -842,6 +843,29 @@ TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandSingleQuoting5) {
 
 TEST_F(RedisEncoderDecoderImplTest, InvalidInterjectedInlineCommand) {
   buffer_.add("*1\r\nECHO\r\n");
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, NestedArrayDepthLimitExceeded) {
+  // Nesting depth of MaxArrayNestingDepth + 1 arrays
+  std::string payload = "";
+  for (int i = 0; i < MaxArrayNestingDepth + 1; ++i) {
+    payload += "*1\r\n";
+  }
+  payload += "+foo\r\n";
+
+  buffer_.add(payload);
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, ArraySizeLimitExceeded) {
+  buffer_.add(absl::StrCat("*", MaxArraySize + 1, "\r\n"));
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, IntegerOverflowTest) {
+  // Extremely large number of digits to trigger uint64_t overflow
+  buffer_.add("*99999999999999999999999999\r\n");
   EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
 }
 
