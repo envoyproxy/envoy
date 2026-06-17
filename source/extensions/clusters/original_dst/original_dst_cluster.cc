@@ -246,10 +246,10 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
   auto excluded_hosts = std::make_shared<ExcludedHostVector>();
   priority_set_.updateHosts(
       0,
-      HostSetImpl::updateHostParams(std::move(all_hosts), HostsPerLocalityImpl::empty(),
-                                    std::move(healthy_hosts), HostsPerLocalityImpl::empty(),
-                                    std::move(degraded_hosts), HostsPerLocalityImpl::empty(),
-                                    std::move(excluded_hosts), HostsPerLocalityImpl::empty()),
+      HostSetImpl::updateHostsParams(std::move(all_hosts), HostsPerLocalityImpl::empty(),
+                                     std::move(healthy_hosts), HostsPerLocalityImpl::empty(),
+                                     std::move(degraded_hosts), HostsPerLocalityImpl::empty(),
+                                     std::move(excluded_hosts), HostsPerLocalityImpl::empty()),
       {}, {std::move(host)}, {}, absl::nullopt, absl::nullopt);
 }
 
@@ -327,10 +327,10 @@ void OriginalDstCluster::cleanup() {
     auto excluded_hosts = std::make_shared<ExcludedHostVector>();
     priority_set_.updateHosts(
         0,
-        HostSetImpl::updateHostParams(std::move(keeping_hosts), HostsPerLocalityImpl::empty(),
-                                      std::move(healthy_hosts), HostsPerLocalityImpl::empty(),
-                                      std::move(degraded_hosts), HostsPerLocalityImpl::empty(),
-                                      std::move(excluded_hosts), HostsPerLocalityImpl::empty()),
+        HostSetImpl::updateHostsParams(std::move(keeping_hosts), HostsPerLocalityImpl::empty(),
+                                       std::move(healthy_hosts), HostsPerLocalityImpl::empty(),
+                                       std::move(degraded_hosts), HostsPerLocalityImpl::empty(),
+                                       std::move(excluded_hosts), HostsPerLocalityImpl::empty()),
         {}, {}, to_be_removed, false, absl::nullopt);
   }
 
