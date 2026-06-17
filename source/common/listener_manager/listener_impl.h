@@ -188,6 +188,7 @@ public:
   bool isQuic() const override;
   bool shouldBypassOverloadManager() const override;
 
+  Stats::Scope& prefixedScope() override;
   Stats::Scope& listenerScope() override;
 
   ListenerFactoryContextBaseImpl& parentFactoryContext() { return *listener_factory_context_base_; }

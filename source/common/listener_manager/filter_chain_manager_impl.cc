@@ -77,6 +77,7 @@ public:
 PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
     Configuration::FactoryContext& parent_context, Init::Manager& init_manager)
     : parent_context_(parent_context), scope_(parent_context_.scope().createScope("")),
+      prefixed_scope_(parent_context_.prefixedScope().createScope("")),
       init_manager_(init_manager) {}
 
 bool PerFilterChainFactoryContextImpl::drainClose(Network::DrainDirection scope) const {
@@ -92,6 +93,7 @@ ProtobufMessage::ValidationVisitor& PerFilterChainFactoryContextImpl::messageVal
 }
 
 Stats::Scope& PerFilterChainFactoryContextImpl::scope() { return *scope_; }
+Stats::Scope& PerFilterChainFactoryContextImpl::prefixedScope() { return *prefixed_scope_; }
 
 Configuration::ServerFactoryContext& PerFilterChainFactoryContextImpl::serverFactoryContext() {
   return parent_context_.serverFactoryContext();

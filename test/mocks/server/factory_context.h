@@ -33,6 +33,7 @@ public:
   MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
   MOCK_METHOD(bool, isQuic, (), (const));
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
+  MOCK_METHOD(Stats::Scope&, prefixedScope, ());
 
   // Server::Configuration::ListenerFactoryContext
   MOCK_METHOD(Stats::Scope&, listenerScope, ());

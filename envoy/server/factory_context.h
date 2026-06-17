@@ -312,6 +312,11 @@ public:
    * @return bool whether the filter should bypass overload manager actions.
    */
   virtual bool shouldBypassOverloadManager() const PURE;
+
+  /**
+   * @return Stats::Scope& same as scope() but with the specific parent prefix.
+   */
+  virtual Stats::Scope& prefixedScope() PURE;
 };
 
 /**

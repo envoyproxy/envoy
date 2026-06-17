@@ -24,6 +24,7 @@ public:
   bool isQuic() const override;
   bool shouldBypassOverloadManager() const override;
 
+  Stats::Scope& prefixedScope() override;
   Stats::Scope& listenerScope() override;
 
 protected:

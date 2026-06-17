@@ -64,6 +64,7 @@ public:
   Network::DrainDecision& drainDecision() override;
   Init::Manager& initManager() override;
   Stats::Scope& scope() override;
+  Stats::Scope& prefixedScope() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
   Configuration::ServerFactoryContext& serverFactoryContext() override;
   envoy::config::core::v3::TrafficDirection direction() const override;
@@ -76,6 +77,7 @@ private:
   Configuration::FactoryContext& parent_context_;
   // The scope that has empty prefix.
   Stats::ScopeSharedPtr scope_;
+  Stats::ScopeSharedPtr prefixed_scope_;
   Init::Manager& init_manager_;
   std::atomic<bool> is_draining_{false};
 };

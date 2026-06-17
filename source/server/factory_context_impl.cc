@@ -22,6 +22,7 @@ ProtobufMessage::ValidationVisitor& FactoryContextImplBase::messageValidationVis
 
 Stats::Scope& FactoryContextImplBase::scope() { return *scope_; }
 
+Stats::Scope& FactoryContextImplBase::prefixedScope() { return *listener_scope_; }
 Stats::Scope& FactoryContextImplBase::listenerScope() { return *listener_scope_; }
 
 const Network::ListenerInfo& FactoryContextImplBase::listenerInfo() const {

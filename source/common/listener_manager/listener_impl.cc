@@ -1014,6 +1014,9 @@ bool PerListenerFactoryContextImpl::isQuic() const {
 bool PerListenerFactoryContextImpl::shouldBypassOverloadManager() const {
   return listener_factory_context_base_->listenerInfo().shouldBypassOverloadManager();
 }
+Stats::Scope& PerListenerFactoryContextImpl::prefixedScope() {
+  return listener_factory_context_base_->listenerScope();
+}
 Stats::Scope& PerListenerFactoryContextImpl::listenerScope() {
   return listener_factory_context_base_->listenerScope();
 }

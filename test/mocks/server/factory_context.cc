@@ -23,6 +23,7 @@ MockFactoryContext::MockFactoryContext() {
 
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(*listener_store_.rootScope()));
+  ON_CALL(*this, prefixedScope()).WillByDefault(ReturnRef(*listener_store_.rootScope()));
   ON_CALL(*this, listenerInfo()).WillByDefault(ReturnRef(listener_info_));
   ON_CALL(*this, direction()).WillByDefault([this]() { return listener_info_.direction(); });
   ON_CALL(*this, isQuic()).WillByDefault([this]() { return listener_info_.isQuic(); });
