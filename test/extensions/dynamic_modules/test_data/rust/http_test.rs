@@ -104,6 +104,12 @@ fn test_header_callbacks_filter_on_request_headers() {
     .once();
 
   envoy_filter
+    .expect_get_attribute_string()
+    .withf(|id| *id == abi::envoy_dynamic_module_type_attribute_id::ConnectionRequestedServerName)
+    .returning(|_| Some(EnvoyBuffer::new(b"example.com")))
+    .once();
+
+  envoy_filter
     .expect_get_worker_index()
     .return_const(0u32)
     .once();

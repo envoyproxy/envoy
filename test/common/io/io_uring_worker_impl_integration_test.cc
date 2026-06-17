@@ -89,7 +89,7 @@ public:
 class IoUringWorkerTestImpl : public IoUringWorkerImpl {
 public:
   IoUringWorkerTestImpl(IoUringPtr io_uring_instance, Event::Dispatcher& dispatcher)
-      : IoUringWorkerImpl(std::move(io_uring_instance), 8192, 1000, dispatcher) {}
+      : IoUringWorkerImpl(std::move(io_uring_instance), 8192, 1000, 131072, 16384, dispatcher) {}
 
   IoUringSocket& addTestSocket(os_fd_t fd) {
     return addSocket(std::make_unique<IoUringSocketTestImpl>(fd, *this));
@@ -112,7 +112,14 @@ protected:
     api_ = Api::createApiForTest(time_system_);
     dispatcher_ = api_->allocateDispatcher("test_thread");
     io_uring_worker_ = std::make_unique<IoUringWorkerTestImpl>(
-        std::make_unique<IoUringImpl>(20, false), *dispatcher_);
+        std::make_unique<IoUringImpl>(20, false, false, 0), *dispatcher_);
+  }
+
+  void initializeMultishot() {
+    api_ = Api::createApiForTest(time_system_);
+    dispatcher_ = api_->allocateDispatcher("test_thread");
+    io_uring_worker_ = std::make_unique<IoUringWorkerTestImpl>(
+        std::make_unique<IoUringImpl>(20, false, true, 65536), *dispatcher_);
   }
 
   void createListenerAndConnectedSocketPair() {
@@ -307,6 +314,55 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketRead) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_EQ(result.value(), write_data.length());
+
+  socket->close(false);
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+// A `multishot` read delivers data in kernel provided buffers and stays armed across reads, so
+// multiple writes are received without resubmitting a read request.
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketMultishotRead) {
+  initializeMultishot();
+  if (!io_uring_worker_->isMultishotEnabled()) {
+    GTEST_SKIP() << "multishot receive not supported on this kernel";
+  }
+  createListenerAndConnectedSocketPair();
+
+  absl::optional<int32_t> result = absl::nullopt;
+  std::string read_data;
+  OptRef<IoUringSocket> socket;
+  socket = io_uring_worker_->addServerSocket(
+      server_socket_,
+      [&socket, &result, &read_data](uint32_t events) {
+        ASSERT(events == Event::FileReadyType::Read);
+        EXPECT_NE(absl::nullopt, socket->getReadParam());
+        result = socket->getReadParam()->result_;
+        read_data += socket->getReadParam()->buf_.toString();
+        socket->getReadParam()->buf_.drain(socket->getReadParam()->buf_.length());
+        return absl::OkStatus();
+      },
+      false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  // The first write is delivered through a provided buffer.
+  std::string write_data = "hello world";
+  Api::OsSysCallsSingleton::get().write(client_socket_, write_data.data(), write_data.size());
+  while (!result.has_value()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_EQ(result.value(), write_data.length());
+  EXPECT_EQ(read_data, write_data);
+
+  // The read stays armed, so a second write is delivered without resubmitting a read request.
+  result = absl::nullopt;
+  std::string second_write = "second chunk";
+  Api::OsSysCallsSingleton::get().write(client_socket_, second_write.data(), second_write.size());
+  while (!result.has_value()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_EQ(read_data, write_data + second_write);
 
   socket->close(false);
   runToClose(server_socket_);
