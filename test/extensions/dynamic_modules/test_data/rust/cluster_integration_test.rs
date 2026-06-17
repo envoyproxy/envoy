@@ -196,9 +196,7 @@ unsafe impl Send for AsyncCompletionTask {}
 
 impl AsyncCompletionTask {
   fn run(self) {
-    self
-      .completion
-      .async_host_selection_complete(Some(self.host), "async_resolved");
+    self.completion.complete(Some(self.host), "async_resolved");
   }
 }
 
