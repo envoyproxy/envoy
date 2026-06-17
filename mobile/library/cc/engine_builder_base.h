@@ -196,13 +196,11 @@ public:
     auto* static_resources = bootstrap->mutable_static_resources();
 
     if (custom_listeners_.empty()) {
-      if (!static_cast<T*>(this)->hasLds()) {
-        auto default_listener_or_status = buildDefaultListener("base_api_listener");
-        if (!default_listener_or_status.ok()) {
-          return default_listener_or_status.status();
-        }
-        *static_resources->add_listeners() = std::move(default_listener_or_status.value());
+      auto default_listener_or_status = buildDefaultListener("base_api_listener");
+      if (!default_listener_or_status.ok()) {
+        return default_listener_or_status.status();
       }
+      *static_resources->add_listeners() = std::move(default_listener_or_status.value());
     } else {
       // Validate custom listeners
       absl::flat_hash_set<absl::string_view> listener_names;
@@ -253,8 +251,6 @@ public:
   }
 
 protected:
-  bool hasLds() const { return false; }
-
   // The default implementation if the derived class does not override it.
   absl::Status configureTracing(::envoy::extensions::filters::network::http_connection_manager::v3::
                                     HttpConnectionManager_Tracing* tracing_config) {
@@ -420,6 +416,7 @@ private:
   int request_timeout_ms_ = 0;
   std::vector<std::pair<std::string, bool>> reloadable_runtime_guards_;
   std::vector<std::pair<std::string, bool>> restart_runtime_guards_;
+  std::vector<envoy::config::listener::v3::Listener> custom_listeners_;
 
   // Common fields for InternalEngine
   Logger::Logger::Levels log_level_ = Logger::Logger::Levels::info;
@@ -430,8 +427,6 @@ private:
   absl::optional<size_t> high_watermark_ = absl::nullopt;
   bool enable_stats_collection_ = true;
   bool use_worker_thread_ = false;
-
-  std::vector<envoy::config::listener::v3::Listener> custom_listeners_;
 };
 
 } // namespace Platform
