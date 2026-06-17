@@ -1998,6 +1998,13 @@ pub trait EnvoySpan {
   /// reported to the tracing system.
   fn set_sampled(&self, sampled: bool);
 
+  /// Set the sampling decision for this span and keep it across a later route refresh.
+  ///
+  /// With the OpenTelemetry tracer the connection manager does not re-derive the decision after a
+  /// route cache change, so a decision made from a filter is not lost. Tracers that do not support
+  /// this fall back to the [`EnvoySpan::set_sampled`] behavior.
+  fn override_sampled(&self, sampled: bool);
+
   /// Get a baggage value from this span.
   ///
   /// Baggage data may have been set by this span or any parent spans.
@@ -2073,6 +2080,12 @@ impl EnvoySpan for EnvoySpanImpl {
   fn set_sampled(&self, sampled: bool) {
     unsafe {
       abi::envoy_dynamic_module_callback_http_span_set_sampled(self.raw_ptr, sampled);
+    }
+  }
+
+  fn override_sampled(&self, sampled: bool) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_override_sampled(self.raw_ptr, sampled);
     }
   }
 

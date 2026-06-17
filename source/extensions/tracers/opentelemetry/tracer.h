@@ -104,6 +104,14 @@ public:
   void setSampled(bool sampled) override { sampled_ = sampled; };
 
   /**
+   * Stop using the local decision so the connection manager does not re-derive it on refresh.
+   */
+  void overrideSampled(bool sampled) override {
+    setSampled(sampled);
+    use_local_decision_ = false;
+  }
+
+  /**
    * @return whether the local tracing decision is used by the span.
    */
   bool useLocalDecision() const override { return use_local_decision_; }
@@ -182,7 +190,7 @@ private:
   Tracer& parent_tracer_;
   Envoy::TimeSource& time_source_;
   bool sampled_;
-  const bool use_local_decision_{false};
+  bool use_local_decision_{false};
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;

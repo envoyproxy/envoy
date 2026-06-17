@@ -2395,6 +2395,15 @@ void envoy_dynamic_module_callback_http_span_set_sampled(
   span->setSampled(sampled);
 }
 
+void envoy_dynamic_module_callback_http_span_override_sampled(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr, bool sampled) {
+  if (span_ptr == nullptr) {
+    return;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  span->overrideSampled(sampled);
+}
+
 // Thread-local storage for temporary strings returned by tracing functions.
 // These strings are valid until the next call to a tracing function on the same thread.
 static thread_local std::string tls_trace_string_storage;

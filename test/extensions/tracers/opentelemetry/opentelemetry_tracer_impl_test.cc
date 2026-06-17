@@ -1111,6 +1111,54 @@ TEST_F(OpenTelemetryDriverTest, UseLocalDecisionFalse) {
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Overriding the sampling decision to false stops using the local decision and drops the span.
+TEST_F(OpenTelemetryDriverTest, OverrideSampledFalse) {
+  setupValidDriver();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  // The span starts on the local decision and is sampled because there is no traceparent header.
+  EXPECT_TRUE(span->useLocalDecision());
+  EXPECT_TRUE(dynamic_cast<Span*>(span.get())->sampled());
+
+  span->overrideSampled(false);
+  // The override stops using the local decision so a route refresh will not re-derive it.
+  EXPECT_FALSE(span->useLocalDecision());
+  EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U)).Times(0);
+  EXPECT_CALL(*mock_client_, sendRaw(_, _, _, _, _, _)).Times(0);
+  span->finishSpan();
+  EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+// Overriding the sampling decision to true stops using the local decision and keeps the span.
+TEST_F(OpenTelemetryDriverTest, OverrideSampledTrue) {
+  setupValidDriver();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  Tracing::SpanPtr span =
+      driver_->startSpan(mock_tracing_config_, request_headers, stream_info_, operation_name_,
+                         {Tracing::Reason::NotTraceable, false});
+  // The span starts on the local decision and is unsampled because there is no traceparent header.
+  EXPECT_TRUE(span->useLocalDecision());
+  EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
+
+  span->overrideSampled(true);
+  EXPECT_FALSE(span->useLocalDecision());
+  EXPECT_TRUE(dynamic_cast<Span*>(span.get())->sampled());
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  EXPECT_CALL(*mock_client_, sendRaw(_, _, _, _, _, _));
+  span->finishSpan();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
 // Verifies tracer is "disabled" when no exporter is configured
 TEST_F(OpenTelemetryDriverTest, NoExportWithoutGrpcService) {
   const std::string yaml_string = "{}";
