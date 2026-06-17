@@ -164,7 +164,7 @@ PYBIND11_MODULE(envoy_engine, m) {
   // -- Engine --
 
   py::class_<Envoy::Platform::Engine, Envoy::Platform::EngineSharedPtr>(m, "Engine")
-      .def("stream_client", &Envoy::Platform::Engine::streamClient)
+      .def("stream_client", &Envoy::Platform::Engine::streamClient, py::arg("listener_name") = "")
       .def("terminate", &Envoy::Platform::Engine::terminate,
            py::call_guard<py::gil_scoped_release>())
       .def("dump_stats", &Envoy::Platform::Engine::dumpStats,

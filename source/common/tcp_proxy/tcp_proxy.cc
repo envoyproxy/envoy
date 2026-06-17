@@ -907,6 +907,15 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
         initial_upstream_connection_start_time_.value(),
         read_callbacks_->connection().dispatcher().timeSource());
   }
+  // Plumb the upstream connection timing into the downstream stream info so the US_CX_BEG and
+  // US_CX_END COMMON_DURATION time points reflect the real connect timing.
+  if (info != nullptr && info->upstreamInfo() != nullptr) {
+    const auto& upstream_timing = info->upstreamInfo()->upstreamTiming();
+    upstream_info.upstreamTiming().upstream_connect_start_ =
+        upstream_timing.upstream_connect_start_;
+    upstream_info.upstreamTiming().upstream_connect_complete_ =
+        upstream_timing.upstream_connect_complete_;
+  }
   upstream_ = std::move(upstream);
   generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);
@@ -1228,6 +1237,9 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
     downstream_closed_ = true;
+    // Record the downstream connection end time point for COMMON_DURATION access logging.
+    getStreamInfo().downstreamTiming().onDownstreamConnectionEnd(
+        read_callbacks_->connection().dispatcher().timeSource());
     // Cancel the potential odcds callback.
     cluster_discovery_handle_ = nullptr;
   }

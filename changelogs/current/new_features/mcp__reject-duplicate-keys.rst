@@ -1,0 +1,1 @@
+Added :ref:`reject_duplicate_keys <envoy_v3_api_field_extensions.filters.http.mcp.v3.Mcp.reject_duplicate_keys>` config option (defaulting to false) to reject requests that contain duplicate JSON keys at any nesting level.

@@ -1,5 +1,7 @@
 #include "contrib/istio/filters/network/peer_metadata/source/peer_metadata.h"
 
+#include <optional>
+
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/bool_accessor_impl.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
@@ -19,12 +21,12 @@ std::string baggageValue(const LocalInfo::LocalInfo& local_info) {
   return obj->baggage();
 }
 
-absl::optional<absl::string_view> internalListenerName(const Network::Address::Instance& address) {
+std::optional<absl::string_view> internalListenerName(const Network::Address::Instance& address) {
   const auto internal = address.envoyInternalAddress();
   if (internal != nullptr) {
     return internal->addressId();
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 bool allowedInternalListener(const Network::Address::Instance& address) {
@@ -76,7 +78,7 @@ Network::FilterStatus Filter::onWrite(Buffer::Instance& buffer, bool) {
     // for peer metadata anymore, if the upstream sent it, we'd have it by
     // now. So we can check if the peer metadata is available or not, and if
     // no peer metadata available, we can give up waiting for it.
-    absl::optional<Protobuf::Any> peer_metadata = discoverPeerMetadata();
+    std::optional<Protobuf::Any> peer_metadata = discoverPeerMetadata();
     if (peer_metadata) {
       propagatePeerMetadata(*peer_metadata);
     } else {
@@ -115,7 +117,7 @@ bool Filter::disableDiscovery() const {
   return discoveryDisabled(metadata);
 }
 
-absl::optional<Protobuf::Any> Filter::discoverPeerMetadata() {
+std::optional<Protobuf::Any> Filter::discoverPeerMetadata() {
   ENVOY_LOG(trace, "Trying to discover peer metadata from filter state set by TCP Proxy");
   ASSERT(write_callbacks_);
 
@@ -126,7 +128,7 @@ absl::optional<Protobuf::Any> Filter::discoverPeerMetadata() {
           TcpProxy::TunnelResponseHeaders::key());
   if (!state) {
     ENVOY_LOG(trace, "TCP Proxy didn't set expected filter state");
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   const Http::HeaderMap& headers = state->value();
@@ -135,7 +137,7 @@ absl::optional<Protobuf::Any> Filter::discoverPeerMetadata() {
     ENVOY_LOG(
         trace,
         "TCP Proxy saved response headers to the filter state, but there is no baggage header");
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   ENVOY_LOG(trace,

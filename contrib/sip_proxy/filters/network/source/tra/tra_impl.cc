@@ -1,5 +1,7 @@
 #include "contrib/sip_proxy/filters/network/source/tra/tra_impl.h"
 
+#include <optional>
+
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -16,7 +18,7 @@ namespace TrafficRoutingAssistant {
 
 GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
                                Event::Dispatcher& dispatcher,
-                               const absl::optional<std::chrono::milliseconds>& timeout)
+                               const std::optional<std::chrono::milliseconds>& timeout)
     : async_client_(async_client), dispatcher_(dispatcher), timeout_(timeout) {}
 
 GrpcClientImpl::~GrpcClientImpl() {
@@ -38,7 +40,7 @@ void GrpcClientImpl::setRequestCallbacks(RequestCallbacks& callbacks) {
 
 void GrpcClientImpl::createTrafficRoutingAssistant(
     const std::string& type, const absl::flat_hash_map<std::string, std::string>& data,
-    const absl::optional<TraContextMap> context, Tracing::Span& parent_span,
+    const std::optional<TraContextMap> context, Tracing::Span& parent_span,
     const StreamInfo::StreamInfo& stream_info) {
 
   envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceRequest request;
@@ -60,7 +62,7 @@ void GrpcClientImpl::createTrafficRoutingAssistant(
 
 void GrpcClientImpl::updateTrafficRoutingAssistant(
     const std::string& type, const absl::flat_hash_map<std::string, std::string>& data,
-    const absl::optional<TraContextMap> context, Tracing::Span& parent_span,
+    const std::optional<TraContextMap> context, Tracing::Span& parent_span,
     const StreamInfo::StreamInfo& stream_info) {
   envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceRequest request;
   request.set_type(type);
@@ -81,7 +83,7 @@ void GrpcClientImpl::updateTrafficRoutingAssistant(
 
 void GrpcClientImpl::retrieveTrafficRoutingAssistant(const std::string& type,
                                                      const std::string& key,
-                                                     const absl::optional<TraContextMap> context,
+                                                     const std::optional<TraContextMap> context,
                                                      Tracing::Span& parent_span,
                                                      const StreamInfo::StreamInfo& stream_info) {
 
@@ -100,7 +102,7 @@ void GrpcClientImpl::retrieveTrafficRoutingAssistant(const std::string& type,
 }
 
 void GrpcClientImpl::deleteTrafficRoutingAssistant(const std::string& type, const std::string& key,
-                                                   const absl::optional<TraContextMap> context,
+                                                   const std::optional<TraContextMap> context,
                                                    Tracing::Span& parent_span,
                                                    const StreamInfo::StreamInfo& stream_info) {
 

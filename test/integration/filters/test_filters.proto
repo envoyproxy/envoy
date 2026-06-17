@@ -96,6 +96,8 @@ message ModifyBufferFilterConfig {
 }
 message ProcessContextFilterConfig {
 }
+message RuntimeFeatureTestFilterConfig {
+}
 message RandomPauseFilterConfig {
 }
 message RefreshRouteClusterConfig {
@@ -107,4 +109,6 @@ message ResetIdleTimerFilterConfig {
 message ResponseMetadataFilterConfig {
 }
 message AddHeaderEmptyFilterConfig {
+}
+message LocalReplyDuringHostSelectionConfig {
 }

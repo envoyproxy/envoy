@@ -9,6 +9,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_socket_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
@@ -149,10 +150,9 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
   headers->addCopy(tenant_hdr, std::string(tenant_id));
   headers->addCopy(upstream_cluster_hdr, cluster_name_);
   using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
-  for (const auto& h : parent_.additionalHeaders()) {
-    const Http::LowerCaseString key(h.header().key());
-    const auto& value = h.header().value();
-    switch (h.append_action()) {
+  const auto apply_header = [&headers](const Http::LowerCaseString& key, absl::string_view value,
+                                       HeaderValueOption::HeaderAppendAction action) {
+    switch (action) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
       headers->addCopy(key, value);
@@ -170,6 +170,18 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
     case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
       headers->setCopy(key, value);
       break;
+    }
+  };
+
+  if (const auto& handshake_headers = parent_.handshakeHeaders(); handshake_headers != nullptr) {
+    StreamInfo::StreamInfoImpl stream_info(connection_->dispatcher().timeSource(), nullptr,
+                                           StreamInfo::FilterState::LifeSpan::Connection);
+    for (const auto& hdr : *handshake_headers) {
+      apply_header(hdr.key, hdr.value_formatter->format({}, stream_info), hdr.append_action);
+    }
+  } else {
+    for (const auto& h : parent_.additionalHeaders()) {
+      apply_header(Http::LowerCaseString(h.header().key()), h.header().value(), h.append_action());
     }
   }
   headers->setContentLength(0);

@@ -139,7 +139,7 @@ TEST_F(MaglevLoadBalancerTest, LbDestructedBeforeFactory) {
 // worker priority set, so the cluster manager should not recreate the worker LB on host changes.
 TEST_F(MaglevLoadBalancerTest, FactoryDoesNotRecreateOnHostChange) {
   init(7);
-  EXPECT_FALSE(lb_->factory()->recreateOnHostChange());
+  EXPECT_FALSE(lb_->factory()->recreateOnHostChangeDeprecated());
 }
 
 // Worker LB instances pick up new factory state when the worker priority set fires a member

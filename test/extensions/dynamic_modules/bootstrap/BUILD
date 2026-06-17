@@ -102,6 +102,7 @@ envoy_cc_test(
     ],
     deps = [
         "//source/extensions/bootstrap/dynamic_modules:config",
+        "//test/extensions/dynamic_modules:util",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",

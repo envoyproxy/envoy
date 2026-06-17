@@ -7,6 +7,7 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/upstream/load_balancer_factory_base.h"
 #include "source/extensions/load_balancing_policies/override_host/config.h"
 #include "source/extensions/load_balancing_policies/override_host/load_balancer.h"
 
@@ -18,6 +19,7 @@
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
@@ -837,6 +839,102 @@ TEST_F(OverrideHostLoadBalancerTest, SelectedEndpointMetadataDoesNotOverwriteEnv
   const Protobuf::Value& metadata_value =
       ::Envoy::Config::Metadata::metadataValue(&metadata, "envoy.lb", "canary");
   EXPECT_EQ(metadata_value.string_value(), "false");
+}
+
+// Test-only fallback factory whose worker-local factory opts into the legacy
+// recreate-on-host-change semantics and counts each invocation. Used to verify
+// that OverrideHostLoadBalancer locally rebuilds the inner fallback LB on host
+// changes when the inner factory still asks for that contract.
+class RecreatingFallbackLb : public Envoy::Upstream::ThreadAwareLoadBalancer {
+public:
+  explicit RecreatingFallbackLb(int& worker_lb_create_count)
+      : factory_(std::make_shared<WorkerFactory>(worker_lb_create_count)) {}
+
+  Envoy::Upstream::LoadBalancerFactorySharedPtr factory() override { return factory_; }
+  absl::Status initialize() override { return absl::OkStatus(); }
+
+private:
+  class WorkerLb : public Envoy::Upstream::LoadBalancer {
+  public:
+    Envoy::Upstream::HostSelectionResponse
+    chooseHost(Envoy::Upstream::LoadBalancerContext*) override {
+      return {nullptr};
+    }
+    Envoy::Upstream::HostConstSharedPtr
+    peekAnotherHost(Envoy::Upstream::LoadBalancerContext*) override {
+      return nullptr;
+    }
+    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+      return {};
+    }
+    absl::optional<Envoy::Upstream::SelectedPoolAndConnection>
+    selectExistingConnection(Envoy::Upstream::LoadBalancerContext*, const Envoy::Upstream::Host&,
+                             std::vector<uint8_t>&) override {
+      return std::nullopt;
+    }
+  };
+
+  class WorkerFactory : public Envoy::Upstream::LoadBalancerFactory {
+  public:
+    explicit WorkerFactory(int& count) : count_(count) {}
+    Envoy::Upstream::LoadBalancerPtr create(Envoy::Upstream::LoadBalancerParams) override {
+      ++count_;
+      return std::make_unique<WorkerLb>();
+    }
+    bool recreateOnHostChangeDeprecated() const override { return true; }
+
+  private:
+    int& count_;
+  };
+
+  std::shared_ptr<WorkerFactory> factory_;
+};
+
+class RecreatingFallbackLbFactory : public Envoy::Upstream::TypedLoadBalancerFactoryBase<
+                                        ::test::load_balancing_policies::override_host::Config> {
+public:
+  explicit RecreatingFallbackLbFactory(int& worker_lb_create_count)
+      : TypedLoadBalancerFactoryBase("envoy.load_balancers.override_host.test"),
+        worker_lb_create_count_(worker_lb_create_count) {}
+
+  absl::StatusOr<Envoy::Upstream::LoadBalancerConfigPtr>
+  loadConfig(Envoy::Server::Configuration::ServerFactoryContext&,
+             const Envoy::Protobuf::Message&) override {
+    return std::make_unique<Envoy::Upstream::LoadBalancerConfig>();
+  }
+
+private:
+  Envoy::Upstream::ThreadAwareLoadBalancerPtr
+  create(OptRef<const Envoy::Upstream::LoadBalancerConfig>, const Envoy::Upstream::ClusterInfo&,
+         const Envoy::Upstream::PrioritySet&, Envoy::Runtime::Loader&,
+         Envoy::Random::RandomGenerator&, TimeSource&) override {
+    return std::make_unique<RecreatingFallbackLb>(worker_lb_create_count_);
+  }
+
+  int& worker_lb_create_count_;
+};
+
+// When the fallback LB's factory still asks for recreate-on-host-change
+// (typical of not-yet-migrated out-of-tree LBs), the outer override_host LB
+// must locally rebuild its inner fallback whenever the worker priority set
+// fires its member-update callback.
+TEST_F(OverrideHostLoadBalancerTest, FallbackRecreatedOnHostChange) {
+  int worker_lb_create_count = 0;
+  RecreatingFallbackLbFactory recreating_factory(worker_lb_create_count);
+  Registry::InjectFactory<Envoy::Upstream::TypedLoadBalancerFactory> injected(recreating_factory);
+
+  createLoadBalancer(makeDefaultConfig());
+
+  // Initial worker LB construction invokes the inner factory once.
+  EXPECT_EQ(worker_lb_create_count, 1);
+
+  // Each host change on the worker priority set should trigger the LB's
+  // member-update callback, which rebuilds the inner fallback LB.
+  thread_local_priority_set_.runUpdateCallbacks(0, {}, {});
+  EXPECT_EQ(worker_lb_create_count, 2);
+
+  thread_local_priority_set_.runUpdateCallbacks(0, {}, {});
+  EXPECT_EQ(worker_lb_create_count, 3);
 }
 } // namespace
 } // namespace OverrideHost
