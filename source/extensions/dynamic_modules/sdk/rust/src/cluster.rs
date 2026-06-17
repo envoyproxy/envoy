@@ -2097,6 +2097,8 @@ impl ClusterLbContext for ClusterLbContextRef<'_> {
     }
   }
 
+  // `host` is an opaque Envoy handle passed back to Envoy, never dereferenced in Rust.
+  #[allow(clippy::not_unsafe_ptr_arg_deref)]
   fn get_host_stat(
     &self,
     host: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
