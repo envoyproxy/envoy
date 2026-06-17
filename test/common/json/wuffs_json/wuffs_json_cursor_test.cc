@@ -365,6 +365,105 @@ TEST(WuffsJsonCursorTest, HandlerAbortPropagated) {
   EXPECT_FALSE(parse(R"({"n":1})", h).ok());
 }
 
+// A non-OK status returned from onBoolean must cause feed() to return that error.
+TEST(WuffsJsonCursorTest, BooleanHandlerAbortPropagated) {
+  struct AbortOnBoolHandler : CapturingHandler {
+    absl::Status onBoolean(absl::string_view, bool, int, size_t, size_t) override {
+      return absl::InternalError("bool abort");
+    }
+  } h;
+  EXPECT_FALSE(parse(R"({"ok":true})", h).ok());
+}
+
+// A non-OK status returned from onKey must cause feed() to return that error.
+TEST(WuffsJsonCursorTest, KeyHandlerAbortPropagated) {
+  struct AbortOnKeyHandler : CapturingHandler {
+    absl::Status onKey(absl::string_view, int, size_t) override {
+      return absl::InternalError("key abort");
+    }
+  } h;
+  EXPECT_FALSE(parse(R"({"a":1})", h).ok());
+}
+
+// ── onStringChunk early-abort tests ──────────────────────────────────────────
+//
+// A handler returning false from onStringChunk must stop further chunk delivery
+// but must not suppress closeStringCapture.
+
+struct AbortStringChunkHandler : WuffsJsonCursor::Handler {
+  bool close_fired{false};
+
+  bool openStringCapture(absl::string_view, int, size_t) override { return true; }
+  bool onStringChunk(absl::string_view, int, absl::string_view) override { return false; }
+  void closeStringCapture(absl::string_view, int, size_t) override { close_fired = true; }
+  absl::Status onKey(absl::string_view, int, size_t) override { return absl::OkStatus(); }
+  absl::Status onNumber(absl::string_view, absl::string_view, int, size_t, size_t) override {
+    return absl::OkStatus();
+  }
+  absl::Status onBoolean(absl::string_view, bool, int, size_t, size_t) override {
+    return absl::OkStatus();
+  }
+  void onNull(absl::string_view, int, size_t, size_t) override {}
+  void onContainerOpen(absl::string_view, bool, int, size_t) override {}
+  void onContainerClose(int, size_t) override {}
+};
+
+// Returning false on a STRING COPY token stops further chunk delivery
+// (string_chunk_active_ = false on line 260) but closeStringCapture still fires.
+TEST(WuffsJsonCursorTest, OnStringChunkFalseStopsDeliveryOnCopy) {
+  AbortStringChunkHandler h;
+  EXPECT_TRUE(parse(R"({"a":"hello"})", h).ok());
+  EXPECT_TRUE(h.close_fired);
+}
+
+// Returning false on a UNICODE_CODE_POINT token (escape at the start of the value)
+// stops further chunk delivery (line 325) but closeStringCapture still fires.
+TEST(WuffsJsonCursorTest, OnStringChunkFalseStopsDeliveryOnEscape) {
+  AbortStringChunkHandler h;
+  EXPECT_TRUE(parse(R"({"a":"\nhello"})", h).ok());
+  EXPECT_TRUE(h.close_fired);
+}
+
+// ── Post-completion feed test ──────────────────────────────────────────────────
+
+// Calling feed() after the document is fully consumed must return OK immediately
+// via the wuffs_done_ guard without re-processing.
+TEST(WuffsJsonCursorTest, FeedAfterCompletion) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  EXPECT_TRUE(cursor.feed("{}", true).ok());
+  EXPECT_TRUE(cursor.feed("extra", true).ok());
+  EXPECT_TRUE(h.fields.empty());
+}
+
+// ── nextSourcePosition test ────────────────────────────────────────────────────
+
+TEST(WuffsJsonCursorTest, NextSourcePositionAfterParse) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  constexpr absl::string_view json = R"({"a":1})";
+  EXPECT_TRUE(cursor.feed(json, true).ok());
+  EXPECT_EQ(cursor.nextSourcePosition(), json.size());
+}
+
+// ── Token buffer reset test ────────────────────────────────────────────────────
+
+// 50 key-value pairs generate ~301 tokens in a single feed() call, exceeding the
+// 256-token ring buffer (kTokenBufLen) and forcing the short_write reset path.
+TEST(WuffsJsonCursorTest, LargeInputTriggersTokenBufferReset) {
+  CapturingHandler h;
+  std::string json = "{";
+  for (int i = 0; i < 50; ++i) {
+    if (i > 0) {
+      json += ",";
+    }
+    json += "\"k" + std::to_string(i) + "\":" + std::to_string(i);
+  }
+  json += "}";
+  EXPECT_TRUE(parse(json, h).ok());
+  EXPECT_EQ(h.fields.size(), 50u);
+}
+
 // ── Byte-range offset tests ───────────────────────────────────────────────────
 
 // The root container's [token_start, token_end) byte range must cover the full input.
