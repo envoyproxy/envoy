@@ -15,8 +15,10 @@ std::vector<uint8_t> generateClientHello(uint16_t tls_min_version, uint16_t tls_
 
   SSL_CTX_set_min_proto_version(ctx.get(), tls_min_version);
   SSL_CTX_set_max_proto_version(ctx.get(), tls_max_version);
+#ifndef ENVOY_SSL_OPENSSL
   static const uint16_t kGroups[] = {SSL_GROUP_X25519, SSL_GROUP_SECP256R1, SSL_GROUP_SECP384R1};
   SSL_CTX_set1_group_ids(ctx.get(), kGroups, std::size(kGroups));
+#endif
 
   bssl::UniquePtr<SSL> ssl(SSL_new(ctx.get()));
 
