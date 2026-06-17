@@ -217,7 +217,7 @@ public:
              bool singleton = false) {
     plugin_config_ = std::make_shared<PluginConfig>(
         plugin_config, server_, server_.scope(), server_.initManager(),
-        envoy::config::core::v3::TrafficDirection::UNSPECIFIED, /*metadata=*/nullptr, singleton);
+        envoy::config::core::v3::TrafficDirection::UNSPECIFIED, singleton);
   }
 
   void createStreamContext() {
