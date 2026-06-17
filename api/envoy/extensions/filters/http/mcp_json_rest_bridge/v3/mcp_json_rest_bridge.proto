@@ -323,5 +323,5 @@ message HttpRule {
 
 // Per-route override configuration for the MCP JSON REST Bridge filter.
 message McpJsonRestBridgePerRoute {
-  ServerToolConfig tool_config = 1;
+  repeated ServerToolConfig tool_config = 1;
 }
