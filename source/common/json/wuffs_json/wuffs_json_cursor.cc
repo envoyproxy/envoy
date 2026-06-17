@@ -298,9 +298,12 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
         break;
       }
 
-      // Backslash escapes (\n, \t, \uXXXX, …) arrive as UNICODE_CODE_POINT tokens
-      // with VBD = decoded code point. in_string_chain_ is managed by surrounding STRING
-      // tokens so it is not updated here.
+      // TODO(tyxia) Espace here to ensure any unicode token can be used, for example, for
+      // comparsion routing, logging purpose. This requires re-escape in the re-encode phase.
+      // Investigate later to see if escape and re-escape are needed.
+      // Backslash escapes (\n, \t, \uXXXX, …) arrive as UNICODE_CODE_POINT tokens with VBD =
+      // decoded code point. in_string_chain_ is managed by surrounding STRING tokens so it is not
+      // updated here.
       case WUFFS_BASE__TOKEN__VBC__UNICODE_CODE_POINT: {
         // token_len is source bytes (e.g. 6 for \uXXXX); decoded write is 1-4 UTF-8 bytes.
         const uint32_t code_point = static_cast<uint32_t>(token_detail);
