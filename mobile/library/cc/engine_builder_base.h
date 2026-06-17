@@ -7,7 +7,6 @@
 #include <utility>
 #include <vector>
 
-#include <unordered_set>
 #include "absl/debugging/leak_check.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -206,7 +205,7 @@ public:
       }
     } else {
       // Validate custom listeners
-      std::unordered_set<std::string> listener_names;
+      absl::flat_hash_set<absl::string_view> listener_names;
       for (const auto& listener : custom_listeners_) {
         if (listener.name().empty()) {
           return absl::InvalidArgumentError("Custom listener must have a name.");
