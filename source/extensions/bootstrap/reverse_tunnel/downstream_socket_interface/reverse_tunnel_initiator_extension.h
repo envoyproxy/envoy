@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.validate.h"
 #include "envoy/server/bootstrap_extension_config.h"
@@ -116,6 +118,29 @@ public:
   handshakeAdditionalHeaders() const {
     return additional_headers_;
   }
+
+  /**
+   * @return whether the bootstrap config explicitly set the ``reconnect_backoff`` block. When
+   * false, the initiator applies the historical defaults baked into ReverseConnectionSocketConfig.
+   */
+  bool hasReconnectBackoffConfig() const { return config_.has_reconnect_backoff(); }
+
+  /**
+   * @return the explicit reconnect backoff/jitter configuration. Only meaningful when
+   * ``hasReconnectBackoffConfig()`` is true.
+   */
+  const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
+      DownstreamReverseConnectionSocketInterface::ReconnectBackoffConfig&
+      reconnectBackoffConfig() const {
+    return config_.reconnect_backoff();
+  }
+
+  /**
+   * @return the server's thread-safe random generator, used to jitter the reconnect backoff and
+   * the maintain tick. Sourced from the server factory context so it is consistent across the
+   * server and injectable in tests.
+   */
+  Random::RandomGenerator& randomGenerator() const { return context_.api().randomGenerator(); }
 
   /**
    * Increment handshake stats for reverse tunnel connections (per-worker only).

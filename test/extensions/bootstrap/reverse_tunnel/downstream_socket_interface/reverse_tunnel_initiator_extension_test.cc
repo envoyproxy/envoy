@@ -171,6 +171,39 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, AdditionalHeadersOverride) {
             envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 }
 
+TEST_F(ReverseTunnelInitiatorExtensionTest, ReconnectBackoffConfigDefaults) {
+  // The fixture's config_ does not set reconnect_backoff, so the accessor reports it absent and the
+  // initiator falls back to the historical defaults baked into ReverseConnectionSocketConfig.
+  EXPECT_FALSE(extension_->hasReconnectBackoffConfig());
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, ReconnectBackoffConfigParsed) {
+  auto custom_config = config_;
+  auto* backoff = custom_config.mutable_reconnect_backoff();
+  backoff->mutable_maintain_interval()->set_seconds(20);
+  backoff->mutable_base_backoff_interval()->set_seconds(2);
+  backoff->mutable_max_backoff_interval()->set_seconds(45);
+  backoff->mutable_jitter()->set_value(0.5);
+
+  auto custom_extension =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
+
+  ASSERT_TRUE(custom_extension->hasReconnectBackoffConfig());
+  const auto& parsed = custom_extension->reconnectBackoffConfig();
+  EXPECT_EQ(parsed.maintain_interval().seconds(), 20);
+  EXPECT_EQ(parsed.base_backoff_interval().seconds(), 2);
+  EXPECT_EQ(parsed.max_backoff_interval().seconds(), 45);
+  ASSERT_TRUE(parsed.has_jitter());
+  EXPECT_DOUBLE_EQ(parsed.jitter().value(), 0.5);
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, RandomGeneratorReturnsContextGenerator) {
+  // Jitter randomness must come from the server factory context's generator so it is consistent
+  // server-wide and injectable in tests.
+  EXPECT_EQ(&extension_->randomGenerator(),
+            static_cast<Random::RandomGenerator*>(&context_.api_.random_));
+}
+
 TEST_F(ReverseTunnelInitiatorExtensionTest, OnServerInitialized) {
   // This should be a no-op.
   extension_->onServerInitialized(server_);

@@ -1,5 +1,6 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
 
+#include <algorithm>
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
@@ -128,6 +129,26 @@ ReverseTunnelInitiator::socket(Envoy::Network::Socket::Type socket_type,
     if (extension_ != nullptr) {
       socket_config.request_path = extension_->handshakeRequestPath();
       socket_config.additional_headers = extension_->handshakeAdditionalHeaders();
+      // Override the reconnect backoff/jitter tunables only when the bootstrap config set the
+      // ``reconnect_backoff`` block; otherwise the ReverseConnectionSocketConfig defaults
+      // (historical behavior) apply. Each duration sub-field independently falls back to the
+      // existing default when unset.
+      if (extension_->hasReconnectBackoffConfig()) {
+        const auto& reconnect_backoff = extension_->reconnectBackoffConfig();
+        socket_config.maintain_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(
+            reconnect_backoff, maintain_interval, socket_config.maintain_interval_ms);
+        socket_config.base_backoff_ms = PROTOBUF_GET_MS_OR_DEFAULT(
+            reconnect_backoff, base_backoff_interval, socket_config.base_backoff_ms);
+        socket_config.max_backoff_ms = PROTOBUF_GET_MS_OR_DEFAULT(
+            reconnect_backoff, max_backoff_interval, socket_config.max_backoff_ms);
+        if (reconnect_backoff.has_jitter()) {
+          socket_config.jitter = reconnect_backoff.jitter().value();
+        }
+        // The cap must never sit below the base, even if misconfigured; raise it if needed so the
+        // exponential backoff math stays well-formed.
+        socket_config.max_backoff_ms =
+            std::max(socket_config.max_backoff_ms, socket_config.base_backoff_ms);
+      }
     }
 
     // Pass config directly to helper method.

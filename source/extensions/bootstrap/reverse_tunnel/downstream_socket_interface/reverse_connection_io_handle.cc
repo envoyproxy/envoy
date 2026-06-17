@@ -1,9 +1,11 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 
+#include <algorithm>
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/address.h"
@@ -670,6 +672,22 @@ bool ReverseConnectionIOHandle::shouldAttemptConnectionToHost(const std::string&
   return true;
 }
 
+uint64_t ReverseConnectionIOHandle::applyJitter(uint64_t base_ms, JitterDirection direction) const {
+  const double jitter = config_.jitter;
+  // Fast path: no jitter configured (the default) or nothing to spread. This avoids touching the
+  // random generator entirely and keeps the schedule deterministic for the common case.
+  if (jitter <= 0.0 || base_ms == 0 || extension_ == nullptr) {
+    return base_ms;
+  }
+  const uint64_t window = static_cast<uint64_t>(static_cast<double>(base_ms) * jitter);
+  if (window == 0) {
+    return base_ms;
+  }
+  const uint64_t rand_part = extension_->randomGenerator().random() % (window + 1);
+  // Down: spread into [base*(1-jitter), base]; Up: spread into [base, base*(1+jitter)].
+  return direction == JitterDirection::Down ? (base_ms - window) + rand_part : base_ms + rand_part;
+}
+
 void ReverseConnectionIOHandle::trackConnectionFailure(const std::string& host_address,
                                                        const std::string& cluster_name) {
   auto host_it = host_to_conn_info_map_.find(host_address);
@@ -681,12 +699,24 @@ void ReverseConnectionIOHandle::trackConnectionFailure(const std::string& host_a
   auto& host_info = host_it->second;
   host_info.failure_count++;
   host_info.last_failure_time = getTimeSource().monotonicTime();
-  // Calculate exponential backoff: base_delay * 2^(failure_count - 1)
-  const uint32_t base_delay_ms = 1000; // 1 second base delay
-  const uint32_t max_delay_ms = 30000; // 30 seconds max delay
 
-  uint32_t backoff_delay_ms = base_delay_ms * (1 << (host_info.failure_count - 1));
-  backoff_delay_ms = std::min(backoff_delay_ms, max_delay_ms);
+  // Exponential backoff with a hard cap: the nth consecutive failure waits
+  // base_backoff_ms * 2^(n-1), capped at max_backoff_ms. The shift is evaluated in 64-bit and
+  // bounded (failure_count grows without limit on sustained failures) to avoid undefined-behavior
+  // overflow; once the shift would exceed the cap the delay simply pins to max_backoff_ms.
+  const uint64_t base_delay_ms = config_.base_backoff_ms;
+  const uint64_t max_delay_ms = config_.max_backoff_ms;
+  const uint32_t shift = host_info.failure_count - 1;
+  uint64_t computed_backoff_ms = max_delay_ms;
+  if (shift < 31) {
+    computed_backoff_ms = std::min(base_delay_ms << shift, max_delay_ms);
+  }
+
+  // Apply the configured jitter (downward spread) so synchronized fleet-wide failures do not retry
+  // in lock-step. With the default jitter of 0 this is a no-op and the schedule stays
+  // deterministic.
+  const uint64_t backoff_delay_ms = applyJitter(computed_backoff_ms, JitterDirection::Down);
+
   // Update the backoff until time. This is used in shouldAttemptConnectionToHost() to check if we
   // should attempt to connect to the host.
   host_info.backoff_until =
@@ -896,12 +926,16 @@ void ReverseConnectionIOHandle::maintainReverseConnections() {
   }
   ENVOY_LOG(debug, "Completed reverse TCP connection maintenance for all clusters.");
 
-  // Enable the retry timer to periodically check for missing connections (like maintainConnCount)
+  // Enable the retry timer to periodically check for missing connections (like maintainConnCount).
   if (rev_conn_retry_timer_) {
-    // TODO(basundhara-c): Make the retry timeout configurable.
-    const std::chrono::milliseconds retry_timeout(10000); // 10 seconds
+    // Re-arm the steady-state maintenance tick. The interval is configurable (defaults to 10s);
+    // when jitter is enabled the tick is spread upward so agents that booted together
+    // de-synchronize, without ever refilling connections faster than the configured interval.
+    const std::chrono::milliseconds retry_timeout(
+        applyJitter(config_.maintain_interval_ms, JitterDirection::Up));
     rev_conn_retry_timer_->enableTimer(retry_timeout);
-    ENVOY_LOG(debug, "Enabled retry timer for next connection check in 10 seconds.");
+    ENVOY_LOG(debug, "Enabled retry timer for next connection check in {}ms.",
+              retry_timeout.count());
   }
 }
 

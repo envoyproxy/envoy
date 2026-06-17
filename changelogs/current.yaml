@@ -64,5 +64,14 @@ new_features:
     RSA public key exchange on behalf of the client. Added a new
     :ref:`downstream_ssl <envoy_v3_api_field_extensions.filters.network.mysql_proxy.v3.MySQLProxy.downstream_ssl>`
     config option with ``DISABLE``, ``REQUIRE``, and ``ALLOW`` modes.
+- area: reverse_tunnel
+  change: |
+    Added configurable reconnect cadence and jitter to the downstream reverse tunnel socket interface
+    (``envoy.bootstrap.reverse_tunnel.downstream_socket_interface``) via the new ``reconnect_backoff``
+    field. Operators can now tune the connection maintenance interval, the per-host exponential
+    backoff base and cap, and a jitter factor that is applied to both the per-host backoff (spread
+    downward) and the maintenance tick (spread upward) to de-synchronize a fleet of initiators after
+    synchronized events. Defaults reproduce the previous hardcoded behavior (10s maintenance interval,
+    1s base backoff, 30s cap, no jitter), so existing deployments are unaffected until configured.
 
 deprecated:

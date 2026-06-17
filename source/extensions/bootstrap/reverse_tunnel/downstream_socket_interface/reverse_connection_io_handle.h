@@ -43,6 +43,13 @@ static constexpr absl::string_view kDoubleCrlf = "\r\n\r\n";
 
 // Connection timing constants.
 static constexpr uint32_t kDefaultMaxReconnectAttempts = 10;
+
+// Default reconnect backoff/jitter parameters. These reproduce the historical hardcoded values so
+// that an unset bootstrap ``reconnect_backoff`` config preserves prior behavior exactly.
+static constexpr uint32_t kDefaultMaintainIntervalMs = 10000; // 10s steady-state re-check cadence.
+static constexpr uint32_t kDefaultBaseBackoffMs = 1000;       // 1s base per-host backoff delay.
+static constexpr uint32_t kDefaultMaxBackoffMs = 30000;       // 30s cap on per-host backoff delay.
+static constexpr double kDefaultReconnectJitter = 0.0; // No jitter (deterministic) by default.
 } // namespace
 
 /**
@@ -96,6 +103,13 @@ struct ReverseConnectionSocketConfig {
       remote_clusters;         // List of remote cluster configurations.
   bool enable_circuit_breaker; // Whether to place a cluster in backoff when reverse connection
                                // attempts fail.
+  // Reconnect backoff/jitter tunables, populated from the bootstrap extension's
+  // ``reconnect_backoff`` proto (see ReconnectBackoffConfig). Defaults reproduce the historical
+  // hardcoded behavior so an unset config changes nothing.
+  uint32_t maintain_interval_ms{kDefaultMaintainIntervalMs}; // Steady-state re-check cadence.
+  uint32_t base_backoff_ms{kDefaultBaseBackoffMs};           // Base per-host exponential backoff.
+  uint32_t max_backoff_ms{kDefaultMaxBackoffMs};             // Cap on per-host backoff delay.
+  double jitter{kDefaultReconnectJitter}; // Jitter factor in [0,1]; 0 = deterministic.
   ReverseConnectionSocketConfig() : enable_circuit_breaker(true) {}
 };
 
@@ -113,6 +127,7 @@ class ReverseConnectionIOHandle : public Network::IoSocketHandleImpl,
   friend class ReverseConnectionIOHandleTest;
   friend class RCConnectionWrapperTest;
   friend class DownstreamReverseConnectionIOHandleTest;
+  friend class ReverseTunnelInitiatorTest;
 
 public:
   /**
@@ -332,6 +347,27 @@ private:
    * @return true if dispatcher is available and safe to use
    */
   bool isThreadLocalDispatcherAvailable() const;
+
+  // Direction in which the configured jitter factor spreads a base delay.
+  enum class JitterDirection {
+    // Result in [base*(1-jitter), base]; used for per-host backoff so a retry never waits longer
+    // than the computed backoff (full jitter at 1.0, equal jitter at 0.5).
+    Down,
+    // Result in [base, base*(1+jitter)]; used for the maintain tick so connections are never
+    // refilled faster than the configured interval while still de-syncing co-started agents.
+    Up,
+  };
+
+  /**
+   * Apply the configured jitter factor to a deterministic base delay using Envoy's thread-safe
+   * Random::RandomGenerator (never rand()). With jitter 0 (the default) this returns ``base_ms``
+   * unchanged, preserving historical deterministic behavior. The random generator is only consulted
+   * when jitter is active. See JitterDirection for the spread semantics.
+   * @param base_ms the deterministic base delay in milliseconds.
+   * @param direction whether to spread downward (backoff) or upward (maintain tick).
+   * @return the jittered delay in milliseconds.
+   */
+  uint64_t applyJitter(uint64_t base_ms, JitterDirection direction) const;
 
   /**
    * Create the trigger mechanism used to wake up accept() when connections are established.

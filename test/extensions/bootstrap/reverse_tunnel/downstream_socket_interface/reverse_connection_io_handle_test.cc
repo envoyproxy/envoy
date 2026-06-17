@@ -242,6 +242,16 @@ protected:
     return it->second;
   }
 
+  // Returns the exact backoff window (backoff_until - last_failure_time) in ms for a host. Because
+  // both timestamps come from the same trackConnectionFailure() call, this equals the computed
+  // (and possibly jittered) delay independent of wall-clock drift, enabling exact assertions.
+  int64_t getBackoffDelayMs(const std::string& host_address) const {
+    const auto& info = getHostConnectionInfo(host_address);
+    return std::chrono::duration_cast<std::chrono::milliseconds>(info.backoff_until -
+                                                                 info.last_failure_time)
+        .count();
+  }
+
   const std::vector<std::unique_ptr<RCConnectionWrapper>>& getConnectionWrappers() const {
     return io_handle_->connection_wrappers_;
   }
@@ -991,6 +1001,148 @@ TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureExponentialBackoff) 
 
   // Verify that shouldAttemptConnectionToHost returns false during backoff.
   EXPECT_FALSE(shouldAttemptConnectionToHost("192.168.1.1", "test-cluster"));
+}
+
+// Test that the per-host backoff honors configured base/max intervals (jitter off =>
+// deterministic).
+TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureRespectsConfiguredIntervals) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  config.base_backoff_ms = 2000; // Non-default base delay.
+  config.max_backoff_ms = 5000;  // Non-default cap.
+  config.jitter = 0.0;           // Deterministic schedule.
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+
+  // Failure 1: 2000 * 2^0 = 2000ms.
+  trackConnectionFailure("192.168.1.1", "test-cluster");
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.1"), 2000);
+  // Failure 2: 2000 * 2^1 = 4000ms.
+  trackConnectionFailure("192.168.1.1", "test-cluster");
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.1"), 4000);
+  // Failure 3: 2000 * 2^2 = 8000ms, capped at the configured max of 5000ms.
+  trackConnectionFailure("192.168.1.1", "test-cluster");
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.1"), 5000);
+}
+
+// Test full jitter (1.0): the backoff is spread into [0, computed]. An injected RNG value of 0 pins
+// the result to the lower bound, proving the random generator (not rand()) drives the spread.
+TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureFullJitterLowerBound) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  config.base_backoff_ms = 1000;
+  config.max_backoff_ms = 30000;
+  config.jitter = 1.0; // Full jitter.
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+
+  // RNG = 0 => full-jitter lower bound => 0ms regardless of the computed backoff.
+  EXPECT_CALL(context_.api_.random_, random()).WillRepeatedly(testing::Return(0));
+
+  trackConnectionFailure("192.168.1.1", "test-cluster");
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.1"), 0);
+  trackConnectionFailure("192.168.1.1", "test-cluster");
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.1"), 0);
+}
+
+// Test full jitter stays within [0, computed] for an arbitrary RNG value across several failures.
+TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureFullJitterWithinBounds) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  config.base_backoff_ms = 1000;
+  config.max_backoff_ms = 30000;
+  config.jitter = 1.0;
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+  EXPECT_CALL(context_.api_.random_, random()).WillRepeatedly(testing::Return(123456789ULL));
+
+  for (uint32_t failure = 1; failure <= 6; ++failure) {
+    trackConnectionFailure("192.168.1.1", "test-cluster");
+    const uint32_t shift = failure - 1;
+    const int64_t computed =
+        std::min<int64_t>(static_cast<int64_t>(1000) << shift, 30000); // base*2^(n-1), capped.
+    const int64_t delay = getBackoffDelayMs("192.168.1.1");
+    EXPECT_GE(delay, 0);
+    EXPECT_LE(delay, computed) << "failure #" << failure;
+  }
+}
+
+// Test equal jitter (0.5): the backoff is spread into [computed/2, computed]. RNG = 0 pins it to
+// the lower bound computed/2.
+TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureEqualJitterLowerBound) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  config.base_backoff_ms = 1000;
+  config.max_backoff_ms = 30000;
+  config.jitter = 0.5; // Equal jitter.
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+  EXPECT_CALL(context_.api_.random_, random()).WillRepeatedly(testing::Return(0));
+
+  // Failure 1: computed 1000 => lower bound 500.
+  trackConnectionFailure("192.168.1.1", "test-cluster");
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.1"), 500);
+  // Failure 2: computed 2000 => lower bound 1000.
+  trackConnectionFailure("192.168.1.1", "test-cluster");
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.1"), 1000);
+}
+
+// Test that the maintain timer is armed with the configured interval (jitter off => exact).
+TEST_F(ReverseConnectionIOHandleTest, MaintainTimerUsesConfiguredInterval) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  config.maintain_interval_ms = 12345; // Non-default interval.
+  config.jitter = 0.0;
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(12345), _))
+      .Times(testing::AtLeast(1));
+
+  Event::FileReadyCb cb = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, cb, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+}
+
+// Test that maintain-tick jitter spreads the interval upward into [interval, interval*(1+jitter)].
+TEST_F(ReverseConnectionIOHandleTest, MaintainTimerJitterSpreadsUpward) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  config.maintain_interval_ms = 10000;
+  config.jitter = 0.5; // Jitter window = 5000ms => tick in [10000, 15000].
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  // RNG = 3000 => tick = 10000 + (3000 % 5001) = 13000ms.
+  EXPECT_CALL(context_.api_.random_, random()).WillRepeatedly(testing::Return(3000));
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  std::chrono::milliseconds captured_interval{0};
+  EXPECT_CALL(*mock_timer, enableTimer(_, _))
+      .WillRepeatedly(testing::SaveArg<0>(&captured_interval));
+
+  Event::FileReadyCb cb = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, cb, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  EXPECT_EQ(captured_interval.count(), 13000);
 }
 
 // Test host mapping and backoff integration.

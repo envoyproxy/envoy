@@ -4,7 +4,11 @@ package envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3
 
 import "envoy/config/core/v3/base.proto";
 
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3";
 option java_outer_classname = "DownstreamReverseConnectionSocketInterfaceProto";
@@ -29,6 +33,40 @@ message DownstreamReverseConnectionSocketInterface {
     repeated config.core.v3.HeaderValueOption additional_headers = 2;
   }
 
+  // Tunables controlling how the initiator re-establishes reverse connections after failures
+  // and how frequently it re-checks for missing connections. The intent is to let operators
+  // de-synchronize a fleet of initiators (for example after a tunnel-server rollout or a fleet
+  // restart) so that over-limit handshakes do not retry in lock-step and trip server-side rate
+  // limits ("thundering herd"). When this message is unset, the initiator uses the historical
+  // defaults (10s maintain interval, 1s base backoff, 30s max backoff, no jitter), preserving
+  // prior behavior exactly.
+  message ReconnectBackoffConfig {
+    // Steady-state interval at which the initiator re-checks each cluster and re-creates any
+    // missing reverse connections. Defaults to 10s. When jitter is set, the effective tick is
+    // spread upward into ``[maintain_interval, maintain_interval * (1 + jitter)]`` so that
+    // connections are never refilled faster than this value.
+    google.protobuf.Duration maintain_interval = 1 [(validate.rules).duration = {gt {}}];
+
+    // Base delay for the per-host exponential backoff applied after a failed reverse-connection
+    // attempt. The nth consecutive failure waits ``base_backoff_interval * 2^(n-1)`` (before
+    // jitter), capped at ``max_backoff_interval``. Keeping the first failure cheap preserves fast
+    // refill of a single dropped connection. Defaults to 1s.
+    google.protobuf.Duration base_backoff_interval = 2 [(validate.rules).duration = {gt {}}];
+
+    // Upper bound on the per-host backoff delay. Should be greater than or equal to
+    // ``base_backoff_interval``; if a smaller value is configured it is raised to
+    // ``base_backoff_interval`` at runtime. Defaults to 30s.
+    google.protobuf.Duration max_backoff_interval = 3 [(validate.rules).duration = {gt {}}];
+
+    // Jitter factor in the range ``[0.0, 1.0]`` applied to both the per-host backoff and the
+    // maintain interval. ``0.0`` (the default) reproduces the deterministic, jitter-free behavior.
+    // For the per-host backoff the delay becomes
+    // ``computed * (1 - jitter) + uniform_random(0, jitter * computed)`` (equal jitter at 0.5,
+    // full jitter at 1.0). For the maintain interval the tick is spread upward as described on
+    // ``maintain_interval``.
+    google.protobuf.DoubleValue jitter = 4 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
+  }
+
   // Stat prefix to be used for downstream reverse connection socket interface stats.
   string stat_prefix = 1;
 
@@ -40,4 +78,8 @@ message DownstreamReverseConnectionSocketInterface {
   // Optional HTTP handshake configuration. When unset, the initiator envoy uses the defaults
   // provided by ``HttpHandshakeConfig``.
   HttpHandshakeConfig http_handshake = 3;
+
+  // Optional reconnect backoff/jitter configuration. When unset, the historical defaults apply
+  // (see ``ReconnectBackoffConfig``).
+  ReconnectBackoffConfig reconnect_backoff = 4;
 }

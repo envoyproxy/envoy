@@ -82,6 +82,13 @@ protected:
     return Network::Utility::parseInternetAddressNoThrow(ip, port);
   }
 
+  // Exposes the (private) merged socket config of an IO handle to TEST_F bodies. The fixture is a
+  // friend of ReverseConnectionIOHandle; the generated per-test classes that derive from it are
+  // not, so private access must go through a fixture member like this one.
+  const ReverseConnectionSocketConfig& getSocketConfig(ReverseConnectionIOHandle& handle) const {
+    return handle.config_;
+  }
+
   void TearDown() override {
     tls_slot_.reset();
     thread_local_registry_.reset();
@@ -260,6 +267,66 @@ TEST_F(ReverseTunnelInitiatorTest, SocketUsesCustomHandshakeRequestPathFromExten
   auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket.get());
   ASSERT_NE(reverse_handle, nullptr);
   EXPECT_EQ(reverse_handle->requestPath(), "/custom/handshake");
+}
+
+TEST_F(ReverseTunnelInitiatorTest, SocketAppliesReconnectBackoffConfigFromExtension) {
+  // Configure non-default backoff/jitter, including a max below the base to exercise the runtime
+  // clamp (PGV only validates each duration is > 0, not the cross-field max >= base invariant).
+  auto* backoff = config_.mutable_reconnect_backoff();
+  backoff->mutable_maintain_interval()->set_seconds(5);
+  backoff->mutable_base_backoff_interval()->set_seconds(3);
+  backoff->mutable_max_backoff_interval()->set_seconds(2);
+  backoff->mutable_jitter()->set_value(0.25);
+  extension_ = std::make_unique<ReverseTunnelInitiatorExtension>(context_, config_);
+  setupThreadLocalSlot();
+
+  ReverseConnectionAddress::ReverseConnectionConfig config;
+  config.src_cluster_id = "test-cluster";
+  config.src_node_id = "test-node";
+  config.src_tenant_id = "test-tenant";
+  config.remote_cluster = "remote-cluster";
+  config.connection_count = 1;
+  auto reverse_address = std::make_shared<ReverseConnectionAddress>(config);
+
+  auto socket = socket_interface_->socket(Network::Socket::Type::Stream, reverse_address,
+                                          Network::SocketCreationOptions{});
+  ASSERT_NE(socket, nullptr);
+  auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket.get());
+  ASSERT_NE(reverse_handle, nullptr);
+
+  const auto& cfg = getSocketConfig(*reverse_handle);
+  EXPECT_EQ(cfg.maintain_interval_ms, 5000u);
+  EXPECT_EQ(cfg.base_backoff_ms, 3000u);
+  // The configured max (2s) sat below the base (3s); the plumbing raises it to the base.
+  EXPECT_EQ(cfg.max_backoff_ms, 3000u);
+  EXPECT_DOUBLE_EQ(cfg.jitter, 0.25);
+}
+
+TEST_F(ReverseTunnelInitiatorTest, SocketUsesDefaultBackoffWhenUnset) {
+  // With no reconnect_backoff block, the io handle must keep the historical defaults so an upgrade
+  // changes nothing until the config opts in.
+  extension_ = std::make_unique<ReverseTunnelInitiatorExtension>(context_, config_);
+  setupThreadLocalSlot();
+
+  ReverseConnectionAddress::ReverseConnectionConfig config;
+  config.src_cluster_id = "test-cluster";
+  config.src_node_id = "test-node";
+  config.src_tenant_id = "test-tenant";
+  config.remote_cluster = "remote-cluster";
+  config.connection_count = 1;
+  auto reverse_address = std::make_shared<ReverseConnectionAddress>(config);
+
+  auto socket = socket_interface_->socket(Network::Socket::Type::Stream, reverse_address,
+                                          Network::SocketCreationOptions{});
+  ASSERT_NE(socket, nullptr);
+  auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket.get());
+  ASSERT_NE(reverse_handle, nullptr);
+
+  const auto& cfg = getSocketConfig(*reverse_handle);
+  EXPECT_EQ(cfg.maintain_interval_ms, 10000u);
+  EXPECT_EQ(cfg.base_backoff_ms, 1000u);
+  EXPECT_EQ(cfg.max_backoff_ms, 30000u);
+  EXPECT_DOUBLE_EQ(cfg.jitter, 0.0);
 }
 
 TEST_F(ReverseTunnelInitiatorTest, CreateReverseConnectionSocketStreamIPv4) {
