@@ -1687,6 +1687,15 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndEncodeAsBase64) {
   rule_tlv1->set_tlv_type(0x00);
   rule_tlv1->mutable_on_tlv_present()->set_key("PP2 tlv1");
 
+  // A rule with explicitly set SANITIZED_UTF8 encoding for comparison: the value will be sanitized
+  // to a valid UTF-8 string.
+  auto rule_tlv2 = proto_config.add_rules();
+  rule_tlv2->set_tlv_type(0x00);
+  rule_tlv2->mutable_on_tlv_present()->set_key("PP2 tlv2");
+  rule_tlv2->mutable_on_tlv_present()->set_value_string_encoding(
+      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
+          SANITIZED_UTF8);
+
   connect(true, &proto_config);
   write(buffer, sizeof(buffer));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -1711,6 +1720,9 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndEncodeAsBase64) {
   // The default encoding sanitizes the value to a valid UTF-8 string: the non utf8 byte
   // 0xff is replaced with the `!` character.
   EXPECT_EQ("!", fields.at("PP2 tlv1").string_value());
+  // The explicitly set SANITIZED_UTF8 encoding also sanitizes the value to a valid UTF-8 string:
+  // the non utf8 byte 0xff is replaced with the `!` character.
+  EXPECT_EQ("!", fields.at("PP2 tlv2").string_value());
   disconnect();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }

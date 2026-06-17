@@ -36,14 +36,17 @@ message ProxyProtocol {
     // Specifies the encoding scheme that is used to encode the TLV value before it is
     // stored in dynamic metadata or filter state.
     enum ValueStringEncoding {
+      // Unspecified encoding scheme. Defaults to ``SANITIZED_UTF8``.
+      UNSPECIFIED = 0;
+
       // The TLV value will be sanitized to a valid UTF-8 string before being stored:
       // any invalid UTF-8 sequences will be replaced with the ``!`` character.
-      SANITIZED_UTF8 = 0;
+      SANITIZED_UTF8 = 1;
 
       // The raw TLV value will be encoded as a `Base64 <https://datatracker.ietf.org/doc/html/rfc4648#section-4>`_
       // string (with padding) before being stored. This is useful for binary TLV values that
       // are not valid UTF-8 strings.
-      BASE64 = 1;
+      BASE64 = 2;
     }
 
     // The namespace — if this is empty, the filter's namespace will be used.
