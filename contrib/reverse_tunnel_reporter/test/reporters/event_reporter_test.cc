@@ -492,14 +492,14 @@ TEST_F(EventReporterTest, InitiationTimeUsedAsCreatedAt) {
   runDispatcher();
 }
 
-TEST_F(EventReporterTest, ZeroInitiationTimeFallsBackToWallClock) {
-  // When initiation_time_ms is 0 (header absent), created_at should be approximately now.
-  const auto before = Envoy::SystemTime::clock::now(); // NO_CHECK_FORMAT(real_time)
+TEST_F(EventReporterTest, ZeroInitiationTimeFallsBackToTimeSource) {
+  // When initiation_time_ms is 0 (header absent), created_at should come from
+  // the injected time source, not the raw wall clock.
+  const auto before = context_.timeSource().systemTime();
 
   EXPECT_CALL(*mock_client1_, receiveEvents(_))
       .WillOnce(Invoke([&before](const ReverseTunnelEvent::TunnelUpdates& updates) {
         ASSERT_EQ(1, updates.connections.size());
-        // The created_at should be between 'before' and a few seconds after.
         EXPECT_GE(updates.connections[0]->created_at, before);
         EXPECT_LE(updates.connections[0]->created_at, before + std::chrono::seconds(5));
       }));
