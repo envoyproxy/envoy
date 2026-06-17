@@ -242,6 +242,7 @@ public:
   void endListenerUpdate(FailureStates&& failure_state) override;
   bool isWorkerStarted() override { return workers_started_; }
   Http::Context& httpContext() { return server_.httpContext(); }
+  using ListenerManager::apiListener;
   ApiListenerOptRef apiListener() override;
   ListenerUpdateCallbacksHandlePtr
   addListenerUpdateCallbacks(ListenerUpdateCallbacks& callbacks) override;

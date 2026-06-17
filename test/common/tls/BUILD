@@ -310,6 +310,25 @@ envoy_cc_test(
 )
 
 envoy_cc_benchmark_binary(
+    name = "cert_compression_benchmark",
+    srcs = ["cert_compression_benchmark.cc"],
+    external_deps = ["ssl"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
+        "//source/common/tls:cert_compression_lib",
+        "@abseil-cpp//absl/strings:string_view",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "cert_compression_benchmark_test",
+    benchmark_binary = "cert_compression_benchmark",
+)
+
+envoy_cc_benchmark_binary(
     name = "tls_throughput_benchmark",
     srcs = ["tls_throughput_benchmark.cc"],
     data = [

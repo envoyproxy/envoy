@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "envoy/local_info/local_info.h"
@@ -72,7 +73,7 @@ public:
 private:
   void populateBaggage();
   bool disableDiscovery() const;
-  absl::optional<Protobuf::Any> discoverPeerMetadata();
+  std::optional<Protobuf::Any> discoverPeerMetadata();
   void propagatePeerMetadata(const Protobuf::Any& peer_metadata);
   void propagateNoPeerMetadata();
 

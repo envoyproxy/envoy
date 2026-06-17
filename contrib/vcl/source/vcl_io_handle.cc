@@ -1,5 +1,7 @@
 #include "contrib/vcl/source/vcl_io_handle.h"
 
+#include <optional>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 
@@ -197,7 +199,7 @@ Api::IoCallUint64Result VclIoHandle::readv(uint64_t max_length, Buffer::RawSlice
 }
 
 #if VCL_RX_ZC
-Api::IoCallUint64Result VclIoHandle::read(Buffer::Instance& buffer, absl::optional<uint64_t>) {
+Api::IoCallUint64Result VclIoHandle::read(Buffer::Instance& buffer, std::optional<uint64_t>) {
   vppcom_data_segment_t ds[16];
   int32_t rv;
 
@@ -227,7 +229,7 @@ Api::IoCallUint64Result VclIoHandle::read(Buffer::Instance& buffer, absl::option
 }
 #else
 Api::IoCallUint64Result VclIoHandle::read(Buffer::Instance& buffer,
-                                          absl::optional<uint64_t> max_length_opt) {
+                                          std::optional<uint64_t> max_length_opt) {
   uint64_t max_length = max_length_opt.value_or(UINT64_MAX);
   if (max_length == 0) {
     return Api::ioCallUint64ResultNoError();
@@ -620,7 +622,7 @@ Api::SysCallIntResult VclIoHandle::setBlocking(bool) {
   return {rv < 0 ? -1 : 0, -rv};
 }
 
-absl::optional<int> VclIoHandle::domain() {
+std::optional<int> VclIoHandle::domain() {
   VCL_LOG("grabbing domain sh {:x}", sh_);
   return {AF_INET};
 };
@@ -769,9 +771,9 @@ IoHandlePtr VclIoHandle::duplicate() {
   return io_handle;
 }
 
-absl::optional<std::chrono::milliseconds> VclIoHandle::lastRoundTripTime() { return {}; }
+std::optional<std::chrono::milliseconds> VclIoHandle::lastRoundTripTime() { return {}; }
 
-absl::optional<uint64_t> VclIoHandle::congestionWindowInBytes() const { return {}; }
+std::optional<uint64_t> VclIoHandle::congestionWindowInBytes() const { return {}; }
 
 } // namespace Vcl
 } // namespace Network

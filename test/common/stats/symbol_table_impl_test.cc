@@ -796,6 +796,15 @@ TEST_F(StatNameTest, StorageCopy) {
   EXPECT_NE(a.data(), c.data());
 }
 
+TEST_F(StatNameTest, StorageFromEmptyStatName) {
+  StatName empty;
+  StatNameStorage b_storage(empty, table_);
+  const StatName b = b_storage.statName();
+  EXPECT_EQ(empty, b);
+  EXPECT_NE(empty.data(), b.data());
+  b_storage.free(table_);
+}
+
 TEST_F(StatNameTest, AddingToPoolViaStatNamePreservesDynamicSegments) {
   const StatNameDynamicStorage tag_name("tag", table_);
   const StatNameDynamicStorage tag_value("value", table_);

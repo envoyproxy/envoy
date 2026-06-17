@@ -7,6 +7,7 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 namespace Envoy {
@@ -22,17 +23,21 @@ Server::BootstrapExtensionPtr DynamicModuleBootstrapExtensionFactory::createBoot
       config, context.messageValidationVisitor());
 
   const auto& module_config = proto_config.dynamic_module_config();
-  auto dynamic_module = Extensions::DynamicModules::newDynamicModuleByName(
-      module_config.name(), module_config.do_not_close(), module_config.load_globally());
-  if (!dynamic_module.ok()) {
-    throwEnvoyExceptionOrPanic("Failed to load dynamic module: " +
-                               std::string(dynamic_module.status().message()));
+  // Bootstrap extensions do not support remote module sources, so no init manager or async callback
+  // is passed; only the synchronous local-file and by-name paths can succeed here.
+  auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
+      module_config, proto_config.extension_name(), context);
+  if (!load_result.ok()) {
+    throwEnvoyExceptionOrPanic(std::string(load_result.status().message()));
   }
+  auto dynamic_module = std::move(load_result->loaded);
 
   std::string extension_config_str;
   if (proto_config.has_extension_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.extension_config());
     if (!config_or_error.ok()) {
+      Extensions::DynamicModules::incrementLoadFailure(
+          context, proto_config.extension_name(), Extensions::DynamicModules::ConfigInitErrorStat);
       throwEnvoyExceptionOrPanic("Failed to parse extension config: " +
                                  std::string(config_or_error.status().message()));
     }
@@ -46,10 +51,12 @@ Server::BootstrapExtensionPtr DynamicModuleBootstrapExtensionFactory::createBoot
 
   auto extension_config = newDynamicModuleBootstrapExtensionConfig(
       proto_config.extension_name(), extension_config_str, metrics_namespace,
-      std::move(dynamic_module.value()), context.mainThreadDispatcher(), context,
+      std::move(dynamic_module), context.mainThreadDispatcher(), context,
       context.serverScope().store());
 
   if (!extension_config.ok()) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        context, proto_config.extension_name(), Extensions::DynamicModules::ConfigInitErrorStat);
     throwEnvoyExceptionOrPanic("Failed to create extension config: " +
                                std::string(extension_config.status().message()));
   }
