@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 #include <queue>
 #include <string>
@@ -26,6 +27,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/synchronization/mutex.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -50,6 +52,9 @@ static constexpr uint32_t kDefaultMaintainIntervalMs = 10000; // 10s steady-stat
 static constexpr uint32_t kDefaultBaseBackoffMs = 1000;       // 1s base per-host backoff delay.
 static constexpr uint32_t kDefaultMaxBackoffMs = 30000;       // 30s cap on per-host backoff delay.
 static constexpr double kDefaultReconnectJitter = 0.0; // No jitter (deterministic) by default.
+// Honor an HTTP Retry-After hint on a 429 handshake by default; the agent should respect an
+// explicit server cool-off when one is provided.
+static constexpr bool kDefaultRespectRetryAfter = true;
 } // namespace
 
 /**
@@ -110,6 +115,8 @@ struct ReverseConnectionSocketConfig {
   uint32_t base_backoff_ms{kDefaultBaseBackoffMs};           // Base per-host exponential backoff.
   uint32_t max_backoff_ms{kDefaultMaxBackoffMs};             // Cap on per-host backoff delay.
   double jitter{kDefaultReconnectJitter}; // Jitter factor in [0,1]; 0 = deterministic.
+  // Whether to honor an HTTP Retry-After hint on a 429 handshake response as the per-host backoff.
+  bool respect_retry_after{kDefaultRespectRetryAfter};
   ReverseConnectionSocketConfig() : enable_circuit_breaker(true) {}
 };
 
@@ -244,8 +251,11 @@ public:
    * @param error error message if the handshake failed, empty string if successful.
    * @param wrapper pointer to the connection wrapper that wraps over the established connection.
    * @param closed whether the connection was closed during handshake.
+   * @param retry_after optional server-provided cool-off hint (from an HTTP ``Retry-After`` header
+   * on a 429 handshake) to use as the per-host backoff; ignored when unset.
    */
-  void onConnectionDone(const std::string& error, RCConnectionWrapper* wrapper, bool closed);
+  void onConnectionDone(const std::string& error, RCConnectionWrapper* wrapper, bool closed,
+                        absl::optional<std::chrono::milliseconds> retry_after = absl::nullopt);
 
   // Backoff logic for connection failures.
   /**
@@ -261,8 +271,14 @@ public:
    * Track a connection failure for a specific host and cluster and trigger backoff logic.
    * @param host_address the address of the host that failed.
    * @param cluster_name the name of the cluster the host belongs to.
+   * @param retry_after optional server-provided cool-off hint (from an HTTP ``Retry-After`` header
+   * on a 429 handshake). When present and ``respect_retry_after`` is enabled, it is used (bounded
+   *        by the max backoff and spread upward by jitter) as the next backoff instead of the
+   *        computed exponential value.
    */
-  void trackConnectionFailure(const std::string& host_address, const std::string& cluster_name);
+  void
+  trackConnectionFailure(const std::string& host_address, const std::string& cluster_name,
+                         absl::optional<std::chrono::milliseconds> retry_after = absl::nullopt);
 
   /**
    * Reset backoff state for a specific host. Called when a connection is established successfully.

@@ -73,5 +73,13 @@ new_features:
     downward) and the maintenance tick (spread upward) to de-synchronize a fleet of initiators after
     synchronized events. Defaults reproduce the previous hardcoded behavior (10s maintenance interval,
     1s base backoff, 30s cap, no jitter), so existing deployments are unaffected until configured.
+- area: reverse_tunnel
+  change: |
+    The downstream reverse tunnel socket interface now honors an HTTP ``Retry-After`` header on a
+    ``429`` reverse-connection handshake response. When present (delta-seconds form), the hint is used
+    as the per-host backoff before the next attempt, bounded by ``max_backoff_interval`` and spread
+    upward by the configured jitter. This is controlled by the new ``respect_retry_after`` field on
+    ``reconnect_backoff`` and defaults to enabled; since rate limiters only emit the header when
+    actively limiting, behavior is unchanged until a server starts sending it.
 
 deprecated:

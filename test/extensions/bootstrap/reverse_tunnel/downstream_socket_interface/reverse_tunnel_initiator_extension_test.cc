@@ -184,6 +184,7 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, ReconnectBackoffConfigParsed) {
   backoff->mutable_base_backoff_interval()->set_seconds(2);
   backoff->mutable_max_backoff_interval()->set_seconds(45);
   backoff->mutable_jitter()->set_value(0.5);
+  backoff->mutable_respect_retry_after()->set_value(false);
 
   auto custom_extension =
       std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
@@ -195,6 +196,8 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, ReconnectBackoffConfigParsed) {
   EXPECT_EQ(parsed.max_backoff_interval().seconds(), 45);
   ASSERT_TRUE(parsed.has_jitter());
   EXPECT_DOUBLE_EQ(parsed.jitter().value(), 0.5);
+  ASSERT_TRUE(parsed.has_respect_retry_after());
+  EXPECT_FALSE(parsed.respect_retry_after().value());
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, RandomGeneratorReturnsContextGenerator) {

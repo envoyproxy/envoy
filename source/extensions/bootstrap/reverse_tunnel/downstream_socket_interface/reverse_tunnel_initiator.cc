@@ -144,6 +144,9 @@ ReverseTunnelInitiator::socket(Envoy::Network::Socket::Type socket_type,
         if (reconnect_backoff.has_jitter()) {
           socket_config.jitter = reconnect_backoff.jitter().value();
         }
+        if (reconnect_backoff.has_respect_retry_after()) {
+          socket_config.respect_retry_after = reconnect_backoff.respect_retry_after().value();
+        }
         // The cap must never sit below the base, even if misconfigured; raise it if needed so the
         // exponential backoff math stays well-formed.
         socket_config.max_backoff_ms =

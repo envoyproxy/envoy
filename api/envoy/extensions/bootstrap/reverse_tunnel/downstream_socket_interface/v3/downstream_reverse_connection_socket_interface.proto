@@ -40,6 +40,7 @@ message DownstreamReverseConnectionSocketInterface {
   // limits ("thundering herd"). When this message is unset, the initiator uses the historical
   // defaults (10s maintain interval, 1s base backoff, 30s max backoff, no jitter), preserving
   // prior behavior exactly.
+  // [#next-free-field: 6]
   message ReconnectBackoffConfig {
     // Steady-state interval at which the initiator re-checks each cluster and re-creates any
     // missing reverse connections. Defaults to 10s. When jitter is set, the effective tick is
@@ -65,6 +66,14 @@ message DownstreamReverseConnectionSocketInterface {
     // full jitter at 1.0). For the maintain interval the tick is spread upward as described on
     // ``maintain_interval``.
     google.protobuf.DoubleValue jitter = 4 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
+
+    // Whether to honor an HTTP ``Retry-After`` header on a ``429`` reverse-connection handshake
+    // response. When enabled (the default) and the server returns a ``Retry-After`` delta-seconds
+    // hint, that value (bounded by ``max_backoff_interval`` and spread upward by ``jitter``) is used
+    // as the per-host backoff before the next attempt, instead of the computed exponential backoff.
+    // When the header is absent, malformed, or this is disabled, the computed jittered backoff
+    // applies. Defaults to ``true``.
+    google.protobuf.BoolValue respect_retry_after = 5;
   }
 
   // Stat prefix to be used for downstream reverse connection socket interface stats.

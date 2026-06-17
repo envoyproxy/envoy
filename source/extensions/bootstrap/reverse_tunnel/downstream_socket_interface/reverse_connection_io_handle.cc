@@ -688,8 +688,9 @@ uint64_t ReverseConnectionIOHandle::applyJitter(uint64_t base_ms, JitterDirectio
   return direction == JitterDirection::Down ? (base_ms - window) + rand_part : base_ms + rand_part;
 }
 
-void ReverseConnectionIOHandle::trackConnectionFailure(const std::string& host_address,
-                                                       const std::string& cluster_name) {
+void ReverseConnectionIOHandle::trackConnectionFailure(
+    const std::string& host_address, const std::string& cluster_name,
+    absl::optional<std::chrono::milliseconds> retry_after) {
   auto host_it = host_to_conn_info_map_.find(host_address);
   if (host_it == host_to_conn_info_map_.end()) {
     ENVOY_LOG(debug, "Host {} not found in host_to_conn_info_map_, skipping failure tracking",
@@ -700,22 +701,35 @@ void ReverseConnectionIOHandle::trackConnectionFailure(const std::string& host_a
   host_info.failure_count++;
   host_info.last_failure_time = getTimeSource().monotonicTime();
 
-  // Exponential backoff with a hard cap: the nth consecutive failure waits
-  // base_backoff_ms * 2^(n-1), capped at max_backoff_ms. The shift is evaluated in 64-bit and
-  // bounded (failure_count grows without limit on sustained failures) to avoid undefined-behavior
-  // overflow; once the shift would exceed the cap the delay simply pins to max_backoff_ms.
-  const uint64_t base_delay_ms = config_.base_backoff_ms;
-  const uint64_t max_delay_ms = config_.max_backoff_ms;
-  const uint32_t shift = host_info.failure_count - 1;
-  uint64_t computed_backoff_ms = max_delay_ms;
-  if (shift < 31) {
-    computed_backoff_ms = std::min(base_delay_ms << shift, max_delay_ms);
-  }
+  uint64_t backoff_delay_ms;
+  if (retry_after.has_value() && config_.respect_retry_after) {
+    // Honor the server's explicit cool-off hint. Bound it by the configured max so a large or
+    // malformed value cannot park the agent indefinitely, and spread it upward by jitter so a fleet
+    // that all received the same Retry-After does not retry in lock-step (upward keeps us at or
+    // after the requested time).
+    const uint64_t hint_ms =
+        std::min<uint64_t>(static_cast<uint64_t>(retry_after->count()), config_.max_backoff_ms);
+    backoff_delay_ms = applyJitter(hint_ms, JitterDirection::Up);
+    ENVOY_LOG(debug, "Host {} honoring Retry-After hint {}ms (bounded/jittered to {}ms)",
+              host_address, retry_after->count(), backoff_delay_ms);
+  } else {
+    // Exponential backoff with a hard cap: the nth consecutive failure waits
+    // base_backoff_ms * 2^(n-1), capped at max_backoff_ms. The shift is evaluated in 64-bit and
+    // bounded (failure_count grows without limit on sustained failures) to avoid undefined-behavior
+    // overflow; once the shift would exceed the cap the delay simply pins to max_backoff_ms.
+    const uint64_t base_delay_ms = config_.base_backoff_ms;
+    const uint64_t max_delay_ms = config_.max_backoff_ms;
+    const uint32_t shift = host_info.failure_count - 1;
+    uint64_t computed_backoff_ms = max_delay_ms;
+    if (shift < 31) {
+      computed_backoff_ms = std::min(base_delay_ms << shift, max_delay_ms);
+    }
 
-  // Apply the configured jitter (downward spread) so synchronized fleet-wide failures do not retry
-  // in lock-step. With the default jitter of 0 this is a no-op and the schedule stays
-  // deterministic.
-  const uint64_t backoff_delay_ms = applyJitter(computed_backoff_ms, JitterDirection::Down);
+    // Apply the configured jitter (downward spread) so synchronized fleet-wide failures do not
+    // retry in lock-step. With the default jitter of 0 this is a no-op and the schedule stays
+    // deterministic.
+    backoff_delay_ms = applyJitter(computed_backoff_ms, JitterDirection::Down);
+  }
 
   // Update the backoff until time. This is used in shouldAttemptConnectionToHost() to check if we
   // should attempt to connect to the host.
@@ -1093,8 +1107,9 @@ bool ReverseConnectionIOHandle::isTriggerPipeReady() const {
   return trigger_pipe_read_fd_ != -1 && trigger_pipe_write_fd_ != -1;
 }
 
-void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
-                                                 RCConnectionWrapper* wrapper, bool closed) {
+void ReverseConnectionIOHandle::onConnectionDone(
+    const std::string& error, RCConnectionWrapper* wrapper, bool closed,
+    absl::optional<std::chrono::milliseconds> retry_after) {
   ENVOY_LOG(debug, "reverse_tunnel: Connection wrapper done - error: '{}', closed: {}", error,
             closed);
 
@@ -1172,7 +1187,7 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
       connection->close(Network::ConnectionCloseType::NoFlush);
     }
 
-    trackConnectionFailure(host_address, cluster_name);
+    trackConnectionFailure(host_address, cluster_name, retry_after);
 
   } else {
     // Handle connection success.

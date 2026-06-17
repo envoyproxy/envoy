@@ -215,6 +215,12 @@ protected:
     io_handle_->trackConnectionFailure(host_address, cluster_name);
   }
 
+  void trackConnectionFailureWithRetryAfter(const std::string& host_address,
+                                            const std::string& cluster_name,
+                                            std::chrono::milliseconds retry_after) {
+    io_handle_->trackConnectionFailure(host_address, cluster_name, retry_after);
+  }
+
   void resetHostBackoff(const std::string& host_address) {
     io_handle_->resetHostBackoff(host_address);
   }
@@ -1143,6 +1149,67 @@ TEST_F(ReverseConnectionIOHandleTest, MaintainTimerJitterSpreadsUpward) {
                                   Event::FileReadyType::Read);
 
   EXPECT_EQ(captured_interval.count(), 13000);
+}
+
+// Test that a Retry-After hint is honored as the per-host backoff (jitter off => exact).
+TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureHonorsRetryAfter) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  config.base_backoff_ms = 1000;
+  config.max_backoff_ms = 30000;
+  config.jitter = 0.0;
+  config.respect_retry_after = true;
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+
+  // Server asked for 7s; with the hint honored the backoff is exactly 7000ms, not the computed
+  // 1000.
+  trackConnectionFailureWithRetryAfter("192.168.1.1", "test-cluster",
+                                       std::chrono::milliseconds(7000));
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.1"), 7000);
+}
+
+// Test that a Retry-After hint is bounded by max_backoff so a large hint cannot park the agent.
+TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureRetryAfterCappedAtMax) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  config.base_backoff_ms = 1000;
+  config.max_backoff_ms = 5000; // Cap.
+  config.jitter = 0.0;
+  config.respect_retry_after = true;
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+
+  // Server asked for 20s but our cap is 5s.
+  trackConnectionFailureWithRetryAfter("192.168.1.1", "test-cluster",
+                                       std::chrono::milliseconds(20000));
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.1"), 5000);
+}
+
+// Test that the Retry-After hint is ignored when respect_retry_after is disabled.
+TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureIgnoresRetryAfterWhenDisabled) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  config.base_backoff_ms = 1000;
+  config.max_backoff_ms = 30000;
+  config.jitter = 0.0;
+  config.respect_retry_after = false; // Disabled => fall back to computed exponential backoff.
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+
+  // Despite the 7s hint, the first failure uses the computed 1000ms.
+  trackConnectionFailureWithRetryAfter("192.168.1.1", "test-cluster",
+                                       std::chrono::milliseconds(7000));
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.1"), 1000);
 }
 
 // Test host mapping and backoff integration.

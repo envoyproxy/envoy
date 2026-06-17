@@ -1063,6 +1063,58 @@ TEST_F(RCConnectionWrapperTest, DecodeHeadersNonOk) {
   wrapper.decodeHeaders(std::move(headers), true);
 }
 
+// Test decodeHeaders handles a 429 (with Retry-After) without crashing on the rate-limited path.
+TEST_F(RCConnectionWrapperTest, DecodeHeadersRateLimited) {
+  auto mock_connection = setupMockConnection();
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+
+  Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+  headers->setStatus(429);
+  headers->addCopy(Http::LowerCaseString("retry-after"), "5");
+
+  wrapper.decodeHeaders(std::move(headers), true);
+}
+
+// Test parseRetryAfter honors the RFC 7231 delta-seconds form.
+TEST_F(RCConnectionWrapperTest, ParseRetryAfterDeltaSeconds) {
+  Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+  headers->setStatus(429);
+  headers->addCopy(Http::LowerCaseString("retry-after"), "7");
+
+  auto result = RCConnectionWrapper::parseRetryAfter(*headers);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result->count(), 7000);
+}
+
+// Test parseRetryAfter returns nullopt for absent, non-numeric (HTTP-date), and empty values.
+TEST_F(RCConnectionWrapperTest, ParseRetryAfterAbsentOrUnparseable) {
+  {
+    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+    headers->setStatus(429);
+    EXPECT_FALSE(RCConnectionWrapper::parseRetryAfter(*headers).has_value());
+  }
+  {
+    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+    headers->setStatus(429);
+    headers->addCopy(Http::LowerCaseString("retry-after"), "Wed, 21 Oct 2025 07:28:00 GMT");
+    EXPECT_FALSE(RCConnectionWrapper::parseRetryAfter(*headers).has_value());
+  }
+}
+
+// Test parseRetryAfter caps very large hints at one hour to avoid overflow before downstream
+// bounding.
+TEST_F(RCConnectionWrapperTest, ParseRetryAfterCappedAtOneHour) {
+  Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+  headers->setStatus(429);
+  headers->addCopy(Http::LowerCaseString("retry-after"), "100000"); // ~27.7h, above the 1h cap.
+
+  auto result = RCConnectionWrapper::parseRetryAfter(*headers);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result->count(), 3600 * 1000);
+}
+
 // Test dispatchHttp1 error path by initializing codec via connect() and
 // then feeding invalid bytes to the parser.
 TEST_F(RCConnectionWrapperTest, DispatchHttp1ErrorPath) {

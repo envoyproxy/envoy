@@ -277,6 +277,7 @@ TEST_F(ReverseTunnelInitiatorTest, SocketAppliesReconnectBackoffConfigFromExtens
   backoff->mutable_base_backoff_interval()->set_seconds(3);
   backoff->mutable_max_backoff_interval()->set_seconds(2);
   backoff->mutable_jitter()->set_value(0.25);
+  backoff->mutable_respect_retry_after()->set_value(false);
   extension_ = std::make_unique<ReverseTunnelInitiatorExtension>(context_, config_);
   setupThreadLocalSlot();
 
@@ -300,6 +301,7 @@ TEST_F(ReverseTunnelInitiatorTest, SocketAppliesReconnectBackoffConfigFromExtens
   // The configured max (2s) sat below the base (3s); the plumbing raises it to the base.
   EXPECT_EQ(cfg.max_backoff_ms, 3000u);
   EXPECT_DOUBLE_EQ(cfg.jitter, 0.25);
+  EXPECT_FALSE(cfg.respect_retry_after);
 }
 
 TEST_F(ReverseTunnelInitiatorTest, SocketUsesDefaultBackoffWhenUnset) {
@@ -327,6 +329,7 @@ TEST_F(ReverseTunnelInitiatorTest, SocketUsesDefaultBackoffWhenUnset) {
   EXPECT_EQ(cfg.base_backoff_ms, 1000u);
   EXPECT_EQ(cfg.max_backoff_ms, 30000u);
   EXPECT_DOUBLE_EQ(cfg.jitter, 0.0);
+  EXPECT_TRUE(cfg.respect_retry_after); // Honored by default.
 }
 
 TEST_F(ReverseTunnelInitiatorTest, CreateReverseConnectionSocketStreamIPv4) {
