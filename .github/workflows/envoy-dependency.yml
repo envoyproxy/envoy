@@ -185,7 +185,7 @@ jobs:
             # Source of truth: the latest `docker-v*` GitHub release in
             # envoyproxy/toolshed. Strip only the `docker-` prefix - the
             # published images keep the leading `v`, eg
-            # `envoyproxy/envoy-build:ci-v0.1.5`.
+            # `envoyproxy/envoy-build:ci-v0.1.6`.
             CONTAINER_TAG=$(
                 gh api -H "Accept: application/vnd.github+json" \
                     --paginate \
@@ -198,7 +198,7 @@ jobs:
             echo "ERROR: Could not determine build image tag from envoyproxy/toolshed releases" >&2
             exit 1
         fi
-        # Normalize: accept `docker-v0.1.5`, `v0.1.5` or `0.1.4` from inputs.version
+        # Normalize: accept `docker-v0.1.6`, `v0.1.6` or `0.1.4` from inputs.version
         CONTAINER_TAG="${CONTAINER_TAG#docker-}"
         [[ "$CONTAINER_TAG" == v* ]] || CONTAINER_TAG="v${CONTAINER_TAG}"
         echo "tag=${CONTAINER_TAG}" >> "$GITHUB_OUTPUT"
