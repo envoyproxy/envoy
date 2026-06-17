@@ -3054,6 +3054,19 @@ void envoy_dynamic_module_callback_http_span_set_sampled(
     envoy_dynamic_module_type_span_envoy_ptr span, bool sampled);
 
 /**
+ * envoy_dynamic_module_callback_http_span_disable_local_decision stops the span from using the
+ * Envoy local tracing decision. Combined with
+ * envoy_dynamic_module_callback_http_span_set_sampled, this keeps a filter's sampling decision when
+ * Envoy refreshes tracing after a route cache change. With the OpenTelemetry tracer the connection
+ * manager does not re-derive the decision after a route cache change. Other tracers may not support
+ * this.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ */
+void envoy_dynamic_module_callback_http_span_disable_local_decision(
+    envoy_dynamic_module_type_span_envoy_ptr span);
+
+/**
  * envoy_dynamic_module_callback_http_span_get_baggage retrieves a baggage value from the span.
  * Baggage data may have been set by this span or any parent spans.
  *

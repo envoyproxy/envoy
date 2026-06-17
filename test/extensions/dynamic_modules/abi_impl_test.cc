@@ -1584,6 +1584,8 @@ WEAK_STUB(HttpSpanSetOperation,
           envoy_dynamic_module_callback_http_span_set_operation(nullptr, {nullptr, 0}))
 WEAK_STUB(HttpSpanLog, envoy_dynamic_module_callback_http_span_log(nullptr, nullptr, {nullptr, 0}))
 WEAK_STUB(HttpSpanSetSampled, envoy_dynamic_module_callback_http_span_set_sampled(nullptr, false))
+WEAK_STUB(HttpSpanDisableLocalDecision,
+          envoy_dynamic_module_callback_http_span_disable_local_decision(nullptr))
 WEAK_STUB(HttpSpanGetBaggage,
           envoy_dynamic_module_callback_http_span_get_baggage(nullptr, {nullptr, 0}, nullptr))
 WEAK_STUB(HttpSpanSetBaggage,

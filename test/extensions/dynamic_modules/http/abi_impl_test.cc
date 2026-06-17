@@ -2993,6 +2993,18 @@ TEST_F(DynamicModuleHttpFilterTest, SpanSetSampled) {
   envoy_dynamic_module_callback_http_span_set_sampled(span, true);
 }
 
+TEST_F(DynamicModuleHttpFilterTest, SpanDisableLocalDecision) {
+  NiceMock<Tracing::MockSpan> mock_span;
+  EXPECT_CALL(decoder_callbacks_, activeSpan()).WillOnce(testing::ReturnRef(mock_span));
+
+  EXPECT_CALL(mock_span, disableLocalDecision());
+
+  auto* span = envoy_dynamic_module_callback_http_get_active_span(filter_.get());
+  ASSERT_NE(span, nullptr);
+
+  envoy_dynamic_module_callback_http_span_disable_local_decision(span);
+}
+
 TEST_F(DynamicModuleHttpFilterTest, SpanGetBaggage) {
   NiceMock<Tracing::MockSpan> mock_span;
   EXPECT_CALL(decoder_callbacks_, activeSpan()).WillOnce(testing::ReturnRef(mock_span));
@@ -3135,6 +3147,7 @@ TEST_F(DynamicModuleHttpFilterTest, TracingCallbacksWithNullSpan) {
   envoy_dynamic_module_callback_http_span_set_operation(nullptr, {key.data(), key.size()});
   envoy_dynamic_module_callback_http_span_log(nullptr, nullptr, {key.data(), key.size()});
   envoy_dynamic_module_callback_http_span_set_sampled(nullptr, true);
+  envoy_dynamic_module_callback_http_span_disable_local_decision(nullptr);
   envoy_dynamic_module_callback_http_span_set_baggage(nullptr, {key.data(), key.size()},
                                                       {value.data(), value.size()});
   EXPECT_FALSE(envoy_dynamic_module_callback_http_span_get_baggage(
