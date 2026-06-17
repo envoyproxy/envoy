@@ -2288,7 +2288,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_choose_host(
     let context = if context_envoy_ptr.is_null() {
       None
     } else {
-      Some(ClusterLbContextRef::new(context_envoy_ptr, wrapper.lb_envoy_ptr))
+      Some(ClusterLbContextRef::new(
+        context_envoy_ptr,
+        wrapper.lb_envoy_ptr,
+      ))
     };
 
     let async_completion = Box::new(EnvoyAsyncHostSelectionCompleteImpl {

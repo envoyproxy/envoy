@@ -5562,9 +5562,12 @@ fn test_async_host_selection_request_context() {
   // On resume the module reads the re-presented context. Its accessors route through the
   // link-time stubs, which report no hash / zero headers for the sentinel pointer.
   let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
-  mock_completion
-    .expect_request_context()
-    .returning(|| Some(cluster::ClusterLbContextRef::new(0x1 as *mut _, std::ptr::null_mut())));
+  mock_completion.expect_request_context().returning(|| {
+    Some(cluster::ClusterLbContextRef::new(
+      0x1 as *mut _,
+      std::ptr::null_mut(),
+    ))
+  });
 
   let ctx = mock_completion
     .request_context()
