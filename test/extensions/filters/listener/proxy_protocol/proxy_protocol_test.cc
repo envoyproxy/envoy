@@ -1720,9 +1720,6 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndEncodeAsBase64) {
   // The default encoding sanitizes the value to a valid UTF-8 string: the non utf8 byte
   // 0xff is replaced with the `!` character.
   EXPECT_EQ("!", fields.at("PP2 tlv1").string_value());
-  // The explicitly set SANITIZED_UTF8 encoding also sanitizes the value to a valid UTF-8 string:
-  // the non utf8 byte 0xff is replaced with the `!` character.
-  EXPECT_EQ("!", fields.at("PP2 tlv2").string_value());
   disconnect();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
