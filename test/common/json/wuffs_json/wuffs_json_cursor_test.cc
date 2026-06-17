@@ -8,6 +8,7 @@
 
 namespace Envoy {
 namespace Json {
+namespace Wuffs {
 namespace {
 
 // Capturing handler
@@ -593,5 +594,6 @@ TEST(WuffsJsonCursorTest, BuildPatternPathNestedMessages) {
 }
 
 } // namespace
+} // namespace Wuffs
 } // namespace Json
 } // namespace Envoy

@@ -14,6 +14,7 @@
 
 namespace Envoy {
 namespace Json {
+namespace Wuffs {
 
 // WuffsJsonCursor — streaming SAX-style JSON parser built on the Wuffs library
 // (https://github.com/google/wuffs).
@@ -346,5 +347,6 @@ private:
   size_t key_token_start_{0};
 };
 
+} // namespace Wuffs
 } // namespace Json
 } // namespace Envoy

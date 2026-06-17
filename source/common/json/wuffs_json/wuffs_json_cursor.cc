@@ -8,6 +8,7 @@
 
 namespace Envoy {
 namespace Json {
+namespace Wuffs {
 
 namespace {
 
@@ -425,5 +426,6 @@ std::string WuffsJsonCursor::buildPatternPath(int depth) const {
   return path;
 }
 
+} // namespace Wuffs
 } // namespace Json
 } // namespace Envoy
