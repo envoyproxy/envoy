@@ -114,14 +114,6 @@ public:
   virtual void setSampled(bool sampled) PURE;
 
   /**
-   * Override the sampling decision so the connection manager does not re-derive it after a route
-   * cache refresh. Implementations that use the Envoy local tracing decision should stop using it
-   * so the refresh leaves this decision intact. The default implementation delegates to setSampled.
-   * @param sampled whether the span and any subsequent child spans should be sampled
-   */
-  virtual void overrideSampled(bool sampled) { setSampled(sampled); }
-
-  /**
    * @return whether this span will be exported to the tracing backend. The HTTP connection
    * manager may skip finalize-time tag work for spans that return false, since those tags
    * would be discarded by the driver anyway.
@@ -147,6 +139,14 @@ public:
    * by the HTTP connection manager based on the new Envoy tracing decision.
    */
   virtual bool useLocalDecision() const PURE;
+
+  /**
+   * Stop using the Envoy local tracing decision for this span. After this is called the connection
+   * manager will not re-derive the sampling decision on a later route refresh, so a decision set
+   * via setSampled is kept. The default implementation is a no-op and is overridden by tracers that
+   * support this.
+   */
+  virtual void disableLocalDecision() {}
 
   /**
    * Retrieve a key's value from the span's baggage.

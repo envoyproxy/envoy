@@ -685,10 +685,10 @@ TEST_P(DynamicModuleHttpLanguageTests, SpanCallbacks) {
   EXPECT_CALL(span, setOperation("operation"));
   EXPECT_CALL(span, log(testing::_, "event"));
   EXPECT_CALL(span, setSampled(true));
-  // The override_sampled SDK wrapper is Rust-only, so scope this expectation to the rust
+  // The disable_local_decision SDK wrapper is Rust-only, so scope this expectation to the rust
   // parameterization like the other language guards in the dynamic_modules integration tests.
   if (GetParam() == "rust") {
-    EXPECT_CALL(span, overrideSampled(true));
+    EXPECT_CALL(span, disableLocalDecision());
   }
   EXPECT_CALL(span, getBaggage("key")).WillOnce(testing::Return(""));
   EXPECT_CALL(span, setBaggage("key", "value"));

@@ -1111,8 +1111,8 @@ TEST_F(OpenTelemetryDriverTest, UseLocalDecisionFalse) {
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
-// Overriding the sampling decision to false stops using the local decision and drops the span.
-TEST_F(OpenTelemetryDriverTest, OverrideSampledFalse) {
+// Disabling the local decision keeps a setSampled(false) decision and drops the span.
+TEST_F(OpenTelemetryDriverTest, DisableLocalDecisionWithSampledFalse) {
   setupValidDriver();
   Tracing::TestTraceContextImpl request_headers{
       {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
@@ -1123,8 +1123,9 @@ TEST_F(OpenTelemetryDriverTest, OverrideSampledFalse) {
   EXPECT_TRUE(span->useLocalDecision());
   EXPECT_TRUE(dynamic_cast<Span*>(span.get())->sampled());
 
-  span->overrideSampled(false);
-  // The override stops using the local decision so a route refresh will not re-derive it.
+  span->setSampled(false);
+  span->disableLocalDecision();
+  // Disabling the local decision stops the connection manager from re-deriving the decision.
   EXPECT_FALSE(span->useLocalDecision());
   EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
 
@@ -1134,8 +1135,8 @@ TEST_F(OpenTelemetryDriverTest, OverrideSampledFalse) {
   EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
-// Overriding the sampling decision to true stops using the local decision and keeps the span.
-TEST_F(OpenTelemetryDriverTest, OverrideSampledTrue) {
+// Disabling the local decision keeps a setSampled(true) decision and keeps the span.
+TEST_F(OpenTelemetryDriverTest, DisableLocalDecisionWithSampledTrue) {
   setupValidDriver();
   Tracing::TestTraceContextImpl request_headers{
       {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
@@ -1147,7 +1148,8 @@ TEST_F(OpenTelemetryDriverTest, OverrideSampledTrue) {
   EXPECT_TRUE(span->useLocalDecision());
   EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
 
-  span->overrideSampled(true);
+  span->setSampled(true);
+  span->disableLocalDecision();
   EXPECT_FALSE(span->useLocalDecision());
   EXPECT_TRUE(dynamic_cast<Span*>(span.get())->sampled());
 

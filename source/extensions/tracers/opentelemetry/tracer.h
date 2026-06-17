@@ -104,17 +104,11 @@ public:
   void setSampled(bool sampled) override { sampled_ = sampled; };
 
   /**
-   * Stop using the local decision so the connection manager does not re-derive it on refresh.
-   */
-  void overrideSampled(bool sampled) override {
-    setSampled(sampled);
-    use_local_decision_ = false;
-  }
-
-  /**
    * @return whether the local tracing decision is used by the span.
    */
   bool useLocalDecision() const override { return use_local_decision_; }
+
+  void disableLocalDecision() override { use_local_decision_ = false; }
 
   /**
    * @return whether the span will be exported to the OTLP backend.

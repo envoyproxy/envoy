@@ -2395,13 +2395,13 @@ void envoy_dynamic_module_callback_http_span_set_sampled(
   span->setSampled(sampled);
 }
 
-void envoy_dynamic_module_callback_http_span_override_sampled(
-    envoy_dynamic_module_type_span_envoy_ptr span_ptr, bool sampled) {
+void envoy_dynamic_module_callback_http_span_disable_local_decision(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr) {
   if (span_ptr == nullptr) {
     return;
   }
   auto* span = static_cast<Tracing::Span*>(span_ptr);
-  span->overrideSampled(sampled);
+  span->disableLocalDecision();
 }
 
 // Thread-local storage for temporary strings returned by tracing functions.
