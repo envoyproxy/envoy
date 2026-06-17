@@ -832,6 +832,13 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   for (auto* callback : upstream_callbacks_) {
     callback->onUpstreamConnectionEstablished();
   }
+
+  // Drive an armed upload splice now that the upstream connection is ready. This keeps engage
+  // event-driven instead of polling for the connection during establishment.
+  if (splice_coordinator_ != nullptr && splice_coordinator_->armedForRequest() &&
+      !splice_coordinator_->engaged()) {
+    splice_coordinator_->scheduleEngage();
+  }
 }
 
 UpstreamToDownstream& UpstreamRequest::upstreamToDownstream() { return *upstream_interface_; }

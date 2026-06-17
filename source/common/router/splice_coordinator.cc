@@ -2,7 +2,6 @@
 
 #include "envoy/http/header_map.h"
 #include "envoy/network/address.h"
-#include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/router/router.h"
@@ -10,7 +9,6 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/numbers.h"
-#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Router {
@@ -162,7 +160,7 @@ void SpliceCoordinator::disarm() {
 
 void SpliceCoordinator::abandon() {
   // Held bytes must precede resumed reads on the wire.
-  incSpliceCounter("abandoned");
+  incSpliceCounter(SpliceCounter::Abandoned);
   flushPreEngageBody();
   maybeReadEnableSource();
   disarm();
@@ -194,13 +192,27 @@ void SpliceCoordinator::armProgressWatchdog() {
   progress_watchdog_->enableTimer(ProgressWatchdogTimeout);
 }
 
-void SpliceCoordinator::incSpliceCounter(absl::string_view event) {
+void SpliceCoordinator::incSpliceCounter(SpliceCounter counter) {
   // Count once per splice decision, never per byte.
   const Upstream::ClusterInfoConstSharedPtr cluster = upstream_request_.parent_.cluster();
   if (cluster == nullptr) {
     return;
   }
-  cluster->statsScope().counterFromString(absl::StrCat("http1_ktls_splice.", event)).inc();
+  auto& stats = cluster->trafficStats();
+  switch (counter) {
+  case SpliceCounter::Engaged:
+    stats->http1_ktls_splice_engaged_.inc();
+    return;
+  case SpliceCounter::Abandoned:
+    stats->http1_ktls_splice_abandoned_.inc();
+    return;
+  case SpliceCounter::Completed:
+    stats->http1_ktls_splice_completed_.inc();
+    return;
+  case SpliceCounter::Truncated:
+    stats->http1_ktls_splice_truncated_.inc();
+    return;
+  }
 }
 
 void SpliceCoordinator::maybeReadEnableSource() {
@@ -230,7 +242,7 @@ void SpliceCoordinator::rescheduleEngage() {
     engage_poll_timer_ =
         upstream_request_.parent_.callbacks()->dispatcher().createTimer([this]() { engage(); });
   }
-  // Space the poll across connect, handshake, and kTLS-TX install I/O.
+  // Poll the brief upstream kTLS-TX install window after the connection is ready.
   engage_poll_timer_->enableTimer(std::chrono::milliseconds(2));
 }
 
@@ -260,7 +272,7 @@ void SpliceCoordinator::engage() {
         abandon();
         return;
       }
-      rescheduleEngage(); // Upstream pool not ready yet.
+      // Pool not ready yet. onPoolReady drives engage once connected, so wait without polling.
       return;
     }
     OptRef<const Network::KtlsBytestreamInfo> ktls = upstream->ktlsBytestreamInfo();
@@ -321,20 +333,20 @@ void SpliceCoordinator::engage() {
     return;
   }
 
-  // Preserve wire order by emitting headers and held body before the spliced remainder.
-  std::string pre_engage = sink.extractPendingWriteForSplice();
-  const size_t pending_size = pre_engage.size();
-  pre_engage.resize(pending_size + buffered);
-  pre_engage_body_.copyOut(0, buffered, pre_engage.data() + pending_size);
-  pre_engage_body_.drain(buffered);
+  // Preserve wire order by emitting headers and held body before the spliced remainder. Both moves
+  // are zero-copy, so the held body (up to the buffered bound) is never copied on the engage path.
+  Buffer::OwnedImpl pre_engage;
+  sink.extractPendingWriteForSplice(pre_engage);
+  pre_engage.move(pre_engage_body_);
   // The sink write buffer is now drained, so the splice is committed.
-  incSpliceCounter("engaged");
+  incSpliceCounter(SpliceCounter::Engaged);
   // prepare() can fail only after bytes were drained, so failure resets the stream.
-  const bool ok = download ? pump->prepare(std::move(pre_engage), /*initial_d2u=*/"")
-                           : pump->prepare(/*initial_u2d=*/"", std::move(pre_engage));
+  Buffer::OwnedImpl no_initial;
+  const bool ok =
+      download ? pump->prepare(pre_engage, no_initial) : pump->prepare(no_initial, pre_engage);
   if (!ok) {
     // Pending output was already drained, so this is a reset, not a fallback.
-    incSpliceCounter("truncated");
+    incSpliceCounter(SpliceCounter::Truncated);
     ENVOY_LOG(warn, "kTLS body-splice setup failed after taking pending output, resetting");
     upstream_request_.onResetStream(Http::StreamResetReason::ConnectionTermination,
                                     "kTLS body-splice setup failed");
@@ -406,7 +418,7 @@ void SpliceCoordinator::finalize() {
 
   if (completion_status_ != TcpProxy::SpliceCompletion::BoundsReached) {
     // A truncated splice cannot recover because part of the body may have reached the sink.
-    incSpliceCounter("truncated");
+    incSpliceCounter(SpliceCounter::Truncated);
     ENVOY_LOG(debug, "kTLS body-splice aborted before the Content-Length boundary, resetting");
     maybeReadEnableSource();
     // The upstream NoFlush close cascades into downstream file-event code. Reinstall the download
@@ -422,7 +434,7 @@ void SpliceCoordinator::finalize() {
   }
 
   // Count before completeSpliced* can delete this coordinator.
-  incSpliceCounter("completed");
+  incSpliceCounter(SpliceCounter::Completed);
 
   // The sink codec did not see the body, so account its full Content-Length here.
   StreamInfo::StreamInfo& downstream_info = upstream_request_.parent_.callbacks()->streamInfo();
@@ -481,8 +493,9 @@ void SpliceCoordinator::reset() {
   // reset() runs from UpstreamRequest teardown, not from inside a pump callback.
   if (splice_pump_ != nullptr) {
     // Count an in-flight splice once when teardown beats finalize().
-    incSpliceCounter(completion_status_ == TcpProxy::SpliceCompletion::BoundsReached ? "completed"
-                                                                                     : "truncated");
+    incSpliceCounter(completion_status_ == TcpProxy::SpliceCompletion::BoundsReached
+                         ? SpliceCounter::Completed
+                         : SpliceCounter::Truncated);
   }
   splice_pump_.reset();
   maybeReadEnableSource();

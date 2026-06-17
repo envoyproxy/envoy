@@ -730,6 +730,10 @@ public:
  */
 #define ALL_CLUSTER_TRAFFIC_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)               \
   COUNTER(bind_errors)                                                                             \
+  COUNTER(http1_ktls_splice_abandoned)                                                             \
+  COUNTER(http1_ktls_splice_completed)                                                             \
+  COUNTER(http1_ktls_splice_engaged)                                                               \
+  COUNTER(http1_ktls_splice_truncated)                                                             \
   COUNTER(original_dst_host_invalid)                                                               \
   COUNTER(retry_or_shadow_abandoned)                                                               \
   COUNTER(upstream_cx_close_notify)                                                                \

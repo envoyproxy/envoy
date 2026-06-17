@@ -115,15 +115,13 @@ void ConnectionImpl::initializeReadWriteFileEvent() {
       trigger, Event::FileReadyType::Read | Event::FileReadyType::Write);
 }
 
-std::string ConnectionImpl::extractPendingWriteForSplice() {
+void ConnectionImpl::extractPendingWriteForSplice(Buffer::Instance& dst) {
   // Hand the kTLS body-splice the bytes already accepted for write but not yet flushed, so the pump
-  // emits them before the spliced body. Detaching them from the write buffer is safe because the
+  // emits them before the spliced body. Moving them out of the write buffer is safe because the
   // splice now drives this socket's output and re-arms the connection when it completes. The splice
   // calls this with only the (small) response headers buffered, well below the high watermark, so
   // the drain does not cross the low watermark or fire a watermark callback.
-  std::string pending = write_buffer_->toString();
-  write_buffer_->drain(write_buffer_->length());
-  return pending;
+  dst.move(*write_buffer_);
 }
 
 void ConnectionImpl::reinstallFileEvents() {

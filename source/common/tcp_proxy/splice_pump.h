@@ -9,6 +9,7 @@
 #include "envoy/event/file_event.h"
 #include "envoy/network/connection.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 
 #include "absl/types/optional.h"
@@ -60,8 +61,9 @@ public:
 
   // Creates only the requested pipe directions before callers do irreversible work.
   virtual bool createPipes(bool need_u2d, bool need_d2u);
-  // Queues pre-engage chunks before callers detach ConnectionImpl FileEvents.
-  virtual bool prepare(std::string initial_u2d, std::string initial_d2u);
+  // Queues pre-engage chunks before callers detach ConnectionImpl FileEvents. The chunks are moved
+  // out of the caller's buffers (zero-copy), so they are left empty on return.
+  virtual bool prepare(Buffer::Instance& initial_u2d, Buffer::Instance& initial_d2u);
   // Switches the pump into bounded mode for exact Content-Length bodies.
   virtual void setBounds(absl::optional<uint64_t> u2d_limit, absl::optional<uint64_t> d2u_limit);
   // Installs the pump's FileEvents after callers detach ConnectionImpl FileEvents.
@@ -85,6 +87,10 @@ private:
   void maybeHalfCloseOrComplete();
   void complete(SpliceCompletion status);
 
+  // The state below is only used by the Linux splice()/kTLS fast path; the non-Linux build compiles
+  // stub methods that never touch it. Guarding it keeps that build free of unused-private-field
+  // errors.
+#if defined(__linux__)
   const os_fd_t down_fd_;
   const os_fd_t up_fd_;
   const bool up_is_ktls_;
@@ -107,11 +113,9 @@ private:
   Event::FileEventPtr down_file_event_;
 
   // Pre-engage upstream chunk waiting for downstream socket space.
-  std::string pending_down_;
-  size_t pending_down_off_{0};
+  Buffer::OwnedImpl pending_down_;
   // Pre-engage downstream chunk waiting for upstream socket space.
-  std::string pending_up_;
-  size_t pending_up_off_{0};
+  Buffer::OwnedImpl pending_up_;
 
   // Readiness latches set by FileEvents and cleared on EAGAIN.
   bool up_readable_{false};
@@ -128,6 +132,7 @@ private:
   // Set when the FileEvent reports Closed.
   bool down_closed_{false};
   bool up_closed_{false};
+#endif
 };
 
 using SplicePumpPtr = std::unique_ptr<SplicePump>;

@@ -317,9 +317,10 @@ public:
   virtual void reinstallFileEvents() {}
 
   /**
-   * Drains pending write-buffer bytes so body-splice can emit them before the spliced body.
+   * Moves pending write-buffer bytes into `dst` so body-splice can emit them before the spliced
+   * body. Defaults to a no-op.
    */
-  virtual std::string extractPendingWriteForSplice() { return {}; }
+  virtual void extractPendingWriteForSplice(Buffer::Instance&) {}
 
   /**
    * @return requested server name (e.g. SNI in TLS), if any.

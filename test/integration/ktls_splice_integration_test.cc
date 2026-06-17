@@ -183,10 +183,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, KtlsSpliceIntegrationTest,
 TEST_P(KtlsSpliceIntegrationTest, DownloadAboveThresholdEngagesSplice) {
   initializeWithFakeKtlsUpstream();
   auto response = runDownload(128 * 1024);
-  test_server_->waitForCounter("cluster.cluster_0.http1_ktls_splice.engaged", testing::Ge(1));
-  test_server_->waitForCounter("cluster.cluster_0.http1_ktls_splice.completed", testing::Ge(1));
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http1_ktls_splice.engaged")->value());
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http1_ktls_splice.completed")->value());
+  test_server_->waitForCounter("cluster.cluster_0.http1_ktls_splice_engaged", testing::Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.http1_ktls_splice_completed", testing::Ge(1));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http1_ktls_splice_engaged")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http1_ktls_splice_completed")->value());
 }
 
 // Below-threshold bodies use the buffered path and do not engage the splice.
@@ -194,7 +194,7 @@ TEST_P(KtlsSpliceIntegrationTest, DownloadBelowThresholdDoesNotEngage) {
   initializeWithFakeKtlsUpstream();
   auto response = runDownload(MinSpliceBodyBytes - 1);
   const Stats::CounterSharedPtr engaged =
-      test_server_->counter("cluster.cluster_0.http1_ktls_splice.engaged");
+      test_server_->counter("cluster.cluster_0.http1_ktls_splice_engaged");
   EXPECT_EQ(0, engaged == nullptr ? 0 : engaged->value());
 }
 
@@ -206,17 +206,23 @@ TEST_P(KtlsSpliceIntegrationTest, DownloadBelowThresholdDoesNotEngage) {
 TEST_P(KtlsSpliceIntegrationTest, UploadAboveThresholdEngagesSplice) {
   initializeWithFakeKtlsUpstream();
   auto response = runUpload(128 * 1024);
-  test_server_->waitForCounter("cluster.cluster_0.http1_ktls_splice.engaged", testing::Ge(1));
-  test_server_->waitForCounter("cluster.cluster_0.http1_ktls_splice.completed", testing::Ge(1));
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http1_ktls_splice.engaged")->value());
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http1_ktls_splice.completed")->value());
+  test_server_->waitForCounter("cluster.cluster_0.http1_ktls_splice_engaged", testing::Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.http1_ktls_splice_completed", testing::Ge(1));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http1_ktls_splice_engaged")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http1_ktls_splice_completed")->value());
   // A clean upload completes rather than truncates.
   const Stats::CounterSharedPtr truncated =
-      test_server_->counter("cluster.cluster_0.http1_ktls_splice.truncated");
+      test_server_->counter("cluster.cluster_0.http1_ktls_splice_truncated");
   EXPECT_EQ(0, truncated == nullptr ? 0 : truncated->value());
 }
 
-TEST_P(KtlsSpliceIntegrationTest, UploadFullyBufferedBeforeEngageAbandons) {
+// An eligible upload sent with its body inline. Whether the coordinator abandons the splice (the
+// body is fully buffered before engage) or engages it (the body is still arriving) depends on how
+// the request is segmented on the wire relative to the upstream connection, so it is not
+// deterministic at the integration level; splice_coordinator_test covers both decisions directly.
+// Either way the body must reach the upstream byte-for-byte, the armed splice must resolve exactly
+// once, and a clean upload must never truncate.
+TEST_P(KtlsSpliceIntegrationTest, UploadInlineBodyRelayedIntact) {
   initializeWithFakeKtlsUpstream();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const std::string body = makeBody(128 * 1024);
@@ -234,10 +240,19 @@ TEST_P(KtlsSpliceIntegrationTest, UploadFullyBufferedBeforeEngageAbandons) {
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
-  test_server_->waitForCounter("cluster.cluster_0.http1_ktls_splice.abandoned", testing::Ge(1));
-  const Stats::CounterSharedPtr engaged =
-      test_server_->counter("cluster.cluster_0.http1_ktls_splice.engaged");
-  EXPECT_EQ(0, engaged == nullptr ? 0 : engaged->value());
+
+  // The counters are incremented on the worker thread before the response completes above, so they
+  // are settled here. Exactly one of abandon or engage fires for the armed splice, and a clean
+  // upload never truncates.
+  const auto splice_counter = [this](absl::string_view name) -> uint64_t {
+    const Stats::CounterSharedPtr counter =
+        test_server_->counter(absl::StrCat("cluster.cluster_0.", name));
+    return counter == nullptr ? 0 : counter->value();
+  };
+  EXPECT_GE(splice_counter("http1_ktls_splice_abandoned") +
+                splice_counter("http1_ktls_splice_engaged"),
+            1);
+  EXPECT_EQ(0, splice_counter("http1_ktls_splice_truncated"));
 }
 
 // Engaged download truncation force-closes upstream after reinstalling the downstream sink, so
@@ -260,7 +275,7 @@ TEST_P(KtlsSpliceIntegrationTest, EngagedDownloadTruncationDoesNotCrash) {
   response->waitForHeaders();
 
   // Confirm engagement before forcing truncation.
-  test_server_->waitForCounter("cluster.cluster_0.http1_ktls_splice.engaged", testing::Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.http1_ktls_splice_engaged", testing::Ge(1));
 
   // Send strictly fewer bytes than the advertised Content-Length (end_stream=false), then close the
   // upstream connection so the body is cut mid-transfer. The pump sees EOF before the bound.
@@ -276,12 +291,12 @@ TEST_P(KtlsSpliceIntegrationTest, EngagedDownloadTruncationDoesNotCrash) {
   EXPECT_FALSE(response->complete());
 
   // Mid-body close counts as truncated after engagement.
-  test_server_->waitForCounter("cluster.cluster_0.http1_ktls_splice.truncated", testing::Ge(1));
-  EXPECT_GE(test_server_->counter("cluster.cluster_0.http1_ktls_splice.engaged")->value(), 1);
+  test_server_->waitForCounter("cluster.cluster_0.http1_ktls_splice_truncated", testing::Ge(1));
+  EXPECT_GE(test_server_->counter("cluster.cluster_0.http1_ktls_splice_engaged")->value(), 1);
   EXPECT_EQ(0,
-            test_server_->counter("cluster.cluster_0.http1_ktls_splice.completed") == nullptr
+            test_server_->counter("cluster.cluster_0.http1_ktls_splice_completed") == nullptr
                 ? 0
-                : test_server_->counter("cluster.cluster_0.http1_ktls_splice.completed")->value());
+                : test_server_->counter("cluster.cluster_0.http1_ktls_splice_completed")->value());
 }
 
 TEST_P(KtlsSpliceIntegrationTest, EngagedUploadTruncationDoesNotCrash) {
@@ -299,18 +314,18 @@ TEST_P(KtlsSpliceIntegrationTest, EngagedUploadTruncationDoesNotCrash) {
                  "no upstream connection");
   RELEASE_ASSERT(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_),
                  "no upstream stream");
-  test_server_->waitForCounter("cluster.cluster_0.http1_ktls_splice.engaged", testing::Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.http1_ktls_splice_engaged", testing::Ge(1));
 
   codec_client_->sendData(encoder, makeBody(64 * 1024), false);
   codec_client_->close();
 
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  test_server_->waitForCounter("cluster.cluster_0.http1_ktls_splice.truncated", testing::Ge(1));
-  EXPECT_GE(test_server_->counter("cluster.cluster_0.http1_ktls_splice.engaged")->value(), 1);
+  test_server_->waitForCounter("cluster.cluster_0.http1_ktls_splice_truncated", testing::Ge(1));
+  EXPECT_GE(test_server_->counter("cluster.cluster_0.http1_ktls_splice_engaged")->value(), 1);
   EXPECT_EQ(0,
-            test_server_->counter("cluster.cluster_0.http1_ktls_splice.completed") == nullptr
+            test_server_->counter("cluster.cluster_0.http1_ktls_splice_completed") == nullptr
                 ? 0
-                : test_server_->counter("cluster.cluster_0.http1_ktls_splice.completed")->value());
+                : test_server_->counter("cluster.cluster_0.http1_ktls_splice_completed")->value());
 }
 
 } // namespace

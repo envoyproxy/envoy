@@ -415,7 +415,9 @@ TEST_P(ConnectionImplTest, SpliceExtractWriteBufferAndReinstallFileEvents) {
   // Buffer output on the client, then take it for the splice. The connection no longer sends it.
   Buffer::OwnedImpl prefix("extracted-prefix");
   client_connection_->write(prefix, false);
-  EXPECT_EQ("extracted-prefix", client_connection_->extractPendingWriteForSplice());
+  Buffer::OwnedImpl extracted;
+  client_connection_->extractPendingWriteForSplice(extracted);
+  EXPECT_EQ("extracted-prefix", extracted.toString());
 
   // Detach the server's file event the way the splice does, then re-arm it.
   server_connection_->getSocket()->ioHandle().resetFileEvents();

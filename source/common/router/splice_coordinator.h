@@ -16,8 +16,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/tcp_proxy/splice_pump.h"
 
-#include "absl/strings/string_view.h"
-
 namespace Envoy {
 namespace Router {
 
@@ -96,8 +94,9 @@ private:
   // Refreshes liveness timers after byte movement.
   void onSpliceProgress();
   void armProgressWatchdog();
-  // Increments the per-cluster splice lifecycle counter.
-  void incSpliceCounter(absl::string_view event);
+  // Per-cluster splice lifecycle counters.
+  enum class SpliceCounter { Engaged, Abandoned, Completed, Truncated };
+  void incSpliceCounter(SpliceCounter counter);
 
   UpstreamRequest& upstream_request_;
   Event::SchedulableCallbackPtr engage_callback_;

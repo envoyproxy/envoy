@@ -100,7 +100,7 @@ public:
     return transport_socket_->ktlsBytestreamInfo();
   }
   void reinstallFileEvents() override;
-  std::string extractPendingWriteForSplice() override;
+  void extractPendingWriteForSplice(Buffer::Instance& dst) override;
   State state() const override;
   bool connecting() const override {
     ENVOY_CONN_LOG_EVENT(debug, "connection_connecting_state", "current connecting state: {}",

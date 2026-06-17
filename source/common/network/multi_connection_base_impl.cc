@@ -220,8 +220,8 @@ OptRef<const KtlsBytestreamInfo> MultiConnectionBaseImpl::ktlsBytestreamInfo() c
 // bounded splice completes.
 void MultiConnectionBaseImpl::reinstallFileEvents() { connections_[0]->reinstallFileEvents(); }
 
-std::string MultiConnectionBaseImpl::extractPendingWriteForSplice() {
-  return connections_[0]->extractPendingWriteForSplice();
+void MultiConnectionBaseImpl::extractPendingWriteForSplice(Buffer::Instance& dst) {
+  connections_[0]->extractPendingWriteForSplice(dst);
 }
 
 Connection::State MultiConnectionBaseImpl::state() const {

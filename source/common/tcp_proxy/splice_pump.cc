@@ -9,6 +9,8 @@
 // forward-declares. The full struct lives here.
 #include "envoy/network/transport_socket.h"
 
+#include "source/common/common/utility.h"
+
 #if defined(__linux__)
 #include <fcntl.h>
 #include <linux/tls.h>
@@ -86,6 +88,19 @@ constexpr size_t kFallbackPipeCapacity = 64 * 1024;
 constexpr int kMaxControlRecordsPerPass = 1024;
 // TLS 1.3 max record, 16384 plaintext plus AEAD and header overhead.
 constexpr size_t kMaxTlsRecordSize = 16640;
+
+// writev a buffer's leading slices to a raw fd, returning the writev() result. The caller loops
+// until the buffer drains, so capping the slice count per call is fine.
+ssize_t writeBufferToFd(os_fd_t fd, Buffer::Instance& buf) {
+  constexpr uint64_t kMaxSlices = 16;
+  const Buffer::RawSliceVector slices = buf.getRawSlices(kMaxSlices);
+  iovec iov[kMaxSlices];
+  for (size_t i = 0; i < slices.size(); i++) {
+    iov[i].iov_base = slices[i].mem_;
+    iov[i].iov_len = slices[i].len_;
+  }
+  return ::writev(fd, iov, static_cast<int>(slices.size()));
+}
 } // namespace
 
 SplicePump::SplicePump(os_fd_t down_fd, os_fd_t up_fd, bool up_is_ktls,
@@ -109,7 +124,7 @@ bool SplicePump::createPipes(bool need_u2d, bool need_d2u) {
   if (need_u2d && u2d_.read_fd < 0) {
     int u2d[2];
     if (::pipe2(u2d, O_NONBLOCK | O_CLOEXEC) != 0) {
-      ENVOY_LOG(warn, "splice pump u2d pipe2 failed, {}", std::strerror(errno));
+      ENVOY_LOG(warn, "splice pump u2d pipe2 failed, {}", errorDetails(errno));
       return false;
     }
     u2d_.read_fd = u2d[0];
@@ -118,7 +133,7 @@ bool SplicePump::createPipes(bool need_u2d, bool need_d2u) {
   if (need_d2u && d2u_.read_fd < 0) {
     int d2u[2];
     if (::pipe2(d2u, O_NONBLOCK | O_CLOEXEC) != 0) {
-      ENVOY_LOG(warn, "splice pump d2u pipe2 failed, {}", std::strerror(errno));
+      ENVOY_LOG(warn, "splice pump d2u pipe2 failed, {}", errorDetails(errno));
       return false;
     }
     d2u_.read_fd = d2u[0];
@@ -127,7 +142,7 @@ bool SplicePump::createPipes(bool need_u2d, bool need_d2u) {
   return true;
 }
 
-bool SplicePump::prepare(std::string initial_u2d, std::string initial_d2u) {
+bool SplicePump::prepare(Buffer::Instance& initial_u2d, Buffer::Instance& initial_d2u) {
   // Lazily create both pipes for callers that did not pre-create them.
   if (u2d_.read_fd < 0 && d2u_.read_fd < 0) {
     if (!createPipes(/*need_u2d=*/true, /*need_d2u=*/true)) {
@@ -136,55 +151,52 @@ bool SplicePump::prepare(std::string initial_u2d, std::string initial_d2u) {
   }
 
   // Write the pre-engage upstream chunk before any spliced upstream-to-downstream bytes.
-  if (!initial_u2d.empty()) {
-    size_t off = 0;
-    while (off < initial_u2d.size()) {
-      const ssize_t w = ::write(down_fd_, initial_u2d.data() + off, initial_u2d.size() - off);
+  if (initial_u2d.length() > 0) {
+    bool delivered = false;
+    while (initial_u2d.length() > 0) {
+      const ssize_t w = writeBufferToFd(down_fd_, initial_u2d);
       if (w > 0) {
-        off += static_cast<size_t>(w);
+        initial_u2d.drain(static_cast<size_t>(w));
         on_u2d_bytes_(static_cast<uint64_t>(w));
+        delivered = true;
       } else if (w < 0 && errno == EINTR) {
         continue;
       } else if (w < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
         break; // Socket full, stash the rest below.
       } else {
-        ENVOY_LOG(warn, "splice pump initial downstream write error, {}", std::strerror(errno));
-        if (off == 0) {
+        ENVOY_LOG(warn, "splice pump initial downstream write error, {}", errorDetails(errno));
+        if (!delivered) {
           return false; // Nothing delivered yet.
         }
         break; // Some bytes already delivered.
       }
     }
-    if (off < initial_u2d.size()) {
-      pending_down_ = std::move(initial_u2d);
-      pending_down_off_ = off;
-    }
+    // Move the unwritten remainder (empty when fully flushed) for pump() to drain.
+    pending_down_.move(initial_u2d);
   }
 
   // Write the pre-engage downstream chunk before any spliced downstream-to-upstream bytes.
-  if (!initial_d2u.empty()) {
-    size_t off = 0;
-    while (off < initial_d2u.size()) {
-      const ssize_t w = ::write(up_fd_, initial_d2u.data() + off, initial_d2u.size() - off);
+  if (initial_d2u.length() > 0) {
+    bool delivered = false;
+    while (initial_d2u.length() > 0) {
+      const ssize_t w = writeBufferToFd(up_fd_, initial_d2u);
       if (w > 0) {
-        off += static_cast<size_t>(w);
+        initial_d2u.drain(static_cast<size_t>(w));
         on_d2u_bytes_(static_cast<uint64_t>(w));
+        delivered = true;
       } else if (w < 0 && errno == EINTR) {
         continue;
       } else if (w < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
         break; // Socket full, stash the rest below.
       } else {
-        ENVOY_LOG(warn, "splice pump initial upstream write error, {}", std::strerror(errno));
-        if (off == 0) {
+        ENVOY_LOG(warn, "splice pump initial upstream write error, {}", errorDetails(errno));
+        if (!delivered) {
           return false; // Nothing delivered yet.
         }
         break;
       }
     }
-    if (off < initial_d2u.size()) {
-      pending_up_ = std::move(initial_d2u);
-      pending_up_off_ = off;
-    }
+    pending_up_.move(initial_d2u);
   }
   return true;
 }
@@ -223,7 +235,7 @@ void SplicePump::arm() {
   // Assume ready at arm and let EAGAIN clear the latches.
   up_readable_ = up_writable_ = down_readable_ = down_writable_ = true;
   ENVOY_LOG(debug, "splice pump armed down_fd={} up_fd={} kTLS={} pending={}", down_fd_, up_fd_,
-            up_is_ktls_, pending_down_.size() - pending_down_off_);
+            up_is_ktls_, pending_down_.length());
   pump();
 }
 
@@ -287,11 +299,10 @@ void SplicePump::pump() {
     const unsigned d2u_out_flags = base_flags | (d2u_more_expected ? SPLICE_F_MORE : 0u);
 
     // Flush pre-engage upstream bytes before spliced upstream-to-downstream bytes.
-    while (down_writable_ && pending_down_off_ < pending_down_.size()) {
-      const ssize_t w = ::write(down_fd_, pending_down_.data() + pending_down_off_,
-                                pending_down_.size() - pending_down_off_);
+    while (down_writable_ && pending_down_.length() > 0) {
+      const ssize_t w = writeBufferToFd(down_fd_, pending_down_);
       if (w > 0) {
-        pending_down_off_ += static_cast<size_t>(w);
+        pending_down_.drain(static_cast<size_t>(w));
         on_u2d_bytes_(static_cast<uint64_t>(w));
         progress = true;
       } else if (w == 0) {
@@ -309,7 +320,7 @@ void SplicePump::pump() {
     }
 
     // Drain upstream-to-downstream pipe after the pre-engage chunk.
-    while (down_writable_ && u2d_.in_pipe > 0 && pending_down_off_ >= pending_down_.size()) {
+    while (down_writable_ && u2d_.in_pipe > 0 && pending_down_.length() == 0) {
       const ssize_t n =
           ::splice(u2d_.read_fd, nullptr, down_fd_, nullptr, u2d_.in_pipe, u2d_out_flags);
       if (n > 0) {
@@ -325,7 +336,7 @@ void SplicePump::pump() {
       } else if (errno == EINTR) {
         continue;
       } else {
-        ENVOY_LOG(debug, "splice pump u2d downstream write error, {}", std::strerror(errno));
+        ENVOY_LOG(debug, "splice pump u2d downstream write error, {}", errorDetails(errno));
         complete(SpliceCompletion::Closed);
         return;
       }
@@ -375,18 +386,17 @@ void SplicePump::pump() {
         }
         break; // Stop reading upstream but keep draining downstream-to-upstream bytes.
       } else {
-        ENVOY_LOG(debug, "splice pump u2d upstream read error, {}", std::strerror(errno));
+        ENVOY_LOG(debug, "splice pump u2d upstream read error, {}", errorDetails(errno));
         complete(SpliceCompletion::Closed);
         return;
       }
     }
 
     // Flush pre-engage downstream bytes before spliced downstream-to-upstream bytes.
-    while (up_writable_ && pending_up_off_ < pending_up_.size()) {
-      const ssize_t w = ::write(up_fd_, pending_up_.data() + pending_up_off_,
-                                pending_up_.size() - pending_up_off_);
+    while (up_writable_ && pending_up_.length() > 0) {
+      const ssize_t w = writeBufferToFd(up_fd_, pending_up_);
       if (w > 0) {
-        pending_up_off_ += static_cast<size_t>(w);
+        pending_up_.drain(static_cast<size_t>(w));
         on_d2u_bytes_(static_cast<uint64_t>(w));
         progress = true;
       } else if (w == 0) {
@@ -404,7 +414,7 @@ void SplicePump::pump() {
     }
 
     // Drain downstream-to-upstream pipe after the pre-engage chunk.
-    while (up_writable_ && d2u_.in_pipe > 0 && pending_up_off_ >= pending_up_.size()) {
+    while (up_writable_ && d2u_.in_pipe > 0 && pending_up_.length() == 0) {
       const ssize_t n =
           ::splice(d2u_.read_fd, nullptr, up_fd_, nullptr, d2u_.in_pipe, d2u_out_flags);
       if (n > 0) {
@@ -420,7 +430,7 @@ void SplicePump::pump() {
       } else if (errno == EINTR) {
         continue;
       } else {
-        ENVOY_LOG(debug, "splice pump d2u upstream write error, {}", std::strerror(errno));
+        ENVOY_LOG(debug, "splice pump d2u upstream write error, {}", errorDetails(errno));
         complete(SpliceCompletion::Closed);
         return;
       }
@@ -464,7 +474,7 @@ void SplicePump::pump() {
       } else if (errno == EINTR) {
         continue;
       } else {
-        ENVOY_LOG(debug, "splice pump d2u downstream read error, {}", std::strerror(errno));
+        ENVOY_LOG(debug, "splice pump d2u downstream read error, {}", errorDetails(errno));
         complete(SpliceCompletion::Closed);
         return;
       }
@@ -498,7 +508,7 @@ bool SplicePump::drainUpstreamControlMessage() {
       up_eagain_this_pass_ = true; // Authoritative upstream drain.
       return false;
     }
-    ENVOY_LOG(debug, "splice pump kTLS control recvmsg error, {}", std::strerror(errno));
+    ENVOY_LOG(debug, "splice pump kTLS control recvmsg error, {}", errorDetails(errno));
     complete(SpliceCompletion::Closed);
     return false;
   }
@@ -558,7 +568,8 @@ bool SplicePump::upstreamHasExtraneousData() {
 void SplicePump::sendUpstreamCloseNotify() {
   // Best-effort close_notify for strict kTLS peers.
   uint8_t alert[2] = {1, kTlsAlertCloseNotify}; // Warning level and close_notify.
-  alignas(struct cmsghdr) char cmsg_space[CMSG_SPACE(sizeof(uint8_t))];
+  // Zero-initialized so no uninitialized padding is handed to sendmsg.
+  alignas(struct cmsghdr) char cmsg_space[CMSG_SPACE(sizeof(uint8_t))] = {};
   struct iovec iov;
   iov.iov_base = alert;
   iov.iov_len = sizeof(alert);
@@ -581,7 +592,7 @@ void SplicePump::sendUpstreamCloseNotify() {
     rc = ::sendmsg(up_fd_, &msg, MSG_DONTWAIT);
   } while (rc < 0 && errno == EINTR);
   if (rc < 0) {
-    ENVOY_LOG(debug, "splice pump close_notify sendmsg failed, {}", std::strerror(errno));
+    ENVOY_LOG(debug, "splice pump close_notify sendmsg failed, {}", errorDetails(errno));
   }
 }
 
@@ -598,11 +609,11 @@ void SplicePump::maybeHalfCloseOrComplete() {
     }
     // A bounded direction is done once its budget and pending bytes are flushed.
     const bool u2d_done =
-        !u2d_limit_.has_value() || (u2d_read_ >= u2d_limit_.value() && u2d_.in_pipe == 0 &&
-                                    pending_down_off_ >= pending_down_.size());
+        !u2d_limit_.has_value() ||
+        (u2d_read_ >= u2d_limit_.value() && u2d_.in_pipe == 0 && pending_down_.length() == 0);
     const bool d2u_done =
-        !d2u_limit_.has_value() || (d2u_read_ >= d2u_limit_.value() && d2u_.in_pipe == 0 &&
-                                    pending_up_off_ >= pending_up_.size());
+        !d2u_limit_.has_value() ||
+        (d2u_read_ >= d2u_limit_.value() && d2u_.in_pipe == 0 && pending_up_.length() == 0);
     if (u2d_done && d2u_done) {
       // DATA past Content-Length would be smuggled onto the next pooled stream. kTLS control
       // records are benign and are drained by the next read.
@@ -615,10 +626,8 @@ void SplicePump::maybeHalfCloseOrComplete() {
     }
     return;
   }
-  const bool u2d_drained =
-      up_read_eof_ && u2d_.in_pipe == 0 && pending_down_off_ >= pending_down_.size();
-  const bool d2u_drained =
-      down_read_eof_ && d2u_.in_pipe == 0 && pending_up_off_ >= pending_up_.size();
+  const bool u2d_drained = up_read_eof_ && u2d_.in_pipe == 0 && pending_down_.length() == 0;
+  const bool d2u_drained = down_read_eof_ && d2u_.in_pipe == 0 && pending_up_.length() == 0;
   // Half-close downstream write after the upstream side drains.
   if (u2d_drained && !down_write_shutdown_) {
     ::shutdown(down_fd_, SHUT_WR);
@@ -636,15 +645,14 @@ void SplicePump::maybeHalfCloseOrComplete() {
     return;
   }
   // Once upstream is done, complete after any upload bytes finish draining.
-  if (u2d_drained && down_write_shutdown_ && d2u_.in_pipe == 0 &&
-      pending_up_off_ >= pending_up_.size()) {
+  if (u2d_drained && down_write_shutdown_ && d2u_.in_pipe == 0 && pending_up_.length() == 0) {
     complete(SpliceCompletion::Closed);
     return;
   }
   // Complete after client EOF only after this pass observes upstream EAGAIN. A stale readable latch
   // does not prove the RX buffer is empty.
   if (d2u_drained && up_write_shutdown_ && up_eagain_this_pass_ && u2d_.in_pipe == 0 &&
-      pending_down_off_ >= pending_down_.size()) {
+      pending_down_.length() == 0) {
     complete(SpliceCompletion::Closed);
   }
 }
@@ -668,17 +676,13 @@ void SplicePump::complete(SpliceCompletion status) {
 
 #else // !defined(__linux__)
 
-// kTLS and splice() are Linux-only.
-SplicePump::SplicePump(os_fd_t down_fd, os_fd_t up_fd, bool up_is_ktls,
-                       Event::Dispatcher& dispatcher, CompletionCb on_complete,
-                       BytesCb on_upstream_to_downstream, BytesCb on_downstream_to_upstream)
-    : down_fd_(down_fd), up_fd_(up_fd), up_is_ktls_(up_is_ktls), dispatcher_(dispatcher),
-      on_complete_(std::move(on_complete)), on_u2d_bytes_(std::move(on_upstream_to_downstream)),
-      on_d2u_bytes_(std::move(on_downstream_to_upstream)) {}
+// kTLS and splice() are Linux-only, so this build stores none of the pump state.
+SplicePump::SplicePump(os_fd_t, os_fd_t, bool, Event::Dispatcher&, CompletionCb, BytesCb, BytesCb) {
+}
 
 SplicePump::~SplicePump() = default;
 bool SplicePump::createPipes(bool, bool) { return false; }
-bool SplicePump::prepare(std::string, std::string) { return false; }
+bool SplicePump::prepare(Buffer::Instance&, Buffer::Instance&) { return false; }
 void SplicePump::setBounds(absl::optional<uint64_t>, absl::optional<uint64_t>) {}
 void SplicePump::arm() {}
 absl::Status SplicePump::onUpReady(uint32_t) { return absl::OkStatus(); }

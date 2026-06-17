@@ -55,6 +55,7 @@ envoy_cc_library(
         "//envoy/network:connection_interface",
         "//envoy/network:transport_socket_interface",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:utility_lib",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/types:optional",
     ],

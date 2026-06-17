@@ -579,6 +579,9 @@ envoy_cc_test(
     name = "splice_coordinator_test",
     srcs = ["splice_coordinator_test.cc"],
     rbe_pool = "6gig",
+    # The fixture rebuilds the full UpstreamRequest mock graph per case, which is slow under MSAN;
+    # shard so no single shard exceeds the test timeout.
+    shard_count = 4,
     deps = [
         "//source/common/network:utility_lib",
         "//source/common/router:router_lib",

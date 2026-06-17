@@ -1306,8 +1306,11 @@ TEST_F(MultiConnectionBaseImplTest, SpliceHelpersDelegateAfterConnect) {
   EXPECT_CALL(*createdConnections()[0], reinstallFileEvents());
   impl_->reinstallFileEvents();
 
-  EXPECT_CALL(*createdConnections()[0], extractPendingWriteForSplice()).WillOnce(Return("pending"));
-  EXPECT_EQ("pending", impl_->extractPendingWriteForSplice());
+  EXPECT_CALL(*createdConnections()[0], extractPendingWriteForSplice(testing::_))
+      .WillOnce(testing::Invoke([](Buffer::Instance& dst) { dst.add("pending"); }));
+  Buffer::OwnedImpl pending;
+  impl_->extractPendingWriteForSplice(pending);
+  EXPECT_EQ("pending", pending.toString());
 }
 
 } // namespace Network

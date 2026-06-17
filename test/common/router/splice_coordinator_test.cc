@@ -56,10 +56,10 @@ public:
     need_d2u_ = need_d2u;
     return create_pipes_result_;
   }
-  bool prepare(std::string initial_u2d, std::string initial_d2u) override {
+  bool prepare(Buffer::Instance& initial_u2d, Buffer::Instance& initial_d2u) override {
     prepare_called_ = true;
-    prepare_initial_u2d_ = std::move(initial_u2d);
-    prepare_initial_d2u_ = std::move(initial_d2u);
+    prepare_initial_u2d_ = initial_u2d.toString();
+    prepare_initial_d2u_ = initial_d2u.toString();
     return prepare_result_;
   }
   void setBounds(absl::optional<uint64_t> u2d_limit, absl::optional<uint64_t> d2u_limit) override {
@@ -195,16 +195,13 @@ protected:
         .WillByDefault(Return(OptRef<const Network::KtlsBytestreamInfo>(up_ktls_)));
 
     // GenericUpstream resolves to upstream_conn_.
-    auto test_upstream = std::make_unique<NiceMock<TestGenericUpstream>>();
-    test_upstream_ = test_upstream.get();
-    test_upstream_->splice_connection_ = upstream_conn_;
-    upstream_request_->upstream_ = std::move(test_upstream);
+    reinstallUpstream();
 
     // Pending writes handed to the pump.
-    ON_CALL(upstream_conn_, extractPendingWriteForSplice())
-        .WillByDefault(Return(std::string("UP-HEADERS")));
-    ON_CALL(downstream_conn_, extractPendingWriteForSplice())
-        .WillByDefault(Return(std::string("DOWN-HEADERS")));
+    ON_CALL(upstream_conn_, extractPendingWriteForSplice(_))
+        .WillByDefault(Invoke([](Buffer::Instance& dst) { dst.add("UP-HEADERS"); }));
+    ON_CALL(downstream_conn_, extractPendingWriteForSplice(_))
+        .WillByDefault(Invoke([](Buffer::Instance& dst) { dst.add("DOWN-HEADERS"); }));
 
     // Capture the fake pump and its callbacks for each test.
     coord_->setSplicePumpFactoryForTest(
@@ -280,7 +277,7 @@ protected:
   }
 
   uint64_t counter(absl::string_view name) {
-    return parent_.cluster_info_->stats_store_.counter(absl::StrCat("http1_ktls_splice.", name))
+    return parent_.cluster_info_->stats_store_.counter(absl::StrCat("http1_ktls_splice_", name))
         .value();
   }
 
@@ -289,6 +286,13 @@ protected:
   // tests call them.
   void setEncodeComplete(bool complete) { upstream_request_->router_sent_end_stream_ = complete; }
   void clearUpstream() { upstream_request_->upstream_.reset(); }
+  // Installs a fresh upstream wired to upstream_conn_, as the pool does when it becomes ready.
+  void reinstallUpstream() {
+    auto test_upstream = std::make_unique<NiceMock<TestGenericUpstream>>();
+    test_upstream_ = test_upstream.get();
+    test_upstream_->splice_connection_ = upstream_conn_;
+    upstream_request_->upstream_ = std::move(test_upstream);
+  }
   bool onResetStreamInProgress() const { return upstream_request_->on_reset_stream_in_progress_; }
   // Re-enters onResetStream as the codec reset cascade would when the upstream is force-closed.
   void reenterOnResetStream() {
@@ -632,7 +636,7 @@ TEST_F(SpliceCoordinatorTest, EngageDownloadRevalidateKtlsLost) {
   initialize();
   ASSERT_TRUE(armDownload());
   coord_->scheduleEngage();
-  up_ktls_.installed = false; // kTLS lost across the schedule gap
+  up_ktls_.installed = false; // kTLS lost across the schedule gap.
   fireEngage();
   EXPECT_FALSE(coord_->engaged());
   EXPECT_EQ(0, counter("engaged"));
@@ -657,7 +661,7 @@ TEST_F(SpliceCoordinatorTest, EngageDownloadWholeBodyBuffered) {
   Buffer::OwnedImpl whole(std::string(kBodyBytes, 'b'));
   ASSERT_TRUE(coord_->bufferPreEngageBody(whole, /*end_stream=*/false));
   coord_->scheduleEngage();
-  EXPECT_CALL(parent_, onUpstreamData(_, _, false)); // held delivered via flush
+  EXPECT_CALL(parent_, onUpstreamData(_, _, false)); // held delivered via flush.
   fireEngage();
   EXPECT_FALSE(coord_->engaged());
   EXPECT_EQ(0, counter("engaged"));
@@ -671,15 +675,17 @@ TEST_F(SpliceCoordinatorTest, EngageDownloadPipeCreateFails) {
   ASSERT_TRUE(armDownload());
   coord_->scheduleEngage();
   // Pending write is not extracted when pipe creation fails before the irreversible drain.
-  EXPECT_CALL(downstream_conn_, extractPendingWriteForSplice()).Times(0);
+  EXPECT_CALL(downstream_conn_, extractPendingWriteForSplice(_)).Times(0);
   fireEngage();
   EXPECT_FALSE(coord_->engaged());
   EXPECT_EQ(0, counter("engaged"));
   EXPECT_EQ(1, counter("abandoned"));
   EXPECT_EQ(0, counter("engaged"));
-  ASSERT_NE(nullptr, fake_pump_);
-  EXPECT_TRUE(fake_pump_->create_pipes_called_);
-  EXPECT_FALSE(fake_pump_->prepare_called_);
+  // createPipes() failed, so engage abandoned and destroyed the pump before extracting pending
+  // output or calling prepare(). The pump is gone, so the created-then-abandoned path is proven by
+  // factory_called_ and the extractPendingWriteForSplice() expectation above rather than by reading
+  // the freed pump.
+  EXPECT_TRUE(factory_called_);
 }
 
 TEST_F(SpliceCoordinatorTest, EngageDownloadPrepareFailsAfterExtract) {
@@ -817,7 +823,8 @@ TEST_F(SpliceCoordinatorTest, EngageUploadDownstreamLost) {
   EXPECT_EQ(0, counter("engaged"));
 }
 
-TEST_F(SpliceCoordinatorTest, EngageUploadPoolNotReadyPoll) {
+// Pool not ready waits for onPoolReady instead of polling during connection establishment.
+TEST_F(SpliceCoordinatorTest, EngageUploadPoolNotReadyWaits) {
   initialize();
   ASSERT_TRUE(armUpload());
   coord_->scheduleEngage();
@@ -825,16 +832,54 @@ TEST_F(SpliceCoordinatorTest, EngageUploadPoolNotReadyPoll) {
   test_upstream_ = nullptr;
   fireEngage();
   EXPECT_FALSE(coord_->engaged());
+  // Still armed and not abandoned, with no pump built and no poll timer created.
+  EXPECT_TRUE(coord_->armedForRequest());
+  EXPECT_FALSE(factory_called_);
   EXPECT_EQ(0, counter("abandoned"));
-  ASSERT_NE(nullptr, poll_timer_);
-  EXPECT_TRUE(poll_timer_->enabled_); // rescheduled on the 2ms poll timer
+  EXPECT_EQ(nullptr, poll_timer_);
+}
+
+// Once the pool becomes ready, the onPoolReady reschedule drives engage to completion.
+TEST_F(SpliceCoordinatorTest, EngageUploadEngagesWhenPoolBecomesReady) {
+  initialize();
+  ASSERT_TRUE(armUpload());
+  coord_->scheduleEngage();
+  clearUpstream(); // Pool is not ready.
+  test_upstream_ = nullptr;
+  fireEngage();
+  ASSERT_TRUE(coord_->armedForRequest());
+  ASSERT_FALSE(coord_->engaged());
+  EXPECT_EQ(nullptr, poll_timer_);
+
+  // onPoolReady installs the upstream and reschedules engage.
+  reinstallUpstream();
+  coord_->scheduleEngage();
+  EXPECT_CALL(parent_, disableRetries());
+  fireEngage();
+  EXPECT_TRUE(coord_->engaged());
+  EXPECT_EQ(1, counter("engaged"));
+}
+
+// With no cluster the lifecycle counter increment is skipped and the splice still engages.
+TEST_F(SpliceCoordinatorTest, IncSpliceCounterNoClusterNoop) {
+  initialize();
+  ASSERT_TRUE(armUpload());
+  coord_->scheduleEngage();
+  // The cluster is absent when engage tries to increment the counter, so the increment is skipped.
+  ON_CALL(parent_, cluster()).WillByDefault(Return(nullptr));
+  EXPECT_CALL(parent_, disableRetries());
+  fireEngage();
+  EXPECT_TRUE(coord_->engaged());
+  EXPECT_EQ(0, counter("engaged"));
+  // Restore the cluster before teardown; UpstreamRequest::cleanUp dereferences it for stats.
+  ON_CALL(parent_, cluster()).WillByDefault(Return(parent_.cluster_info_));
 }
 
 TEST_F(SpliceCoordinatorTest, EngageUploadUpstreamNotHttp1) {
   initialize();
   ASSERT_TRUE(armUpload());
   coord_->scheduleEngage();
-  test_upstream_->splice_connection_ = {}; // present but cannot be borrowed
+  test_upstream_->splice_connection_ = {}; // present but cannot be borrowed.
   fireEngage();
   EXPECT_FALSE(coord_->engaged());
   EXPECT_EQ(1, counter("abandoned"));
@@ -859,7 +904,7 @@ TEST_F(SpliceCoordinatorTest, EngageUploadKtlsInstallingPoll) {
   initialize();
   ASSERT_TRUE(armUpload());
   coord_->scheduleEngage();
-  up_ktls_.installed = false; // kTLS-TX still installing
+  up_ktls_.installed = false; // kTLS-TX still installing.
   fireEngage();
   EXPECT_FALSE(coord_->engaged());
   EXPECT_EQ(0, counter("abandoned"));
@@ -871,8 +916,8 @@ TEST_F(SpliceCoordinatorTest, EngageUploadPollExceedsMax) {
   initialize();
   ASSERT_TRUE(armUpload());
   coord_->scheduleEngage();
-  up_ktls_.installed = false; // keep polling forever
-  fireEngage();               // engage_polls_ -> 1, schedules poll timer
+  up_ktls_.installed = false; // keep polling forever.
+  fireEngage();               // engage_polls_ -> 1, schedules poll timer.
   ASSERT_NE(nullptr, poll_timer_);
   // Fire the poll timer until the bound is exceeded. The first fireEngage already did poll 1.
   EXPECT_CALL(downstream_conn_, readDisable(false))
@@ -1095,8 +1140,8 @@ TEST_F(SpliceCoordinatorTest, ResetDownloadReinstallsSinkBeforeUpstreamClose) {
   ON_CALL(upstream_conn_, close(Network::ConnectionCloseType::NoFlush)).WillByDefault(Invoke([&]() {
     reinstalled_before_close = sink_reinstalled;
   }));
-  EXPECT_CALL(downstream_conn_, reinstallFileEvents()).Times(1);
-  EXPECT_CALL(upstream_conn_, close(Network::ConnectionCloseType::NoFlush)).Times(1);
+  EXPECT_CALL(downstream_conn_, reinstallFileEvents());
+  EXPECT_CALL(upstream_conn_, close(Network::ConnectionCloseType::NoFlush));
   // The upstream is force-closed, never re-armed.
   EXPECT_CALL(upstream_conn_, reinstallFileEvents()).Times(0);
 
@@ -1126,7 +1171,7 @@ TEST_F(SpliceCoordinatorTest, ResetDoubleFreeGuard) {
   // The nested onResetStream must short-circuit at the latch.
   EXPECT_CALL(parent_, onUpstreamReset(_, _, _)).Times(0);
   // The upstream is force-closed exactly once.
-  EXPECT_CALL(upstream_conn_, close(Network::ConnectionCloseType::NoFlush)).Times(1);
+  EXPECT_CALL(upstream_conn_, close(Network::ConnectionCloseType::NoFlush));
 
   // The latch is clear before reset(), proving reset() itself sets it (not fixture init).
   EXPECT_FALSE(onResetStreamInProgress());
@@ -1161,12 +1206,12 @@ TEST_F(SpliceCoordinatorTest, ResetIdempotent) {
   fireEngage();
   ASSERT_TRUE(coord_->engaged());
 
-  EXPECT_CALL(upstream_conn_, close(Network::ConnectionCloseType::NoFlush)).Times(1);
+  EXPECT_CALL(upstream_conn_, close(Network::ConnectionCloseType::NoFlush));
   // The download sink is reinstalled exactly once. The first reset clears the connection refs, so
   // the second reset's reinstall guard is false.
-  EXPECT_CALL(downstream_conn_, reinstallFileEvents()).Times(1);
+  EXPECT_CALL(downstream_conn_, reinstallFileEvents());
   coord_->reset();
-  coord_->reset(); // second reset is a no-op, no second close, no second truncated
+  coord_->reset(); // second reset is a no-op, no second close, no second truncated.
   EXPECT_EQ(1, counter("truncated"));
 }
 
@@ -1261,10 +1306,10 @@ TEST_F(SpliceCoordinatorTest, FinalizeLegClosedSkipRearm) {
   ASSERT_TRUE(coord_->engaged());
   completion_cb_(TcpProxy::SpliceCompletion::BoundsReached);
 
-  upstream_conn_.state_ = Network::Connection::State::Closed; // captured upstream not Open
+  upstream_conn_.state_ = Network::Connection::State::Closed; // captured upstream not Open.
   EXPECT_CALL(downstream_conn_, reinstallFileEvents());
   EXPECT_CALL(*test_upstream_, completeSplicedResponse(_));
-  EXPECT_CALL(upstream_conn_, reinstallFileEvents()).Times(0); // closed leg not re-armed
+  EXPECT_CALL(upstream_conn_, reinstallFileEvents()).Times(0); // closed leg not re-armed.
   fireFinalize();
 }
 
@@ -1371,7 +1416,6 @@ TEST_F(SpliceCoordinatorTest, ReadEnableUploadOnce) {
   fireEngage();
   completion_cb_(TcpProxy::SpliceCompletion::BoundsReached);
   EXPECT_CALL(downstream_conn_, readDisable(false))
-      .Times(1)
       .WillOnce(Return(Network::Connection::ReadDisableStatus::NoTransition));
   EXPECT_CALL(down_cb_, completeSplicedRequest(_));
   fireFinalize();
@@ -1485,7 +1529,7 @@ TEST_F(SpliceCoordinatorTest, ResetDuringPollDisablesTimer) {
   initialize();
   ASSERT_TRUE(armUpload());
   coord_->scheduleEngage();
-  up_ktls_.installed = false; // keep polling
+  up_ktls_.installed = false; // keep polling.
   fireEngage();
   ASSERT_NE(nullptr, poll_timer_);
   EXPECT_CALL(*poll_timer_, disableTimer());
