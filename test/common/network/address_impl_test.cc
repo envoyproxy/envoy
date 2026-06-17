@@ -206,6 +206,16 @@ TEST(Ipv4InstanceTest, PortOnly) {
   EXPECT_FALSE(address.ip()->isUnicastAddress());
 }
 
+TEST(Ipv4InstanceTest, V4MappedSockAddr) {
+  const sockaddr_in6 mapped = Ipv4Instance("1.2.3.4", 5678).v4MappedSockAddr();
+  sockaddr_in6 expected;
+  memset(&expected, 0, sizeof(expected));
+  expected.sin6_family = AF_INET6;
+  expected.sin6_port = htons(5678);
+  ASSERT_EQ(1, inet_pton(AF_INET6, "::ffff:1.2.3.4", &expected.sin6_addr));
+  EXPECT_EQ(0, memcmp(&mapped, &expected, sizeof(mapped)));
+}
+
 TEST(Ipv4InstanceTest, NetnsComparison) {
   Ipv4Instance address1("1.2.3.4", nullptr, "/var/run/netns/11111");
   Ipv4Instance address2("1.2.3.4", nullptr, "/var/run/netns/22222");

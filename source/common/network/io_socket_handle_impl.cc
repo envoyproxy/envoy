@@ -172,6 +172,22 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
   msghdr message;
   message.msg_name = reinterpret_cast<void*>(sock_addr);
   message.msg_namelen = address_base->sockAddrLen();
+
+#if defined(__APPLE__)
+  // macOS rejects an AF_INET msg_name on an AF_INET6 fd with EINVAL even when the
+  // socket is dual-stack. When sending an IPv4 destination on such a socket, swap msg_name
+  // for the v4-mapped sockaddr_in6 form.
+  sockaddr_in6 mapped_peer;
+  if (domain_ == AF_INET6 && sock_addr->sa_family == AF_INET) {
+    const auto* v4 = dynamic_cast<const Address::Ipv4Instance*>(&peer_address);
+    if (v4 != nullptr) {
+      mapped_peer = v4->v4MappedSockAddr();
+      message.msg_name = &mapped_peer;
+      message.msg_namelen = sizeof(mapped_peer);
+    }
+  }
+#endif
+
   message.msg_iov = iov.begin();
   message.msg_iovlen = num_slices_to_write;
   message.msg_flags = 0;

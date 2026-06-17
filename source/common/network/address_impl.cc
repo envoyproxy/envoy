@@ -178,6 +178,17 @@ bool Ipv4Instance::operator==(const Instance& rhs) const {
           (ip_.port() == rhs_casted->ip_.port()) && (networkNamespace() == rhs.networkNamespace()));
 }
 
+sockaddr_in6 Ipv4Instance::v4MappedSockAddr() const {
+  sockaddr_in6 out;
+  memset(&out, 0, sizeof(out));
+  out.sin6_family = AF_INET6;
+  out.sin6_port = ip_.ipv4_.address_.sin_port;
+  out.sin6_addr.s6_addr[10] = 0xff;
+  out.sin6_addr.s6_addr[11] = 0xff;
+  safeMemcpyUnsafeDst(&out.sin6_addr.s6_addr[12], &ip_.ipv4_.address_.sin_addr.s_addr);
+  return out;
+}
+
 std::string Ipv4Instance::sockaddrToString(const sockaddr_in& addr) {
   static constexpr size_t BufferSize = 16; // enough space to hold an IPv4 address in string form
   char str[BufferSize];
