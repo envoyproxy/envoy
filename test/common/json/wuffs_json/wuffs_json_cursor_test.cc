@@ -261,7 +261,7 @@ TEST(WuffsJsonCursorTest, StringEscapes) {
 // 中 (U+4E2D) -> 3 UTF-8 bytes E4 B8 AD.
 TEST(WuffsJsonCursorTest, UnicodeEscapeMultiByteUtf8) {
   CapturingHandler h;
-  EXPECT_TRUE(parse(R"({"a":"É","b":"中"})", h).ok());
+  EXPECT_TRUE(parse(R"({"a":"\u00C9","b":"\u4E2D"})", h).ok());
   ASSERT_EQ(h.fields.size(), 2u);
   EXPECT_EQ(h.fields[0].str_val, "\xC3\x89");     // U+00C9
   EXPECT_EQ(h.fields[1].str_val, "\xE4\xB8\xAD"); // U+4E2D
