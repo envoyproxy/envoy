@@ -949,8 +949,12 @@ TEST_F(HttpHealthCheckerImplTest, LastHealthCheckHttpStatusClearedOnNetworkFailu
   health_checker_->start();
 
   // First, a successful 200 response records the HTTP status.
+<<<<<<< Updated upstream
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _))
       .Times(2);
+=======
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).Times(2);
+>>>>>>> Stashed changes
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillRepeatedly(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
@@ -969,8 +973,16 @@ TEST_F(HttpHealthCheckerImplTest, LastHealthCheckHttpStatusClearedOnNetworkFailu
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   test_sessions_[0]->timeout_timer_->invokeCallback();
+<<<<<<< Updated upstream
   EXPECT_FALSE(
       cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->lastHealthCheckHttpStatus().has_value());
+=======
+  EXPECT_FALSE(cluster_->prioritySet()
+                   .getMockHostSet(0)
+                   ->hosts_[0]
+                   ->lastHealthCheckHttpStatus()
+                   .has_value());
+>>>>>>> Stashed changes
 }
 
 TEST_F(HttpHealthCheckerImplTest, Degraded) {
