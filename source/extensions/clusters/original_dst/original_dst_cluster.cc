@@ -190,28 +190,26 @@ OriginalDstCluster::LoadBalancer::metadataOverrideHost(LoadBalancerContext* cont
   return metadata_host;
 }
 
-OriginalDstCluster::OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config,
-                                       ClusterFactoryContext& context,
-                                       absl::Status& creation_status)
+OriginalDstCluster::OriginalDstCluster(
+    const envoy::config::cluster::v3::Cluster& config,
+    const envoy::extensions::clusters::original_dst::v3::OriginalDstCluster& original_dst_config,
+    ClusterFactoryContext& context, absl::Status& creation_status)
     : ClusterImplBase(config, context, creation_status),
       dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
       cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })),
       host_map_(std::make_shared<HostMultiMap>()) {
-  if (config.has_original_dst_lb_config()) {
-    const auto& lb_config = config.original_dst_lb_config();
-    if (lb_config.use_http_header()) {
-      http_header_name_ = lb_config.http_header_name().empty()
-                              ? Http::Headers::get().EnvoyOriginalDstHost
-                              : Http::LowerCaseString(lb_config.http_header_name());
-    }
-    if (lb_config.has_metadata_key()) {
-      metadata_key_ = Config::MetadataKey(lb_config.metadata_key());
-    }
-    if (lb_config.has_upstream_port_override()) {
-      port_override_ = lb_config.upstream_port_override().value();
-    }
+  if (original_dst_config.use_http_header()) {
+    http_header_name_ = original_dst_config.http_header_name().empty()
+                            ? Http::Headers::get().EnvoyOriginalDstHost
+                            : Http::LowerCaseString(original_dst_config.http_header_name());
+  }
+  if (original_dst_config.has_metadata_key()) {
+    metadata_key_ = Config::MetadataKey(original_dst_config.metadata_key());
+  }
+  if (original_dst_config.has_upstream_port_override()) {
+    port_override_ = original_dst_config.upstream_port_override().value();
   }
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }
@@ -323,11 +321,14 @@ absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
 OriginalDstClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                                              ClusterFactoryContext& context) {
   if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
-    return absl::InvalidArgumentError(
-        fmt::format("cluster: LB policy {} is not valid for Cluster type {}. Only "
-                    "'CLUSTER_PROVIDED' is allowed with cluster type 'ORIGINAL_DST'",
-                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(cluster.lb_policy()),
-                    envoy::config::cluster::v3::Cluster::DiscoveryType_Name(cluster.type())));
+    const std::string cluster_type =
+        cluster.has_cluster_type()
+            ? cluster.cluster_type().name()
+            : envoy::config::cluster::v3::Cluster::DiscoveryType_Name(cluster.type());
+    return absl::InvalidArgumentError(fmt::format(
+        "cluster: LB policy {} is not valid for Cluster type {}. Only "
+        "'CLUSTER_PROVIDED' is allowed with cluster type 'ORIGINAL_DST'",
+        envoy::config::cluster::v3::Cluster::LbPolicy_Name(cluster.lb_policy()), cluster_type));
   }
 
   if (cluster.has_load_assignment()) {
@@ -335,20 +336,44 @@ OriginalDstClusterFactory::createClusterImpl(const envoy::config::cluster::v3::C
         "ORIGINAL_DST clusters must have no load assignment configured");
   }
 
-  if (!cluster.original_dst_lb_config().use_http_header() &&
-      !cluster.original_dst_lb_config().http_header_name().empty()) {
+  envoy::extensions::clusters::original_dst::v3::OriginalDstCluster proto_config;
+  if (cluster.has_cluster_type()) {
+    // New path: deserialize from cluster_type.typed_config.
+    RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+        cluster.cluster_type().typed_config(), context.messageValidationVisitor(), proto_config));
+    MessageUtil::validate(proto_config, context.messageValidationVisitor());
+  } else if (cluster.has_original_dst_lb_config()) {
+    // Legacy path: convert original_dst_lb_config to the new proto.
+    const auto& lb_config = cluster.original_dst_lb_config();
+    proto_config.set_use_http_header(lb_config.use_http_header());
+    proto_config.set_http_header_name(lb_config.http_header_name());
+    if (lb_config.has_upstream_port_override()) {
+      proto_config.mutable_upstream_port_override()->set_value(
+          lb_config.upstream_port_override().value());
+    }
+    if (lb_config.has_metadata_key()) {
+      *proto_config.mutable_metadata_key() = lb_config.metadata_key();
+    }
+  }
+
+  return createClusterWithConfig(cluster, proto_config, context);
+}
+
+absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
+OriginalDstClusterFactory::createClusterWithConfig(
+    const envoy::config::cluster::v3::Cluster& cluster,
+    const envoy::extensions::clusters::original_dst::v3::OriginalDstCluster& proto_config,
+    ClusterFactoryContext& context) {
+  if (!proto_config.use_http_header() && !proto_config.http_header_name().empty()) {
     return absl::InvalidArgumentError(fmt::format(
         "ORIGINAL_DST cluster: invalid config http_header_name={} and use_http_header is "
         "false. Set use_http_header to true if http_header_name is desired.",
-        cluster.original_dst_lb_config().http_header_name()));
+        proto_config.http_header_name()));
   }
 
-  // TODO(mattklein123): The original DST load balancer type should be deprecated and instead
-  //                     the cluster should directly supply the load balancer. This will remove
-  //                     a special case and allow this cluster to be compiled out as an extension.
   absl::Status creation_status = absl::OkStatus();
   auto new_cluster = std::shared_ptr<OriginalDstCluster>(
-      new OriginalDstCluster(cluster, context, creation_status));
+      new OriginalDstCluster(cluster, proto_config, context, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   auto lb = std::make_unique<OriginalDstCluster::ThreadAwareLoadBalancer>(
       std::make_shared<OriginalDstClusterHandle>(new_cluster));

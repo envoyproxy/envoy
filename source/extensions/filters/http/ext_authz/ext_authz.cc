@@ -1342,9 +1342,9 @@ void Filter::setShadowFilterState(Filters::Common::ExtAuthz::Response& response)
         response.status_code != zeroHttpCode() ? response.status_code : config_->statusOnError();
     stats_.shadow_error_.inc();
     break;
-  default:
-    IS_ENVOY_BUG("unexpected CheckStatus value in shadow mode");
-    return;
+  default:                                                       // LCOV_EXCL_LINE
+    IS_ENVOY_BUG("unexpected CheckStatus value in shadow mode"); // LCOV_EXCL_LINE
+    return;                                                      // LCOV_EXCL_LINE
   }
 
   auto object = std::make_shared<ShadowDecisionObject>(check_result, status_code,

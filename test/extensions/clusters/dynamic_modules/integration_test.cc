@@ -159,6 +159,46 @@ TEST_P(DynamicModuleClusterIntegrationTest, RunOnAllWorkersFiresOnEachWorker) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Exercises the worker local priority set path across multiple workers end to end. Each worker
+// load balancer learns the added host through get_member_update_host, confirms its worker local set
+// agrees, and routes a request to the upstream through that host pointer.
+TEST_P(DynamicModuleClusterIntegrationTest, WorkerLocalPrioritySetRebuild) {
+  concurrency_ = 2;
+  initializeWithDecCluster("worker_local_rebuild");
+
+  // Each worker increments the counter once its worker local set converges, so wait for all of
+  // them before routing.
+  test_server_->waitForCounter("dynamicmodulescustom.membership_hosts_total", testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Drives the packed member-update address getter end to end. Each worker load balancer reads the
+// added host's address both as a string and as packed integers and confirms they agree before
+// incrementing the counter, so this runs the real packing under both IPv4 and IPv6 params.
+TEST_P(DynamicModuleClusterIntegrationTest, MemberUpdatePackedAddress) {
+  concurrency_ = 2;
+  initializeWithDecCluster("member_update_packed_address");
+
+  // Each worker increments the counter once its packed address matches the formatted address.
+  test_server_->waitForCounter("dynamicmodulescustom.packed_address_verified_total",
+                               testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 // Verifies that the cluster lifecycle callbacks fire correctly during cluster
 // initialization.
 TEST_P(DynamicModuleClusterIntegrationTest, LifecycleCallbacks) {

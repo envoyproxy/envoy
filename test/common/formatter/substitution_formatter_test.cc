@@ -1837,6 +1837,26 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_THAT(duration_format.formatValue({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(3000)));
   }
+
+  {
+    // DS_CX_BEG uses the downstream connection begin time point when set, instead of the stream
+    // start time, so the connection duration reflects the whole connection for HTTP.
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    MockTimeSystem time_system;
+
+    stream_info.start_time_monotonic_ = MonotonicTime(std::chrono::nanoseconds(1000000));
+    stream_info.downstream_timing_.setDownstreamConnectionBegin(
+        MonotonicTime(std::chrono::nanoseconds(500000)));
+
+    EXPECT_CALL(time_system, monotonicTime)
+        .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(4000000))));
+    stream_info.downstream_timing_.onDownstreamConnectionEnd(time_system);
+
+    StreamInfoFormatter duration_format("COMMON_DURATION", "DS_CX_BEG:DS_CX_END:us");
+    EXPECT_EQ("3500", duration_format.format({}, stream_info));
+    EXPECT_THAT(duration_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::numberValue(3500)));
+  }
 }
 
 TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
@@ -3921,41 +3941,46 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
-    DownstreamPeerCertVStartFormatter cert_start_formart("DOWNSTREAM_PEER_CERT_V_START(%Y/%m/%d)");
-    EXPECT_EQ(absl::nullopt, cert_start_formart.format(stream_info));
-    EXPECT_THAT(cert_start_formart.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
+    auto cert_start_formart = makeTimeFormatter<DownstreamPeerCertVStartFormatter>(
+                                  "DOWNSTREAM_PEER_CERT_V_START(%Y/%m/%d)")
+                                  .value();
+    EXPECT_EQ(absl::nullopt, cert_start_formart->format(stream_info));
+    EXPECT_THAT(cert_start_formart->formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   // No validFromPeerCertificate
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    DownstreamPeerCertVStartFormatter cert_start_formart("DOWNSTREAM_PEER_CERT_V_START(%Y/%m/%d)");
+    auto cert_start_formart = makeTimeFormatter<DownstreamPeerCertVStartFormatter>(
+                                  "DOWNSTREAM_PEER_CERT_V_START(%Y/%m/%d)")
+                                  .value();
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(absl::nullopt));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
-    EXPECT_EQ(absl::nullopt, cert_start_formart.format(stream_info));
-    EXPECT_THAT(cert_start_formart.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(absl::nullopt, cert_start_formart->format(stream_info));
+    EXPECT_THAT(cert_start_formart->formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   // Default format string
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    DownstreamPeerCertVStartFormatter cert_start_format("");
+    auto cert_start_format = makeTimeFormatter<DownstreamPeerCertVStartFormatter>("").value();
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time), cert_start_format.format(stream_info));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time), cert_start_format->format(stream_info));
   }
   // Custom format string
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    DownstreamPeerCertVStartFormatter cert_start_format("%b %e %H:%M:%S %Y %Z");
+    auto cert_start_format =
+        makeTimeFormatter<DownstreamPeerCertVStartFormatter>("%b %e %H:%M:%S %Y %Z").value();
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
-    EXPECT_EQ("Mar 28 23:35:58 2018 UTC", cert_start_format.format(stream_info));
+    EXPECT_EQ("Mar 28 23:35:58 2018 UTC", cert_start_format->format(stream_info));
   }
 }
 
@@ -3964,42 +3989,43 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVEndFormatter) {
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
-    DownstreamPeerCertVEndFormatter cert_end_format("%Y/%m/%d");
-    EXPECT_EQ(absl::nullopt, cert_end_format.format(stream_info));
-    EXPECT_THAT(cert_end_format.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
+    auto cert_end_format = makeTimeFormatter<DownstreamPeerCertVEndFormatter>("%Y/%m/%d").value();
+    EXPECT_EQ(absl::nullopt, cert_end_format->format(stream_info));
+    EXPECT_THAT(cert_end_format->formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   // No expirationPeerCertificate
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    DownstreamPeerCertVEndFormatter cert_end_format("%Y/%m/%d");
+    auto cert_end_format = makeTimeFormatter<DownstreamPeerCertVEndFormatter>("%Y/%m/%d").value();
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, expirationPeerCertificate())
         .WillRepeatedly(Return(absl::nullopt));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
-    EXPECT_EQ(absl::nullopt, cert_end_format.format(stream_info));
-    EXPECT_THAT(cert_end_format.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(absl::nullopt, cert_end_format->format(stream_info));
+    EXPECT_THAT(cert_end_format->formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   // Default format string
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    DownstreamPeerCertVEndFormatter cert_end_format("");
+    auto cert_end_format = makeTimeFormatter<DownstreamPeerCertVEndFormatter>("").value();
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time), cert_end_format.format(stream_info));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time), cert_end_format->format(stream_info));
   }
   // Custom format string
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    DownstreamPeerCertVEndFormatter cert_end_format("%b %e %H:%M:%S %Y %Z");
+    auto cert_end_format =
+        makeTimeFormatter<DownstreamPeerCertVEndFormatter>("%b %e %H:%M:%S %Y %Z").value();
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
-    EXPECT_EQ("Mar 28 23:35:58 2018 UTC", cert_end_format.format(stream_info));
+    EXPECT_EQ("Mar 28 23:35:58 2018 UTC", cert_end_format->format(stream_info));
   }
 }
 
@@ -4008,49 +4034,54 @@ TEST(SubstitutionFormatterTest, UpstreamPeerCertVStartFormatter) {
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(Return(nullptr));
-    UpstreamPeerCertVStartFormatter cert_start_format("%Y/%m/%d");
-    EXPECT_EQ(absl::nullopt, cert_start_format.format(stream_info));
-    EXPECT_THAT(cert_start_format.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
+    auto cert_start_format = makeTimeFormatter<UpstreamPeerCertVStartFormatter>("%Y/%m/%d").value();
+    EXPECT_EQ(absl::nullopt, cert_start_format->format(stream_info));
+    EXPECT_THAT(cert_start_format->formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   // No upstreamSslConnection
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.upstreamInfo()->setUpstreamSslConnection(nullptr);
-    DownstreamPeerCertVStartFormatter cert_start_format("UPSTREAM_PEER_CERT_V_START(%Y/%m/%d)");
-    EXPECT_EQ(absl::nullopt, cert_start_format.format(stream_info));
-    EXPECT_THAT(cert_start_format.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
+    auto cert_start_format =
+        makeTimeFormatter<DownstreamPeerCertVStartFormatter>("UPSTREAM_PEER_CERT_V_START(%Y/%m/%d)")
+            .value();
+    EXPECT_EQ(absl::nullopt, cert_start_format->format(stream_info));
+    EXPECT_THAT(cert_start_format->formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   // No validFromPeerCertificate
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    DownstreamPeerCertVStartFormatter cert_start_format("UPSTREAM_PEER_CERT_V_START(%Y/%m/%d)");
+    auto cert_start_format =
+        makeTimeFormatter<DownstreamPeerCertVStartFormatter>("UPSTREAM_PEER_CERT_V_START(%Y/%m/%d)")
+            .value();
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(absl::nullopt));
     stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
-    EXPECT_EQ(absl::nullopt, cert_start_format.format(stream_info));
-    EXPECT_THAT(cert_start_format.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(absl::nullopt, cert_start_format->format(stream_info));
+    EXPECT_THAT(cert_start_format->formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   // Default format string
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    UpstreamPeerCertVStartFormatter cert_start_format("");
+    auto cert_start_format = makeTimeFormatter<UpstreamPeerCertVStartFormatter>("").value();
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time), cert_start_format.format(stream_info));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time), cert_start_format->format(stream_info));
   }
   // Custom format string
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    UpstreamPeerCertVStartFormatter cert_start_format("%b %e %H:%M:%S %Y %Z");
+    auto cert_start_format =
+        makeTimeFormatter<UpstreamPeerCertVStartFormatter>("%b %e %H:%M:%S %Y %Z").value();
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
-    EXPECT_EQ("Mar 28 23:35:58 2018 UTC", cert_start_format.format(stream_info));
+    EXPECT_EQ("Mar 28 23:35:58 2018 UTC", cert_start_format->format(stream_info));
   }
 }
 
@@ -4059,50 +4090,51 @@ TEST(SubstitutionFormatterTest, UpstreamPeerCertVEndFormatter) {
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(Return(nullptr));
-    UpstreamPeerCertVEndFormatter cert_end_format("%Y/%m/%d");
-    EXPECT_EQ(absl::nullopt, cert_end_format.format(stream_info));
-    EXPECT_THAT(cert_end_format.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
+    auto cert_end_format = makeTimeFormatter<UpstreamPeerCertVEndFormatter>("%Y/%m/%d").value();
+    EXPECT_EQ(absl::nullopt, cert_end_format->format(stream_info));
+    EXPECT_THAT(cert_end_format->formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   // No upstreamSslConnection
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.upstreamInfo()->setUpstreamSslConnection(nullptr);
-    UpstreamPeerCertVEndFormatter cert_end_format("%Y/%m/%d");
-    EXPECT_EQ(absl::nullopt, cert_end_format.format(stream_info));
-    EXPECT_THAT(cert_end_format.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
+    auto cert_end_format = makeTimeFormatter<UpstreamPeerCertVEndFormatter>("%Y/%m/%d").value();
+    EXPECT_EQ(absl::nullopt, cert_end_format->format(stream_info));
+    EXPECT_THAT(cert_end_format->formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   // No expirationPeerCertificate
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    UpstreamPeerCertVEndFormatter cert_end_format("%Y/%m/%d");
+    auto cert_end_format = makeTimeFormatter<UpstreamPeerCertVEndFormatter>("%Y/%m/%d").value();
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, expirationPeerCertificate())
         .WillRepeatedly(Return(absl::nullopt));
     stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
-    EXPECT_EQ(absl::nullopt, cert_end_format.format(stream_info));
-    EXPECT_THAT(cert_end_format.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(absl::nullopt, cert_end_format->format(stream_info));
+    EXPECT_THAT(cert_end_format->formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   // Default format string
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    UpstreamPeerCertVEndFormatter cert_end_format("");
+    auto cert_end_format = makeTimeFormatter<UpstreamPeerCertVEndFormatter>("").value();
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time), cert_end_format.format(stream_info));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time), cert_end_format->format(stream_info));
   }
   // Custom format string
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    UpstreamPeerCertVEndFormatter cert_end_format("%b %e %H:%M:%S %Y %Z");
+    auto cert_end_format =
+        makeTimeFormatter<UpstreamPeerCertVEndFormatter>("%b %e %H:%M:%S %Y %Z").value();
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
-    EXPECT_EQ("Mar 28 23:35:58 2018 UTC", cert_end_format.format(stream_info));
+    EXPECT_EQ("Mar 28 23:35:58 2018 UTC", cert_end_format->format(stream_info));
   }
 }
 
@@ -4114,21 +4146,21 @@ TEST(SubstitutionFormatterTest, StartTimeFormatter) {
   std::string body;
 
   {
-    StartTimeFormatter start_time_format("%Y/%m/%d");
+    auto start_time_format = makeTimeFormatter<StartTimeFormatter>("%Y/%m/%d").value();
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
-    EXPECT_EQ("2018/03/28", start_time_format.format(stream_info));
-    EXPECT_THAT(start_time_format.formatValue(stream_info),
+    EXPECT_EQ("2018/03/28", start_time_format->format(stream_info));
+    EXPECT_THAT(start_time_format->formatValue(stream_info),
                 ProtoEq(ValueUtil::stringValue("2018/03/28")));
   }
 
   {
-    StartTimeFormatter start_time_format("");
+    auto start_time_format = makeTimeFormatter<StartTimeFormatter>("").value();
     SystemTime time;
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time), start_time_format.format(stream_info));
-    EXPECT_THAT(start_time_format.formatValue(stream_info),
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time), start_time_format->format(stream_info));
+    EXPECT_THAT(start_time_format->formatValue(stream_info),
                 ProtoEq(ValueUtil::stringValue(AccessLogDateTimeFormatter::fromTime(time))));
   }
 }

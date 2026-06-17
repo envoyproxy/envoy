@@ -6,8 +6,10 @@
 #include <memory>
 #include <regex>
 #include <string>
+#include <type_traits>
 #include <vector>
 
+#include "envoy/common/exception.h"
 #include "envoy/formatter/substitution_formatter.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -15,6 +17,7 @@
 #include "source/common/formatter/substitution_format_utility.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/types/optional.h"
 
@@ -224,7 +227,12 @@ public:
       std::function<absl::optional<SystemTime>(const StreamInfo::StreamInfo& stream_info)>;
   using TimeFieldExtractorPtr = std::unique_ptr<TimeFieldExtractor>;
 
-  SystemTimeFormatter(absl::string_view format, TimeFieldExtractorPtr f, bool local_time = false);
+  static absl::StatusOr<std::unique_ptr<SystemTimeFormatter>>
+  make(absl::string_view format, TimeFieldExtractorPtr&& f, bool local_time = false) {
+    RETURN_IF_NOT_OK(checkConstructPreconditions(format));
+    return std::unique_ptr<SystemTimeFormatter>(
+        new SystemTimeFormatter(format, std::move(f), local_time));
+  }
 
   // StreamInfoFormatterProvider
   // Don't hide the other structure of format and formatValue.
@@ -232,6 +240,10 @@ public:
   using StreamInfoFormatterProvider::formatValue;
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
+
+protected:
+  SystemTimeFormatter(absl::string_view format, TimeFieldExtractorPtr f, bool local_time = false);
+  static absl::Status checkConstructPreconditions(absl::string_view format);
 
 private:
   const Envoy::DateFormatter date_formatter_;
@@ -244,8 +256,11 @@ private:
  * SystemTimeFormatter (FormatterProvider) for request start time from StreamInfo.
  */
 class StartTimeFormatter : public SystemTimeFormatter {
-public:
+protected:
   StartTimeFormatter(absl::string_view format);
+
+  template <typename U>
+  friend absl::StatusOr<std::unique_ptr<U>> makeTimeFormatter(absl::string_view format);
 };
 
 /**
@@ -253,8 +268,11 @@ public:
  * ConnectionInfo.
  */
 class DownstreamPeerCertVStartFormatter : public SystemTimeFormatter {
-public:
+protected:
   DownstreamPeerCertVStartFormatter(absl::string_view format);
+
+  template <typename U>
+  friend absl::StatusOr<std::unique_ptr<U>> makeTimeFormatter(absl::string_view format);
 };
 
 /**
@@ -262,8 +280,11 @@ public:
  * ConnectionInfo.
  */
 class DownstreamPeerCertVEndFormatter : public SystemTimeFormatter {
-public:
+protected:
   DownstreamPeerCertVEndFormatter(absl::string_view format);
+
+  template <typename U>
+  friend absl::StatusOr<std::unique_ptr<U>> makeTimeFormatter(absl::string_view format);
 };
 
 /**
@@ -271,8 +292,11 @@ public:
  * upstreamInfo.
  */
 class UpstreamPeerCertVStartFormatter : public SystemTimeFormatter {
-public:
+protected:
   UpstreamPeerCertVStartFormatter(absl::string_view format);
+
+  template <typename U>
+  friend absl::StatusOr<std::unique_ptr<U>> makeTimeFormatter(absl::string_view format);
 };
 
 /**
@@ -280,9 +304,26 @@ public:
  * upstreamInfo.
  */
 class UpstreamPeerCertVEndFormatter : public SystemTimeFormatter {
-public:
+protected:
   UpstreamPeerCertVEndFormatter(absl::string_view format);
+
+  template <typename U>
+  friend absl::StatusOr<std::unique_ptr<U>> makeTimeFormatter(absl::string_view format);
 };
+
+/**
+ * Factory method for creating an object of type derived from SystemTimeFormatter
+ * The method first checks constructor preconditions are satisfied. If not the method
+ * return an error.
+ * Otherwise it returns unique_ptr with an object.
+ */
+template <typename T>
+absl::StatusOr<std::unique_ptr<T>> makeTimeFormatter(absl::string_view format) {
+  static_assert(std::is_base_of<SystemTimeFormatter, T>::value,
+                "T must be derived from SystemTimeFormatter");
+  RETURN_IF_NOT_OK(T::checkConstructPreconditions(format));
+  return std::unique_ptr<T>(new T(format));
+}
 
 /**
  * FormatterProvider for environment. If no valid environment value then

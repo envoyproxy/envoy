@@ -4251,6 +4251,25 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_hos
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_host(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _index: usize,
+  _is_added: bool,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _index: usize,
+  _is_added: bool,
+  _result: *mut abi::envoy_dynamic_module_type_packed_address,
+) -> bool {
+  false
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
   _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
   _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
@@ -4519,6 +4538,18 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_worker_slot_get(
   std::ptr::null_mut()
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_get_name(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) {
+  const NAME: &str = "test_cluster";
+  unsafe {
+    (*result).ptr = NAME.as_ptr() as *const _;
+    (*result).length = NAME.len();
+  }
+}
+
 // Cluster config metrics FFI stubs for testing.
 
 #[no_mangle]
@@ -4720,6 +4751,15 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_http_callout(
 // =============================================================================
 // Cluster Extension Rust SDK tests.
 // =============================================================================
+
+#[test]
+fn test_cluster_get_cluster_name() {
+  let mut mock_cluster = cluster::MockEnvoyCluster::new();
+  mock_cluster
+    .expect_get_cluster_name()
+    .returning(|| EnvoyBuffer::new(b"my_cluster"));
+  assert_eq!(mock_cluster.get_cluster_name().as_slice(), b"my_cluster");
+}
 
 #[test]
 fn test_cluster_scheduler_mock() {
@@ -5237,6 +5277,67 @@ fn test_cluster_lb_get_host_address_none() {
   let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
   mock_lb.expect_get_host_address().returning(|_, _| None);
   assert!(mock_lb.get_host_address(0, 0).is_none());
+}
+
+#[test]
+fn test_cluster_lb_get_member_update_host() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_member_update_host()
+    .withf(|index, is_added| *index == 0 && *is_added)
+    .returning(|_, _| Some(0x1234 as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr));
+  assert_eq!(
+    mock_lb.get_member_update_host(0, true).map(|h| h as usize),
+    Some(0x1234)
+  );
+}
+
+#[test]
+fn test_cluster_lb_get_member_update_host_none() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_member_update_host()
+    .returning(|_, _| None);
+  assert!(mock_lb.get_member_update_host(0, false).is_none());
+}
+
+#[test]
+fn test_cluster_lb_get_member_update_host_packed_address() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_member_update_host_packed_address()
+    .withf(|index, is_added| *index == 0 && *is_added)
+    .returning(|_, _| Some(cluster::PackedAddress::V4([127, 0, 0, 1], 10001)));
+  mock_lb
+    .expect_get_member_update_host_packed_address()
+    .withf(|_, is_added| !*is_added)
+    .returning(|_, _| Some(cluster::PackedAddress::V6([1; 16], 10002)));
+
+  match mock_lb.get_member_update_host_packed_address(0, true) {
+    Some(cluster::PackedAddress::V4(addr, port)) => {
+      assert_eq!(addr, [127, 0, 0, 1]);
+      assert_eq!(port, 10001);
+    },
+    other => panic!("expected V4, got {other:?}"),
+  }
+  match mock_lb.get_member_update_host_packed_address(0, false) {
+    Some(cluster::PackedAddress::V6(addr, port)) => {
+      assert_eq!(addr, [1; 16]);
+      assert_eq!(port, 10002);
+    },
+    other => panic!("expected V6, got {other:?}"),
+  }
+}
+
+#[test]
+fn test_cluster_lb_get_member_update_host_packed_address_none() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_member_update_host_packed_address()
+    .returning(|_, _| None);
+  assert!(mock_lb
+    .get_member_update_host_packed_address(0, false)
+    .is_none());
 }
 
 #[test]
@@ -7529,4 +7630,323 @@ fn test_mock_envoy_transport_socket_do_read() {
 
   let mut socket = EchoTransportSocket;
   assert_eq!(socket.on_do_read(&mut mock), IoResult::keep_open(5, false));
+}
+
+// =============================================================================
+// Formatter unit tests
+// =============================================================================
+
+#[test]
+fn test_envoy_dynamic_module_on_formatter_config_new_impl() {
+  struct TestFormatterConfig;
+  impl formatter::FormatterConfig for TestFormatterConfig {
+    fn parse(
+      &self,
+      _command: &str,
+      _command_arg: &str,
+      _max_length: Option<usize>,
+    ) -> Option<Box<dyn formatter::FormatterProvider>> {
+      None
+    }
+  }
+
+  let mut new_fn: NewFormatterConfigFunction = |_, _| Some(Box::new(TestFormatterConfig));
+  let result = formatter::envoy_dynamic_module_on_formatter_config_new_impl(
+    "test_formatter",
+    b"config",
+    &new_fn,
+  );
+  assert!(!result.is_null());
+  unsafe {
+    formatter::envoy_dynamic_module_on_formatter_config_destroy(result);
+  }
+
+  // None should result in a null pointer (e.g. unknown formatter name).
+  new_fn = |_, _| None;
+  let result = formatter::envoy_dynamic_module_on_formatter_config_new_impl(
+    "test_formatter",
+    b"config",
+    &new_fn,
+  );
+  assert!(result.is_null());
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_formatter_config_destroy() {
+  // This test ensures the wrapped trait object is dropped exactly once on `_destroy`.
+  static DROP_COUNT: AtomicU32 = AtomicU32::new(0);
+  struct TestFormatterConfig;
+  impl formatter::FormatterConfig for TestFormatterConfig {
+    fn parse(
+      &self,
+      _command: &str,
+      _command_arg: &str,
+      _max_length: Option<usize>,
+    ) -> Option<Box<dyn formatter::FormatterProvider>> {
+      None
+    }
+  }
+  impl Drop for TestFormatterConfig {
+    fn drop(&mut self) {
+      DROP_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let new_fn: NewFormatterConfigFunction = |_, _| Some(Box::new(TestFormatterConfig));
+  let config_ptr =
+    formatter::envoy_dynamic_module_on_formatter_config_new_impl("test_formatter", b"", &new_fn);
+  assert!(!config_ptr.is_null());
+  unsafe {
+    formatter::envoy_dynamic_module_on_formatter_config_destroy(config_ptr);
+  }
+  assert_eq!(1, DROP_COUNT.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_formatter_parse_format_and_destroy() {
+  // Round-trip the provider to ensure parse, format, and destroy correctly own and free the boxed
+  // trait object and that the produced value is returned through the result buffer.
+  static PROVIDER_DROP_COUNT: AtomicU32 = AtomicU32::new(0);
+
+  struct TestFormatterConfig;
+  impl formatter::FormatterConfig for TestFormatterConfig {
+    fn parse(
+      &self,
+      command: &str,
+      _command_arg: &str,
+      max_length: Option<usize>,
+    ) -> Option<Box<dyn formatter::FormatterProvider>> {
+      match command {
+        "value" => Some(Box::new(TestProvider {
+          value: Some("hello".to_string()),
+        })),
+        "absent" => Some(Box::new(TestProvider { value: None })),
+        // Recognized only when the configured truncation length is threaded through as `Some(3)`.
+        "withlen" if max_length == Some(3) => Some(Box::new(TestProvider {
+          value: Some("len".to_string()),
+        })),
+        _ => None,
+      }
+    }
+  }
+
+  struct TestProvider {
+    value: Option<String>,
+  }
+  impl formatter::FormatterProvider for TestProvider {
+    fn format(&self, _ctx: &formatter::FormatterContext) -> Option<String> {
+      self.value.clone()
+    }
+  }
+  impl Drop for TestProvider {
+    fn drop(&mut self) {
+      PROVIDER_DROP_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let new_fn: NewFormatterConfigFunction = |_, _| Some(Box::new(TestFormatterConfig));
+  let config_ptr =
+    formatter::envoy_dynamic_module_on_formatter_config_new_impl("test_formatter", b"", &new_fn);
+  assert!(!config_ptr.is_null());
+
+  let make_buf = |s: &str| abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: s.as_ptr() as *const _,
+    length: s.len(),
+  };
+  let empty_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: std::ptr::null(),
+    length: 0,
+  };
+
+  // An unrecognized command yields a null provider.
+  let none_provider = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_parse(
+      config_ptr,
+      make_buf("unknown"),
+      empty_buf,
+      false,
+      0,
+    )
+  };
+  assert!(none_provider.is_null());
+
+  // A recognized command yields a provider that fills the result buffer.
+  let provider = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_parse(
+      config_ptr,
+      make_buf("value"),
+      empty_buf,
+      false,
+      0,
+    )
+  };
+  assert!(!provider.is_null());
+
+  let mut result = abi::envoy_dynamic_module_type_module_buffer {
+    ptr: std::ptr::null(),
+    length: 0,
+  };
+  let produced = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_format(provider, std::ptr::null_mut(), &mut result)
+  };
+  assert!(produced);
+  let value = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+  assert_eq!(value, b"hello");
+
+  unsafe {
+    formatter::envoy_dynamic_module_on_formatter_provider_destroy(provider);
+  }
+  assert_eq!(
+    1,
+    PROVIDER_DROP_COUNT.load(std::sync::atomic::Ordering::SeqCst)
+  );
+
+  // A configured truncation length is threaded through to parse as `Some`, while its absence
+  // yields `None`.
+  let with_len = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_parse(
+      config_ptr,
+      make_buf("withlen"),
+      empty_buf,
+      true,
+      3,
+    )
+  };
+  assert!(!with_len.is_null());
+  unsafe {
+    formatter::envoy_dynamic_module_on_formatter_provider_destroy(with_len);
+  }
+  let without_len = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_parse(
+      config_ptr,
+      make_buf("withlen"),
+      empty_buf,
+      false,
+      3,
+    )
+  };
+  assert!(without_len.is_null());
+
+  // A provider that returns None makes the format hook report the value is absent.
+  let absent_provider = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_parse(
+      config_ptr,
+      make_buf("absent"),
+      empty_buf,
+      false,
+      0,
+    )
+  };
+  assert!(!absent_provider.is_null());
+  let produced = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_format(
+      absent_provider,
+      std::ptr::null_mut(),
+      &mut result,
+    )
+  };
+  assert!(!produced);
+  unsafe {
+    formatter::envoy_dynamic_module_on_formatter_provider_destroy(absent_provider);
+    formatter::envoy_dynamic_module_on_formatter_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_formatter_format_recovers_from_panic() {
+  // format runs on worker threads, so a panic must be caught at the FFI boundary and reported as an
+  // absent value rather than unwinding across the ABI.
+  struct PanicProvider;
+  impl formatter::FormatterProvider for PanicProvider {
+    fn format(&self, _ctx: &formatter::FormatterContext) -> Option<String> {
+      panic!("intentional panic in format");
+    }
+  }
+
+  let provider: Box<dyn formatter::FormatterProvider> = Box::new(PanicProvider);
+  let provider_ptr = Box::into_raw(Box::new(provider)) as *const std::ffi::c_void;
+  let mut result = abi::envoy_dynamic_module_type_module_buffer {
+    ptr: std::ptr::null(),
+    length: 0,
+  };
+  let produced = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_format(
+      provider_ptr,
+      std::ptr::null_mut(),
+      &mut result,
+    )
+  };
+  assert!(!produced);
+  unsafe {
+    formatter::envoy_dynamic_module_on_formatter_provider_destroy(provider_ptr);
+  }
+}
+
+#[test]
+fn test_mock_envoy_transport_socket_fd_and_write_rearm() {
+  // Exercises the raw socket callbacks a transport such as kTLS relies on. It reads the descriptor
+  // on connect and, when it defers buffered bytes for its own reasons, re-arms the writable
+  // notification so the write is retried later.
+  struct ProbeTransportSocket {
+    fd: Option<i32>,
+  }
+  impl TransportSocket<transport_socket::MockEnvoyTransportSocket> for ProbeTransportSocket {
+    fn on_set_callbacks(&mut self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) {}
+    fn on_connected(&mut self, envoy: &mut transport_socket::MockEnvoyTransportSocket) {
+      self.fd = envoy.get_fd();
+    }
+    fn on_do_read(&mut self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) -> IoResult {
+      IoResult::keep_open(0, false)
+    }
+    fn on_do_write(
+      &mut self,
+      envoy: &mut transport_socket::MockEnvoyTransportSocket,
+      _end_stream: bool,
+    ) -> IoResult {
+      // A transport that defers the buffered bytes re-arms instead of sending, so it is driven
+      // again on a later iteration.
+      if envoy.write_buffer_length() > 0 {
+        envoy.set_is_writable();
+      }
+      IoResult::keep_open(0, false)
+    }
+    fn on_close(
+      &mut self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+      _event: ConnectionEvent,
+      _abort_reset: bool,
+    ) {
+    }
+    fn get_protocol(&self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) -> String {
+      String::new()
+    }
+    fn get_failure_reason(
+      &self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+    ) -> String {
+      String::new()
+    }
+    fn can_flush_close(&self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) -> bool {
+      true
+    }
+    fn start_secure_transport(
+      &mut self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+    ) -> bool {
+      false
+    }
+  }
+
+  let mut mock = transport_socket::MockEnvoyTransportSocket::new();
+  mock.expect_get_fd().times(1).returning(|| Some(7));
+  mock.expect_write_buffer_length().times(1).returning(|| 3);
+  mock.expect_set_is_writable().times(1).returning(|| ());
+
+  let mut socket = ProbeTransportSocket { fd: None };
+  socket.on_connected(&mut mock);
+  assert_eq!(socket.fd, Some(7));
+  assert_eq!(
+    socket.on_do_write(&mut mock, false),
+    IoResult::keep_open(0, false)
+  );
 }

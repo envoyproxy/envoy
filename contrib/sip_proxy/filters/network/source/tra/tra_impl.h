@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
@@ -37,27 +39,27 @@ class GrpcClientImpl : public Client,
                        public Logger::Loggable<Logger::Id::filter> {
 public:
   GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client, Event::Dispatcher& dispatcher,
-                 const absl::optional<std::chrono::milliseconds>& timeout);
+                 const std::optional<std::chrono::milliseconds>& timeout);
   ~GrpcClientImpl() override;
 
   // Extensions::NetworkFilters::SipProxy::TrafficRoutingAssistant::Client
   void setRequestCallbacks(RequestCallbacks& callbacks) override;
   void createTrafficRoutingAssistant(const std::string& type,
                                      const absl::flat_hash_map<std::string, std::string>& data,
-                                     const absl::optional<TraContextMap> context,
+                                     const std::optional<TraContextMap> context,
                                      Tracing::Span& parent_span,
                                      const StreamInfo::StreamInfo& stream_info) override;
   void updateTrafficRoutingAssistant(const std::string& type,
                                      const absl::flat_hash_map<std::string, std::string>& data,
-                                     const absl::optional<TraContextMap> context,
+                                     const std::optional<TraContextMap> context,
                                      Tracing::Span& parent_span,
                                      const StreamInfo::StreamInfo& stream_info) override;
   void retrieveTrafficRoutingAssistant(const std::string& type, const std::string& key,
-                                       const absl::optional<TraContextMap> context,
+                                       const std::optional<TraContextMap> context,
                                        Tracing::Span& parent_span,
                                        const StreamInfo::StreamInfo& stream_info) override;
   void deleteTrafficRoutingAssistant(const std::string& type, const std::string& key,
-                                     const absl::optional<TraContextMap> context,
+                                     const std::optional<TraContextMap> context,
                                      Tracing::Span& parent_span,
                                      const StreamInfo::StreamInfo& stream_info) override;
   void subscribeTrafficRoutingAssistant(const std::string& type, Tracing::Span& parent_span,
@@ -183,7 +185,7 @@ private:
       envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>
       async_client_;
   Event::Dispatcher& dispatcher_;
-  absl::optional<std::chrono::milliseconds> timeout_;
+  std::optional<std::chrono::milliseconds> timeout_;
 
   std::list<std::unique_ptr<AsyncRequestCallbacks>> request_callbacks_;
   std::list<std::unique_ptr<AsyncStreamCallbacks>> stream_callbacks_;

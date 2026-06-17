@@ -184,6 +184,7 @@ EXTENSIONS = {
     "envoy.filters.http.ext_proc":                      "//source/extensions/filters/http/ext_proc:config",
     "envoy.filters.http.fault":                         "//source/extensions/filters/http/fault:config",
     "envoy.filters.http.file_server":                   "//source/extensions/filters/http/file_server:config",
+    "envoy.filters.http.filter_chain":                  "//source/extensions/filters/http/filter_chain:config",
     "envoy.filters.http.file_system_buffer":            "//source/extensions/filters/http/file_system_buffer:config",
     "envoy.filters.http.gcp_authn":                     "//source/extensions/filters/http/gcp_authn:config",
     "envoy.filters.http.geoip":                         "//source/extensions/filters/http/geoip:config",
@@ -510,6 +511,7 @@ EXTENSIONS = {
     #
 
     "envoy.formatter.cel":                              "//source/extensions/formatter/cel:config",
+    "envoy.formatter.dynamic_modules":                  "//source/extensions/formatter/dynamic_modules:config",
     "envoy.formatter.file_content":                     "//source/extensions/formatter/file_content:config",
     "envoy.formatter.generic_secret":                   "//source/extensions/formatter/generic_secret:config",
     "envoy.formatter.metadata":                         "//source/extensions/formatter/metadata:config",

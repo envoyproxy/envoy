@@ -44,6 +44,8 @@ areas:
     title: access_log
   attributes:
     title: attributes
+  basic_auth:
+    title: basic_auth
   build:
     title: build
   circuit_breaker:
