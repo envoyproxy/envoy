@@ -11,7 +11,7 @@
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/formatter/substitution_formatter_base.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"

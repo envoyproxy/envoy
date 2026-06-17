@@ -279,6 +279,7 @@ TEST_P(DynamicModuleHttpLanguageTests, HeaderCallbacks) {
       .WillRepeatedly(testing::ReturnPointee(info.downstream_connection_info_provider_));
   auto addr = Envoy::Network::Utility::parseInternetAddressNoThrow("1.1.1.1", 1234, false);
   info.downstream_connection_info_provider_->setRemoteAddress(addr);
+  info.downstream_connection_info_provider_->setRequestedServerName("example.com");
 
   std::initializer_list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}, {"to-be-deleted", "value"}};

@@ -111,6 +111,17 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
   }
 
   uint64_t ret = io_uring_socket_->write(slices, num_slice);
+  // The socket accepts nothing when it is applying write backpressure, so report EAGAIN to keep
+  // the data in the caller's buffer until a write event is delivered.
+  if (ret == 0) {
+    uint64_t length = 0;
+    for (uint64_t i = 0; i < num_slice; i++) {
+      length += slices[i].len_;
+    }
+    if (length > 0) {
+      return {0, IoSocketError::getIoSocketEagainError()};
+    }
+  }
   return {ret, IoSocketError::none()};
 }
 
@@ -124,7 +135,13 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer)
 
   uint64_t buffer_size = buffer.length();
   io_uring_socket_->write(buffer);
-  return {buffer_size, IoSocketError::none()};
+  // The socket keeps the data when it is applying write backpressure, so report EAGAIN to keep the
+  // data in the caller's buffer until a write event is delivered.
+  uint64_t bytes_written = buffer_size - buffer.length();
+  if (bytes_written == 0 && buffer_size > 0) {
+    return {0, IoSocketError::getIoSocketEagainError()};
+  }
+  return {bytes_written, IoSocketError::none()};
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::sendmsg(const Buffer::RawSlice*, uint64_t, int,

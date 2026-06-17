@@ -36,6 +36,7 @@ namespace ReverseConnection {
 // Forward declarations.
 class ReverseTunnelInitiatorExtension;
 class ReverseConnectionIOHandle;
+struct HandshakeHeader;
 
 namespace {
 // HTTP protocol constants.
@@ -88,6 +89,7 @@ struct ReverseConnectionSocketConfig {
   std::vector<envoy::config::core::v3::HeaderValueOption>
       additional_headers;       // Additional headers for the handshake request.
   bool use_http_upgrade{false}; // Negotiate handshake as HTTP/1.1 Upgrade -> 101.
+  std::shared_ptr<const std::vector<HandshakeHeader>> handshake_headers;
   // TODO(basundhara-c): Add support for multiple remote clusters using the same
   // ReverseConnectionIOHandle. Currently, each ReverseConnectionIOHandle handles
   // reverse connections for a single upstream cluster since a different ReverseConnectionAddress
@@ -321,6 +323,13 @@ public:
    * @return whether the handshake is negotiated as an HTTP/1.1 Upgrade exchange.
    */
   bool useHttpUpgrade() const { return config_.use_http_upgrade; }
+
+  /**
+   * @return handshake headers (key + append action + value formatter), or nullptr if none.
+   */
+  const std::shared_ptr<const std::vector<HandshakeHeader>>& handshakeHeaders() const {
+    return config_.handshake_headers;
+  }
 
 private:
   /**

@@ -6,6 +6,7 @@
 
 #include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/original_dst/v3/original_dst.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/network/address_impl.h"
@@ -1226,6 +1227,76 @@ TEST(DestinationAddress, ObjectFactory) {
   EXPECT_THAT(object->getField("ip"), testing::VariantWith<absl::string_view>("10.0.0.10"));
   EXPECT_THAT(object->getField("port"), testing::VariantWith<int64_t>(8080));
   EXPECT_EQ(nullptr, factory->createFromBytes("foo"));
+}
+
+TEST_F(OriginalDstClusterTest, ClusterTypeConfig) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 1.250s
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.cluster.original_dst
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.original_dst.v3.OriginalDstCluster
+        use_http_header: true
+        http_header_name: x-custom-dst
+        upstream_port_override:
+          value: 8080
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  setupFromYaml(yaml);
+
+  OriginalDstCluster::LoadBalancer lb(handle_, cluster_->prioritySet());
+  Event::PostCb post_cb;
+
+  // HTTP header override with custom header name.
+  TestLoadBalancerContext lb_context1(nullptr, "x-custom-dst", "127.0.0.1:5555");
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
+  HostConstSharedPtr host1 = lb.chooseHost(&lb_context1).host;
+  post_cb();
+  ASSERT_NE(host1, nullptr);
+  // Port override takes effect: 5555->8080
+  EXPECT_EQ("127.0.0.1:8080", host1->address()->asString());
+}
+
+TEST_F(OriginalDstClusterTest, ClusterTypeConfigDefaultValues) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 1.250s
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.cluster.original_dst
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.original_dst.v3.OriginalDstCluster
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(membership_updated_, ready()).Times(0);
+  setupFromYaml(yaml);
+
+  // With default config (no use_http_header, no port override), no header-based override.
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+}
+
+TEST_F(OriginalDstClusterTest, ClusterTypeConfigBadHttpHeader) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 1.250s
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.cluster.original_dst
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.original_dst.v3.OriginalDstCluster
+        http_header_name: x-custom-dst
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(setupFromYaml(yaml, false), EnvoyException,
+                          "ORIGINAL_DST cluster: invalid config http_header_name=x-custom-dst");
 }
 
 } // namespace

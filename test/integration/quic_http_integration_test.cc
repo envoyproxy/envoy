@@ -200,7 +200,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
 TEST_P(QuicHttpIntegrationTest, EarlyDataDisabled) {
   // Make sure all connections use the same PersistentQuicInfoImpl.
   concurrency_ = 1;
-  configureEarlyData(false);
+  configureTlsOptions(/*early_data_enabled=*/false, /*resumption_enabled=*/true);
   initialize();
   // Start the first connection.
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -1440,7 +1440,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
 }
 
 TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
-  configureEarlyData(true);
+  configureTlsOptions(/*early_data_enabled=*/true, /*resumption_enabled=*/true);
   inplaceInitialize(/*add_default_filter_chain=*/false);
 
   auto codec_client_0 = makeRawHttp3Connection(
@@ -1451,7 +1451,8 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
 
   // Modify 1st transport socket factory to disable early data.
   ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
-  configureEarlyData(false, &new_config_helper);
+  configureTlsOptions(/*early_data_enabled=*/false, /*resumption_enabled=*/false,
+                      &new_config_helper);
 
   new_config_helper.setLds("1");
   test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
@@ -1468,6 +1469,37 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
   EnvoyQuicClientSession* quic_session =
       static_cast<EnvoyQuicClientSession*>(codec_client_2->connection());
   EXPECT_FALSE(quic_session->EarlyDataAccepted());
+  codec_client_2->close();
+}
+
+TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableResumption) {
+  configureTlsOptions(/*early_data_enabled=*/true, /*resumption_enabled=*/true);
+  inplaceInitialize(/*add_default_filter_chain=*/false);
+
+  auto codec_client_0 = makeRawHttp3Connection(
+      makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"), absl::nullopt,
+      /*wait_for_1rtt_key*/ true);
+  makeRequestAndWaitForResponse(*codec_client_0);
+  codec_client_0->close();
+
+  // Modify 1st transport socket factory to disable resumption.
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
+  configureTlsOptions(/*early_data_enabled=*/false, /*resumption_enabled=*/false,
+                      &new_config_helper);
+
+  new_config_helper.setLds("1");
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Ge(1));
+
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
+
+  auto codec_client_2 = makeRawHttp3Connection(
+      makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"), absl::nullopt,
+      /*wait_for_1rtt_key*/ true);
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_2->connection());
+  EXPECT_FALSE(quic_session->IsResumption());
+  makeRequestAndWaitForResponse(*codec_client_2);
   codec_client_2->close();
 }
 
