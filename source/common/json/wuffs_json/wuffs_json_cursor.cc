@@ -370,11 +370,7 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
       }
     }
 
-    if (status.repr == nullptr) {
-      wuffs_done_ = true;
-      break;
-    }
-    if (wuffs_base__status__is_note(&status)) {
+    if (status.repr == nullptr || wuffs_base__status__is_note(&status)) {
       wuffs_done_ = true;
       break;
     }

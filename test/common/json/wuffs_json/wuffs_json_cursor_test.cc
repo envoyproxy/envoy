@@ -273,7 +273,7 @@ TEST(WuffsJsonCursorTest, UnicodeEscapeMultiByteUtf8) {
 // 😀 -> U+1F600 -> F0 9F 98 80.
 TEST(WuffsJsonCursorTest, UnicodeSurrogatePairDecodedToUtf8) {
   CapturingHandler h;
-  EXPECT_TRUE(parse(R"({"a":"😀"})", h).ok());
+  EXPECT_TRUE(parse(R"({"a":"\uD83D\uDE00"})", h).ok());
   ASSERT_EQ(h.fields.size(), 1u);
   EXPECT_EQ(h.fields[0].str_val, "\xF0\x9F\x98\x80"); // U+1F600
 }
