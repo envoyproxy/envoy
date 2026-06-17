@@ -260,6 +260,14 @@ modify different aspects of the server:
   Dump current heap profile of Envoy process. The output content is parsable binary by the ``pprof`` tool.
   Requires compiling with tcmalloc (default).
 
+.. _operations_admin_interface_peak_heap_dump:
+
+.. http:get:: /peak_heap_dump
+
+  Dump peak heap profile of Envoy process. This captures the heap state at peak memory usage.
+  The output content is parsable binary by the ``pprof`` tool.
+  Requires compiling with tcmalloc (default).
+
 .. http:post:: /allocprofiler
 
   Enable or disable the allocation profiler. The output content is parsable binary by the ``pprof`` tool.
@@ -342,6 +350,7 @@ modify different aspects of the server:
     source/common/network/udp_listener_impl.cc: trace
 
   - ``/logging?paths=source/common/event/dispatcher_impl.cc:debug`` will make the level of ``source/common/event/dispatcher_impl.cc`` be debug.
+  - ``/logging?group=http:info`` will make the level of all loggers in the ``http`` group be info.
   - ``/logging?admin_filter=info`` will make the level of ``source/server/admin/admin_filter.cc`` be info, and other unmatched loggers will be the default trace.
   - ``/logging?paths=source/common*:warning`` will make the level of ``source/common/event/dispatcher_impl.cc:``, ``source/common/network/tcp_listener_impl.cc`` be warning.
     Other unmatched loggers will be the default trace, e.g., `admin_filter.cc`, even it was updated to info from the previous post update.

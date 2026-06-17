@@ -1,5 +1,7 @@
 #include "contrib/istio/filters/common/source/workload_discovery.h"
 
+#include <optional>
+
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/factory_context.h"
@@ -81,7 +83,7 @@ public:
     subscription_.start();
   }
 
-  absl::optional<Istio::Common::WorkloadMetadataObject>
+  std::optional<Istio::Common::WorkloadMetadataObject>
   getMetadata(const Network::Address::InstanceConstSharedPtr& address) override {
     if (address && address->ip()) {
       if (const auto ipv4 = address->ip()->ipv4(); ipv4) {
@@ -127,7 +129,7 @@ private:
     }
     size_t total() const { return address_to_workload_.size(); }
     // Returns by-value since the flat map does not provide pointer stability.
-    absl::optional<Istio::Common::WorkloadMetadataObject> get(const std::string& address) {
+    std::optional<Istio::Common::WorkloadMetadataObject> get(const std::string& address) {
       const auto it = address_to_workload_.find(address);
       if (it != address_to_workload_.end()) {
         return it->second;

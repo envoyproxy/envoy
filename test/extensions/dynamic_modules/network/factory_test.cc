@@ -26,6 +26,9 @@ public:
   DynamicModuleNetworkFilterConfigFactory factory_;
 };
 
+// Pull the shared dynamic-modules test helper into scope.
+using ::Envoy::Extensions::DynamicModules::failureCounter;
+
 TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfig) {
   envoy::extensions::filters::network::dynamic_modules::v3::DynamicModuleNetworkFilter config;
   config.mutable_dynamic_module_config()->set_name("network_no_op");
@@ -33,6 +36,36 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfig) {
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
   EXPECT_TRUE(result.ok()) << result.status().message();
+
+  // The happy path emits no load-failure counters.
+  auto& server_scope = context_.server_factory_context_.serverScope();
+  EXPECT_EQ(0U, failureCounter(server_scope, "module_load_error", "test_filter"));
+  EXPECT_EQ(0U, failureCounter(server_scope, "config_init_error", "test_filter"));
+}
+
+// Load the module via the ``module.local.filename`` data source instead of by name.
+TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfigWithLocalFile) {
+  envoy::extensions::filters::network::dynamic_modules::v3::DynamicModuleNetworkFilter config;
+  config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+      Extensions::DynamicModules::testSharedObjectPath("network_no_op", "c"));
+  config.set_filter_name("test_filter");
+
+  auto result = factory_.createFilterFactoryFromProto(config, context_);
+  EXPECT_TRUE(result.ok()) << result.status().message();
+}
+
+// Remote module sources are not supported for network filters (no init manager is wired up).
+TEST_F(DynamicModuleNetworkFilterFactoryTest, RemoteSourceRejected) {
+  envoy::extensions::filters::network::dynamic_modules::v3::DynamicModuleNetworkFilter config;
+  auto* remote = config.mutable_dynamic_module_config()->mutable_module()->mutable_remote();
+  remote->mutable_http_uri()->set_uri("https://example.com/module.so");
+  remote->mutable_http_uri()->set_cluster("cluster_1");
+  remote->mutable_http_uri()->mutable_timeout()->set_seconds(5);
+  remote->set_sha256("abc123");
+  config.set_filter_name("test_filter");
+
+  auto result = factory_.createFilterFactoryFromProto(config, context_);
+  EXPECT_FALSE(result.ok());
 }
 
 TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfigWithFilterConfig) {
@@ -53,6 +86,9 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, InvalidModuleName) {
   auto result = factory_.createFilterFactoryFromProto(config, context_);
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module"));
+
+  EXPECT_EQ(1U, failureCounter(context_.server_factory_context_.serverScope(), "module_load_error",
+                               "test_filter"));
 }
 
 TEST_F(DynamicModuleNetworkFilterFactoryTest, MissingNetworkFilterSymbols) {
@@ -64,6 +100,12 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, MissingNetworkFilterSymbols) {
   auto result = factory_.createFilterFactoryFromProto(config, context_);
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to create filter config"));
+
+  // The module loads fine but lacks the network filter ABI symbols, so the failure is counted as
+  // config_init_error, not module_load_error.
+  auto& server_scope = context_.server_factory_context_.serverScope();
+  EXPECT_EQ(1U, failureCounter(server_scope, "config_init_error", "test_filter"));
+  EXPECT_EQ(0U, failureCounter(server_scope, "module_load_error", "test_filter"));
 }
 
 TEST_F(DynamicModuleNetworkFilterFactoryTest, ConfigInitializationFailure) {
@@ -75,6 +117,28 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, ConfigInitializationFailure) {
   auto result = factory_.createFilterFactoryFromProto(config, context_);
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to create filter config"));
+
+  EXPECT_EQ(1U, failureCounter(context_.server_factory_context_.serverScope(), "config_init_error",
+                               "test_filter"));
+}
+
+TEST_F(DynamicModuleNetworkFilterFactoryTest, MalformedFilterConfig) {
+  // The module loads fine, but the filter_config Any cannot be unpacked, so the failure is counted
+  // as config_init_error (not module_load_error). A malformed Any must be built programmatically
+  // because a filter_config parsed from YAML is always valid.
+  envoy::extensions::filters::network::dynamic_modules::v3::DynamicModuleNetworkFilter config;
+  config.mutable_dynamic_module_config()->set_name("network_no_op");
+  config.set_filter_name("test_filter");
+  auto* any = config.mutable_filter_config();
+  any->set_type_url("type.googleapis.com/google.protobuf.StringValue");
+  any->set_value("invalid_binary_data_that_cannot_be_unpacked_as_string_value");
+
+  auto result = factory_.createFilterFactoryFromProto(config, context_);
+  EXPECT_FALSE(result.ok());
+
+  auto& server_scope = context_.server_factory_context_.serverScope();
+  EXPECT_EQ(1U, failureCounter(server_scope, "config_init_error", "test_filter"));
+  EXPECT_EQ(0U, failureCounter(server_scope, "module_load_error", "test_filter"));
 }
 
 TEST_F(DynamicModuleNetworkFilterFactoryTest, FactoryName) {

@@ -358,7 +358,7 @@ class FieldList:
                         init_list.append(init_list_item)
                     else:
                         # Field is optional<T>, and the parameter is T in this version.
-                        init_list_item = '%s_{absl::make_optional(%s)}' % (field.name, field.name)
+                        init_list_item = '%s_{std::make_optional(%s)}' % (field.name, field.name)
                         init_list.append(init_list_item)
                 else:
                     # Field is T, so parameter cannot be optional<T>.
@@ -408,13 +408,13 @@ class FieldSpec:
 
     def field_declaration(self):
         if self.is_nullable():
-            return 'absl::optional<%s> %s' % (self.type.name, self.name)
+            return 'std::optional<%s> %s' % (self.type.name, self.name)
         else:
             return '%s %s' % (self.type.name, self.name)
 
     def parameter_declaration(self, version):
         if self.is_nullable_in_version(version):
-            return 'absl::optional<%s> %s' % (self.type.name, self.name)
+            return 'std::optional<%s> %s' % (self.type.name, self.name)
         else:
             return '%s %s' % (self.type.name, self.name)
 
@@ -425,13 +425,13 @@ class FieldSpec:
             if type_default_value != 'null':
                 return '{%s}' % type_default_value
             else:
-                return 'absl::nullopt'
+                return 'std::nullopt'
         else:
             return str(self.type.default_value())
 
     def example_value_for_test(self, version):
         if self.is_nullable_in_version(version):
-            return 'absl::make_optional<%s>(%s)' % (
+            return 'std::make_optional<%s>(%s)' % (
                 self.type.name, self.type.example_value_for_test(version))
         else:
             return str(self.type.example_value_for_test(version))

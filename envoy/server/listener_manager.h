@@ -302,6 +302,12 @@ public:
    */
   virtual ApiListenerOptRef apiListener() PURE;
 
+  /**
+   * @return the server's API Listener by name if it exists, nullopt if it does
+   * not.
+   */
+  virtual ApiListenerOptRef apiListener(absl::string_view) { return apiListener(); }
+
   /*
    * @return TRUE if the worker has started or FALSE if not.
    */

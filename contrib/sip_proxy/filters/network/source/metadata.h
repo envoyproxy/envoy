@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "source/common/common/logger.h"
 
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.h"
@@ -107,10 +109,10 @@ public:
   MethodType methodType() { return method_type_; }
   void setMethodType(MethodType data) { method_type_ = data; }
 
-  absl::optional<absl::string_view> ep() { return ep_; }
+  std::optional<absl::string_view> ep() { return ep_; }
   void setEP(absl::string_view data) { ep_ = data; }
 
-  absl::optional<absl::string_view> opaque() { return opaque_; }
+  std::optional<absl::string_view> opaque() { return opaque_; }
   void setOpaque(absl::string_view data) { opaque_ = data; }
 
   std::vector<Operation>& operationList() { return operation_list_; }
@@ -118,11 +120,11 @@ public:
 
 #if 1
   // TODO Only used for NOKIA customized affinity. should be deleted later.
-  absl::optional<std::pair<std::string, std::string>> pCookieIpMap() { return p_cookie_ip_map_; }
+  std::optional<std::pair<std::string, std::string>> pCookieIpMap() { return p_cookie_ip_map_; }
   void setPCookieIpMap(std::pair<std::string, std::string>&& data) { p_cookie_ip_map_ = data; }
 #endif
 
-  absl::optional<absl::string_view> transactionId() { return transaction_id_; }
+  std::optional<absl::string_view> transactionId() { return transaction_id_; }
   /**
    * @param data full SIP header
    */
@@ -192,12 +194,12 @@ private:
   std::vector<std::vector<SipHeader>> headers_{HeaderType::HeaderMaxNum};
 
   std::vector<Operation> operation_list_;
-  absl::optional<absl::string_view> ep_;
-  absl::optional<absl::string_view> opaque_;
+  std::optional<absl::string_view> ep_;
+  std::optional<absl::string_view> opaque_;
 
-  absl::optional<std::pair<std::string, std::string>> p_cookie_ip_map_;
+  std::optional<std::pair<std::string, std::string>> p_cookie_ip_map_;
 
-  absl::optional<absl::string_view> transaction_id_;
+  std::optional<absl::string_view> transaction_id_;
 
   std::string destination_;
 

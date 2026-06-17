@@ -669,6 +669,31 @@ fn test_listener_filter_counter_invalid_id() {
 }
 
 #[test]
+fn test_listener_get_dynamic_metadata_string() {
+  let mut mock = listener::MockEnvoyListenerFilter::new();
+  mock
+    .expect_get_dynamic_metadata_string()
+    .withf(|namespace, key| namespace == "my.namespace" && key == "my_key")
+    .returning(|_, _| Some(EnvoyBuffer::new(b"my_value")));
+  assert_eq!(
+    mock
+      .get_dynamic_metadata_string("my.namespace", "my_key")
+      .unwrap()
+      .as_slice(),
+    b"my_value"
+  );
+}
+
+#[test]
+fn test_listener_get_dynamic_metadata_string_none() {
+  let mut mock = listener::MockEnvoyListenerFilter::new();
+  mock
+    .expect_get_dynamic_metadata_string()
+    .returning(|_, _| None);
+  assert!(mock.get_dynamic_metadata_string("missing", "key").is_none());
+}
+
+#[test]
 fn test_listener_filter_config_define_and_manipulate_gauge() {
   reset_listener_filter_metrics();
   let mut config = EnvoyListenerFilterConfigImpl {
@@ -1670,7 +1695,7 @@ fn test_get_upstream_host_address_with_host() {
   let result = filter.get_upstream_host_address();
   assert!(result.is_some());
   let (addr, port) = result.unwrap();
-  assert_eq!(addr, "192.168.1.100");
+  assert_eq!(addr.as_slice(), b"192.168.1.100");
   assert_eq!(port, 8080);
 }
 
@@ -1720,7 +1745,7 @@ fn test_get_upstream_host_hostname_with_host() {
 
   let result = filter.get_upstream_host_hostname();
   assert!(result.is_some());
-  assert_eq!(result.unwrap(), "api.example.com");
+  assert_eq!(result.unwrap().as_slice(), b"api.example.com");
 }
 
 #[test]
@@ -1769,7 +1794,7 @@ fn test_get_upstream_host_cluster_with_host() {
 
   let result = filter.get_upstream_host_cluster();
   assert!(result.is_some());
-  assert_eq!(result.unwrap(), "backend_cluster");
+  assert_eq!(result.unwrap().as_slice(), b"backend_cluster");
 }
 
 #[test]
@@ -1864,16 +1889,19 @@ fn test_upstream_host_full_info() {
   let addr_result = filter.get_upstream_host_address();
   assert!(addr_result.is_some());
   let (addr, port) = addr_result.unwrap();
-  assert_eq!(addr, "10.20.30.40");
+  assert_eq!(addr.as_slice(), b"10.20.30.40");
   assert_eq!(port, 8443);
 
   let hostname_result = filter.get_upstream_host_hostname();
   assert!(hostname_result.is_some());
-  assert_eq!(hostname_result.unwrap(), "secure-backend.example.com");
+  assert_eq!(
+    hostname_result.unwrap().as_slice(),
+    b"secure-backend.example.com"
+  );
 
   let cluster_result = filter.get_upstream_host_cluster();
   assert!(cluster_result.is_some());
-  assert_eq!(cluster_result.unwrap(), "secure_cluster");
+  assert_eq!(cluster_result.unwrap().as_slice(), b"secure_cluster");
 }
 
 #[test]
@@ -1897,7 +1925,7 @@ fn test_upstream_host_partial_info() {
   let addr_result = filter.get_upstream_host_address();
   assert!(addr_result.is_some());
   let (addr, port) = addr_result.unwrap();
-  assert_eq!(addr, "192.168.0.1");
+  assert_eq!(addr.as_slice(), b"192.168.0.1");
   assert_eq!(port, 3000);
 
   // Hostname should be None.
@@ -1906,7 +1934,7 @@ fn test_upstream_host_partial_info() {
   // Cluster should be available.
   let cluster_result = filter.get_upstream_host_cluster();
   assert!(cluster_result.is_some());
-  assert_eq!(cluster_result.unwrap(), "partial_cluster");
+  assert_eq!(cluster_result.unwrap().as_slice(), b"partial_cluster");
 }
 
 #[test]
@@ -1926,7 +1954,7 @@ fn test_upstream_host_ipv6_address() {
   let addr_result = filter.get_upstream_host_address();
   assert!(addr_result.is_some());
   let (addr, port) = addr_result.unwrap();
-  assert_eq!(addr, "::1");
+  assert_eq!(addr.as_slice(), b"::1");
   assert_eq!(port, 8080);
 }
 
@@ -1947,8 +1975,37 @@ fn test_upstream_host_full_ipv6_address() {
   let addr_result = filter.get_upstream_host_address();
   assert!(addr_result.is_some());
   let (addr, port) = addr_result.unwrap();
-  assert_eq!(addr, "2001:0db8:85a3:0000:0000:8a2e:0370:7334");
+  assert_eq!(addr.as_slice(), b"2001:0db8:85a3:0000:0000:8a2e:0370:7334");
   assert_eq!(port, 443);
+}
+
+// =============================================================================
+// Network Dynamic Metadata String Tests
+// =============================================================================
+
+#[test]
+fn test_network_get_dynamic_metadata_string() {
+  let mut mock = network::MockEnvoyNetworkFilter::new();
+  mock
+    .expect_get_dynamic_metadata_string()
+    .withf(|namespace, key| namespace == "my.namespace" && key == "my_key")
+    .returning(|_, _| Some(EnvoyBuffer::new(b"my_value")));
+  assert_eq!(
+    mock
+      .get_dynamic_metadata_string("my.namespace", "my_key")
+      .unwrap()
+      .as_slice(),
+    b"my_value"
+  );
+}
+
+#[test]
+fn test_network_get_dynamic_metadata_string_none() {
+  let mut mock = network::MockEnvoyNetworkFilter::new();
+  mock
+    .expect_get_dynamic_metadata_string()
+    .returning(|_, _| None);
+  assert!(mock.get_dynamic_metadata_string("missing", "key").is_none());
 }
 
 // =============================================================================
@@ -3714,6 +3771,112 @@ fn test_lb_config_vec_metric_invalid_id() {
 }
 
 // =============================================================================
+// Load Balancer accessor tests
+// =============================================================================
+
+#[test]
+fn test_lb_get_cluster_name() {
+  let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
+  mock_lb
+    .expect_get_cluster_name()
+    .returning(|| Some(EnvoyBuffer::new(b"my_cluster")));
+  assert_eq!(
+    mock_lb.get_cluster_name().unwrap().as_slice(),
+    b"my_cluster"
+  );
+}
+
+#[test]
+fn test_lb_get_cluster_name_none() {
+  let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
+  mock_lb.expect_get_cluster_name().returning(|| None);
+  assert!(mock_lb.get_cluster_name().is_none());
+}
+
+#[test]
+fn test_lb_get_healthy_host_address() {
+  let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
+  mock_lb
+    .expect_get_healthy_host_address()
+    .withf(|priority, index| *priority == 0 && *index == 1)
+    .returning(|_, _| Some(EnvoyBuffer::new(b"10.0.0.1:8080")));
+  assert_eq!(
+    mock_lb.get_healthy_host_address(0, 1).unwrap().as_slice(),
+    b"10.0.0.1:8080"
+  );
+}
+
+#[test]
+fn test_lb_get_host_address() {
+  let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
+  mock_lb
+    .expect_get_host_address()
+    .returning(|_, _| Some(EnvoyBuffer::new(b"192.168.0.1:443")));
+  assert_eq!(
+    mock_lb.get_host_address(0, 0).unwrap().as_slice(),
+    b"192.168.0.1:443"
+  );
+}
+
+#[test]
+fn test_lb_get_host_address_none() {
+  let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
+  mock_lb.expect_get_host_address().returning(|_, _| None);
+  assert!(mock_lb.get_host_address(0, 0).is_none());
+}
+
+#[test]
+fn test_lb_get_host_locality() {
+  let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
+  mock_lb.expect_get_host_locality().returning(|_, _| {
+    Some((
+      EnvoyBuffer::new(b"us-east-1"),
+      EnvoyBuffer::new(b"us-east-1a"),
+      EnvoyBuffer::new(b"sub-1"),
+    ))
+  });
+  let (region, zone, sub_zone) = mock_lb.get_host_locality(0, 0).unwrap();
+  assert_eq!(region.as_slice(), b"us-east-1");
+  assert_eq!(zone.as_slice(), b"us-east-1a");
+  assert_eq!(sub_zone.as_slice(), b"sub-1");
+}
+
+#[test]
+fn test_lb_context_get_downstream_headers() {
+  let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
+  mock_lb
+    .expect_context_get_downstream_headers()
+    .returning(|| vec![(EnvoyBuffer::new(b"host"), EnvoyBuffer::new(b"example.com"))]);
+  let headers = mock_lb.context_get_downstream_headers();
+  assert_eq!(headers.len(), 1);
+  assert_eq!(headers[0].0.as_slice(), b"host");
+  assert_eq!(headers[0].1.as_slice(), b"example.com");
+}
+
+#[test]
+fn test_lb_context_get_downstream_header() {
+  let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
+  mock_lb
+    .expect_context_get_downstream_header()
+    .withf(|key, index| key == "host" && *index == 0)
+    .returning(|_, _| Some((EnvoyBuffer::new(b"example.com"), 1)));
+  let result = mock_lb.context_get_downstream_header("host", 0).unwrap();
+  assert_eq!(result.0.as_slice(), b"example.com");
+  assert_eq!(result.1, 1);
+}
+
+#[test]
+fn test_lb_context_get_override_host() {
+  let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
+  mock_lb
+    .expect_context_get_override_host()
+    .returning(|| Some((EnvoyBuffer::new(b"10.0.0.2:9090"), false)));
+  let result = mock_lb.context_get_override_host().unwrap();
+  assert_eq!(result.0.as_slice(), b"10.0.0.2:9090");
+  assert!(!result.1);
+}
+
+// =============================================================================
 // CatchUnwind Tests
 // =============================================================================
 
@@ -4088,6 +4251,25 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_hos
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_host(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _index: usize,
+  _is_added: bool,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _index: usize,
+  _is_added: bool,
+  _result: *mut abi::envoy_dynamic_module_type_packed_address,
+) -> bool {
+  false
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
   _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
   _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
@@ -4356,6 +4538,18 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_worker_slot_get(
   std::ptr::null_mut()
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_get_name(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) {
+  const NAME: &str = "test_cluster";
+  unsafe {
+    (*result).ptr = NAME.as_ptr() as *const _;
+    (*result).length = NAME.len();
+  }
+}
+
 // Cluster config metrics FFI stubs for testing.
 
 #[no_mangle]
@@ -4557,6 +4751,15 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_http_callout(
 // =============================================================================
 // Cluster Extension Rust SDK tests.
 // =============================================================================
+
+#[test]
+fn test_cluster_get_cluster_name() {
+  let mut mock_cluster = cluster::MockEnvoyCluster::new();
+  mock_cluster
+    .expect_get_cluster_name()
+    .returning(|| EnvoyBuffer::new(b"my_cluster"));
+  assert_eq!(mock_cluster.get_cluster_name().as_slice(), b"my_cluster");
+}
 
 #[test]
 fn test_cluster_scheduler_mock() {
@@ -4875,22 +5078,24 @@ fn test_cluster_lb_context_get_downstream_headers_size() {
 fn test_cluster_lb_context_get_downstream_headers() {
   let mut mock_ctx = cluster::MockClusterLbContext::new();
   mock_ctx.expect_get_downstream_headers().returning(|| {
-    Some(vec![
-      (":method".to_string(), "GET".to_string()),
-      ("host".to_string(), "example.com".to_string()),
-    ])
+    vec![
+      (EnvoyBuffer::new(b":method"), EnvoyBuffer::new(b"GET")),
+      (EnvoyBuffer::new(b"host"), EnvoyBuffer::new(b"example.com")),
+    ]
   });
-  let headers = mock_ctx.get_downstream_headers().unwrap();
+  let headers = mock_ctx.get_downstream_headers();
   assert_eq!(headers.len(), 2);
-  assert_eq!(headers[0], (":method".to_string(), "GET".to_string()));
-  assert_eq!(headers[1], ("host".to_string(), "example.com".to_string()));
+  assert_eq!(headers[0].0.as_slice(), b":method");
+  assert_eq!(headers[0].1.as_slice(), b"GET");
+  assert_eq!(headers[1].0.as_slice(), b"host");
+  assert_eq!(headers[1].1.as_slice(), b"example.com");
 }
 
 #[test]
-fn test_cluster_lb_context_get_downstream_headers_none() {
+fn test_cluster_lb_context_get_downstream_headers_empty() {
   let mut mock_ctx = cluster::MockClusterLbContext::new();
-  mock_ctx.expect_get_downstream_headers().returning(|| None);
-  assert!(mock_ctx.get_downstream_headers().is_none());
+  mock_ctx.expect_get_downstream_headers().returning(Vec::new);
+  assert!(mock_ctx.get_downstream_headers().is_empty());
 }
 
 #[test]
@@ -4899,9 +5104,9 @@ fn test_cluster_lb_context_get_downstream_header() {
   mock_ctx
     .expect_get_downstream_header()
     .withf(|key, index| key == "host" && *index == 0)
-    .returning(|_, _| Some(("example.com".to_string(), 1)));
+    .returning(|_, _| Some((EnvoyBuffer::new(b"example.com"), 1)));
   let result = mock_ctx.get_downstream_header("host", 0).unwrap();
-  assert_eq!(result.0, "example.com");
+  assert_eq!(result.0.as_slice(), b"example.com");
   assert_eq!(result.1, 1);
 }
 
@@ -4947,9 +5152,9 @@ fn test_cluster_lb_context_get_override_host() {
   let mut mock_ctx = cluster::MockClusterLbContext::new();
   mock_ctx
     .expect_get_override_host()
-    .returning(|| Some(("10.0.0.1:8080".to_string(), true)));
+    .returning(|| Some((EnvoyBuffer::new(b"10.0.0.1:8080"), true)));
   let result = mock_ctx.get_override_host().unwrap();
-  assert_eq!(result.0, "10.0.0.1:8080");
+  assert_eq!(result.0.as_slice(), b"10.0.0.1:8080");
   assert!(result.1);
 }
 
@@ -4958,9 +5163,9 @@ fn test_cluster_lb_context_get_override_host_non_strict() {
   let mut mock_ctx = cluster::MockClusterLbContext::new();
   mock_ctx
     .expect_get_override_host()
-    .returning(|| Some(("10.0.0.2:9090".to_string(), false)));
+    .returning(|| Some((EnvoyBuffer::new(b"10.0.0.2:9090"), false)));
   let result = mock_ctx.get_override_host().unwrap();
-  assert_eq!(result.0, "10.0.0.2:9090");
+  assert_eq!(result.0.as_slice(), b"10.0.0.2:9090");
   assert!(!result.1);
 }
 
@@ -4976,10 +5181,10 @@ fn test_cluster_lb_context_get_downstream_connection_sni() {
   let mut mock_ctx = cluster::MockClusterLbContext::new();
   mock_ctx
     .expect_get_downstream_connection_sni()
-    .returning(|| Some("example.com".to_string()));
+    .returning(|| Some(EnvoyBuffer::new(b"example.com")));
   assert_eq!(
-    mock_ctx.get_downstream_connection_sni(),
-    Some("example.com".to_string())
+    mock_ctx.get_downstream_connection_sni().unwrap().as_slice(),
+    b"example.com"
   );
 }
 
@@ -5021,6 +5226,134 @@ fn test_cluster_lb_context_get_host_stat_null_host() {
     ),
     0
   );
+}
+
+#[test]
+fn test_cluster_lb_get_cluster_name() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_cluster_name()
+    .returning(|| Some(EnvoyBuffer::new(b"my_cluster")));
+  assert_eq!(
+    mock_lb.get_cluster_name().unwrap().as_slice(),
+    b"my_cluster"
+  );
+}
+
+#[test]
+fn test_cluster_lb_get_cluster_name_none() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb.expect_get_cluster_name().returning(|| None);
+  assert!(mock_lb.get_cluster_name().is_none());
+}
+
+#[test]
+fn test_cluster_lb_get_healthy_host_address() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_healthy_host_address()
+    .withf(|priority, index| *priority == 0 && *index == 1)
+    .returning(|_, _| Some(EnvoyBuffer::new(b"10.0.0.1:8080")));
+  assert_eq!(
+    mock_lb.get_healthy_host_address(0, 1).unwrap().as_slice(),
+    b"10.0.0.1:8080"
+  );
+}
+
+#[test]
+fn test_cluster_lb_get_host_address() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_host_address()
+    .returning(|_, _| Some(EnvoyBuffer::new(b"192.168.0.1:443")));
+  assert_eq!(
+    mock_lb.get_host_address(0, 0).unwrap().as_slice(),
+    b"192.168.0.1:443"
+  );
+}
+
+#[test]
+fn test_cluster_lb_get_host_address_none() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb.expect_get_host_address().returning(|_, _| None);
+  assert!(mock_lb.get_host_address(0, 0).is_none());
+}
+
+#[test]
+fn test_cluster_lb_get_member_update_host() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_member_update_host()
+    .withf(|index, is_added| *index == 0 && *is_added)
+    .returning(|_, _| Some(0x1234 as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr));
+  assert_eq!(
+    mock_lb.get_member_update_host(0, true).map(|h| h as usize),
+    Some(0x1234)
+  );
+}
+
+#[test]
+fn test_cluster_lb_get_member_update_host_none() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_member_update_host()
+    .returning(|_, _| None);
+  assert!(mock_lb.get_member_update_host(0, false).is_none());
+}
+
+#[test]
+fn test_cluster_lb_get_member_update_host_packed_address() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_member_update_host_packed_address()
+    .withf(|index, is_added| *index == 0 && *is_added)
+    .returning(|_, _| Some(cluster::PackedAddress::V4([127, 0, 0, 1], 10001)));
+  mock_lb
+    .expect_get_member_update_host_packed_address()
+    .withf(|_, is_added| !*is_added)
+    .returning(|_, _| Some(cluster::PackedAddress::V6([1; 16], 10002)));
+
+  match mock_lb.get_member_update_host_packed_address(0, true) {
+    Some(cluster::PackedAddress::V4(addr, port)) => {
+      assert_eq!(addr, [127, 0, 0, 1]);
+      assert_eq!(port, 10001);
+    },
+    other => panic!("expected V4, got {other:?}"),
+  }
+  match mock_lb.get_member_update_host_packed_address(0, false) {
+    Some(cluster::PackedAddress::V6(addr, port)) => {
+      assert_eq!(addr, [1; 16]);
+      assert_eq!(port, 10002);
+    },
+    other => panic!("expected V6, got {other:?}"),
+  }
+}
+
+#[test]
+fn test_cluster_lb_get_member_update_host_packed_address_none() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_member_update_host_packed_address()
+    .returning(|_, _| None);
+  assert!(mock_lb
+    .get_member_update_host_packed_address(0, false)
+    .is_none());
+}
+
+#[test]
+fn test_cluster_lb_get_host_locality() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb.expect_get_host_locality().returning(|_, _| {
+    Some((
+      EnvoyBuffer::new(b"us-east-1"),
+      EnvoyBuffer::new(b"us-east-1a"),
+      EnvoyBuffer::new(b"sub-1"),
+    ))
+  });
+  let (region, zone, sub_zone) = mock_lb.get_host_locality(0, 0).unwrap();
+  assert_eq!(region.as_slice(), b"us-east-1");
+  assert_eq!(zone.as_slice(), b"us-east-1a");
+  assert_eq!(sub_zone.as_slice(), b"sub-1");
 }
 
 #[test]
@@ -5140,13 +5473,13 @@ fn test_cluster_lb_context_full_workflow() {
         Some(s) => s,
         None => return cluster::HostSelectionResult::NoHost,
       };
-      assert_eq!(sni, "backend.example.com");
+      assert_eq!(sni.as_slice(), b"backend.example.com");
 
       let (host_header, _) = match ctx.get_downstream_header("host", 0) {
         Some(h) => h,
         None => return cluster::HostSelectionResult::NoHost,
       };
-      assert_eq!(host_header, "backend.example.com");
+      assert_eq!(host_header.as_slice(), b"backend.example.com");
 
       let hash = match ctx.compute_hash_key() {
         Some(h) => h,
@@ -5165,11 +5498,11 @@ fn test_cluster_lb_context_full_workflow() {
   let mut mock_ctx = cluster::MockClusterLbContext::new();
   mock_ctx
     .expect_get_downstream_connection_sni()
-    .returning(|| Some("backend.example.com".to_string()));
+    .returning(|| Some(EnvoyBuffer::new(b"backend.example.com")));
   mock_ctx
     .expect_get_downstream_header()
     .withf(|key, index| key == "host" && *index == 0)
-    .returning(|_, _| Some(("backend.example.com".to_string(), 1)));
+    .returning(|_, _| Some((EnvoyBuffer::new(b"backend.example.com"), 1)));
   mock_ctx.expect_compute_hash_key().returning(|| Some(99999));
   mock_ctx
     .expect_should_select_another_host()
@@ -6264,6 +6597,84 @@ fn test_cluster_callout_done_with_null_buffers_yields_none() {
 }
 
 // =============================================================================
+// Matcher Header Retrieval FFI stubs and tests.
+// =============================================================================
+
+const MOCK_MATCHER_HEADERS: [(&[u8], &[u8]); 2] =
+  [(b":path", b"/index"), (b"content-type", b"text/plain")];
+
+// The size stub derives its count from the fixture so it can never disagree with the number of
+// entries the fill stub writes.
+static MOCK_MATCHER_MAP_EMPTY: AtomicBool = AtomicBool::new(false);
+static MOCK_MATCHER_FILL_SUCCEEDS: AtomicBool = AtomicBool::new(true);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_matcher_get_headers_size(
+  _matcher_input_envoy_ptr: abi::envoy_dynamic_module_type_matcher_input_envoy_ptr,
+  _header_type: abi::envoy_dynamic_module_type_http_header_type,
+) -> usize {
+  if MOCK_MATCHER_MAP_EMPTY.load(std::sync::atomic::Ordering::SeqCst) {
+    0
+  } else {
+    MOCK_MATCHER_HEADERS.len()
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_matcher_get_headers(
+  _matcher_input_envoy_ptr: abi::envoy_dynamic_module_type_matcher_input_envoy_ptr,
+  _header_type: abi::envoy_dynamic_module_type_http_header_type,
+  result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header,
+) -> bool {
+  if !MOCK_MATCHER_FILL_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
+    return false;
+  }
+  for (i, (key, value)) in MOCK_MATCHER_HEADERS.iter().enumerate() {
+    unsafe {
+      *result_headers.add(i) = abi::envoy_dynamic_module_type_envoy_http_header {
+        key_ptr: key.as_ptr() as *mut _,
+        key_length: key.len(),
+        value_ptr: value.as_ptr() as *mut _,
+        value_length: value.len(),
+      };
+    }
+  }
+  true
+}
+
+#[test]
+fn test_matcher_get_all_headers() {
+  let ctx = crate::matcher::MatchContext::new(std::ptr::null_mut());
+
+  // A populated map yields every key-value pair in fill order.
+  MOCK_MATCHER_MAP_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
+  MOCK_MATCHER_FILL_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
+  let headers = ctx
+    .get_all_headers(abi::envoy_dynamic_module_type_http_header_type::RequestHeader)
+    .expect("header map is available");
+  assert_eq!(
+    headers,
+    vec![
+      (b":path".as_slice(), b"/index".as_slice()),
+      (b"content-type".as_slice(), b"text/plain".as_slice()),
+    ]
+  );
+
+  // An empty map returns None without invoking the fill callback.
+  MOCK_MATCHER_MAP_EMPTY.store(true, std::sync::atomic::Ordering::SeqCst);
+  assert!(ctx
+    .get_all_headers(abi::envoy_dynamic_module_type_http_header_type::RequestHeader)
+    .is_none());
+
+  // A failed fill returns None rather than exposing the uninitialized capacity.
+  MOCK_MATCHER_MAP_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
+  MOCK_MATCHER_FILL_SUCCEEDS.store(false, std::sync::atomic::Ordering::SeqCst);
+  assert!(ctx
+    .get_all_headers(abi::envoy_dynamic_module_type_http_header_type::RequestHeader)
+    .is_none());
+}
+
+// =============================================================================
 // Stats Sink unit tests
 // =============================================================================
 
@@ -6973,4 +7384,593 @@ fn test_envoy_dynamic_module_on_stat_sink_config_scheduled_recovers_from_panic()
     );
     stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
   }
+}
+
+// =============================================================================
+// Transport Socket Tests
+// =============================================================================
+
+#[test]
+fn test_transport_socket_io_result_conversions() {
+  let keep = IoResult::keep_open(7, true);
+  assert_eq!(keep.action, PostIoAction::KeepOpen);
+  assert_eq!(keep.bytes_processed, 7);
+  assert!(keep.end_stream_read);
+
+  let close = IoResult::close(3, false);
+  assert_eq!(close.action, PostIoAction::Close);
+  assert_eq!(close.bytes_processed, 3);
+  assert!(!close.end_stream_read);
+
+  // Round-trip through the ABI representation in both directions.
+  let abi_result: abi::envoy_dynamic_module_type_transport_socket_io_result = keep.into();
+  assert_eq!(abi_result.bytes_processed, 7);
+  assert!(abi_result.end_stream_read);
+  assert_eq!(IoResult::from(abi_result), keep);
+}
+
+#[test]
+fn test_transport_socket_post_io_action_conversions() {
+  for action in [PostIoAction::KeepOpen, PostIoAction::Close] {
+    let abi_action: abi::envoy_dynamic_module_type_transport_socket_post_io_action = action.into();
+    assert_eq!(PostIoAction::from(abi_action), action);
+  }
+}
+
+#[test]
+fn test_transport_socket_io_status_conversions() {
+  assert_eq!(
+    IoStatus::from(abi::envoy_dynamic_module_type_transport_socket_io_status::Success),
+    IoStatus::Success
+  );
+  assert_eq!(
+    IoStatus::from(abi::envoy_dynamic_module_type_transport_socket_io_status::Again),
+    IoStatus::Again
+  );
+  assert_eq!(
+    IoStatus::from(abi::envoy_dynamic_module_type_transport_socket_io_status::Error),
+    IoStatus::Error
+  );
+}
+
+#[test]
+fn test_transport_socket_connection_event_conversions() {
+  for event in [
+    ConnectionEvent::RemoteClose,
+    ConnectionEvent::LocalClose,
+    ConnectionEvent::Connected,
+    ConnectionEvent::ConnectedZeroRtt,
+  ] {
+    let abi_event: abi::envoy_dynamic_module_type_network_connection_event = event.into();
+    assert_eq!(ConnectionEvent::from(abi_event), event);
+  }
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_transport_socket_hooks() {
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+
+  struct TestConfig;
+  impl TransportSocketFactoryConfig<EnvoyTransportSocketImpl> for TestConfig {
+    fn new_transport_socket(
+      &self,
+      _envoy: &mut EnvoyTransportSocketImpl,
+    ) -> Box<dyn TransportSocket<EnvoyTransportSocketImpl>> {
+      Box::new(TestSocket)
+    }
+  }
+
+  // The hooks below pass a null Envoy pointer, so the socket must never call back into Envoy.
+  struct TestSocket;
+  impl Drop for TestSocket {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+  impl TransportSocket<EnvoyTransportSocketImpl> for TestSocket {
+    fn on_set_callbacks(&mut self, _envoy: &mut EnvoyTransportSocketImpl) {}
+    fn on_connected(&mut self, _envoy: &mut EnvoyTransportSocketImpl) {}
+    fn on_do_read(&mut self, _envoy: &mut EnvoyTransportSocketImpl) -> IoResult {
+      IoResult::keep_open(0, true)
+    }
+    fn on_do_write(
+      &mut self,
+      _envoy: &mut EnvoyTransportSocketImpl,
+      _end_stream: bool,
+    ) -> IoResult {
+      IoResult::close(0, false)
+    }
+    fn on_close(
+      &mut self,
+      _envoy: &mut EnvoyTransportSocketImpl,
+      _event: ConnectionEvent,
+      _abort_reset: bool,
+    ) {
+    }
+    fn get_protocol(&self, _envoy: &mut EnvoyTransportSocketImpl) -> String {
+      "test-proto".to_string()
+    }
+    fn get_failure_reason(&self, _envoy: &mut EnvoyTransportSocketImpl) -> String {
+      "test-failure".to_string()
+    }
+    fn can_flush_close(&self, _envoy: &mut EnvoyTransportSocketImpl) -> bool {
+      true
+    }
+    fn start_secure_transport(&mut self, _envoy: &mut EnvoyTransportSocketImpl) -> bool {
+      true
+    }
+  }
+
+  let config: Box<dyn TransportSocketFactoryConfig<EnvoyTransportSocketImpl>> =
+    Box::new(TestConfig);
+  let config_ptr = wrap_into_c_void_ptr!(config);
+  let socket_ptr = unsafe {
+    transport_socket::envoy_dynamic_module_on_transport_socket_new(config_ptr, std::ptr::null_mut())
+  };
+  assert!(!socket_ptr.is_null());
+
+  unsafe {
+    transport_socket::envoy_dynamic_module_on_transport_socket_set_callbacks(
+      std::ptr::null_mut(),
+      socket_ptr,
+    );
+    transport_socket::envoy_dynamic_module_on_transport_socket_on_connected(
+      std::ptr::null_mut(),
+      socket_ptr,
+    );
+
+    let read = transport_socket::envoy_dynamic_module_on_transport_socket_do_read(
+      std::ptr::null_mut(),
+      socket_ptr,
+    );
+    assert_eq!(
+      read.action,
+      abi::envoy_dynamic_module_type_transport_socket_post_io_action::KeepOpen
+    );
+    assert!(read.end_stream_read);
+
+    let write = transport_socket::envoy_dynamic_module_on_transport_socket_do_write(
+      std::ptr::null_mut(),
+      socket_ptr,
+      true,
+    );
+    assert_eq!(
+      write.action,
+      abi::envoy_dynamic_module_type_transport_socket_post_io_action::Close
+    );
+
+    assert!(
+      transport_socket::envoy_dynamic_module_on_transport_socket_can_flush_close(
+        std::ptr::null_mut(),
+        socket_ptr,
+      )
+    );
+    assert!(
+      transport_socket::envoy_dynamic_module_on_transport_socket_start_secure_transport(
+        std::ptr::null_mut(),
+        socket_ptr,
+      )
+    );
+
+    let mut protocol_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    transport_socket::envoy_dynamic_module_on_transport_socket_get_protocol(
+      std::ptr::null_mut(),
+      socket_ptr,
+      &mut protocol_buf,
+    );
+    let protocol = std::slice::from_raw_parts(protocol_buf.ptr as *const u8, protocol_buf.length);
+    assert_eq!(protocol, b"test-proto");
+
+    let mut failure_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    transport_socket::envoy_dynamic_module_on_transport_socket_get_failure_reason(
+      std::ptr::null_mut(),
+      socket_ptr,
+      &mut failure_buf,
+    );
+    let failure = std::slice::from_raw_parts(failure_buf.ptr as *const u8, failure_buf.length);
+    assert_eq!(failure, b"test-failure");
+
+    transport_socket::envoy_dynamic_module_on_transport_socket_close(
+      std::ptr::null_mut(),
+      socket_ptr,
+      abi::envoy_dynamic_module_type_network_connection_event::LocalClose,
+      false,
+    );
+
+    transport_socket::envoy_dynamic_module_on_transport_socket_destroy(socket_ptr);
+    transport_socket::envoy_dynamic_module_on_transport_socket_factory_config_destroy(config_ptr);
+  }
+
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+// =============================================================================
+// MockEnvoyTransportSocket Tests
+// =============================================================================
+
+#[test]
+fn test_mock_envoy_transport_socket_do_read() {
+  struct EchoTransportSocket;
+  impl TransportSocket<transport_socket::MockEnvoyTransportSocket> for EchoTransportSocket {
+    fn on_set_callbacks(&mut self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) {}
+    fn on_connected(&mut self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) {}
+    fn on_do_read(&mut self, envoy: &mut transport_socket::MockEnvoyTransportSocket) -> IoResult {
+      let mut buffer = [0u8; 8];
+      let (status, n) = envoy.io_read(&mut buffer);
+      assert_eq!(status, IoStatus::Success);
+      envoy.read_buffer_add(&buffer[..n]);
+      IoResult::keep_open(n, false)
+    }
+    fn on_do_write(
+      &mut self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+      _end_stream: bool,
+    ) -> IoResult {
+      IoResult::keep_open(0, false)
+    }
+    fn on_close(
+      &mut self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+      _event: ConnectionEvent,
+      _abort_reset: bool,
+    ) {
+    }
+    fn get_protocol(&self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) -> String {
+      String::new()
+    }
+    fn get_failure_reason(
+      &self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+    ) -> String {
+      String::new()
+    }
+    fn can_flush_close(&self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) -> bool {
+      true
+    }
+    fn start_secure_transport(
+      &mut self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+    ) -> bool {
+      false
+    }
+  }
+
+  let mut mock = transport_socket::MockEnvoyTransportSocket::new();
+  mock.expect_io_read().times(1).returning(|buffer| {
+    buffer[..5].copy_from_slice(b"hello");
+    (IoStatus::Success, 5)
+  });
+  mock
+    .expect_read_buffer_add()
+    .with(mockall::predicate::eq(b"hello".as_slice()))
+    .times(1)
+    .returning(|_| ());
+
+  let mut socket = EchoTransportSocket;
+  assert_eq!(socket.on_do_read(&mut mock), IoResult::keep_open(5, false));
+}
+
+// =============================================================================
+// Formatter unit tests
+// =============================================================================
+
+#[test]
+fn test_envoy_dynamic_module_on_formatter_config_new_impl() {
+  struct TestFormatterConfig;
+  impl formatter::FormatterConfig for TestFormatterConfig {
+    fn parse(
+      &self,
+      _command: &str,
+      _command_arg: &str,
+      _max_length: Option<usize>,
+    ) -> Option<Box<dyn formatter::FormatterProvider>> {
+      None
+    }
+  }
+
+  let mut new_fn: NewFormatterConfigFunction = |_, _| Some(Box::new(TestFormatterConfig));
+  let result = formatter::envoy_dynamic_module_on_formatter_config_new_impl(
+    "test_formatter",
+    b"config",
+    &new_fn,
+  );
+  assert!(!result.is_null());
+  unsafe {
+    formatter::envoy_dynamic_module_on_formatter_config_destroy(result);
+  }
+
+  // None should result in a null pointer (e.g. unknown formatter name).
+  new_fn = |_, _| None;
+  let result = formatter::envoy_dynamic_module_on_formatter_config_new_impl(
+    "test_formatter",
+    b"config",
+    &new_fn,
+  );
+  assert!(result.is_null());
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_formatter_config_destroy() {
+  // This test ensures the wrapped trait object is dropped exactly once on `_destroy`.
+  static DROP_COUNT: AtomicU32 = AtomicU32::new(0);
+  struct TestFormatterConfig;
+  impl formatter::FormatterConfig for TestFormatterConfig {
+    fn parse(
+      &self,
+      _command: &str,
+      _command_arg: &str,
+      _max_length: Option<usize>,
+    ) -> Option<Box<dyn formatter::FormatterProvider>> {
+      None
+    }
+  }
+  impl Drop for TestFormatterConfig {
+    fn drop(&mut self) {
+      DROP_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let new_fn: NewFormatterConfigFunction = |_, _| Some(Box::new(TestFormatterConfig));
+  let config_ptr =
+    formatter::envoy_dynamic_module_on_formatter_config_new_impl("test_formatter", b"", &new_fn);
+  assert!(!config_ptr.is_null());
+  unsafe {
+    formatter::envoy_dynamic_module_on_formatter_config_destroy(config_ptr);
+  }
+  assert_eq!(1, DROP_COUNT.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_formatter_parse_format_and_destroy() {
+  // Round-trip the provider to ensure parse, format, and destroy correctly own and free the boxed
+  // trait object and that the produced value is returned through the result buffer.
+  static PROVIDER_DROP_COUNT: AtomicU32 = AtomicU32::new(0);
+
+  struct TestFormatterConfig;
+  impl formatter::FormatterConfig for TestFormatterConfig {
+    fn parse(
+      &self,
+      command: &str,
+      _command_arg: &str,
+      max_length: Option<usize>,
+    ) -> Option<Box<dyn formatter::FormatterProvider>> {
+      match command {
+        "value" => Some(Box::new(TestProvider {
+          value: Some("hello".to_string()),
+        })),
+        "absent" => Some(Box::new(TestProvider { value: None })),
+        // Recognized only when the configured truncation length is threaded through as `Some(3)`.
+        "withlen" if max_length == Some(3) => Some(Box::new(TestProvider {
+          value: Some("len".to_string()),
+        })),
+        _ => None,
+      }
+    }
+  }
+
+  struct TestProvider {
+    value: Option<String>,
+  }
+  impl formatter::FormatterProvider for TestProvider {
+    fn format(&self, _ctx: &formatter::FormatterContext) -> Option<String> {
+      self.value.clone()
+    }
+  }
+  impl Drop for TestProvider {
+    fn drop(&mut self) {
+      PROVIDER_DROP_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let new_fn: NewFormatterConfigFunction = |_, _| Some(Box::new(TestFormatterConfig));
+  let config_ptr =
+    formatter::envoy_dynamic_module_on_formatter_config_new_impl("test_formatter", b"", &new_fn);
+  assert!(!config_ptr.is_null());
+
+  let make_buf = |s: &str| abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: s.as_ptr() as *const _,
+    length: s.len(),
+  };
+  let empty_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: std::ptr::null(),
+    length: 0,
+  };
+
+  // An unrecognized command yields a null provider.
+  let none_provider = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_parse(
+      config_ptr,
+      make_buf("unknown"),
+      empty_buf,
+      false,
+      0,
+    )
+  };
+  assert!(none_provider.is_null());
+
+  // A recognized command yields a provider that fills the result buffer.
+  let provider = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_parse(
+      config_ptr,
+      make_buf("value"),
+      empty_buf,
+      false,
+      0,
+    )
+  };
+  assert!(!provider.is_null());
+
+  let mut result = abi::envoy_dynamic_module_type_module_buffer {
+    ptr: std::ptr::null(),
+    length: 0,
+  };
+  let produced = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_format(provider, std::ptr::null_mut(), &mut result)
+  };
+  assert!(produced);
+  let value = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+  assert_eq!(value, b"hello");
+
+  unsafe {
+    formatter::envoy_dynamic_module_on_formatter_provider_destroy(provider);
+  }
+  assert_eq!(
+    1,
+    PROVIDER_DROP_COUNT.load(std::sync::atomic::Ordering::SeqCst)
+  );
+
+  // A configured truncation length is threaded through to parse as `Some`, while its absence
+  // yields `None`.
+  let with_len = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_parse(
+      config_ptr,
+      make_buf("withlen"),
+      empty_buf,
+      true,
+      3,
+    )
+  };
+  assert!(!with_len.is_null());
+  unsafe {
+    formatter::envoy_dynamic_module_on_formatter_provider_destroy(with_len);
+  }
+  let without_len = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_parse(
+      config_ptr,
+      make_buf("withlen"),
+      empty_buf,
+      false,
+      3,
+    )
+  };
+  assert!(without_len.is_null());
+
+  // A provider that returns None makes the format hook report the value is absent.
+  let absent_provider = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_parse(
+      config_ptr,
+      make_buf("absent"),
+      empty_buf,
+      false,
+      0,
+    )
+  };
+  assert!(!absent_provider.is_null());
+  let produced = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_format(
+      absent_provider,
+      std::ptr::null_mut(),
+      &mut result,
+    )
+  };
+  assert!(!produced);
+  unsafe {
+    formatter::envoy_dynamic_module_on_formatter_provider_destroy(absent_provider);
+    formatter::envoy_dynamic_module_on_formatter_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_formatter_format_recovers_from_panic() {
+  // format runs on worker threads, so a panic must be caught at the FFI boundary and reported as an
+  // absent value rather than unwinding across the ABI.
+  struct PanicProvider;
+  impl formatter::FormatterProvider for PanicProvider {
+    fn format(&self, _ctx: &formatter::FormatterContext) -> Option<String> {
+      panic!("intentional panic in format");
+    }
+  }
+
+  let provider: Box<dyn formatter::FormatterProvider> = Box::new(PanicProvider);
+  let provider_ptr = Box::into_raw(Box::new(provider)) as *const std::ffi::c_void;
+  let mut result = abi::envoy_dynamic_module_type_module_buffer {
+    ptr: std::ptr::null(),
+    length: 0,
+  };
+  let produced = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_format(
+      provider_ptr,
+      std::ptr::null_mut(),
+      &mut result,
+    )
+  };
+  assert!(!produced);
+  unsafe {
+    formatter::envoy_dynamic_module_on_formatter_provider_destroy(provider_ptr);
+  }
+}
+
+#[test]
+fn test_mock_envoy_transport_socket_fd_and_write_rearm() {
+  // Exercises the raw socket callbacks a transport such as kTLS relies on. It reads the descriptor
+  // on connect and, when it defers buffered bytes for its own reasons, re-arms the writable
+  // notification so the write is retried later.
+  struct ProbeTransportSocket {
+    fd: Option<i32>,
+  }
+  impl TransportSocket<transport_socket::MockEnvoyTransportSocket> for ProbeTransportSocket {
+    fn on_set_callbacks(&mut self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) {}
+    fn on_connected(&mut self, envoy: &mut transport_socket::MockEnvoyTransportSocket) {
+      self.fd = envoy.get_fd();
+    }
+    fn on_do_read(&mut self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) -> IoResult {
+      IoResult::keep_open(0, false)
+    }
+    fn on_do_write(
+      &mut self,
+      envoy: &mut transport_socket::MockEnvoyTransportSocket,
+      _end_stream: bool,
+    ) -> IoResult {
+      // A transport that defers the buffered bytes re-arms instead of sending, so it is driven
+      // again on a later iteration.
+      if envoy.write_buffer_length() > 0 {
+        envoy.set_is_writable();
+      }
+      IoResult::keep_open(0, false)
+    }
+    fn on_close(
+      &mut self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+      _event: ConnectionEvent,
+      _abort_reset: bool,
+    ) {
+    }
+    fn get_protocol(&self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) -> String {
+      String::new()
+    }
+    fn get_failure_reason(
+      &self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+    ) -> String {
+      String::new()
+    }
+    fn can_flush_close(&self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) -> bool {
+      true
+    }
+    fn start_secure_transport(
+      &mut self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+    ) -> bool {
+      false
+    }
+  }
+
+  let mut mock = transport_socket::MockEnvoyTransportSocket::new();
+  mock.expect_get_fd().times(1).returning(|| Some(7));
+  mock.expect_write_buffer_length().times(1).returning(|| 3);
+  mock.expect_set_is_writable().times(1).returning(|| ());
+
+  let mut socket = ProbeTransportSocket { fd: None };
+  socket.on_connected(&mut mock);
+  assert_eq!(socket.fd, Some(7));
+  assert_eq!(
+    socket.on_do_write(&mut mock, false),
+    IoResult::keep_open(0, false)
+  );
 }

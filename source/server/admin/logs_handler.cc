@@ -1,12 +1,14 @@
 #include "source/server/admin/logs_handler.h"
 
 #include <string>
+#include <vector>
 
 #include "source/common/common/fine_grain_logger.h"
 #include "source/common/common/logger.h"
 #include "source/server/admin/utils.h"
 
 #include "absl/strings/str_split.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Server {
@@ -50,6 +52,7 @@ Http::Code LogsHandler::handlerLogging(Http::ResponseHeaderMap&, Buffer::Instanc
     response.add("usage: /logging?<name>=<level> (change single level)\n");
     response.add("usage: /logging?paths=name1:level1,name2:level2,... (change multiple levels)\n");
     response.add("usage: /logging?level=<level> (change all levels)\n");
+    response.add("usage: /logging?group=<group_name>:<level> (change group of loggers)\n");
     response.add("levels: ");
     for (auto level_string_view : spdlog::level::level_string_views) {
       response.add(fmt::format("{} ", level_string_view));
@@ -83,30 +86,33 @@ Http::Code LogsHandler::handlerReopenLogs(Http::ResponseHeaderMap&, Buffer::Inst
 }
 
 absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParamsMulti& params) {
-  // "level" and "paths" will be set to the empty string when this is invoked
-  // from HTML without setting them, so clean out empty values.
-  auto level = params.getFirstValue("level");
-  if (level.has_value() && level.value().empty()) {
-    params.remove("level");
-    level = std::nullopt;
-  }
-  auto paths = params.getFirstValue("paths");
-  if (paths.has_value() && paths.value().empty()) {
-    params.remove("paths");
-    paths = std::nullopt;
+  // Identify active non-empty parameters.
+  std::string active_key;
+  std::string active_value;
+  int active_params_count = 0;
+
+  for (auto const& [key, values] : params.data()) {
+    if (values.empty() || values[0].empty()) {
+      continue;
+    }
+    active_params_count++;
+    active_key = key;
+    active_value = values[0];
   }
 
-  if (params.data().empty()) {
+  if (active_params_count == 0) {
     return absl::OkStatus();
   }
 
-  if (params.data().size() != 1) {
+  if (active_params_count != 1) {
     return absl::InvalidArgumentError("invalid number of parameters");
   }
 
-  if (level.has_value()) {
+  const bool use_fine_grain_logger = Logger::Context::useFineGrainLogger();
+
+  if (active_key == "level") {
     // Change all log levels.
-    const absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(level.value());
+    const absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(active_value);
     if (!level_to_use.ok()) {
       return level_to_use.status();
     }
@@ -118,59 +124,72 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParamsMulti& params
   // Build a map of name:level pairs, a few allocations is ok here since it's
   // not common to call this function at a high rate.
   absl::flat_hash_map<absl::string_view, spdlog::level::level_enum> name_levels;
-  std::vector<std::pair<absl::string_view, int>> glob_levels;
-  const bool use_fine_grain_logger = Logger::Context::useFineGrainLogger();
+  std::vector<FineGrainLogContext::VerbosityUpdate> glob_levels;
 
-  if (paths.has_value()) {
+  if (active_key == "paths") {
     // Bulk change log level by name:level pairs, separated by comma.
     std::vector<absl::string_view> pairs =
-        absl::StrSplit(paths.value(), ',', absl::SkipWhitespace());
+        absl::StrSplit(active_value, ',', absl::SkipWhitespace());
     for (const auto& name_level : pairs) {
       const std::pair<absl::string_view, absl::string_view> name_level_pair =
           absl::StrSplit(name_level, absl::MaxSplits(':', 1), absl::SkipWhitespace());
-      auto [name, level] = name_level_pair;
-      if (name.empty() || level.empty()) {
+      auto [name, level_str] = name_level_pair;
+      if (name.empty() || level_str.empty()) {
         return absl::InvalidArgumentError("empty logger name or empty logger level");
       }
 
-      const absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(level);
+      const absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(level_str);
       if (!level_to_use.ok()) {
         return level_to_use.status();
       }
 
       if (use_fine_grain_logger) {
-        ENVOY_LOG(info, "adding fine-grain log update, glob='{}' level='{}'", name,
+        ENVOY_LOG(info, "adding fine-grain log update, pattern='{}' level='{}'", name,
                   spdlog::level::level_string_views[*level_to_use]);
-        glob_levels.emplace_back(name, *level_to_use);
+        glob_levels.push_back({name, static_cast<int>(*level_to_use), false});
       } else {
         name_levels[name] = *level_to_use;
       }
     }
-  } else {
-    // The HTML admin interface will always populate "level" and "paths" though
-    // they may be empty. There's a legacy non-HTML-accessible mechanism to
-    // set a single logger to a level, which we'll handle now. In this scenario,
-    // "level" and "paths" will not be populated.
-    if (params.data().size() != 1) {
-      return absl::InvalidArgumentError("invalid number of parameters");
+  } else if (active_key == "group") {
+    // Group parameter requires fine-grain logging to be enabled
+    if (!use_fine_grain_logger) {
+      return absl::InvalidArgumentError(
+          "group parameter requires fine-grain logging to be enabled");
     }
-
-    // Change particular log level by name.
-    const auto it = params.data().begin();
-    const std::string& key = it->first;
-    const std::string& value = it->second[0];
-
-    const absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(value);
+    const std::pair<absl::string_view, absl::string_view> name_level_pair =
+        absl::StrSplit(active_value, absl::MaxSplits(':', 1), absl::SkipWhitespace());
+    auto [name, level_str] = name_level_pair;
+    if (name.empty() || level_str.empty()) {
+      return absl::InvalidArgumentError("empty logger name or empty logger level in group");
+    }
+    const absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(level_str);
+    if (!level_to_use.ok()) {
+      return level_to_use.status();
+    }
+    ENVOY_LOG(info, "adding fine-grain log update, group='{}' level='{}'", name,
+              spdlog::level::level_string_views[*level_to_use]);
+    glob_levels.push_back({name, static_cast<int>(*level_to_use), true});
+  } else {
+    // Change particular log level by name (legacy non-HTML mechanism).
+    const absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(active_value);
     if (!level_to_use.ok()) {
       return level_to_use.status();
     }
 
     if (use_fine_grain_logger) {
-      ENVOY_LOG(info, "adding fine-grain log update, glob='{}' level='{}'", key,
+      ENVOY_LOG(info, "adding fine-grain log update, pattern='{}' level='{}'", active_key,
                 spdlog::level::level_string_views[*level_to_use]);
-      glob_levels.emplace_back(key, *level_to_use);
+      glob_levels.push_back({active_key, static_cast<int>(*level_to_use), false});
     } else {
-      name_levels[key] = *level_to_use;
+      if (active_key == "level" || active_key == "paths" || active_key == "group") {
+        if (active_key == "group") {
+          return absl::InvalidArgumentError(
+              "group parameter requires fine-grain logging to be enabled");
+        }
+        return absl::InvalidArgumentError(fmt::format("invalid parameter: {}", active_key));
+      }
+      name_levels[active_key] = *level_to_use;
     }
   }
 

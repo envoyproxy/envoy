@@ -92,7 +92,7 @@ public:
 
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override;
 
-    bool recreateOnHostChange() const override { return false; }
+    bool recreateOnHostChangeDeprecated() const override { return false; }
 
     Upstream::LoadBalancerPtr createWithCommonLbConfig(const CommonLbConfig& common_lb_config,
                                                        Upstream::LoadBalancerParams params);

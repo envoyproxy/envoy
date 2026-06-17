@@ -230,6 +230,21 @@ class TestAsyncClientFetch(unittest.TestCase):
 
         asyncio.run(run())
 
+    def test_non_existent_listener(self):
+        """Verify that using a non-existent listener name fails."""
+
+        async def run():
+            async with AsyncClient(
+                self._make_client_builder(), listener_name="non_existent_listener"
+            ) as client:
+                with self.assertRaises(ClientResponseError) as cm:
+                    await client.get(f"{self._echo_server_url}/")
+                self.assertIsNotNone(cm.exception.envoy_error)
+                self.assertIn("Listener not found", cm.exception.envoy_error.message)
+                self.assertIn("non_existent_listener", cm.exception.envoy_error.message)
+
+        asyncio.run(run())
+
 
 if __name__ == "__main__":
     unittest.main()

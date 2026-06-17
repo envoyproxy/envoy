@@ -226,7 +226,7 @@ public:
   const envoy::config::core::v3::Locality& locality() const override { return *locality_; }
   const MetadataConstSharedPtr localityMetadata() const override { return locality_metadata_; }
   Stats::StatName localityZoneStatName() const override {
-    return locality_zone_stat_name_.statName();
+    return locality_->zone().empty() ? Stats::StatName() : locality_zone_stat_name_.statName();
   }
   uint32_t priority() const override { return priority_; }
   void priority(uint32_t priority) override { priority_ = priority; }
