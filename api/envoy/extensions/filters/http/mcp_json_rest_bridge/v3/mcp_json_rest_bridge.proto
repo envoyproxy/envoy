@@ -183,6 +183,7 @@ message ToolsListLocal {
 }
 
 // Configuration for the MCP tool capability of the server.
+// [#next-free-field: 6]
 message ServerToolConfig {
   // List of MCP tools configurations.
   repeated ToolConfig tools = 1;
