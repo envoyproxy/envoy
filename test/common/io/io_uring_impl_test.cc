@@ -509,12 +509,26 @@ TEST_F(IoUringImplTest, MultishotRecvDeliversDataInProvidedBuffer) {
   EXPECT_TRUE(more);
   EXPECT_EQ(0, memcmp(pool->getBuffer(buffer_id), data.data(), data.size()));
 
-  // Returning the buffer to the kernel must be safe and lets it be reused.
-  pool->returnBuffer(pool->getBuffer(buffer_id));
+  // Releasing the buffer to the kernel must be safe and lets it be reused.
+  pool->releaseBuffer(pool->getBuffer(buffer_id));
 
   io_uring->unregisterEventfd();
   ::close(fds[0]);
   ::close(fds[1]);
+}
+
+TEST_F(IoUringImplTest, MultishotReleaseBufferRejectsOutOfBoundsPointer) {
+  auto io_uring = std::make_unique<IoUringImpl>(8, false, true, 4096);
+  if (!io_uring->isMultishotEnabled()) {
+    GTEST_SKIP() << "provided buffer rings not supported on this kernel";
+  }
+  IoUringBufferPoolSharedPtr pool = io_uring->bufferPool();
+  ASSERT_NE(pool, nullptr);
+
+  // A pointer that does not belong to the pool is flagged as a bug instead of driving an out of
+  // bounds add into the ring.
+  uint8_t stray = 0;
+  EXPECT_ENVOY_BUG(pool->releaseBuffer(&stray), "released buffer pointer is out of range");
 }
 
 } // namespace

@@ -2,6 +2,8 @@
 
 #include <sys/eventfd.h>
 
+#include <chrono>
+
 namespace Envoy {
 namespace Io {
 
@@ -56,8 +58,8 @@ public:
   // buffer ring support.
   bool valid() const { return buf_ring_ != nullptr; }
 
-  // Releases the kernel buffer ring while the io_uring is still alive. After this returnBuffer is a
-  // no-op, so outstanding read fragments can be drained safely once the ring is gone.
+  // Releases the kernel buffer ring while the io_uring is still alive. After this releaseBuffer is
+  // a no-op, so outstanding read fragments can be drained safely once the ring is gone.
   void releaseRing() {
     if (buf_ring_ != nullptr) {
       io_uring_free_buf_ring(ring_, buf_ring_, buffer_count_, group_id_);
@@ -72,12 +74,20 @@ public:
     return buffers_.get() + static_cast<size_t>(buffer_id) * buffer_size_;
   }
   uint32_t bufferSize() const override { return buffer_size_; }
-  void returnBuffer(const void* buffer) override {
+  void releaseBuffer(const void* buffer) override {
     if (buf_ring_ == nullptr) {
       return;
     }
-    const auto buffer_id = static_cast<uint16_t>(
-        (static_cast<const uint8_t*>(buffer) - buffers_.get()) / buffer_size_);
+    // A stray pointer would index the ring out of bounds, so reject anything outside the backing
+    // memory.
+    const uint8_t* const buf_ptr = static_cast<const uint8_t*>(buffer);
+    const uint8_t* const start = buffers_.get();
+    const uint8_t* const end = start + static_cast<size_t>(buffer_count_) * buffer_size_;
+    if (buf_ptr < start || buf_ptr >= end) {
+      IS_ENVOY_BUG("released buffer pointer is out of range");
+      return;
+    }
+    const auto buffer_id = static_cast<uint16_t>((buf_ptr - start) / buffer_size_);
     io_uring_buf_ring_add(buf_ring_, const_cast<void*>(buffer), buffer_size_, buffer_id, mask_, 0);
     io_uring_buf_ring_advance(buf_ring_, 1);
   }
@@ -152,7 +162,7 @@ IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polli
 
 IoUringImpl::~IoUringImpl() {
   // Release the provided buffer ring while the io_uring is still alive. The pool object itself may
-  // outlive this ring when read fragments still reference its buffers, after which returnBuffer is
+  // outlive this ring when read fragments still reference its buffers, after which releaseBuffer is
   // a no-op.
   if (buffer_pool_ != nullptr) {
     buffer_pool_->releaseRing();
@@ -184,7 +194,10 @@ bool IoUringImpl::isEventfdRegistered() const { return SOCKET_VALID(event_fd_); 
 void IoUringImpl::checkCqOverflow() {
   if (*(ring_.sq.kflags) & IORING_SQ_CQ_OVERFLOW) {
     cq_overflow_count_++;
-    ENVOY_LOG(warn, "io_uring completion queue overflow detected, count = {}", cq_overflow_count_);
+    // Overflow persists under heavy load, so rate limit the warning to avoid flooding the log.
+    ENVOY_LOG_PERIODIC(warn, std::chrono::seconds(1),
+                       "io_uring completion queue overflow detected, count = {}",
+                       cq_overflow_count_);
   }
 }
 

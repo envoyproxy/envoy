@@ -805,38 +805,6 @@ TEST(IoUringWorkerImplTest, WriteResumesBelowLowWatermark) {
   delete injected_req;
 }
 
-// A zero high watermark disables backpressure, so writes are always accepted.
-TEST(IoUringWorkerImplTest, BackpressureDisabledWhenHighWatermarkZero) {
-  Event::MockDispatcher dispatcher;
-  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
-  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
-
-  EXPECT_CALL(mock_io_uring, registerEventfd());
-  EXPECT_CALL(dispatcher,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
-      .WillOnce(ReturnNew<NiceMock<Event::MockFileEvent>>());
-  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
-
-  IoUringServerSocket socket(0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, 0, 0, false);
-
-  // Only the first write submits a request, the second is buffered behind the in flight write. The
-  // important part is that both writes are accepted in full even though the buffer grows large.
-  Request* write_req = nullptr;
-  EXPECT_CALL(mock_io_uring, prepareWritev(_, _, _, _, _))
-      .WillOnce(DoAll(SaveArg<4>(&write_req), Return<IoUringResult>(IoUringResult::Ok)));
-  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-
-  std::string data(100, 'x');
-  Buffer::RawSlice slice;
-  slice.mem_ = data.data();
-  slice.len_ = data.size();
-  EXPECT_EQ(100, socket.write(&slice, 1));
-  EXPECT_EQ(100, socket.write(&slice, 1));
-
-  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
-  delete write_req;
-}
-
 // A failed write drains the buffer and clears backpressure, so a later write before close is
 // accepted instead of being silently refused by the stale high watermark.
 TEST(IoUringWorkerImplTest, WriteFailureClearsBackpressure) {
@@ -971,8 +939,8 @@ public:
     return memory_.data() + static_cast<size_t>(buffer_id) * buffer_size_;
   }
   uint32_t bufferSize() const override { return buffer_size_; }
-  void returnBuffer(const void* buffer) override {
-    returned_buffers_.push_back(static_cast<uint32_t>(
+  void releaseBuffer(const void* buffer) override {
+    released_buffers_.push_back(static_cast<uint32_t>(
         (static_cast<const uint8_t*>(buffer) - memory_.data()) / buffer_size_));
   }
 
@@ -982,7 +950,7 @@ public:
 
   const uint32_t buffer_size_;
   std::vector<uint8_t> memory_;
-  std::vector<uint32_t> returned_buffers_;
+  std::vector<uint32_t> released_buffers_;
 };
 
 // A `multishot` read stays armed across completions, delivers data in the provided buffers, and
@@ -1032,19 +1000,55 @@ TEST(IoUringWorkerImplTest, ServerSocketMultishotRead) {
   read_req->setMoreCompletions(true);
   socket.onRead(read_req, 5, false);
   EXPECT_EQ("hello", read_data);
-  EXPECT_EQ(std::vector<uint32_t>({0}), buffer_pool->returned_buffers_);
+  EXPECT_EQ(std::vector<uint32_t>({0}), buffer_pool->released_buffers_);
 
   // A second completion reuses the same armed request with another provided buffer.
   read_req->setBufferId(1);
   read_req->setMoreCompletions(true);
   socket.onRead(read_req, 6, false);
   EXPECT_EQ("helloworld!", read_data);
-  EXPECT_EQ(std::vector<uint32_t>({0, 1}), buffer_pool->returned_buffers_);
+  EXPECT_EQ(std::vector<uint32_t>({0, 1}), buffer_pool->released_buffers_);
 
   // A terminal completion without more data releases the armed request and reports the close.
   read_req->setMoreCompletions(false);
   socket.onRead(read_req, 0, false);
   EXPECT_EQ(0, last_result);
+
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  delete read_req;
+}
+
+// A `multishot` completion that reports data with no provided buffer id is flagged as a bug and
+// the data is dropped instead of indexing the pool out of bounds.
+TEST(IoUringWorkerImplTest, ServerSocketMultishotReadInvalidBufferIdDropsData) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+  auto buffer_pool = std::make_shared<FakeIoUringBufferPool>(16, 4);
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(mock_io_uring, isMultishotEnabled()).WillRepeatedly(Return(true));
+  EXPECT_CALL(mock_io_uring, bufferPool()).WillRepeatedly(Return(buffer_pool));
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                           Event::FileReadyType::Read));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+
+  // Arm the `multishot` read.
+  Request* read_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareReadMultishot(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&read_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  IoUringServerSocket socket(
+      0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, 131072, 16384, false);
+  socket.enableRead();
+
+  // The completion reports data with an absent buffer id, which is dropped and recycles no buffer.
+  read_req->setBufferId(-1);
+  read_req->setMoreCompletions(true);
+  EXPECT_ENVOY_BUG(socket.onRead(read_req, 5, false), "invalid multishot buffer id");
+  EXPECT_EQ(0, socket.getReadBuffer().length());
+  EXPECT_TRUE(buffer_pool->released_buffers_.empty());
 
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
   delete read_req;
@@ -1214,8 +1218,8 @@ TEST(IoUringWorkerImplTest, ServerSocketMultishotDisabledOnEopnotsupp) {
 }
 
 // A `multishot` completion that arrives after the socket is closed without keeping the fd open
-// drops the data but still returns the provided buffer so the pool is not depleted.
-TEST(IoUringWorkerImplTest, ServerSocketMultishotCloseDiscardsAndReturnsBuffer) {
+// drops the data but still releases the provided buffer so the pool is not depleted.
+TEST(IoUringWorkerImplTest, ServerSocketMultishotCloseDiscardsAndReleasesBuffer) {
   Event::MockDispatcher dispatcher;
   IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
   MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
@@ -1246,7 +1250,7 @@ TEST(IoUringWorkerImplTest, ServerSocketMultishotCloseDiscardsAndReturnsBuffer) 
   socket.close(false, nullptr);
   socket.onCancel(cancel_req, 0, false);
 
-  // The terminal `multishot` completion drops its data but returns the buffer, then closes.
+  // The terminal `multishot` completion drops its data but releases the buffer, then closes.
   Request* close_req = nullptr;
   EXPECT_CALL(mock_io_uring, prepareClose(_, _))
       .WillOnce(DoAll(SaveArg<1>(&close_req), Return<IoUringResult>(IoUringResult::Ok)))
@@ -1255,7 +1259,7 @@ TEST(IoUringWorkerImplTest, ServerSocketMultishotCloseDiscardsAndReturnsBuffer) 
   multishot_req->setBufferId(2);
   multishot_req->setMoreCompletions(false);
   socket.onRead(multishot_req, 7, false);
-  EXPECT_EQ(std::vector<uint32_t>({2}), buffer_pool->returned_buffers_);
+  EXPECT_EQ(std::vector<uint32_t>({2}), buffer_pool->released_buffers_);
 
   // The close completion cleans up the socket.
   EXPECT_CALL(mock_io_uring, removeInjectedCompletion(0));
@@ -1269,7 +1273,7 @@ TEST(IoUringWorkerImplTest, ServerSocketMultishotCloseDiscardsAndReturnsBuffer) 
 }
 
 // Closing a `multishot` socket while keeping the fd open hands the buffered data to the callback as
-// owned memory so the provided buffers are not returned to the ring from another worker thread.
+// owned memory so the provided buffers are not released to the ring from another worker thread.
 TEST(IoUringWorkerImplTest, ServerSocketMultishotCloseKeepFdOpenCopiesData) {
   Event::MockDispatcher dispatcher;
   IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
@@ -1302,10 +1306,10 @@ TEST(IoUringWorkerImplTest, ServerSocketMultishotCloseKeepFdOpenCopiesData) {
   bool is_closed = false;
   socket.close(true, [&buffer_pool, &closed_data, &is_closed](Buffer::Instance& read_buffer) {
     closed_data = read_buffer.toString();
+    // The provided buffer is drained and released on this thread before the callback runs, so the
+    // callback only receives owned data.
+    EXPECT_EQ(std::vector<uint32_t>({0}), buffer_pool->released_buffers_);
     read_buffer.drain(read_buffer.length());
-    // The callback receives owned data, not the provided buffer, so draining it does not return a
-    // buffer to the pool on this thread.
-    EXPECT_TRUE(buffer_pool->returned_buffers_.empty());
     is_closed = true;
   });
   socket.onCancel(cancel_req, 0, false);

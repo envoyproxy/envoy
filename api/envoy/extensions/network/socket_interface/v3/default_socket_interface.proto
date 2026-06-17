@@ -68,6 +68,7 @@ message IoUringOptions {
   // The high watermark in bytes for the write buffer. When the amount of pending write data
   // exceeds this threshold, the socket stops accepting new writes from the connection so that
   // backpressure propagates to the upper layers. If not specified, defaults to 131072 (128 KiB).
+  // When set, the value must be at least 4096 (4 KiB).
   google.protobuf.UInt32Value write_high_watermark_bytes = 5
       [(validate.rules).uint32 = {gte: 4096}];
 
@@ -75,6 +76,7 @@ message IoUringOptions {
   // ``write_high_watermark_bytes`` and writes were paused, the socket resumes accepting writes
   // once the pending write data drops to or below this value.
   // If not specified, defaults to 16384 (16 KiB).
+  // When set, the value must be at least 1024 (1 KiB).
   //
   // .. note::
   //

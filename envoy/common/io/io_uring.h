@@ -84,8 +84,8 @@ enum class IoUringResult { Ok, Busy, Failed };
 
 /**
  * A pool of fixed-size buffers provided to the kernel for `multishot` reads. The kernel fills a
- * buffer when data arrives and reports its id in the completion. The owner returns the buffer once
- * the data has been consumed. Returning a buffer after the io_uring is gone is a safe no-op.
+ * buffer when data arrives and reports its id in the completion. The owner releases the buffer once
+ * the data has been consumed. Releasing a buffer after the io_uring is gone is a safe no-op.
  */
 class IoUringBufferPool {
 public:
@@ -105,7 +105,7 @@ public:
    * Hands a consumed buffer back to the kernel so it can be reused for a later read. The pointer
    * must be the address previously returned by getBuffer.
    */
-  virtual void returnBuffer(const void* buffer) PURE;
+  virtual void releaseBuffer(const void* buffer) PURE;
 };
 
 using IoUringBufferPoolSharedPtr = std::shared_ptr<IoUringBufferPool>;

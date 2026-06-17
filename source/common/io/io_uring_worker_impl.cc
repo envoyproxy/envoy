@@ -9,6 +9,18 @@ namespace Io {
 // transfers use fewer, larger reads while small responses keep using small buffers.
 constexpr uint32_t MaxReadBufferSizeMultiplier = 16;
 
+namespace {
+// A negative provided buffer id would index the pool out of bounds. Flag the bug and let the caller
+// skip the buffer when that happens.
+bool multishotBufferIdValid(int32_t buffer_id) {
+  if (buffer_id < 0) {
+    IS_ENVOY_BUG(fmt::format("invalid multishot buffer id {}", buffer_id));
+    return false;
+  }
+  return true;
+}
+} // namespace
+
 ReadRequest::ReadRequest(IoUringSocket& socket, uint32_t size)
     // Value-initialize the buffer because io_uring fills it in the kernel, which MemorySanitizer
     // cannot observe and would otherwise report as uninitialized.
@@ -498,17 +510,19 @@ void IoUringServerSocket::onCancel(Request* req, int32_t result, bool injected) 
 }
 
 void IoUringServerSocket::moveReadDataToBuffer(Request* req, size_t data_length) {
-  // A `multishot` read delivers data in a provided buffer. Wrap it as a fragment that returns the
+  // A `multishot` read delivers data in a provided buffer. Wrap it as a fragment that releases the
   // buffer to the pool once drained. The captured pool keeps the buffer memory alive even after the
-  // io_uring is gone, at which point returning a buffer is a safe no-op.
+  // io_uring is gone, at which point releasing a buffer is a safe no-op.
   if (read_is_multishot_) {
     const int32_t buffer_id = req->bufferId();
-    ASSERT(buffer_id >= 0);
+    if (!multishotBufferIdValid(buffer_id)) {
+      return;
+    }
     const IoUringBufferPoolSharedPtr& pool = parent_.bufferPool();
     Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
         pool->getBuffer(buffer_id), data_length,
         [pool](const void* data, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
-          pool->returnBuffer(data);
+          pool->releaseBuffer(data);
           delete this_fragment;
         });
     read_buf_.addBufferFragment(*fragment);
@@ -554,11 +568,13 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
         if (keep_fd_open_) {
           moveReadDataToBuffer(req, result);
         } else if (read_is_multishot_) {
-          // The data is dropped while closing, but the provided buffer must still be returned to
+          // The data is dropped while closing, but the provided buffer must still be released to
           // the ring so the pool is not depleted.
-          ASSERT(req->bufferId() >= 0);
-          const IoUringBufferPoolSharedPtr& pool = parent_.bufferPool();
-          pool->returnBuffer(pool->getBuffer(req->bufferId()));
+          const int32_t buffer_id = req->bufferId();
+          if (multishotBufferIdValid(buffer_id)) {
+            const IoUringBufferPoolSharedPtr& pool = parent_.bufferPool();
+            pool->releaseBuffer(pool->getBuffer(buffer_id));
+          }
         }
       }
       // Wait for an armed `multishot` read to finish before closing.
@@ -734,10 +750,12 @@ void IoUringServerSocket::closeInternal() {
     if (on_closed_cb_) {
       // The fd is handed to another worker thread. `Multishot` reads leave provided buffer
       // fragments in the read buffer that are bound to this worker's ring, so copy the data into
-      // owned memory and let those buffers return to the ring on this thread.
+      // owned memory and drain the read buffer here so those buffers return to the ring on this
+      // thread right away.
       if (parent_.isMultishotEnabled() && read_buf_.length() > 0) {
         Buffer::OwnedImpl owned_data;
         owned_data.add(read_buf_);
+        read_buf_.drain(read_buf_.length());
         on_closed_cb_(owned_data);
       } else {
         on_closed_cb_(read_buf_);
@@ -788,11 +806,6 @@ void IoUringServerSocket::submitWriteOrShutdownRequest() {
 }
 
 void IoUringServerSocket::checkWriteWatermarks() {
-  // A zero high watermark disables backpressure.
-  if (write_high_watermark_bytes_ == 0) {
-    return;
-  }
-
   if (!above_write_high_watermark_ && write_buf_.length() > write_high_watermark_bytes_) {
     above_write_high_watermark_ = true;
     ENVOY_LOG(trace, "write buffer above high watermark, fd = {}, size = {}", fd_,
