@@ -202,12 +202,14 @@ void WebTransportSessionBridge::bridgeIncomingStream(webtransport::Stream* local
     return;
   }
   auto bridge = std::make_shared<WebTransportStreamBridge>(local_stream, peer_stream);
+  // The two visitors co-own the bridge (each holds a shared_ptr) and are owned by their streams via
+  // SetVisitor, so the bridge lives as long as either stream and is freed once both close. No
+  // separate ownership by the session bridge is needed.
   local_stream->SetVisitor(bridge->makeLocalVisitor());
   peer_stream->SetVisitor(bridge->makePeerVisitor());
   // Drain any data that arrived before the visitors were installed (QUICHE does not replay
   // OnCanRead for it).
   bridge->start();
-  stream_bridges_.push_back(std::move(bridge));
 }
 
 void WebTransportSessionBridge::OnIncomingBidirectionalStreamAvailable() {

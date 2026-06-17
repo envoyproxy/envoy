@@ -20,10 +20,10 @@ namespace Quic {
 // single stream bridge is symmetric: at the session level it pairs a stream accepted on one
 // session with a stream opened on the other, and which of those is the proxy's downstream vs
 // upstream depends on which session created the bridge (see WebTransportSessionBridge).
-// The visitors below are owned by the QUIC streams (via Stream::SetVisitor), while the bridge is
-// owned by the WebTransportSessionBridge. During connection teardown one side's stream/adapter can
-// be destroyed before the other's, so the bridge is reference-counted and each visitor holds a
-// shared_ptr to it: the bridge therefore always outlives both visitors. When a visitor is
+// The visitors below are owned by the QUIC streams (via Stream::SetVisitor). The bridge is
+// reference-counted and co-owned by its two visitors (each holds a shared_ptr to it), so it lives
+// as long as at least one of its streams and is freed once both are gone. During connection
+// teardown one side's stream/adapter can be destroyed before the other's; when a visitor is
 // destroyed (its stream is gone) it nulls the corresponding stream pointer on the bridge, so the
 // surviving visitor never dereferences a freed peer.
 class WebTransportStreamBridge : protected Logger::Loggable<Logger::Id::quic_stream>,
@@ -195,7 +195,6 @@ private:
 
   WebTransportSessionStateSharedPtr session_state_;
   const bool is_downstream_{};
-  std::vector<WebTransportStreamBridgeSharedPtr> stream_bridges_;
   bool closed_{false};
 };
 
