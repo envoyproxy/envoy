@@ -517,8 +517,7 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
       headers_->get(Extensions::Bootstrap::ReverseConnection::reverseTunnelInitiationTimeHeader());
   if (!initiation_time_vals.empty()) {
     if (!absl::SimpleAtoi(initiation_time_vals[0]->value().getStringView(), &initiation_time_ms)) {
-      ENVOY_CONN_LOG(warn,
-                     "reverse_tunnel: failed to parse initiation-time header value '{}'",
+      ENVOY_CONN_LOG(warn, "reverse_tunnel: failed to parse initiation-time header value '{}'",
                      parent_.read_callbacks_->connection(),
                      initiation_time_vals[0]->value().getStringView());
       initiation_time_ms = 0;

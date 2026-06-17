@@ -199,6 +199,21 @@ public:
     return req;
   }
 
+  // Helper to craft HTTP request with a raw (possibly non-numeric) initiation-time header value.
+  // Used to exercise the parse-failure fallback path.
+  std::string makeHttpRequestWithRawInitiationTime(const std::string& method,
+                                                   const std::string& path, const std::string& node,
+                                                   const std::string& cluster,
+                                                   const std::string& tenant,
+                                                   const std::string& initiation_time_value) {
+    std::string req = fmt::format("{} {} HTTP/1.1\r\n", method, path);
+    req += "Host: localhost\r\n";
+    req += makeRtHeaders(node, cluster, tenant);
+    req += "x-envoy-reverse-tunnel-initiation-time: " + initiation_time_value + "\r\n";
+    req += "Content-Length: 0\r\n\r\n";
+    return req;
+  }
+
   // Helper to craft HTTP request with reverse tunnel headers and optional body.
   std::string makeHttpRequestWithRtHeaders(const std::string& method, const std::string& path,
                                            const std::string& node, const std::string& cluster,
@@ -1669,6 +1684,62 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest,
   // No initiation-time header — standard request without it.
   Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
                                                          node_id, cluster_id, tenant_id));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+}
+
+TEST_F(ReverseTunnelFilterWithUpstreamTest,
+       ProcessAcceptedConnectionFallsBackToZeroOnUnparseableInitiationTime) {
+  auto* reporter_cfg = upstream_config_.mutable_reporter_config();
+  reporter_cfg->set_name(Bootstrap::ReverseConnection::MOCK_REPORTER);
+  Protobuf::StringValue reporter_payload;
+  reporter_cfg->mutable_typed_config()->PackFrom(reporter_payload);
+
+  NiceMock<Bootstrap::ReverseConnection::MockReporterFactory> reporter_factory;
+  Registry::InjectFactory<Bootstrap::ReverseConnection::ReverseTunnelReporterFactory>
+      reporter_injector(reporter_factory);
+
+  std::string node_id = "node-bad-time";
+  std::string cluster_id = "cluster";
+  std::string tenant_id = "tenant";
+
+  EXPECT_CALL(context_, messageValidationVisitor())
+      .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  // A non-numeric header value must fail to parse and fall back to 0.
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([&]() {
+    auto reporter =
+        std::make_unique<NiceMock<Bootstrap::ReverseConnection::MockReverseTunnelReporter>>();
+    EXPECT_CALL(*reporter, reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
+                                                 testing::Eq(tenant_id), testing::Eq(int64_t(0))));
+    return reporter;
+  }));
+
+  setupUpstreamExtension();
+  setupUpstreamThreadLocalSlot();
+
+  auto mock_socket = std::make_unique<Network::MockConnectionSocket>();
+  auto mock_io_handle = std::make_unique<Network::MockIoHandle>();
+  auto dup_io_handle = std::make_unique<Network::MockIoHandle>();
+
+  EXPECT_CALL(*dup_io_handle, resetFileEvents());
+  EXPECT_CALL(*dup_io_handle, fdDoNotUse()).WillRepeatedly(testing::Return(100));
+  EXPECT_CALL(*dup_io_handle, isOpen()).WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(*mock_io_handle, duplicate())
+      .WillOnce(testing::Return(testing::ByMove(std::move(dup_io_handle))));
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(testing::ReturnRef(*mock_io_handle));
+  EXPECT_CALL(*mock_socket, isOpen()).WillRepeatedly(testing::Return(true));
+
+  static Network::ConnectionSocketPtr stored_mock_socket4;
+  static std::unique_ptr<Network::MockIoHandle> stored_io_handle4;
+  stored_io_handle4 = std::move(mock_io_handle);
+  stored_mock_socket4 = std::move(mock_socket);
+
+  EXPECT_CALL(callbacks_.connection_, getSocket())
+      .WillRepeatedly(testing::ReturnRef(stored_mock_socket4));
+
+  // Non-numeric initiation-time value exercises the SimpleAtoi failure branch.
+  Buffer::OwnedImpl request(makeHttpRequestWithRawInitiationTime(
+      "GET", "/reverse_connections/request", node_id, cluster_id, tenant_id, "not-a-number"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
 }
 
