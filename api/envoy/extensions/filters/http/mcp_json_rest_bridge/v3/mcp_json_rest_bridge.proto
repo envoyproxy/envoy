@@ -208,6 +208,10 @@ message ServerToolConfig {
     // ToolsListSpecificConfig.
     ToolsListLocal tool_list_local = 4;
   }
+
+  // [#not-implemented-hide:]
+  // Default server info for tools without specific ones.
+  McpServerInfo default_server_info = 5;
 }
 
 // [#not-implemented-hide:]
