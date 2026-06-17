@@ -657,6 +657,9 @@ public:
   bool isValidTrailersCallbackState() const override;
   bool canFailOpen() const override;
   bool localResponseStarted() const { return local_response_started_; }
+  bool noExternalProcess() const override {
+    return !local_response_started_ && ProcessorState::noExternalProcess();
+  }
 
 private:
   void setProcessingModeInternal(
