@@ -320,7 +320,7 @@ bssl::UniquePtr<SSL_CTX> makeRegisteredCtx() {
 
 // Compresses the cert chain prefix once per iteration, mirroring a single handshake.
 // The compression callbacks cache per SSL_CTX, so each iteration uses a fresh context
-// to force a recompression; the context setup is excluded from the timing.
+// to force a re-compression; the context setup is excluded from the timing.
 void benchmarkCompress(benchmark::State& state, CompressFn compress, ChainFn chain) {
   const std::vector<uint8_t> der = certChainPrefixDer(chain, state.range(0));
   size_t compressed_len = 0;
@@ -346,7 +346,7 @@ void benchmarkCompress(benchmark::State& state, CompressFn compress, ChainFn cha
 // Same as benchmarkCompress, but drives compression through a real SSL_CTX so the
 // per-context compressed-cert cache is exercised: the first iteration compresses,
 // the rest are served from the cache. Measures the steady-state per-handshake cost
-// once caching is in place (vs benchmarkCompress, which always recompresses).
+// once caching is in place (vs benchmarkCompress, which always re-compresses).
 void benchmarkCompressCached(benchmark::State& state, CompressFn compress, RegisterFn register_alg,
                              ChainFn chain) {
   const std::vector<uint8_t> der = certChainPrefixDer(chain, state.range(0));

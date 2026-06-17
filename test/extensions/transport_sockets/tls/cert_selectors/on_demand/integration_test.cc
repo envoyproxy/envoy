@@ -692,8 +692,7 @@ TEST_P(OnDemandIntegrationTest, CertCompressionCacheAcrossContexts) {
   sendSecret(stream, "server", "server2");
   test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(2));
 
-  // Two more connections now serve the new chain: miss then hit on the new SSL_CTX. If the
-  // cache were shared or miskeyed across chains, the debug assertion would abort here.
+  // Two more connections now serve the new chain: miss then hit on the new SSL_CTX.
   for (int i = 0; i < 2; i++) {
     auto conn = createClientConnection();
     conn->waitForUpstreamConnection();

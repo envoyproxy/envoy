@@ -46,8 +46,7 @@ std::string certChainHash(const uint8_t* in, size_t in_len) {
   return hash;
 }
 
-void freeCompressedCertCache(void* /*parent*/, void* ptr, CRYPTO_EX_DATA* /*ad*/, int /*index*/,
-                             long /*argl*/, void* /*argp*/) {
+void freeCompressedCertCache(void*, void* ptr, CRYPTO_EX_DATA*, int, long, void*) {
   delete static_cast<CompressedCertCache*>(ptr);
 }
 
