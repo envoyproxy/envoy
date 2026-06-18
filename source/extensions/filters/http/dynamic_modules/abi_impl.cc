@@ -1645,6 +1645,18 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     }
     break;
   }
+  case envoy_dynamic_module_type_attribute_id_ConnectionRequestedServerName: {
+    const auto stream_info = filter->streamInfo();
+    if (stream_info) {
+      // Downstream TLS SNI; empty when no SNI was offered, read as not-found.
+      const absl::string_view sni = stream_info->downstreamAddressProvider().requestedServerName();
+      if (!sni.empty()) {
+        *result = {sni.data(), sni.size()};
+        ok = true;
+      }
+    }
+    break;
+  }
   case envoy_dynamic_module_type_attribute_id_RequestId: {
     const auto stream_info = filter->streamInfo();
     if (stream_info) {
@@ -2381,6 +2393,15 @@ void envoy_dynamic_module_callback_http_span_set_sampled(
   }
   auto* span = static_cast<Tracing::Span*>(span_ptr);
   span->setSampled(sampled);
+}
+
+void envoy_dynamic_module_callback_http_span_disable_local_decision(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr) {
+  if (span_ptr == nullptr) {
+    return;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  span->disableLocalDecision();
 }
 
 // Thread-local storage for temporary strings returned by tracing functions.

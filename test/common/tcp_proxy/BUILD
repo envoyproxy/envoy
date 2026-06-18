@@ -61,10 +61,14 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "tcp_proxy_test",
+    size = "large",
     srcs = [
         "tcp_proxy_test.cc",
     ],
     rbe_pool = "6gig",
+    # MemorySanitizer's instrumentation overhead makes this large parameterized suite exceed the
+    # default 300s cap, so allow 900s and shard the work to keep each shard well under the limit.
+    shard_count = 5,
     deps = [
         ":tcp_proxy_test_base",
         "//source/common/router:string_accessor_lib",

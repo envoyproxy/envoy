@@ -4444,6 +4444,12 @@ envoy_dynamic_module_callback_http_span_set_sampled(envoy_dynamic_module_type_sp
       "envoy_dynamic_module_callback_http_span_set_sampled: not implemented in this context");
 }
 
+__attribute__((weak)) void envoy_dynamic_module_callback_http_span_disable_local_decision(
+    envoy_dynamic_module_type_span_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_http_span_disable_local_decision: not implemented "
+               "in this context");
+}
+
 __attribute__((weak)) bool
 envoy_dynamic_module_callback_http_span_get_baggage(envoy_dynamic_module_type_span_envoy_ptr,
                                                     envoy_dynamic_module_type_module_buffer,

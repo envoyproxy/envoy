@@ -5525,36 +5525,63 @@ fn test_cluster_lb_context_full_workflow() {
 fn test_async_host_selection_complete_with_host() {
   let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   mock_completion
-    .expect_async_host_selection_complete()
+    .expect_complete()
     .withf(|host, details| host.is_some() && details == "resolved")
     .times(1)
     .returning(|_, _| ());
 
-  mock_completion.async_host_selection_complete(Some(0x1234 as *mut _), "resolved");
+  Box::new(mock_completion).complete(Some(0x1234 as *mut _), "resolved");
 }
 
 #[test]
 fn test_async_host_selection_complete_no_host() {
   let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   mock_completion
-    .expect_async_host_selection_complete()
+    .expect_complete()
     .withf(|host, details| host.is_none() && details == "dns_failure")
     .times(1)
     .returning(|_, _| ());
 
-  mock_completion.async_host_selection_complete(None, "dns_failure");
+  Box::new(mock_completion).complete(None, "dns_failure");
 }
 
 #[test]
 fn test_async_host_selection_complete_empty_details() {
   let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   mock_completion
-    .expect_async_host_selection_complete()
+    .expect_complete()
     .withf(|host, details| host.is_none() && details.is_empty())
     .times(1)
     .returning(|_, _| ());
 
-  mock_completion.async_host_selection_complete(None, "");
+  Box::new(mock_completion).complete(None, "");
+}
+
+#[test]
+fn test_async_host_selection_request_context() {
+  // On resume the module reads the re-presented context. Its accessors route through the
+  // link-time stubs, which report no hash / zero headers for the sentinel pointer.
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion.expect_request_context().returning(|| {
+    Some(cluster::ClusterLbContextRef::new(
+      0x1 as *mut _,
+      std::ptr::null_mut(),
+    ))
+  });
+
+  let ctx = mock_completion
+    .request_context()
+    .expect("context present on resume");
+  assert_eq!(ctx.compute_hash_key(), None);
+  assert_eq!(ctx.get_downstream_headers_size(), 0);
+}
+
+#[test]
+fn test_async_host_selection_request_context_absent() {
+  // No context (e.g. health-check selections) is reported as None, matching choose_host.
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion.expect_request_context().returning(|| None);
+  assert!(mock_completion.request_context().is_none());
 }
 
 #[test]
@@ -5579,7 +5606,7 @@ fn test_async_host_selection_with_stored_completion() {
 
   let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   mock_completion
-    .expect_async_host_selection_complete()
+    .expect_complete()
     .withf(|host, details| host == &Some(0xBEEF as *mut _) && details == "dns_resolved")
     .times(1)
     .returning(|_, _| ());
@@ -5595,7 +5622,7 @@ fn test_async_host_selection_with_stored_completion() {
 
   // Simulate async DNS resolution completing.
   let completion = lb.pending_completion.take().unwrap();
-  completion.async_host_selection_complete(Some(0xBEEF as *mut _), "dns_resolved");
+  completion.complete(Some(0xBEEF as *mut _), "dns_resolved");
 }
 
 #[test]
