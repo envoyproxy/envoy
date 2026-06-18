@@ -1023,8 +1023,8 @@ TEST_F(OAuth2Test, RequestSignout) {
 }
 
 /**
- * Scenario: The OAuth filter receives a sign out request when end session endpoint is configured.
- * Neider is the post_logout_redirect_uri explicitly defined, nor is it disabled.
+ * Scenario: The OAuth filter receives a sign-out request when end session endpoint is configured.
+ * The post_logout_redirect_uri is not defined and is not disabled.
  *
  * Expected behavior: the filter should redirect to the end session endpoint and use the request-derived default
  * ``post_logout_redirect_uri`` query parameter (<schema>://<host>/).

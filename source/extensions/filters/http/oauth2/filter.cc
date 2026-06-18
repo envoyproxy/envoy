@@ -1192,7 +1192,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
       }
       absl::StrAppend(&oidc_logout_url,
                       fmt::format(OIDCLogoutUrlPostLogoutRedirectFormatString,
-                                  Http::Utility::PercentEncoding::encode(redirect_uri, ":/=&?")));
+                                  Http::Utility::PercentEncoding::urlEncode(redirect_uri)));
     }
     response_headers->setLocation(oidc_logout_url);
   } else {
