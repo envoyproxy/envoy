@@ -163,6 +163,7 @@ TEST(CodecClientProdTest, UpstreamClientCodecFactoryIsUsed) {
       .WillOnce(Invoke([&](const ClientCodecFactory::Context& context) -> ClientConnectionPtr {
         EXPECT_EQ(CodecType::HTTP1, context.type);
         EXPECT_EQ(cluster.get(), &context.cluster);
+        EXPECT_EQ(nullptr, context.options);
         auto codec = std::make_unique<NiceMock<MockClientConnection>>();
         ON_CALL(*codec, protocol()).WillByDefault(Return(Protocol::Http2));
         return codec;

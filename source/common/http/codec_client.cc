@@ -299,7 +299,7 @@ CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& 
   // SETTINGS), so building one we would discard could corrupt the connection.
   if (auto factory = host->cluster().upstreamHttpClientCodecFactory(); factory.has_value()) {
     codec_ = factory->createClientCodec(Http::ClientCodecFactory::Context{
-        type, *connection_, *this, host->cluster(), random_generator});
+        type, *connection_, *this, host->cluster(), random_generator, options});
   }
 
   if (codec_ == nullptr) {

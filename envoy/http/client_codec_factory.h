@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/common/pure.h"
 #include "envoy/http/codec.h"
 
@@ -7,6 +9,7 @@ namespace Envoy {
 
 namespace Network {
 class Connection;
+class TransportSocketOptions;
 } // namespace Network
 
 namespace Random {
@@ -42,6 +45,9 @@ public:
     const Upstream::ClusterInfo& cluster;
     // Random generator for codecs that need it (e.g. HTTP/2).
     Random::RandomGenerator& random;
+    // The transport socket options for the connection, if any. Used e.g. by the HTTP/1 codec to
+    // detect a proxied connection (http11ProxyInfo()).
+    const std::shared_ptr<const Network::TransportSocketOptions>& options;
   };
 
   /**
