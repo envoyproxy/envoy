@@ -24,7 +24,6 @@ TEST(DynamicModuleConfigFactory, LoadOK) {
       TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
       1);
 
-  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter config;
   const std::string yaml = R"EOF(
 dynamic_module_config:
     name: no_op
@@ -202,7 +201,6 @@ TEST(DynamicModuleConfigFactory, LoadOKNoOptionalABI) {
       TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
       1);
 
-  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter config;
   const std::string yaml = R"EOF(
 dynamic_module_config:
     name: no_op_no_optional_abi
@@ -242,7 +240,6 @@ TEST(DynamicModuleConfigFactory, LoadOKBasedOnServerContext) {
       TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
       1);
 
-  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter config;
   const std::string yaml = R"EOF(
 dynamic_module_config:
     name: no_op
@@ -281,7 +278,6 @@ TEST(DynamicModuleConfigFactory, LoadEmpty) {
       TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
       1);
 
-  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter config;
   const std::string yaml = R"EOF(
 dynamic_module_config:
     name: no_op
@@ -318,7 +314,6 @@ TEST(DynamicModuleConfigFactory, LoadBytes) {
       TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
       1);
 
-  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter config;
   const std::string yaml = R"EOF(
 dynamic_module_config:
     name: no_op
@@ -358,7 +353,6 @@ TEST(DynamicModuleConfigFactory, LoadStruct) {
       TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
       1);
 
-  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter config;
   const std::string yaml = R"EOF(
 dynamic_module_config:
     name: no_op
@@ -400,7 +394,6 @@ TEST(DynamicModuleConfigFactory, LoadError) {
       1);
 
   // Non existent module.
-  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter config;
   const std::string yaml = R"EOF(
 dynamic_module_config:
     name: something-not-exist

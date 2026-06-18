@@ -89,8 +89,6 @@ protected:
   createStrictDnsCluster(const envoy::config::cluster::v3::Cluster& cluster_config,
                          ClusterFactoryContext& factory_context,
                          std::shared_ptr<Network::DnsResolver> dns_resolver) {
-    envoy::extensions::clusters::dns::v3::DnsCluster dns_cluster{};
-
     ClusterFactoryContextImpl::LazyCreateDnsResolver resolver_fn = [&]() { return dns_resolver; };
     auto status_or_cluster =
         ClusterFactoryImplBase::create(cluster_config, factory_context.serverFactoryContext(),

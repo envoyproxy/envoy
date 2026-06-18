@@ -70,8 +70,6 @@ class SdsApiTest : public testing::Test, public SdsApiTestBase {};
 // Validate that SdsApi object is created and initialized successfully.
 TEST_F(SdsApiTest, BasicTest) {
   ::testing::InSequence s;
-  const envoy::service::secret::v3::SdsDummy dummy;
-
   envoy::config::core::v3::ConfigSource config_source;
   setupMocks();
   TlsCertificateSdsApi sds_api(
@@ -84,8 +82,6 @@ TEST_F(SdsApiTest, BasicTest) {
 // Validate that target initializes when no warming is requested.
 TEST_F(SdsApiTest, BasicNoWarmTest) {
   ::testing::InSequence s;
-  const envoy::service::secret::v3::SdsDummy dummy;
-
   envoy::config::core::v3::ConfigSource config_source;
   setupMocks();
   TlsCertificateSdsApi sds_api(
@@ -99,8 +95,6 @@ TEST_F(SdsApiTest, BasicNoWarmTest) {
 // Validate that start() initializes the target.
 TEST_F(SdsApiTest, BasicManualStart) {
   ::testing::InSequence s;
-  const envoy::service::secret::v3::SdsDummy dummy;
-
   envoy::config::core::v3::ConfigSource config_source;
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,

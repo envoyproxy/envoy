@@ -1150,7 +1150,6 @@ TEST_P(TcpTunnelingIntegrationTest, SchemeHeader) {
   if (!(GetParam().upstream_protocol == Http::CodecType::HTTP2)) {
     return;
   }
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
     proxy_config.set_stat_prefix("tcp_stats");
