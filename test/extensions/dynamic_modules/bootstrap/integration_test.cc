@@ -19,20 +19,25 @@ public:
   void initializeWithBootstrapExtension(const std::string& module_dir,
                                         const std::string& module_name = "test",
                                         const std::string& extension_name = "test",
-                                        const std::string& extension_config = "test_config") {
+                                        const std::string& extension_config = "test_config",
+                                        bool do_not_close = false) {
     TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", module_dir, 1);
-    const std::string yaml = fmt::format(R"EOF(
+    // Only emit do_not_close when requested so the generated config is unchanged for modules that
+    // do not need to be pinned in memory.
+    const std::string do_not_close_config = do_not_close ? "\n          do_not_close: true" : "";
+    const std::string yaml =
+        fmt::format(R"EOF(
       name: envoy.bootstrap.dynamic_modules
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension
         dynamic_module_config:
-          name: {}
+          name: {}{}
         extension_name: {}
         extension_config:
           "@type": type.googleapis.com/google.protobuf.StringValue
           value: {}
     )EOF",
-                                         module_name, extension_name, extension_config);
+                    module_name, do_not_close_config, extension_name, extension_config);
 
     config_helper_.addBootstrapExtension(yaml);
     HttpIntegrationTest::initialize();
@@ -87,14 +92,20 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, StatsAccessRust) {
 // This test verifies that the Rust bootstrap extension can register and resolve functions
 // via the process-wide function registry.
 TEST_P(DynamicModulesBootstrapIntegrationTest, FunctionRegistryRust) {
-  EXPECT_LOG_CONTAINS(
-      "info", "Bootstrap function registry test completed successfully!",
-      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_function_registry_test"));
+  // The module registers process-wide function pointers, so it must be pinned with do_not_close.
+  // Otherwise the module would be unloaded between the IPv4 and IPv6 runs, and the registry would
+  // hand back a dangling pointer on the second run, crashing when it is called.
+  EXPECT_LOG_CONTAINS("info", "Bootstrap function registry test completed successfully!",
+                      initializeWithBootstrapExtension(testDataDir("rust"),
+                                                       "bootstrap_function_registry_test", "test",
+                                                       "test_config", /*do_not_close=*/true));
 }
 
 // This test verifies that the Rust bootstrap extension can register, retrieve, and overwrite
 // shared data via the process-wide shared data registry.
 TEST_P(DynamicModulesBootstrapIntegrationTest, SharedDataRegistryRust) {
+  // The shared data registry overwrites existing entries, so each parameterized run re-registers a
+  // fresh pointer before reading it; the module therefore needs no do_not_close.
   EXPECT_LOG_CONTAINS(
       "info", "Bootstrap shared data registry test completed successfully!",
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_shared_data_test"));
@@ -189,13 +200,17 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, FunctionRegistryCrossFilterRust) 
   TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", module_dir, 1);
 
   // Add the bootstrap extension that initializes the routing table and registers the lookup
-  // function.
+  // function. As in FunctionRegistryRust, the module must be pinned with do_not_close so the
+  // registered function pointer stays valid across the IPv4 and IPv6 runs. Because do_not_close
+  // only takes effect on the first load of the shared module, both the bootstrap and the HTTP
+  // filter below set it to keep the module resident regardless of which loads first.
   const std::string bootstrap_yaml = R"EOF(
       name: envoy.bootstrap.dynamic_modules
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension
         dynamic_module_config:
           name: bootstrap_http_combined_test
+          do_not_close: true
         extension_name: combined_test
         extension_config:
           "@type": type.googleapis.com/google.protobuf.StringValue
@@ -210,6 +225,7 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
   dynamic_module_config:
     name: bootstrap_http_combined_test
+    do_not_close: true
   filter_name: combined_filter
   filter_config:
     "@type": type.googleapis.com/google.protobuf.StringValue

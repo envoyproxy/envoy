@@ -529,7 +529,9 @@ bool envoy_dynamic_module_callback_is_validation_mode();
  * cross-module interactions.
  *
  * Registration is typically done once during bootstrap (e.g., in on_server_initialized). The
- * function pointer must remain valid for the lifetime of the process.
+ * function pointer must remain valid for the lifetime of the process, so a module that registers
+ * functions must be loaded with do_not_close set to true to avoid being unloaded while the registry
+ * still hands out the pointer.
  *
  * Callers are responsible for agreeing on the function signature out-of-band, since the registry
  * stores opaque void* pointers — analogous to dlsym semantics.
@@ -576,7 +578,9 @@ bool envoy_dynamic_module_callback_get_function(envoy_dynamic_module_type_module
  * Callers are responsible for managing the lifetime of overwritten data pointers.
  *
  * Registration is typically done once during bootstrap (e.g., in on_server_initialized or
- * on_scheduled). The data pointer must remain valid for the lifetime of the process.
+ * on_scheduled). The data pointer must remain valid while reachable through the registry. A module
+ * that registers a pointer into its own memory must either be loaded with do_not_close set to true
+ * or overwrite the pointer on each reload before any consumer reads it.
  *
  * This is thread-safe and can be called from any thread.
  *
