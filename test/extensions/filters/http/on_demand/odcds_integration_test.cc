@@ -12,6 +12,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/well_known_names.h"
 
+#include "test/common/config/dummy_config.pb.h"
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/ads_integration.h"
 #include "test/integration/ads_xdstp_config_sources_integration.h"
@@ -58,10 +59,10 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::filters::http::on_demand::v3::OnDemand>();
+    return std::make_unique<test::common::config::DummyConfig>();
   }
 
-  std::set<std::string> configTypes() override { return {}; }
+  std::set<std::string> configTypes() override { return {"test.common.config.DummyConfig"}; }
 
   std::string name() const override { return "odcds-test-filter"; }
 };
@@ -401,10 +402,15 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryFetchesClusterInfo) {
   config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
     auto* filters = hcm.mutable_http_filters();
     RELEASE_ASSERT(filters->size() == 2, "");
-    auto router_filter = filters->Get(1);
+
+    auto* new_filter = filters->Add();
+    *new_filter = filters->Get(1);
+
     auto* test_filter = filters->Mutable(1);
     test_filter->set_name("odcds-test-filter");
-    *filters->Add() = router_filter;
+
+    test::common::config::DummyConfig test_filter_config;
+    test_filter->mutable_typed_config()->PackFrom(test_filter_config);
   });
 
   initialize();
@@ -432,11 +438,11 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryFetchesClusterInfo) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
   ASSERT_TRUE(response->waitForEndStream());
-  verifyResponse(std::move(response), "200", {}, {});
-
   auto fetched_cluster = response->headers().get(Http::LowerCaseString("fetched-cluster-name"));
   ASSERT_FALSE(fetched_cluster.empty());
   EXPECT_EQ(fetched_cluster[0]->value().getStringView(), "new_cluster");
+
+  verifyResponse(std::move(response), "200", {}, {});
 
   cleanUpXdsConnection();
   cleanupUpstreamAndDownstream();
