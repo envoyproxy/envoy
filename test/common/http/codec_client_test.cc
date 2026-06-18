@@ -248,6 +248,34 @@ TEST(CodecClientProdTest, UpstreamClientCodecFactoryNullptrUsesStockCodecHttp2) 
   EXPECT_EQ(Protocol::Http2, client.protocol());
 }
 
+// For HTTP/3 the factory is consulted and owns full construction. The factory returns its own codec
+// without touching the connection, so the stock QUIC path (which would dynamic_cast the connection
+// to EnvoyQuicClientSession and call Initialize()) is skipped; that this runs against a plain mock
+// connection without crashing is the proof the stock path was not taken.
+TEST(CodecClientProdTest, UpstreamClientCodecFactoryIsUsedHttp3) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  Upstream::HostDescriptionConstSharedPtr host =
+      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80");
+
+  auto factory = std::make_shared<NiceMock<MockClientCodecFactory>>();
+  ON_CALL(*cluster, upstreamHttpClientCodecFactory())
+      .WillByDefault(Return(OptRef<const ClientCodecFactory>(*factory)));
+  EXPECT_CALL(*factory, createClientCodec(_))
+      .WillOnce(Invoke([&](const ClientCodecFactory::Context& context) -> ClientConnectionPtr {
+        EXPECT_EQ(CodecType::HTTP3, context.type);
+        auto codec = std::make_unique<NiceMock<MockClientConnection>>();
+        ON_CALL(*codec, protocol()).WillByDefault(Return(Protocol::Http3));
+        return codec;
+      }));
+
+  auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  CodecClientProd client(CodecType::HTTP3, std::move(connection), host, dispatcher, random, nullptr,
+                         /*should_connect=*/false);
+  EXPECT_EQ(Protocol::Http3, client.protocol());
+}
+
 // The transport socket options are forwarded to the factory verbatim.
 TEST(CodecClientProdTest, UpstreamClientCodecFactoryReceivesTransportSocketOptions) {
   NiceMock<Event::MockDispatcher> dispatcher;
