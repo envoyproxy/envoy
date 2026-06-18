@@ -2197,7 +2197,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateWithBase64Encoding) {
   auto rule3 = proto_config.add_rules();
   rule3->set_tlv_type(0x00);
   rule3->mutable_on_tlv_present()->set_key("PP2 tlv1");
-rule3->mutable_on_tlv_present()->set_value_string_encoding(
+  rule3->mutable_on_tlv_present()->set_value_string_encoding(
       envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
           SANITIZED_UTF8);
 
