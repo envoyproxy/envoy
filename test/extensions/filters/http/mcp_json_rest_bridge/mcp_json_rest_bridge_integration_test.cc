@@ -723,7 +723,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, PerRouteConfigOverridesHttpRule) {
                                           v3::HttpConnectionManager& hcm) {
     auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute per_route;
-    auto* tool = per_route.mutable_tool_config()->add_tools();
+    auto* tool = per_route.add_tool_config()->add_tools();
     tool->set_name("create_api_key");
     tool->mutable_http_rule()->set_post("/v1/{parent=projects/*}/keys_override");
     tool->mutable_http_rule()->set_body("key");
