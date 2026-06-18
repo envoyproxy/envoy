@@ -667,7 +667,7 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, BridgeConfigWithStruct) {
 
   Protobuf::Struct struct_value;
   (*struct_value.mutable_fields())["key"].set_string_value("value");
-  config.mutable_bridge_config()->PackFrom(struct_value);
+  static_cast<void>(config.mutable_bridge_config()->PackFrom(struct_value));
 
   auto pool = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,

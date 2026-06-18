@@ -182,9 +182,9 @@ void modifyPolicy(
     if (action.typed_config().type_url() == Traits<Policy>::getTypeUrl() && action.name() == name) {
       auto& any = *action.mutable_typed_config();
       Policy policy;
-      any.UnpackTo(&policy);
+      static_cast<void>(any.UnpackTo(&policy));
       function(policy);
-      any.PackFrom(policy);
+      static_cast<void>(any.PackFrom(policy));
     }
   }
 }

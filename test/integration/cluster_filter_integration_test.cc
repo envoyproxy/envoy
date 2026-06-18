@@ -141,7 +141,7 @@ public:
       filter->set_name("envoy.upstream.polite");
       Protobuf::StringValue config;
       config.set_value("surely ");
-      filter->mutable_typed_config()->PackFrom(config);
+      static_cast<void>(filter->mutable_typed_config()->PackFrom(config));
     });
     ClusterFilterIntegrationTestBase::initialize();
     BaseIntegrationTest::initialize();
@@ -201,7 +201,7 @@ public:
       filter->set_name("envoy.upstream.polite");
       Protobuf::StringValue config;
       config.set_value("");
-      filter->mutable_typed_config()->PackFrom(config);
+      static_cast<void>(filter->mutable_typed_config()->PackFrom(config));
     });
     ClusterFilterIntegrationTestBase::initialize();
     HttpIntegrationTest::initialize();

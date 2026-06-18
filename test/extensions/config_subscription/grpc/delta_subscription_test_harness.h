@@ -180,7 +180,7 @@ public:
         auto* resource = response->add_resources();
         resource->set_name(cluster);
         resource->set_version(version);
-        resource->mutable_resource()->PackFrom(*load_assignment);
+        static_cast<void>(resource->mutable_resource()->PackFrom(*load_assignment));
       }
     }
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, version)).WillOnce(ThrowOnRejectedConfig(accept));

@@ -126,7 +126,7 @@ void verifyCaresDnsConfigAndUnpack(
   EXPECT_EQ(
       typed_dns_resolver_config.typed_config().type_url(),
       "type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig");
-  typed_dns_resolver_config.typed_config().UnpackTo(&cares);
+  static_cast<void>(typed_dns_resolver_config.typed_config().UnpackTo(&cares));
 }
 
 TEST_F(DnsCacheImplTest, PreresolveSuccess) {
@@ -2004,7 +2004,7 @@ TEST(DnsCacheConfigOptionsTest, EmtpyDnsResolutionConfig) {
   std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
   envoy::config::core::v3::TypedExtensionConfig empty_typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
-  empty_typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  static_cast<void>(empty_typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares));
   empty_typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory(dns_resolver_factory);
@@ -2027,7 +2027,7 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfig) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   cares.add_resolvers()->MergeFrom(resolvers);
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  static_cast<void>(typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares));
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
@@ -2065,7 +2065,7 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfigOverridingUseTcp) {
   cares.add_resolvers()->MergeFrom(resolvers);
   cares.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(true);
   cares.mutable_dns_resolver_options()->set_no_default_search_domain(true);
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  static_cast<void>(typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares));
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
@@ -2105,12 +2105,13 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyTypedDnsResolverConfig) {
   cares.add_resolvers()->MergeFrom(resolvers);
   cares.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(true);
   cares.mutable_dns_resolver_options()->set_no_default_search_domain(true);
-  config.mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(cares);
+  static_cast<void>(
+      config.mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(cares));
   config.mutable_typed_dns_resolver_config()->set_name(std::string(Network::CaresDnsResolver));
 
   // setup the expected function call parameter.
   envoy::config::core::v3::TypedExtensionConfig expected_typed_dns_resolver_config;
-  expected_typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  static_cast<void>(expected_typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares));
   expected_typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory(dns_resolver_factory);
@@ -2189,8 +2190,8 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
   Registry::InjectFactory<KeyValueStoreFactory> injector(factory);
   auto* key_value_config = config_.mutable_key_value_config()->mutable_config();
   key_value_config->set_name("mock_key_value_store_factory");
-  key_value_config->mutable_typed_config()->PackFrom(
-      envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig());
+  static_cast<void>(key_value_config->mutable_typed_config()->PackFrom(
+      envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig()));
 
   initialize();
   InSequence s;
@@ -2329,8 +2330,8 @@ TEST_F(DnsCacheImplTest, CacheLoad) {
   Registry::InjectFactory<KeyValueStoreFactory> injector(factory);
   auto* key_value_config = config_.mutable_key_value_config()->mutable_config();
   key_value_config->set_name("mock_key_value_store_factory");
-  key_value_config->mutable_typed_config()->PackFrom(
-      envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig());
+  static_cast<void>(key_value_config->mutable_typed_config()->PackFrom(
+      envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig()));
 
   initialize();
   ASSERT(store != nullptr);
@@ -2395,8 +2396,8 @@ TEST_F(DnsCacheImplTest, SingleAddressCache) {
   Registry::InjectFactory<KeyValueStoreFactory> injector(factory);
   auto* key_value_config = config_.mutable_key_value_config()->mutable_config();
   key_value_config->set_name("mock_key_value_store_factory");
-  key_value_config->mutable_typed_config()->PackFrom(
-      envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig());
+  static_cast<void>(key_value_config->mutable_typed_config()->PackFrom(
+      envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig()));
 
   initialize();
   ASSERT(store != nullptr);
@@ -2444,8 +2445,8 @@ TEST_F(DnsCacheImplTest, CacheLoadParsingErrors) {
   Registry::InjectFactory<KeyValueStoreFactory> injector(factory);
   auto* key_value_config = config_.mutable_key_value_config()->mutable_config();
   key_value_config->set_name("mock_key_value_store_factory");
-  key_value_config->mutable_typed_config()->PackFrom(
-      envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig());
+  static_cast<void>(key_value_config->mutable_typed_config()->PackFrom(
+      envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig()));
 
   // Create the timers but let NiceMock handle all the expectations
   new NiceMock<Event::MockTimer>(&context_.server_context_.dispatcher_);

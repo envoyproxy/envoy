@@ -154,7 +154,7 @@ void expectSerializedBuffer(SpanBuffer& buffer, const bool delay_allocation,
 
 template <typename Type> std::string serializedMessageToJson(const std::string& serialized) {
   Type message;
-  message.ParseFromString(serialized);
+  static_cast<void>(message.ParseFromString(serialized));
   std::string json;
   Protobuf::util::MessageToJsonString(message, &json).IgnoreError();
   return json;

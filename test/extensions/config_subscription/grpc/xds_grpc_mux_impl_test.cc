@@ -350,7 +350,7 @@ envoy::service::discovery::v3::Resource
 resourceWithTtl(std::chrono::milliseconds ttl,
                 envoy::config::endpoint::v3::ClusterLoadAssignment& cla) {
   envoy::service::discovery::v3::Resource resource;
-  resource.mutable_resource()->PackFrom(cla);
+  static_cast<void>(resource.mutable_resource()->PackFrom(cla));
   resource.mutable_ttl()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(ttl.count()));
 
   resource.set_name(cla.cluster_name());
@@ -360,7 +360,7 @@ resourceWithTtl(std::chrono::milliseconds ttl,
 envoy::service::discovery::v3::Resource
 resourceWithEmptyTtl(envoy::config::endpoint::v3::ClusterLoadAssignment& cla) {
   envoy::service::discovery::v3::Resource resource;
-  resource.mutable_resource()->PackFrom(cla);
+  static_cast<void>(resource.mutable_resource()->PackFrom(cla));
   resource.set_name(cla.cluster_name());
   return resource;
 }
@@ -390,7 +390,7 @@ TEST_P(GrpcMuxImplTest, ResourceTTL) {
     load_assignment.set_cluster_name("x");
 
     auto wrapped_resource = resourceWithTtl(std::chrono::milliseconds(1000), load_assignment);
-    response->add_resources()->PackFrom(wrapped_resource);
+    static_cast<void>(response->add_resources()->PackFrom(wrapped_resource));
 
     EXPECT_CALL(*ttl_timer, enabled());
     EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(1000), _));
@@ -411,7 +411,7 @@ TEST_P(GrpcMuxImplTest, ResourceTTL) {
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
     auto wrapped_resource = resourceWithTtl(std::chrono::milliseconds(10000), load_assignment);
-    response->add_resources()->PackFrom(wrapped_resource);
+    static_cast<void>(response->add_resources()->PackFrom(wrapped_resource));
 
     EXPECT_CALL(*ttl_timer, enabled());
     EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(10000), _));
@@ -431,7 +431,7 @@ TEST_P(GrpcMuxImplTest, ResourceTTL) {
     response->set_type_url(type_url);
     response->set_version_info("1");
     auto wrapped_resource = heartbeatResource(std::chrono::milliseconds(10000), "x");
-    response->add_resources()->PackFrom(wrapped_resource);
+    static_cast<void>(response->add_resources()->PackFrom(wrapped_resource));
 
     EXPECT_CALL(*ttl_timer, enabled());
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
@@ -452,7 +452,7 @@ TEST_P(GrpcMuxImplTest, ResourceTTL) {
     response->set_version_info("1");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
-    response->add_resources()->PackFrom(resourceWithEmptyTtl(load_assignment));
+    static_cast<void>(response->add_resources()->PackFrom(resourceWithEmptyTtl(load_assignment)));
 
     EXPECT_CALL(*ttl_timer, disableTimer());
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
@@ -472,7 +472,7 @@ TEST_P(GrpcMuxImplTest, ResourceTTL) {
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
     auto wrapped_resource = resourceWithTtl(std::chrono::milliseconds(10000), load_assignment);
-    response->add_resources()->PackFrom(wrapped_resource);
+    static_cast<void>(response->add_resources()->PackFrom(wrapped_resource));
 
     EXPECT_CALL(*ttl_timer, enabled());
     EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(10000), _));
@@ -550,7 +550,7 @@ TEST_P(GrpcMuxImplTest, WildcardWatch) {
     response->set_version_info("1");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
-    response->add_resources()->PackFrom(load_assignment);
+    static_cast<void>(response->add_resources()->PackFrom(load_assignment));
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
         .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& resources,
                                             const std::string&) {
@@ -589,7 +589,7 @@ TEST_P(GrpcMuxImplTest, WatchDemux) {
     response->set_version_info("1");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
-    response->add_resources()->PackFrom(load_assignment);
+    static_cast<void>(response->add_resources()->PackFrom(load_assignment));
     EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "1")).Times(0);
     EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1"))
         .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& resources,
@@ -613,13 +613,13 @@ TEST_P(GrpcMuxImplTest, WatchDemux) {
     response->set_version_info("2");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_x;
     load_assignment_x.set_cluster_name("x");
-    response->add_resources()->PackFrom(load_assignment_x);
+    static_cast<void>(response->add_resources()->PackFrom(load_assignment_x));
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_y;
     load_assignment_y.set_cluster_name("y");
-    response->add_resources()->PackFrom(load_assignment_y);
+    static_cast<void>(response->add_resources()->PackFrom(load_assignment_y));
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_z;
     load_assignment_z.set_cluster_name("z");
-    response->add_resources()->PackFrom(load_assignment_z);
+    static_cast<void>(response->add_resources()->PackFrom(load_assignment_z));
     EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "2"))
         .WillOnce(Invoke([&load_assignment_y, &load_assignment_z](
                              const std::vector<DecodedResourceRef>& resources, const std::string&) {
@@ -918,7 +918,7 @@ TEST_P(GrpcMuxImplTest, UnwatchedTypeAcceptsResources) {
   response->set_type_url(type_url);
   envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
   load_assignment.set_cluster_name("x");
-  response->add_resources()->PackFrom(load_assignment);
+  static_cast<void>(response->add_resources()->PackFrom(load_assignment));
   response->set_version_info("1");
 
   expectSendMessage(type_url, {}, "1");
@@ -1004,7 +1004,7 @@ TEST_P(GrpcMuxImplTest, ValidResourceDecoderAfterRemoval) {
       response->set_version_info("1");
       envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
       load_assignment.set_cluster_name("x");
-      response->add_resources()->PackFrom(load_assignment);
+      static_cast<void>(response->add_resources()->PackFrom(load_assignment));
       EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1"))
           .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& resources,
                                               const std::string&) {
@@ -1039,7 +1039,7 @@ TEST_P(GrpcMuxImplTest, ValidResourceDecoderAfterRemoval) {
     response->set_version_info("2");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("y");
-    response->add_resources()->PackFrom(load_assignment);
+    static_cast<void>(response->add_resources()->PackFrom(load_assignment));
     EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "2"))
         .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& resources,
                                             const std::string&) {
@@ -1145,7 +1145,7 @@ TEST_P(GrpcMuxImplTest, CacheEdsResource) {
     response->set_version_info("1");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
-    response->add_resources()->PackFrom(load_assignment);
+    static_cast<void>(response->add_resources()->PackFrom(load_assignment));
 
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
         .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
@@ -1187,7 +1187,7 @@ TEST_P(GrpcMuxImplTest, UpdateCacheEdsResource) {
     response->set_version_info("1");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
-    response->add_resources()->PackFrom(load_assignment);
+    static_cast<void>(response->add_resources()->PackFrom(load_assignment));
 
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
         .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
@@ -1236,7 +1236,7 @@ TEST_P(GrpcMuxImplTest, AddRemoveSubscriptions) {
       response->set_version_info("1");
       envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
       load_assignment.set_cluster_name("x");
-      response->add_resources()->PackFrom(load_assignment);
+      static_cast<void>(response->add_resources()->PackFrom(load_assignment));
 
       EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
           .WillOnce(
@@ -1267,7 +1267,7 @@ TEST_P(GrpcMuxImplTest, AddRemoveSubscriptions) {
       response->set_version_info("2");
       envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
       load_assignment.set_cluster_name("y");
-      response->add_resources()->PackFrom(load_assignment);
+      static_cast<void>(response->add_resources()->PackFrom(load_assignment));
 
       EXPECT_CALL(callbacks_, onConfigUpdate(_, "2"))
           .WillOnce(
@@ -1345,7 +1345,7 @@ TEST_P(GrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
     response->set_version_info("1");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
-    response->add_resources()->PackFrom(load_assignment);
+    static_cast<void>(response->add_resources()->PackFrom(load_assignment));
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
         .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& resources,
                                             const std::string&) {
@@ -1386,7 +1386,7 @@ TEST_P(GrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
     response->set_version_info("2");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("y");
-    response->add_resources()->PackFrom(load_assignment);
+    static_cast<void>(response->add_resources()->PackFrom(load_assignment));
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "2"))
         .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& resources,
                                             const std::string&) {

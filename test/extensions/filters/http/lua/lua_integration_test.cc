@@ -175,9 +175,9 @@ public:
           (*cluster->mutable_typed_extension_protocol_options())
               ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
       old_protocol_options.clear_http_filters();
-      (*cluster->mutable_typed_extension_protocol_options())
-          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-              .PackFrom(old_protocol_options);
+      static_cast<void>((*cluster->mutable_typed_extension_protocol_options())
+                            ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                                .PackFrom(old_protocol_options));
     }
   }
 
@@ -1680,7 +1680,7 @@ public:
 
     // Pack metadata into Any
     Protobuf::Any typed_config;
-    typed_config.PackFrom(metadata);
+    static_cast<void>(typed_config.PackFrom(metadata));
     typed_filter_metadata.insert({metadata_key, typed_config});
 
     return Network::FilterStatus::Continue;
@@ -1758,7 +1758,7 @@ public:
 
     // Pack metadata into Any
     Protobuf::Any typed_config;
-    typed_config.PackFrom(metadata);
+    static_cast<void>(typed_config.PackFrom(metadata));
     typed_filter_metadata.insert({metadata_key, typed_config});
 
     return Network::FilterStatus::Continue;

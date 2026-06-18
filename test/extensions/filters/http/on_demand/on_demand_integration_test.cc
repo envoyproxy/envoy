@@ -936,7 +936,7 @@ routes:
             ->set_cluster_name("xds_cluster");
       }
 
-      config_blob->PackFrom(hcm_config);
+      static_cast<void>(config_blob->PackFrom(hcm_config));
     });
 
     HttpIntegrationTest::initialize();

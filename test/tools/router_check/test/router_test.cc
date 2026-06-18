@@ -112,7 +112,8 @@ TEST(RouterCheckTest, RouterCheckTestRoutesFailuresTest) {
       }
   )pb";
   envoy::RouterCheckToolSchema::ValidationItemResult expected_result_proto;
-  Protobuf::TextFormat::ParseFromString(expected_result_str, &expected_result_proto);
+  static_cast<void>(
+      Protobuf::TextFormat::ParseFromString(expected_result_str, &expected_result_proto));
 
   EXPECT_TRUE(TestUtility::protoEqual(expected_result_proto, test_result, true));
 }

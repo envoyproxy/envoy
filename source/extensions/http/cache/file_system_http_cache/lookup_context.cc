@@ -175,7 +175,7 @@ void FileLookupContext::getTrailers(LookupTrailersCallback&& cb) {
           return;
         }
         CacheFileTrailer trailer;
-        trailer.ParseFromString(read_result.value()->toString());
+        static_cast<void>(trailer.ParseFromString(read_result.value()->toString()));
         std::move(cb)(trailersFromTrailerProto(trailer));
       });
   ASSERT(queued.ok(), queued.status().ToString());

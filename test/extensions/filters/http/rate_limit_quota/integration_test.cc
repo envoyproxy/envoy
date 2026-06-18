@@ -162,7 +162,7 @@ protected:
           *config_option.deny_response_settings;
     }
 
-    mutable_config->PackFrom(mutable_bucket_settings);
+    static_cast<void>(mutable_config->PackFrom(mutable_bucket_settings));
   }
 
   static Matcher constructPreviewMatcher() {
@@ -218,7 +218,7 @@ protected:
       // to JSON so that we can add it to the overall config
       envoy::config::listener::v3::Filter rate_limit_quota_filter;
       rate_limit_quota_filter.set_name("envoy.filters.http.rate_limit_quota");
-      rate_limit_quota_filter.mutable_typed_config()->PackFrom(proto_config_);
+      static_cast<void>(rate_limit_quota_filter.mutable_typed_config()->PackFrom(proto_config_));
       config_helper_.prependFilter(
           MessageUtil::getJsonStringFromMessageOrError(rate_limit_quota_filter));
     });

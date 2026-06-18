@@ -93,7 +93,7 @@ void appendHttpBodyEnvelope(Buffer::Instance& output, std::string content_type,
     StringOutputStream string_stream(&proto_envelope);
     CodedOutputStream coded_stream(&string_stream);
 
-    body.SerializeToCodedStream(&coded_stream);
+    static_cast<void>(body.SerializeToCodedStream(&coded_stream));
     coded_stream.WriteTag(http_body_tag);
     coded_stream.WriteVarint64(content_length);
   }

@@ -39,7 +39,7 @@ protected:
     envoy::extensions::transport_sockets::dynamic_modules::v3::DynamicModuleTransportSocket config;
     config.mutable_dynamic_module_config()->set_name(kReferenceModule);
     config.set_transport_socket_name(name);
-    transport_socket.mutable_typed_config()->PackFrom(config);
+    static_cast<void>(transport_socket.mutable_typed_config()->PackFrom(config));
     return transport_socket;
   }
 

@@ -84,7 +84,7 @@ public:
 
   envoy::extensions::filters::http::cache::v3::CacheConfig cacheConfig(ConfigProto cfg) {
     envoy::extensions::filters::http::cache::v3::CacheConfig cache_config;
-    cache_config.mutable_typed_config()->PackFrom(cfg);
+    static_cast<void>(cache_config.mutable_typed_config()->PackFrom(cfg));
     return cache_config;
   }
 

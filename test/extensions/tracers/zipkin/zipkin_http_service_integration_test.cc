@@ -62,7 +62,8 @@ public:
       zipkin_config.set_collector_endpoint_version(ZipkinConfig::HTTP_JSON);
 
       tracing.mutable_provider()->set_name("envoy.tracers.zipkin");
-      tracing.mutable_provider()->mutable_typed_config()->PackFrom(zipkin_config);
+      static_cast<void>(
+          tracing.mutable_provider()->mutable_typed_config()->PackFrom(zipkin_config));
 
       *hcm.mutable_tracing() = tracing;
     });

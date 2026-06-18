@@ -37,12 +37,13 @@ protected:
           dm_config.mutable_dynamic_module_config()->set_name(module_name);
           dm_config.set_filter_name(filter_name);
           if (!config.empty()) {
-            dm_config.mutable_filter_config()->PackFrom(ValueUtil::stringValue(config));
+            static_cast<void>(
+                dm_config.mutable_filter_config()->PackFrom(ValueUtil::stringValue(config)));
           }
 
           auto* dm_filter = filter_chain->add_filters();
           dm_filter->set_name("envoy.filters.network.dynamic_modules");
-          dm_filter->mutable_typed_config()->PackFrom(dm_config);
+          static_cast<void>(dm_filter->mutable_typed_config()->PackFrom(dm_config));
 
           // Add the tcp_proxy back.
           filter_chain->add_filters()->CopyFrom(tcp_proxy_filter);

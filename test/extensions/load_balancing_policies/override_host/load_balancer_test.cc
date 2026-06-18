@@ -76,7 +76,8 @@ protected:
     Config locality_picker_config;
     auto* typed_extension_config =
         config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-    typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
+    static_cast<void>(
+        typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config));
     typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
     return config;
   }
@@ -93,7 +94,8 @@ protected:
     Config locality_picker_config;
     auto* typed_extension_config =
         config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-    typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
+    static_cast<void>(
+        typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config));
     typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
     config.add_override_host_sources()->set_header(primary_header_name);
     setMetadataHostSource(config.add_override_host_sources(), primary_header_name);
@@ -109,7 +111,8 @@ protected:
     Config locality_picker_config;
     auto* typed_extension_config =
         config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-    typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
+    static_cast<void>(
+        typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config));
     typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
     setMetadataHostSource(config.add_override_host_sources(), primary_header_name);
     config.add_override_host_sources()->set_header(primary_header_name);
@@ -127,7 +130,8 @@ protected:
     Config locality_picker_config;
     auto* typed_extension_config =
         config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-    typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
+    static_cast<void>(
+        typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config));
     typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
     return config;
   }
@@ -146,7 +150,8 @@ protected:
     Config locality_picker_config;
     auto* typed_extension_config =
         config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-    typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
+    static_cast<void>(
+        typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config));
     typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
     return config;
   }

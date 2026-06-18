@@ -76,7 +76,8 @@ public:
           // Add the custom response filter to the http filter chain.
           auto* filter = hcm.mutable_http_filters()->Add();
           filter->set_name("envoy.filters.http.custom_response");
-          filter->mutable_typed_config()->PackFrom(custom_response_filter_config_);
+          static_cast<void>(
+              filter->mutable_typed_config()->PackFrom(custom_response_filter_config_));
           hcm.mutable_http_filters()->SwapElements(0, 1);
           int cer_position = 0;
 
@@ -150,7 +151,7 @@ public:
         });
 
     Any cfg_any;
-    cfg_any.PackFrom(cer_config);
+    static_cast<void>(cfg_any.PackFrom(cer_config));
     return cfg_any;
   }
 

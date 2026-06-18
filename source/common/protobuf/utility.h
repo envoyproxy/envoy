@@ -181,7 +181,7 @@ public:
       printer.SetHideUnknownFields(true);
       for (const auto& message : source) {
         std::string text_message;
-        printer.PrintToString(message, &text_message);
+        static_cast<void>(printer.PrintToString(message, &text_message));
         absl::StrAppend(&text, text_message);
       }
     }

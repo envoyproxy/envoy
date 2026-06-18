@@ -87,7 +87,7 @@ ResponseMetadata metadataFromHeaderProto(const CacheFileHeader& header) {
 
 CacheFileHeader makeCacheFileHeaderProto(Buffer::Instance& buffer) {
   CacheFileHeader ret;
-  ret.ParseFromString(buffer.toString());
+  static_cast<void>(ret.ParseFromString(buffer.toString()));
   return ret;
 }
 

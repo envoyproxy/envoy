@@ -91,7 +91,7 @@ CreateApiKeyRequest makeCreateApiKeyRequest(absl::string_view pb = R"pb(
   parent: "project-id"
 )pb") {
   CreateApiKeyRequest request;
-  Protobuf::TextFormat::ParseFromString(pb, &request);
+  static_cast<void>(Protobuf::TextFormat::ParseFromString(pb, &request));
   return request;
 }
 
@@ -106,7 +106,7 @@ apikeys::ApiKey makeCreateApiKeyResponse(absl::string_view pb = R"pb(
   expire_time { seconds: 1715842560 nanos: 0 }
 )pb") {
   apikeys::ApiKey response;
-  Envoy::Protobuf::TextFormat::ParseFromString(pb, &response);
+  static_cast<void>(Envoy::Protobuf::TextFormat::ParseFromString(pb, &response));
   return response;
 }
 

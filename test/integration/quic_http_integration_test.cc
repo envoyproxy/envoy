@@ -1232,7 +1232,7 @@ TEST_P(QuicHttpIntegrationTest, ConfigureAlpnProtocols) {
         quic_transport_socket_config.mutable_downstream_tls_context()->mutable_common_tls_context();
     common_tls_context->add_alpn_protocols("h3");
     common_tls_context->add_alpn_protocols("h3-special");
-    ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+    static_cast<void>(ts->mutable_typed_config()->PackFrom(quic_transport_socket_config));
   });
   initialize();
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
@@ -1296,7 +1296,7 @@ public:
           ->mutable_routes(0)
           ->mutable_route()
           ->set_cluster("cluster_1");
-      config_blob->PackFrom(hcm_config);
+      static_cast<void>(config_blob->PackFrom(hcm_config));
       bootstrap.mutable_static_resources()->mutable_clusters()->Add()->MergeFrom(
           *bootstrap.mutable_static_resources()->mutable_clusters(0));
       bootstrap.mutable_static_resources()->mutable_clusters(1)->set_name("cluster_1");
@@ -1556,7 +1556,8 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddress) {
             server_preferred_address;
         server_preferred_address.set_ipv4_address("127.0.0.2");
         server_preferred_address.set_ipv6_address("::2");
-        preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
+        static_cast<void>(
+            preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address));
 
         // Configure a test listener filter which is incompatible with any server preferred
         // addresses but with any matcher, which effectively disables the filter.
@@ -1567,7 +1568,7 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddress) {
         configuration.set_added_value("foo");
         configuration.set_allow_server_migration(false);
         configuration.set_allow_client_migration(false);
-        listener_filter->mutable_typed_config()->PackFrom(configuration);
+        static_cast<void>(listener_filter->mutable_typed_config()->PackFrom(configuration));
         listener_filter->mutable_filter_disabled()->set_any_match(true);
       });
 
@@ -1639,7 +1640,8 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
         server_preferred_address.mutable_ipv6_config()->mutable_address()->set_port_value(12345);
         server_preferred_address.mutable_ipv6_config()->mutable_dnat_address()->set_address("::2");
         server_preferred_address.mutable_ipv6_config()->mutable_dnat_address()->set_port_value(0);
-        preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
+        static_cast<void>(
+            preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address));
 
         // Configure a test listener filter which is incompatible with any server preferred
         // addresses but with any matcher, which effectively disables the filter.
@@ -1650,7 +1652,7 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
         configuration.set_added_value("foo");
         configuration.set_allow_server_migration(false);
         configuration.set_allow_client_migration(false);
-        listener_filter->mutable_typed_config()->PackFrom(configuration);
+        static_cast<void>(listener_filter->mutable_typed_config()->PackFrom(configuration));
         listener_filter->mutable_filter_disabled()->set_any_match(true);
       });
 
@@ -1730,7 +1732,8 @@ TEST_P(QuicHttpIntegrationSPATest, PreferredAddressRuntimeFlag) {
             server_preferred_address;
         server_preferred_address.set_ipv4_address("127.0.0.2");
         server_preferred_address.set_ipv6_address("::2");
-        preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
+        static_cast<void>(
+            preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address));
 
         // Configure a test listener filter which is incompatible with any server preferred
         // addresses but with any matcher, which effectively disables the filter.
@@ -1741,7 +1744,7 @@ TEST_P(QuicHttpIntegrationSPATest, PreferredAddressRuntimeFlag) {
         configuration.set_added_value("foo");
         configuration.set_allow_server_migration(false);
         configuration.set_allow_client_migration(false);
-        listener_filter->mutable_typed_config()->PackFrom(configuration);
+        static_cast<void>(listener_filter->mutable_typed_config()->PackFrom(configuration));
         listener_filter->mutable_filter_disabled()->set_any_match(true);
       });
 
@@ -1793,7 +1796,8 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDualStack) {
     envoy::extensions::quic::server_preferred_address::v3::FixedServerPreferredAddressConfig
         server_preferred_address;
     server_preferred_address.set_ipv4_address("127.0.0.2");
-    preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
+    static_cast<void>(
+        preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address));
   });
 
   initialize();
@@ -1851,7 +1855,8 @@ TEST_P(QuicHttpIntegrationTest, PreferredAddressDroppedByIncompatibleListenerFil
             server_preferred_address;
         server_preferred_address.set_ipv4_address("127.0.0.2");
         server_preferred_address.set_ipv6_address("::2");
-        preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
+        static_cast<void>(
+            preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address));
 
         // Configure a test listener filter which is incompatible with any server preferred
         // addresses.
@@ -1862,7 +1867,7 @@ TEST_P(QuicHttpIntegrationTest, PreferredAddressDroppedByIncompatibleListenerFil
         configuration.set_added_value("foo");
         configuration.set_allow_server_migration(false);
         configuration.set_allow_client_migration(false);
-        listener_filter->mutable_typed_config()->PackFrom(configuration);
+        static_cast<void>(listener_filter->mutable_typed_config()->PackFrom(configuration));
       });
 
   initialize();
@@ -1984,7 +1989,7 @@ TEST_P(QuicHttpIntegrationTest, ConnectionDebugVisitor) {
                                     ->mutable_connection_debug_visitor_config();
     debug_visitor_config->set_name("envoy.quic.connection_debug_visitor.basic");
     envoy::extensions::quic::connection_debug_visitor::v3::BasicConfig config;
-    debug_visitor_config->mutable_typed_config()->PackFrom(config);
+    static_cast<void>(debug_visitor_config->mutable_typed_config()->PackFrom(config));
   });
 
   initialize();
@@ -2057,7 +2062,7 @@ TEST_P(QuicHttpIntegrationTest, QuicListenerFilterReceivesFirstPacketWithCmsg) {
     configuration.set_added_value("foo");
     configuration.set_allow_server_migration(false);
     configuration.set_allow_client_migration(false);
-    listener_filter->mutable_typed_config()->PackFrom(configuration);
+    static_cast<void>(listener_filter->mutable_typed_config()->PackFrom(configuration));
   });
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -2095,7 +2100,7 @@ TEST_P(QuicHttpIntegrationTest, SessionTicketResumptionWithStaticKeys) {
                      ->mutable_session_ticket_keys();
     // Session ticket keys must be exactly 80 bytes.
     keys->add_keys()->set_inline_bytes(std::string(80, '\x01'));
-    ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+    static_cast<void>(ts->mutable_typed_config()->PackFrom(quic_transport_socket_config));
   });
 
   initialize();

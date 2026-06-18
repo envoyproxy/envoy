@@ -193,7 +193,7 @@ public:
       auto* filter = filters->Mutable(i);
       if (filter->name() == Extensions::HttpFilters::HttpFilterNames::get().OnDemand) {
         filter->clear_typed_config();
-        filter->mutable_typed_config()->PackFrom(std::move(config));
+        static_cast<void>(filter->mutable_typed_config()->PackFrom(std::move(config)));
         break;
       }
     }
@@ -203,8 +203,9 @@ public:
                                 std::string vhost_name, std::string route_name) {
     auto maybe_map = findPerRouteConfigMap(hcm, vhost_name, route_name);
     if (maybe_map.has_value()) {
-      maybe_map.ref()[Extensions::HttpFilters::HttpFilterNames::get().OnDemand].PackFrom(
-          std::move(config));
+      static_cast<void>(
+          maybe_map.ref()[Extensions::HttpFilters::HttpFilterNames::get().OnDemand].PackFrom(
+              std::move(config)));
     }
   }
 };
@@ -221,7 +222,7 @@ public:
 
   ConfigHelper::HttpConnectionManager& hcm() { return hcm_; }
   envoy::config::listener::v3::Listener listener() {
-    hcm_any_->PackFrom(hcm_);
+    static_cast<void>(hcm_any_->PackFrom(hcm_));
     return listener_;
   }
 
@@ -677,7 +678,8 @@ public:
     // Set the ODCDS filter on the HCM to use ADS, and a long timeout.
     auto odcds_config =
         OdCdsIntegrationHelper::createOnDemandConfig(std::move(ads_config_source), 10000);
-    hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(std::move(odcds_config));
+    static_cast<void>(
+        hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(std::move(odcds_config)));
     // The clusters are on-demand - no need to validate them.
     hcm.mutable_route_config()->mutable_validate_clusters()->set_value(false);
     // Update the route to match "/" to cluster: "new_cluster1".

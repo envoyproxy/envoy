@@ -124,7 +124,8 @@ public:
           filter_chain->mutable_transport_socket()->mutable_typed_config()->UnpackTo(&tls_context);
       RELEASE_ASSERT(unpack_ok, "failed to unpack DownstreamTlsContext for test listener");
       tls_context.mutable_require_client_certificate()->set_value(true);
-      filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+      static_cast<void>(
+          filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context));
     });
 
     BaseIntegrationTest::initialize();
