@@ -5,10 +5,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-#if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
-#include <linux/filter.h>
-#endif
-
 namespace Envoy {
 namespace Quic {
 namespace Extensions {
@@ -28,12 +24,10 @@ class FactoryFunctions {
 public:
   FactoryFunctions(EnvoyQuicConnectionIdGeneratorFactory& factory, uint32_t concurrency);
 
-  uint32_t concurrency_;
+  const uint32_t concurrency_;
   const QuicConnectionIdWorkerSelector worker_selector_;
-#if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   Network::Socket::OptionConstSharedPtr opt_;
-  const sock_fprog* bpf_prog_;
-#endif
+  const void* bpf_prog_ = nullptr;
 };
 
 class GivenPacket {
