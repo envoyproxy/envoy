@@ -1027,7 +1027,7 @@ TEST_F(OAuth2Test, RequestSignout) {
  * The post_logout_redirect_uri is not defined and is not disabled.
  *
  * Expected behavior: the filter should redirect to the end session endpoint and use the request-derived default
- * ``post_logout_redirect_uri`` query parameter (<schema>://<host>/).
+ * ``post_logout_redirect_uri`` query parameter (<scheme>://<host>/).
  */
 TEST_F(OAuth2Test, RequestSignoutWhenEndSessionEndpointIsConfigured) {
   // Create a filter config with end session endpoint and openid scope.
