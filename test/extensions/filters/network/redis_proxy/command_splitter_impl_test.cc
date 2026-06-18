@@ -429,8 +429,7 @@ TEST_F(RedisSingleServerRequestTest, HExpireSuccess) {
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name, "redis.foo.command.hexpire.latency"),
-                          10));
+                          Property(&Stats::Metric::name, "redis.foo.command.hexpire.latency"), 10));
   respond();
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.hexpire.total").value());
@@ -447,9 +446,9 @@ TEST_F(RedisSingleServerRequestTest, HExpireAtSuccess) {
   EXPECT_NE(nullptr, handle_);
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(10));
-  EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name, "redis.foo.command.hexpireat.latency"),
-                          10));
+  EXPECT_CALL(store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "redis.foo.command.hexpireat.latency"), 10));
   respond();
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.hexpireat.total").value());
@@ -466,9 +465,9 @@ TEST_F(RedisSingleServerRequestTest, HPExpireSuccess) {
   EXPECT_NE(nullptr, handle_);
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(10));
-  EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name, "redis.foo.command.hpexpire.latency"),
-                          10));
+  EXPECT_CALL(store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "redis.foo.command.hpexpire.latency"), 10));
   respond();
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.hpexpire.total").value());
@@ -485,9 +484,9 @@ TEST_F(RedisSingleServerRequestTest, HPExpireAtSuccess) {
   EXPECT_NE(nullptr, handle_);
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(10));
-  EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name, "redis.foo.command.hpexpireat.latency"),
-                          10));
+  EXPECT_CALL(store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "redis.foo.command.hpexpireat.latency"), 10));
   respond();
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.hpexpireat.total").value());
@@ -504,9 +503,9 @@ TEST_F(RedisSingleServerRequestTest, HPersistSuccess) {
   EXPECT_NE(nullptr, handle_);
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(10));
-  EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name, "redis.foo.command.hpersist.latency"),
-                          10));
+  EXPECT_CALL(store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "redis.foo.command.hpersist.latency"), 10));
   respond();
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.hpersist.total").value());
@@ -559,9 +558,9 @@ TEST_F(RedisSingleServerRequestTest, HExpireTimeSuccess) {
   EXPECT_NE(nullptr, handle_);
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(10));
-  EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name, "redis.foo.command.hexpiretime.latency"),
-                          10));
+  EXPECT_CALL(store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "redis.foo.command.hexpiretime.latency"), 10));
   respond();
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.hexpiretime.total").value());
@@ -578,9 +577,9 @@ TEST_F(RedisSingleServerRequestTest, HPExpireTimeSuccess) {
   EXPECT_NE(nullptr, handle_);
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(10));
-  EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name, "redis.foo.command.hpexpiretime.latency"),
-                          10));
+  EXPECT_CALL(store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "redis.foo.command.hpexpiretime.latency"), 10));
   respond();
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.hpexpiretime.total").value());
@@ -589,8 +588,7 @@ TEST_F(RedisSingleServerRequestTest, HPExpireTimeSuccess) {
 
 // Verify write classification: hexpire/hexpireat/hpexpire/hpexpireat/hpersist are write commands.
 TEST_F(RedisSingleServerRequestTest, HashFieldExpiryWriteCommandsClassification) {
-  for (const std::string& cmd :
-       {"hexpire", "hexpireat", "hpexpire", "hpexpireat", "hpersist"}) {
+  for (const std::string& cmd : {"hexpire", "hexpireat", "hpexpire", "hpexpireat", "hpersist"}) {
     EXPECT_FALSE(Common::Redis::SupportedCommands::isReadCommand(cmd))
         << cmd << " should be classified as a write command";
   }
