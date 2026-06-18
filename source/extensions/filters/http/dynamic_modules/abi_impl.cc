@@ -964,7 +964,7 @@ void envoy_dynamic_module_callback_http_send_response_headers(
     headers->addCopy(Http::LowerCaseString(key), value);
   }
 
-  filter->decoder_callbacks_->encodeHeaders(std::move(headers), end_stream, "");
+  filter->sendResponseHeaders(std::move(headers), end_stream);
 }
 
 void envoy_dynamic_module_callback_http_send_response_data(
@@ -976,7 +976,7 @@ void envoy_dynamic_module_callback_http_send_response_data(
   }
 
   Buffer::OwnedImpl buffer(absl::string_view{data.ptr, data.length});
-  filter->decoder_callbacks_->encodeData(buffer, end_stream);
+  filter->sendResponseData(buffer, end_stream);
 }
 
 void envoy_dynamic_module_callback_http_send_response_trailers(
@@ -996,7 +996,7 @@ void envoy_dynamic_module_callback_http_send_response_trailers(
     trailers->addCopy(Http::LowerCaseString(key), value);
   }
 
-  filter->decoder_callbacks_->encodeTrailers(std::move(trailers));
+  filter->sendResponseTrailers(std::move(trailers));
 }
 
 size_t envoy_dynamic_module_callback_http_get_body_size(

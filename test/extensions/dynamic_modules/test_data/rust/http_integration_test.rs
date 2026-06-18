@@ -86,6 +86,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
       }))
     },
     "streaming_terminal_filter" => Some(Box::new(StreamingTerminalFilterConfig {})),
+    "streaming_response_reentry" => Some(Box::new(StreamingResponseReentryFilterConfig {})),
     "buffer_limit_filter" => Some(Box::new(BufferLimitFilterConfig {})),
     "http_stream_basic" => Some(Box::new(HttpStreamBasicConfig {
       cluster_name: String::from_utf8(config.to_owned()).unwrap(),
@@ -1486,6 +1487,44 @@ impl StreamingTerminalHttpFilter {
     let chunk = vec![b'a'; chunk_size];
     envoy_filter.send_response_data(&chunk, false);
     self.large_response_bytes_sent += chunk_size;
+  }
+}
+
+// =============================================================================
+// Streaming Response Reentry Test Filter
+// =============================================================================
+
+// Produces a response inline with the streaming-response ABI, then stamps a marker header from
+// on_response_headers. Without the fix the streaming response re-enters this hook, so the marker
+// leaks onto the module's own response. With the fix the hook is suppressed and the marker is
+// absent.
+struct StreamingResponseReentryFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StreamingResponseReentryFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(StreamingResponseReentryHttpFilter {})
+  }
+}
+
+struct StreamingResponseReentryHttpFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingResponseReentryHttpFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    envoy_filter.send_response_headers(&[(":status", b"200"), ("x-produced", b"yes")], true);
+    envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  }
+
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    envoy_filter.set_response_header("x-reentered", b"yes");
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }
 
