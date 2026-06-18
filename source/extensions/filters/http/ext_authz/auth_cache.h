@@ -24,9 +24,9 @@ struct RequestAttributes {
   envoy::config::core::v3::Metadata route_metadata_context_;
 };
 
-class AuthCache {
+class AuthCacheSession {
 public:
-  virtual ~AuthCache() = default;
+  virtual ~AuthCacheSession() = default;
 
   class LookupRequest {
   public:
@@ -39,29 +39,42 @@ public:
   /**
    * Looks for a matching request/response pair in the cache.
    * If lookup fails or misses, the callback should be invoked with nullptr.
-   * Lifetimes of the arguments passed to it must last until onDestroy is called.
+   * Lifetimes of the arguments passed to it must last until cb or LookupRequest::cancel is called.
    * @param decoder_callbacks The stream decoder filter callbacks.
    * @param attributes The RequestAttributes containing authorization context.
    * @param cb The callback to invoke when the lookup completes.
    * @return A LookupRequest handle if the lookup is asynchronous and can be cancelled,
    *         or nullptr if the lookup completed synchronously.
+   *         Invalidated when `cb` or `LookupRequest::cancel` is called.
    */
   virtual LookupRequest* lookup(Http::StreamDecoderFilterCallbacks& decoder_callbacks,
                                 const RequestAttributes& attributes, LookupCallback&& cb) = 0;
 
   /**
    * Inserts a response into the cache.
-   * @param attributes The RequestAttributes containing authorization context.
    * @param response The Response received from the authz service.
    */
-  virtual void insert(const RequestAttributes& attributes,
-                      const Filters::Common::ExtAuthz::Response& response) = 0;
+  virtual void insert(const Filters::Common::ExtAuthz::Response& response) = 0;
+};
+
+using AuthCacheSessionPtr = std::unique_ptr<AuthCacheSession>;
+
+class AuthCache {
+public:
+  virtual ~AuthCache() = default;
+
+  /**
+   * Creates a new cache session for a stream filter.
+   */
+  virtual AuthCacheSessionPtr createSession() = 0;
 };
 
 using AuthCachePtr = std::unique_ptr<AuthCache>;
 
 class AuthCacheFactory : public Config::TypedFactory {
 public:
+  ~AuthCacheFactory() override = default;
+
   virtual AuthCachePtr createAuthCache(const Protobuf::Message& config,
                                        Server::Configuration::ServerFactoryContext& context) = 0;
   std::string category() const override { return "envoy.filters.http.ext_authz.cache"; }

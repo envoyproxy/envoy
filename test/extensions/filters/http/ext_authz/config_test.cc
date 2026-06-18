@@ -713,14 +713,22 @@ TEST_F(ExtAuthzFilterGrpcTest, GoogleGrpc) {
   testFilterFactoryAndFilterWithGrpcClient(ext_authz_config_yaml);
 }
 
+class MockAuthCacheSession : public AuthCacheSession {
+public:
+  MockAuthCacheSession() = default;
+  ~MockAuthCacheSession() override = default;
+
+  MOCK_METHOD(LookupRequest*, lookup,
+              (Http::StreamDecoderFilterCallbacks&, const RequestAttributes&, LookupCallback&&));
+  MOCK_METHOD(void, insert, (const Filters::Common::ExtAuthz::Response&));
+};
+
 class MockAuthCache : public AuthCache {
 public:
   MockAuthCache() = default;
   ~MockAuthCache() override = default;
 
-  MOCK_METHOD(LookupRequest*, lookup,
-              (Http::StreamDecoderFilterCallbacks&, const RequestAttributes&, LookupCallback&&));
-  MOCK_METHOD(void, insert, (const RequestAttributes&, const Filters::Common::ExtAuthz::Response&));
+  MOCK_METHOD(AuthCacheSessionPtr, createSession, ());
 };
 
 class MockAuthCacheFactory : public AuthCacheFactory {
@@ -737,7 +745,11 @@ public:
   // AuthCacheFactory
   AuthCachePtr createAuthCache(const Protobuf::Message&,
                                Server::Configuration::ServerFactoryContext&) override {
-    return std::make_unique<NiceMock<MockAuthCache>>();
+    auto cache = std::make_unique<NiceMock<MockAuthCache>>();
+    ON_CALL(*cache, createSession()).WillByDefault(Invoke([]() {
+      return std::make_unique<NiceMock<MockAuthCacheSession>>();
+    }));
+    return cache;
   }
 };
 

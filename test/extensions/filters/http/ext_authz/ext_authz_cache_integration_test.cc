@@ -23,21 +23,27 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
-class SimpleInMemoryCache : public AuthCache {
+struct SimpleInMemoryCacheStorage {
+  absl::Mutex mutex;
+  absl::flat_hash_map<std::string, Filters::Common::ExtAuthz::Response> map ABSL_GUARDED_BY(mutex);
+};
+
+class SimpleInMemoryCacheSession : public AuthCacheSession {
 public:
-  SimpleInMemoryCache() = default;
+  SimpleInMemoryCacheSession(std::shared_ptr<SimpleInMemoryCacheStorage> storage)
+      : storage_(storage) {}
 
   LookupRequest* lookup(Http::StreamDecoderFilterCallbacks&, const RequestAttributes& attributes,
                         LookupCallback&& cb) override {
-    std::string key = std::string(attributes.headers_.getPathValue());
-    if (key.empty()) {
+    current_key_ = std::string(attributes.headers_.getPathValue());
+    if (current_key_.empty()) {
       cb(nullptr);
       return nullptr;
     }
 
-    absl::ReaderMutexLock lock(&mutex_);
-    auto it = map_.find(key);
-    if (it != map_.end()) {
+    absl::ReaderMutexLock lock(&storage_->mutex);
+    auto it = storage_->map.find(current_key_);
+    if (it != storage_->map.end()) {
       cb(std::make_unique<Filters::Common::ExtAuthz::Response>(it->second));
       return nullptr;
     }
@@ -45,26 +51,35 @@ public:
     return nullptr;
   }
 
-  void insert(const RequestAttributes& attributes,
-              const Filters::Common::ExtAuthz::Response& response) override {
-    std::string key = std::string(attributes.headers_.getPathValue());
-    if (key.empty()) {
+  void insert(const Filters::Common::ExtAuthz::Response& response) override {
+    if (current_key_.empty()) {
       return;
     }
 
-    absl::WriterMutexLock lock(&mutex_);
-    map_[key] = response;
-  }
-
-  void clear() {
-    absl::WriterMutexLock lock(&mutex_);
-    map_.clear();
+    absl::WriterMutexLock lock(&storage_->mutex);
+    storage_->map[current_key_] = response;
   }
 
 private:
-  absl::Mutex mutex_;
-  absl::flat_hash_map<std::string, Filters::Common::ExtAuthz::Response>
-      map_ ABSL_GUARDED_BY(mutex_);
+  std::shared_ptr<SimpleInMemoryCacheStorage> storage_;
+  std::string current_key_;
+};
+
+class SimpleInMemoryCache : public AuthCache {
+public:
+  SimpleInMemoryCache() : storage_(std::make_shared<SimpleInMemoryCacheStorage>()) {}
+
+  AuthCacheSessionPtr createSession() override {
+    return std::make_unique<SimpleInMemoryCacheSession>(storage_);
+  }
+
+  void clear() {
+    absl::WriterMutexLock lock(&storage_->mutex);
+    storage_->map.clear();
+  }
+
+private:
+  std::shared_ptr<SimpleInMemoryCacheStorage> storage_;
 };
 
 class SimpleInMemoryCacheFactory : public AuthCacheFactory {

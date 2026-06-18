@@ -402,17 +402,17 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
 
   request_attributes_.emplace(collectAttributes(headers));
 
-  if (config_->cache() != nullptr) {
+  if (cache_session_ != nullptr) {
     ENVOY_STREAM_LOG(trace, "ext_authz filter performing cache lookup.", *decoder_callbacks_);
     initiating_lookup_ = true;
     filter_return_ = FilterReturn::StopDecoding;
 
     active_lookup_ =
-        config_->cache()->lookup(*decoder_callbacks_, *request_attributes_,
-                                 [this](Filters::Common::ExtAuthz::ResponsePtr&& response) {
-                                   active_lookup_ = nullptr;
-                                   onCacheLookupComplete(std::move(response));
-                                 });
+        cache_session_->lookup(*decoder_callbacks_, *request_attributes_,
+                               [this](Filters::Common::ExtAuthz::ResponsePtr&& response) {
+                                 active_lookup_ = nullptr;
+                                 onCacheLookupComplete(std::move(response));
+                               });
     initiating_lookup_ = false;
     return;
   }
@@ -711,8 +711,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
   updateLoggingInfo(response->grpc_status);
 
-  if (!from_cache && config_->cache() != nullptr && request_attributes_.has_value()) {
-    config_->cache()->insert(*request_attributes_, *response);
+  if (!from_cache && cache_session_ != nullptr) {
+    cache_session_->insert(*response);
   }
 
   if (response->saw_invalid_append_actions) {

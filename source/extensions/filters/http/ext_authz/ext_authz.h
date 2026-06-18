@@ -459,13 +459,16 @@ class Filter : public Logger::Loggable<Logger::Id::ext_authz>,
                public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
   Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client)
-      : config_(config), client_(std::move(client)), stats_(config->stats()) {}
+      : config_(config), client_(std::move(client)),
+        cache_session_(config->cache() != nullptr ? config->cache()->createSession() : nullptr),
+        stats_(config->stats()) {}
 
   // Constructor that includes server context for per-route service support.
   Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client,
          Server::Configuration::ServerFactoryContext& server_context)
-      : config_(config), client_(std::move(client)), server_context_(&server_context),
-        stats_(config->stats()) {}
+      : config_(config), client_(std::move(client)),
+        cache_session_(config->cache() != nullptr ? config->cache()->createSession() : nullptr),
+        server_context_(&server_context), stats_(config->stats()) {}
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -564,7 +567,8 @@ private:
   Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& response);
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
-  AuthCache::LookupRequest* active_lookup_{nullptr};
+  AuthCacheSessionPtr cache_session_;
+  AuthCacheSession::LookupRequest* active_lookup_{nullptr};
   // Server context for creating per-route clients.
   Server::Configuration::ServerFactoryContext* server_context_{nullptr};
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
