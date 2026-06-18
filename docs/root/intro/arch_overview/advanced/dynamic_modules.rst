@@ -101,23 +101,23 @@ The repository is available at `envoyproxy/dynamic-modules-examples <https://git
 Statistics
 ---------------------------
 
-The dynamic module HTTP filter emits the following statistics in the ``dynamic_modules.`` namespace.
-These stats track failures encountered while loading a filter configuration.
-Each one is tagged with ``config_name``, set to the configured name of the dynamic-module extension
-instance — for the HTTP filter this is the
+All dynamic-module extension types emit the following statistics in the shared ``dynamic_modules.`` namespace.
+These stats track failures encountered while loading the extension's configuration. Each one is tagged with
+``config_name``, set to the configured name of the dynamic-module extension instance — for example the
 :ref:`filter_name
 <envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter.filter_name>`
-(``default`` if it is empty). The ``dynamic_modules.`` namespace is shared across dynamic-module
-extension types.
+for the HTTP filter, ``transport_socket_name`` for the transport socket, ``lb_policy_name`` for the
+load-balancing policy, ``tracer_name`` for the tracer or ``cluster_name`` for the cluster
+(``default`` if the extension has no per-instance name, as for the UDP listener filter).
 
 .. csv-table::
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  module_load_error, Counter, "Total dynamic modules that could not be loaded (missing or invalid module source, ``dlopen`` failure, or by-name lookup miss)."
-  config_init_error, Counter, "Total filter configurations that failed to initialize after the module loaded successfully (a required ABI symbol could not be resolved, or the module failing to load the configuration)."
-  remote_fetch_error, Counter, "Total failures fetching or loading a remote module source, including rejected cache misses when ``nack_on_cache_miss`` is set."
-  per_route_config_error, Counter, "Total per-route configurations that failed to load or initialize."
+  module_load_error, Counter, "Total dynamic modules that could not be loaded (missing or invalid module source, ``dlopen`` failure, by-name lookup miss, or a required ABI symbol could not be resolved)."
+  config_init_error, Counter, "Total configurations that failed to initialize after the module loaded successfully (the module rejected or failed to parse the supplied configuration)."
+  remote_fetch_error, Counter, "Total failures fetching or loading a remote module source, including rejected cache misses when ``nack_on_cache_miss`` is set. Only the HTTP filter supports remote module sources."
+  per_route_config_error, Counter, "Total per-route configurations that failed to load or initialize. Only emitted by the HTTP filter."
 
 In addition to the counters above, a module may define its own custom metrics. These are emitted
 under the configurable :ref:`metrics_namespace

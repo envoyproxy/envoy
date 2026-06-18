@@ -48,6 +48,9 @@ protected:
 // Config Tests
 // =============================================================================
 
+// Pull the shared dynamic-modules test helper into scope.
+using ::Envoy::Extensions::DynamicModules::failureCounter;
+
 TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigSuccess) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
@@ -58,6 +61,10 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigSuccess) {
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
   EXPECT_TRUE(lb_config_or_error.ok());
   EXPECT_NE(lb_config_or_error.value(), nullptr);
+
+  // The happy path emits no load-failure counters.
+  EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "module_load_error", "test_lb"));
+  EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "config_init_error", "test_lb"));
 }
 
 // Load the module via the ``module.local.filename`` data source instead of by name.
@@ -102,6 +109,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleNotFound) {
   EXPECT_FALSE(lb_config_or_error.ok());
   EXPECT_THAT(lb_config_or_error.status().message(),
               testing::HasSubstr("Failed to load dynamic module"));
+  EXPECT_EQ(1U, failureCounter(factory_context_.serverScope(), "module_load_error", "test_lb"));
 }
 
 TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleConfigNewFails) {
@@ -115,6 +123,29 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleConfigNewFails) {
   EXPECT_FALSE(lb_config_or_error.ok());
   EXPECT_THAT(lb_config_or_error.status().message(),
               testing::HasSubstr("failed to create load balancer config"));
+
+  // The module loads fine but its config creation fails, so this is counted as config_init_error.
+  EXPECT_EQ(1U, failureCounter(factory_context_.serverScope(), "config_init_error", "test_lb"));
+  EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "module_load_error", "test_lb"));
+}
+
+TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigMalformedLbPolicyConfig) {
+  // The module loads fine but the lb_policy_config Any cannot be unpacked, counted as
+  // config_init_error. A malformed Any must be built programmatically.
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+  auto* any = config.mutable_lb_policy_config();
+  any->set_type_url("type.googleapis.com/google.protobuf.StringValue");
+  any->set_value("invalid_binary_data_that_cannot_be_unpacked_as_string_value");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  EXPECT_FALSE(lb_config_or_error.ok());
+
+  EXPECT_EQ(1U, failureCounter(factory_context_.serverScope(), "config_init_error", "test_lb"));
+  EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "module_load_error", "test_lb"));
 }
 
 TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleMissingSymbol) {

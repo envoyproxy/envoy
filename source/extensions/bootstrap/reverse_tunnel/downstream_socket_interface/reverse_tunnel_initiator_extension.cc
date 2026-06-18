@@ -1,5 +1,6 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
 
+#include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -7,6 +8,8 @@
 
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/formatter/substitution_format_string.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
@@ -38,6 +41,24 @@ ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
     additional_headers_ = {config.http_handshake().additional_headers().begin(),
                            config.http_handshake().additional_headers().end()};
     use_http_upgrade_ = config.http_handshake().use_http_upgrade();
+
+    if (!config.http_handshake().formatters().empty()) {
+      Server::GenericFactoryContextImpl formatter_context(context,
+                                                          context.messageValidationVisitor());
+      auto command_parsers =
+          returnOrThrow(Formatter::SubstitutionFormatStringUtils::parseFormatters(
+              config.http_handshake().formatters(), formatter_context));
+      auto handshake_headers = std::make_shared<std::vector<HandshakeHeader>>();
+      handshake_headers->reserve(additional_headers_.size());
+      for (const auto& header : additional_headers_) {
+        auto value_formatter = returnOrThrow(
+            Formatter::FormatterImpl::create(header.header().value(), true, command_parsers));
+        handshake_headers->push_back(HandshakeHeader{Http::LowerCaseString(header.header().key()),
+                                                     header.append_action(),
+                                                     std::move(value_formatter)});
+      }
+      handshake_headers_ = std::move(handshake_headers);
+    }
   }
   // Instantiate access loggers from config.
   Server::GenericFactoryContextImpl generic_context(context, context.scope(),

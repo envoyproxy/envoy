@@ -529,7 +529,9 @@ bool envoy_dynamic_module_callback_is_validation_mode();
  * cross-module interactions.
  *
  * Registration is typically done once during bootstrap (e.g., in on_server_initialized). The
- * function pointer must remain valid for the lifetime of the process.
+ * function pointer must remain valid for the lifetime of the process, so a module that registers
+ * functions must be loaded with do_not_close set to true to avoid being unloaded while the registry
+ * still hands out the pointer.
  *
  * Callers are responsible for agreeing on the function signature out-of-band, since the registry
  * stores opaque void* pointers — analogous to dlsym semantics.
@@ -576,7 +578,9 @@ bool envoy_dynamic_module_callback_get_function(envoy_dynamic_module_type_module
  * Callers are responsible for managing the lifetime of overwritten data pointers.
  *
  * Registration is typically done once during bootstrap (e.g., in on_server_initialized or
- * on_scheduled). The data pointer must remain valid for the lifetime of the process.
+ * on_scheduled). The data pointer must remain valid while reachable through the registry. A module
+ * that registers a pointer into its own memory must either be loaded with do_not_close set to true
+ * or overwrite the pointer on each reload before any consumer reads it.
  *
  * This is thread-safe and can be called from any thread.
  *
@@ -1338,7 +1342,9 @@ envoy_dynamic_module_on_http_filter_local_reply(
  * NOTE: label_names_length could be 0 if there are no labels.
  * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
  * can be passed to envoy_dynamic_module_callback_http_filter_increment_counter together with
- * filter_envoy_ptr created from filter_config_envoy_ptr.
+ * filter_envoy_ptr created from filter_config_envoy_ptr, or to
+ * envoy_dynamic_module_callback_http_filter_config_increment_counter together with
+ * filter_config_envoy_ptr.
  * @return the result of the operation.
  */
 envoy_dynamic_module_type_metrics_result
@@ -1383,7 +1389,9 @@ envoy_dynamic_module_callback_http_filter_increment_counter(
  * NOTE: label_names_length could be 0 if there are no labels.
  * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored. This can
  * be passed to envoy_dynamic_module_callback_http_filter_increment_gauge together with
- * filter_envoy_ptr created from filter_config_envoy_ptr.
+ * filter_envoy_ptr created from filter_config_envoy_ptr, or to the
+ * envoy_dynamic_module_callback_http_filter_config_{increment,decrement,set}_gauge functions
+ * together with filter_config_envoy_ptr.
  * @return the result of the operation.
  */
 envoy_dynamic_module_type_metrics_result
@@ -1467,7 +1475,9 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filt
  * NOTE: label_names_length could be 0 if there are no labels.
  * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored. This
  * can be passed to envoy_dynamic_module_callback_http_filter_record_histogram_value_vec together
- * with filter_envoy_ptr created from filter_config_envoy_ptr.
+ * with filter_envoy_ptr created from filter_config_envoy_ptr, or to
+ * envoy_dynamic_module_callback_http_filter_config_record_histogram_value together with
+ * filter_config_envoy_ptr.
  * @return the result of the operation.
  */
 envoy_dynamic_module_type_metrics_result
@@ -1494,6 +1504,121 @@ envoy_dynamic_module_callback_http_filter_config_define_histogram(
 envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_http_filter_record_histogram_value(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_increment_counter is called by the module to
+ * increment a previously defined counter from the filter config context. Unlike
+ * envoy_dynamic_module_callback_http_filter_increment_counter, this does not require a per-stream
+ * filter and can be called outside of the request lifecycle, e.g. from a scheduled background task.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig that defined
+ * the counter.
+ * @param id is the ID of the counter previously defined using filter_config_envoy_ptr.
+ * @param label_values is the values of the labels to be incremented.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING COUNTER DEFINITION.**
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_increment_counter(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_increment_gauge is called by the module to
+ * increase the value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_http_filter_increment_gauge, this does not require a per-stream
+ * filter and can be called outside of the request lifecycle, e.g. from a scheduled background task.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig that defined
+ * the gauge.
+ * @param id is the ID of the gauge previously defined using filter_config_envoy_ptr.
+ * @param label_values is the values of the labels to be increased.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_increment_gauge(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_decrement_gauge is called by the module to
+ * decrease the value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_http_filter_decrement_gauge, this does not require a per-stream
+ * filter and can be called outside of the request lifecycle, e.g. from a scheduled background task.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig that defined
+ * the gauge.
+ * @param id is the ID of the gauge previously defined using filter_config_envoy_ptr.
+ * @param label_values is the values of the labels to be decreased.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_decrement_gauge(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_set_gauge is called by the module to set the
+ * value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_http_filter_set_gauge, this does not require a per-stream filter
+ * and can be called outside of the request lifecycle, e.g. from a scheduled background task.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig that defined
+ * the gauge.
+ * @param id is the ID of the gauge previously defined using filter_config_envoy_ptr.
+ * @param label_values is the values of the labels to be set.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filter_config_set_gauge(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_record_histogram_value is called by the module
+ * to record a value in a previously defined histogram from the filter config context. Unlike
+ * envoy_dynamic_module_callback_http_filter_record_histogram_value, this does not require a
+ * per-stream filter and can be called outside of the request lifecycle, e.g. from a scheduled
+ * background task.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig that defined
+ * the histogram.
+ * @param id is the ID of the histogram previously defined using filter_config_envoy_ptr.
+ * @param label_values is the values of the labels to be recorded.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING HISTOGRAM DEFINITION.**
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_record_histogram_value(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
     envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
     uint64_t value);
 
@@ -2933,6 +3058,19 @@ void envoy_dynamic_module_callback_http_span_set_sampled(
     envoy_dynamic_module_type_span_envoy_ptr span, bool sampled);
 
 /**
+ * envoy_dynamic_module_callback_http_span_disable_local_decision stops the span from using the
+ * Envoy local tracing decision. Combined with
+ * envoy_dynamic_module_callback_http_span_set_sampled, this keeps a filter's sampling decision when
+ * Envoy refreshes tracing after a route cache change. With the OpenTelemetry tracer the connection
+ * manager does not re-derive the decision after a route cache change. Other tracers may not support
+ * this.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ */
+void envoy_dynamic_module_callback_http_span_disable_local_decision(
+    envoy_dynamic_module_type_span_envoy_ptr span);
+
+/**
  * envoy_dynamic_module_callback_http_span_get_baggage retrieves a baggage value from the span.
  * Baggage data may have been set by this span or any parent spans.
  *
@@ -4255,6 +4393,96 @@ envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_network_filter_record_histogram_value(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value);
 
+/**
+ * envoy_dynamic_module_callback_network_filter_config_increment_counter is called by the module to
+ * increment a previously defined counter from the filter config context. Unlike
+ * envoy_dynamic_module_callback_network_filter_increment_counter, this does not require a
+ * per-connection filter and can be called outside of the connection lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig that defined the
+ * counter.
+ * @param id is the ID of the counter previously defined using config_envoy_ptr.
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_increment_counter(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_increment_gauge is called by the module to
+ * increase the value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_network_filter_increment_gauge, this does not require a
+ * per-connection filter and can be called outside of the connection lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig that defined the
+ * gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_increment_gauge(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_decrement_gauge is called by the module to
+ * decrease the value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_network_filter_decrement_gauge, this does not require a
+ * per-connection filter and can be called outside of the connection lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig that defined the
+ * gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_decrement_gauge(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_set_gauge is called by the module to set the
+ * value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_network_filter_set_gauge, this does not require a per-connection
+ * filter and can be called outside of the connection lifecycle, e.g. from a scheduled background
+ * task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig that defined the
+ * gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_set_gauge(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_record_histogram_value is called by the
+ * module to record a value in a previously defined histogram from the filter config context.
+ * Unlike envoy_dynamic_module_callback_network_filter_record_histogram_value, this does not require
+ * a per-connection filter and can be called outside of the connection lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig that defined the
+ * histogram.
+ * @param id is the ID of the histogram previously defined using config_envoy_ptr.
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_record_histogram_value(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
 // ---------------------- Upstream Host Access Callbacks -----------------------
 
 /**
@@ -5550,6 +5778,96 @@ envoy_dynamic_module_callback_listener_filter_record_histogram_value(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
     uint64_t value);
 
+/**
+ * envoy_dynamic_module_callback_listener_filter_config_increment_counter is called by the module to
+ * increment a previously defined counter from the filter config context. Unlike
+ * envoy_dynamic_module_callback_listener_filter_increment_counter, this does not require a
+ * per-connection filter and can be called outside of the connection lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig that defined the
+ * counter.
+ * @param id is the ID of the counter previously defined using config_envoy_ptr.
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_increment_counter(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_config_increment_gauge is called by the module to
+ * increase the value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_listener_filter_increment_gauge, this does not require a
+ * per-connection filter and can be called outside of the connection lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig that defined the
+ * gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_increment_gauge(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_config_decrement_gauge is called by the module to
+ * decrease the value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_listener_filter_decrement_gauge, this does not require a
+ * per-connection filter and can be called outside of the connection lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig that defined the
+ * gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_decrement_gauge(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_config_set_gauge is called by the module to set the
+ * value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_listener_filter_set_gauge, this does not require a per-connection
+ * filter and can be called outside of the connection lifecycle, e.g. from a scheduled background
+ * task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig that defined the
+ * gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_set_gauge(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_config_record_histogram_value is called by the
+ * module to record a value in a previously defined histogram from the filter config context.
+ * Unlike envoy_dynamic_module_callback_listener_filter_record_histogram_value, this does not
+ * require a per-connection filter and can be called outside of the connection lifecycle, e.g. from
+ * a scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig that defined the
+ * histogram.
+ * @param id is the ID of the histogram previously defined using config_envoy_ptr.
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_record_histogram_value(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
 // ---------------------- Listener Filter Callbacks - HTTP Callout ---------------
 
 /**
@@ -5973,6 +6291,96 @@ envoy_dynamic_module_callback_udp_listener_filter_config_define_histogram(
 envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_udp_listener_filter_record_histogram_value(
     envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_config_increment_counter is called by the
+ * module to increment a previously defined counter from the filter config context. Unlike
+ * envoy_dynamic_module_callback_udp_listener_filter_increment_counter, this does not require a
+ * per-datagram filter and can be called outside of the datagram processing lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilterConfig that defined
+ * the counter.
+ * @param id is the ID of the counter previously defined using config_envoy_ptr.
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_increment_counter(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_config_increment_gauge is called by the module
+ * to increase the value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_udp_listener_filter_increment_gauge, this does not require a
+ * per-datagram filter and can be called outside of the datagram processing lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilterConfig that defined
+ * the gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_increment_gauge(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_config_decrement_gauge is called by the module
+ * to decrease the value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_udp_listener_filter_decrement_gauge, this does not require a
+ * per-datagram filter and can be called outside of the datagram processing lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilterConfig that defined
+ * the gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_decrement_gauge(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_config_set_gauge is called by the module to set
+ * the value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_udp_listener_filter_set_gauge, this does not require a per-datagram
+ * filter and can be called outside of the datagram processing lifecycle, e.g. from a scheduled
+ * background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilterConfig that defined
+ * the gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_set_gauge(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_config_record_histogram_value is called by the
+ * module to record a value in a previously defined histogram from the filter config context.
+ * Unlike envoy_dynamic_module_callback_udp_listener_filter_record_histogram_value, this does not
+ * require a per-datagram filter and can be called outside of the datagram processing lifecycle,
+ * e.g. from a scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilterConfig that defined
+ * the histogram.
+ * @param id is the ID of the histogram previously defined using config_envoy_ptr.
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_record_histogram_value(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
     uint64_t value);
 
 // --------------------- UDP Listener Filter Callbacks - Misc ---------------
@@ -6999,6 +7407,34 @@ bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_name,
     envoy_dynamic_module_type_module_buffer path, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get a number value from dynamic metadata by filter name and key path.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace (can be nested with dots).
+ * @param result receives the number value. Only number-typed metadata is returned.
+ * @return true if a number value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, double* result);
+
+/**
+ * Get a bool value from dynamic metadata by filter name and key path.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace (can be nested with dots).
+ * @param result receives the bool value. Only bool-typed metadata is returned.
+ * @return true if a bool value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, bool* result);
 
 /**
  * Get a value from filter state by key.
@@ -9976,6 +10412,7 @@ envoy_dynamic_module_callback_cluster_http_callout(
  * the cluster's host set.
  *
  * During this callback, the module can call
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_host to get the host pointers, or
  * envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address to get the addresses of
  * the added or removed hosts by index.
  *
@@ -10012,6 +10449,59 @@ void envoy_dynamic_module_on_cluster_lb_on_host_membership_update(
 bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added,
     envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_host returns the host pointer of an
+ * added or removed host during the on_cluster_lb_on_host_membership_update event hook. This
+ * returns the host directly from the added or removed list without an address lookup, so it is
+ * only valid during envoy_dynamic_module_on_cluster_lb_on_host_membership_update.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param index is the index of the host in the added or removed list.
+ * @param is_added is true to get an added host, false to get a removed host.
+ * @return the host pointer if found, or nullptr if the index is out of bounds or the callback is
+ * not active.
+ */
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_lb_get_member_update_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added);
+
+/**
+ * envoy_dynamic_module_type_packed_address holds a host's IP address and port as packed integers,
+ * read directly from the host's parsed sockaddr without any string formatting. This is the output
+ * of envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address.
+ *
+ * @param address_bytes is the IP address in network byte order. An IPv4 address occupies the first
+ * four bytes; an IPv6 address occupies all sixteen. Bytes beyond the address are zeroed.
+ * @param port is the port in host byte order.
+ * @param family is 4 for an IPv4 address and 6 for an IPv6 address.
+ */
+typedef struct envoy_dynamic_module_type_packed_address {
+  uint8_t address_bytes[16];
+  uint16_t port;
+  uint8_t family;
+} envoy_dynamic_module_type_packed_address;
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address returns the
+ * address of an added or removed host during the on_cluster_lb_on_host_membership_update event hook
+ * as packed integers, read directly from the host's sockaddr with no string formatting or
+ * allocation. This is the packed-integer sibling of
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address, intended for modules
+ * that key their own host maps by an integer rather than a string. It is only valid during
+ * envoy_dynamic_module_on_cluster_lb_on_host_membership_update.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param index is the index of the host in the added or removed list.
+ * @param is_added is true to get an added host address, false to get a removed host address.
+ * @param result is the output buffer that receives the packed address. Its contents are unspecified
+ * when the callback returns false; callers must gate on the return value.
+ * @return true if the host was found and has an IP address, false on a null pointer, an
+ * out-of-bounds index, the callback not being active, or a non-IP (pipe) address.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added,
+    envoy_dynamic_module_type_packed_address* result);
 
 // =============================================================================
 // =============================== Load Balancer ===============================

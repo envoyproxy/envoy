@@ -2,7 +2,10 @@
 
 // This file provides host-side implementations for the cluster dynamic module ABI callbacks.
 
+#include <cstring>
+
 #include "source/common/common/assert.h"
+#include "source/common/common/safe_memcpy.h"
 #include "source/common/common/thread.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/router/string_accessor_impl.h"
@@ -206,6 +209,14 @@ envoy_dynamic_module_type_cluster_host_envoy_ptr
 envoy_dynamic_module_callback_cluster_find_host_by_address(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
     envoy_dynamic_module_type_module_buffer address) {
+  // This reads the main thread cross-priority host map, so it is main-thread-only. An
+  // `ASSERT_IS_MAIN_OR_TEST_THREAD` would be compiled out under NDEBUG, so guard explicitly and
+  // fail closed.
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_find_host_by_address must be called on the "
+                 "main thread");
+    return nullptr;
+  }
   auto* cluster = getCluster(cluster_envoy_ptr);
   std::string address_str(address.ptr, address.length);
   auto host = cluster->findHostByAddress(address_str);
@@ -1342,6 +1353,60 @@ bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(
   const auto& address_str = (*hosts)[index]->address()->asStringView();
   result->ptr = address_str.data();
   result->length = address_str.size();
+  return true;
+}
+
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_lb_get_member_update_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added) {
+  if (lb_envoy_ptr == nullptr) {
+    return nullptr;
+  }
+  const auto* hosts =
+      is_added ? getLb(lb_envoy_ptr)->hostsAdded() : getLb(lb_envoy_ptr)->hostsRemoved();
+  if (hosts == nullptr || index >= hosts->size()) {
+    return nullptr;
+  }
+  return const_cast<Envoy::Upstream::Host*>((*hosts)[index].get());
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added,
+    envoy_dynamic_module_type_packed_address* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  const auto* hosts =
+      is_added ? getLb(lb_envoy_ptr)->hostsAdded() : getLb(lb_envoy_ptr)->hostsRemoved();
+  if (hosts == nullptr || index >= hosts->size()) {
+    return false;
+  }
+  // Null for a pipe (non-IP) address; the packed representation only covers IP addresses.
+  const auto* ip = (*hosts)[index]->address()->ip();
+  if (ip == nullptr) {
+    return false;
+  }
+  std::memset(result->address_bytes, 0, sizeof(result->address_bytes));
+  // Both accessors return the address in network byte order, read straight from the sockaddr; see
+  // Ipv4/Ipv6Instance in source/common/network/address_impl.{h,cc}.
+  switch (ip->version()) {
+  case Envoy::Network::Address::IpVersion::v4: {
+    result->family = 4;
+    const uint32_t v4 = ip->ipv4()->address();
+    Envoy::safeMemcpyUnsafeDst(result->address_bytes, &v4);
+    break;
+  }
+  case Envoy::Network::Address::IpVersion::v6: {
+    result->family = 6;
+    const absl::uint128 v6 = ip->ipv6()->address();
+    Envoy::safeMemcpyUnsafeDst(result->address_bytes, &v6);
+    break;
+  }
+  default:
+    IS_ENVOY_BUG("unexpected IP version in cluster LB packed address getter");
+    return false;
+  }
+  result->port = static_cast<uint16_t>(ip->port());
   return true;
 }
 

@@ -9,6 +9,7 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 
 #include "openssl/ssl.h"
 
@@ -314,13 +315,21 @@ absl::StatusOr<CertValidatorPtr> DynamicModuleCertValidatorFactory::createCertVa
   std::string validator_config_str;
   if (proto_config.has_validator_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.validator_config());
-    RETURN_IF_NOT_OK_REF(config_or_error.status());
+    if (!config_or_error.ok()) {
+      Envoy::Extensions::DynamicModules::incrementLoadFailure(
+          context, proto_config.validator_name(),
+          Envoy::Extensions::DynamicModules::ConfigInitErrorStat);
+      return config_or_error.status();
+    }
     validator_config_str = std::move(config_or_error.value());
   }
 
   auto factory_config_or_error = newDynamicModuleCertValidatorConfig(
       proto_config.validator_name(), validator_config_str, std::move(dynamic_module));
   if (!factory_config_or_error.ok()) {
+    Envoy::Extensions::DynamicModules::incrementLoadFailure(
+        context, proto_config.validator_name(),
+        Envoy::Extensions::DynamicModules::ConfigInitErrorStat);
     return factory_config_or_error.status();
   }
 

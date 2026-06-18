@@ -57,12 +57,25 @@ public:
   static bool getAttributeBool(const StreamInfo::StreamInfo& stream_info,
                                envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
 
-  // Get a value from dynamic metadata by filter name and dotted key path. Only string values are
-  // returned, matching the zero-copy ABI contract.
+  // Get a string value from dynamic metadata by filter name and dotted key path. Returns false
+  // when the path is absent or the value is not a string.
   static bool getDynamicMetadata(const StreamInfo::StreamInfo& stream_info,
                                  envoy_dynamic_module_type_module_buffer filter_name,
                                  envoy_dynamic_module_type_module_buffer path,
                                  envoy_dynamic_module_type_envoy_buffer* result);
+
+  // Get a number value from dynamic metadata by filter name and dotted key path. Returns false
+  // when the path is absent or the value is not a number.
+  static bool getDynamicMetadataNumber(const StreamInfo::StreamInfo& stream_info,
+                                       envoy_dynamic_module_type_module_buffer filter_name,
+                                       envoy_dynamic_module_type_module_buffer path,
+                                       double* result);
+
+  // Get a bool value from dynamic metadata by filter name and dotted key path. Returns false when
+  // the path is absent or the value is not a bool.
+  static bool getDynamicMetadataBool(const StreamInfo::StreamInfo& stream_info,
+                                     envoy_dynamic_module_type_module_buffer filter_name,
+                                     envoy_dynamic_module_type_module_buffer path, bool* result);
 
   // Get the local reply body from the formatting context. Returns false when there is no body.
   static bool getLocalReplyBody(const Formatter::Context& context,

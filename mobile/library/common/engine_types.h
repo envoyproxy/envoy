@@ -28,6 +28,7 @@ struct EnvoyLogger {
 };
 
 inline constexpr absl::string_view ENVOY_EVENT_TRACKER_API_NAME = "event_tracker_api";
+inline constexpr absl::string_view DEFAULT_API_LISTENER_NAME = "base_api_listener";
 
 /** The callbacks for Envoy Event Tracker. */
 struct EnvoyEventTracker {

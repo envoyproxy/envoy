@@ -124,6 +124,12 @@ public:
   void setBodyReceived(bool b) { body_received_ = b; }
   bool partialBodyProcessed() const { return partial_body_processed_; }
 
+  // Check whether external processing is configured.
+  virtual bool noExternalProcess() const {
+    return !send_headers_ && !send_trailers_ &&
+           body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE;
+  }
+
   virtual void setProcessingMode(
       const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode) PURE;
 
@@ -301,6 +307,20 @@ public:
   // a body response is received and processed.
   bool isLastResponseAfterBodyResp(bool eos_seen_in_body) const;
 
+  // Check whether this is the last response from the ext_proc server for this
+  // direction.
+  bool isLastResponseForDirection() const { return last_response_for_direction_; }
+
+  void setLastResponseForDirection(bool last_response_for_direction) {
+    last_response_for_direction_ = last_response_for_direction;
+  }
+
+  // Check for this direction, the external processing is either not configured,
+  // or the last response is already received.
+  bool noMoreExternalProcess() const {
+    return (noExternalProcess() || last_response_for_direction_);
+  }
+
 protected:
   void setBodyMode(
       envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode);
@@ -368,6 +388,8 @@ protected:
   // If true, the attributes for this processing state have already been sent.
   bool attributes_sent_ : 1 = false;
   const bool allow_content_length_header_ : 1;
+  // If true, this is the last response from the processor for this direction.
+  bool last_response_for_direction_ : 1 = false;
 
   // The request_headers_ field is guaranteed to hold the pointer to the request
   // headers as set in decodeHeaders. This allows both decoding and encoding states
@@ -635,6 +657,9 @@ public:
   bool isValidTrailersCallbackState() const override;
   bool canFailOpen() const override;
   bool localResponseStarted() const { return local_response_started_; }
+  bool noExternalProcess() const override {
+    return !local_response_started_ && ProcessorState::noExternalProcess();
+  }
 
 private:
   void setProcessingModeInternal(
@@ -735,9 +760,8 @@ public:
   }
 
   // Check whether external processing is configured in the encoding path.
-  bool noExternalProcess() const {
-    return !local_response_streaming_ && !send_headers_ && !send_trailers_ &&
-           body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE;
+  bool noExternalProcess() const override {
+    return !local_response_streaming_ && ProcessorState::noExternalProcess();
   }
 
   void setLocalResponseStreaming();

@@ -573,7 +573,7 @@ public:
     return {};
   }
 
-  // Access the priority set for lb callbacks.
+  // Worker local priority set used to answer host queries from the lb callbacks.
   const Upstream::PrioritySet& prioritySet() const;
 
   // Access the handle for async host selection completion.
@@ -617,7 +617,8 @@ public:
 
 private:
   const DynamicModuleClusterHandleSharedPtr handle_;
-  // Worker local priority set that backs the membership update subscription.
+  // Worker local priority set that backs the membership update subscription and answers host
+  // queries from the lb callbacks.
   const Upstream::PrioritySet& priority_set_;
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
 

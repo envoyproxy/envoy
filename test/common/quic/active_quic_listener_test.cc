@@ -1,14 +1,19 @@
 #include <cstdlib>
 #include <memory>
+#include <vector>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/config/listener/v3/quic_config.pb.validate.h"
 #include "envoy/network/exception.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/listener_manager/connection_handler_impl.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/quic/active_quic_listener.h"
 #include "source/common/quic/envoy_quic_clock.h"
 #include "source/common/quic/envoy_quic_utils.h"
@@ -130,8 +135,8 @@ protected:
         local_address_(Network::Test::getAnyAddress(version_, true)),
         connection_handler_(*dispatcher_, absl::nullopt),
         transport_socket_factory_(*Quic::QuicServerTransportSocketFactory::create(
-            true, *store_.rootScope(), std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(),
-            ssl_context_manager_)),
+            /*enable_early_data=*/true, /*enable_resumption=*/true, *store_.rootScope(),
+            std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(), ssl_context_manager_)),
         quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
 
@@ -276,26 +281,28 @@ protected:
     }
     int value = kECT1;
     client_sockets_.back()->setSocketOption(level, optname, &value, sizeof(value));
-    Buffer::OwnedImpl payload =
-        generateChloPacketToSend(quic_version_, quic_config_, connection_id);
-    Buffer::RawSliceVector slice = payload.getRawSlices();
-    ASSERT_EQ(1u, slice.size());
-    Network::Address::InstanceConstSharedPtr dest_address;
-    if (client_address->ip()->version() == Network::Address::IpVersion::v4) {
-      dest_address = std::make_shared<const Network::Address::Ipv4Instance>(
-          client_address->ip()->addressAsString(),
-          listen_socket_->connectionInfoProvider().localAddress()->ip()->port(),
-          &(listen_socket_->connectionInfoProvider().localAddress()->socketInterface()));
-    } else {
-      dest_address = std::make_shared<const Network::Address::Ipv6Instance>(
-          client_address->ip()->addressAsString(),
-          listen_socket_->connectionInfoProvider().localAddress()->ip()->port(),
-          &(listen_socket_->connectionInfoProvider().localAddress()->socketInterface()));
+    std::vector<Buffer::OwnedImpl> payloads =
+        generateChloPacketsToSend(quic_version_, quic_config_, connection_id);
+    for (Buffer::OwnedImpl& payload : payloads) {
+      Buffer::RawSliceVector slice = payload.getRawSlices();
+      ASSERT_EQ(1u, slice.size());
+      Network::Address::InstanceConstSharedPtr dest_address;
+      if (client_address->ip()->version() == Network::Address::IpVersion::v4) {
+        dest_address = std::make_shared<const Network::Address::Ipv4Instance>(
+            client_address->ip()->addressAsString(),
+            listen_socket_->connectionInfoProvider().localAddress()->ip()->port(),
+            &(listen_socket_->connectionInfoProvider().localAddress()->socketInterface()));
+      } else {
+        dest_address = std::make_shared<const Network::Address::Ipv6Instance>(
+            client_address->ip()->addressAsString(),
+            listen_socket_->connectionInfoProvider().localAddress()->ip()->port(),
+            &(listen_socket_->connectionInfoProvider().localAddress()->socketInterface()));
+      }
+      // Send a full CHLO to finish 0-RTT handshake.
+      auto send_rc = Network::Utility::writeToSocket(client_sockets_.back()->ioHandle(),
+                                                     slice.data(), 1, nullptr, *dest_address);
+      ASSERT_EQ(slice[0].len_, send_rc.return_value_);
     }
-    // Send a full CHLO to finish 0-RTT handshake.
-    auto send_rc = Network::Utility::writeToSocket(client_sockets_.back()->ioHandle(), slice.data(),
-                                                   1, nullptr, *dest_address);
-    ASSERT_EQ(slice[0].len_, send_rc.return_value_);
   }
 
   void readFromClientSockets() {
@@ -469,7 +476,8 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLODuringHotRestartShouldForwardPacket) {
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   maybeConfigureMocks(/* connection_count = */ 0);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
-  EXPECT_CALL(mock_packet_forwarding, handle(_, _));
+  EXPECT_CALL(mock_packet_forwarding, handle(_, _))
+      .Times(generateChloPacketsToSend(quic_version_, quic_config_, connection_id).size());
   sendCHLO(connection_id);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());

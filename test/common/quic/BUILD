@@ -422,8 +422,16 @@ envoy_cc_test(
 
 envoy_cc_test_library(
     name = "connection_id_matchers",
-    hdrs = ["connection_id_matchers.h"],
-    deps = ["//test/mocks/network:network_mocks"],
+    srcs = envoy_select_enable_http3(["connection_id_matchers.cc"]),
+    hdrs = envoy_select_enable_http3(["connection_id_matchers.h"]),
+    deps = envoy_select_enable_http3([
+        "//source/common/quic:envoy_quic_connection_id_generator_factory_interface",
+        "//test/mocks/network:network_mocks",
+        "@abseil-cpp//absl/cleanup",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+    ]),
 )
 
 envoy_cc_test(

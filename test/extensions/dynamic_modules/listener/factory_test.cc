@@ -26,6 +26,9 @@ public:
   DynamicModuleListenerFilterConfigFactory factory_;
 };
 
+// Pull the shared dynamic-modules test helper into scope.
+using ::Envoy::Extensions::DynamicModules::failureCounter;
+
 TEST_F(DynamicModuleListenerFilterFactoryTest, ValidConfig) {
   envoy::extensions::filters::listener::dynamic_modules::v3::DynamicModuleListenerFilter config;
   config.mutable_dynamic_module_config()->set_name("listener_no_op");
@@ -34,6 +37,12 @@ TEST_F(DynamicModuleListenerFilterFactoryTest, ValidConfig) {
   auto result = factory_.createListenerFilterFactoryFromProto(config, nullptr, context_);
   // Result is a factory callback, which should not be null.
   EXPECT_NE(nullptr, result);
+
+  // The happy path emits no load-failure counters. They live on the server scope so they survive a
+  // rejected listener config update.
+  auto& server_scope = context_.server_factory_context_.serverScope();
+  EXPECT_EQ(0U, failureCounter(server_scope, "module_load_error", "test_filter"));
+  EXPECT_EQ(0U, failureCounter(server_scope, "config_init_error", "test_filter"));
 }
 
 // Load the module via the ``module.local.filename`` data source instead of by name.
@@ -78,6 +87,9 @@ TEST_F(DynamicModuleListenerFilterFactoryTest, InvalidModuleName) {
 
   EXPECT_THROW_WITH_REGEX(factory_.createListenerFilterFactoryFromProto(config, nullptr, context_),
                           EnvoyException, "Failed to load dynamic module");
+
+  EXPECT_EQ(1U, failureCounter(context_.server_factory_context_.serverScope(), "module_load_error",
+                               "test_filter"));
 }
 
 TEST_F(DynamicModuleListenerFilterFactoryTest, MissingListenerFilterSymbols) {
@@ -88,6 +100,12 @@ TEST_F(DynamicModuleListenerFilterFactoryTest, MissingListenerFilterSymbols) {
 
   EXPECT_THROW_WITH_REGEX(factory_.createListenerFilterFactoryFromProto(config, nullptr, context_),
                           EnvoyException, "Failed to create filter config");
+
+  // The module loads fine but lacks the listener filter ABI symbols, so the failure is counted as
+  // config_init_error, not module_load_error.
+  auto& server_scope = context_.server_factory_context_.serverScope();
+  EXPECT_EQ(1U, failureCounter(server_scope, "config_init_error", "test_filter"));
+  EXPECT_EQ(0U, failureCounter(server_scope, "module_load_error", "test_filter"));
 }
 
 TEST_F(DynamicModuleListenerFilterFactoryTest, ConfigInitializationFailure) {
@@ -98,6 +116,9 @@ TEST_F(DynamicModuleListenerFilterFactoryTest, ConfigInitializationFailure) {
 
   EXPECT_THROW_WITH_REGEX(factory_.createListenerFilterFactoryFromProto(config, nullptr, context_),
                           EnvoyException, "Failed to create filter config");
+
+  EXPECT_EQ(1U, failureCounter(context_.server_factory_context_.serverScope(), "config_init_error",
+                               "test_filter"));
 }
 
 TEST_F(DynamicModuleListenerFilterFactoryTest, FactoryName) {
@@ -151,6 +172,10 @@ TEST_F(DynamicModuleListenerFilterFactoryTest, InvalidFilterConfigUnpackFailure)
 
   EXPECT_THROW_WITH_REGEX(factory_.createListenerFilterFactoryFromProto(config, nullptr, context_),
                           EnvoyException, "Failed to parse filter config");
+
+  // A filter_config that fails to unpack is a config-init failure.
+  EXPECT_EQ(1U, failureCounter(context_.server_factory_context_.serverScope(), "config_init_error",
+                               "test_filter"));
 }
 
 // Test that the legacy behavior registers the custom stat namespace when the runtime guard is
