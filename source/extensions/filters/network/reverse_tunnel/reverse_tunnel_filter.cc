@@ -514,7 +514,7 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
   // Extract DP-side tunnel initiation timestamp if present. Defaults to 0 (absent).
   int64_t initiation_time_ms = 0;
   const auto initiation_time_vals =
-      headers_->get(Extensions::Bootstrap::ReverseConnection::reverseTunnelInitiationTimeHeader());
+      headers_->get(Bootstrap::ReverseConnection::reverseTunnelInitiationTimeHeader());
   if (!initiation_time_vals.empty()) {
     if (!absl::SimpleAtoi(initiation_time_vals[0]->value().getStringView(), &initiation_time_ms)) {
       ENVOY_CONN_LOG(warn, "reverse_tunnel: failed to parse initiation-time header value '{}'",

@@ -1,3 +1,5 @@
+#include <limits>
+
 #include "source/common/api/api_impl.h"
 
 #include "test/mocks/common.h"
@@ -506,6 +508,24 @@ TEST_F(EventReporterTest, ZeroInitiationTimeFallsBackToTimeSource) {
   EXPECT_CALL(*mock_client2_, receiveEvents(_));
 
   createTestConnection("node1", "cluster1", "tenant1", 0);
+  runDispatcher();
+}
+
+TEST_F(EventReporterTest, OverflowInitiationTimeFallsBackToTimeSource) {
+  // A maliciously large initiation_time_ms (e.g. int64 max) would overflow when converted into
+  // SystemTime's finer-grained duration. It must be rejected and fall back to the injected time
+  // source rather than triggering undefined behavior.
+  const auto before = context_.timeSource().systemTime();
+
+  EXPECT_CALL(*mock_client1_, receiveEvents(_))
+      .WillOnce(Invoke([&before](const ReverseTunnelEvent::TunnelUpdates& updates) {
+        ASSERT_EQ(1, updates.connections.size());
+        EXPECT_GE(updates.connections[0]->created_at, before);
+        EXPECT_LE(updates.connections[0]->created_at, before + std::chrono::seconds(5));
+      }));
+  EXPECT_CALL(*mock_client2_, receiveEvents(_));
+
+  createTestConnection("node1", "cluster1", "tenant1", std::numeric_limits<int64_t>::max());
   runDispatcher();
 }
 
