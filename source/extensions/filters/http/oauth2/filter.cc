@@ -497,7 +497,8 @@ FilterConfig::FilterConfig(
       authorization_endpoint_(proto_config.authorization_endpoint()),
       end_session_endpoint_(proto_config.end_session_endpoint()),
       post_logout_redirect_uri_formatter_(
-          proto_config.post_logout_redirect_uri().empty()
+          (proto_config.post_logout_redirect_uri().empty() ||
+           proto_config.disable_post_logout_redirect_uri())
               ? nullptr
               : THROW_OR_RETURN_VALUE(
                     Formatter::FormatterImpl::create(proto_config.post_logout_redirect_uri()),
