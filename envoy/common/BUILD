@@ -30,6 +30,7 @@ envoy_basic_cc_library(
         "exception.h",
     ],
     deps = [
+        "//source/common/common:assert_lib",
         "@abseil-cpp//absl/status:status",
         "@abseil-cpp//absl/status:statusor",
     ],
