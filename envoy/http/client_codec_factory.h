@@ -57,6 +57,14 @@ public:
    *         wants to decorate the stock behavior constructs its own codec from @p context (the
    *         stock codec cannot be wrapped after construction, because intercepting inbound events
    *         such as GOAWAY requires owning the ConnectionCallbacks at construction time).
+   *
+   *         An implementation that returns a non-null codec takes over the full construction the
+   *         stock path would otherwise perform. In particular, for an HTTP/3 connection it must
+   *         initialize the QUIC session itself (dynamic_cast context.connection to
+   *         EnvoyQuicClientSession and call Initialize()), since CodecClientProd only does so on
+   *         the stock path. Returning nullptr for unsupported codec types defers to the stock
+   *         codec (e.g. the reverse-tunnel codec handles only HTTP/2 and returns nullptr
+   *         otherwise).
    */
   virtual ClientConnectionPtr createClientCodec(const Context& context) const PURE;
 };
