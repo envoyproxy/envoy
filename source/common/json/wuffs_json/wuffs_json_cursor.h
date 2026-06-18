@@ -328,6 +328,12 @@ private:
 
   bool in_string_chain_{false};
 
+  // Bytes unread by Wuffs before the last short_read suspension. Wuffs rewinds
+  // iop_a_src to before an incomplete NUMBER or LITERAL token before suspending,
+  // so those bytes must be prepended to the next chunk to form a contiguous
+  // buffer. Empty between feed() calls when no token straddles a boundary.
+  std::string pending_bytes_;
+
   // TODO(tyxia): Implement PolicyHandler : Handler that accepts
   // DecoderConfig (max_body_bytes, max_inline_bytes, max_element_capture_bytes)
   // and a list of ExtractFieldSpec; routes callbacks by matching

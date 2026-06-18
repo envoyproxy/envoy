@@ -593,6 +593,38 @@ TEST(WuffsJsonCursorTest, BuildPatternPathNestedMessages) {
   EXPECT_EQ(h.paths[1], "messages[].role");
 }
 
+// NUMBER split test, "1234" split as "12" | "34":
+TEST(WuffsJsonCursorTest, NumberSplitChunkCorrectValue) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  ASSERT_TRUE(cursor.feed(R"({"n":12)", /*closed=*/false).ok());
+  ASSERT_TRUE(cursor.feed(R"(34})", /*closed=*/true).ok());
+  ASSERT_EQ(h.fields.size(), 1u);
+  EXPECT_EQ(h.fields[0].raw_val, "1234");
+}
+
+// LITERAL split test
+TEST(WuffsJsonCursorTest, LiteralSplitChunkAccepted) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  ASSERT_TRUE(cursor.feed(R"({"x":tr)", /*closed=*/false).ok());
+  EXPECT_TRUE(cursor.feed(R"(ue})", /*closed=*/true).ok());
+  ASSERT_EQ(h.fields.size(), 1u);
+  EXPECT_EQ(h.fields[0].raw_val, "true");
+}
+
+// STRING value split across a chunk boundary: "hello" as {"s":"hel" | lo"}.
+// Wuffs emits what it has as a continued=true STRING token before suspending,
+// leaving no unread bytes. The next chunk delivers the remainder cleanly.
+TEST(WuffsJsonCursorTest, StringValueSplitChunkCorrectValue) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  ASSERT_TRUE(cursor.feed(R"({"s":"hel)", /*closed=*/false).ok());
+  ASSERT_TRUE(cursor.feed(R"(lo"})", /*closed=*/true).ok());
+  ASSERT_EQ(h.fields.size(), 1u);
+  EXPECT_EQ(h.fields[0].str_val, "hello");
+}
+
 } // namespace
 } // namespace Wuffs
 } // namespace Json

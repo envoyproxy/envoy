@@ -21,7 +21,7 @@ void appendStringToken(std::string& out, absl::string_view raw, uint64_t token_d
     return;
   }
   if (token_detail & WUFFS_BASE__TOKEN__VBD__STRING__CONVERT_1_DST_1_SRC_COPY) {
-    out.append(raw.data(), raw.size());
+    out.append(raw);
   }
 }
 
@@ -149,13 +149,28 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
     return absl::OkStatus();
   }
 
+  // If the previous call left unread bytes (a NUMBER or LITERAL that started
+  // near the end of the prior chunk), prepend them so Wuffs sees the full
+  // token in one contiguous buffer. STRING tokens are not affected: Wuffs
+  // flushes whatever string content it has before suspending, so no string
+  // bytes are ever left in pending_bytes_.
+  std::string pending_storage;
+  absl::string_view effective_chunk = chunk;
+  if (!pending_bytes_.empty()) {
+    pending_storage = std::move(pending_bytes_);
+    pending_storage.append(chunk.data(), chunk.size());
+    effective_chunk = pending_storage;
+  }
+  pending_bytes_.clear();
+
   // body_src_pos_ is a global byte counter across all feed() calls. Token
   // offsets are expressed in the same global space, so (token_start - chunk_base)
-  // gives the offset into the current chunk — needed for chunk.substr() when
-  // extracting raw bytes for STRING / NUMBER / LITERAL tokens.
+  // gives the offset into effective_chunk — needed for substr() when extracting
+  // raw bytes for STRING / NUMBER / LITERAL tokens.
   const size_t chunk_base = body_src_pos_;
   wuffs_base__io_buffer source_buf = wuffs_base__ptr_u8__reader(
-      const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(chunk.data())), chunk.size(), closed);
+      const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(effective_chunk.data())),
+      effective_chunk.size(), closed);
 
   while (true) {
     wuffs_base__status status = wuffs_json__decoder__decode_tokens(
@@ -225,7 +240,7 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
       // A single logical string may span multiple continued tokens if Wuffs
       // fills token_buf_ before the closing quote; in_string_chain_ tracks mid-chain state.
       case WUFFS_BASE__TOKEN__VBC__STRING: {
-        const absl::string_view raw = chunk.substr(token_start - chunk_base, token_len);
+        const absl::string_view raw = effective_chunk.substr(token_start - chunk_base, token_len);
         if (!in_string_chain_) {
           // First token of a new string: decide key vs. value.
           key_buffer_.clear();
@@ -298,8 +313,8 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
         break;
       }
 
-      // TODO(tyxia) Espace here to ensure any unicode token can be used, for example, for
-      // comparsion routing, logging purpose. This requires re-escape in the re-encode phase.
+      // TODO(tyxia) Escape here to ensure any unicode token can be used, for example, for
+      // comparison routing, logging purpose. This requires re-escape in the re-encode phase.
       // Investigate later to see if escape and re-escape are needed.
       // Backslash escapes (\n, \t, \uXXXX, …) arrive as UNICODE_CODE_POINT tokens with VBD =
       // decoded code point. in_string_chain_ is managed by surrounding STRING tokens so it is not
@@ -340,7 +355,7 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
         const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
                                                 ? absl::string_view(key_stack_[depth_])
                                                 : absl::string_view();
-        const absl::string_view raw = chunk.substr(token_start - chunk_base, token_len);
+        const absl::string_view raw = effective_chunk.substr(token_start - chunk_base, token_len);
         if (token_category == WUFFS_BASE__TOKEN__VBC__NUMBER) {
           if (auto s = handler_.onNumber(value_key, raw, depth_, token_start, body_src_pos_);
               !s.ok()) {
@@ -379,6 +394,14 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
           absl::StrCat("wuffs json: ", wuffs_base__status__message(&status)));
     }
     if (status.repr == wuffs_base__suspension__short_read) {
+      // Wuffs rewound iop_a_src to before the incomplete token before
+      // suspending (the iop_a_src-- unread loop for NUMBER; no-op for
+      // LITERAL since match7 is peek-only). Save those bytes so the next
+      // feed() call can prepend them and give Wuffs a contiguous view.
+      if (source_buf.meta.ri < effective_chunk.size()) {
+        pending_bytes_.assign(effective_chunk.data() + source_buf.meta.ri,
+                              effective_chunk.size() - source_buf.meta.ri);
+      }
       break;
     }
     token_buf_.meta.ri = token_buf_.meta.wi = 0; // short_write: reset ring, retry
