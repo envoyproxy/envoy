@@ -882,14 +882,14 @@ TEST_P(ClientSideWeightedRoundRobinEdsIntegrationTest, UpdateLocalityPriority) {
     // Send 100 requests to cluster1 so host weights are updated.
     std::vector<uint64_t> initial_usage;
     sendRequestsAndTrackUpstreamUsage(upstream_qps, 10, initial_usage);
-    ENVOY_LOG(trace, "initial_usage {}", initial_usage);
+    ENVOY_LOG(trace, "initial_usage {}", absl::StrJoin(initial_usage, ", "));
 
     test_server_->waitForCounter("cluster.cluster_1.membership_change", Eq(i * 2 + 1));
 
     // Send another 100 requests to cluster1, expecting weights to be used.
     std::vector<uint64_t> upstream_usage;
     sendRequestsAndTrackUpstreamUsage(upstream_qps, 100, upstream_usage);
-    ENVOY_LOG(trace, "upstream_usage {}", upstream_usage);
+    ENVOY_LOG(trace, "upstream_usage {}", absl::StrJoin(upstream_usage, ", "));
     // Expect the usage of first locality to be non-zero.
     EXPECT_GT(upstream_usage[0], 0);
     EXPECT_GT(upstream_usage[1], 0);
@@ -931,14 +931,14 @@ TEST_P(ClientSideWeightedRoundRobinEdsIntegrationTest, AddRemoveLocality) {
     // Send 100 requests to cluster1 so host weights are updated.
     std::vector<uint64_t> initial_usage;
     sendRequestsAndTrackUpstreamUsage(upstream_qps, 10, initial_usage);
-    ENVOY_LOG(trace, "initial_usage {}", initial_usage);
+    ENVOY_LOG(trace, "initial_usage {}", absl::StrJoin(initial_usage, ", "));
 
     test_server_->waitForCounter("cluster.cluster_1.membership_change", Eq(i + 1));
 
     // Send another 100 requests to cluster1, expecting weights to be used.
     std::vector<uint64_t> upstream_usage;
     sendRequestsAndTrackUpstreamUsage(upstream_qps, 100, upstream_usage);
-    ENVOY_LOG(trace, "upstream_usage {}", upstream_usage);
+    ENVOY_LOG(trace, "upstream_usage {}", absl::StrJoin(upstream_usage, ", "));
     // Expect the usage of first locality to be non-zero.
     EXPECT_GT(upstream_usage[0], 0);
     EXPECT_GT(upstream_usage[1], 0);
