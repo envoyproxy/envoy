@@ -5234,7 +5234,7 @@ TEST_P(Http2CodecImplTest, TooManyCookiesHistogram) {
 }
 
 // Verify that the nghttp2 RST_STREAM rate limiter is configurable via stream_reset_burst and
-// stream_reset_rate. When the burst budget is exhausted by incoming RST_STREAMs, the server
+// stream_reset_rate. When the burst budget is exhausted by incoming RST_STREAM frames, the server
 // should send GOAWAY and close the connection.
 TEST_P(Http2CodecImplTest, StreamResetRateLimitConfigurable) {
   if (http2_implementation_ == Http2Impl::Oghttp2) {
@@ -5243,7 +5243,7 @@ TEST_P(Http2CodecImplTest, StreamResetRateLimitConfigurable) {
     return;
   }
 
-  // Set a very small burst so it is exhausted after a few RST_STREAMs.
+  // Set a very small burst so it is exhausted after a few RST_STREAM frames.
   const uint32_t burst = 5;
   server_http2_options_.mutable_stream_reset_burst()->set_value(burst);
   server_http2_options_.mutable_stream_reset_rate()->set_value(0);
