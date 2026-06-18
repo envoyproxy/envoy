@@ -1,7 +1,5 @@
 #pragma once
 
-#include <functional>
-
 #include "envoy/common/pure.h"
 #include "envoy/http/codec.h"
 
@@ -31,11 +29,6 @@ public:
   virtual ~ClientCodecFactory() = default;
 
   /**
-   * Builds the stock client codec that CodecClientProd would otherwise build for this connection.
-   */
-  using CreateDefaultCodecCb = std::function<ClientConnectionPtr()>;
-
-  /**
    * Everything CodecClientProd hands the stock codecs, so that a fresh codec can be constructed.
    */
   struct Context {
@@ -53,11 +46,13 @@ public:
 
   /**
    * @param context supplies the materials needed to build a fresh codec.
-   * @param create_default builds the stock codec, for implementations that prefer to decorate.
-   * @return the codec to use for this connection. Returning create_default() is a valid no-op.
+   * @return the client codec to use for this connection, or nullptr to indicate that the stock
+   *         codec CodecClientProd would otherwise build should be used. An implementation that
+   *         wants to decorate the stock behavior constructs its own codec from @p context (the
+   *         stock codec cannot be wrapped after construction, because intercepting inbound events
+   *         such as GOAWAY requires owning the ConnectionCallbacks at construction time).
    */
-  virtual ClientConnectionPtr
-  createClientCodec(const Context& context, const CreateDefaultCodecCb& create_default) const PURE;
+  virtual ClientConnectionPtr createClientCodec(const Context& context) const PURE;
 };
 
 } // namespace Http

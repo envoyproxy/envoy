@@ -917,6 +917,15 @@ using ClusterTimeoutBudgetStatsOptRef =
 class ProtocolOptionsConfig {
 public:
   virtual ~ProtocolOptionsConfig() = default;
+
+  /**
+   * @return an optional upstream (client) HTTP codec factory provided by this options object.
+   *         Defaults to none. An options extension attached via typed_extension_protocol_options
+   *         can override this to make CodecClientProd build a custom or decorated client codec.
+   */
+  virtual OptRef<const Http::ClientCodecFactory> upstreamHttpClientCodecFactory() const {
+    return {};
+  }
 };
 using ProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const ProtocolOptionsConfig>;
 

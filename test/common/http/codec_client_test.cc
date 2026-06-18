@@ -140,14 +140,12 @@ TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
 
 class MockClientCodecFactory : public ClientCodecFactory {
 public:
-  MOCK_METHOD(ClientConnectionPtr, createClientCodec,
-              (const Context& context, const CreateDefaultCodecCb& create_default), (const));
+  MOCK_METHOD(ClientConnectionPtr, createClientCodec, (const Context& context), (const));
 };
 
-// When a cluster exposes an upstream ClientCodecFactory, CodecClientProd consults it, hands it a
-// thunk that yields the stock codec, and installs the codec the factory returns. Uses a bare
-// fixture-less test because it constructs a real CodecClientProd rather than the fixture's
-// CodecClientForTest.
+// When a cluster exposes an upstream ClientCodecFactory, CodecClientProd consults it and installs
+// the codec the factory returns (the stock codec is not built). Uses a bare fixture-less test
+// because it constructs a real CodecClientProd rather than the fixture's CodecClientForTest.
 TEST(CodecClientProdTest, UpstreamClientCodecFactoryIsUsed) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Random::MockRandomGenerator> random;
@@ -159,24 +157,44 @@ TEST(CodecClientProdTest, UpstreamClientCodecFactoryIsUsed) {
   ON_CALL(*cluster, upstreamHttpClientCodecFactory())
       .WillByDefault(Return(OptRef<const ClientCodecFactory>(*factory)));
 
-  bool stock_codec_built = false;
-  EXPECT_CALL(*factory, createClientCodec(_, _))
-      .WillOnce(Invoke([&](const ClientCodecFactory::Context& context,
-                           const ClientCodecFactory::CreateDefaultCodecCb& create_default)
-                           -> ClientConnectionPtr {
+  // The factory returns its own codec; CodecClientProd must install it verbatim. Use a sentinel
+  // protocol (HTTP/2) distinct from the stock HTTP/1 codec to prove the returned codec is used.
+  EXPECT_CALL(*factory, createClientCodec(_))
+      .WillOnce(Invoke([&](const ClientCodecFactory::Context& context) -> ClientConnectionPtr {
         EXPECT_EQ(CodecType::HTTP1, context.type);
         EXPECT_EQ(cluster.get(), &context.cluster);
-        // The thunk hands over the stock codec CodecClientProd already built.
-        ClientConnectionPtr stock = create_default();
-        stock_codec_built = (stock != nullptr);
-        return std::make_unique<NiceMock<MockClientConnection>>();
+        auto codec = std::make_unique<NiceMock<MockClientConnection>>();
+        ON_CALL(*codec, protocol()).WillByDefault(Return(Protocol::Http2));
+        return codec;
       }));
 
   auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
   CodecClientProd client(CodecType::HTTP1, std::move(connection), host, dispatcher, random, nullptr,
                          /*should_connect=*/false);
 
-  EXPECT_TRUE(stock_codec_built);
+  EXPECT_EQ(Protocol::Http2, client.protocol());
+}
+
+// A factory that returns nullptr defers to the stock codec, which CodecClientProd then builds.
+TEST(CodecClientProdTest, UpstreamClientCodecFactoryNullptrUsesStockCodec) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  Upstream::HostDescriptionConstSharedPtr host =
+      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80");
+
+  auto factory = std::make_shared<NiceMock<MockClientCodecFactory>>();
+  ON_CALL(*cluster, upstreamHttpClientCodecFactory())
+      .WillByDefault(Return(OptRef<const ClientCodecFactory>(*factory)));
+  EXPECT_CALL(*factory, createClientCodec(_))
+      .WillOnce(Invoke(
+          [](const ClientCodecFactory::Context&) -> ClientConnectionPtr { return nullptr; }));
+
+  auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  CodecClientProd client(CodecType::HTTP1, std::move(connection), host, dispatcher, random, nullptr,
+                         /*should_connect=*/false);
+  // The factory declined, so the stock HTTP/1 codec is installed.
+  EXPECT_EQ(Protocol::Http11, client.protocol());
 }
 
 // With no factory configured (the default), CodecClientProd builds the stock codec.
