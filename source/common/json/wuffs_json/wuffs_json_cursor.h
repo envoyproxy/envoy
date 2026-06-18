@@ -16,112 +16,58 @@ namespace Envoy {
 namespace Json {
 namespace Wuffs {
 
-// WuffsJsonCursor — streaming SAX-style JSON parser built on the Wuffs library
-// (https://github.com/google/wuffs).
+// WuffsJsonCursor — streaming SAX-style JSON parser built on the Wuffs library.
 //
-// The cursor tokenizes a JSON document delivered as a sequence of byte chunks
-// (e.g. HTTP body fragments arriving on an event loop) and fires synchronous
-// callbacks into a Handler as semantic events are recognized. All low-level
-// Wuffs mechanics — token ring-buffer management, coroutine suspension and
-// resumption, escape sequence decoding — are hidden behind the Handler
-// interface; consumers see only clean, decoded events.
+// Tokenizes a JSON document delivered as a sequence of byte chunks and fires
+// synchronous callbacks into a Handler. Chunks may split at any byte boundary.
 //
-// Streaming model
-//
-// Call feed(chunk, closed) for each incoming chunk; set closed=true on the
-// final one to signal EOF. The Wuffs decoder is a class member that preserves
-// all parse state across calls, so chunks may split at any byte boundary —
-// including the middle of a string value or a multi-digit number:
-//
-//   class MyHandler : public WuffsJsonCursor::Handler { ... };
 //   MyHandler h;
 //   WuffsJsonCursor cursor(h);
-//   for (const Chunk& c : http_body_chunks) {
+//   for (const Chunk& c : body_chunks) {
 //     if (auto s = cursor.feed(c.data, c.is_last); !s.ok()) { /* error */ }
 //   }
 //
-// Depth and key model
+// Depth and key
 //
-// Every callback receives `depth` — the nesting level of the value or container
-// being reported. Depth starts at 0 before the root container.
-// onContainerOpen fires after depth is incremented; onContainerClose fires
-// before it is decremented, so both report the depth of the container itself.
+// Every callback receives `depth` (1 = root container) and, for dict values,
+// `key` (the dict key to the left; "" for array elements).
 //
 //   { "a": { "b": [ 1, 2 ] } }
 //    ^d=1    ^d=2   ^d=3
 //
-// For values inside a dict, callbacks also receive `key` — the dict key
-// immediately to the left of the value. For array elements, key is "".
-// The cursor tracks the current key internally, so handlers never need a
-// separate current_key_ member.
+// Callback sequence for {"messages": [{"role": "user"}]}:
 //
-// Example callback sequence for {"messages": [{"role": "user"}]}:
-//
-//   onContainerOpen    (key="",         is_dict=true,  depth=1)  ← root {
+//   onContainerOpen    (key="",         is_dict=true,  depth=1)
 //   onKey              ("messages",                    depth=1)
-//   onContainerOpen    (key="messages", is_dict=false, depth=2)  ← [
-//   onContainerOpen    (key="",         is_dict=true,  depth=3)  ← { (parent is array)
+//   onContainerOpen    (key="messages", is_dict=false, depth=2)
+//   onContainerOpen    (key="",         is_dict=true,  depth=3)
 //   onKey              ("role",                        depth=3)
 //   openStringCapture  ("role",  depth=3, token_start)  → true/false
-//   onStringChunk      ("role",  depth=3, "user")        ← if true; one call per chunk
-//   closeStringCapture ("role",  depth=3, token_end)     ← if true
-//   onContainerClose   (depth=3, ...)
-//   onContainerClose   (depth=2, ...)
-//   onContainerClose   (depth=1, ...)
+//   onStringChunk      ("role",  depth=3, "user")
+//   closeStringCapture ("role",  depth=3, token_end)
+//   onContainerClose   (depth=3..1, ...)
 //
-// String value lifecycle
+// String capture
 //
-// At the start of a string value the cursor calls openStringCapture. Return
-// true to receive the content as decoded UTF-8 via onStringChunk — one call
-// per chunk across however many Wuffs tokens or feed() calls the string spans.
-// When the closing quote is seen, closeStringCapture fires with token_end.
-// Return false to discard at zero cost: no onStringChunk calls occur, no
-// allocation is made, and closeStringCapture is never called.
+// Return true from openStringCapture to receive decoded UTF-8 via onStringChunk,
+// false to discard at zero cost (no allocation, no further callbacks).
+// onStringChunk returning false stops chunk delivery but parsing continues;
+// closeStringCapture always fires with token_end.
 //
-// onStringChunk delivers fully decoded UTF-8; backslash escapes are converted
-// by the cursor before the call. Each chunk is a string_view valid only for
-// the duration of that call — copy if retention is needed.
-//
-// Fine-grained control inside large values
-//
-// onStringChunk returning bool enables chunk-level decisions within a single
-// string value, not just the all-or-nothing choice at openStringCapture:
-//
-//   Partial capture — accumulate up to a limit, then stop appending but keep
-//   returning true so the cursor continues parsing to the closing ":
-//     if (buf_.size() < kLimit) { buf_.append(chunk); }
-//     return true;
-//
-//   Early abort — stop chunk delivery entirely once a threshold is reached:
-//     return buf_.size() < kLimit;  // false stops further onStringChunk calls
-//
-//   Streaming without accumulation — process each chunk in place (e.g. hash,
-//   scan for keywords) without ever buffering the full value:
-//     hasher_.Update(chunk);
-//     return true;
-//
-// In all cases closeStringCapture still fires with token_end, so byte-range
-// information is available regardless of how the content was handled.
-//
-// For large values (e.g. message content) where decoding is unnecessary,
-// return false from openStringCapture and use onContainerOpen/Close byte
-// ranges on the parent container for zero-copy access to the raw JSON bytes.
+// onStringChunk also enables fine-grained control mid-value: accumulate up to a
+// limit and keep returning true, or return false to stop early — the cursor
+// finishes parsing to the closing " either way.
 //
 // Container byte ranges
 //
-// onContainerOpen receives token_start — the byte offset of the opening { or [
-// in the original body stream. onContainerClose receives token_end — the offset
-// immediately past the closing } or ]. Together they delimit a half-open byte
-// range [token_start, token_end) suitable for zero-copy sub-range extraction when
-// the body is memory-mapped or stored contiguously.
+// onContainerOpen / onContainerClose deliver token_start / token_end, forming
+// a half-open range [token_start, token_end) over the raw body bytes.
 //
 // Path tracking
 //
-// Construct with track_paths=true and call buildIndexedPath(depth) or
-// buildPatternPath(depth) from within any callback to obtain dot-notation
-// path strings for the current position:
-//   buildIndexedPath → "messages[0].role"  — concrete index, for per-element keys
-//   buildPatternPath → "messages[].role"   — wildcard index, for config matching
+// With track_paths=true, call from any callback:
+//   buildIndexedPath(depth) → "messages[0].role"
+//   buildPatternPath(depth) → "messages[].role"
 //
 class WuffsJsonCursor {
 public:
@@ -264,8 +210,8 @@ public:
   // Monotonically increasing byte offset of the next source byte to be consumed.
   // Matches the token_start / token_end values delivered to onContainerOpen / onContainerClose.
   // TODO(tyxia): the outer filter should compare nextSourcePosition() against
-  //   DecoderConfig::max_body_bytes between feed() calls and return ResourceExhausted
-  //   before calling feed() again if the limit is exceeded.
+  // DecoderConfig::max_body_bytes between feed() calls and return ResourceExhausted
+  // before calling feed() again if the limit is exceeded.
   size_t nextSourcePosition() const { return body_src_pos_; }
 
 private:
@@ -335,18 +281,17 @@ private:
   std::string pending_bytes_;
   std::string pending_storage_; // retains capacity across feed() calls to avoid reallocation
 
-  // TODO(tyxia): Implement Handler : Handler that accepts
-  // DecoderConfig (max_body_bytes, max_inline_bytes, max_element_capture_bytes)
-  // and a list of ExtractFieldSpec; routes callbacks by matching
-  // buildPatternPath(depth) / buildPatternPath(depth-1) at onContainerOpen
-  // against specs and records element byte ranges. Implements the three-tier
-  // body-size logic (full capture / semantic-only / reject).
-  // Implement a utility to parse ExtractFieldSpec path
-  // strings ("messages[].content[].text") into a normalized form directly
-  // comparable with buildPatternPath() output.
-  // At filter init, derive the max_depth constructor
-  // argument from the deepest ExtractFieldSpec path rather than the static
-  // default, tightening the DoS bound to exactly what the policy requires.
+  // TODO(tyxia): Implement Handler : Handler that accepts DecoderConfig (max_body_bytes,
+  // max_inline_bytes, max_element_capture_bytes) and a list of ExtractFieldSpec; routes callbacks
+  // by matching buildPatternPath(depth) / buildPatternPath(depth-1) at onContainerOpen against
+  // specs and records element byte ranges.
+  //
+  // Implements the three-tier body-size logic (full capture semantic-only / reject). Implement a
+  // utility to parse ExtractFieldSpec path strings
+  // ("messages[].content[].text") into a normalized form directly comparable with
+  // buildPatternPath() output. At filter init, derive the max_depth constructor argument from the
+  // deepest ExtractFieldSpec path rather than the static default, tightening the DoS bound to
+  // exactly what the policy requires.
   bool string_is_key_{false};
   bool string_capturing_{false};    // openStringCapture returned true for current value string
   bool string_chunk_active_{false}; // onStringChunk hasn't returned false yet

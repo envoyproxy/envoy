@@ -67,80 +67,39 @@ WuffsJsonCursor::WuffsJsonCursor(Handler& handler, bool track_paths, int max_dep
 // to the Handler callbacks.
 //
 // Wuffs token model
-// Each wuffs_base__token carries three fields used here:
 //
-//   token_category (value_base_category) — coarse token kind; the switch below:
-//     FILLER     Whitespace and punctuation (commas, colons, quotes).
-//                No semantic meaning; silently skipped.
-//     STRUCTURE  Container open/close: { } [ ].
-//                token_detail bits distinguish open vs. close and dict vs. array:
-//                  VBD__STRUCTURE__PUSH    set on { or [
-//                  VBD__STRUCTURE__TO_DICT set on { (clear on [)
-//                depth_ is incremented before onContainerOpen and decremented
-//                after onContainerClose, so the handler always sees the depth
-//                of the container itself.
-//     STRING     One segment of a JSON string value or key — plain bytes only.
-//                A single logical string may span multiple tokens if Wuffs fills
-//                token_buf_ before the closing quote; the `continued` flag
-//                (token__continued) is true on all but the last segment.
-//                On the first token of a new value string (!in_string_chain_),
-//                openStringCapture is called — returns true to receive content via
-//                onStringChunk, or false to discard at zero cost. COPY tokens deliver
-//                content to onStringChunk while string_chunk_active_ is true; DROP
-//                tokens (quote delimiters) are skipped. On the last token
-//                (continued=false), closeStringCapture fires if string_capturing_.
-//                Key strings bypass openStringCapture: they accumulate into the
-//                internal key_buffer_ and fire onKey on completion.
-//                token_detail bits:
-//                  VBD__STRING__CONVERT_0_DST_1_SRC_DROP  — opening/closing quote
-//                  VBD__STRING__CONVERT_1_DST_1_SRC_COPY  — plain bytes (content)
-//                NOTE: backslash escapes do NOT arrive as STRING tokens — Wuffs
-//                emits them as UNICODE_CODE_POINT tokens (see below).
-//     UNICODE_CODE_POINT
-//                A decoded escape sequence. token_detail holds the Unicode code
-//                point value directly. The token's length covers the raw escape
-//                bytes in the source. Encoded to UTF-8 in a stack buffer and
-//                delivered to onStringChunk if string_chunk_active_; skipped if not.
-//                in_string_chain_ is NOT updated here — its lifecycle is managed
-//                by the surrounding STRING tokens.
-//     NUMBER     A JSON number literal (integer or floating-point).
-//                Raw bytes forwarded to onNumber(key, raw, depth).
-//     LITERAL    One of: true, false, null.
-//                Dispatched to onBoolean(key, value, depth) or onNull(key, depth).
+// Each token has three fields:
+//   token_category — coarse kind (the switch below)
+//   token_detail   — kind-specific bit flags
+//   token_len      — source bytes consumed; body_src_pos_ is advanced by this
+//                    for every token, giving a monotonic global byte counter.
 //
-//   token_detail  (value_base_detail) — kind-specific bit flags (see token_category above).
+// Token categories dispatched here:
 //
-//   token_len (token__length) — number of source bytes this token consumed.
-//        body_src_pos_ is advanced by token_len for every token regardless of token_category,
-//        giving a monotonically increasing byte counter. onContainerOpen and
-//        onContainerClose deliver token_start / token_end from this counter.
+//   FILLER              Whitespace, commas, colons, quote delimiters — skipped.
 //
-// VBC dispatch summary
-//   VBC constant        Meaning                           Action
-//   FILLER              Whitespace, commas, colons        Advance body_src_pos_; no other action
-//   STRUCTURE           Object/array open or close        Manage depth_, is_dict_[],
-//   expecting_key_[];
-//                                                         record byte ranges for containers
-//   STRING              String content or quote delim     Keys: appendStringToken to key_buffer_.
-//                       (plain bytes only — no escapes)   Values: COPY tokens -> onStringChunk if
-//                                                         string_chunk_active_; DROP tokens
-//                                                         skipped.
-//   UNICODE_CODE_POINT  Decoded backslash escape          Keys: appendCodePoint to key_buffer_.
-//                                                         Values: encode to stack buf,
-//                                                         onStringChunk if string_chunk_active_.
-//   NUMBER              Numeric literal                   Forward raw bytes to onNumber
-//   LITERAL             true / false / null               Dispatch to onBoolean or onNull
+//   STRUCTURE           { } [ ] open/close. VBD__STRUCTURE__PUSH set on open;
+//                       VBD__STRUCTURE__TO_DICT distinguishes { from [.
 //
-// Outer loop suspension
-// decode_tokens returns one of three status classes:
-//   nullptr / note  Complete — document fully consumed; set wuffs_done_.
-//   short_read      token_buf_ drained before source_buf exhausted — need more
-//                   input; break and return, resuming on next feed() call.
-//                   The Wuffs stackless coroutine in decoder_ preserves all parse
-//                   state so resumption is exact.
-//   short_write     source_buf has input but token_buf_ is full — reset the token
-//                   ring buffer and re-invoke decode_tokens to drain more.
-//   other error     Malformed JSON; propagate as InvalidArgumentError.
+//   STRING              One segment of a string key or value (plain bytes only;
+//                       escapes arrive as UNICODE_CODE_POINT). A logical string
+//                       may span multiple tokens — `continued` is true on all
+//                       but the last. Keys accumulate into key_buffer_; values
+//                       route through openStringCapture / onStringChunk.
+//                       VBD__STRING__CONVERT_0_DST_1_SRC_DROP  — quote delimiter
+//                       VBD__STRING__CONVERT_1_DST_1_SRC_COPY  — plain content
+//
+//   UNICODE_CODE_POINT  Decoded backslash escape; token_detail holds the code
+//                       point. Encoded to UTF-8 and forwarded to onStringChunk.
+//
+//   NUMBER / LITERAL    Raw bytes forwarded to onNumber; true/false/null
+//                       dispatched to onBoolean / onNull.
+//
+// decode_tokens suspension:
+//   nullptr / note  — document complete; set wuffs_done_.
+//   short_read      — need more input; break and resume on next feed().
+//   short_write     — token_buf_ full; reset ring and retry.
+//   other           — malformed JSON; return InvalidArgumentError.
 absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
   if (!decoder_) {
     return absl::InternalError("wuffs json: alloc failed");
