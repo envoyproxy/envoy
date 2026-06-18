@@ -120,7 +120,7 @@ public class CronetHttp3Test {
 
     if (setUpLogging) {
       nativeCronetEngineBuilder.setLogger(logger);
-      nativeCronetEngineBuilder.setLogLevel(EnvoyEngine.LogLevel.TRACE);
+      nativeCronetEngineBuilder.setLogLevel(EnvoyEngine.LogLevel.INFO);
     }
     if (useAndroidNetworkMonitorV2) {
       nativeCronetEngineBuilder.setUseV2NetworkMonitor(useAndroidNetworkMonitorV2);

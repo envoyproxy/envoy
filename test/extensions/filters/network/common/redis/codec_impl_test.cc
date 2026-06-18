@@ -8,6 +8,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
 using testing::ContainerEq;
@@ -854,6 +855,17 @@ TEST_F(RedisEncoderDecoderImplTest, NestedArrayDepthLimitExceeded) {
   payload += "+foo\r\n";
 
   buffer_.add(payload);
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, ArraySizeLimitExceeded) {
+  buffer_.add(absl::StrCat("*", MaxArraySize + 1, "\r\n"));
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, IntegerOverflowTest) {
+  // Extremely large number of digits to trigger uint64_t overflow
+  buffer_.add("*99999999999999999999999999\r\n");
   EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
 }
 

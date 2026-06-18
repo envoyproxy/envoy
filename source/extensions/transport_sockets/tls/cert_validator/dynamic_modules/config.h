@@ -28,6 +28,19 @@ using OnCertValidatorUpdateDigestType =
     decltype(&envoy_dynamic_module_on_cert_validator_update_digest);
 
 /**
+ * Per-call state for an active do_verify_cert_chain invocation. The validator config is shared
+ * across worker threads, so the module receives a pointer to this call scoped context as the verify
+ * envoy pointer instead of the shared config. It is valid only for the duration of the module call.
+ */
+struct CertValidatorCallContext {
+  // The transport socket callbacks for the connection being verified. Used by the filter state
+  // callbacks to reach the connection stream info.
+  Network::TransportSocketCallbacks* callbacks = nullptr;
+  // Error details set by the module via the set_error_details callback.
+  absl::optional<std::string> error_details;
+};
+
+/**
  * Configuration holding the resolved dynamic module and ABI function pointers
  * for cert validation. This is shared between the factory and the validator.
  */
@@ -50,14 +63,6 @@ public:
 
   const std::string& validatorName() const { return validator_name_; }
   const std::string& validatorConfig() const { return validator_config_; }
-
-  // Stores error details set by the module via the set_error_details callback during
-  // do_verify_cert_chain. Reset before each verification call.
-  absl::optional<std::string> last_error_details_;
-
-  // Stores the transport socket callbacks pointer during do_verify_cert_chain so that
-  // filter state callbacks can access the connection's stream info. Reset after each call.
-  Network::TransportSocketCallbacks* current_callbacks_ = nullptr;
 
 private:
   friend absl::StatusOr<std::shared_ptr<DynamicModuleCertValidatorConfig>>

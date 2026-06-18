@@ -100,6 +100,23 @@ public:
                              const Network::ExtraShutdownListenerOptions& options) PURE;
 
   /**
+   * Notify the connections in the given filter chains that they are being drained. This is
+   * intended to be invoked at the start of a filter-chain drain sequence (before the drain
+   * timer expires and connections are forcibly closed). It does not close connections.
+   * @param listener_tag supplies the tag passed to addListener().
+   * @param filter_chains supplies the filter chains whose connections should be notified.
+   */
+  virtual void onFilterChainDrain(uint64_t listener_tag,
+                                  const std::list<const FilterChain*>& filter_chains) PURE;
+
+  /**
+   * Notify all connections belonging to the listener with the given tag that they are being
+   * drained. Does not close any connections.
+   * @param listener_tag supplies the tag passed to addListener().
+   */
+  virtual void onListenerDrain(uint64_t listener_tag) PURE;
+
+  /**
    * Stop all listeners. This will not close any connections and is used for draining.
    */
   virtual void stopListeners() PURE;
@@ -177,6 +194,22 @@ public:
      */
     virtual void onFilterChainDraining(
         const std::list<const Network::FilterChain*>& draining_filter_chains) PURE;
+
+    /**
+     * Called at the start of the drain sequence for the given filter chains. Implementations
+     * should notify all owned connections that they are being drained (by invoking
+     * Network::Connection::onDrain()) so that callbacks registered on those connections can
+     * react to the drain (e.g. send GOAWAY). Connections are not closed by this call.
+     */
+    virtual void onFilterChainDrainStart(
+        const std::list<const Network::FilterChain*>& draining_filter_chains) PURE;
+
+    /**
+     * Called at the start of the drain sequence for the listener as a whole. Implementations
+     * should notify all owned connections that they are being drained. Connections are not
+     * closed by this call.
+     */
+    virtual void onListenerDrainStart() PURE;
 
     // New method for handling idle connection closing
     virtual void onCloseIdleHttpConnections(bool /*is_saturated*/) {

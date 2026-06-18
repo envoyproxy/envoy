@@ -215,6 +215,17 @@ TEST(TestConfig, StreamIdleTimeout) {
   EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("stream_idle_timeout { seconds: 42 }"));
 }
 
+TEST(TestConfig, RequestTimeout) {
+  EngineBuilder engine_builder;
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("timeout { }"));
+
+  engine_builder.setRequestTimeoutMilliseconds(42500);
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("timeout { seconds: 42 nanos: 500000000 }"));
+}
+
 TEST(TestConfig, PerTryIdleTimeout) {
   EngineBuilder engine_builder;
 

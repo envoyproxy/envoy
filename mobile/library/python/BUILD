@@ -1,4 +1,5 @@
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 load("@mobile_pip3//:requirements.bzl", "requirement")
 load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
 load("@rules_python//python:defs.bzl", "py_library")
@@ -6,7 +7,7 @@ load("@rules_python//python:packaging.bzl", "py_package", "py_wheel")
 
 licenses(["notice"])  # Apache 2
 
-package(default_visibility = ["//visibility:public"])
+envoy_mobile_package()
 
 string_flag(
     name = "python_platform",

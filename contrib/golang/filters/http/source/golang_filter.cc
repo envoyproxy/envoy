@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -1552,8 +1553,8 @@ CAPIStatus Filter::getStringPropertyCommon(absl::string_view path, uint64_t* val
   return status;
 }
 
-absl::optional<google::api::expr::runtime::CelValue> Filter::findValue(absl::string_view name,
-                                                                       Protobuf::Arena* arena) {
+std::optional<google::api::expr::runtime::CelValue> Filter::findValue(absl::string_view name,
+                                                                      Protobuf::Arena* arena) {
   // as we already support getting/setting FilterState, we don't need to implement
   // getProperty with non-attribute name & setProperty which actually work on FilterState
   return StreamActivation::FindValue(name, arena);
@@ -2090,12 +2091,12 @@ SecretReader::SecretReader(
   }
 }
 
-absl::optional<const std::string> SecretReader::secret(const std::string& name) const {
+std::optional<const std::string> SecretReader::secret(const std::string& name) const {
   auto secret = secrets_.find(name);
   if (secret != secrets_.end()) {
     return secret->second->secret();
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 } // namespace Golang
