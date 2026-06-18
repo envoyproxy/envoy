@@ -660,13 +660,10 @@ void UpstreamSocketManager::onPingTimeout(const int fd) {
 }
 
 uint64_t UpstreamSocketManager::pingIntervalWithJitterMs() {
-  uint64_t interval_ms = static_cast<uint64_t>(ping_interval_.count()) * 1000;
+  // 15% upward jitter, matching the HTTP/2 keepalive pattern.
   constexpr uint64_t jitter_percent = 15;
-  uint64_t jitter_mod = jitter_percent * interval_ms / 100;
-  if (jitter_mod > 0) {
-    interval_ms += random_generator_->random() % jitter_mod;
-  }
-  return interval_ms;
+  const uint64_t interval_ms = static_cast<uint64_t>(ping_interval_.count()) * 1000;
+  return ReverseConnectionUtility::addJitter(interval_ms, jitter_percent, *random_generator_);
 }
 
 void UpstreamSocketManager::rearmPingSendTimer(int fd) {
