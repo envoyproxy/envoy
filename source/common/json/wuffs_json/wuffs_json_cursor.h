@@ -293,11 +293,11 @@ private:
   // kMaxTrackedDepth-1 regardless of max_depth, because the per-depth arrays
   // below are stack-allocated at compile time.
   //
-  // TODO(tyxia): replace the fixed arrays with std::vector<T> so
-  // that max_depth_ can exceed kMaxTrackedDepth-1 without losing tracking
-  // accuracy. This removes the hard compile-time cap at the cost of per-push
-  // heap allocation; evaluate against the request-path perf budget before
-  // doing so.
+  // TODO(tyxia): replace the fixed arrays with std::vector<T> to support
+  // dynamic dpeth so that max_depth_ can exceed kMaxTrackedDepth-1 without
+  // losing tracking accuracy. This removes the hard compile-time cap at the
+  // cost of per-push heap allocation; evaluate against the request-path perf
+  // budget before doing so.
   static constexpr int kMaxTrackedDepth = 9;
   static constexpr size_t kMaxKeyBytes = 256;
   int depth_{0};
@@ -334,7 +334,7 @@ private:
   // buffer. Empty between feed() calls when no token straddles a boundary.
   std::string pending_bytes_;
 
-  // TODO(tyxia): Implement PolicyHandler : Handler that accepts
+  // TODO(tyxia): Implement Handler : Handler that accepts
   // DecoderConfig (max_body_bytes, max_inline_bytes, max_element_capture_bytes)
   // and a list of ExtractFieldSpec; routes callbacks by matching
   // buildPatternPath(depth) / buildPatternPath(depth-1) at onContainerOpen
