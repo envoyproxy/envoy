@@ -498,7 +498,12 @@ FilterConfig::FilterConfig(
     : oauth_token_endpoint_(proto_config.token_endpoint()),
       authorization_endpoint_(proto_config.authorization_endpoint()),
       end_session_endpoint_(proto_config.end_session_endpoint()),
-      post_logout_redirect_uri_(proto_config.post_logout_redirect_uri()),
+      post_logout_redirect_uri_formatter_(
+          proto_config.post_logout_redirect_uri().empty()
+              ? nullptr
+              : THROW_OR_RETURN_VALUE(
+                    Formatter::FormatterImpl::create(proto_config.post_logout_redirect_uri()),
+                    Formatter::FormatterPtr)),
       disable_post_logout_redirect_uri_(proto_config.disable_post_logout_redirect_uri()),
       authorization_query_params_(buildAutorizationQueryParams(proto_config)),
       client_id_(proto_config.credentials().client_id()),
@@ -1181,14 +1186,12 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
                                               config_->clientId());
 
     if (!config_->disablePostLogoutRedirectUri()) {
-      const std::string& configured_uri = config_->postLogoutRedirectUri();
       std::string redirect_uri;
-      if (configured_uri.empty()) {
+      if (config_->postLogoutRedirectUriFormatter() == nullptr) {
         redirect_uri = default_post_logout_redirect_url;
       } else {
-        Formatter::FormatterPtr formatter = THROW_OR_RETURN_VALUE(
-            Formatter::FormatterImpl::create(configured_uri), Formatter::FormatterPtr);
-        redirect_uri = formatter->format({&headers}, decoder_callbacks_->streamInfo());
+        redirect_uri = config_->postLogoutRedirectUriFormatter()->format(
+            {&headers}, decoder_callbacks_->streamInfo());
       }
       absl::StrAppend(&oidc_logout_url,
                       fmt::format(OIDCLogoutUrlPostLogoutRedirectFormatString,
