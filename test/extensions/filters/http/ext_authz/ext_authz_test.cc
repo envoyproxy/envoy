@@ -7104,12 +7104,20 @@ TEST_F(HttpFilterTest, ShadowModeWithRequestBody) {
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
 }
 
+class MockLookupRequest : public AuthCache::LookupRequest {
+public:
+  MockLookupRequest() = default;
+  ~MockLookupRequest() override = default;
+
+  MOCK_METHOD(void, cancel, ());
+};
+
 class MockAuthCache : public AuthCache {
 public:
   MockAuthCache() = default;
   ~MockAuthCache() override = default;
 
-  MOCK_METHOD(void, lookup,
+  MOCK_METHOD(LookupRequest*, lookup,
               (Http::StreamDecoderFilterCallbacks&, const RequestAttributes&, LookupCallback&&));
   MOCK_METHOD(void, insert, (const RequestAttributes&, const Filters::Common::ExtAuthz::Response&));
 };
@@ -7138,7 +7146,10 @@ TEST_F(HttpFilterCacheTest, CacheHitOk) {
   AuthCache::LookupCallback lookup_cb;
   EXPECT_CALL(*mock_cache_, lookup(_, _, _))
       .WillOnce(Invoke([&](Http::StreamDecoderFilterCallbacks&, const RequestAttributes&,
-                           AuthCache::LookupCallback&& cb) { lookup_cb = std::move(cb); }));
+                           AuthCache::LookupCallback&& cb) -> AuthCache::LookupRequest* {
+        lookup_cb = std::move(cb);
+        return nullptr;
+      }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -7168,11 +7179,12 @@ TEST_F(HttpFilterCacheTest, CacheHitOkSync) {
 
   EXPECT_CALL(*mock_cache_, lookup(_, _, _))
       .WillOnce(Invoke([&](Http::StreamDecoderFilterCallbacks&, const RequestAttributes&,
-                           AuthCache::LookupCallback&& cb) {
+                           AuthCache::LookupCallback&& cb) -> AuthCache::LookupRequest* {
         auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
         cached_response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
         cached_response->headers_to_add.push_back({"x-cached-header", "yes"});
         cb(std::move(cached_response));
+        return nullptr;
       }));
 
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
@@ -7195,7 +7207,10 @@ TEST_F(HttpFilterCacheTest, CacheHitDenied) {
   AuthCache::LookupCallback lookup_cb;
   EXPECT_CALL(*mock_cache_, lookup(_, _, _))
       .WillOnce(Invoke([&](Http::StreamDecoderFilterCallbacks&, const RequestAttributes&,
-                           AuthCache::LookupCallback&& cb) { lookup_cb = std::move(cb); }));
+                           AuthCache::LookupCallback&& cb) -> AuthCache::LookupRequest* {
+        lookup_cb = std::move(cb);
+        return nullptr;
+      }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -7226,12 +7241,13 @@ TEST_F(HttpFilterCacheTest, CacheHitDeniedSync) {
 
   EXPECT_CALL(*mock_cache_, lookup(_, _, _))
       .WillOnce(Invoke([&](Http::StreamDecoderFilterCallbacks&, const RequestAttributes&,
-                           AuthCache::LookupCallback&& cb) {
+                           AuthCache::LookupCallback&& cb) -> AuthCache::LookupRequest* {
         auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
         cached_response->status = Filters::Common::ExtAuthz::CheckStatus::Denied;
         cached_response->status_code = Http::Code::Forbidden;
         cached_response->body = "Access Denied by Cache";
         cb(std::move(cached_response));
+        return nullptr;
       }));
 
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
@@ -7256,7 +7272,10 @@ TEST_F(HttpFilterCacheTest, CacheHitErrorFailOpen) {
   AuthCache::LookupCallback lookup_cb;
   EXPECT_CALL(*mock_cache_, lookup(_, _, _))
       .WillOnce(Invoke([&](Http::StreamDecoderFilterCallbacks&, const RequestAttributes&,
-                           AuthCache::LookupCallback&& cb) { lookup_cb = std::move(cb); }));
+                           AuthCache::LookupCallback&& cb) -> AuthCache::LookupRequest* {
+        lookup_cb = std::move(cb);
+        return nullptr;
+      }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -7285,10 +7304,11 @@ TEST_F(HttpFilterCacheTest, CacheHitErrorFailOpenSync) {
 
   EXPECT_CALL(*mock_cache_, lookup(_, _, _))
       .WillOnce(Invoke([&](Http::StreamDecoderFilterCallbacks&, const RequestAttributes&,
-                           AuthCache::LookupCallback&& cb) {
+                           AuthCache::LookupCallback&& cb) -> AuthCache::LookupRequest* {
         auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
         cached_response->status = Filters::Common::ExtAuthz::CheckStatus::Error;
         cb(std::move(cached_response));
+        return nullptr;
       }));
 
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
@@ -7311,7 +7331,10 @@ TEST_F(HttpFilterCacheTest, CacheHitErrorFailClosed) {
   AuthCache::LookupCallback lookup_cb;
   EXPECT_CALL(*mock_cache_, lookup(_, _, _))
       .WillOnce(Invoke([&](Http::StreamDecoderFilterCallbacks&, const RequestAttributes&,
-                           AuthCache::LookupCallback&& cb) { lookup_cb = std::move(cb); }));
+                           AuthCache::LookupCallback&& cb) -> AuthCache::LookupRequest* {
+        lookup_cb = std::move(cb);
+        return nullptr;
+      }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -7341,11 +7364,12 @@ TEST_F(HttpFilterCacheTest, CacheHitErrorFailClosedSync) {
 
   EXPECT_CALL(*mock_cache_, lookup(_, _, _))
       .WillOnce(Invoke([&](Http::StreamDecoderFilterCallbacks&, const RequestAttributes&,
-                           AuthCache::LookupCallback&& cb) {
+                           AuthCache::LookupCallback&& cb) -> AuthCache::LookupRequest* {
         auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
         cached_response->status = Filters::Common::ExtAuthz::CheckStatus::Error;
         cached_response->status_code = Http::Code::Forbidden;
         cb(std::move(cached_response));
+        return nullptr;
       }));
 
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
@@ -7370,7 +7394,10 @@ TEST_F(HttpFilterCacheTest, CacheMiss) {
   AuthCache::LookupCallback lookup_cb;
   EXPECT_CALL(*mock_cache_, lookup(_, _, _))
       .WillOnce(Invoke([&](Http::StreamDecoderFilterCallbacks&, const RequestAttributes&,
-                           AuthCache::LookupCallback&& cb) { lookup_cb = std::move(cb); }));
+                           AuthCache::LookupCallback&& cb) -> AuthCache::LookupRequest* {
+        lookup_cb = std::move(cb);
+        return nullptr;
+      }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -7401,9 +7428,11 @@ TEST_F(HttpFilterCacheTest, DestroyDuringLookup) {
 
   prepareCheck();
 
-  EXPECT_CALL(*mock_cache_, lookup(_, _, _));
+  NiceMock<MockLookupRequest> mock_request;
+  EXPECT_CALL(*mock_cache_, lookup(_, _, _)).WillOnce(Return(&mock_request));
   filter_->decodeHeaders(request_headers_, false);
 
+  EXPECT_CALL(mock_request, cancel());
   filter_->onDestroy();
 }
 

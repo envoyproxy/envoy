@@ -718,7 +718,7 @@ public:
   MockAuthCache() = default;
   ~MockAuthCache() override = default;
 
-  MOCK_METHOD(void, lookup,
+  MOCK_METHOD(LookupRequest*, lookup,
               (Http::StreamDecoderFilterCallbacks&, const RequestAttributes&, LookupCallback&&));
   MOCK_METHOD(void, insert, (const RequestAttributes&, const Filters::Common::ExtAuthz::Response&));
 };

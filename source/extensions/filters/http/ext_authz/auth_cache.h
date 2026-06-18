@@ -28,6 +28,12 @@ class AuthCache {
 public:
   virtual ~AuthCache() = default;
 
+  class LookupRequest {
+  public:
+    virtual ~LookupRequest() = default;
+    virtual void cancel() = 0;
+  };
+
   using LookupCallback = std::function<void(Filters::Common::ExtAuthz::ResponsePtr&&)>;
 
   /**
@@ -37,9 +43,11 @@ public:
    * @param decoder_callbacks The stream decoder filter callbacks.
    * @param attributes The RequestAttributes containing authorization context.
    * @param cb The callback to invoke when the lookup completes.
+   * @return A LookupRequest handle if the lookup is asynchronous and can be cancelled,
+   *         or nullptr if the lookup completed synchronously.
    */
-  virtual void lookup(Http::StreamDecoderFilterCallbacks& decoder_callbacks,
-                      const RequestAttributes& attributes, LookupCallback&& cb) = 0;
+  virtual LookupRequest* lookup(Http::StreamDecoderFilterCallbacks& decoder_callbacks,
+                                const RequestAttributes& attributes, LookupCallback&& cb) = 0;
 
   /**
    * Inserts a response into the cache.

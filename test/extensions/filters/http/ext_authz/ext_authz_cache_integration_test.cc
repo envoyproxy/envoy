@@ -27,21 +27,22 @@ class SimpleInMemoryCache : public AuthCache {
 public:
   SimpleInMemoryCache() = default;
 
-  void lookup(Http::StreamDecoderFilterCallbacks&, const RequestAttributes& attributes,
-              LookupCallback&& cb) override {
+  LookupRequest* lookup(Http::StreamDecoderFilterCallbacks&, const RequestAttributes& attributes,
+                        LookupCallback&& cb) override {
     std::string key = std::string(attributes.headers_.getPathValue());
     if (key.empty()) {
       cb(nullptr);
-      return;
+      return nullptr;
     }
 
     absl::ReaderMutexLock lock(&mutex_);
     auto it = map_.find(key);
     if (it != map_.end()) {
       cb(std::make_unique<Filters::Common::ExtAuthz::Response>(it->second));
-      return;
+      return nullptr;
     }
     cb(nullptr);
+    return nullptr;
   }
 
   void insert(const RequestAttributes& attributes,

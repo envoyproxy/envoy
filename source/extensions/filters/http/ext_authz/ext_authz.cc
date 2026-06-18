@@ -407,10 +407,12 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     initiating_lookup_ = true;
     filter_return_ = FilterReturn::StopDecoding;
 
-    config_->cache()->lookup(*decoder_callbacks_, *request_attributes_,
-                             [this](Filters::Common::ExtAuthz::ResponsePtr&& response) {
-                               onCacheLookupComplete(std::move(response));
-                             });
+    active_lookup_ =
+        config_->cache()->lookup(*decoder_callbacks_, *request_attributes_,
+                                 [this](Filters::Common::ExtAuthz::ResponsePtr&& response) {
+                                   active_lookup_ = nullptr;
+                                   onCacheLookupComplete(std::move(response));
+                                 });
     initiating_lookup_ = false;
     return;
   }
@@ -683,6 +685,10 @@ void Filter::onDestroy() {
   if (state_ == State::Calling) {
     state_ = State::Complete;
     client_->cancel();
+  }
+  if (active_lookup_ != nullptr) {
+    active_lookup_->cancel();
+    active_lookup_ = nullptr;
   }
 }
 
