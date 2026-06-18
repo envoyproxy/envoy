@@ -239,7 +239,7 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
   HostVectorSharedPtr all_hosts(new HostVector(first_host_set.hosts()));
   all_hosts->emplace_back(host);
 
-  // updateHostParams() called without partitioning the hosts, because health does not matter for
+  // updateHostsParams() called without partitioning the hosts, because health does not matter for
   // ORIGINAL_DST clusters (hosts are used without regard for health signal).
   auto healthy_hosts = std::make_shared<HealthyHostVector>(*all_hosts);
   auto degraded_hosts = std::make_shared<DegradedHostVector>();
@@ -320,7 +320,7 @@ void OriginalDstCluster::cleanup() {
     }
     setHostMap(new_host_map);
 
-    // updateHostParams() called without partitioning the hosts, because health does not matter for
+    // updateHostsParams() called without partitioning the hosts, because health does not matter for
     // ORIGINAL_DST clusters (hosts are used without regard for health signal).
     auto healthy_hosts = std::make_shared<HealthyHostVector>(*keeping_hosts);
     auto degraded_hosts = std::make_shared<DegradedHostVector>();
