@@ -72,6 +72,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/http:codec_client_lib",
         "//source/common/http:exception_lib",
+        "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/upstream:upstream_includes",

@@ -585,6 +585,7 @@ envoy_cc_test(
         ":test_local_address_selector",
         ":utility_lib",
         "//envoy/api:api_interface",
+        "//envoy/http:client_codec_factory_interface",
         "//envoy/http:codec_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:metadata_lib",

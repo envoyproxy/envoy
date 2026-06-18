@@ -8,6 +8,7 @@
 #include "source/common/http/exception.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -196,6 +197,80 @@ TEST(CodecClientProdTest, UpstreamClientCodecFactoryNullptrUsesStockCodec) {
                          /*should_connect=*/false);
   // The factory declined, so the stock HTTP/1 codec is installed.
   EXPECT_EQ(Protocol::Http11, client.protocol());
+}
+
+// The factory is consulted for HTTP/2 connections as well; the returned codec is installed.
+TEST(CodecClientProdTest, UpstreamClientCodecFactoryIsUsedHttp2) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  Upstream::HostDescriptionConstSharedPtr host =
+      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80");
+
+  auto factory = std::make_shared<NiceMock<MockClientCodecFactory>>();
+  ON_CALL(*cluster, upstreamHttpClientCodecFactory())
+      .WillByDefault(Return(OptRef<const ClientCodecFactory>(*factory)));
+
+  // Sentinel protocol HTTP/1 (distinct from the stock HTTP/2 codec) proves the returned codec is
+  // installed verbatim rather than the stock one being built.
+  EXPECT_CALL(*factory, createClientCodec(_))
+      .WillOnce(Invoke([&](const ClientCodecFactory::Context& context) -> ClientConnectionPtr {
+        EXPECT_EQ(CodecType::HTTP2, context.type);
+        auto codec = std::make_unique<NiceMock<MockClientConnection>>();
+        ON_CALL(*codec, protocol()).WillByDefault(Return(Protocol::Http11));
+        return codec;
+      }));
+
+  auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  CodecClientProd client(CodecType::HTTP2, std::move(connection), host, dispatcher, random, nullptr,
+                         /*should_connect=*/false);
+  EXPECT_EQ(Protocol::Http11, client.protocol());
+}
+
+// A factory that returns nullptr for an HTTP/2 connection defers to the stock HTTP/2 codec.
+TEST(CodecClientProdTest, UpstreamClientCodecFactoryNullptrUsesStockCodecHttp2) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  Upstream::HostDescriptionConstSharedPtr host =
+      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80");
+
+  auto factory = std::make_shared<NiceMock<MockClientCodecFactory>>();
+  ON_CALL(*cluster, upstreamHttpClientCodecFactory())
+      .WillByDefault(Return(OptRef<const ClientCodecFactory>(*factory)));
+  EXPECT_CALL(*factory, createClientCodec(_))
+      .WillOnce(Invoke(
+          [](const ClientCodecFactory::Context&) -> ClientConnectionPtr { return nullptr; }));
+
+  auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  CodecClientProd client(CodecType::HTTP2, std::move(connection), host, dispatcher, random, nullptr,
+                         /*should_connect=*/false);
+  EXPECT_EQ(Protocol::Http2, client.protocol());
+}
+
+// The transport socket options are forwarded to the factory verbatim.
+TEST(CodecClientProdTest, UpstreamClientCodecFactoryReceivesTransportSocketOptions) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  Upstream::HostDescriptionConstSharedPtr host =
+      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80");
+
+  auto factory = std::make_shared<NiceMock<MockClientCodecFactory>>();
+  ON_CALL(*cluster, upstreamHttpClientCodecFactory())
+      .WillByDefault(Return(OptRef<const ClientCodecFactory>(*factory)));
+
+  Network::TransportSocketOptionsConstSharedPtr transport_options =
+      std::make_shared<Network::TransportSocketOptionsImpl>();
+  EXPECT_CALL(*factory, createClientCodec(_))
+      .WillOnce(Invoke([&](const ClientCodecFactory::Context& context) -> ClientConnectionPtr {
+        EXPECT_EQ(transport_options.get(), context.options.get());
+        return std::make_unique<NiceMock<MockClientConnection>>();
+      }));
+
+  auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  CodecClientProd client(CodecType::HTTP1, std::move(connection), host, dispatcher, random,
+                         transport_options, /*should_connect=*/false);
 }
 
 // With no factory configured (the default), CodecClientProd builds the stock codec.
