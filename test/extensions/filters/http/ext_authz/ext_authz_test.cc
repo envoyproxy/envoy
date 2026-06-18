@@ -136,11 +136,12 @@ public:
   void
   initializeWithCache(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
                       AuthCachePtr&& cache) {
-    config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(),
-                                             "ext_authz_prefix", factory_context_);
+    config_ =
+        std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(), "ext_authz_prefix",
+                                       factory_context_, std::move(cache));
     client_ = new NiceMock<Filters::Common::ExtAuthz::MockClient>();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_},
-                                       factory_context_, std::move(cache));
+                                       factory_context_);
     ON_CALL(decoder_filter_callbacks_, filterConfigName()).WillByDefault(Return(FilterConfigName));
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
@@ -7110,8 +7111,7 @@ public:
 
   MOCK_METHOD(void, lookup,
               (Http::StreamDecoderFilterCallbacks&, const RequestAttributes&, LookupCallback&&));
-  MOCK_METHOD(void, insert, (const Filters::Common::ExtAuthz::Response&));
-  MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(void, insert, (const RequestAttributes&, const Filters::Common::ExtAuthz::Response&));
 };
 
 class HttpFilterCacheTest : public HttpFilterTestBase<testing::Test> {
@@ -7386,7 +7386,7 @@ TEST_F(HttpFilterCacheTest, CacheMiss) {
   auto authz_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
   authz_response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
 
-  EXPECT_CALL(*mock_cache_, insert(_));
+  EXPECT_CALL(*mock_cache_, insert(_, _));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
 
   authz_cb->onComplete(std::move(authz_response));
@@ -7404,7 +7404,6 @@ TEST_F(HttpFilterCacheTest, DestroyDuringLookup) {
   EXPECT_CALL(*mock_cache_, lookup(_, _, _));
   filter_->decodeHeaders(request_headers_, false);
 
-  EXPECT_CALL(*mock_cache_, onDestroy());
   filter_->onDestroy();
 }
 

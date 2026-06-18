@@ -189,7 +189,8 @@ class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                Stats::Scope& scope, const std::string& stats_prefix,
-               Server::Configuration::ServerFactoryContext& factory_context);
+               Server::Configuration::ServerFactoryContext& factory_context,
+               AuthCachePtr cache = nullptr);
 
   bool allowPartialMessage() const { return allow_partial_message_; }
 
@@ -263,6 +264,8 @@ public:
   }
 
   const ExtAuthzFilterStats& stats() const { return stats_; }
+
+  AuthCache* cache() const { return cache_.get(); }
 
   void incCounter(Stats::Scope& scope, Stats::StatName name) {
     scope.counterFromStatName(name).inc();
@@ -364,6 +367,7 @@ public:
   const Stats::StatName ext_authz_error_;
   const Stats::StatName ext_authz_invalid_;
   const Stats::StatName ext_authz_failure_mode_allowed_;
+  const AuthCachePtr cache_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -454,17 +458,14 @@ class Filter : public Logger::Loggable<Logger::Id::ext_authz>,
                public Http::StreamFilter,
                public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
-  Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client,
-         AuthCachePtr&& cache = nullptr)
-      : config_(config), client_(std::move(client)), cache_(std::move(cache)),
-        stats_(config->stats()) {}
+  Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client)
+      : config_(config), client_(std::move(client)), stats_(config->stats()) {}
 
   // Constructor that includes server context for per-route service support.
   Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client,
-         Server::Configuration::ServerFactoryContext& server_context,
-         AuthCachePtr&& cache = nullptr)
-      : config_(config), client_(std::move(client)), cache_(std::move(cache)),
-        server_context_(&server_context), stats_(config->stats()) {}
+         Server::Configuration::ServerFactoryContext& server_context)
+      : config_(config), client_(std::move(client)), server_context_(&server_context),
+        stats_(config->stats()) {}
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -563,7 +564,6 @@ private:
   Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& response);
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
-  AuthCachePtr cache_;
   // Server context for creating per-route clients.
   Server::Configuration::ServerFactoryContext* server_context_{nullptr};
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};

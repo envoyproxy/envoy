@@ -84,7 +84,8 @@ Http::Code zeroHttpCode() {
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                            Stats::Scope& scope, const std::string& stats_prefix,
-                           Server::Configuration::ServerFactoryContext& factory_context)
+                           Server::Configuration::ServerFactoryContext& factory_context,
+                           AuthCachePtr cache)
     : allow_partial_message_(config.with_request_body().allow_partial_message()),
       failure_mode_allow_(config.failure_mode_allow()),
       failure_mode_allow_header_add_(config.failure_mode_allow_header_add()),
@@ -147,7 +148,8 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       ext_authz_error_(pool_.add(createPoolStatName(config.stat_prefix(), "error"))),
       ext_authz_invalid_(pool_.add(createPoolStatName(config.stat_prefix(), "invalid"))),
       ext_authz_failure_mode_allowed_(
-          pool_.add(createPoolStatName(config.stat_prefix(), "failure_mode_allowed"))) {
+          pool_.add(createPoolStatName(config.stat_prefix(), "failure_mode_allowed"))),
+      cache_(std::move(cache)) {
   auto bootstrap = factory_context.bootstrap();
   auto labels_key_it =
       bootstrap.node().metadata().fields().find(config.bootstrap_metadata_labels_key());
@@ -400,15 +402,15 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
 
   request_attributes_.emplace(collectAttributes(headers));
 
-  if (cache_ != nullptr) {
+  if (config_->cache() != nullptr) {
     ENVOY_STREAM_LOG(trace, "ext_authz filter performing cache lookup.", *decoder_callbacks_);
     initiating_lookup_ = true;
     filter_return_ = FilterReturn::StopDecoding;
 
-    cache_->lookup(*decoder_callbacks_, *request_attributes_,
-                   [this](Filters::Common::ExtAuthz::ResponsePtr&& response) {
-                     onCacheLookupComplete(std::move(response));
-                   });
+    config_->cache()->lookup(*decoder_callbacks_, *request_attributes_,
+                             [this](Filters::Common::ExtAuthz::ResponsePtr&& response) {
+                               onCacheLookupComplete(std::move(response));
+                             });
     initiating_lookup_ = false;
     return;
   }
@@ -682,9 +684,6 @@ void Filter::onDestroy() {
     state_ = State::Complete;
     client_->cancel();
   }
-  if (cache_ != nullptr) {
-    cache_->onDestroy();
-  }
 }
 
 CheckResult Filter::validateAndCheckDecoderHeaderMutation(
@@ -706,8 +705,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
   updateLoggingInfo(response->grpc_status);
 
-  if (!from_cache && cache_ != nullptr) {
-    cache_->insert(*response);
+  if (!from_cache && config_->cache() != nullptr && request_attributes_.has_value()) {
+    config_->cache()->insert(*request_attributes_, *response);
   }
 
   if (response->saw_invalid_append_actions) {

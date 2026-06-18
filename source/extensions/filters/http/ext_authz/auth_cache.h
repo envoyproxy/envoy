@@ -43,15 +43,11 @@ public:
 
   /**
    * Inserts a response into the cache.
+   * @param attributes The RequestAttributes containing authorization context.
    * @param response The Response received from the authz service.
    */
-  virtual void insert(const Filters::Common::ExtAuthz::Response& response) = 0;
-
-  /**
-   * Called when the filter is being destroyed. The cache implementation must
-   * abort any in-progress asynchronous operations before returning.
-   */
-  virtual void onDestroy() = 0;
+  virtual void insert(const RequestAttributes& attributes,
+                      const Filters::Common::ExtAuthz::Response& response) = 0;
 };
 
 using AuthCachePtr = std::unique_ptr<AuthCache>;

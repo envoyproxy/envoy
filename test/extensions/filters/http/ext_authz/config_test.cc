@@ -720,8 +720,7 @@ public:
 
   MOCK_METHOD(void, lookup,
               (Http::StreamDecoderFilterCallbacks&, const RequestAttributes&, LookupCallback&&));
-  MOCK_METHOD(void, insert, (const Filters::Common::ExtAuthz::Response&));
-  MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(void, insert, (const RequestAttributes&, const Filters::Common::ExtAuthz::Response&));
 };
 
 class MockAuthCacheFactory : public AuthCacheFactory {
