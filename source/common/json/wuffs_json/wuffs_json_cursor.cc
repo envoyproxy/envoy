@@ -154,12 +154,11 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
   // token in one contiguous buffer. STRING tokens are not affected: Wuffs
   // flushes whatever string content it has before suspending, so no string
   // bytes are ever left in pending_bytes_.
-  std::string pending_storage;
   absl::string_view effective_chunk = chunk;
   if (!pending_bytes_.empty()) {
-    pending_storage = std::move(pending_bytes_);
-    pending_storage.append(chunk.data(), chunk.size());
-    effective_chunk = pending_storage;
+    pending_storage_ = std::move(pending_bytes_);
+    pending_storage_.append(chunk.data(), chunk.size());
+    effective_chunk = pending_storage_;
   }
   pending_bytes_.clear();
 
