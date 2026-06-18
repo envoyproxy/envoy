@@ -27,13 +27,13 @@ namespace Matcher {
 namespace {
 
 #ifdef SUPPORTS_TESTING_BPF_PROG
-// Runs `prog` against `data` via a socketpair + SO_ATTACH_FILTER and returns the program's return
+// Runs `prog` against `data` via a socketpair + `SO_ATTACH_FILTER` and returns the program's return
 // value.
 //
-// We can't attach via SO_ATTACH_REUSEPORT_CBPF, that would require a reuseport group sized to
-// `concurrency`. SO_ATTACH_FILTER reinterprets the same uint32_t return as "bytes to deliver", so
-// we read it back via recv(MSG_TRUNC) on a 1-byte buffer. EAGAIN/EWOULDBLOCK signals index 0, which
-// SO_ATTACH_FILTER reinterprets as drop.
+// We can't attach via `SO_ATTACH_REUSEPORT_CBPF`, that would require a reuseport group sized to
+// `concurrency`. `SO_ATTACH_FILTER` reinterprets the return value as "bytes to deliver", so
+// we read it back via `recv(MSG_TRUNC)` on a 1-byte buffer. `EAGAIN/EWOULDBLOCK` signals index 0,
+// which `SO_ATTACH_FILTER` reinterprets as drop.
 absl::StatusOr<uint32_t> runCbpf(const sock_fprog* prog, absl::string_view data, uint32_t min_len) {
   std::string padded(data);
   if (padded.size() < min_len) {
