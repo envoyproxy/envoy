@@ -469,7 +469,6 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                                 EMPTY_STRING,
                                 Http::Code::OK,
                                 Protobuf::Struct{}}};
-
     return std::move(ok.response_);
   }
 
@@ -497,7 +496,6 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                                   message->bodyAsString(),
                                   static_cast<Http::Code>(status_code),
                                   Protobuf::Struct{}}};
-
   return std::move(denied.response_);
 }
 
