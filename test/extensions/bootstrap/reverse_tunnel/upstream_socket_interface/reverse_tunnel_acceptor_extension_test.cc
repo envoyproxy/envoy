@@ -617,14 +617,14 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateConnectionReporting) {
         auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
 
         EXPECT_CALL(*reporter, reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
-                                                     testing::Eq(tenant_id)));
+                                                     testing::Eq(tenant_id), testing::_));
 
         return reporter;
       }));
 
   extension_ =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
-  extension_->reportConnection(node_id, cluster_id, tenant_id);
+  extension_->reportConnection(node_id, cluster_id, tenant_id, 0);
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateDisconnectionReporting) {
