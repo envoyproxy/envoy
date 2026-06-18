@@ -101,6 +101,7 @@ envoy_extension_cc_test(
         "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//test/integration:ads_integration_lib",
         "//test/integration:integration_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )

@@ -80,6 +80,7 @@ envoy_extension_cc_test(
         "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//test/config:utility_lib",
         "//test/integration:http_protocol_integration_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],

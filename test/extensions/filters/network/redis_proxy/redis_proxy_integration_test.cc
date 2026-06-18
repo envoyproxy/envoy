@@ -11,7 +11,9 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/integration.h"
+#include "test/integration/utility.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gtest/gtest.h"
 
@@ -762,6 +764,8 @@ protected:
   const int num_upstreams_;
   const Network::Address::IpVersion version_;
   Runtime::MockLoader* runtime_{};
+  OsSysCallsWithMockedDns mock_os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&mock_os_sys_calls_};
 };
 
 class RedisProxyWithRedirectionIntegrationTest : public RedisProxyIntegrationTest {
@@ -1012,7 +1016,7 @@ void RedisProxyIntegrationTest::initialize() {
   setUpstreamCount(num_upstreams_);
   setDeterministicValue();
   config_helper_.renameListener("redis_proxy");
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.getaddrinfo_no_ai_flags", "true");
+  mock_os_sys_calls_.setIpVersion(version_);
   BaseIntegrationTest::initialize();
 }
 

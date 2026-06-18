@@ -9,6 +9,8 @@
 
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
+#include "test/integration/utility.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 using testing::Eq;
 using testing::Ge;
@@ -91,7 +93,7 @@ typed_config:
 
     // Load the CDS cluster and wait for it to initialize.
     cds_helper_.setCds({cluster_});
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.getaddrinfo_no_ai_flags", "true");
+    mock_os_sys_calls_.setIpVersion(GetParam());
     HttpIntegrationTest::initialize();
     test_server_->waitForCounter("cluster_manager.cluster_added", Eq(1));
     test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
@@ -118,6 +120,8 @@ typed_config:
   std::string upstream_cert_name_{"server"};
   CdsHelper cds_helper_;
   envoy::config::cluster::v3::Cluster cluster_;
+  OsSysCallsWithMockedDns mock_os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&mock_os_sys_calls_};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SniDynamicProxyFilterIntegrationTest,

@@ -14,7 +14,9 @@
 #include "test/extensions/filters/udp/udp_proxy/session_filters/psc_setter.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/psc_setter.pb.h"
 #include "test/integration/integration.h"
+#include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 using testing::Eq;
 namespace Envoy {
@@ -162,7 +164,7 @@ typed_config:
 
     // Load the CDS cluster and wait for it to initialize.
     cds_helper_.setCds({dynamic_cluster_});
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.getaddrinfo_no_ai_flags", "true");
+    mock_os_sys_calls_.setIpVersion(GetParam());
     BaseIntegrationTest::initialize();
     test_server_->waitForCounter("cluster_manager.cluster_added", Eq(2));
     test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
@@ -171,6 +173,8 @@ typed_config:
   CdsHelper cds_helper_;
   envoy::config::cluster::v3::Cluster dynamic_cluster_;
   envoy::config::cluster::v3::Cluster static_cluster_;
+  OsSysCallsWithMockedDns mock_os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&mock_os_sys_calls_};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicForwardProxyIntegrationTest,
