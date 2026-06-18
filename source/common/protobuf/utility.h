@@ -2,6 +2,7 @@
 
 #include <numeric>
 #include <string>
+#include <type_traits>
 
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
@@ -379,7 +380,8 @@ public:
   static const MessageType&
   downcastAndValidate(const Protobuf::Message& config,
                       ProtobufMessage::ValidationVisitor& validation_visitor) {
-    const auto& typed_config = dynamic_cast<MessageType>(config);
+    const auto& typed_config =
+        Envoy::Protobuf::DynamicCastMessage<std::remove_reference_t<MessageType>>(config);
     validate(typed_config, validation_visitor);
     return typed_config;
   }

@@ -44,8 +44,8 @@ class Response:
         self.__streaming_started = False
         self.__stream_reader: Optional["StreamReader"] = None
 
-    def attach(self, engine: envoy_engine.Engine) -> envoy_engine.Stream:
-        proto = engine.stream_client().new_stream_prototype()
+    def attach(self, engine: envoy_engine.Engine, listener_name: str = "") -> envoy_engine.Stream:
+        proto = engine.stream_client(listener_name).new_stream_prototype()
         self.__stream = proto.start(
             on_headers=self.__executor.wrap(self.on_headers),
             on_data=self.__executor.wrap(self.on_data),

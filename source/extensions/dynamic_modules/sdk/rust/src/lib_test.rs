@@ -4251,6 +4251,25 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_hos
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_host(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _index: usize,
+  _is_added: bool,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _index: usize,
+  _is_added: bool,
+  _result: *mut abi::envoy_dynamic_module_type_packed_address,
+) -> bool {
+  false
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
   _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
   _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
@@ -5261,6 +5280,67 @@ fn test_cluster_lb_get_host_address_none() {
 }
 
 #[test]
+fn test_cluster_lb_get_member_update_host() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_member_update_host()
+    .withf(|index, is_added| *index == 0 && *is_added)
+    .returning(|_, _| Some(0x1234 as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr));
+  assert_eq!(
+    mock_lb.get_member_update_host(0, true).map(|h| h as usize),
+    Some(0x1234)
+  );
+}
+
+#[test]
+fn test_cluster_lb_get_member_update_host_none() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_member_update_host()
+    .returning(|_, _| None);
+  assert!(mock_lb.get_member_update_host(0, false).is_none());
+}
+
+#[test]
+fn test_cluster_lb_get_member_update_host_packed_address() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_member_update_host_packed_address()
+    .withf(|index, is_added| *index == 0 && *is_added)
+    .returning(|_, _| Some(cluster::PackedAddress::V4([127, 0, 0, 1], 10001)));
+  mock_lb
+    .expect_get_member_update_host_packed_address()
+    .withf(|_, is_added| !*is_added)
+    .returning(|_, _| Some(cluster::PackedAddress::V6([1; 16], 10002)));
+
+  match mock_lb.get_member_update_host_packed_address(0, true) {
+    Some(cluster::PackedAddress::V4(addr, port)) => {
+      assert_eq!(addr, [127, 0, 0, 1]);
+      assert_eq!(port, 10001);
+    },
+    other => panic!("expected V4, got {other:?}"),
+  }
+  match mock_lb.get_member_update_host_packed_address(0, false) {
+    Some(cluster::PackedAddress::V6(addr, port)) => {
+      assert_eq!(addr, [1; 16]);
+      assert_eq!(port, 10002);
+    },
+    other => panic!("expected V6, got {other:?}"),
+  }
+}
+
+#[test]
+fn test_cluster_lb_get_member_update_host_packed_address_none() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_member_update_host_packed_address()
+    .returning(|_, _| None);
+  assert!(mock_lb
+    .get_member_update_host_packed_address(0, false)
+    .is_none());
+}
+
+#[test]
 fn test_cluster_lb_get_host_locality() {
   let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
   mock_lb.expect_get_host_locality().returning(|_, _| {
@@ -5445,36 +5525,63 @@ fn test_cluster_lb_context_full_workflow() {
 fn test_async_host_selection_complete_with_host() {
   let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   mock_completion
-    .expect_async_host_selection_complete()
+    .expect_complete()
     .withf(|host, details| host.is_some() && details == "resolved")
     .times(1)
     .returning(|_, _| ());
 
-  mock_completion.async_host_selection_complete(Some(0x1234 as *mut _), "resolved");
+  Box::new(mock_completion).complete(Some(0x1234 as *mut _), "resolved");
 }
 
 #[test]
 fn test_async_host_selection_complete_no_host() {
   let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   mock_completion
-    .expect_async_host_selection_complete()
+    .expect_complete()
     .withf(|host, details| host.is_none() && details == "dns_failure")
     .times(1)
     .returning(|_, _| ());
 
-  mock_completion.async_host_selection_complete(None, "dns_failure");
+  Box::new(mock_completion).complete(None, "dns_failure");
 }
 
 #[test]
 fn test_async_host_selection_complete_empty_details() {
   let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   mock_completion
-    .expect_async_host_selection_complete()
+    .expect_complete()
     .withf(|host, details| host.is_none() && details.is_empty())
     .times(1)
     .returning(|_, _| ());
 
-  mock_completion.async_host_selection_complete(None, "");
+  Box::new(mock_completion).complete(None, "");
+}
+
+#[test]
+fn test_async_host_selection_request_context() {
+  // On resume the module reads the re-presented context. Its accessors route through the
+  // link-time stubs, which report no hash / zero headers for the sentinel pointer.
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion.expect_request_context().returning(|| {
+    Some(cluster::ClusterLbContextRef::new(
+      0x1 as *mut _,
+      std::ptr::null_mut(),
+    ))
+  });
+
+  let ctx = mock_completion
+    .request_context()
+    .expect("context present on resume");
+  assert_eq!(ctx.compute_hash_key(), None);
+  assert_eq!(ctx.get_downstream_headers_size(), 0);
+}
+
+#[test]
+fn test_async_host_selection_request_context_absent() {
+  // No context (e.g. health-check selections) is reported as None, matching choose_host.
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion.expect_request_context().returning(|| None);
+  assert!(mock_completion.request_context().is_none());
 }
 
 #[test]
@@ -5499,7 +5606,7 @@ fn test_async_host_selection_with_stored_completion() {
 
   let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   mock_completion
-    .expect_async_host_selection_complete()
+    .expect_complete()
     .withf(|host, details| host == &Some(0xBEEF as *mut _) && details == "dns_resolved")
     .times(1)
     .returning(|_, _| ());
@@ -5515,7 +5622,7 @@ fn test_async_host_selection_with_stored_completion() {
 
   // Simulate async DNS resolution completing.
   let completion = lb.pending_completion.take().unwrap();
-  completion.async_host_selection_complete(Some(0xBEEF as *mut _), "dns_resolved");
+  completion.complete(Some(0xBEEF as *mut _), "dns_resolved");
 }
 
 #[test]

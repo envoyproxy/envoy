@@ -1846,7 +1846,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsCallPerRouteConfig) {
 
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
       override_config;
-  auto* override_tool = override_config.mutable_tool_config()->add_tools();
+  auto* override_tool = override_config.add_tool_config()->add_tools();
   override_tool->set_name("my_tool");
   override_tool->mutable_http_rule()->set_get("/override/path");
 
@@ -1921,7 +1921,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListPerRouteConfigOverridesStaticConfig
 
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
       override_config;
-  override_config.mutable_tool_config()->mutable_tool_list_http_rule()->set_get("/override/path");
+  override_config.add_tool_config()->mutable_tool_list_http_rule()->set_get("/override/path");
 
   McpJsonRestBridgePerRouteConfig override(override_config);
 

@@ -4,6 +4,7 @@ package envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3
 
 import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 
 import "udpa/annotations/status.proto";
 
@@ -34,6 +35,12 @@ message DownstreamReverseConnectionSocketInterface {
     // afterward. The responder must set this flag to the same value.
     // Defaults to ``false``.
     bool use_http_upgrade = 3;
+
+    // Formatter extensions usable in ``additional_headers`` substitution. See the formatter
+    // extensions documentation for details. When set, ``additional_headers`` values are evaluated
+    // as substitution format strings; when empty, the values are sent literally.
+    // [#extension-category: envoy.formatter]
+    repeated config.core.v3.TypedExtensionConfig formatters = 4;
   }
 
   // Stat prefix to be used for downstream reverse connection socket interface stats.

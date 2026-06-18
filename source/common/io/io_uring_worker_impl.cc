@@ -1,20 +1,39 @@
 #include "source/common/io/io_uring_worker_impl.h"
 
+#include <algorithm>
+
 namespace Envoy {
 namespace Io {
 
+// The adaptive read buffer grows up to this multiple of the configured read buffer size so large
+// transfers use fewer, larger reads while small responses keep using small buffers.
+constexpr uint32_t MaxReadBufferSizeMultiplier = 16;
+
+namespace {
+// A negative provided buffer id would index the pool out of bounds. Flag the bug and let the caller
+// skip the buffer when that happens.
+bool multishotBufferIdValid(int32_t buffer_id) {
+  if (buffer_id < 0) {
+    IS_ENVOY_BUG(fmt::format("invalid multishot buffer id {}", buffer_id));
+    return false;
+  }
+  return true;
+}
+} // namespace
+
 ReadRequest::ReadRequest(IoUringSocket& socket, uint32_t size)
-    : Request(RequestType::Read, socket), buf_(std::make_unique<uint8_t[]>(size)),
-      iov_(std::make_unique<struct iovec>()) {
-  iov_->iov_base = buf_.get();
-  iov_->iov_len = size;
+    // Value-initialize the buffer because io_uring fills it in the kernel, which MemorySanitizer
+    // cannot observe and would otherwise report as uninitialized.
+    : Request(RequestType::Read, socket), buf_(std::make_unique<uint8_t[]>(size)) {
+  iov_.iov_base = buf_.get();
+  iov_.iov_len = size;
 }
 
 WriteRequest::WriteRequest(IoUringSocket& socket, const Buffer::RawSliceVector& slices)
-    : Request(RequestType::Write, socket), iov_(std::make_unique<struct iovec[]>(slices.size())) {
-  for (size_t i = 0; i < slices.size(); i++) {
-    iov_[i].iov_base = slices[i].mem_;
-    iov_[i].iov_len = slices[i].len_;
+    : Request(RequestType::Write, socket) {
+  iov_.reserve(slices.size());
+  for (const auto& slice : slices) {
+    iov_.push_back({slice.mem_, slice.len_});
   }
 }
 
@@ -59,15 +78,23 @@ void IoUringSocketEntry::onRemoteClose() {
 }
 
 IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
-                                     uint32_t read_buffer_size, uint32_t write_timeout_ms,
+                                     bool enable_multishot_receive, uint32_t read_buffer_size,
+                                     uint32_t write_timeout_ms, uint32_t write_high_watermark_bytes,
+                                     uint32_t write_low_watermark_bytes,
                                      Event::Dispatcher& dispatcher)
-    : IoUringWorkerImpl(std::make_unique<IoUringImpl>(io_uring_size, use_submission_queue_polling),
-                        read_buffer_size, write_timeout_ms, dispatcher) {}
+    : IoUringWorkerImpl(std::make_unique<IoUringImpl>(io_uring_size, use_submission_queue_polling,
+                                                      enable_multishot_receive, read_buffer_size),
+                        read_buffer_size, write_timeout_ms, write_high_watermark_bytes,
+                        write_low_watermark_bytes, dispatcher) {}
 
 IoUringWorkerImpl::IoUringWorkerImpl(IoUringPtr&& io_uring, uint32_t read_buffer_size,
-                                     uint32_t write_timeout_ms, Event::Dispatcher& dispatcher)
-    : io_uring_(std::move(io_uring)), read_buffer_size_(read_buffer_size),
-      write_timeout_ms_(write_timeout_ms), dispatcher_(dispatcher) {
+                                     uint32_t write_timeout_ms, uint32_t write_high_watermark_bytes,
+                                     uint32_t write_low_watermark_bytes,
+                                     Event::Dispatcher& dispatcher)
+    : io_uring_(std::move(io_uring)), multishot_enabled_(io_uring_->isMultishotEnabled()),
+      buffer_pool_(io_uring_->bufferPool()), read_buffer_size_(read_buffer_size),
+      write_timeout_ms_(write_timeout_ms), write_high_watermark_bytes_(write_high_watermark_bytes),
+      write_low_watermark_bytes_(write_low_watermark_bytes), dispatcher_(dispatcher) {
   const os_fd_t event_fd = io_uring_->registerEventfd();
   // We only care about the read event of Eventfd, since we only receive the
   // event here.
@@ -104,7 +131,8 @@ IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, Event::FileReadyCb
                                                   bool enable_close_event) {
   ENVOY_LOG(trace, "add server socket, fd = {}", fd);
   std::unique_ptr<IoUringServerSocket> socket = std::make_unique<IoUringServerSocket>(
-      fd, *this, std::move(cb), write_timeout_ms_, enable_close_event);
+      fd, *this, std::move(cb), write_timeout_ms_, write_high_watermark_bytes_,
+      write_low_watermark_bytes_, enable_close_event);
   socket->enableRead();
   return addSocket(std::move(socket));
 }
@@ -113,7 +141,8 @@ IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, Buffer::Instance& 
                                                   Event::FileReadyCb cb, bool enable_close_event) {
   ENVOY_LOG(trace, "add server socket through existing socket, fd = {}", fd);
   std::unique_ptr<IoUringServerSocket> socket = std::make_unique<IoUringServerSocket>(
-      fd, read_buf, *this, std::move(cb), write_timeout_ms_, enable_close_event);
+      fd, read_buf, *this, std::move(cb), write_timeout_ms_, write_high_watermark_bytes_,
+      write_low_watermark_bytes_, enable_close_event);
   socket->enableRead();
   return addSocket(std::move(socket));
 }
@@ -123,7 +152,8 @@ IoUringSocket& IoUringWorkerImpl::addClientSocket(os_fd_t fd, Event::FileReadyCb
   ENVOY_LOG(trace, "add client socket, fd = {}", fd);
   // The client socket should not be read enabled until it is connected.
   std::unique_ptr<IoUringClientSocket> socket = std::make_unique<IoUringClientSocket>(
-      fd, *this, std::move(cb), write_timeout_ms_, enable_close_event);
+      fd, *this, std::move(cb), write_timeout_ms_, write_high_watermark_bytes_,
+      write_low_watermark_bytes_, enable_close_event);
   return addSocket(std::move(socket));
 }
 
@@ -153,16 +183,36 @@ IoUringWorkerImpl::submitConnectRequest(IoUringSocket& socket,
 }
 
 Request* IoUringWorkerImpl::submitReadRequest(IoUringSocket& socket) {
-  ReadRequest* req = new ReadRequest(socket, read_buffer_size_);
+  return submitReadRequest(socket, read_buffer_size_);
+}
+
+Request* IoUringWorkerImpl::submitReadRequest(IoUringSocket& socket, uint32_t read_size) {
+  ReadRequest* req = new ReadRequest(socket, read_size);
 
   ENVOY_LOG(trace, "submit read request, fd = {}, read req = {}", socket.fd(), fmt::ptr(req));
 
-  auto res = io_uring_->prepareReadv(socket.fd(), req->iov_.get(), 1, 0, req);
+  auto res = io_uring_->prepareReadv(socket.fd(), &req->iov_, 1, 0, req);
   if (res == IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
-    res = io_uring_->prepareReadv(socket.fd(), req->iov_.get(), 1, 0, req);
+    res = io_uring_->prepareReadv(socket.fd(), &req->iov_, 1, 0, req);
     RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare readv");
+  }
+  submit();
+  return req;
+}
+
+Request* IoUringWorkerImpl::submitReadMultishotRequest(IoUringSocket& socket) {
+  Request* req = new Request(Request::RequestType::Read, socket);
+
+  ENVOY_LOG(trace, "submit read multishot request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
+
+  auto res = io_uring_->prepareReadMultishot(socket.fd(), req);
+  if (res == IoUringResult::Failed) {
+    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+    submit();
+    res = io_uring_->prepareReadMultishot(socket.fd(), req);
+    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare read multishot");
   }
   submit();
   return req;
@@ -174,11 +224,11 @@ Request* IoUringWorkerImpl::submitWriteRequest(IoUringSocket& socket,
 
   ENVOY_LOG(trace, "submit write request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
 
-  auto res = io_uring_->prepareWritev(socket.fd(), req->iov_.get(), slices.size(), 0, req);
+  auto res = io_uring_->prepareWritev(socket.fd(), req->iov_.data(), slices.size(), 0, req);
   if (res == IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
-    res = io_uring_->prepareWritev(socket.fd(), req->iov_.get(), slices.size(), 0, req);
+    res = io_uring_->prepareWritev(socket.fd(), req->iov_.data(), slices.size(), 0, req);
     RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare writev");
   }
   submit();
@@ -229,7 +279,7 @@ Request* IoUringWorkerImpl::submitShutdownRequest(IoUringSocket& socket, int how
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
     res = io_uring_->prepareShutdown(socket.fd(), how, req);
-    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare cancel");
+    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare shutdown");
   }
   submit();
   return req;
@@ -294,10 +344,22 @@ void IoUringWorkerImpl::onFileEvent() {
       break;
     }
 
-    delete req;
+    // A `multishot` request is reused by the kernel across completions, so keep it alive until the
+    // kernel signals it will deliver no more completions for it.
+    if (!req->moreCompletions()) {
+      delete req;
+    }
   });
   delay_submit_ = false;
   submit();
+
+  // forEveryCompletion reaps a bounded batch, so a burst that exceeds it (for example many
+  // `multishot` completions) leaves entries in the completion queue. The eventfd is edge-triggered
+  // and already drained, so re-arm the read event to reap the rest on the next loop iteration
+  // instead of stranding it until the next completion arrives.
+  if (io_uring_->hasReadyCompletions()) {
+    file_event_->activate(Event::FileReadyType::Read);
+  }
 }
 
 void IoUringWorkerImpl::submit() {
@@ -308,15 +370,22 @@ void IoUringWorkerImpl::submit() {
 
 IoUringServerSocket::IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent,
                                          Event::FileReadyCb cb, uint32_t write_timeout_ms,
+                                         uint32_t write_high_watermark_bytes,
+                                         uint32_t write_low_watermark_bytes,
                                          bool enable_close_event)
     : IoUringSocketEntry(fd, parent, std::move(cb), enable_close_event),
-      write_timeout_ms_(write_timeout_ms) {}
+      write_timeout_ms_(write_timeout_ms), write_high_watermark_bytes_(write_high_watermark_bytes),
+      write_low_watermark_bytes_(write_low_watermark_bytes) {}
 
 IoUringServerSocket::IoUringServerSocket(os_fd_t fd, Buffer::Instance& read_buf,
                                          IoUringWorkerImpl& parent, Event::FileReadyCb cb,
-                                         uint32_t write_timeout_ms, bool enable_close_event)
+                                         uint32_t write_timeout_ms,
+                                         uint32_t write_high_watermark_bytes,
+                                         uint32_t write_low_watermark_bytes,
+                                         bool enable_close_event)
     : IoUringSocketEntry(fd, parent, std::move(cb), enable_close_event),
-      write_timeout_ms_(write_timeout_ms) {
+      write_timeout_ms_(write_timeout_ms), write_high_watermark_bytes_(write_high_watermark_bytes),
+      write_low_watermark_bytes_(write_low_watermark_bytes) {
   read_buf_.move(read_buf);
 }
 
@@ -378,11 +447,18 @@ void IoUringServerSocket::write(Buffer::Instance& data) {
   ENVOY_LOG(trace, "write, buffer size = {}, fd = {}", data.length(), fd_);
   ASSERT(!shutdown_.has_value());
 
+  // Apply backpressure by keeping the data in the handler when the write buffer is above the high
+  // watermark. The handler retries after a write event is delivered once the buffer drains.
+  if (above_write_high_watermark_) {
+    return;
+  }
+
   // We need to reset the drain trackers, since the write and close is async in
   // the iouring. When the write is actually finished the above layer may already
   // release the drain trackers.
   write_buf_.move(data, data.length(), true);
 
+  checkWriteWatermarks();
   submitWriteOrShutdownRequest();
 }
 
@@ -390,12 +466,17 @@ uint64_t IoUringServerSocket::write(const Buffer::RawSlice* slices, uint64_t num
   ENVOY_LOG(trace, "write, num_slices = {}, fd = {}", num_slice, fd_);
   ASSERT(!shutdown_.has_value());
 
+  if (above_write_high_watermark_) {
+    return 0;
+  }
+
   uint64_t bytes_written = 0;
   for (uint64_t i = 0; i < num_slice; i++) {
     write_buf_.add(slices[i].mem_, slices[i].len_);
     bytes_written += slices[i].len_;
   }
 
+  checkWriteWatermarks();
   submitWriteOrShutdownRequest();
   return bytes_written;
 }
@@ -429,6 +510,24 @@ void IoUringServerSocket::onCancel(Request* req, int32_t result, bool injected) 
 }
 
 void IoUringServerSocket::moveReadDataToBuffer(Request* req, size_t data_length) {
+  // A `multishot` read delivers data in a provided buffer. Wrap it as a fragment that releases the
+  // buffer to the pool once drained. The captured pool keeps the buffer memory alive even after the
+  // io_uring is gone, at which point releasing a buffer is a safe no-op.
+  if (read_is_multishot_) {
+    const int32_t buffer_id = req->bufferId();
+    if (!multishotBufferIdValid(buffer_id)) {
+      return;
+    }
+    const IoUringBufferPoolSharedPtr& pool = parent_.bufferPool();
+    Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
+        pool->getBuffer(buffer_id), data_length,
+        [pool](const void* data, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
+          pool->releaseBuffer(data);
+          delete this_fragment;
+        });
+    read_buf_.addBufferFragment(*fragment);
+    return;
+  }
   ReadRequest* read_req = static_cast<ReadRequest*>(req);
   Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
       read_req->buf_.release(), data_length,
@@ -457,14 +556,31 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
             "onRead with result {}, fd = {}, injected = {}, status_ = {}, enable_close_event = {}",
             result, fd_, injected, static_cast<int>(status_), enable_close_event_);
   if (!injected) {
-    read_req_ = nullptr;
+    // A `multishot` read stays armed across completions, so only release the request once the
+    // kernel signals it will deliver no more completions for it.
+    if (!read_is_multishot_ || !req->moreCompletions()) {
+      read_req_ = nullptr;
+    }
     // If the socket is going to close, discard all results.
     if (status_ == Closed && write_or_shutdown_req_ == nullptr && read_cancel_req_ == nullptr &&
         write_or_shutdown_cancel_req_ == nullptr) {
-      if (result > 0 && keep_fd_open_) {
-        moveReadDataToBuffer(req, result);
+      if (result > 0) {
+        if (keep_fd_open_) {
+          moveReadDataToBuffer(req, result);
+        } else if (read_is_multishot_) {
+          // The data is dropped while closing, but the provided buffer must still be released to
+          // the ring so the pool is not depleted.
+          const int32_t buffer_id = req->bufferId();
+          if (multishotBufferIdValid(buffer_id)) {
+            const IoUringBufferPoolSharedPtr& pool = parent_.bufferPool();
+            pool->releaseBuffer(pool->getBuffer(buffer_id));
+          }
+        }
       }
-      closeInternal();
+      // Wait for an armed `multishot` read to finish before closing.
+      if (read_req_ == nullptr) {
+        closeInternal();
+      }
       return;
     }
   }
@@ -472,10 +588,28 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
   // Move read data from request to buffer or store the error.
   if (result > 0) {
     moveReadDataToBuffer(req, result);
-  } else {
-    if (result != -ECANCELED) {
-      read_error_ = result;
+    // Adaptive read sizing for the readv path. Grow the next read when the buffer is filled and
+    // reset it to the base size otherwise, so large transfers use fewer reads while small responses
+    // stay small. `Multishot` reads use fixed-size provided buffers and skip this.
+    if (!injected && !read_is_multishot_) {
+      const uint32_t base_read_size = parent_.readBufferSize();
+      if (static_cast<uint32_t>(result) >= next_read_size_) {
+        next_read_size_ =
+            std::min(next_read_size_ * 2, base_read_size * MaxReadBufferSizeMultiplier);
+      } else {
+        next_read_size_ = base_read_size;
+      }
     }
+  } else if (result == -ENOBUFS) {
+    // The provided buffer pool is exhausted, which ends the `multishot` read. Fall back to a readv
+    // for the next read so progress continues until buffers are recycled.
+    multishot_fallback_ = true;
+  } else if (read_is_multishot_ && (result == -EINVAL || result == -EOPNOTSUPP)) {
+    // The kernel registered the provided buffer ring but does not support `multishot` recv, which
+    // needs Linux 6.0. Disable `multishot` for this socket and use readv from now on.
+    multishot_disabled_ = true;
+  } else if (result != -ECANCELED) {
+    read_error_ = result;
   }
 
   // Discard calling back since the socket is not ready or closed.
@@ -580,9 +714,13 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
   if (result > 0) {
     write_buf_.drain(result);
     ENVOY_LOG(trace, "drain write buf, drain size = {}, fd = {}", result, fd_);
+    checkWriteWatermarks();
   } else {
     // Drain all write buf since the write failed.
     write_buf_.drain(write_buf_.length());
+    // The write buffer is empty now, so clear backpressure to avoid a stuck write if the socket
+    // lingers before close.
+    above_write_high_watermark_ = false;
     if (!shutdown_.has_value() && status_ != Closed) {
       status_ = RemoteClosed;
       if (result == -EPIPE) {
@@ -610,7 +748,18 @@ void IoUringServerSocket::onShutdown(Request* req, int32_t result, bool injected
 void IoUringServerSocket::closeInternal() {
   if (keep_fd_open_) {
     if (on_closed_cb_) {
-      on_closed_cb_(read_buf_);
+      // The fd is handed to another worker thread. `Multishot` reads leave provided buffer
+      // fragments in the read buffer that are bound to this worker's ring, so copy the data into
+      // owned memory and drain the read buffer here so those buffers return to the ring on this
+      // thread right away.
+      if (parent_.isMultishotEnabled() && read_buf_.length() > 0) {
+        Buffer::OwnedImpl owned_data;
+        owned_data.add(read_buf_);
+        read_buf_.drain(read_buf_.length());
+        on_closed_cb_(owned_data);
+      } else {
+        on_closed_cb_(read_buf_);
+      }
     }
     cleanup();
     return;
@@ -621,9 +770,23 @@ void IoUringServerSocket::closeInternal() {
 }
 
 void IoUringServerSocket::submitReadRequest() {
-  if (!read_req_) {
-    read_req_ = parent_.submitReadRequest(*this);
+  if (read_req_) {
+    return;
   }
+  // Prefer a `multishot` read when available so the kernel keeps delivering data without a new
+  // submission per read. After a buffer pool exhaustion fall back to a single readv, then re-arm
+  // `multishot` on the following read.
+  if (parent_.isMultishotEnabled() && !multishot_fallback_ && !multishot_disabled_) {
+    read_is_multishot_ = true;
+    read_req_ = parent_.submitReadMultishotRequest(*this);
+    return;
+  }
+  multishot_fallback_ = false;
+  read_is_multishot_ = false;
+  if (next_read_size_ == 0) {
+    next_read_size_ = parent_.readBufferSize();
+  }
+  read_req_ = parent_.submitReadRequest(*this, next_read_size_);
 }
 
 void IoUringServerSocket::submitWriteOrShutdownRequest() {
@@ -642,10 +805,29 @@ void IoUringServerSocket::submitWriteOrShutdownRequest() {
   }
 }
 
+void IoUringServerSocket::checkWriteWatermarks() {
+  if (!above_write_high_watermark_ && write_buf_.length() > write_high_watermark_bytes_) {
+    above_write_high_watermark_ = true;
+    ENVOY_LOG(trace, "write buffer above high watermark, fd = {}, size = {}", fd_,
+              write_buf_.length());
+  } else if (above_write_high_watermark_ && write_buf_.length() <= write_low_watermark_bytes_) {
+    above_write_high_watermark_ = false;
+    ENVOY_LOG(trace, "write buffer below low watermark, fd = {}, size = {}", fd_,
+              write_buf_.length());
+    // Inject a write event so the handler resumes writing the data it kept while `backpressured`.
+    if (!shutdown_.has_value() && status_ != Closed) {
+      injectCompletion(Request::RequestType::Write);
+    }
+  }
+}
+
 IoUringClientSocket::IoUringClientSocket(os_fd_t fd, IoUringWorkerImpl& parent,
                                          Event::FileReadyCb cb, uint32_t write_timeout_ms,
+                                         uint32_t write_high_watermark_bytes,
+                                         uint32_t write_low_watermark_bytes,
                                          bool enable_close_event)
-    : IoUringServerSocket(fd, parent, cb, write_timeout_ms, enable_close_event) {}
+    : IoUringServerSocket(fd, parent, cb, write_timeout_ms, write_high_watermark_bytes,
+                          write_low_watermark_bytes, enable_close_event) {}
 
 void IoUringClientSocket::connect(const Network::Address::InstanceConstSharedPtr& address) {
   // Reuse read request since there is no read on connecting and connect is cancellable.

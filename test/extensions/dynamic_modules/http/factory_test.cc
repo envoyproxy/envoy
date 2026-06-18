@@ -1,6 +1,5 @@
 #include "envoy/extensions/filters/http/dynamic_modules/v3/dynamic_modules.pb.h"
 
-#include "source/common/stats/utility.h"
 #include "source/extensions/filters/http/dynamic_modules/factory.h"
 
 #include "test/extensions/dynamic_modules/util.h"
@@ -11,20 +10,6 @@ namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 namespace HttpFilters {
-
-namespace {
-
-// Reads the value of a ``dynamic_modules.<leaf>`` failure counter tagged with the given filter
-// name.
-uint64_t failureCounter(Stats::Scope& scope, absl::string_view leaf, absl::string_view filter) {
-  Stats::StatNameDynamicPool pool(scope.symbolTable());
-  Stats::StatNameTagVector tags{{pool.add("config_name"), pool.add(filter)}};
-  return Stats::Utility::counterFromElements(
-             scope, {Stats::DynamicName("dynamic_modules"), Stats::DynamicName(leaf)}, tags)
-      .value();
-}
-
-} // namespace
 
 TEST(DynamicModuleConfigFactory, Overrides) {
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;

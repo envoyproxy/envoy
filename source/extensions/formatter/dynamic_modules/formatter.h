@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/formatter/substitution_formatter_base.h"
+#include "envoy/formatter/substitution_formatter.h"
 
 #include "source/common/common/statusor.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"

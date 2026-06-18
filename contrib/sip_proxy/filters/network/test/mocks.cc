@@ -1,6 +1,7 @@
 #include "contrib/sip_proxy/filters/network/test/mocks.h"
 
 #include <memory>
+#include <optional>
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -99,7 +100,7 @@ MockTrafficRoutingAssistantHandler::MockTrafficRoutingAssistantHandler(
     : TrafficRoutingAssistantHandler(parent, dispatcher, config, context, stream_info) {
   ON_CALL(*this, retrieveTrafficRoutingAssistant(_, _, _, _, _))
       .WillByDefault(
-          Invoke([&](const std::string&, const std::string&, const absl::optional<TraContextMap>,
+          Invoke([&](const std::string&, const std::string&, const std::optional<TraContextMap>,
                      SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
             host = "10.0.0.11";
             return QueryStatus::Continue;

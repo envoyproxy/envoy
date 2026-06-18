@@ -4,6 +4,7 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter_config.h"
 
@@ -20,11 +21,12 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
   const auto& proto_config = MessageUtil::downcastAndValidate<const ListenerFilterConfig&>(
       message, context.messageValidationVisitor());
 
+  Server::Configuration::ServerFactoryContext& server_context = context.serverFactoryContext();
   const auto& module_config = proto_config.dynamic_module_config();
   // Listener filters do not support remote module sources, so no init manager or async callback is
   // passed; only the synchronous local-file and by-name paths can succeed here.
   auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
-      module_config, proto_config.filter_name(), context.serverFactoryContext());
+      module_config, proto_config.filter_name(), server_context);
   if (!load_result.ok()) {
     throw EnvoyException(std::string(load_result.status().message()));
   }
@@ -34,6 +36,9 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
   if (proto_config.has_filter_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.filter_config());
     if (!config_or_error.ok()) {
+      Extensions::DynamicModules::incrementLoadFailure(
+          server_context, proto_config.filter_name(),
+          Extensions::DynamicModules::ConfigInitErrorStat);
       throw EnvoyException("Failed to parse filter config: " +
                            std::string(config_or_error.status().message()));
     }
@@ -49,10 +54,13 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
   auto filter_config =
       Extensions::DynamicModules::ListenerFilters::newDynamicModuleListenerFilterConfig(
           proto_config.filter_name(), filter_config_str, metrics_namespace,
-          std::move(dynamic_module), context.serverFactoryContext().clusterManager(),
-          context.listenerScope(), context.serverFactoryContext().mainThreadDispatcher());
+          std::move(dynamic_module), server_context.clusterManager(), context.listenerScope(),
+          server_context.mainThreadDispatcher());
 
   if (!filter_config.ok()) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        server_context, proto_config.filter_name(),
+        Extensions::DynamicModules::ConfigInitErrorStat);
     throw EnvoyException("Failed to create filter config: " +
                          std::string(filter_config.status().message()));
   }
@@ -62,8 +70,7 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
   // is added. This is the legacy behavior for backward compatibility.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
-    context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
-        metrics_namespace);
+    server_context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
   }
 
   return [filter_cfg = filter_config.value(),

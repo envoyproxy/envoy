@@ -50,6 +50,12 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "stats_callbacks" => {
       let config = String::from_utf8(config.to_owned()).unwrap();
       let mut config_iter = config.split(',');
+      // Emit a metric directly from the config context (no per-stream filter), exercising the
+      // config-scoped emission path. This would typically be done from a scheduled background task.
+      let config_total = envoy_filter_config.define_counter("config_total").unwrap();
+      envoy_filter_config
+        .increment_counter(config_total, 1)
+        .unwrap();
       Some(Box::new(StatsCallbacksFilterConfig {
         requests_total: envoy_filter_config
           .define_counter("requests_total")

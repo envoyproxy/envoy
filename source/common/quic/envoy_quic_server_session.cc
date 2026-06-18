@@ -237,6 +237,11 @@ quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() const {
                                         position_->filter_chain_.transportSocketFactory())
                                         .earlyDataEnabled()
                                   : true;
+  config.disable_ticket_support = position_.has_value()
+                                      ? !dynamic_cast<const QuicServerTransportSocketFactory&>(
+                                             position_->filter_chain_.transportSocketFactory())
+                                             .resumptionEnabled()
+                                      : false;
   return config;
 }
 
