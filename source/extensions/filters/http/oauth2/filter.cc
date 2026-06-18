@@ -56,10 +56,8 @@ constexpr const char* CookieDeleteFormatString =
 constexpr const char* CookieTailHttpOnlyFormatString = ";path={};Max-Age={};secure;HttpOnly{}";
 constexpr const char* CookieDomainFormatString = ";domain={}";
 
-constexpr const char* OIDCLogoutUrlBaseFormatString =
-    "{0}?id_token_hint={1}&client_id={2}";
-constexpr const char* OIDCLogoutUrlPostLogoutRedirectFormatString =
-    "&post_logout_redirect_uri={0}";
+constexpr const char* OIDCLogoutUrlBaseFormatString = "{0}?id_token_hint={1}&client_id={2}";
+constexpr const char* OIDCLogoutUrlPostLogoutRedirectFormatString = "&post_logout_redirect_uri={0}";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 constexpr absl::string_view ServiceUnavailableBodyMessage = "Service Unavailable";
@@ -1181,9 +1179,9 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   if (!config_->endSessionEndpoint().empty()) {
     const std::string id_token =
         Http::Utility::parseCookieValue(headers, config_->cookieNames().id_token_);
-    std::string oidc_logout_url = fmt::format(OIDCLogoutUrlBaseFormatString,
-                                              config_->endSessionEndpoint(), id_token,
-                                              config_->clientId());
+    std::string oidc_logout_url =
+        fmt::format(OIDCLogoutUrlBaseFormatString, config_->endSessionEndpoint(), id_token,
+                    config_->clientId());
 
     if (!config_->disablePostLogoutRedirectUri()) {
       std::string redirect_uri;
