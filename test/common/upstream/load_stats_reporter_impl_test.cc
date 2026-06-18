@@ -34,9 +34,7 @@ namespace {
 
 class LoadStatsReporterImplTest : public testing::Test {
 public:
-  void SetUp() override {
-    start_time_ = time_system_.monotonicTime();
-  }
+  void SetUp() override { start_time_ = time_system_.monotonicTime(); }
 
   LoadStatsReporterImplTest()
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),

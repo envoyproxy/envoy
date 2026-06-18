@@ -162,6 +162,7 @@ typed_config:
 
     // Load the CDS cluster and wait for it to initialize.
     cds_helper_.setCds({dynamic_cluster_});
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.getaddrinfo_no_ai_flags", "true");
     BaseIntegrationTest::initialize();
     test_server_->waitForCounter("cluster_manager.cluster_added", Eq(2));
     test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));

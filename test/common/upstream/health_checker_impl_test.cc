@@ -1584,7 +1584,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckSetsCorrectLastHcPassTime) 
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillRepeatedly(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
-      enableTimer(std::chrono::milliseconds(45000), _));
+              enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   absl::optional<std::string> health_checked_cluster("locations-production-iad");
   respond(0, "200", false, false, true, false, health_checked_cluster);

@@ -71,9 +71,7 @@ public:
 
 class OutlierDetectorImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
-  void SetUp() override {
-    start_time_ = time_system_.monotonicTime();
-  }
+  void SetUp() override { start_time_ = time_system_.monotonicTime(); }
 
   OutlierDetectorImplTest()
       : outlier_detection_ejections_active_(cluster_.info_->stats_store_.gauge(

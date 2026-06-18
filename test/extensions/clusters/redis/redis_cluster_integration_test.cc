@@ -153,6 +153,7 @@ public:
     setUpstreamCount(num_upstreams_);
     setDeterministicValue();
     config_helper_.renameListener("redis_proxy");
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.getaddrinfo_no_ai_flags", "true");
 
     // Change the port for each of the discovery host in cluster_0.
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -281,7 +282,7 @@ protected:
     std::string proxied_cluster_slot_request;
 
     FakeRawConnectionPtr fake_upstream_connection_;
-    EXPECT_TRUE(fake_upstreams_[stream_index]->waitForRawConnection(fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstreams_[stream_index]->waitForRawConnection(fake_upstream_connection_));
     if (auth_password.empty()) {
       EXPECT_TRUE(fake_upstream_connection_->waitForData(cluster_slot_request.size(),
                                                          &proxied_cluster_slot_request));

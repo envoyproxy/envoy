@@ -863,6 +863,13 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
   }
   return runOnDispatcherThreadAndWait([&]() {
     absl::MutexLock lock(lock_);
+    if (new_connections_.empty()) {
+      return AssertionFailure() << "No connections available.";
+    }
+    if (!new_connections_.front()->connected()) {
+      consumeConnection(/*defer_read_enable=*/true);
+      return AssertionFailure() << "Connection disconnected before it could be consumed.";
+    }
     connection = std::make_unique<FakeHttpConnection>(
         *this, consumeConnection(/*defer_read_enable=*/true), http_type_, time_system_,
         config_.max_request_headers_kb_, config_.max_request_headers_count_,
@@ -900,8 +907,15 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
         }
       }
 
-      EXPECT_TRUE(upstream.runOnDispatcherThreadAndWait([&]() {
+      AssertionResult result = upstream.runOnDispatcherThreadAndWait([&]() {
         absl::MutexLock lock(upstream.lock_);
+        if (upstream.new_connections_.empty()) {
+          return AssertionFailure() << "No connections available.";
+        }
+        if (!upstream.new_connections_.front()->connected()) {
+          upstream.consumeConnection(/*defer_read_enable=*/true);
+          return AssertionFailure() << "Connection disconnected before it could be consumed.";
+        }
         connection = std::make_unique<FakeHttpConnection>(
             upstream, upstream.consumeConnection(/*defer_read_enable=*/true), upstream.http_type_,
             upstream.timeSystem(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
@@ -910,8 +924,11 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                 !upstream.disable_and_do_not_enable_);
         connection->initialize();
         return AssertionSuccess();
-      }));
-      return i;
+      });
+      EXPECT_TRUE(result);
+      if (result) {
+        return i;
+      }
     }
   }
   return absl::InternalError("Timed out waiting for HTTP connection.");
@@ -954,6 +971,13 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
 
   return runOnDispatcherThreadAndWait([&]() {
     absl::MutexLock lock(lock_);
+    if (new_connections_.empty()) {
+      return AssertionFailure() << "No connections available.";
+    }
+    if (!new_connections_.front()->connected()) {
+      consumeConnection(/*defer_read_enable=*/true);
+      return AssertionFailure() << "Connection disconnected before it could be consumed.";
+    }
     connection = makeRawConnection(consumeConnection(), timeSystem());
     connection->initialize();
     // Skip enableHalfClose if the connection is already disconnected.

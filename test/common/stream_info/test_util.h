@@ -31,8 +31,6 @@ public:
     setUpstreamInfo(std::make_shared<Envoy::StreamInfo::UpstreamInfoImpl>());
   }
 
-
-
   const Network::ConnectionInfoSetter& downstreamAddressProvider() const override {
     return *downstream_connection_info_provider_;
   }

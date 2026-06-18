@@ -1012,6 +1012,7 @@ void RedisProxyIntegrationTest::initialize() {
   setUpstreamCount(num_upstreams_);
   setDeterministicValue();
   config_helper_.renameListener("redis_proxy");
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.getaddrinfo_no_ai_flags", "true");
   BaseIntegrationTest::initialize();
 }
 
@@ -1184,7 +1185,7 @@ void RedisProxyWithRedirectionIntegrationTest::simpleRedirection(
   EXPECT_TRUE(fake_upstream_connection_1->write(redirection_response));
   // The proxy should initiate a new connection to the fake redis server, target_server, in
   // response.
-  EXPECT_TRUE(target_server->waitForRawConnection(fake_upstream_connection_2));
+  ASSERT_TRUE(target_server->waitForRawConnection(fake_upstream_connection_2));
 
   if (asking) {
     // The server, target_server, should receive an "asking" command before the original request.

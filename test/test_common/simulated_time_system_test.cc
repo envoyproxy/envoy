@@ -1,3 +1,5 @@
+#include <future>
+
 #include "source/common/common/thread.h"
 #include "source/common/event/libevent.h"
 #include "source/common/event/libevent_scheduler.h"
@@ -9,7 +11,6 @@
 
 #include "event2/event.h"
 #include "gtest/gtest.h"
-#include <future>
 
 namespace Envoy {
 namespace Event {

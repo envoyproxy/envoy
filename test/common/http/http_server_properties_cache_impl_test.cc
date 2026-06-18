@@ -94,12 +94,13 @@ TEST_P(HttpServerPropertiesCacheImplTest, SetAlternativesThenSrtt) {
   initialize();
   EXPECT_EQ(0, protocols_->size());
   EXPECT_EQ(std::chrono::microseconds(0), protocols_->getSrtt(origin1_, false));
-  auto ma1 = std::chrono::duration_cast<std::chrono::seconds>(expiration1_.time_since_epoch()).count();
-  EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1", absl::StrCat("alpn1=\"hostname1:1\"; ma=", ma1, "|0|0"), kNoTtl));
+  auto ma1 =
+      std::chrono::duration_cast<std::chrono::seconds>(expiration1_.time_since_epoch()).count();
+  EXPECT_CALL_WHEN_STORE_VALID(addOrUpdate(
+      "https://hostname1:1", absl::StrCat("alpn1=\"hostname1:1\"; ma=", ma1, "|0|0"), kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
-  EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1", absl::StrCat("alpn1=\"hostname1:1\"; ma=", ma1, "|5|0"), kNoTtl));
+  EXPECT_CALL_WHEN_STORE_VALID(addOrUpdate(
+      "https://hostname1:1", absl::StrCat("alpn1=\"hostname1:1\"; ma=", ma1, "|5|0"), kNoTtl));
   protocols_->setSrtt(origin1_, std::chrono::microseconds(5));
   EXPECT_EQ(1, protocols_->size());
   EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_, false));
@@ -112,9 +113,10 @@ TEST_P(HttpServerPropertiesCacheImplTest, SetSrttThenAlternatives) {
   protocols_->setSrtt(origin1_, std::chrono::microseconds(5));
   EXPECT_EQ(1, protocols_->size());
   EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_, false));
-  auto ma1 = std::chrono::duration_cast<std::chrono::seconds>(expiration1_.time_since_epoch()).count();
-  EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1", absl::StrCat("alpn1=\"hostname1:1\"; ma=", ma1, "|5|0"), kNoTtl));
+  auto ma1 =
+      std::chrono::duration_cast<std::chrono::seconds>(expiration1_.time_since_epoch()).count();
+  EXPECT_CALL_WHEN_STORE_VALID(addOrUpdate(
+      "https://hostname1:1", absl::StrCat("alpn1=\"hostname1:1\"; ma=", ma1, "|5|0"), kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
   EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_, false));
 }
@@ -129,9 +131,10 @@ TEST_P(HttpServerPropertiesCacheImplTest, SetConcurrency) {
 
 TEST_P(HttpServerPropertiesCacheImplTest, FindAlternatives) {
   initialize();
-  auto ma1 = std::chrono::duration_cast<std::chrono::seconds>(expiration1_.time_since_epoch()).count();
-  EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1", absl::StrCat("alpn1=\"hostname1:1\"; ma=", ma1, "|0|0"), kNoTtl));
+  auto ma1 =
+      std::chrono::duration_cast<std::chrono::seconds>(expiration1_.time_since_epoch()).count();
+  EXPECT_CALL_WHEN_STORE_VALID(addOrUpdate(
+      "https://hostname1:1", absl::StrCat("alpn1=\"hostname1:1\"; ma=", ma1, "|0|0"), kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
   OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
@@ -141,13 +144,15 @@ TEST_P(HttpServerPropertiesCacheImplTest, FindAlternatives) {
 
 TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesAfterReplacement) {
   initialize();
-  auto ma1 = std::chrono::duration_cast<std::chrono::seconds>(expiration1_.time_since_epoch()).count();
-  auto ma2 = std::chrono::duration_cast<std::chrono::seconds>(expiration2_.time_since_epoch()).count();
-  EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1", absl::StrCat("alpn1=\"hostname1:1\"; ma=", ma1, "|0|0"), kNoTtl));
+  auto ma1 =
+      std::chrono::duration_cast<std::chrono::seconds>(expiration1_.time_since_epoch()).count();
+  auto ma2 =
+      std::chrono::duration_cast<std::chrono::seconds>(expiration2_.time_since_epoch()).count();
+  EXPECT_CALL_WHEN_STORE_VALID(addOrUpdate(
+      "https://hostname1:1", absl::StrCat("alpn1=\"hostname1:1\"; ma=", ma1, "|0|0"), kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
-  EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1", absl::StrCat("alpn2=\"hostname2:2\"; ma=", ma2, "|0|0"), kNoTtl));
+  EXPECT_CALL_WHEN_STORE_VALID(addOrUpdate(
+      "https://hostname1:1", absl::StrCat("alpn2=\"hostname2:2\"; ma=", ma2, "|0|0"), kNoTtl));
   protocols_->setAlternatives(origin1_, protocols2_);
   OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
@@ -158,13 +163,15 @@ TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesAfterReplacement) {
 
 TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesForMultipleOrigins) {
   initialize();
-  auto ma1 = std::chrono::duration_cast<std::chrono::seconds>(expiration1_.time_since_epoch()).count();
-  auto ma2 = std::chrono::duration_cast<std::chrono::seconds>(expiration2_.time_since_epoch()).count();
-  EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1", absl::StrCat("alpn1=\"hostname1:1\"; ma=", ma1, "|0|0"), kNoTtl));
+  auto ma1 =
+      std::chrono::duration_cast<std::chrono::seconds>(expiration1_.time_since_epoch()).count();
+  auto ma2 =
+      std::chrono::duration_cast<std::chrono::seconds>(expiration2_.time_since_epoch()).count();
+  EXPECT_CALL_WHEN_STORE_VALID(addOrUpdate(
+      "https://hostname1:1", absl::StrCat("alpn1=\"hostname1:1\"; ma=", ma1, "|0|0"), kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
-  EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname2:2", absl::StrCat("alpn2=\"hostname2:2\"; ma=", ma2, "|0|0"), kNoTtl));
+  EXPECT_CALL_WHEN_STORE_VALID(addOrUpdate(
+      "https://hostname2:2", absl::StrCat("alpn2=\"hostname2:2\"; ma=", ma2, "|0|0"), kNoTtl));
   protocols_->setAlternatives(origin2_, protocols2_);
   OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
@@ -177,9 +184,10 @@ TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesForMultipleOrigins) {
 
 TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesAfterExpiration) {
   initialize();
-  auto ma1 = std::chrono::duration_cast<std::chrono::seconds>(expiration1_.time_since_epoch()).count();
-  EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1", absl::StrCat("alpn1=\"hostname1:1\"; ma=", ma1, "|0|0"), kNoTtl));
+  auto ma1 =
+      std::chrono::duration_cast<std::chrono::seconds>(expiration1_.time_since_epoch()).count();
+  EXPECT_CALL_WHEN_STORE_VALID(addOrUpdate(
+      "https://hostname1:1", absl::StrCat("alpn1=\"hostname1:1\"; ma=", ma1, "|0|0"), kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
   dispatcher_.globalTimeSystem().advanceTimeWait(Seconds(6));
   EXPECT_CALL_WHEN_STORE_VALID(remove("https://hostname1:1"));
@@ -191,16 +199,19 @@ TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesAfterExpiration) {
 
 TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesAfterPartialExpiration) {
   initialize();
-  auto ma1 = std::chrono::duration_cast<std::chrono::seconds>(expiration1_.time_since_epoch()).count();
-  auto ma2 = std::chrono::duration_cast<std::chrono::seconds>(expiration2_.time_since_epoch()).count();
-  EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1",
-                  absl::StrCat("alpn1=\"hostname1:1\"; ma=", ma1, ",alpn2=\"hostname2:2\"; ma=", ma2, "|0|0"), kNoTtl));
+  auto ma1 =
+      std::chrono::duration_cast<std::chrono::seconds>(expiration1_.time_since_epoch()).count();
+  auto ma2 =
+      std::chrono::duration_cast<std::chrono::seconds>(expiration2_.time_since_epoch()).count();
+  EXPECT_CALL_WHEN_STORE_VALID(addOrUpdate(
+      "https://hostname1:1",
+      absl::StrCat("alpn1=\"hostname1:1\"; ma=", ma1, ",alpn2=\"hostname2:2\"; ma=", ma2, "|0|0"),
+      kNoTtl));
   std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol> both = {protocol1_, protocol2_};
   protocols_->setAlternatives(origin1_, both);
   dispatcher_.globalTimeSystem().advanceTimeWait(Seconds(6));
-  EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1", absl::StrCat("alpn2=\"hostname2:2\"; ma=", ma2, "|0|0"), kNoTtl));
+  EXPECT_CALL_WHEN_STORE_VALID(addOrUpdate(
+      "https://hostname1:1", absl::StrCat("alpn2=\"hostname2:2\"; ma=", ma2, "|0|0"), kNoTtl));
   OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
   ASSERT_TRUE(protocols.has_value());
@@ -266,13 +277,15 @@ TEST_P(HttpServerPropertiesCacheImplTest, MaxEntries) {
   initialize();
   EXPECT_EQ(0, protocols_->size());
   const std::string hostname = "hostname";
-  auto ma1 = std::chrono::duration_cast<std::chrono::seconds>(expiration1_.time_since_epoch()).count();
+  auto ma1 =
+      std::chrono::duration_cast<std::chrono::seconds>(expiration1_.time_since_epoch()).count();
   for (uint32_t i = 0; i <= max_entries_; ++i) {
     const HttpServerPropertiesCache::Origin origin = {https_, hostname, i};
     HttpServerPropertiesCache::AlternateProtocol protocol = {alpn1_, hostname, i, expiration1_};
     std::vector<HttpServerPropertiesCache::AlternateProtocol> protocols = {protocol};
-    EXPECT_CALL(*store_, addOrUpdate(absl::StrCat("https://hostname:", i),
-                                     absl::StrCat("alpn1=\"hostname:", i, "\"; ma=", ma1, "|0|0"), kNoTtl));
+    EXPECT_CALL(*store_,
+                addOrUpdate(absl::StrCat("https://hostname:", i),
+                            absl::StrCat("alpn1=\"hostname:", i, "\"; ma=", ma1, "|0|0"), kNoTtl));
     if (i == max_entries_) {
       EXPECT_CALL(*store_, remove("https://hostname:0"));
     }
@@ -285,14 +298,17 @@ TEST_P(HttpServerPropertiesCacheImplTest, ToAndFromString) {
   auto testAltSvc = [&](uint32_t ma1, uint32_t ma2, bool has_second, uint32_t srtt,
                         uint32_t concurrency) -> void {
     auto now_sec = std::chrono::duration_cast<std::chrono::seconds>(
-        dispatcher_.timeSource().monotonicTime().time_since_epoch()).count();
+                       dispatcher_.timeSource().monotonicTime().time_since_epoch())
+                       .count();
     std::string original_alt_svc;
     std::string expected_alt_svc;
     if (has_second) {
-      original_alt_svc = absl::StrCat("h3-29=\":443\"; ma=", now_sec + ma1,
-                                      ",h3=\":443\"; ma=", now_sec + ma2, "|", srtt, "|", concurrency);
+      original_alt_svc =
+          absl::StrCat("h3-29=\":443\"; ma=", now_sec + ma1, ",h3=\":443\"; ma=", now_sec + ma2,
+                       "|", srtt, "|", concurrency);
     } else {
-      original_alt_svc = absl::StrCat("h3-29=\":443\"; ma=", now_sec + ma1, "|", srtt, "|", concurrency);
+      original_alt_svc =
+          absl::StrCat("h3-29=\":443\"; ma=", now_sec + ma1, "|", srtt, "|", concurrency);
     }
     expected_alt_svc = original_alt_svc;
 

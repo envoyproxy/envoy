@@ -17,9 +17,7 @@ auto IsBetween = [](uint64_t min, uint64_t max) {
 };
 
 class ClientTest : public testing::Test {
-  void SetUp() override {
-    start_time_ = time_system_.monotonicTime();
-  }
+  void SetUp() override { start_time_ = time_system_.monotonicTime(); }
 
 protected:
   MonotonicTime start_time_;

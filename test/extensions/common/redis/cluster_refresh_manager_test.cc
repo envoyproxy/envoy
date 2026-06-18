@@ -148,7 +148,10 @@ TEST_F(ClusterRefreshManagerTest, Basic) {
 
   EXPECT_GE(callback_count_, 2);
   EXPECT_EQ(cluster_info->redirects_count_, 0);
-  EXPECT_EQ(cluster_info->last_callback_time_ms_.load(), std::chrono::duration_cast<std::chrono::milliseconds>((start_time_ + std::chrono::seconds(3)).time_since_epoch()).count());
+  EXPECT_EQ(cluster_info->last_callback_time_ms_.load(),
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                (start_time_ + std::chrono::seconds(3)).time_since_epoch())
+                .count());
   EXPECT_EQ(cluster_info->min_time_between_triggering_, std::chrono::milliseconds(1000));
   EXPECT_EQ(cluster_info->redirects_threshold_, 1);
   EXPECT_EQ(cluster_info->failure_threshold_, 1);
@@ -193,7 +196,10 @@ TEST_F(ClusterRefreshManagerTest, BasicFailureEvents) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_GE(callback_count_, 2);
   EXPECT_EQ(cluster_info->failures_count_, 0);
-  EXPECT_EQ(cluster_info->last_callback_time_ms_.load(), std::chrono::duration_cast<std::chrono::milliseconds>((start_time_ + std::chrono::seconds(3)).time_since_epoch()).count());
+  EXPECT_EQ(cluster_info->last_callback_time_ms_.load(),
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                (start_time_ + std::chrono::seconds(3)).time_since_epoch())
+                .count());
   EXPECT_EQ(cluster_info->min_time_between_triggering_, std::chrono::milliseconds(1000));
   EXPECT_EQ(cluster_info->redirects_threshold_, 1);
   EXPECT_EQ(cluster_info->failure_threshold_, 1);
@@ -239,7 +245,10 @@ TEST_F(ClusterRefreshManagerTest, BasicDegradedEvents) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_GE(callback_count_, 2);
   EXPECT_EQ(cluster_info->host_degraded_count_, 0);
-  EXPECT_EQ(cluster_info->last_callback_time_ms_.load(), std::chrono::duration_cast<std::chrono::milliseconds>((start_time_ + std::chrono::seconds(3)).time_since_epoch()).count());
+  EXPECT_EQ(cluster_info->last_callback_time_ms_.load(),
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                (start_time_ + std::chrono::seconds(3)).time_since_epoch())
+                .count());
   EXPECT_EQ(cluster_info->min_time_between_triggering_, std::chrono::milliseconds(1000));
   EXPECT_EQ(cluster_info->redirects_threshold_, 1);
   EXPECT_EQ(cluster_info->failure_threshold_, 1);

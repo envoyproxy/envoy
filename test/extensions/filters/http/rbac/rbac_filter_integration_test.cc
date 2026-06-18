@@ -1728,6 +1728,7 @@ typed_config:
     TestUtility::loadFromYaml(cluster_type_config, *cluster_.mutable_cluster_type());
     // Load the CDS cluster and wait for it to initialize.
     cds_helper_.setCds({cluster_});
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.getaddrinfo_no_ai_flags", "true");
     HttpIntegrationTest::initialize();
     test_server_->waitForCounter("cluster_manager.cluster_added", Eq(1));
     test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));

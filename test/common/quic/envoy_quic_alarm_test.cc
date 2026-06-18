@@ -35,9 +35,7 @@ public:
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         alarm_factory_(*dispatcher_, clock_) {}
 
-  void SetUp() override {
-    start_time_ = clock_.Now();
-  }
+  void SetUp() override { start_time_ = clock_.Now(); }
 
   void advanceMsAndLoop(int64_t delay_ms) {
     time_system_.advanceTimeAndRun(std::chrono::milliseconds(delay_ms), *dispatcher_,
