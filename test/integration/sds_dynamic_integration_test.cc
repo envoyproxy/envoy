@@ -542,13 +542,18 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, EmptyRotation) {
   testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 }
 
-// Validate that key logging keeps working across a key-cert rotation: a
-// connection established before the rotation stays usable (its handshaker
-// pinned the pre-rotation context), and a connection established after the
-// rotation writes key log lines via the new context. Key log lines are only
-// emitted during the handshake, so this is rotation smoke coverage for the
-// pinned context lifetime rather than proof that the old context is used
-// after the swap.
+// Validate that key logging keeps working across key-cert rotations, including
+// a rotation that races a connection's handshake:
+//   - A connection established before a rotation stays usable afterwards (its
+//     handshaker pinned the pre-rotation context).
+//   - A second rotation is kicked off and the next connection is opened
+//     immediately, so its handshake progresses in parallel with the context
+//     swap. The handshaker pins whichever context sslCtx() returns at
+//     construction time; both the pre- and post-rotation contexts are complete
+//     and valid (the swap is atomic under the factory mutex), so the handshake
+//     succeeds and key log lines are written no matter how the two interleave.
+// The test asserts only on those race-independent outcomes (request succeeds,
+// key log grows), so it is deterministic regardless of the interleaving.
 TEST_P(SdsDynamicKeyRotationIntegrationTest, KeyLogRotation) {
   v3_resource_api_ = true;
   configure_keylog_ = true;
@@ -587,12 +592,26 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, KeyLogRotation) {
       waitForAccessLogEntries(keylog_path_, /*client_connection=*/nullptr, /*min_entries=*/1)
           .size());
 
-  // A connection handshaking after the rotation key logs via the new context.
+  // Stage a symlink back to the RSA key/cert. After the first rotation
+  // root/current points at the ECDSA key/cert, so rotating to the RSA key/cert
+  // is a real cert change that triggers another SDS reload rather than a no-op.
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("root/server"),
+                                 TestEnvironment::temporaryPath("root/next"));
+
+  // Trigger the second rotation and immediately open the next connection so its
+  // handshake races the context swap. Either order is valid (see the test
+  // comment), so assert only that the request succeeds and the key log grows.
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("root/next"),
+                              TestEnvironment::temporaryPath("root/current"));
   codec_client_ = makeHttpConnection(makeSslClientConnection());
   sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0,
                                 dataPlaneUpstreamIndex());
   waitForAccessLogEntries(keylog_path_, /*client_connection=*/nullptr,
                           /*min_entries=*/entries_before + 1);
+
+  // Confirm the second rotation eventually applied, so the race above really
+  // exercised an in-flight context swap.
+  waitForSdsUpdateStats(3);
   cleanupUpstreamAndDownstream();
 }
 
