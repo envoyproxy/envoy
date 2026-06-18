@@ -178,6 +178,8 @@ enforcement (in ext_authz), while ensuring the ext_authz filter is only instanti
 
 ExtAuthz Caching
 ----------------
+.. _config_http_filters_ext_authz_caching:
+
 The External Authorization filter supports caching authorization decisions to bypass the external authorization service call.
 
 To enable this, configure the :ref:`cache <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.cache>` field with a cache extension configuration. The extension must implement the ``envoy.filters.http.ext_authz.cache`` interface.

@@ -401,6 +401,7 @@ message ExtAuthz {
 
   // Optional configuration for a cache extension. If specified, the filter will
   // attempt to lookup and populate the cache for authorization requests.
+  // See the :ref:`caching semantics <config_http_filters_ext_authz_caching>` for more details.
   // The extension must implement the "envoy.filters.http.ext_authz.cache" interface.
   config.core.v3.TypedExtensionConfig cache = 33;
 }
