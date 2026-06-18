@@ -87,8 +87,6 @@ AwsRequestSigningFilterFactory::createSigner(
 
   std::string region = config.region();
 
-  envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
-
   // If we have an overriding credential provider configuration, read it here as it may contain
   // references to the region
   envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider credential_file_config = {};

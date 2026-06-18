@@ -30,8 +30,6 @@ public:
   void initialize() override {
     setMaxRequestHeadersKb(60);
     setMaxRequestHeadersCount(100);
-    envoy::config::route::v3::RetryPolicy retry_policy;
-
     auto pass_through = config_helper_.createVirtualHost("pass.through.internal.redirect");
     config_helper_.addVirtualHost(pass_through);
 

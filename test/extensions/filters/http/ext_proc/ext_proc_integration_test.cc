@@ -229,7 +229,6 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithInvalidServer) {
   initializeConfig(config_option);
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
-  ProcessingRequest request_headers_msg;
   // Failure is expected when it is connecting to invalid gRPC server. Therefore, default timeout
   // is not used here.
   EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_,
