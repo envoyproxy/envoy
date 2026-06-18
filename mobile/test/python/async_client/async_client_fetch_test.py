@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import random
 import unittest
 from test.python.echo_test_server import EchoTestServer
 
@@ -16,10 +15,9 @@ class TestAsyncClientFetch(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up an echo test server for the tests to hit."""
-        port = random.randint(2**14, 2**16)
-        cls._echo_server = EchoTestServer("127.0.0.1", port)
+        cls._echo_server = EchoTestServer()
         cls._echo_server.start()
-        cls._echo_server_url = f"http://127.0.0.1:{port}"
+        cls._echo_server_url = f"http://{cls._echo_server.url}"
 
     @classmethod
     def tearDownClass(cls):
@@ -28,7 +26,11 @@ class TestAsyncClientFetch(unittest.TestCase):
 
     def _make_client_builder(self):
         # factory to keep constructor logic consistent without sharing instances
-        builder = EngineBuilder().set_log_level(LogLevel.trace)
+        builder = (
+            EngineBuilder()
+            .set_log_level(LogLevel.info)
+            .add_runtime_guard("getaddrinfo_no_ai_flags", True)
+        )
         return builder
 
     def test_simple_get_request(self):
@@ -107,7 +109,10 @@ class TestAsyncClientFetch(unittest.TestCase):
                     ),
                     client.get(f"{self._echo_server_url}/"),
                 ]
-                responses = await asyncio.gather(*tasks)
+                responses = await asyncio.wait_for(
+                    asyncio.gather(*tasks),
+                    timeout=30,
+                )
 
                 for resp in responses:
                     async with resp:
@@ -222,6 +227,21 @@ class TestAsyncClientFetch(unittest.TestCase):
                         json={"foo": "bar"},
                         data="some data",
                     )
+
+        asyncio.run(run())
+
+    def test_non_existent_listener(self):
+        """Verify that using a non-existent listener name fails."""
+
+        async def run():
+            async with AsyncClient(
+                self._make_client_builder(), listener_name="non_existent_listener"
+            ) as client:
+                with self.assertRaises(ClientResponseError) as cm:
+                    await client.get(f"{self._echo_server_url}/")
+                self.assertIsNotNone(cm.exception.envoy_error)
+                self.assertIn("Listener not found", cm.exception.envoy_error.message)
+                self.assertIn("non_existent_listener", cm.exception.envoy_error.message)
 
         asyncio.run(run())
 

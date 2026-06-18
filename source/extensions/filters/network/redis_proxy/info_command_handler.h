@@ -46,15 +46,15 @@ private:
     std::string key;                     // Metric key name
     AggregationType agg_type;            // How to aggregate
     std::string str_value;               // String value storage
-    int64_t int_value;                   // Integer value storage
+    int64_t int_value{0};                // Integer value storage
     CustomAggregatorFunc custom_handler; // Custom aggregation function
     std::string source_metric_for_human; // If set, convert this metric to human-readable format
 
     MetricConfig(const std::string& sec, const std::string& k, AggregationType type,
                  const std::string& default_val = "", CustomAggregatorFunc handler = nullptr,
                  const std::string& human_source = "")
-        : section(sec), key(k), agg_type(type), str_value(default_val), int_value(0),
-          custom_handler(handler), source_metric_for_human(human_source) {}
+        : section(sec), key(k), agg_type(type), str_value(default_val), custom_handler(handler),
+          source_metric_for_human(human_source) {}
   };
 
   // Initialize the metric template

@@ -315,6 +315,8 @@ envoy_cc_library(
     hdrs = ["prod_cluster_info_factory.h"],
     deps = [
         ":upstream_includes",
+        "//source/common/init:manager_lib",
+        "//source/common/init:watcher_lib",
     ],
 )
 

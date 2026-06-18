@@ -1321,7 +1321,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, WriteToSocketSuccess) {
       .WillOnce(testing::Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         uint64_t len = buffer.length();
         buffer.drain(len);
-        return Api::IoCallUint64Result(len, Api::IoError::none());
+        return {len, Api::IoError::none()};
       }));
 
   char data[] = "S";
@@ -1338,7 +1338,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, WriteToSocketMultipleBytes) {
       .WillOnce(testing::Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         uint64_t len = buffer.length();
         buffer.drain(len);
-        return Api::IoCallUint64Result(len, Api::IoError::none());
+        return {len, Api::IoError::none()};
       }));
 
   char data[] = "hello world";
@@ -1380,7 +1380,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, WriteToSocketIoError) {
   EXPECT_CALL(callbacks_.socket_, ioHandle()).WillOnce(testing::ReturnRef(io_handle));
   EXPECT_CALL(io_handle, write(testing::_))
       .WillOnce(testing::Invoke([](Buffer::Instance&) -> Api::IoCallUint64Result {
-        return Api::IoCallUint64Result(0, Network::IoSocketError::create(ECONNRESET));
+        return {0, Network::IoSocketError::create(ECONNRESET)};
       }));
 
   char data[] = "S";
@@ -2768,6 +2768,70 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, MetricsFrozenAfterInit) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
             envoy_dynamic_module_callback_listener_filter_config_define_histogram(
                 static_cast<void*>(filter_config_.get()), name, &out_id));
+}
+
+// Verifies metrics can be operated from the filter config context (outside the connection
+// lifecycle), mirroring the per-filter operate callbacks.
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ConfigStatsOperate) {
+  void* config = static_cast<void*>(filter_config_.get());
+
+  size_t counter_id = 0;
+  envoy_dynamic_module_type_module_buffer counter_name = {const_cast<char*>("cfg_counter"), 11};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_define_counter(
+                config, counter_name, &counter_id));
+  size_t gauge_id = 0;
+  envoy_dynamic_module_type_module_buffer gauge_name = {const_cast<char*>("cfg_gauge"), 9};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_define_gauge(config, gauge_name,
+                                                                              &gauge_id));
+  size_t histogram_id = 0;
+  envoy_dynamic_module_type_module_buffer histogram_name = {const_cast<char*>("cfg_histogram"), 13};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_define_histogram(
+                config, histogram_name, &histogram_id));
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_increment_counter(config,
+                                                                                   counter_id, 7));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_listener_filter_config_increment_gauge(config, gauge_id, 10));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_listener_filter_config_decrement_gauge(config, gauge_id, 3));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_record_histogram_value(
+                config, histogram_id, 42));
+
+  EXPECT_EQ(7, stats_.counterFromString("dynamicmodulescustom.cfg_counter").value());
+  EXPECT_EQ(
+      7,
+      stats_.gaugeFromString("dynamicmodulescustom.cfg_gauge", Stats::Gauge::ImportMode::Accumulate)
+          .value());
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_set_gauge(config, gauge_id, 100));
+  EXPECT_EQ(
+      100,
+      stats_.gaugeFromString("dynamicmodulescustom.cfg_gauge", Stats::Gauge::ImportMode::Accumulate)
+          .value());
+
+  const size_t invalid_id = 9999;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_config_increment_counter(config,
+                                                                                   invalid_id, 1));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_listener_filter_config_increment_gauge(config, invalid_id, 1));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_listener_filter_config_decrement_gauge(config, invalid_id, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_config_set_gauge(config, invalid_id, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_config_record_histogram_value(
+                config, invalid_id, 1));
 }
 
 } // namespace ListenerFilters

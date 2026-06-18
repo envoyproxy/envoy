@@ -321,9 +321,12 @@ Filter::HandleDataStatus Filter::handleEncodeData(Envoy::Buffer::Instance& data,
     // The converter returns an empty stream_message for the last empty
     // buffer.
     if (stream_message->message() == nullptr) {
+      // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
       DCHECK(end_stream);
+      // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
       DCHECK(stream_message->isFinalMessage());
       // This is the last one in the vector.
+      // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
       DCHECK(msg_idx == buffering->size() - 1);
       continue;
     }

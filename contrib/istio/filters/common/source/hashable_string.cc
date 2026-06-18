@@ -1,6 +1,7 @@
 #include "contrib/istio/filters/common/source/hashable_string.h"
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/registry/registry.h"
@@ -14,7 +15,7 @@ namespace Common {
 
 HashableString::HashableString(absl::string_view value) : Router::StringAccessorImpl(value) {}
 
-absl::optional<uint64_t> HashableString::hash() const { return HashUtil::xxHash64(asString()); }
+std::optional<uint64_t> HashableString::hash() const { return HashUtil::xxHash64(asString()); }
 
 namespace {
 

@@ -59,6 +59,7 @@ envoy_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
+        ":golang_test_filters_proto_cc_proto",
         "//contrib/golang/filters/http/source:config",
         "//source/exe:main_common_lib",
         "//source/extensions/filters/http/lua:config",
@@ -68,6 +69,11 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
+)
+
+envoy_proto_library(
+    name = "golang_test_filters_proto",
+    srcs = ["golang_test_filters.proto"],
 )
 
 envoy_proto_library(

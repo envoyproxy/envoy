@@ -1,9 +1,23 @@
 #include "source/extensions/filters/http/wasm/wasm_filter.h"
 
+#include "source/common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Wasm {
+
+namespace {
+
+Stats::Scope& upstreamWasmStatsScope(Server::Configuration::UpstreamFactoryContext& context) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.upstream_wasm_filter_uses_root_scope")) {
+    return context.serverFactoryContext().serverScope();
+  }
+  return context.scope();
+}
+
+} // namespace
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
                            Server::Configuration::FactoryContext& context)
@@ -13,9 +27,10 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Was
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
                            Server::Configuration::UpstreamFactoryContext& context)
-    : Extensions::Common::Wasm::PluginConfig(
-          config.config(), context.serverFactoryContext(), context.scope(), context.initManager(),
-          envoy::config::core::v3::TrafficDirection::OUTBOUND, nullptr, false) {}
+    : Extensions::Common::Wasm::PluginConfig(config.config(), context.serverFactoryContext(),
+                                             upstreamWasmStatsScope(context), context.initManager(),
+                                             envoy::config::core::v3::TrafficDirection::OUTBOUND,
+                                             nullptr, false) {}
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
                            Server::Configuration::ServerFactoryContext& context)

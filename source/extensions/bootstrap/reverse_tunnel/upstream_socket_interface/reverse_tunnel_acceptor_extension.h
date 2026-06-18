@@ -5,7 +5,10 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <string>
 
+#include "envoy/access_log/access_log.h"
+#include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/reverse_tunnel_reporter.h"
@@ -16,14 +19,16 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface.h"
-#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_lifecycle_info.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/strings/string_view.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -34,6 +39,7 @@ namespace ReverseConnection {
 // Forward declarations
 class UpstreamSocketManager;
 class ReverseTunnelAcceptorExtension;
+class ReverseTunnelAcceptor;
 
 /**
  * Thread local storage for ReverseTunnelAcceptor.
@@ -92,40 +98,9 @@ public:
   ReverseTunnelAcceptorExtension(
       ReverseTunnelAcceptor& sock_interface, Server::Configuration::ServerFactoryContext& context,
       const envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
-          UpstreamReverseConnectionSocketInterface& config)
-      : Envoy::Network::SocketInterfaceExtension(sock_interface), context_(context),
-        socket_interface_(&sock_interface) {
-    stat_prefix_ = PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "reverse_tunnel_acceptor");
-    // Configure ping miss threshold (minimum 1).
-    const uint32_t cfg_threshold =
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, ping_failure_threshold, 3);
-    ping_failure_threshold_ = std::max<uint32_t>(1, cfg_threshold);
-    // Configure detailed stats flag (defaults to false).
-    enable_detailed_stats_ = config.enable_detailed_stats();
-    // Configure tenant isolation flag (defaults to false).
-    enable_tenant_isolation_ =
-        config.has_enable_tenant_isolation() ? config.enable_tenant_isolation().value() : false;
-    ENVOY_LOG(debug,
-              "ReverseTunnelAcceptorExtension: creating upstream reverse connection "
-              "socket interface with stat_prefix: {}, tenant_isolation: {}",
-              stat_prefix_, enable_tenant_isolation_);
-    // Construct the reporter if enabled from the yaml.
-    if (config.has_reporter_config()) {
-      auto& reporter_factory =
-          Config::Utility::getAndCheckFactoryByName<ReverseTunnelReporterFactory>(
-              config.reporter_config().name());
-      auto reporter_config = Config::Utility::translateAnyToFactoryConfig(
-          config.reporter_config().typed_config(), context_.messageValidationVisitor(),
-          reporter_factory);
+          UpstreamReverseConnectionSocketInterface& config);
 
-      reporter_ = reporter_factory.createReporter(context, std::move(reporter_config));
-    }
-    // Ensure the socket interface has a reference to this extension early, so stats can be
-    // recorded even before onServerInitialized().
-    if (socket_interface_ != nullptr) {
-      socket_interface_->extension_ = this;
-    }
-  }
+  ~ReverseTunnelAcceptorExtension() override;
 
   /**
    * Called when the server is initialized.
@@ -194,6 +169,30 @@ public:
   bool enableTenantIsolation() const { return enable_tenant_isolation_; }
 
   /**
+   * @return whether lifecycle access logs are configured.
+   */
+  bool hasAccessLogs() const { return !access_logs_.empty(); }
+
+  /**
+   * Emit a lifecycle access log using a synthetic StreamInfo built from reverse-tunnel metadata.
+   */
+  void emitSyntheticLifecycleLog(
+      absl::string_view event, const ReverseTunnelLifecycleInfo& lifecycle, TimeSource& time_source,
+      AccessLog::AccessLogType access_log_type = AccessLog::AccessLogType::NotSet,
+      absl::string_view handoff_kind = {}, absl::string_view close_reason = {},
+      const LifecycleLogMetadata& extra_metadata = LifecycleLogMetadata{}) const;
+
+  /**
+   * Emit a lifecycle access log using an existing connection-backed StreamInfo.
+   */
+  void emitConnectionLifecycleLog(
+      absl::string_view event, StreamInfo::StreamInfo& stream_info,
+      const ReverseTunnelLifecycleInfo& lifecycle,
+      AccessLog::AccessLogType access_log_type = AccessLog::AccessLogType::NotSet,
+      absl::string_view handoff_kind = {}, absl::string_view close_reason = {},
+      const LifecycleLogMetadata& extra_metadata = LifecycleLogMetadata{}) const;
+
+  /**
    * Forward a connection event to the configured reporter.
    * If no reporter is present, the call is ignored.
    * @param node_id node to which the connection is made.
@@ -228,7 +227,21 @@ public:
     tls_slot_ = std::move(slot);
   }
 
+  /**
+   * Test-only method to replace lifecycle access loggers.
+   */
+  void setTestOnlyAccessLogs(AccessLog::InstanceSharedPtrVector access_logs) {
+    access_logs_ = std::move(access_logs);
+  }
+
 private:
+  void emitLifecycleLog(const Formatter::Context& log_context,
+                        const StreamInfo::StreamInfo& stream_info) const;
+  void populateLifecycleStreamInfo(StreamInfo::StreamInfo& stream_info,
+                                   const ReverseTunnelLifecycleInfo& lifecycle,
+                                   absl::string_view event, absl::string_view handoff_kind,
+                                   absl::string_view close_reason,
+                                   const LifecycleLogMetadata& extra_metadata) const;
   Server::Configuration::ServerFactoryContext& context_;
   // Thread-local slot for storing the socket manager per worker thread.
   std::unique_ptr<ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>> tls_slot_;
@@ -237,6 +250,7 @@ private:
   uint32_t ping_failure_threshold_{3};
   bool enable_detailed_stats_{false};
   bool enable_tenant_isolation_{false};
+  AccessLog::InstanceSharedPtrVector access_logs_;
   ReverseTunnelReporterPtr reporter_{nullptr};
 
   /**

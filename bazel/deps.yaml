@@ -296,7 +296,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-04-30"
+  release_date: "2026-06-11"
   use_category:
   - controlplane
   - dataplane_core
@@ -650,6 +650,7 @@ com_google_protobuf:
   - com_google_protobuf_protoc_osx_aarch_64
   - com_google_protobuf_protoc_osx_x86_64
   - com_google_protobuf_protoc_win64
+  - zlib
   cpe: "cpe:2.3:a:google:protobuf:*"
   license: "Protocol Buffers"
   license_url: "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE"
@@ -799,7 +800,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-05-06"
+  release_date: "2026-06-10"
   use_category:
   - build
   - controlplane
@@ -854,7 +855,7 @@ fips_go_linux_amd64:
   project_name: "Go (Linux amd64)"
   project_desc: "Go programming language (Linux amd64)"
   project_url: "https://golang.org/"
-  release_date: "2025-06-05"
+  release_date: "2025-05-07"
   use_category:
   - build
   - dataplane_core
@@ -867,7 +868,7 @@ fips_go_linux_arm64:
   project_name: "Go (Linux arm64)"
   project_desc: "Go programming language (Linux arm64)"
   project_url: "https://golang.org/"
-  release_date: "2025-06-05"
+  release_date: "2025-05-07"
   use_category:
   - build
   - dataplane_core
@@ -906,7 +907,7 @@ fips_go_ppc64le:
   project_name: "Go (Linux ppc64le)"
   project_desc: "Go programming language (Linux ppc64le)"
   project_url: "https://golang.org/"
-  release_date: "2026-04-07"
+  release_date: "2025-05-07"
   use_category:
   - build
   - dataplane_core
@@ -1281,9 +1282,15 @@ rules_java:
   project_name: "Java rules for Bazel"
   project_desc: "Bazel rules for the Java language"
   project_url: "https://github.com/bazelbuild/rules_java/"
-  release_date: "2025-03-25"
+  release_date: "2026-02-24"
   use_category:
   - build
+  - dataplane_core
+  - dataplane_ext
+  - observability_ext
+  - controlplane
+  - api
+  - other
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/rules_java/blob/{version}/LICENSE"
 
@@ -1365,6 +1372,12 @@ rules_shell:
   release_date: "2026-03-23"
   use_category:
   - build
+  - dataplane_core
+  - dataplane_ext
+  - observability_ext
+  - controlplane
+  - api
+  - other
   license: "Apache-2.0"
   license_url: "https://github.com/protocolbuffers/rules_shell/blob/{version}/LICENSE"
 

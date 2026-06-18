@@ -148,7 +148,7 @@ void MultiStream::maybeSwitchToIdle() {
 
 MuxDemux::MuxDemux(Server::Configuration::FactoryContext& context) : factory_context_(context) {}
 
-MuxDemux::~MuxDemux() {}
+MuxDemux::~MuxDemux() = default;
 
 absl::StatusOr<std::unique_ptr<MultiStream>>
 MuxDemux::multicast(const AsyncClient::StreamOptions& options,

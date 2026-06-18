@@ -101,6 +101,52 @@ TEST_F(IoUringSocketHandleTest, WritevError) {
   EXPECT_EQ(ret.err_->getErrorCode(), Api::IoError::IoErrorCode::BadFd);
 }
 
+TEST_F(IoUringSocketHandleTest, WriteBackpressureReturnsEagain) {
+  IoUringSocketHandleTestImpl impl(factory_, false);
+  EXPECT_CALL(worker_, addClientSocket(_, _, _)).WillOnce(testing::ReturnRef(socket_));
+  EXPECT_CALL(factory_, getIoUringWorker())
+      .WillOnce(testing::Return(OptRef<Io::IoUringWorker>(worker_)));
+  impl.initializeFileEvent(
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::PlatformDefaultTriggerType,
+      Event::FileReadyType::Read);
+
+  // No pending write error, so the write proceeds to the socket.
+  OptRef<Io::WriteParam> no_write_param;
+  EXPECT_CALL(socket_, getWriteParam()).WillOnce(testing::ReturnRef(no_write_param));
+  // The socket is applying backpressure and accepts nothing, so the data stays in the buffer and
+  // the handle reports EAGAIN.
+  Buffer::OwnedImpl write_buffer;
+  write_buffer.add("hello");
+  EXPECT_CALL(socket_, write(testing::An<Buffer::Instance&>()));
+  auto ret = impl.write(write_buffer);
+  EXPECT_EQ(ret.return_value_, 0);
+  EXPECT_EQ(ret.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
+  EXPECT_EQ(5, write_buffer.length());
+}
+
+TEST_F(IoUringSocketHandleTest, WritevBackpressureReturnsEagain) {
+  IoUringSocketHandleTestImpl impl(factory_, false);
+  EXPECT_CALL(worker_, addClientSocket(_, _, _)).WillOnce(testing::ReturnRef(socket_));
+  EXPECT_CALL(factory_, getIoUringWorker())
+      .WillOnce(testing::Return(OptRef<Io::IoUringWorker>(worker_)));
+  impl.initializeFileEvent(
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::PlatformDefaultTriggerType,
+      Event::FileReadyType::Read);
+
+  // No pending write error, so the write proceeds to the socket.
+  OptRef<Io::WriteParam> no_write_param;
+  EXPECT_CALL(socket_, getWriteParam()).WillOnce(testing::ReturnRef(no_write_param));
+  // The socket accepts nothing while `backpressured`, so the handle reports EAGAIN.
+  Buffer::OwnedImpl write_buffer;
+  write_buffer.add("hello");
+  auto slice = write_buffer.frontSlice();
+  EXPECT_CALL(socket_, write(testing::An<const Buffer::RawSlice*>(), 1))
+      .WillOnce(testing::Return(0));
+  auto ret = impl.writev(&slice, 1);
+  EXPECT_EQ(ret.return_value_, 0);
+  EXPECT_EQ(ret.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
+}
+
 TEST_F(IoUringSocketHandleTest, SendmsgNotSupported) {
   IoUringSocketHandleTestImpl impl(factory_, true);
 

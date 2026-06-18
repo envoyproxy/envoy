@@ -325,14 +325,13 @@ ContextImpl::ContextImpl(
       }
 
       if (additional_init != nullptr) {
-        absl::Status init_status = additional_init(ctx, tls_certificate);
-        SET_AND_RETURN_IF_NOT_OK(creation_status, init_status);
+        SET_AND_RETURN_IF_NOT_OK(additional_init(ctx, tls_certificate), creation_status);
       }
     }
   }
 
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols(), creation_status);
-  SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
+  RETURN_ONLY_IF_NOT_OK_REF(creation_status);
 
   // Register stat names based on lists reported by BoringSSL.
   std::vector<const char*> list(SSL_get_all_cipher_names(nullptr, 0));
@@ -571,13 +570,6 @@ void ContextImpl::logHandshake(SSL* ssl) const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
   if (!cert.get()) {
     stats_.no_certificate_.inc();
-  }
-
-  // Increment the `was_key_usage_invalid_` stats to indicate the given cert would have triggered an
-  // error but is allowed because the enforcement that rsa key usage and tls usage need to be
-  // matched has been disabled.
-  if (SSL_was_key_usage_invalid(ssl)) {
-    stats_.was_key_usage_invalid_.inc();
   }
 }
 

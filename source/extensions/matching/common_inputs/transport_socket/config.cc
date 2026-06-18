@@ -60,7 +60,7 @@ absl::optional<std::string> extractMetadataValue(const envoy::config::core::v3::
 template <typename InputType, typename ConfigType>
 Matcher::DataInputFactoryCb<Upstream::TransportSocketMatchingData>
 createMetadataInputFactoryCb(const Protobuf::Message& config) {
-  const auto& typed_config = dynamic_cast<const ConfigType&>(config);
+  const auto& typed_config = Envoy::Protobuf::DynamicCastMessage<ConfigType>(config);
 
   std::string filter = typed_config.filter().empty()
                            ? std::string(Envoy::Config::MetadataFilters::get().ENVOY_LB)
@@ -158,9 +158,8 @@ Matcher::DataInputFactoryCb<Upstream::TransportSocketMatchingData>
 FilterStateInputFactory::createDataInputFactoryCb(
     const Protobuf::Message& config, ProtobufMessage::ValidationVisitor& validation_visitor) {
   UNREFERENCED_PARAMETER(validation_visitor);
-  const auto& typed_config = dynamic_cast<
-      const envoy::extensions::matching::common_inputs::transport_socket::v3::FilterStateInput&>(
-      config);
+  const auto& typed_config = Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::matching::common_inputs::transport_socket::v3::FilterStateInput>(config);
 
   std::string key = typed_config.key();
   return [key = std::move(key)]() { return std::make_unique<FilterStateInput>(key); };
@@ -175,9 +174,9 @@ Matcher::ActionConstSharedPtr
 TransportSocketNameActionFactory::createAction(const Protobuf::Message& config,
                                                Server::Configuration::ServerFactoryContext&,
                                                ProtobufMessage::ValidationVisitor&) {
-  const auto& typed_config =
-      dynamic_cast<const envoy::extensions::matching::common_inputs::transport_socket::v3::
-                       TransportSocketNameAction&>(config);
+  const auto& typed_config = Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::matching::common_inputs::transport_socket::v3::TransportSocketNameAction>(
+      config);
   return std::make_shared<TransportSocketNameAction>(typed_config.name());
 }
 

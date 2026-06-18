@@ -171,7 +171,7 @@ SpanContextExtractor::extractSpanContextFromB3SingleFormat(bool is_sampled) {
   ASSERT(b3_head_entry.has_value());
   // This is an implicitly untrusted header, so only the first value is used.
   const std::string b3(b3_head_entry.value());
-  if (!b3.length()) {
+  if (b3.empty()) {
     throw ExtractorException("Invalid input: empty");
   }
 

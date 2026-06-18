@@ -147,6 +147,8 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   case Http::StreamResetReason::Http1PrematureUpstreamHalfClose:
     IS_ENVOY_BUG("H/1 premature response reset is not applicable to H/3.");
     break;
+  case Http::StreamResetReason::RemoteResetNoError:
+    return quic::QUIC_STREAM_NO_ERROR;
   }
 
   ENVOY_LOG_MISC(error, absl::StrCat("Unknown reset reason: ", reason));
@@ -316,8 +318,7 @@ Network::ConnectionSocketPtr createConnectionSocket(
   return connection_socket;
 }
 
-bssl::UniquePtr<X509> parseDERCertificate(const std::string& der_bytes,
-                                          std::string* error_details) {
+bssl::UniquePtr<X509> parseDERCertificate(absl::string_view der_bytes, std::string* error_details) {
   const uint8_t* data;
   const uint8_t* orig_data;
   orig_data = data = reinterpret_cast<const uint8_t*>(der_bytes.data());

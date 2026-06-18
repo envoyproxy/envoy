@@ -56,6 +56,7 @@ public:
     return reset_headers_;
   }
   std::chrono::milliseconds resetMaxInterval() const override { return reset_max_interval_; }
+  bool refreshClusterOnRetry() const override { return refresh_cluster_on_retry_; }
 
 private:
   RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
@@ -86,6 +87,7 @@ private:
   std::chrono::milliseconds reset_max_interval_{300000};
   ProtobufMessage::ValidationVisitor* validation_visitor_{};
   std::vector<Upstream::RetryOptionsPredicateConstSharedPtr> retry_options_predicates_;
+  const bool refresh_cluster_on_retry_{false};
 };
 
 } // namespace Router

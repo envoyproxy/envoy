@@ -31,7 +31,7 @@ public:
   Upstream::UpstreamLocalAddress getUpstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr& endpoint_address,
       const Network::ConnectionSocket::OptionsSharedPtr& socket_options,
-      OptRef<const Network::TransportSocketOptions> transport_socket_options) const {
+      OptRef<const Network::TransportSocketOptions> transport_socket_options) const override {
     const auto upstream_address =
         inner_->getUpstreamLocalAddress(endpoint_address, socket_options, transport_socket_options);
     if (transport_socket_options && upstream_address.address_) {

@@ -420,8 +420,10 @@ case $CI_TARGET in
         export FIX_YAML="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
         export CLANG_TIDY_APPLY_FIXES=1
         mkdir -p "${ENVOY_TEST_TMPDIR}/lint-fixes"
-        if [[ -n "$CLANG_TIDY_TARGETS" ]]; then
-            read -ra CLANG_TIDY_TARGETS <<< "${CLANG_TIDY_TARGETS}"
+        if [[ $# -ge 1 ]]; then
+            CLANG_TIDY_TARGETS=("$@")
+        elif [[ -n "${CLANG_TIDY_TARGETS[*]}" ]]; then
+            read -ra CLANG_TIDY_TARGETS <<< "${CLANG_TIDY_TARGETS[*]}"
         else
             CLANG_TIDY_TARGETS=(
                 //contrib/...
@@ -433,6 +435,14 @@ case $CI_TARGET in
         bazel build \
               "${BAZEL_BUILD_OPTIONS[@]}" \
               --config=clang-tidy \
+              "${CLANG_TIDY_TARGETS[@]}"
+        echo "Collecting clang-tidy fixes into ${ENVOY_SRCDIR}/clang-tidy-fixes.yaml"
+        bazel run \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/clang-tidy:collect_fixes \
+              -- \
+              --repository="envoy" \
+              --output="${ENVOY_SRCDIR}/clang-tidy-fixes.yaml" \
               "${CLANG_TIDY_TARGETS[@]}"
         ;;
 
@@ -1047,17 +1057,6 @@ case $CI_TARGET in
 
     refresh_compdb)
         setup_clang_toolchain
-        # Override the BAZEL_STARTUP_OPTIONS to setting different output directory.
-        # So the compdb headers won't be overwritten by another bazel run.
-        for i in "${!BAZEL_STARTUP_OPTIONS[@]}"; do
-            if [[ ${BAZEL_STARTUP_OPTIONS[i]} == "--output_base"* ]]; then
-                COMPDB_OUTPUT_BASE="${BAZEL_STARTUP_OPTIONS[i]}"-envoy-compdb
-                BAZEL_STARTUP_OPTIONS[i]="${COMPDB_OUTPUT_BASE}"
-                BAZEL_STARTUP_OPTION_LIST="${BAZEL_STARTUP_OPTIONS[*]}"
-                export BAZEL_STARTUP_OPTION_LIST
-            fi
-        done
-
         if [[ -z "${SKIP_PROTO_FORMAT}" ]]; then
             "${CURRENT_SCRIPT_DIR}/../tools/proto_format/proto_format.sh" fix
         fi
@@ -1072,16 +1071,6 @@ case $CI_TARGET in
 
     pre_refresh_compdb)
         setup_clang_toolchain
-        # Override the BAZEL_STARTUP_OPTIONS to setting different output directory.
-        # So the compdb headers won't be overwritten by another bazel run.
-        for i in "${!BAZEL_STARTUP_OPTIONS[@]}"; do
-            if [[ ${BAZEL_STARTUP_OPTIONS[i]} == "--output_base"* ]]; then
-                COMPDB_OUTPUT_BASE="${BAZEL_STARTUP_OPTIONS[i]}"-envoy-compdb
-                BAZEL_STARTUP_OPTIONS[i]="${COMPDB_OUTPUT_BASE}"
-                BAZEL_STARTUP_OPTION_LIST="${BAZEL_STARTUP_OPTIONS[*]}"
-                export BAZEL_STARTUP_OPTION_LIST
-            fi
-        done
         # Ensure that LLVM toolchain is downloaded by using clangd target.
         # This is used during devcontainer bootstrap.
         bazel build @llvm_toolchain//:clangd

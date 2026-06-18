@@ -37,6 +37,7 @@ private:
   absl::optional<uint64_t> hits_addend_;
   bool is_negative_hits_ = false;
   std::vector<Envoy::RateLimit::DescriptorProducerPtr> actions_;
+  absl::optional<Envoy::Router::RateLimitOverrideActionPtr> limit_override_ = absl::nullopt;
 };
 
 class RateLimitConfig : Logger::Loggable<Envoy::Logger::Id::config> {

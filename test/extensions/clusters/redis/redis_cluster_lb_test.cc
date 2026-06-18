@@ -37,8 +37,8 @@ public:
   const std::string& clientZone() const override { return client_zone_; }
 
   absl::optional<uint64_t> hash_key_;
-  bool is_read_;
-  NetworkFilters::Common::Redis::Client::ReadPolicy read_policy_;
+  bool is_read_{};
+  NetworkFilters::Common::Redis::Client::ReadPolicy read_policy_{};
   std::string client_zone_;
 };
 
@@ -76,8 +76,9 @@ public:
     }
   }
 
-  static std::pair<std::string, Upstream::HostSharedPtr> makePair(Upstream::HostSharedPtr host) {
-    return std::make_pair(host->address()->asString(), std::move(host));
+  static std::pair<std::string, Upstream::HostSharedPtr>
+  makePair(const Upstream::HostSharedPtr& host) {
+    return {host->address()->asString(), host};
   }
 
   Upstream::HostMap generateHostMap(Upstream::HostVector& hosts) {
@@ -426,6 +427,61 @@ TEST_F(RedisClusterLoadBalancerTest, ClusterSlotUpdate) {
   const std::vector<std::pair<uint32_t, uint32_t>> updated_assignments = {
       {100, 0}, {1100, 1}, {2100, 0}};
   validateAssignment(hosts, updated_assignments);
+}
+
+// Verifies that a worker-local LB instance refreshes its slot and shard
+// snapshot when the worker priority set fires its member update callback,
+// rather than relying on the cluster manager to recreate the LB.
+TEST_F(RedisClusterLoadBalancerTest, LoadBalancerRefreshesOnMemberUpdate) {
+  Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:91")};
+  Upstream::HostMap all_hosts{{hosts[0]->address()->asString(), hosts[0]},
+                              {hosts[1]->address()->asString(), hosts[1]}};
+  init();
+
+  // Install the initial slot assignment.
+  factory_->onClusterSlotUpdate(std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
+                                    ClusterSlot(0, 1000, hosts[0]->address()),
+                                    ClusterSlot(1001, 16383, hosts[1]->address())}),
+                                all_hosts);
+
+  // Create a single LB *before* any further slot updates and exercise it.
+  Upstream::LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+  {
+    TestLoadBalancerContext context(100); // slot 100 → hosts[0]
+    EXPECT_EQ(hosts[0]->address()->asString(),
+              lb->chooseHost(&context).host->address()->asString());
+    TestLoadBalancerContext context2(2100); // slot 2100 → hosts[1]
+    EXPECT_EQ(hosts[1]->address()->asString(),
+              lb->chooseHost(&context2).host->address()->asString());
+  }
+
+  // Update slot assignment in the factory so that slot 2100 now maps to hosts[0].
+  factory_->onClusterSlotUpdate(
+      std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
+          ClusterSlot(0, 1000, hosts[0]->address()), ClusterSlot(1001, 2000, hosts[1]->address()),
+          ClusterSlot(2001, 16383, hosts[0]->address())}),
+      all_hosts);
+
+  // Until the worker priority set fires its member update callback, the LB
+  // still holds the previous snapshot.
+  {
+    TestLoadBalancerContext context(2100);
+    EXPECT_EQ(hosts[1]->address()->asString(),
+              lb->chooseHost(&context).host->address()->asString());
+  }
+
+  // Simulate the worker host update broadcast: the cluster manager calls
+  // priority_set_.updateHosts on the worker, which fires every registered
+  // MemberUpdateCb -- including the one the LB installed in its constructor.
+  worker_priority_set_.runUpdateCallbacks(0, {}, {});
+
+  // The same LB instance now picks the updated assignment.
+  {
+    TestLoadBalancerContext context(2100);
+    EXPECT_EQ(hosts[0]->address()->asString(),
+              lb->chooseHost(&context).host->address()->asString());
+  }
 }
 
 TEST_F(RedisClusterLoadBalancerTest, ClusterSlotNoUpdate) {

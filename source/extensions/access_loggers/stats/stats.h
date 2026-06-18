@@ -145,8 +145,8 @@ private:
   struct Gauge {
     enum class OperationType {
       SET,
-      PAIRED_ADD,
-      PAIRED_SUBTRACT,
+      PAIRED_ADD,      // NOLINT(readability-identifier-naming)
+      PAIRED_SUBTRACT, // NOLINT(readability-identifier-naming)
     };
 
     NameAndTags stat_;

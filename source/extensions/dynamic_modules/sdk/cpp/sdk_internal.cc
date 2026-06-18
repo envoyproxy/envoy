@@ -234,7 +234,7 @@ public:
       : host_plugin_ptr_(host_plugin_ptr), child_span_ptr_(child_span_ptr),
         span_ptr_(reinterpret_cast<envoy_dynamic_module_type_span_envoy_ptr>(child_span_ptr)) {}
 
-  ~ChildSpanImpl() override { finish(); }
+  ~ChildSpanImpl() override { finishImpl(); }
 
   void setTag(std::string_view key, std::string_view value) override {
     envoy_dynamic_module_callback_http_span_set_tag(
@@ -298,7 +298,10 @@ public:
     return std::make_unique<ChildSpanImpl>(host_plugin_ptr_, child);
   }
 
-  void finish() override {
+  void finish() override { finishImpl(); }
+
+private:
+  void finishImpl() {
     if (child_span_ptr_ == nullptr) {
       return;
     }
@@ -306,8 +309,6 @@ public:
     child_span_ptr_ = nullptr;
     span_ptr_ = nullptr;
   }
-
-private:
   const envoy_dynamic_module_type_http_filter_envoy_ptr host_plugin_ptr_;
   envoy_dynamic_module_type_child_span_module_ptr child_span_ptr_;
   envoy_dynamic_module_type_span_envoy_ptr span_ptr_;
@@ -959,6 +960,60 @@ public:
             tags_keys.size(), &metric_id));
     return {metric_id, result};
   }
+
+  MetricsResult recordHistogramValue(MetricID id, uint64_t value,
+                                     std::span<const BufferView> tags_values) override {
+    return static_cast<MetricsResult>(
+        envoy_dynamic_module_callback_http_filter_config_record_histogram_value(
+            host_config_ptr_, id,
+            const_cast<envoy_dynamic_module_type_module_buffer*>(
+                reinterpret_cast<const envoy_dynamic_module_type_module_buffer*>(
+                    tags_values.data())),
+            tags_values.size(), value));
+  }
+
+  MetricsResult setGaugeValue(MetricID id, uint64_t value,
+                              std::span<const BufferView> tags_values) override {
+    return static_cast<MetricsResult>(envoy_dynamic_module_callback_http_filter_config_set_gauge(
+        host_config_ptr_, id,
+        const_cast<envoy_dynamic_module_type_module_buffer*>(
+            reinterpret_cast<const envoy_dynamic_module_type_module_buffer*>(tags_values.data())),
+        tags_values.size(), value));
+  }
+
+  MetricsResult incrementGaugeValue(MetricID id, uint64_t value,
+                                    std::span<const BufferView> tags_values) override {
+    return static_cast<MetricsResult>(
+        envoy_dynamic_module_callback_http_filter_config_increment_gauge(
+            host_config_ptr_, id,
+            const_cast<envoy_dynamic_module_type_module_buffer*>(
+                reinterpret_cast<const envoy_dynamic_module_type_module_buffer*>(
+                    tags_values.data())),
+            tags_values.size(), value));
+  }
+
+  MetricsResult decrementGaugeValue(MetricID id, uint64_t value,
+                                    std::span<const BufferView> tags_values) override {
+    return static_cast<MetricsResult>(
+        envoy_dynamic_module_callback_http_filter_config_decrement_gauge(
+            host_config_ptr_, id,
+            const_cast<envoy_dynamic_module_type_module_buffer*>(
+                reinterpret_cast<const envoy_dynamic_module_type_module_buffer*>(
+                    tags_values.data())),
+            tags_values.size(), value));
+  }
+
+  MetricsResult incrementCounterValue(MetricID id, uint64_t value,
+                                      std::span<const BufferView> tags_values) override {
+    return static_cast<MetricsResult>(
+        envoy_dynamic_module_callback_http_filter_config_increment_counter(
+            host_config_ptr_, id,
+            const_cast<envoy_dynamic_module_type_module_buffer*>(
+                reinterpret_cast<const envoy_dynamic_module_type_module_buffer*>(
+                    tags_values.data())),
+            tags_values.size(), value));
+  }
+
   bool logEnabled(LogLevel level) override {
     return envoy_dynamic_module_callback_log_enabled(
         static_cast<envoy_dynamic_module_type_log_level>(level));
