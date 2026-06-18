@@ -498,6 +498,7 @@ FilterConfig::FilterConfig(
       end_session_endpoint_(proto_config.end_session_endpoint()),
       post_logout_redirect_uri_formatter_(
           (proto_config.post_logout_redirect_uri().empty() ||
+           proto_config.end_session_endpoint().empty() ||
            proto_config.disable_post_logout_redirect_uri())
               ? nullptr
               : THROW_OR_RETURN_VALUE(

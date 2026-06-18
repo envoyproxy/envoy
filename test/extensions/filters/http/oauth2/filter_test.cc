@@ -1333,13 +1333,13 @@ TEST_F(OAuth2Test, RequestSignoutDisableOverridesCustomPostLogoutRedirectUri) {
 }
 
 /**
- * Scenario: ``post_logout_redirect_uri`` contains an invalid header-formatter string, while
- * ``disable_post_logout_redirect_uri`` is true.
+ * Scenario: ``post_logout_redirect_uri`` contains an invalid header-formatter string.
  *
- * Expected behavior: because the field is documented to be ignored when disabled, the formatter is
- * never compiled and the config loads successfully. Conversely, the same invalid format string
- * fails config load when the field is not disabled, proving validation still happens when the value
- * is actually used.
+ * Expected behavior: because the field is documented to be ignored when either
+ * ``end_session_endpoint`` is not set or post logout redirect is disabled, the
+ * formatter is never compiled and the config loads successfully.
+ * Conversely, the same invalid format string fails config load when the field is not
+ * disabled, proving validation still happens when the value is actually used.
  */
 TEST_F(OAuth2Test, InvalidPostLogoutRedirectUriIgnoredWhenDisabled) {
   envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
@@ -1355,14 +1355,20 @@ TEST_F(OAuth2Test, InvalidPostLogoutRedirectUriIgnoredWhenDisabled) {
   credentials->set_client_id(TEST_CLIENT_ID);
   credentials->mutable_token_secret()->set_name("secret");
   credentials->mutable_hmac_secret()->set_name("hmac");
-  p.set_end_session_endpoint("https://auth.example.com/oauth/logout");
   // Invalid header-formatter command (PATH does not accept argument 'A').
   p.set_post_logout_redirect_uri("%PATH(A)%");
   p.add_auth_scopes("openid");
 
   auto secret_reader = std::make_shared<MockSecretReader>();
 
-  // Disabled: the invalid formatter is never compiled, so the config loads without throwing.
+  // End_session_endpoint is not defined: the invalid formatter is never compiled,
+  // so the config loads without throwing.
+  EXPECT_NO_THROW(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
+                                                 secret_reader, scope_, "test."));
+
+  // Post logout redirect uri disabled: the invalid formatter is never compiled,
+  // so the config loads without throwing.
+  p.set_end_session_endpoint("https://auth.example.com/oauth/logout");
   p.set_disable_post_logout_redirect_uri(true);
   EXPECT_NO_THROW(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
                                                  secret_reader, scope_, "test."));
