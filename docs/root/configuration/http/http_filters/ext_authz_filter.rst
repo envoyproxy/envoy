@@ -210,7 +210,6 @@ The HTTP filter outputs statistics in the ``cluster.<route target cluster>.ext_a
   because it couldn't apply all header mutations"
   response_header_limits_reached, Counter, "Total responses for which ext_authz sent a local reply
   because it couldn't apply all header mutations"
-  invalid_cached_response, Counter, Total cached responses that failed to be Base64-decoded or parsed.
 
 Dynamic Metadata
 ----------------
