@@ -17,6 +17,7 @@ fn new_listener_filter_config_fn<EC: EnvoyListenerFilterConfig, ELF: EnvoyListen
   match name {
     "write_to_socket" => Some(Box::new(WriteToSocketFilterConfig)),
     "buffer_read" => Some(Box::new(BufferReadFilterConfig)),
+    "http_callout_on_accept" => Some(Box::new(HttpCalloutOnAcceptFilterConfig)),
     _ => panic!("unknown filter name: {name}"),
   }
 }
@@ -91,5 +92,59 @@ impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for BufferReadFilter {
 
   fn max_read_bytes(&mut self, _envoy_filter: &mut ELF) -> usize {
     4
+  }
+}
+
+// =============================================================================
+// HTTP Callout On Accept Test Filter
+// =============================================================================
+
+// Issues an HTTP callout on accept and resumes the chain when it completes. The callout calls
+// shared_from_this on the filter, which throws std::bad_weak_ptr and aborts the worker unless the
+// production factory shares ownership. The callout targets cluster_0, served by the test autonomous
+// upstream.
+struct HttpCalloutOnAcceptFilterConfig;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for HttpCalloutOnAcceptFilterConfig {
+  fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+    Box::new(HttpCalloutOnAcceptFilter)
+  }
+}
+
+struct HttpCalloutOnAcceptFilter;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for HttpCalloutOnAcceptFilter {
+  fn on_accept(
+    &mut self,
+    envoy_filter: &mut ELF,
+  ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+    let (result, _id) = envoy_filter.send_http_callout(
+      "cluster_0",
+      vec![
+        (":method", b"GET"),
+        (":path", b"/"),
+        ("host", b"example.com"),
+      ],
+      None,
+      5000,
+    );
+    // Always wait for the callout. The accept resumes only from on_http_callout_done, so the test
+    // echo proves the round trip ran. The autonomous upstream makes the callout succeed.
+    assert_eq!(
+      result,
+      abi::envoy_dynamic_module_type_http_callout_init_result::Success
+    );
+    abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration
+  }
+
+  fn on_http_callout_done(
+    &mut self,
+    envoy_filter: &mut ELF,
+    _callout_id: u64,
+    _result: abi::envoy_dynamic_module_type_http_callout_result,
+    _response_headers: Vec<(EnvoyBuffer, EnvoyBuffer)>,
+    _response_body: Vec<EnvoyBuffer>,
+  ) {
+    envoy_filter.continue_filter_chain(true);
   }
 }
