@@ -381,6 +381,8 @@ public:
 
   // Accessors.
   const DynamicModuleClusterConfigSharedPtr& config() const { return config_; }
+  // The cluster's CDS name (ClusterInfo::name()).
+  const std::string& clusterName() const { return info()->name(); }
   envoy_dynamic_module_type_cluster_module_ptr inModuleCluster() const {
     return in_module_cluster_;
   }
@@ -453,7 +455,7 @@ private:
     DynamicModuleClusterConfigSharedPtr config_;
   };
 
-  // Allocates worker_slot_ lazily on first use.
+  // Allocates worker_slot_ and seeds a null payload.
   void ensureWorkerSlot();
 
   uint64_t getNextCalloutId() { return next_callout_id_++; }
@@ -477,7 +479,6 @@ private:
   Server::ServerLifecycleNotifier::HandlePtr server_initialized_handle_;
 
   // Thread-local slot backing both the worker fan-out and the worker_slot_set/get pattern.
-  // Allocated lazily on first use.
   ThreadLocal::TypedSlotPtr<WorkerSlotData> worker_slot_;
 
   // HTTP callout tracking.
@@ -572,7 +573,7 @@ public:
     return {};
   }
 
-  // Access the priority set for lb callbacks.
+  // Worker local priority set used to answer host queries from the lb callbacks.
   const Upstream::PrioritySet& prioritySet() const;
 
   // Access the handle for async host selection completion.
@@ -616,7 +617,8 @@ public:
 
 private:
   const DynamicModuleClusterHandleSharedPtr handle_;
-  // Worker local priority set that backs the membership update subscription.
+  // Worker local priority set that backs the membership update subscription and answers host
+  // queries from the lb callbacks.
   const Upstream::PrioritySet& priority_set_;
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
 

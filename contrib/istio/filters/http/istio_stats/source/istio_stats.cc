@@ -15,6 +15,7 @@
 #include "contrib/istio/filters/http/istio_stats/source/istio_stats.h"
 
 #include <atomic>
+#include <optional>
 
 #include "envoy/registry/registry.h"
 #include "envoy/router/string_accessor.h"
@@ -56,7 +57,7 @@ namespace {
 
 constexpr absl::string_view NamespaceKey = "/ns/";
 
-absl::optional<absl::string_view> getNamespace(absl::string_view principal) {
+std::optional<absl::string_view> getNamespace(absl::string_view principal) {
   // The namespace is a substring in principal with format:
   // "<DOMAIN>/ns/<NAMESPACE>/sa/<SERVICE-ACCOUNT>". '/' is not allowed to
   // appear in actual content except as delimiter between tokens.
@@ -89,7 +90,7 @@ absl::string_view extractMapString(const Protobuf::Struct& metadata, const std::
   return extractString(it->second.struct_value(), key);
 }
 
-absl::optional<Istio::Common::WorkloadMetadataObject>
+std::optional<Istio::Common::WorkloadMetadataObject>
 extractEndpointMetadata(const StreamInfo::StreamInfo& info) {
   auto upstream_info = info.upstreamInfo();
   auto upstream_host = upstream_info ? upstream_info->upstreamHost() : nullptr;
@@ -126,7 +127,7 @@ bool peerInfoRead(Reporter reporter, const StreamInfo::FilterState& filter_state
          filter_state.hasDataWithName(Istio::Common::NoPeer);
 }
 
-absl::optional<Istio::Common::WorkloadMetadataObject>
+std::optional<Istio::Common::WorkloadMetadataObject>
 peerInfo(Reporter reporter, const StreamInfo::FilterState& filter_state) {
   const auto& cel_state_key =
       reporter == Reporter::ServerSidecar || reporter == Reporter::ServerGateway
@@ -393,7 +394,7 @@ struct MetricOverrides : public Logger::Loggable<Logger::Id::filter> {
   // Initial transformation: metrics dropped.
   absl::flat_hash_set<Stats::StatName> drop_;
   // Second transformation: tags changed.
-  using TagOverrides = absl::flat_hash_map<Stats::StatName, absl::optional<uint32_t>>;
+  using TagOverrides = absl::flat_hash_map<Stats::StatName, std::optional<uint32_t>>;
   absl::flat_hash_map<Stats::StatName, TagOverrides> tag_overrides_;
   // Third transformation: tags added.
   using TagAdditions = std::vector<std::pair<Stats::StatName, uint32_t>>;
@@ -429,7 +430,7 @@ struct MetricOverrides : public Logger::Loggable<Logger::Id::filter> {
     }
     return out;
   }
-  absl::optional<uint32_t> getOrCreateExpression(const std::string& expr, bool int_expr) {
+  std::optional<uint32_t> getOrCreateExpression(const std::string& expr, bool int_expr) {
     const auto& it = expression_ids_.find(expr);
     if (it != expression_ids_.end()) {
       return {it->second};
@@ -977,7 +978,7 @@ private:
   void populatePeerInfo(const StreamInfo::StreamInfo& info,
                         const StreamInfo::FilterState& filter_state) {
     // Compute peer info with client-side fallbacks.
-    absl::optional<Istio::Common::WorkloadMetadataObject> peer;
+    std::optional<Istio::Common::WorkloadMetadataObject> peer;
     auto object = peerInfo(config_->reporter(), filter_state);
     if (object) {
       peer.emplace(object.value());
@@ -1072,7 +1073,7 @@ private:
     case Reporter::ClientSidecar: {
       const Ssl::ConnectionInfoConstSharedPtr ssl_info =
           info.upstreamInfo() ? info.upstreamInfo()->upstreamSslConnection() : nullptr;
-      absl::optional<Istio::Common::WorkloadMetadataObject> endpoint_peer;
+      std::optional<Istio::Common::WorkloadMetadataObject> endpoint_peer;
       if (ssl_info && !ssl_info->uriSanPeerCertificate().empty()) {
         peer_san = ssl_info->uriSanPeerCertificate()[0];
       }
@@ -1131,7 +1132,7 @@ private:
                                                      : context_.unknown_});
       switch (config_->reporter()) {
       case Reporter::ServerGateway: {
-        absl::optional<Istio::Common::WorkloadMetadataObject> endpoint_peer;
+        std::optional<Istio::Common::WorkloadMetadataObject> endpoint_peer;
         auto endpoint_object = peerInfo(Reporter::ClientSidecar, filter_state);
         if (endpoint_object) {
           endpoint_peer.emplace(endpoint_object.value());
@@ -1260,7 +1261,7 @@ private:
   bool peer_read_{false};
   uint64_t bytes_sent_{0};
   uint64_t bytes_received_{0};
-  absl::optional<bool> mutual_tls_;
+  std::optional<bool> mutual_tls_;
   bool is_grpc_{false};
   uint64_t request_message_count_{0};
   uint64_t response_message_count_{0};

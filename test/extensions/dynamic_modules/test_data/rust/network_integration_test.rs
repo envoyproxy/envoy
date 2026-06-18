@@ -11,13 +11,21 @@ fn init() -> bool {
 /// This implements the [`envoy_proxy_dynamic_modules_rust_sdk::NewNetworkFilterConfigFunction`]
 /// signature.
 fn new_network_filter_config_fn<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkFilter>(
-  _envoy_filter_config: &mut EC,
+  envoy_filter_config: &mut EC,
   name: &str,
   _config: &[u8],
 ) -> Option<Box<dyn NetworkFilterConfig<ENF>>> {
   match name {
     "flow_control" => Some(Box::new(FlowControlFilterConfig)),
-    "connection_state" => Some(Box::new(ConnectionStateFilterConfig)),
+    "connection_state" => {
+      // Emit a metric directly from the config context (no per-connection filter), exercising the
+      // config-scoped emission path. This would typically be done from a scheduled background task.
+      let config_total = envoy_filter_config.define_counter("config_total").unwrap();
+      envoy_filter_config
+        .increment_counter(config_total, 1)
+        .unwrap();
+      Some(Box::new(ConnectionStateFilterConfig))
+    },
     "half_close" => Some(Box::new(HalfCloseFilterConfig)),
     "buffer_limits" => Some(Box::new(BufferLimitsFilterConfig)),
     _ => panic!("unknown filter name: {name}"),

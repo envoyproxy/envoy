@@ -7,6 +7,8 @@
 #include "source/common/common/logger.h"
 #include "source/common/io/io_uring_impl.h"
 
+#include "absl/container/inlined_vector.h"
+
 namespace Envoy {
 namespace Io {
 
@@ -15,14 +17,16 @@ public:
   ReadRequest(IoUringSocket& socket, uint32_t size);
 
   std::unique_ptr<uint8_t[]> buf_;
-  std::unique_ptr<struct iovec> iov_;
+  struct iovec iov_;
 };
 
 class WriteRequest : public Request {
 public:
   WriteRequest(IoUringSocket& socket, const Buffer::RawSliceVector& slices);
 
-  std::unique_ptr<struct iovec[]> iov_;
+  // Inline storage matches the RawSliceVector capacity, so a typical write keeps its iovecs inside
+  // this request and avoids a second heap allocation per write.
+  absl::InlinedVector<struct iovec, 16> iov_;
 };
 
 class IoUringSocketEntry;
@@ -31,9 +35,11 @@ using IoUringSocketEntryPtr = std::unique_ptr<IoUringSocketEntry>;
 class IoUringWorkerImpl : public IoUringWorker, private Logger::Loggable<Logger::Id::io> {
 public:
   IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
-                    uint32_t read_buffer_size, uint32_t write_timeout_ms,
-                    Event::Dispatcher& dispatcher);
+                    bool enable_multishot_receive, uint32_t read_buffer_size,
+                    uint32_t write_timeout_ms, uint32_t write_high_watermark_bytes,
+                    uint32_t write_low_watermark_bytes, Event::Dispatcher& dispatcher);
   IoUringWorkerImpl(IoUringPtr&& io_uring, uint32_t read_buffer_size, uint32_t write_timeout_ms,
+                    uint32_t write_high_watermark_bytes, uint32_t write_low_watermark_bytes,
                     Event::Dispatcher& dispatcher);
   ~IoUringWorkerImpl() override;
 
@@ -48,6 +54,10 @@ public:
   Request* submitConnectRequest(IoUringSocket& socket,
                                 const Network::Address::InstanceConstSharedPtr& address) override;
   Request* submitReadRequest(IoUringSocket& socket) override;
+  // Submit a read request using an explicit read size to support adaptive read sizing.
+  Request* submitReadRequest(IoUringSocket& socket, uint32_t read_size);
+  // Submit a `multishot` read request that draws buffers from the provided buffer pool.
+  Request* submitReadMultishotRequest(IoUringSocket& socket);
   Request* submitWriteRequest(IoUringSocket& socket, const Buffer::RawSliceVector& slices) override;
   Request* submitCloseRequest(IoUringSocket& socket) override;
   Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) override;
@@ -64,6 +74,16 @@ public:
   // Return the number of sockets in this worker.
   uint32_t getNumOfSockets() const override { return sockets_.size(); }
 
+  // Return the configured base read buffer size used as the starting point for adaptive reads.
+  uint32_t readBufferSize() const { return read_buffer_size_; }
+
+  // Whether this worker's io_uring has `multishot` reads backed by a provided buffer pool
+  // available.
+  bool isMultishotEnabled() const { return multishot_enabled_; }
+  // The provided buffer pool used for `multishot` reads, or nullptr when `multishot` reads are not
+  // available. Cached at construction to avoid a virtual call on each read completion.
+  const IoUringBufferPoolSharedPtr& bufferPool() const { return buffer_pool_; }
+
 protected:
   // Add a socket to the worker.
   IoUringSocketEntry& addSocket(IoUringSocketEntryPtr&& socket);
@@ -72,8 +92,16 @@ protected:
 
   // The iouring instance.
   IoUringPtr io_uring_;
+  // Whether `multishot` reads are available, cached once at construction to avoid a virtual call on
+  // each read submission.
+  const bool multishot_enabled_;
+  // The provided buffer pool used for `multishot` reads, cached once at construction. Null when
+  // `multishot` reads are not available.
+  const IoUringBufferPoolSharedPtr buffer_pool_;
   const uint32_t read_buffer_size_;
   const uint32_t write_timeout_ms_;
+  const uint32_t write_high_watermark_bytes_;
+  const uint32_t write_low_watermark_bytes_;
   // The dispatcher of this worker is running on.
   Event::Dispatcher& dispatcher_;
   // The file event of iouring's eventfd.
@@ -183,9 +211,12 @@ protected:
 class IoUringServerSocket : public IoUringSocketEntry {
 public:
   IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent, Event::FileReadyCb cb,
-                      uint32_t write_timeout_ms, bool enable_close_event);
+                      uint32_t write_timeout_ms, uint32_t write_high_watermark_bytes,
+                      uint32_t write_low_watermark_bytes, bool enable_close_event);
   IoUringServerSocket(os_fd_t fd, Buffer::Instance& read_buf, IoUringWorkerImpl& parent,
-                      Event::FileReadyCb cb, uint32_t write_timeout_ms, bool enable_close_event);
+                      Event::FileReadyCb cb, uint32_t write_timeout_ms,
+                      uint32_t write_high_watermark_bytes, uint32_t write_low_watermark_bytes,
+                      bool enable_close_event);
   ~IoUringServerSocket() override;
 
   // IoUringSocket
@@ -207,22 +238,33 @@ protected:
   // Since the write of IoUringSocket is async, there may have write request is on the fly when
   // close the socket. This timeout is setting for a time to wait the write request done.
   const uint32_t write_timeout_ms_;
+  // The write buffer high and low watermarks used to apply backpressure to the handler.
+  const uint32_t write_high_watermark_bytes_;
+  const uint32_t write_low_watermark_bytes_;
   // For read. iouring socket will read sequentially in the order of buf_ and read_error_. Unless
   // the buf_ is empty, the read_error_ will not be past to the handler. There is an exception that
   // when enable_close_event_ is set, the remote close read_error_(0) will always be past to the
   // handler.
   Request* read_req_{};
+  // The next read size for adaptive read sizing. It starts at the base read buffer size, grows when
+  // a read fills the buffer and resets to the base size when a read does not.
+  uint32_t next_read_size_{0};
+  // Whether the in-flight read request is a `multishot` read drawing from the provided buffer pool.
+  bool read_is_multishot_{false};
+  // Set when a `multishot` read ends with an exhausted buffer pool. The next read uses a readv that
+  // re-arms `multishot` once buffers are recycled.
+  bool multishot_fallback_{false};
+  // Set when the kernel reports `multishot` recv is unsupported. The socket then uses readv only.
+  bool multishot_disabled_{false};
   // TODO (soulxu): Add water mark here.
   Buffer::OwnedImpl read_buf_;
   absl::optional<int32_t> read_error_;
 
-  // TODO (soulxu): We need water mark for write buffer.
-  // The upper layer will think the buffer released when the data copy into this write buffer.
-  // This leads to the `IntegrationTest.TestFloodUpstreamErrors` timeout, since the http layer
-  // always think the response is write successful, so flood protection is never kicked.
-  //
   // For write. iouring socket will write sequentially in the order of write_buf_ and shutdown_
   // Unless the write_buf_ is empty, the shutdown operation will not be performed.
+  // Once write_buf_ grows above the high watermark the handler is told to stop writing, and it is
+  // notified to resume after write_buf_ drains below the low watermark. This applies backpressure
+  // to the upper layer so flood protection can kick in.
   Buffer::OwnedImpl write_buf_;
   // shutdown_ has 3 states. A absl::nullopt indicates the socket has not been shutdown, a false
   // value represents the socket wants to be shutdown but the shutdown has not been performed or
@@ -242,6 +284,8 @@ protected:
   Request* write_or_shutdown_cancel_req_{nullptr};
   // This is used for tracking the close request.
   Request* close_req_{nullptr};
+  // Whether the write buffer is above the high watermark and backpressure is being applied.
+  bool above_write_high_watermark_{false};
 
   void closeInternal();
   void submitReadRequest();
@@ -249,12 +293,14 @@ protected:
   void moveReadDataToBuffer(Request* req, size_t data_length);
   void onReadCompleted(int32_t result);
   void onWriteCompleted(int32_t result);
+  void checkWriteWatermarks();
 };
 
 class IoUringClientSocket : public IoUringServerSocket {
 public:
   IoUringClientSocket(os_fd_t fd, IoUringWorkerImpl& parent, Event::FileReadyCb cb,
-                      uint32_t write_timeout_ms, bool enable_close_event);
+                      uint32_t write_timeout_ms, uint32_t write_high_watermark_bytes,
+                      uint32_t write_low_watermark_bytes, bool enable_close_event);
 
   void connect(const Network::Address::InstanceConstSharedPtr& address) override;
   void onConnect(Request* req, int32_t result, bool injected) override;

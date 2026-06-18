@@ -282,7 +282,7 @@ public:
     ON_CALL(*direct_response_entry_, responseCode()).WillByDefault(Return(code));
     ON_CALL(*direct_response_entry_, formatBody(_, _, _, _))
         .WillByDefault(Return(direct_response_body_));
-    ON_CALL(*direct_response_entry_, newUri(_)).WillByDefault(Return(new_uri));
+    ON_CALL(*direct_response_entry_, newUri(_, _)).WillByDefault(Return(new_uri));
     ON_CALL(*mock_route_, directResponseEntry())
         .WillByDefault(Return(direct_response_entry_.get()));
   }

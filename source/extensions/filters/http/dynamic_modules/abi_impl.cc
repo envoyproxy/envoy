@@ -32,17 +32,16 @@ void bodyBufferToModule(const Buffer::Instance& buffer,
   }
 }
 
-static Stats::StatNameTagVector
-buildTagsForModuleMetric(DynamicModuleHttpFilter& filter, const Stats::StatNameVec& label_names,
-                         envoy_dynamic_module_type_module_buffer* label_values,
-                         size_t label_values_length) {
+static Stats::StatNameTagVector buildTagsForModuleMetric(
+    Stats::StatNameDynamicPool& stat_name_pool, const Stats::StatNameVec& label_names,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length) {
 
   ASSERT(label_values_length == label_names.size());
   Stats::StatNameTagVector tags;
   tags.reserve(label_values_length);
   for (size_t i = 0; i < label_values_length; i++) {
     absl::string_view label_value_view(label_values[i].ptr, label_values[i].length);
-    auto label_value = filter.getStatNamePool().add(label_value_view);
+    auto label_value = stat_name_pool.add(label_value_view);
     tags.push_back(Stats::StatNameTag(label_names[i], label_value));
   }
   return tags;
@@ -92,6 +91,20 @@ bool getHeaderValueImpl(HeadersMapOptConstRef map, envoy_dynamic_module_type_mod
 
   const auto value = values[index]->value().getStringView();
   *result = {.ptr = const_cast<char*>(value.data()), .length = value.size()};
+  return true;
+}
+
+bool getHeaderValuesImpl(HeadersMapOptConstRef map, envoy_dynamic_module_type_module_buffer key,
+                         envoy_dynamic_module_type_envoy_buffer* result_buffer) {
+  if (!map.has_value()) {
+    return false;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  const auto values = map->get(Envoy::Http::LowerCaseString(key_view));
+  for (size_t i = 0; i < values.size(); i++) {
+    const auto value = values[i]->value().getStringView();
+    result_buffer[i] = {.ptr = const_cast<char*>(value.data()), .length = value.size()};
+  }
   return true;
 }
 
@@ -152,6 +165,18 @@ bool headerAsAttribute(HeadersMapOptConstRef map, const Envoy::Http::LowerCaseSt
   auto lower_header = header.get();
   return getHeaderValueImpl(map, {.ptr = lower_header.data(), .length = lower_header.size()},
                             result, 0, nullptr);
+}
+
+// A null entry means the header is absent, in which case we leave the attribute unset rather than
+// reporting it as an empty string.
+bool headerEntryAsAttribute(const Envoy::Http::HeaderEntry* entry,
+                            envoy_dynamic_module_type_envoy_buffer* result) {
+  if (entry == nullptr) {
+    return false;
+  }
+  const absl::string_view value = entry->value().getStringView();
+  *result = {.ptr = const_cast<char*>(value.data()), .length = value.size()};
+  return true;
 }
 
 const Buffer::Instance* getBufferByType(DynamicModuleHttpFilter* filter,
@@ -220,6 +245,7 @@ const envoy::config::core::v3::Metadata*
 getMetadata(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
             envoy_dynamic_module_type_metadata_source metadata_source) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  filter->last_metadata_snapshot_.reset();
   auto* callbacks = filter->callbacks();
   if (!callbacks) {
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
@@ -251,9 +277,9 @@ getMetadata(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     if (upstreamInfo) {
       Upstream::HostDescriptionConstSharedPtr hostInfo = upstreamInfo->upstreamHost();
       if (hostInfo) {
-        Upstream::MetadataConstSharedPtr md = hostInfo->metadata();
-        if (md) {
-          return md.get();
+        filter->last_metadata_snapshot_ = hostInfo->metadata();
+        if (filter->last_metadata_snapshot_) {
+          return filter->last_metadata_snapshot_.get();
         }
       }
     }
@@ -264,9 +290,9 @@ getMetadata(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     if (upstreamInfo) {
       Upstream::HostDescriptionConstSharedPtr hostInfo = upstreamInfo->upstreamHost();
       if (hostInfo) {
-        Upstream::MetadataConstSharedPtr md = hostInfo->localityMetadata();
-        if (md) {
-          return md.get();
+        filter->last_metadata_snapshot_ = hostInfo->localityMetadata();
+        if (filter->last_metadata_snapshot_) {
+          return filter->last_metadata_snapshot_.get();
         }
       }
     }
@@ -506,8 +532,8 @@ envoy_dynamic_module_callback_http_filter_increment_counter(
   if (label_values_length != counter->getLabelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  auto tags = buildTagsForModuleMetric(*filter, counter->getLabelNames(), label_values,
-                                       label_values_length);
+  auto tags = buildTagsForModuleMetric(filter->getStatNamePool(), counter->getLabelNames(),
+                                       label_values, label_values_length);
   counter->add(*filter->getFilterConfig().stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
@@ -567,8 +593,8 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filt
   if (label_values_length != gauge->getLabelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  auto tags =
-      buildTagsForModuleMetric(*filter, gauge->getLabelNames(), label_values, label_values_length);
+  auto tags = buildTagsForModuleMetric(filter->getStatNamePool(), gauge->getLabelNames(),
+                                       label_values, label_values_length);
   gauge->increase(*filter->getFilterConfig().stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
@@ -594,8 +620,8 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filt
   if (label_values_length != gauge->getLabelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  auto tags =
-      buildTagsForModuleMetric(*filter, gauge->getLabelNames(), label_values, label_values_length);
+  auto tags = buildTagsForModuleMetric(filter->getStatNamePool(), gauge->getLabelNames(),
+                                       label_values, label_values_length);
   gauge->decrease(*filter->getFilterConfig().stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
@@ -621,8 +647,8 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filt
   if (label_values_length != gauge->getLabelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  auto tags =
-      buildTagsForModuleMetric(*filter, gauge->getLabelNames(), label_values, label_values_length);
+  auto tags = buildTagsForModuleMetric(filter->getStatNamePool(), gauge->getLabelNames(),
+                                       label_values, label_values_length);
   gauge->set(*filter->getFilterConfig().stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
@@ -683,9 +709,155 @@ envoy_dynamic_module_callback_http_filter_record_histogram_value(
   if (label_values_length != hist->getLabelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  auto tags =
-      buildTagsForModuleMetric(*filter, hist->getLabelNames(), label_values, label_values_length);
+  auto tags = buildTagsForModuleMetric(filter->getStatNamePool(), hist->getLabelNames(),
+                                       label_values, label_values_length);
   hist->recordValue(*filter->getFilterConfig().stats_scope_, tags, value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_increment_counter(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
+
+  // Handle the special case where the labels size is zero.
+  if (label_values_length == 0) {
+    auto counter = filter_config->getCounterById(id);
+    if (!counter.has_value()) {
+      return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+    }
+    counter->add(value);
+    return envoy_dynamic_module_type_metrics_result_Success;
+  }
+
+  auto counter = filter_config->getCounterVecById(id);
+  if (!counter.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  if (label_values_length != counter->getLabelNames().size()) {
+    return envoy_dynamic_module_type_metrics_result_InvalidLabels;
+  }
+  Stats::StatNameDynamicPool stat_name_pool(filter_config->stats_scope_->symbolTable());
+  auto tags = buildTagsForModuleMetric(stat_name_pool, counter->getLabelNames(), label_values,
+                                       label_values_length);
+  counter->add(*filter_config->stats_scope_, tags, value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_increment_gauge(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
+  // Handle the special case where the labels size is zero.
+  if (label_values_length == 0) {
+    auto gauge = filter_config->getGaugeById(id);
+    if (!gauge.has_value()) {
+      return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+    }
+    gauge->increase(value);
+    return envoy_dynamic_module_type_metrics_result_Success;
+  }
+  auto gauge = filter_config->getGaugeVecById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  if (label_values_length != gauge->getLabelNames().size()) {
+    return envoy_dynamic_module_type_metrics_result_InvalidLabels;
+  }
+  Stats::StatNameDynamicPool stat_name_pool(filter_config->stats_scope_->symbolTable());
+  auto tags = buildTagsForModuleMetric(stat_name_pool, gauge->getLabelNames(), label_values,
+                                       label_values_length);
+  gauge->increase(*filter_config->stats_scope_, tags, value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_decrement_gauge(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
+  // Handle the special case where the labels size is zero.
+  if (label_values_length == 0) {
+    auto gauge = filter_config->getGaugeById(id);
+    if (!gauge.has_value()) {
+      return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+    }
+    gauge->decrease(value);
+    return envoy_dynamic_module_type_metrics_result_Success;
+  }
+  auto gauge = filter_config->getGaugeVecById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  if (label_values_length != gauge->getLabelNames().size()) {
+    return envoy_dynamic_module_type_metrics_result_InvalidLabels;
+  }
+  Stats::StatNameDynamicPool stat_name_pool(filter_config->stats_scope_->symbolTable());
+  auto tags = buildTagsForModuleMetric(stat_name_pool, gauge->getLabelNames(), label_values,
+                                       label_values_length);
+  gauge->decrease(*filter_config->stats_scope_, tags, value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filter_config_set_gauge(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
+  // Handle the special case where the labels size is zero.
+  if (label_values_length == 0) {
+    auto gauge = filter_config->getGaugeById(id);
+    if (!gauge.has_value()) {
+      return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+    }
+    gauge->set(value);
+    return envoy_dynamic_module_type_metrics_result_Success;
+  }
+  auto gauge = filter_config->getGaugeVecById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  if (label_values_length != gauge->getLabelNames().size()) {
+    return envoy_dynamic_module_type_metrics_result_InvalidLabels;
+  }
+  Stats::StatNameDynamicPool stat_name_pool(filter_config->stats_scope_->symbolTable());
+  auto tags = buildTagsForModuleMetric(stat_name_pool, gauge->getLabelNames(), label_values,
+                                       label_values_length);
+  gauge->set(*filter_config->stats_scope_, tags, value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_record_histogram_value(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
+  // Handle the special case where the labels size is zero.
+  if (label_values_length == 0) {
+    auto hist = filter_config->getHistogramById(id);
+    if (!hist.has_value()) {
+      return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+    }
+    hist->recordValue(value);
+    return envoy_dynamic_module_type_metrics_result_Success;
+  }
+  auto hist = filter_config->getHistogramVecById(id);
+  if (!hist.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  if (label_values_length != hist->getLabelNames().size()) {
+    return envoy_dynamic_module_type_metrics_result_InvalidLabels;
+  }
+  Stats::StatNameDynamicPool stat_name_pool(filter_config->stats_scope_->symbolTable());
+  auto tags = buildTagsForModuleMetric(stat_name_pool, hist->getLabelNames(), label_values,
+                                       label_values_length);
+  hist->recordValue(*filter_config->stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -697,6 +869,15 @@ bool envoy_dynamic_module_callback_http_get_header(
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   return getHeaderValueImpl(getHeaderMapByType(filter, header_type), key, result, index,
                             optional_size);
+}
+
+bool envoy_dynamic_module_callback_http_get_header_values(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer) {
+  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  return getHeaderValuesImpl(getHeaderMapByType(filter, header_type), key, result_buffer);
 }
 
 bool envoy_dynamic_module_callback_http_add_header(
@@ -1014,6 +1195,32 @@ void envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
   absl::string_view value_view(value.ptr, value.length);
   Protobuf::Struct metadata_value;
   (*metadata_value.mutable_fields())[key_view].set_string_value(value_view);
+  metadata_namespace->MergeFrom(metadata_value);
+}
+
+void envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size) {
+  if (entries_size == 0) {
+    // An empty batch is a no-op and must not create the namespace.
+    return;
+  }
+  auto metadata_namespace = getDynamicMetadataNamespace(filter_envoy_ptr, ns);
+  if (!metadata_namespace) {
+    // If stream info is not available, we cannot guarantee that the namespace is created.
+    // TODO(wbpcode): this should never happen and we should simplify this.
+    return;
+  }
+  // Build the whole namespace fragment first, then merge once instead of once per entry.
+  Protobuf::Struct metadata_value;
+  auto* fields = metadata_value.mutable_fields();
+  for (size_t i = 0; i < entries_size; i++) {
+    const auto& entry = entries[i];
+    absl::string_view key_view(entry.key_ptr, entry.key_length);
+    absl::string_view value_view(entry.value_ptr, entry.value_length);
+    (*fields)[key_view].set_string_value(value_view);
+  }
   metadata_namespace->MergeFrom(metadata_value);
 }
 
@@ -1364,7 +1571,14 @@ bool envoy_dynamic_module_callback_http_get_filter_state_typed(
 void envoy_dynamic_module_callback_http_clear_route_cache(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  filter->decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+  if (filter->decoder_callbacks_ == nullptr) {
+    return;
+  }
+  auto downstream_callbacks = filter->decoder_callbacks_->downstreamCallbacks();
+  if (!downstream_callbacks.has_value()) {
+    return;
+  }
+  downstream_callbacks->clearRouteCache();
 }
 
 envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
@@ -1431,6 +1645,18 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     }
     break;
   }
+  case envoy_dynamic_module_type_attribute_id_ConnectionRequestedServerName: {
+    const auto stream_info = filter->streamInfo();
+    if (stream_info) {
+      // Downstream TLS SNI; empty when no SNI was offered, read as not-found.
+      const absl::string_view sni = stream_info->downstreamAddressProvider().requestedServerName();
+      if (!sni.empty()) {
+        *result = {sni.data(), sni.size()};
+        ok = true;
+      }
+    }
+    break;
+  }
   case envoy_dynamic_module_type_attribute_id_RequestId: {
     const auto stream_info = filter->streamInfo();
     if (stream_info) {
@@ -1446,19 +1672,23 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestPath: {
-    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().Path, result);
+    RequestHeaderMapOptRef headers = filter->requestHeaders();
+    ok = headers.has_value() && headerEntryAsAttribute(headers->Path(), result);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestHost: {
-    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().Host, result);
+    RequestHeaderMapOptRef headers = filter->requestHeaders();
+    ok = headers.has_value() && headerEntryAsAttribute(headers->Host(), result);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestMethod: {
-    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().Method, result);
+    RequestHeaderMapOptRef headers = filter->requestHeaders();
+    ok = headers.has_value() && headerEntryAsAttribute(headers->Method(), result);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestScheme: {
-    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().Scheme, result);
+    RequestHeaderMapOptRef headers = filter->requestHeaders();
+    ok = headers.has_value() && headerEntryAsAttribute(headers->Scheme(), result);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestReferer: {
@@ -1467,7 +1697,8 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestUserAgent: {
-    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().UserAgent, result);
+    RequestHeaderMapOptRef headers = filter->requestHeaders();
+    ok = headers.has_value() && headerEntryAsAttribute(headers->UserAgent(), result);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestUrlPath: {
@@ -1679,6 +1910,9 @@ void envoy_dynamic_module_callback_http_add_custom_flag(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer flag) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->decoder_callbacks_ == nullptr) {
+    return;
+  }
   absl::string_view flag_name_view(flag.ptr, flag.length);
   filter->decoder_callbacks_->streamInfo().addCustomFlag(flag_name_view);
 }
@@ -2159,6 +2393,15 @@ void envoy_dynamic_module_callback_http_span_set_sampled(
   }
   auto* span = static_cast<Tracing::Span*>(span_ptr);
   span->setSampled(sampled);
+}
+
+void envoy_dynamic_module_callback_http_span_disable_local_decision(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr) {
+  if (span_ptr == nullptr) {
+    return;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  span->disableLocalDecision();
 }
 
 // Thread-local storage for temporary strings returned by tracing functions.

@@ -9,9 +9,11 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/json_escape_string.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/common/mcp/constants.h"
 #include "source/extensions/filters/http/mcp_json_rest_bridge/http_request_builder.h"
+#include "source/extensions/filters/http/mcp_json_rest_bridge/trace_context.h"
 
 #include "absl/base/no_destructor.h"
 #include "absl/container/flat_hash_set.h"
@@ -29,11 +31,24 @@ namespace HttpFilters {
 namespace McpJsonRestBridge {
 namespace {
 
+using ::Envoy::Extensions::HttpFilters::McpJsonRestBridge::McpTraceContext;
 using ::nlohmann::json;
 namespace McpConstants = Envoy::Extensions::Filters::Common::Mcp::McpConstants;
 
 constexpr uint32_t DEFAULT_MAX_REQUEST_BODY_SIZE = 1024 * 64;    // 64KB
 constexpr uint32_t DEFAULT_MAX_RESPONSE_BODY_SIZE = 1024 * 1024; // 1MB
+
+const Http::LowerCaseString& traceparentHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "traceparent");
+}
+
+const Http::LowerCaseString& tracestateHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "tracestate");
+}
+
+const Http::LowerCaseString& baggageHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "baggage");
+}
 
 bool isMcpProtocolVersionSupported(absl::string_view protocol_version) {
   static const absl::NoDestructor<absl::flat_hash_set<absl::string_view>> supported_mcp_versions({
@@ -131,6 +146,22 @@ bool validateRequestMcpVersion(absl::string_view method,
   return isMcpProtocolVersionSupported(protocol_version);
 }
 
+void setTraceContextHeaders(Http::RequestHeaderMap& request_headers,
+                            const McpTraceContext& trace_context) {
+  if (!trace_context.traceparent().empty()) {
+    request_headers.setCopy(traceparentHeader(), trace_context.traceparent());
+    if (trace_context.tracestate().empty()) {
+      request_headers.remove(tracestateHeader());
+    } else {
+      request_headers.setCopy(tracestateHeader(), trace_context.tracestate());
+    }
+  }
+
+  if (!trace_context.baggage().empty()) {
+    request_headers.setCopy(baggageHeader(), trace_context.baggage());
+  }
+}
+
 } // namespace
 
 McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
@@ -175,6 +206,48 @@ McpJsonRestBridgeFilterConfig::getToolsListHttpRule() const {
   return proto_config_.tool_config().tool_list_http_rule();
 }
 
+McpJsonRestBridgePerRouteConfig::McpJsonRestBridgePerRouteConfig(
+    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
+        proto_config)
+    : proto_config_(proto_config) {
+  for (const auto& tool_config : proto_config.tool_config()) {
+    for (const auto& tool : tool_config.tools()) {
+      tool_entries_[tool.name()] = {tool.http_rule(), tool.text_content_streaming_enabled()};
+    }
+  }
+  ENVOY_LOG(debug, "Received MCP JSON REST Bridge per-route config: {}",
+            proto_config_.DebugString());
+}
+
+absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+McpJsonRestBridgePerRouteConfig::getHttpRule(absl::string_view tool_name) const {
+  auto it = tool_entries_.find(tool_name);
+  if (it == tool_entries_.end()) {
+    return absl::InvalidArgumentError(
+        fmt::format("Failed to find http rule for tool_name: {}", tool_name));
+  }
+  return it->second.http_rule;
+}
+
+bool McpJsonRestBridgePerRouteConfig::textContentStreamingEnabled(
+    absl::string_view tool_name) const {
+  auto it = tool_entries_.find(tool_name);
+  if (it == tool_entries_.end()) {
+    return false;
+  }
+  return it->second.text_content_streaming_enabled;
+}
+
+absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+McpJsonRestBridgePerRouteConfig::getToolsListHttpRule() const {
+  for (const auto& tool_config : proto_config_.tool_config()) {
+    if (tool_config.has_tool_list_http_rule()) {
+      return tool_config.tool_list_http_rule();
+    }
+  }
+  return absl::NotFoundError("tools_list_http_rule is not configured.");
+}
+
 Http::FilterHeadersStatus
 McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
   absl::string_view path = request_headers.getPathValue();
@@ -214,6 +287,10 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
     return Http::FilterDataStatus::Continue;
   }
 
+  const auto* per_route_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(
+          decoder_callbacks_);
+
   const uint32_t max_request_body_size = config_->maxRequestBodySize();
   if (max_request_body_size > 0 &&
       (request_body_.length() + data.length()) > max_request_body_size) {
@@ -244,7 +321,7 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
-  handleMcpMethod(request_body_json, decoder_callbacks_->requestHeaders());
+  handleMcpMethod(request_body_json, decoder_callbacks_->requestHeaders(), per_route_config);
   data.add(request_body_str_);
   request_body_str_.clear();
 
@@ -407,8 +484,9 @@ void McpJsonRestBridgeFilter::buildStreamingPrefixAndSuffix(bool is_error) {
   streaming_json_suffix_ = ref_json.substr(pos + marker.size() - 1);
 }
 
-void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
-                                              Http::RequestHeaderMapOptRef request_headers) {
+void McpJsonRestBridgeFilter::handleMcpMethod(
+    const nlohmann::json& json_rpc, Http::RequestHeaderMapOptRef request_headers,
+    const McpJsonRestBridgePerRouteConfig* per_route_config) {
   ENVOY_STREAM_LOG(debug, "Handling MCP JSON-RPC: {}", *decoder_callbacks_, json_rpc.dump());
   if (!validateJsonRpcIdAndMethod(json_rpc).ok()) {
     return;
@@ -430,7 +508,8 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
   // TODO(guoyilin42): Consider supporting local response for tools/list in addition to the GET.
   if (method == McpConstants::Methods::TOOLS_LIST) {
     absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
-        config_->getToolsListHttpRule();
+        (per_route_config == nullptr) ? config_->getToolsListHttpRule()
+                                      : per_route_config->getToolsListHttpRule();
     if (http_rule.ok() && !http_rule->get().empty()) {
       mcp_operation_ = McpOperation::ToolsList;
       // We don't support pagination for the tools/list request for now.
@@ -486,7 +565,13 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
                                        "mcp_json_rest_bridge_filter_initialize_ack");
   } else if (method == McpConstants::Methods::TOOLS_CALL) {
     mcp_operation_ = McpOperation::ToolsCall;
-    mapMcpToolToApiBackend(json_rpc);
+    if (config_->traceContextExtraction() && request_headers.has_value()) {
+      ENVOY_STREAM_LOG(debug, "Trace context extraction is enabled for tools/call method.",
+                       *decoder_callbacks_);
+      McpTraceContext trace_context(json_rpc);
+      setTraceContextHeaders(*request_headers, trace_context);
+    }
+    mapMcpToolToApiBackend(json_rpc, per_route_config);
   } else {
     sendErrorResponse(
         Http::Code::BadRequest, "mcp_json_rest_bridge_filter_method_not_supported",
@@ -580,7 +665,8 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
   }
 }
 
-void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_rpc) {
+void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
+    const nlohmann::json& json_rpc, const McpJsonRestBridgePerRouteConfig* per_route_config) {
   const auto params_it = json_rpc.find(McpConstants::PARAMS_FIELD);
   if (params_it == json_rpc.end() || !params_it->is_object()) {
     ENVOY_STREAM_LOG(error,
@@ -603,7 +689,9 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
   const auto& tool_name = name_it->get<std::string>();
 
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
-      config_->getHttpRule(tool_name);
+      (per_route_config == nullptr) ? config_->getHttpRule(tool_name)
+                                    : per_route_config->getHttpRule(tool_name);
+
   if (!http_rule.ok()) {
     ENVOY_STREAM_LOG(error, "Failed to get http rule for method: {}", *decoder_callbacks_,
                      tool_name);
@@ -613,7 +701,9 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
   }
 
   // Set the per-request streaming flag based on the tool's config.
-  text_content_streaming_enabled_ = config_->textContentStreamingEnabled(tool_name);
+  text_content_streaming_enabled_ = (per_route_config == nullptr)
+                                        ? config_->textContentStreamingEnabled(tool_name)
+                                        : per_route_config->textContentStreamingEnabled(tool_name);
 
   const auto arguments_it = params.find(McpConstants::ARGUMENTS_FIELD);
   if (arguments_it != params.end() && !arguments_it->is_object()) {

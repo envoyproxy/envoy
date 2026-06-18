@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/key_value_store.h"
@@ -420,10 +422,10 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
 // A KeyValueStore implementation that returns an invalid proto field value for a Cluster resource.
 class InvalidProtoKeyValueStore : public KeyValueStore {
 public:
-  absl::optional<absl::string_view> get(absl::string_view) override { return absl::nullopt; }
+  std::optional<absl::string_view> get(absl::string_view) override { return std::nullopt; }
   void remove(absl::string_view) override {}
   void addOrUpdate(absl::string_view, absl::string_view,
-                   absl::optional<std::chrono::seconds>) override {}
+                   std::optional<std::chrono::seconds>) override {}
   void flush() override {}
 
   // We only have a cds_config making wildcard requests, so we only need to implement the iterate

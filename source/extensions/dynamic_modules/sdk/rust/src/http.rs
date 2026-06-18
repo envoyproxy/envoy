@@ -2,9 +2,9 @@ use crate::abi::envoy_dynamic_module_type_metrics_result;
 use crate::buffer::{EnvoyBuffer, EnvoyMutBuffer};
 use crate::utility::HeaderPairSlice;
 use crate::{
-  abi, bytes_to_module_buffer, str_to_module_buffer, ClusterHostCount, EnvoyCounterId,
-  EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
-  NewHttpFilterConfigFunction, NewHttpFilterPerRouteConfigFunction,
+  abi, bytes_to_module_buffer, str_to_module_buffer, strs_to_module_buffers, ClusterHostCount,
+  EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId,
+  EnvoyHistogramVecId, NewHttpFilterConfigFunction, NewHttpFilterPerRouteConfigFunction,
   NEW_HTTP_FILTER_CONFIG_FUNCTION, NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION,
 };
 use mockall::*;
@@ -382,6 +382,84 @@ pub trait EnvoyHttpFilterConfig {
     labels: &[&str],
   ) -> Result<EnvoyHistogramVecId, envoy_dynamic_module_type_metrics_result>;
 
+  /// Increment the counter with the given id from the config context.
+  ///
+  /// Unlike [`EnvoyHttpFilter::increment_counter`], this does not require a per-stream filter and
+  /// can be called outside of the request lifecycle, for example from a scheduled background task.
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increment the counter vec with the given id from the config context.
+  fn increment_counter_vec(
+    &self,
+    id: EnvoyCounterVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase the gauge with the given id from the config context.
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase the gauge vec with the given id from the config context.
+  fn increase_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease the gauge with the given id from the config context.
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease the gauge vec with the given id from the config context.
+  fn decrease_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of the gauge with the given id from the config context.
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of the gauge vec with the given id from the config context.
+  fn set_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in the histogram with the given id from the config context.
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in the histogram vec with the given id from the config context.
+  fn record_histogram_value_vec(
+    &self,
+    id: EnvoyHistogramVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
   /// Create a new implementation of the [`EnvoyHttpFilterConfigScheduler`] trait.
   ///
   /// This can be used to schedule an event to the main thread where the filter config is running.
@@ -469,15 +547,14 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
     name: &str,
     labels: &[&str],
   ) -> Result<EnvoyCounterVecId, envoy_dynamic_module_type_metrics_result> {
-    let labels_ptr = labels.as_ptr();
-    let labels_size = labels.len();
+    let mut label_bufs = strs_to_module_buffers(labels);
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_http_filter_config_define_counter(
         self.raw_ptr,
         str_to_module_buffer(name),
-        labels_ptr as *const _ as *mut _,
-        labels_size,
+        label_bufs.as_mut_ptr(),
+        label_bufs.len(),
         &mut id,
       )
     })?;
@@ -506,15 +583,14 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
     name: &str,
     labels: &[&str],
   ) -> Result<EnvoyGaugeVecId, envoy_dynamic_module_type_metrics_result> {
-    let labels_ptr = labels.as_ptr();
-    let labels_size = labels.len();
+    let mut label_bufs = strs_to_module_buffers(labels);
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_http_filter_config_define_gauge(
         self.raw_ptr,
         str_to_module_buffer(name),
-        labels_ptr as *const _ as *mut _,
-        labels_size,
+        label_bufs.as_mut_ptr(),
+        label_bufs.len(),
         &mut id,
       )
     })?;
@@ -543,19 +619,208 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
     name: &str,
     labels: &[&str],
   ) -> Result<EnvoyHistogramVecId, envoy_dynamic_module_type_metrics_result> {
-    let labels_ptr = labels.as_ptr();
-    let labels_size = labels.len();
+    let mut label_bufs = strs_to_module_buffers(labels);
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_http_filter_config_define_histogram(
         self.raw_ptr,
         str_to_module_buffer(name),
-        labels_ptr as *const _ as *mut _,
-        labels_size,
+        label_bufs.as_mut_ptr(),
+        label_bufs.len(),
         &mut id,
       )
     })?;
     Ok(EnvoyHistogramVecId(id))
+  }
+
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_increment_counter(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn increment_counter_vec(
+    &self,
+    id: EnvoyCounterVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterVecId(id) = id;
+    let mut label_bufs = strs_to_module_buffers(labels);
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_increment_counter(
+        self.raw_ptr,
+        id,
+        label_bufs.as_mut_ptr(),
+        label_bufs.len(),
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_increment_gauge(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn increase_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let mut label_bufs = strs_to_module_buffers(labels);
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_increment_gauge(
+        self.raw_ptr,
+        id,
+        label_bufs.as_mut_ptr(),
+        label_bufs.len(),
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_decrement_gauge(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn decrease_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let mut label_bufs = strs_to_module_buffers(labels);
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_decrement_gauge(
+        self.raw_ptr,
+        id,
+        label_bufs.as_mut_ptr(),
+        label_bufs.len(),
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_set_gauge(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn set_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let mut label_bufs = strs_to_module_buffers(labels);
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_set_gauge(
+        self.raw_ptr,
+        id,
+        label_bufs.as_mut_ptr(),
+        label_bufs.len(),
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_record_histogram_value(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn record_histogram_value_vec(
+    &self,
+    id: EnvoyHistogramVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramVecId(id) = id;
+    let mut label_bufs = strs_to_module_buffers(labels);
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_record_histogram_value(
+        self.raw_ptr,
+        id,
+        label_bufs.as_mut_ptr(),
+        label_bufs.len(),
+        value,
+      )
+    })?;
+    Ok(())
   }
 
   fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterConfigScheduler> {
@@ -895,6 +1160,18 @@ pub trait EnvoyHttpFilter {
   ///
   /// Returns true if the operation is successful.
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str);
+
+  /// Set multiple string-typed dynamic metadata entries under `namespace` in a single call.
+  ///
+  /// Equivalent to calling [`Self::set_dynamic_metadata_string`] once per entry but resolves the
+  /// namespace and merges into the metadata struct only once. Existing entries with the same key
+  /// are overwritten. Within `entries`, a later entry overwrites an earlier one with the same key.
+  /// An empty `entries` is a no-op and does not create the namespace.
+  fn set_dynamic_metadata_string_batch<'a>(
+    &mut self,
+    namespace: &'a str,
+    entries: &'a [(&'a str, &'a str)],
+  );
 
   /// Get the bool-typed metadata value with the given key.
   /// Use the `source` parameter to specify which metadata to use.
@@ -1721,6 +1998,14 @@ pub trait EnvoySpan {
   /// reported to the tracing system.
   fn set_sampled(&self, sampled: bool);
 
+  /// Stop using the Envoy local tracing decision for this span.
+  ///
+  /// Combined with [`EnvoySpan::set_sampled`], this keeps a filter's sampling decision when Envoy
+  /// refreshes tracing after a route cache change. With the OpenTelemetry tracer the connection
+  /// manager does not re-derive the decision after a route cache change. Other tracers may not
+  /// support this.
+  fn disable_local_decision(&self);
+
   /// Get a baggage value from this span.
   ///
   /// Baggage data may have been set by this span or any parent spans.
@@ -1796,6 +2081,12 @@ impl EnvoySpan for EnvoySpanImpl {
   fn set_sampled(&self, sampled: bool) {
     unsafe {
       abi::envoy_dynamic_module_callback_http_span_set_sampled(self.raw_ptr, sampled);
+    }
+  }
+
+  fn disable_local_decision(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_disable_local_decision(self.raw_ptr);
     }
   }
 
@@ -2336,6 +2627,30 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
+  fn set_dynamic_metadata_string_batch(&mut self, namespace: &str, entries: &[(&str, &str)]) {
+    // `pairs` borrows the key/value bytes of `entries`, which outlive this call. Envoy copies the
+    // bytes into the metadata Struct synchronously, so the pointers never dangle. An empty
+    // `entries` yields an empty Vec paired with a zero length the callback treats as a no-op.
+    let mut pairs: Vec<abi::envoy_dynamic_module_type_module_key_value_pair> =
+      Vec::with_capacity(entries.len());
+    for (key, value) in entries {
+      pairs.push(abi::envoy_dynamic_module_type_module_key_value_pair {
+        key_ptr: key.as_ptr() as *const _,
+        key_length: key.len(),
+        value_ptr: value.as_ptr() as *const _,
+        value_length: value.len(),
+      });
+    }
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        pairs.as_ptr(),
+        pairs.len(),
+      )
+    }
+  }
+
   fn get_metadata_bool(
     &self,
     source: abi::envoy_dynamic_module_type_metadata_source,
@@ -2385,28 +2700,20 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     if count == 0 {
       return None;
     }
-    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null(),
-        length: 0,
-      };
-      count
-    ];
+    let mut buffers: Vec<EnvoyBuffer> = Vec::with_capacity(count);
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_metadata_keys(
         self.raw_ptr,
         source,
         str_to_module_buffer(namespace),
-        buffers.as_mut_ptr() as *mut _,
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if success {
-      Some(
-        buffers
-          .into_iter()
-          .map(|b| unsafe { EnvoyBuffer::new_from_raw(b.ptr as *const _, b.length) })
-          .collect(),
-      )
+      unsafe {
+        buffers.set_len(count);
+      }
+      Some(buffers)
     } else {
       None
     }
@@ -2422,27 +2729,19 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     if count == 0 {
       return None;
     }
-    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null(),
-        length: 0,
-      };
-      count
-    ];
+    let mut buffers: Vec<EnvoyBuffer> = Vec::with_capacity(count);
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_metadata_namespaces(
         self.raw_ptr,
         source,
-        buffers.as_mut_ptr() as *mut _,
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if success {
-      Some(
-        buffers
-          .into_iter()
-          .map(|b| unsafe { EnvoyBuffer::new_from_raw(b.ptr as *const _, b.length) })
-          .collect(),
-      )
+      unsafe {
+        buffers.set_len(count);
+      }
+      Some(buffers)
     } else {
       None
     }
@@ -2651,15 +2950,18 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       return None;
     }
 
-    let buffers: Vec<EnvoyMutBuffer> = vec![EnvoyMutBuffer::default(); size];
+    let mut buffers: Vec<EnvoyMutBuffer> = Vec::with_capacity(size);
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_body_chunks(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::ReceivedRequestBody,
-        buffers.as_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if success {
+      unsafe {
+        buffers.set_len(size);
+      }
       Some(buffers)
     } else {
       None
@@ -2677,15 +2979,18 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       return None;
     }
 
-    let buffers: Vec<EnvoyMutBuffer> = vec![EnvoyMutBuffer::default(); size];
+    let mut buffers: Vec<EnvoyMutBuffer> = Vec::with_capacity(size);
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_body_chunks(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::BufferedRequestBody,
-        buffers.as_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if success {
+      unsafe {
+        buffers.set_len(size);
+      }
       Some(buffers)
     } else {
       None
@@ -2761,15 +3066,18 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       return None;
     }
 
-    let buffers: Vec<EnvoyMutBuffer> = vec![EnvoyMutBuffer::default(); size];
+    let mut buffers: Vec<EnvoyMutBuffer> = Vec::with_capacity(size);
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_body_chunks(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::ReceivedResponseBody,
-        buffers.as_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if success {
+      unsafe {
+        buffers.set_len(size);
+      }
       Some(buffers)
     } else {
       None
@@ -2787,15 +3095,18 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       return None;
     }
 
-    let buffers: Vec<EnvoyMutBuffer> = vec![EnvoyMutBuffer::default(); size];
+    let mut buffers: Vec<EnvoyMutBuffer> = Vec::with_capacity(size);
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_body_chunks(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::BufferedResponseBody,
-        buffers.as_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if success {
+      unsafe {
+        buffers.set_len(size);
+      }
       Some(buffers)
     } else {
       None
@@ -3149,12 +3460,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
     let EnvoyCounterVecId(id) = id;
+    let mut label_bufs = strs_to_module_buffers(labels);
     let res = unsafe {
       abi::envoy_dynamic_module_callback_http_filter_increment_counter(
         self.raw_ptr,
         id,
-        labels.as_ptr() as *const _ as *mut _,
-        labels.len(),
+        label_bufs.as_mut_ptr(),
+        label_bufs.len(),
         value,
       )
     };
@@ -3194,12 +3506,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
     let EnvoyGaugeVecId(id) = id;
+    let mut label_bufs = strs_to_module_buffers(labels);
     let res = unsafe {
       abi::envoy_dynamic_module_callback_http_filter_increment_gauge(
         self.raw_ptr,
         id,
-        labels.as_ptr() as *const _ as *mut _,
-        labels.len(),
+        label_bufs.as_mut_ptr(),
+        label_bufs.len(),
         value,
       )
     };
@@ -3239,12 +3552,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
     let EnvoyGaugeVecId(id) = id;
+    let mut label_bufs = strs_to_module_buffers(labels);
     let res = unsafe {
       abi::envoy_dynamic_module_callback_http_filter_decrement_gauge(
         self.raw_ptr,
         id,
-        labels.as_ptr() as *const _ as *mut _,
-        labels.len(),
+        label_bufs.as_mut_ptr(),
+        label_bufs.len(),
         value,
       )
     };
@@ -3284,12 +3598,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
     let EnvoyGaugeVecId(id) = id;
+    let mut label_bufs = strs_to_module_buffers(labels);
     let res = unsafe {
       abi::envoy_dynamic_module_callback_http_filter_set_gauge(
         self.raw_ptr,
         id,
-        labels.as_ptr() as *const _ as *mut _,
-        labels.len(),
+        label_bufs.as_mut_ptr(),
+        label_bufs.len(),
         value,
       )
     };
@@ -3325,12 +3640,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
     let EnvoyHistogramVecId(id) = id;
+    let mut label_bufs = strs_to_module_buffers(labels);
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_http_filter_record_histogram_value(
         self.raw_ptr,
         id,
-        labels.as_ptr() as *const _ as *mut _,
-        labels.len(),
+        label_bufs.as_mut_ptr(),
+        label_bufs.len(),
         value,
       )
     })?;
@@ -3606,14 +3922,13 @@ impl EnvoyHttpFilterImpl {
         headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
       )
     };
+    if !success {
+      return Vec::default();
+    }
     unsafe {
       headers.set_len(count);
     }
-    if success {
-      headers
-    } else {
-      Vec::default()
-    }
+    headers
   }
 
   /// This implements the common logic for getting the header/trailer values.
@@ -3660,8 +3975,8 @@ impl EnvoyHttpFilterImpl {
 
     let mut count: usize = 0;
 
-    // Get the first value to get the count.
-    let ret = unsafe {
+    // The indexed getter reports the total number of values via its size output.
+    let found = unsafe {
       abi::envoy_dynamic_module_callback_http_get_header(
         self.raw_ptr,
         header_type,
@@ -3672,31 +3987,25 @@ impl EnvoyHttpFilterImpl {
       )
     };
 
-    let mut results = Vec::new();
-    if count == 0 || !ret {
-      return results;
+    if !found || count == 0 {
+      return Vec::new();
     }
 
-    // At this point, we assume at least one value is present.
-    results.push(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) });
-    // So, we iterate from 1 to count - 1.
-    for i in 1..count {
-      let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null(),
-        length: 0,
-      };
-      unsafe {
-        abi::envoy_dynamic_module_callback_http_get_header(
-          self.raw_ptr,
-          header_type,
-          str_to_module_buffer(key),
-          &mut result as *mut _ as *mut _,
-          i,
-          std::ptr::null_mut(),
-        )
-      };
-      // Within the range, all results are guaranteed to be non-null by Envoy.
-      results.push(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) });
+    // Fill all values in a single crossing instead of one call per value.
+    let mut results: Vec<EnvoyBuffer> = Vec::with_capacity(count);
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_header_values(
+        self.raw_ptr,
+        header_type,
+        str_to_module_buffer(key),
+        results.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+      )
+    };
+    if !success {
+      return Vec::new();
+    }
+    unsafe {
+      results.set_len(count);
     }
     results
   }

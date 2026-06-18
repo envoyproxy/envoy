@@ -18,6 +18,7 @@
 #include "test/extensions/filters/http/dynamic_forward_proxy/test_resolver.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/test_common/registry.h"
+#include "source/common/common/logger.h"
 #include "test/test_common/test_random_generator.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -86,7 +87,11 @@ public:
     Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
   }
 
+  ~ClientIntegrationTest() override { Logger::Context::changeAllLogLevels(spdlog::level::info); }
+
   void initialize() override {
+    builder_.setLogLevel(log_level_);
+    Logger::Context::changeAllLogLevels(static_cast<spdlog::level::level_enum>(log_level_));
     builder_.enableWorkerThread(getUseWorkerThread());
     if (getUseWorkerThread()) {
       // Platform cert validation is disabled when using worker thread. The engine will use the
@@ -95,10 +100,10 @@ public:
     }
     // Integration test starts upstreams before Envoy which can cause a data race.
     builder_.enableLogger(false);
-    builder_.setLogLevel(Logger::Logger::trace);
     builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
     builder_.addRuntimeGuard("quic_no_tcp_delay", true);
     builder_.addRuntimeGuard("mobile_use_network_observer_registry", true);
+    builder_.addRuntimeGuard("getaddrinfo_no_ai_flags", true);
 
     if (getCodecType() == Http::CodecType::HTTP3) {
       setUpstreamProtocol(Http::CodecType::HTTP3);
@@ -212,6 +217,7 @@ public:
   }
 
 protected:
+  Logger::Logger::Levels log_level_ = Logger::Logger::info;
   std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
   bool add_quic_hints_ = false;
   bool add_fake_dns_ = false;
@@ -307,6 +313,7 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
   builder_.setDnsResolver(dns_resolver_config);
 
   builder_.setDisableDnsRefreshOnFailure(true);
+  log_level_ = Logger::Logger::debug;
   initialize();
 
   default_request_headers_.setHost("doesnotexist");
@@ -333,6 +340,7 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnNetworkChange) {
         }
       });
   builder_.setDisableDnsRefreshOnNetworkChange(true);
+  log_level_ = Logger::Logger::debug;
   initialize();
 
   internalEngine()->onDefaultNetworkChanged(1);
@@ -353,6 +361,7 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEvents) {
         }
       });
   builder_.setDisableDnsRefreshOnNetworkChange(false);
+  log_level_ = Logger::Logger::trace;
   initialize();
 
   // Set the network type to WIFI. This should trigger a network change.
@@ -413,7 +422,7 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEventsAndroid) {
         }
       });
   builder_.setDisableDnsRefreshOnNetworkChange(false);
-
+  log_level_ = Logger::Logger::trace;
   initialize();
 
   // A new WIFI network appears and becomes the default network. Even though

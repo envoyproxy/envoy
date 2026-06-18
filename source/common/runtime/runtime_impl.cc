@@ -45,7 +45,21 @@ void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
   stats.deprecated_feature_seen_since_process_start_.inc();
 }
 
-void refreshReloadableFlags(const Snapshot::EntryMap& flag_map) {
+void refreshReloadableFlags(const Snapshot::EntryMap& flag_map,
+                            absl::node_hash_map<std::string, bool>& runtime_feature_defaults) {
+  for (const auto& it : flag_map) {
+    if (it.second.bool_value_.has_value() && isRuntimeFeature(it.first)) {
+      runtime_feature_defaults.try_emplace(it.first, Runtime::runtimeFeatureEnabled(it.first));
+    }
+  }
+
+  for (const auto& it : runtime_feature_defaults) {
+    const auto flag = flag_map.find(it.first);
+    if (flag == flag_map.end() || !flag->second.bool_value_.has_value()) {
+      maybeSetRuntimeGuard(it.first, it.second);
+    }
+  }
+
   for (const auto& it : flag_map) {
     if (it.second.bool_value_.has_value() && isRuntimeFeature(it.first)) {
       maybeSetRuntimeGuard(it.first, it.second.bool_value_.value());
@@ -579,8 +593,8 @@ RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& 
   if (!valid.ok()) {
     return valid;
   }
-  const auto& runtime =
-      dynamic_cast<const envoy::service::runtime::v3::Runtime&>(resources[0].get().resource());
+  const auto& runtime = Envoy::Protobuf::DynamicCastMessage<envoy::service::runtime::v3::Runtime>(
+      resources[0].get().resource());
   if (runtime.name() != resource_name_) {
     return absl::InvalidArgumentError(
         fmt::format("Unexpected RTDS runtime (expecting {}): {}", resource_name_, runtime.name()));
@@ -654,7 +668,7 @@ absl::Status LoaderImpl::loadNewSnapshot() {
     return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(ptr);
   });
 
-  refreshReloadableFlags(ptr->values());
+  refreshReloadableFlags(ptr->values(), runtime_feature_defaults_);
 
   {
     absl::MutexLock lock(snapshot_mutex_);
