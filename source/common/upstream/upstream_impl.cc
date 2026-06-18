@@ -159,7 +159,7 @@ absl::StatusOr<std::shared_ptr<const Http::ClientCodecFactory>> findUpstreamHttp
           "typed_extension_protocol_options; at most one is allowed");
     }
     // Aliasing shared_ptr: shares ownership with the options object (the factory and the options
-    // object are the same instance) while pointing at the ClientCodecFactory subobject.
+    // object are the same instance) while exposing it as a ClientCodecFactory.
     found = std::shared_ptr<const Http::ClientCodecFactory>(option, &factory.ref());
   }
   return found;
