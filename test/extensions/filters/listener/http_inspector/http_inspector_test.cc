@@ -445,6 +445,21 @@ TEST_P(HttpInspectorTest, InvalidHttpMethod) {
   testHttpInspectNotFound(header);
 }
 
+TEST_P(HttpInspectorTest, JmxRmiBinaryPayload) {
+  const absl::string_view header("\x4a\x52\x4d\x49\x00\x02\x4b", 7);
+  testHttpInspectNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, BinaryWithEmbeddedNul) {
+  const absl::string_view header("\x4e\x00\x00\x00\x0a", 5);
+  testHttpInspectNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, HighBitBinaryPayload) {
+  const absl::string_view header("\xff\xfe\xfd\xfc", 4);
+  testHttpInspectNotFound(header);
+}
+
 TEST_P(HttpInspectorTest, InvalidHttpRequestLine) {
   const absl::string_view header = "BAD /anything HTTP/1.1\r\n";
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
