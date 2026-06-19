@@ -182,12 +182,12 @@ public:
                              StatsMatcherSharedPtr matcher = nullptr) {
     return rootScope()->createScope(name, evictable, limits, std::move(matcher));
   }
-  ScopeSharedPtr createScope(absl::string_view base_name, TagStringViewSpan name_tags,
-                             absl::string_view tagged_name, bool evictable = false,
-                             const ScopeStatsLimitSettings& limits = {},
-                             StatsMatcherSharedPtr matcher = nullptr) {
-    return rootScope()->createScope(base_name, name_tags, tagged_name, evictable, limits,
-                                    std::move(matcher));
+  ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name, TagStringViewSpan name_tags,
+                                           absl::string_view tagged_name, bool evictable = false,
+                                           const ScopeStatsLimitSettings& limits = {},
+                                           StatsMatcherSharedPtr matcher = nullptr) {
+    return rootScope()->createScopeWithTaggedName(base_name, name_tags, tagged_name, evictable,
+                                                  limits, std::move(matcher));
   }
 
   /**

@@ -61,11 +61,9 @@ ConstScopeSharedPtr IsolatedStoreImpl::constRootScope() const {
 
 IsolatedStoreImpl::~IsolatedStoreImpl() = default;
 
-ScopeSharedPtr IsolatedScopeImpl::createScope(absl::string_view base_name,
-                                              TagStringViewSpan name_tags,
-                                              absl::string_view tagged_name, bool evictable,
-                                              const ScopeStatsLimitSettings& limits,
-                                              StatsMatcherSharedPtr matcher) {
+ScopeSharedPtr IsolatedScopeImpl::createScopeWithTaggedName(
+    absl::string_view base_name, TagStringViewSpan name_tags, absl::string_view tagged_name,
+    bool evictable, const ScopeStatsLimitSettings& limits, StatsMatcherSharedPtr matcher) {
   // Intern the string-based tag-extracted name, name_tags and (optional) tagged name into a
   // temporary pool, then delegate to the StatName-based variant.
   StatNamePool tag_pool(symbolTable());
@@ -83,14 +81,14 @@ ScopeSharedPtr IsolatedScopeImpl::createScope(absl::string_view base_name,
   for (const auto& [tag, value] : name_tags) {
     stat_name_tags.emplace_back(tag_pool.add(tag), tag_pool.add(value));
   }
-  return scopeFromStatName(stat_name, stat_name_tags, stat_tagged_name, evictable, limits,
-                           std::move(matcher));
+  return scopeFromTaggedName(stat_name, stat_name_tags, stat_tagged_name, evictable, limits,
+                             std::move(matcher));
 }
 
-ScopeSharedPtr IsolatedScopeImpl::scopeFromStatName(StatName base_name, StatNameTagSpan name_tags,
-                                                    StatName tagged_name, bool,
-                                                    const ScopeStatsLimitSettings&,
-                                                    StatsMatcherSharedPtr matcher) {
+ScopeSharedPtr IsolatedScopeImpl::scopeFromTaggedName(StatName base_name, StatNameTagSpan name_tags,
+                                                      StatName tagged_name, bool,
+                                                      const ScopeStatsLimitSettings&,
+                                                      StatsMatcherSharedPtr matcher) {
   // Combine this scope's tag-extracted/tagged prefix with the new scope element to derive the
   // child's flat prefix.
   const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(), base_name,

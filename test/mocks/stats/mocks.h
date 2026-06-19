@@ -297,22 +297,16 @@ class MockScope : public TestUtil::TestScope {
 public:
   MockScope(StatName prefix, MockStore& store);
 
-  // Keep the base's non-virtual convenience overloads visible alongside the tag-aware overrides.
-  using TestUtil::TestScope::counterFromStatName;
-  using TestUtil::TestScope::createScope;
-  using TestUtil::TestScope::gaugeFromStatName;
-  using TestUtil::TestScope::histogramFromStatName;
-  using TestUtil::TestScope::scopeFromStatName;
-  using TestUtil::TestScope::textReadoutFromStatName;
-  ScopeSharedPtr createScope(absl::string_view base_name, TagStringViewSpan, absl::string_view,
-                             bool evictable, const ScopeStatsLimitSettings& limits,
-                             StatsMatcherSharedPtr) override {
+  ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name, TagStringViewSpan,
+                                           absl::string_view, bool evictable,
+                                           const ScopeStatsLimitSettings& limits,
+                                           StatsMatcherSharedPtr) override {
     checkCreateScopeArgs(evictable, limits);
     return ScopeSharedPtr(createScope_(std::string(base_name)));
   }
-  ScopeSharedPtr scopeFromStatName(StatName base_name, StatNameTagSpan, StatName, bool evictable,
-                                   const ScopeStatsLimitSettings& limits,
-                                   StatsMatcherSharedPtr) override {
+  ScopeSharedPtr scopeFromTaggedName(StatName base_name, StatNameTagSpan, StatName, bool evictable,
+                                     const ScopeStatsLimitSettings& limits,
+                                     StatsMatcherSharedPtr) override {
     checkCreateScopeArgs(evictable, limits);
     return createScope_(symbolTable().toString(base_name));
   }
@@ -328,17 +322,17 @@ public:
   // back to the old string-based mechanisms still on the MockStore object
   // to allow tests to inject EXPECT_CALL hooks for those. The optional pre-built tagged_name is
   // ignored.
-  MOCK_METHOD(Counter&, counterFromStatName, (StatName, absl::optional<StatNameTagSpan>, StatName),
-              (override));
+  MOCK_METHOD(Counter&, counterFromTaggedName,
+              (StatName, absl::optional<StatNameTagSpan>, StatName), (override));
   // NOLINTNEXTLINE(readability-identifier-naming)
-  Counter& counterFromStatName_(StatName base_name, absl::optional<StatNameTagSpan>, StatName);
+  Counter& counterFromTaggedName_(StatName base_name, absl::optional<StatNameTagSpan>, StatName);
 
-  Gauge& gaugeFromStatName(StatName base_name, absl::optional<StatNameTagSpan>, StatName,
-                           Gauge::ImportMode import_mode) override;
-  Histogram& histogramFromStatName(StatName base_name, absl::optional<StatNameTagSpan>, StatName,
-                                   Histogram::Unit unit) override;
-  TextReadout& textReadoutFromStatName(StatName base_name, absl::optional<StatNameTagSpan>,
-                                       StatName) override;
+  Gauge& gaugeFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan>, StatName,
+                             Gauge::ImportMode import_mode) override;
+  Histogram& histogramFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan>, StatName,
+                                     Histogram::Unit unit) override;
+  TextReadout& textReadoutFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan>,
+                                         StatName) override;
 
   MockStore& mock_store_;
 };

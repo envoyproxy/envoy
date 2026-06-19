@@ -157,7 +157,7 @@ TEST_F(StatsIsolatedStoreImplTest, PrefixIsStatName) {
 TEST_F(StatsIsolatedStoreImplTest, ScopeFromTagsWithoutExplicitTaggedName) {
   StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
   ScopeSharedPtr cluster_scope =
-      scope_->scopeFromStatName(makeStatName("cluster"), StatNameTagSpan(name_tags), StatName());
+      scope_->scopeFromTaggedName(makeStatName("cluster"), StatNameTagSpan(name_tags), StatName());
   EXPECT_EQ("cluster.cluster_name.foo", symbol_table_.toString(cluster_scope->prefix()));
 
   Counter& c = cluster_scope->counterFromString("upstream_rq");
@@ -167,7 +167,8 @@ TEST_F(StatsIsolatedStoreImplTest, ScopeFromTagsWithoutExplicitTaggedName) {
 
   // Same behavior via the string-view createScope path.
   std::vector<TagStringView> sv_tags{{"cluster_name", "bar"}};
-  ScopeSharedPtr bar_scope = scope_->createScope("cluster", sv_tags, /*tagged_name=*/"");
+  ScopeSharedPtr bar_scope =
+      scope_->createScopeWithTaggedName("cluster", sv_tags, /*tagged_name=*/"");
   EXPECT_EQ("cluster.cluster_name.bar", symbol_table_.toString(bar_scope->prefix()));
   EXPECT_EQ("cluster.cluster_name.bar.upstream_rq",
             bar_scope->counterFromString("upstream_rq").name());
@@ -580,8 +581,8 @@ TEST_F(IsolatedStoreScopeMatcherTest, ChildScopeOverridesMatcher) {
 TEST_F(StatsIsolatedStoreImplTest, CounterNameAndNameTags) {
   StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
   Counter& c =
-      scope_->counterFromStatName(makeStatName("cluster.upstream_rq"), StatNameTagSpan(name_tags),
-                                  makeStatName("cluster.foo.up"));
+      scope_->counterFromTaggedName(makeStatName("cluster.upstream_rq"), StatNameTagSpan(name_tags),
+                                    makeStatName("cluster.foo.up"));
   EXPECT_EQ("cluster.foo.up", c.name());
   EXPECT_EQ("cluster.upstream_rq", c.tagExtractedName());
   ASSERT_EQ(1, c.tags().size());
@@ -593,8 +594,8 @@ TEST_F(StatsIsolatedStoreImplTest, CounterNameAndNameTags) {
 // convention).
 TEST_F(StatsIsolatedStoreImplTest, CounterTagsAppendedWithoutTaggedName) {
   StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
-  Counter& c = scope_->counterFromStatName(makeStatName("upstream_rq"), StatNameTagSpan(name_tags),
-                                           StatName());
+  Counter& c = scope_->counterFromTaggedName(makeStatName("upstream_rq"),
+                                             StatNameTagSpan(name_tags), StatName());
   EXPECT_EQ("upstream_rq.cluster_name.foo", c.name());
   EXPECT_EQ("upstream_rq", c.tagExtractedName());
   ASSERT_EQ(1, c.tags().size());
@@ -606,7 +607,7 @@ TEST_F(StatsIsolatedStoreImplTest, CounterTagsAppendedWithoutTaggedName) {
 // propagated tag.
 TEST_F(StatsIsolatedStoreImplTest, ScopeTagsAreNotPropagated) {
   StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
-  ScopeSharedPtr cluster_scope = scope_->scopeFromStatName(
+  ScopeSharedPtr cluster_scope = scope_->scopeFromTaggedName(
       makeStatName("cluster"), StatNameTagSpan(name_tags), makeStatName("cluster.foo"));
   EXPECT_EQ("cluster.foo", symbol_table_.toString(cluster_scope->prefix()));
 
@@ -618,7 +619,7 @@ TEST_F(StatsIsolatedStoreImplTest, ScopeTagsAreNotPropagated) {
   // Per-stat name_tags still work: only the metric's own tag is attached.
   StatNameTagVector own{{makeStatName("method"), makeStatName("get")}};
   Counter& c2 =
-      cluster_scope->counterFromStatName(makeStatName("rq"), StatNameTagSpan(own), StatName());
+      cluster_scope->counterFromTaggedName(makeStatName("rq"), StatNameTagSpan(own), StatName());
   EXPECT_EQ("cluster.foo.rq.method.get", c2.name());
   EXPECT_EQ("cluster.foo.rq", c2.tagExtractedName());
   ASSERT_EQ(1, c2.tags().size());
@@ -639,7 +640,8 @@ TEST_F(StatsIsolatedStoreImplTest, LegacyScopeApiStillWorks) {
 // the scope-level tags (none propagate to child stats).
 TEST_F(StatsIsolatedStoreImplTest, CreateScopeWithTagStringViewsDropsScopeTags) {
   std::vector<TagStringView> name_tags{{"cluster_name", "foo"}};
-  ScopeSharedPtr cluster_scope = scope_->createScope("cluster", name_tags, "cluster.foo");
+  ScopeSharedPtr cluster_scope =
+      scope_->createScopeWithTaggedName("cluster", name_tags, "cluster.foo");
   EXPECT_EQ("cluster.foo", symbol_table_.toString(cluster_scope->prefix()));
 
   Counter& c = cluster_scope->counterFromString("upstream_rq");
@@ -650,7 +652,8 @@ TEST_F(StatsIsolatedStoreImplTest, CreateScopeWithTagStringViewsDropsScopeTags) 
 
 TEST_F(StatsIsolatedStoreImplTest, CreateScopeWithTagStringViewsDropsScopeTags2) {
   std::vector<TagStringView> name_tags{{"cluster_name", "foo"}};
-  ScopeSharedPtr cluster_scope = scope_->createScope("cluster", name_tags, /*tagged_name=*/"");
+  ScopeSharedPtr cluster_scope =
+      scope_->createScopeWithTaggedName("cluster", name_tags, /*tagged_name=*/"");
   EXPECT_EQ("cluster.cluster_name.foo", symbol_table_.toString(cluster_scope->prefix()));
 
   Counter& c = cluster_scope->counterFromString("upstream_rq");
@@ -663,7 +666,7 @@ TEST_F(StatsIsolatedStoreImplTest, CreateScopeWithTagStringViewsDropsScopeTags2)
 // just counters/gauges.
 TEST_F(StatsIsolatedStoreImplTest, HistogramAndTextReadoutNameAndNameTags) {
   StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
-  Histogram& h = scope_->histogramFromStatName(
+  Histogram& h = scope_->histogramFromTaggedName(
       makeStatName("cluster.rq_time"), StatNameTagSpan(name_tags),
       makeStatName("cluster.foo.rq_time"), Histogram::Unit::Unspecified);
   EXPECT_EQ("cluster.foo.rq_time", h.name());
@@ -672,8 +675,8 @@ TEST_F(StatsIsolatedStoreImplTest, HistogramAndTextReadoutNameAndNameTags) {
   EXPECT_EQ("foo", h.tags()[0].value_);
 
   TextReadout& t =
-      scope_->textReadoutFromStatName(makeStatName("cluster.version"), StatNameTagSpan(name_tags),
-                                      makeStatName("cluster.foo.version"));
+      scope_->textReadoutFromTaggedName(makeStatName("cluster.version"), StatNameTagSpan(name_tags),
+                                        makeStatName("cluster.foo.version"));
   EXPECT_EQ("cluster.foo.version", t.name());
   EXPECT_EQ("cluster.version", t.tagExtractedName());
   ASSERT_EQ(1, t.tags().size());

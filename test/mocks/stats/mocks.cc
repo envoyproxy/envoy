@@ -83,29 +83,29 @@ MockSinkPredicates::~MockSinkPredicates() = default;
 
 MockScope::MockScope(StatName prefix, MockStore& store)
     : TestUtil::TestScope(prefix, store), mock_store_(store) {
-  ON_CALL(*this, counterFromStatName(_, _, _))
+  ON_CALL(*this, counterFromTaggedName(_, _, _))
       .WillByDefault(Invoke([this](StatName base_name, absl::optional<StatNameTagSpan> name_tags,
                                    StatName tagged_name) -> Counter& {
-        return counterFromStatName_(base_name, name_tags, tagged_name);
+        return counterFromTaggedName_(base_name, name_tags, tagged_name);
       }));
 }
 
-Counter& MockScope::counterFromStatName_(StatName base_name, absl::optional<StatNameTagSpan>,
-                                         StatName) {
+Counter& MockScope::counterFromTaggedName_(StatName base_name, absl::optional<StatNameTagSpan>,
+                                           StatName) {
   // We always just respond with the mocked counter, so the tags don't matter.
   return mock_store_.counter(symbolTable().toString(base_name));
 }
-Gauge& MockScope::gaugeFromStatName(StatName base_name, absl::optional<StatNameTagSpan>, StatName,
-                                    Gauge::ImportMode import_mode) {
+Gauge& MockScope::gaugeFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan>, StatName,
+                                      Gauge::ImportMode import_mode) {
   // We always just respond with the mocked gauge, so the tags don't matter.
   return mock_store_.gauge(symbolTable().toString(base_name), import_mode);
 }
-Histogram& MockScope::histogramFromStatName(StatName base_name, absl::optional<StatNameTagSpan>,
-                                            StatName, Histogram::Unit unit) {
+Histogram& MockScope::histogramFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan>,
+                                              StatName, Histogram::Unit unit) {
   return mock_store_.histogram(symbolTable().toString(base_name), unit);
 }
-TextReadout& MockScope::textReadoutFromStatName(StatName base_name, absl::optional<StatNameTagSpan>,
-                                                StatName) {
+TextReadout& MockScope::textReadoutFromTaggedName(StatName base_name,
+                                                  absl::optional<StatNameTagSpan>, StatName) {
   // We always just respond with the mocked counter, so the tags don't matter.
   return mock_store_.textReadout(symbolTable().toString(base_name));
 }

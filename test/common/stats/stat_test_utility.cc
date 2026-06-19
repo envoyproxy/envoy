@@ -182,40 +182,40 @@ void TestScope::verifyConsistency(StatName ref_stat_name, StatName base_name,
                       " stat_name=", symbolTable().toString(joined_stat_name)));
 }
 
-Counter& TestScope::counterFromStatName(StatName base_name,
-                                        absl::optional<StatNameTagSpan> name_tags,
-                                        StatName tagged_name) {
+Counter& TestScope::counterFromTaggedName(StatName base_name,
+                                          absl::optional<StatNameTagSpan> name_tags,
+                                          StatName tagged_name) {
   std::string flat_name = statNameWithTags(base_name, name_tags, tagged_name);
   Counter*& counter_ref = store_.counter_map_[flat_name];
   if (counter_ref == nullptr) {
-    counter_ref = &IsolatedScopeImpl::counterFromStatName(base_name, name_tags, tagged_name);
+    counter_ref = &IsolatedScopeImpl::counterFromTaggedName(base_name, name_tags, tagged_name);
   } else {
     verifyConsistency(counter_ref->statName(), base_name, name_tags, tagged_name);
   }
   return *counter_ref;
 }
 
-Gauge& TestScope::gaugeFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
-                                    StatName tagged_name, Gauge::ImportMode import_mode) {
+Gauge& TestScope::gaugeFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+                                      StatName tagged_name, Gauge::ImportMode import_mode) {
   std::string flat_name = statNameWithTags(base_name, name_tags, tagged_name);
   Gauge*& gauge_ref = store_.gauge_map_[flat_name];
   if (gauge_ref == nullptr) {
     gauge_ref =
-        &IsolatedScopeImpl::gaugeFromStatName(base_name, name_tags, tagged_name, import_mode);
+        &IsolatedScopeImpl::gaugeFromTaggedName(base_name, name_tags, tagged_name, import_mode);
   } else {
     verifyConsistency(gauge_ref->statName(), base_name, name_tags, tagged_name);
   }
   return *gauge_ref;
 }
 
-Histogram& TestScope::histogramFromStatName(StatName base_name,
-                                            absl::optional<StatNameTagSpan> name_tags,
-                                            StatName tagged_name, Histogram::Unit unit) {
+Histogram& TestScope::histogramFromTaggedName(StatName base_name,
+                                              absl::optional<StatNameTagSpan> name_tags,
+                                              StatName tagged_name, Histogram::Unit unit) {
   std::string flat_name = statNameWithTags(base_name, name_tags, tagged_name);
   Histogram*& histogram_ref = store_.histogram_map_[flat_name];
   if (histogram_ref == nullptr) {
     histogram_ref =
-        &IsolatedScopeImpl::histogramFromStatName(base_name, name_tags, tagged_name, unit);
+        &IsolatedScopeImpl::histogramFromTaggedName(base_name, name_tags, tagged_name, unit);
   } else {
     verifyConsistency(histogram_ref->statName(), base_name, name_tags, tagged_name);
   }

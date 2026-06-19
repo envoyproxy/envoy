@@ -101,7 +101,8 @@ public:
   ScopeSharedPtr createScope(absl::string_view name, bool evictable = false,
                              const ScopeStatsLimitSettings& limits = {},
                              StatsMatcherSharedPtr matcher = nullptr) {
-    return createScope(name, {}, absl::string_view{}, evictable, limits, std::move(matcher));
+    return createScopeWithTaggedName(name, {}, absl::string_view{}, evictable, limits,
+                                     std::move(matcher));
   }
 
   /**
@@ -118,10 +119,12 @@ public:
    * @param limits metric limits for counters, gauges and histograms allowed in this scope.
    * @param matcher optional per-scope stats matcher; replaces the store-level matcher when set.
    */
-  virtual ScopeSharedPtr createScope(absl::string_view base_name, TagStringViewSpan name_tags,
-                                     absl::string_view tagged_name, bool evictable = false,
-                                     const ScopeStatsLimitSettings& limits = {},
-                                     StatsMatcherSharedPtr matcher = nullptr) PURE;
+  virtual ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name,
+                                                   TagStringViewSpan name_tags,
+                                                   absl::string_view tagged_name,
+                                                   bool evictable = false,
+                                                   const ScopeStatsLimitSettings& limits = {},
+                                                   StatsMatcherSharedPtr matcher = nullptr) PURE;
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
@@ -139,12 +142,13 @@ public:
   ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
                                    const ScopeStatsLimitSettings& limits = {},
                                    StatsMatcherSharedPtr matcher = nullptr) {
-    return scopeFromStatName(name, {}, StatName(), evictable, limits, std::move(matcher));
+    return scopeFromTaggedName(name, {}, StatName(), evictable, limits, std::move(matcher));
   }
 
   /**
    * Allocate a new scope from a StatName, optionally supplying tags and a pre-built tagged name
-   * (with tag values interleaved). See the `createScope` variant for details and notes.
+   * (with tag values interleaved). See the `createScopeWithTaggedName` variant for details and
+   * notes.
    *
    * @param base_name supplies the scope's tag-extracted name.
    * @param name_tags tags to associate with (and propagate from) the scope.
@@ -155,10 +159,10 @@ public:
    * @param limits metric limits for counters, gauges and histograms allowed in this scope.
    * @param matcher optional per-scope stats matcher; replaces the store-level matcher when set.
    */
-  virtual ScopeSharedPtr scopeFromStatName(StatName base_name, StatNameTagSpan name_tags,
-                                           StatName tagged_name, bool evictable = false,
-                                           const ScopeStatsLimitSettings& limits = {},
-                                           StatsMatcherSharedPtr matcher = nullptr) PURE;
+  virtual ScopeSharedPtr scopeFromTaggedName(StatName base_name, StatNameTagSpan name_tags,
+                                             StatName tagged_name, bool evictable = false,
+                                             const ScopeStatsLimitSettings& limits = {},
+                                             StatsMatcherSharedPtr matcher = nullptr) PURE;
 
   /**
    * Creates a Counter from the tag-extracted name, tags and an optional pre-built tagged name.
@@ -170,13 +174,13 @@ public:
    *
    * @return a counter within the scope's namespace.
    */
-  virtual Counter& counterFromStatName(StatName base_name,
-                                       absl::optional<StatNameTagSpan> name_tags,
-                                       StatName tagged_name) PURE;
+  virtual Counter& counterFromTaggedName(StatName base_name,
+                                         absl::optional<StatNameTagSpan> name_tags,
+                                         StatName tagged_name) PURE;
 
   /**
    * Creates a Gauge from the tag-extracted name, tags and an optional pre-built tagged name.
-   * See the `counterFromStatName` variant for details and notes on name_tags and tagged_name.
+   * See the `counterFromTaggedName` variant for details and notes on name_tags and tagged_name.
    *
    * @param base_name The tag-extracted name of the stat (no tag values), obtained from the
    * SymbolTable.
@@ -187,12 +191,12 @@ public:
    * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.
    */
-  virtual Gauge& gaugeFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
-                                   StatName tagged_name, Gauge::ImportMode import_mode) PURE;
+  virtual Gauge& gaugeFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+                                     StatName tagged_name, Gauge::ImportMode import_mode) PURE;
 
   /**
    * Creates a Histogram from the tag-extracted name, tags and an optional pre-built tagged name.
-   * See the `counterFromStatName` variant for details and notes on name_tags and tagged_name.
+   * See the `counterFromTaggedName` variant for details and notes on name_tags and tagged_name.
    *
    * @param base_name The tag-extracted name of the stat (no tag values), obtained from the
    * SymbolTable.
@@ -203,13 +207,13 @@ public:
    * @param unit The unit of measurement.
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogramFromStatName(StatName base_name,
-                                           absl::optional<StatNameTagSpan> name_tags,
-                                           StatName tagged_name, Histogram::Unit unit) PURE;
+  virtual Histogram& histogramFromTaggedName(StatName base_name,
+                                             absl::optional<StatNameTagSpan> name_tags,
+                                             StatName tagged_name, Histogram::Unit unit) PURE;
 
   /**
    * Creates a TextReadout from the tag-extracted name, tags and an optional pre-built tagged name.
-   * See the `counterFromStatName` variant for details and notes on name_tags and tagged_name.
+   * See the `counterFromTaggedName` variant for details and notes on name_tags and tagged_name.
    *
    * @param base_name The tag-extracted name of the stat (no tag values), obtained from the
    * SymbolTable.
@@ -219,9 +223,9 @@ public:
    * by joining the base_name and name_tags.
    * @return a text readout within the scope's namespace.
    */
-  virtual TextReadout& textReadoutFromStatName(StatName base_name,
-                                               absl::optional<StatNameTagSpan> name_tags,
-                                               StatName tagged_name) PURE;
+  virtual TextReadout& textReadoutFromTaggedName(StatName base_name,
+                                                 absl::optional<StatNameTagSpan> name_tags,
+                                                 StatName tagged_name) PURE;
 
   /**
    * Creates a Counter from the stat name. Tag extraction will be performed on the name.
@@ -239,7 +243,7 @@ public:
    * @return a counter within the scope's namespace.
    */
   Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags) {
-    return counterFromStatName(name, toTagSpan(tags), StatName());
+    return counterFromTaggedName(name, toTagSpan(tags), StatName());
   }
 
   /**
@@ -269,7 +273,7 @@ public:
    */
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) {
-    return gaugeFromStatName(name, toTagSpan(tags), StatName(), import_mode);
+    return gaugeFromTaggedName(name, toTagSpan(tags), StatName(), import_mode);
   }
 
   /**
@@ -300,7 +304,7 @@ public:
    */
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) {
-    return histogramFromStatName(name, toTagSpan(tags), StatName(), unit);
+    return histogramFromTaggedName(name, toTagSpan(tags), StatName(), unit);
   }
 
   /**
@@ -329,7 +333,7 @@ public:
    */
   TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                StatNameTagVectorOptConstRef tags) {
-    return textReadoutFromStatName(name, toTagSpan(tags), StatName());
+    return textReadoutFromTaggedName(name, toTagSpan(tags), StatName());
   }
 
   /**

@@ -135,19 +135,15 @@ public:
   // to keep the maps up-to-date.
   //
   // Stats::Scope
-  // Keep the base's non-virtual convenience overloads visible alongside the tag-aware overrides.
-  using Scope::counterFromStatName;
-  using Scope::gaugeFromStatName;
-  using Scope::histogramFromStatName;
   Counter& counterFromString(const std::string& name) override;
   Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override;
   Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override;
-  Counter& counterFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
-                               StatName tagged_name) override;
-  Gauge& gaugeFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
-                           StatName tagged_name, Gauge::ImportMode import_mode) override;
-  Histogram& histogramFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
-                                   StatName tagged_name, Histogram::Unit unit) override;
+  Counter& counterFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+                                 StatName tagged_name) override;
+  Gauge& gaugeFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+                             StatName tagged_name, Gauge::ImportMode import_mode) override;
+  Histogram& histogramFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+                                     StatName tagged_name, Histogram::Unit unit) override;
   TestStore& store() override { return store_; }
   const TestStore& constStore() const override { return store_; }
 

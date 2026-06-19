@@ -2728,8 +2728,8 @@ public:
 TEST_F(ThreadLocalStoreTagScopeTest, CounterNameAndNameTags) {
   StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
   Counter& c =
-      scope_.counterFromStatName(makeStatName("cluster.upstream_rq"), StatNameTagSpan(name_tags),
-                                 makeStatName("cluster.foo.up"));
+      scope_.counterFromTaggedName(makeStatName("cluster.upstream_rq"), StatNameTagSpan(name_tags),
+                                   makeStatName("cluster.foo.up"));
   EXPECT_EQ("cluster.foo.up", c.name());
   EXPECT_EQ("cluster.upstream_rq", c.tagExtractedName());
   ASSERT_EQ(1, c.tags().size());
@@ -2746,7 +2746,7 @@ TEST_F(ThreadLocalStoreTagScopeTest, CounterNameAndNameTags) {
 // and interleaves the tag value without double-counting.
 TEST_F(ThreadLocalStoreTagScopeTest, ScopeTagsPropagate) {
   StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
-  ScopeSharedPtr cluster_scope = scope_.scopeFromStatName(
+  ScopeSharedPtr cluster_scope = scope_.scopeFromTaggedName(
       makeStatName("cluster"), StatNameTagSpan(name_tags), makeStatName("cluster.foo"));
   EXPECT_EQ("cluster.foo", symbol_table_.toString(cluster_scope->prefix()));
 
@@ -2757,8 +2757,8 @@ TEST_F(ThreadLocalStoreTagScopeTest, ScopeTagsPropagate) {
   EXPECT_EQ("cluster_name", c.tags()[0].name_);
   EXPECT_EQ("foo", c.tags()[0].value_);
 
-  Gauge& g = cluster_scope->gaugeFromStatName(makeStatName("active"), absl::nullopt, StatName(),
-                                              Gauge::ImportMode::Accumulate);
+  Gauge& g = cluster_scope->gaugeFromTaggedName(makeStatName("active"), absl::nullopt, StatName(),
+                                                Gauge::ImportMode::Accumulate);
   EXPECT_EQ("cluster.foo.active", g.name());
   EXPECT_EQ("cluster.active", g.tagExtractedName());
   ASSERT_EQ(1, g.tags().size());
@@ -2777,7 +2777,8 @@ TEST_F(ThreadLocalStoreTagScopeTest, LegacyScopeApiStillWorks) {
 // stats, exercising the TagStringViewSpan path.
 TEST_F(ThreadLocalStoreTagScopeTest, CreateScopeWithTagStringViews) {
   std::vector<TagStringView> name_tags{{"cluster_name", "foo"}};
-  ScopeSharedPtr cluster_scope = scope_.createScope("cluster", name_tags, "cluster.foo");
+  ScopeSharedPtr cluster_scope =
+      scope_.createScopeWithTaggedName("cluster", name_tags, "cluster.foo");
   EXPECT_EQ("cluster.foo", symbol_table_.toString(cluster_scope->prefix()));
 
   Counter& c = cluster_scope->counterFromString("upstream_rq");
@@ -2792,18 +2793,18 @@ TEST_F(ThreadLocalStoreTagScopeTest, CreateScopeWithTagStringViews) {
 // inherited tags: the tag propagates as metadata and the prefix interleaves the value.
 TEST_F(ThreadLocalStoreTagScopeTest, HistogramAndTextReadoutTagsPropagate) {
   StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
-  ScopeSharedPtr cluster_scope = scope_.scopeFromStatName(
+  ScopeSharedPtr cluster_scope = scope_.scopeFromTaggedName(
       makeStatName("cluster"), StatNameTagSpan(name_tags), makeStatName("cluster.foo"));
 
-  Histogram& h = cluster_scope->histogramFromStatName(makeStatName("rq_time"), absl::nullopt,
-                                                      StatName(), Histogram::Unit::Unspecified);
+  Histogram& h = cluster_scope->histogramFromTaggedName(makeStatName("rq_time"), absl::nullopt,
+                                                        StatName(), Histogram::Unit::Unspecified);
   EXPECT_EQ("cluster.foo.rq_time", h.name());
   EXPECT_EQ("cluster.rq_time", h.tagExtractedName());
   ASSERT_EQ(1, h.tags().size());
   EXPECT_EQ("foo", h.tags()[0].value_);
 
   TextReadout& t =
-      cluster_scope->textReadoutFromStatName(makeStatName("version"), absl::nullopt, StatName());
+      cluster_scope->textReadoutFromTaggedName(makeStatName("version"), absl::nullopt, StatName());
   EXPECT_EQ("cluster.foo.version", t.name());
   EXPECT_EQ("cluster.version", t.tagExtractedName());
   ASSERT_EQ(1, t.tags().size());
@@ -2818,15 +2819,15 @@ TEST_F(StatsThreadLocalStoreTest, LegacyScopeBackwardCompatWithExplicitArgs) {
 
   // Counter: explicit `tagged_name` overrides `name`; tag metadata is dropped.
   StatNameTagVector tags{{pool.add("cluster_name"), pool.add("foo")}};
-  Counter& c = scope_.counterFromStatName(pool.add("upstream_rq"), StatNameTagSpan(tags),
-                                          pool.add("upstream_rq.cluster_name.foo"));
+  Counter& c = scope_.counterFromTaggedName(pool.add("upstream_rq"), StatNameTagSpan(tags),
+                                            pool.add("upstream_rq.cluster_name.foo"));
   EXPECT_EQ("upstream_rq.cluster_name.foo", c.name());
   // Tag extraction runs against the flat name on the legacy path; well-known tags may still match.
   EXPECT_EQ(0, c.tags().size());
 
   // createScope: explicit (non-empty) tagged_name overrides `name`; tags are dropped.
   std::vector<TagStringView> sv_tags{{"cluster_name", "foo"}};
-  ScopeSharedPtr child = scope_.createScope("cluster", sv_tags, "svc.foo");
+  ScopeSharedPtr child = scope_.createScopeWithTaggedName("cluster", sv_tags, "svc.foo");
   Counter& c2 = child->counterFromString("rq");
   EXPECT_EQ("svc.foo.rq", c2.name());
   EXPECT_EQ(0, c2.tags().size());
@@ -2834,7 +2835,7 @@ TEST_F(StatsThreadLocalStoreTest, LegacyScopeBackwardCompatWithExplicitArgs) {
   // scopeFromStatName: explicit tagged_name overrides `name`; tags are dropped.
   StatNameTagVector sn_tags{{pool.add("name"), pool.add("foo")}};
   ScopeSharedPtr child2 =
-      scope_.scopeFromStatName(pool.add("svc"), StatNameTagSpan(sn_tags), pool.add("svc2.foo"));
+      scope_.scopeFromTaggedName(pool.add("svc"), StatNameTagSpan(sn_tags), pool.add("svc2.foo"));
   Counter& c3 = child2->counterFromString("rq");
   EXPECT_EQ("svc2.foo.rq", c3.name());
   EXPECT_EQ(0, c3.tags().size());
@@ -2850,7 +2851,7 @@ TEST_F(StatsThreadLocalStoreTest, LegacyStatCreationMatrix) {
 
   // No name_tags, no tagged_name. The flat name is parent_prefix + name; tag extraction runs on
   // the flat name (no well-known match here, so tagExtractedName == name).
-  Counter& c1 = child->counterFromStatName(pool.add("rq"), absl::nullopt, StatName());
+  Counter& c1 = child->counterFromTaggedName(pool.add("rq"), absl::nullopt, StatName());
   EXPECT_EQ("svc.rq", c1.name());
   EXPECT_EQ("svc.rq", c1.tagExtractedName());
   EXPECT_EQ(0, c1.tags().size());
@@ -2858,7 +2859,7 @@ TEST_F(StatsThreadLocalStoreTest, LegacyStatCreationMatrix) {
   // With name_tags, no tagged_name. The flat name appends ".<tag_name>.<tag_value>"; the explicit
   // name_tags are recorded as metadata (no re-extraction).
   StatNameTagVector tags{{pool.add("k"), pool.add("v")}};
-  Counter& c2 = child->counterFromStatName(pool.add("active"), StatNameTagSpan(tags), StatName());
+  Counter& c2 = child->counterFromTaggedName(pool.add("active"), StatNameTagSpan(tags), StatName());
   EXPECT_EQ("svc.active.k.v", c2.name());
   EXPECT_EQ("svc.active", c2.tagExtractedName());
   ASSERT_EQ(1, c2.tags().size());
@@ -2867,14 +2868,15 @@ TEST_F(StatsThreadLocalStoreTest, LegacyStatCreationMatrix) {
 
   // No name_tags, with tagged_name. The legacy backward-compat shim treats tagged_name as both
   // canonical and flat; tag extraction then runs on the flat name.
-  Counter& c3 = child->counterFromStatName(pool.add("rx"), absl::nullopt, pool.add("rx.with.dots"));
+  Counter& c3 =
+      child->counterFromTaggedName(pool.add("rx"), absl::nullopt, pool.add("rx.with.dots"));
   EXPECT_EQ("svc.rx.with.dots", c3.name());
   EXPECT_EQ("svc.rx.with.dots", c3.tagExtractedName());
   EXPECT_EQ(0, c3.tags().size());
 
   // With name_tags + tagged_name. The shim drops the tags; tagged_name wins.
   Counter& c4 =
-      child->counterFromStatName(pool.add("tx"), StatNameTagSpan(tags), pool.add("tx.flat"));
+      child->counterFromTaggedName(pool.add("tx"), StatNameTagSpan(tags), pool.add("tx.flat"));
   EXPECT_EQ("svc.tx.flat", c4.name());
   EXPECT_EQ("svc.tx.flat", c4.tagExtractedName());
   EXPECT_EQ(0, c4.tags().size());
@@ -2886,26 +2888,26 @@ TEST_F(StatsThreadLocalStoreTest, LegacyScopeCreationMatrix) {
   StatNamePool pool(symbol_table_);
 
   // No name_tags, no tagged_name: name is used directly as the child scope prefix.
-  ScopeSharedPtr s1 = scope_.scopeFromStatName(pool.add("a"), StatNameTagSpan{}, StatName());
+  ScopeSharedPtr s1 = scope_.scopeFromTaggedName(pool.add("a"), StatNameTagSpan{}, StatName());
   EXPECT_EQ("a", symbol_table_.toString(s1->prefix()));
   EXPECT_EQ("a.c", s1->counterFromString("c").name());
 
   // With name_tags, no tagged_name: tags are dropped, name is used as the prefix.
   StatNameTagVector tags{{pool.add("k"), pool.add("v")}};
-  ScopeSharedPtr s2 = scope_.scopeFromStatName(pool.add("b"), StatNameTagSpan(tags), StatName());
+  ScopeSharedPtr s2 = scope_.scopeFromTaggedName(pool.add("b"), StatNameTagSpan(tags), StatName());
   EXPECT_EQ("b", symbol_table_.toString(s2->prefix()));
   Counter& s2c = s2->counterFromString("c");
   EXPECT_EQ("b.c", s2c.name());
   EXPECT_EQ(0, s2c.tags().size());
 
   // No name_tags, with tagged_name: tagged_name replaces name, becomes the child prefix.
-  ScopeSharedPtr s3 = scope_.scopeFromStatName(pool.add("d"), StatNameTagSpan{}, pool.add("d.x"));
+  ScopeSharedPtr s3 = scope_.scopeFromTaggedName(pool.add("d"), StatNameTagSpan{}, pool.add("d.x"));
   EXPECT_EQ("d.x", symbol_table_.toString(s3->prefix()));
   EXPECT_EQ("d.x.c", s3->counterFromString("c").name());
 
   // With name_tags + tagged_name: same as above, tags dropped.
   ScopeSharedPtr s4 =
-      scope_.scopeFromStatName(pool.add("e"), StatNameTagSpan(tags), pool.add("e.y"));
+      scope_.scopeFromTaggedName(pool.add("e"), StatNameTagSpan(tags), pool.add("e.y"));
   EXPECT_EQ("e.y", symbol_table_.toString(s4->prefix()));
   EXPECT_EQ("e.y.c", s4->counterFromString("c").name());
 }
@@ -2915,7 +2917,7 @@ TEST_F(StatsThreadLocalStoreTest, LegacyScopeCreationMatrix) {
 // name_tags are empty, tagged_name is ignored and `name` is used.
 TEST_F(ThreadLocalStoreTagScopeTest, TagStatCreationMatrixOnPlainScope) {
   // No name_tags, no tagged_name.
-  Counter& c1 = scope_.counterFromStatName(makeStatName("rq"), absl::nullopt, StatName());
+  Counter& c1 = scope_.counterFromTaggedName(makeStatName("rq"), absl::nullopt, StatName());
   EXPECT_EQ("rq", c1.name());
   EXPECT_EQ("rq", c1.tagExtractedName());
   EXPECT_EQ(0, c1.tags().size());
@@ -2923,7 +2925,7 @@ TEST_F(ThreadLocalStoreTagScopeTest, TagStatCreationMatrixOnPlainScope) {
   // With name_tags, no tagged_name -> tag values appended to canonical name.
   StatNameTagVector tags{{makeStatName("k"), makeStatName("v")}};
   Counter& c2 =
-      scope_.counterFromStatName(makeStatName("active"), StatNameTagSpan(tags), StatName());
+      scope_.counterFromTaggedName(makeStatName("active"), StatNameTagSpan(tags), StatName());
   EXPECT_EQ("active.k.v", c2.name());
   EXPECT_EQ("active", c2.tagExtractedName());
   ASSERT_EQ(1, c2.tags().size());
@@ -2932,15 +2934,15 @@ TEST_F(ThreadLocalStoreTagScopeTest, TagStatCreationMatrixOnPlainScope) {
 
   // No name_tags, with tagged_name -> tagged_name is ignored when there are no tags.
   Counter& c3 =
-      scope_.counterFromStatName(makeStatName("rx"), absl::nullopt, makeStatName("rx.ignored"));
+      scope_.counterFromTaggedName(makeStatName("rx"), absl::nullopt, makeStatName("rx.ignored"));
   EXPECT_EQ("rx", c3.name());
   EXPECT_EQ("rx", c3.tagExtractedName());
   EXPECT_EQ(0, c3.tags().size());
 
   // With name_tags + tagged_name -> caller-supplied tagged_name wins for the flat name; the
   // canonical name and tags still come from `name` / `name_tags`.
-  Counter& c4 = scope_.counterFromStatName(makeStatName("cluster.tx"), StatNameTagSpan(tags),
-                                           makeStatName("cluster.v.tx"));
+  Counter& c4 = scope_.counterFromTaggedName(makeStatName("cluster.tx"), StatNameTagSpan(tags),
+                                             makeStatName("cluster.v.tx"));
   EXPECT_EQ("cluster.v.tx", c4.name());
   EXPECT_EQ("cluster.tx", c4.tagExtractedName());
   ASSERT_EQ(1, c4.tags().size());
@@ -2950,7 +2952,7 @@ TEST_F(ThreadLocalStoreTagScopeTest, TagStatCreationMatrixOnPlainScope) {
 // child scope, verify the child's prefix and the names/tag metadata of stats created in the child.
 TEST_F(ThreadLocalStoreTagScopeTest, TagScopeCreationMatrix) {
   // No name_tags, no tagged_name -> child has flat == canonical == "a".
-  ScopeSharedPtr s1 = scope_.scopeFromStatName(makeStatName("a"), StatNameTagSpan{}, StatName());
+  ScopeSharedPtr s1 = scope_.scopeFromTaggedName(makeStatName("a"), StatNameTagSpan{}, StatName());
   EXPECT_EQ("a", symbol_table_.toString(s1->prefix()));
   Counter& s1c = s1->counterFromStatName(makeStatName("c"));
   EXPECT_EQ("a.c", s1c.name());
@@ -2959,14 +2961,14 @@ TEST_F(ThreadLocalStoreTagScopeTest, TagScopeCreationMatrix) {
 
   // No name_tags, with tagged_name -> tagged_name is ignored; child prefix == "b".
   ScopeSharedPtr s2 =
-      scope_.scopeFromStatName(makeStatName("b"), StatNameTagSpan{}, makeStatName("b.ignored"));
+      scope_.scopeFromTaggedName(makeStatName("b"), StatNameTagSpan{}, makeStatName("b.ignored"));
   EXPECT_EQ("b", symbol_table_.toString(s2->prefix()));
   EXPECT_EQ("b.c", s2->counterFromStatName(makeStatName("c")).name());
 
   // With name_tags, no tagged_name -> child prefix is derived: "d.k.v".
   StatNameTagVector tags{{makeStatName("k"), makeStatName("v")}};
   ScopeSharedPtr s3 =
-      scope_.scopeFromStatName(makeStatName("d"), StatNameTagSpan(tags), StatName());
+      scope_.scopeFromTaggedName(makeStatName("d"), StatNameTagSpan(tags), StatName());
   EXPECT_EQ("d.k.v", symbol_table_.toString(s3->prefix()));
   Counter& s3c = s3->counterFromStatName(makeStatName("c"));
   EXPECT_EQ("d.k.v.c", s3c.name());
@@ -2975,8 +2977,8 @@ TEST_F(ThreadLocalStoreTagScopeTest, TagScopeCreationMatrix) {
   EXPECT_EQ("k", s3c.tags()[0].name_);
 
   // With name_tags + tagged_name -> child uses caller-supplied tagged_name; tags propagate.
-  ScopeSharedPtr s4 =
-      scope_.scopeFromStatName(makeStatName("e"), StatNameTagSpan(tags), makeStatName("e.custom"));
+  ScopeSharedPtr s4 = scope_.scopeFromTaggedName(makeStatName("e"), StatNameTagSpan(tags),
+                                                 makeStatName("e.custom"));
   EXPECT_EQ("e.custom", symbol_table_.toString(s4->prefix()));
   Counter& s4c = s4->counterFromStatName(makeStatName("c"));
   EXPECT_EQ("e.custom.c", s4c.name());
@@ -2991,11 +2993,11 @@ TEST_F(ThreadLocalStoreTagScopeTest, TagScopeCreationMatrix) {
 // or a tagged_name.
 TEST_F(ThreadLocalStoreTagScopeTest, TagStatCreationMatrixOnTaggedScope) {
   StatNameTagVector prefix_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
-  ScopeSharedPtr cluster = scope_.scopeFromStatName(
+  ScopeSharedPtr cluster = scope_.scopeFromTaggedName(
       makeStatName("cluster"), StatNameTagSpan(prefix_tags), makeStatName("cluster.foo"));
 
   // No name_tags, no tagged_name. Inherited tag still propagates; flat name reuses tagged prefix.
-  Counter& c1 = cluster->counterFromStatName(makeStatName("rq"), absl::nullopt, StatName());
+  Counter& c1 = cluster->counterFromTaggedName(makeStatName("rq"), absl::nullopt, StatName());
   EXPECT_EQ("cluster.foo.rq", c1.name());
   EXPECT_EQ("cluster.rq", c1.tagExtractedName());
   ASSERT_EQ(1, c1.tags().size());
@@ -3004,7 +3006,7 @@ TEST_F(ThreadLocalStoreTagScopeTest, TagStatCreationMatrixOnTaggedScope) {
   // No name_tags, with tagged_name. tagged_name is ignored when there are no own tags; inherited
   // tag still propagates.
   Counter& c2 =
-      cluster->counterFromStatName(makeStatName("rx"), absl::nullopt, makeStatName("rx.ignored"));
+      cluster->counterFromTaggedName(makeStatName("rx"), absl::nullopt, makeStatName("rx.ignored"));
   EXPECT_EQ("cluster.foo.rx", c2.name());
   EXPECT_EQ("cluster.rx", c2.tagExtractedName());
   ASSERT_EQ(1, c2.tags().size());
@@ -3013,15 +3015,15 @@ TEST_F(ThreadLocalStoreTagScopeTest, TagStatCreationMatrixOnTaggedScope) {
   // metadata. The inherited scope tag is NOT duplicated in the flat name.
   StatNameTagVector own{{makeStatName("method"), makeStatName("get")}};
   Counter& c3 =
-      cluster->counterFromStatName(makeStatName("calls"), StatNameTagSpan(own), StatName());
+      cluster->counterFromTaggedName(makeStatName("calls"), StatNameTagSpan(own), StatName());
   EXPECT_EQ("cluster.foo.calls.method.get", c3.name());
   EXPECT_EQ("cluster.calls", c3.tagExtractedName());
   ASSERT_EQ(2, c3.tags().size());
 
   // With own name_tags + tagged_name. tagged_name wins for the flat name; canonical and tags
   // (inherited + own) are still derived from `name` / `name_tags`.
-  Counter& c4 = cluster->counterFromStatName(makeStatName("tx"), StatNameTagSpan(own),
-                                             makeStatName("tx.with.method.get"));
+  Counter& c4 = cluster->counterFromTaggedName(makeStatName("tx"), StatNameTagSpan(own),
+                                               makeStatName("tx.with.method.get"));
   EXPECT_EQ("cluster.foo.tx.with.method.get", c4.name());
   EXPECT_EQ("cluster.tx", c4.tagExtractedName());
   ASSERT_EQ(2, c4.tags().size());

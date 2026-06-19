@@ -77,61 +77,53 @@ public:
   TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopeSharedPtr wrapped_scope, Store& store)
       : lock_(lock), wrapped_scope_(wrapped_scope), store_(store) {}
 
-  // Keep the base's non-virtual convenience overloads visible alongside the tag-aware overrides.
-  using Scope::counterFromStatName;
-  using Scope::createScope;
-  using Scope::gaugeFromStatName;
-  using Scope::histogramFromStatName;
-  using Scope::scopeFromStatName;
-  using Scope::textReadoutFromStatName;
-
-  ScopeSharedPtr createScope(absl::string_view base_name, TagStringViewSpan name_tags,
-                             absl::string_view tagged_name, bool evictable,
-                             const ScopeStatsLimitSettings& limits,
-                             StatsMatcherSharedPtr matcher) override {
+  ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name, TagStringViewSpan name_tags,
+                                           absl::string_view tagged_name, bool evictable,
+                                           const ScopeStatsLimitSettings& limits,
+                                           StatsMatcherSharedPtr matcher) override {
     Thread::LockGuard lock(lock_);
     return std::make_shared<TestScopeWrapper>(
         lock_,
-        wrapped_scope_->createScope(base_name, name_tags, tagged_name, evictable, limits,
-                                    std::move(matcher)),
+        wrapped_scope_->createScopeWithTaggedName(base_name, name_tags, tagged_name, evictable,
+                                                  limits, std::move(matcher)),
         store_);
   }
 
-  ScopeSharedPtr scopeFromStatName(StatName base_name, StatNameTagSpan name_tags,
-                                   StatName tagged_name, bool evictable,
-                                   const ScopeStatsLimitSettings& limits,
-                                   StatsMatcherSharedPtr matcher) override {
+  ScopeSharedPtr scopeFromTaggedName(StatName base_name, StatNameTagSpan name_tags,
+                                     StatName tagged_name, bool evictable,
+                                     const ScopeStatsLimitSettings& limits,
+                                     StatsMatcherSharedPtr matcher) override {
     Thread::LockGuard lock(lock_);
     return std::make_shared<TestScopeWrapper>(
         lock_,
-        wrapped_scope_->scopeFromStatName(base_name, name_tags, tagged_name, evictable, limits,
-                                          std::move(matcher)),
+        wrapped_scope_->scopeFromTaggedName(base_name, name_tags, tagged_name, evictable, limits,
+                                            std::move(matcher)),
         store_);
   }
 
-  Counter& counterFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
-                               StatName tagged_name) override {
+  Counter& counterFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+                                 StatName tagged_name) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->counterFromStatName(base_name, name_tags, tagged_name);
+    return wrapped_scope_->counterFromTaggedName(base_name, name_tags, tagged_name);
   }
 
-  Gauge& gaugeFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
-                           StatName tagged_name, Gauge::ImportMode import_mode) override {
+  Gauge& gaugeFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+                             StatName tagged_name, Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->gaugeFromStatName(base_name, name_tags, tagged_name, import_mode);
+    return wrapped_scope_->gaugeFromTaggedName(base_name, name_tags, tagged_name, import_mode);
   }
 
-  Histogram& histogramFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
-                                   StatName tagged_name, Histogram::Unit unit) override {
+  Histogram& histogramFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+                                     StatName tagged_name, Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->histogramFromStatName(base_name, name_tags, tagged_name, unit);
+    return wrapped_scope_->histogramFromTaggedName(base_name, name_tags, tagged_name, unit);
   }
 
-  TextReadout& textReadoutFromStatName(StatName base_name,
-                                       absl::optional<StatNameTagSpan> name_tags,
-                                       StatName tagged_name) override {
+  TextReadout& textReadoutFromTaggedName(StatName base_name,
+                                         absl::optional<StatNameTagSpan> name_tags,
+                                         StatName tagged_name) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->textReadoutFromStatName(base_name, name_tags, tagged_name);
+    return wrapped_scope_->textReadoutFromTaggedName(base_name, name_tags, tagged_name);
   }
 
   Counter& counterFromString(const std::string& name) override {

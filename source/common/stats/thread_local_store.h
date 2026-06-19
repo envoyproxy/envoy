@@ -300,34 +300,27 @@ private:
     }
 
     // Stats::Scope
-    // Keep the base's non-virtual convenience overloads (the legacy createScope/scopeFromStatName
-    // and *FromStatNameWithTags methods, and the single-argument *FromStatName helpers) visible
-    // alongside the tag-aware overrides below; otherwise the overrides would hide them.
-    using Scope::counterFromStatName;
-    using Scope::createScope;
-    using Scope::gaugeFromStatName;
-    using Scope::histogramFromStatName;
-    using Scope::scopeFromStatName;
-    using Scope::textReadoutFromStatName;
     // The legacy scope ignores name_tags/tagged_name: it joins parent's prefix + base_name as
     // before.
-    Counter& counterFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
-                                 StatName tagged_name) override;
-    Gauge& gaugeFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
-                             StatName tagged_name, Gauge::ImportMode import_mode) override;
-    Histogram& histogramFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
-                                     StatName tagged_name, Histogram::Unit unit) override;
-    TextReadout& textReadoutFromStatName(StatName base_name,
-                                         absl::optional<StatNameTagSpan> name_tags,
-                                         StatName tagged_name) override;
-    ScopeSharedPtr createScope(absl::string_view base_name, TagStringViewSpan name_tags,
-                               absl::string_view tagged_name, bool evictable,
-                               const ScopeStatsLimitSettings& limits,
-                               StatsMatcherSharedPtr matcher) override;
-    ScopeSharedPtr scopeFromStatName(StatName base_name, StatNameTagSpan name_tags,
-                                     StatName tagged_name, bool evictable,
-                                     const ScopeStatsLimitSettings& limits,
-                                     StatsMatcherSharedPtr matcher) override;
+    Counter& counterFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+                                   StatName tagged_name) override;
+    Gauge& gaugeFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+                               StatName tagged_name, Gauge::ImportMode import_mode) override;
+    Histogram& histogramFromTaggedName(StatName base_name,
+                                       absl::optional<StatNameTagSpan> name_tags,
+                                       StatName tagged_name, Histogram::Unit unit) override;
+    TextReadout& textReadoutFromTaggedName(StatName base_name,
+                                           absl::optional<StatNameTagSpan> name_tags,
+                                           StatName tagged_name) override;
+    ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name,
+                                             TagStringViewSpan name_tags,
+                                             absl::string_view tagged_name, bool evictable,
+                                             const ScopeStatsLimitSettings& limits,
+                                             StatsMatcherSharedPtr matcher) override;
+    ScopeSharedPtr scopeFromTaggedName(StatName base_name, StatNameTagSpan name_tags,
+                                       StatName tagged_name, bool evictable,
+                                       const ScopeStatsLimitSettings& limits,
+                                       StatsMatcherSharedPtr matcher) override;
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
@@ -522,31 +515,25 @@ private:
                  const ScopeStatsLimitSettings& limits = {},
                  StatsMatcherSharedPtr matcher = nullptr);
 
-    // Keep the base's non-virtual convenience overloads visible alongside the tag-aware overrides.
-    using Scope::counterFromStatName;
-    using Scope::createScope;
-    using Scope::gaugeFromStatName;
-    using Scope::histogramFromStatName;
-    using Scope::scopeFromStatName;
-    using Scope::textReadoutFromStatName;
-
-    ScopeSharedPtr createScope(absl::string_view base_name, TagStringViewSpan name_tags,
-                               absl::string_view tagged_name, bool evictable,
-                               const ScopeStatsLimitSettings& limits,
-                               StatsMatcherSharedPtr matcher) override;
-    ScopeSharedPtr scopeFromStatName(StatName base_name, StatNameTagSpan name_tags,
-                                     StatName tagged_name, bool evictable,
-                                     const ScopeStatsLimitSettings& limits,
-                                     StatsMatcherSharedPtr matcher) override;
-    Counter& counterFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
-                                 StatName tagged_name) override;
-    Gauge& gaugeFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
-                             StatName tagged_name, Gauge::ImportMode import_mode) override;
-    Histogram& histogramFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
-                                     StatName tagged_name, Histogram::Unit unit) override;
-    TextReadout& textReadoutFromStatName(StatName base_name,
-                                         absl::optional<StatNameTagSpan> name_tags,
-                                         StatName tagged_name) override;
+    ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name,
+                                             TagStringViewSpan name_tags,
+                                             absl::string_view tagged_name, bool evictable,
+                                             const ScopeStatsLimitSettings& limits,
+                                             StatsMatcherSharedPtr matcher) override;
+    ScopeSharedPtr scopeFromTaggedName(StatName base_name, StatNameTagSpan name_tags,
+                                       StatName tagged_name, bool evictable,
+                                       const ScopeStatsLimitSettings& limits,
+                                       StatsMatcherSharedPtr matcher) override;
+    Counter& counterFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+                                   StatName tagged_name) override;
+    Gauge& gaugeFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+                               StatName tagged_name, Gauge::ImportMode import_mode) override;
+    Histogram& histogramFromTaggedName(StatName base_name,
+                                       absl::optional<StatNameTagSpan> name_tags,
+                                       StatName tagged_name, Histogram::Unit unit) override;
+    TextReadout& textReadoutFromTaggedName(StatName base_name,
+                                           absl::optional<StatNameTagSpan> name_tags,
+                                           StatName tagged_name) override;
 
   private:
     std::unique_ptr<StatNamePool> pool_;
