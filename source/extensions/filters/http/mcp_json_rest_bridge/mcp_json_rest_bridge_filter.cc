@@ -365,13 +365,30 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // TODO(guoyilin42): Handle headers-only upstream responses (e.g., 204 No Content).
-  // Currently, these cases bypass transcoding, which can cause MCP SDKs to timeout
-  // or throw exceptions because they expect a valid JSON-RPC response with a
-  // matching ID. Envoy should generate a synthetic JSON-RPC response (e.g., an
-  // empty ToolResult or a generic error) to ensure client stability.
-  return end_stream ? Http::FilterHeadersStatus::Continue
-                    : Http::FilterHeadersStatus::StopIteration;
+  if (end_stream) {
+    // Backend returned a headers-only response (e.g., 204 No Content). Synthesize a JSON-RPC
+    // response body so MCP clients don't hang waiting for a body that will never arrive.
+    const bool is_error =
+        getResponseCode(response_headers) >= static_cast<int>(Http::Code::BadRequest);
+    std::string synthetic;
+    if (mcp_operation_ == McpOperation::ToolsCall) {
+      synthetic = translateJsonRestResponseToJsonRpc("", *session_id_, is_error).dump();
+    } else {
+      // ToolsList: headers-only means no tools list is available; return a server error.
+      json ret = {
+          {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
+          {McpConstants::ID_FIELD, *session_id_},
+          {McpConstants::ERROR_FIELD, generateErrorJsonResponse(-32000, "Server error")},
+      };
+      synthetic = ret.dump();
+    }
+    response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+    response_headers.setContentLength(synthetic.size());
+    Buffer::OwnedImpl body_buffer(synthetic);
+    encoder_callbacks_->addEncodedData(body_buffer, false);
+    return Http::FilterHeadersStatus::Continue;
+  }
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& data,
