@@ -387,7 +387,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   }
 }
 
-absl::Status ActiveQuicListenerFactory::doFinalPreWorkerInit(Network::ListenSocketFactory&) {
+absl::Status ActiveQuicListenerFactory::doFinalPreWorkerInit() {
   ASSERT(quic_cid_generator_factory_ != nullptr);
   quic_cid_generator_context_ =
       quic_cid_generator_factory_->createQuicConnectionIdGeneratorContext();

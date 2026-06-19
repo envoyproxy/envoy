@@ -328,10 +328,7 @@ public:
    */
   virtual const Network::Socket::OptionsSharedPtr& socketOptions() const PURE;
 
-  virtual absl::Status doFinalPreWorkerInit(Network::ListenSocketFactory& socket_factory) {
-    UNREFERENCED_PARAMETER(socket_factory);
-    return absl::OkStatus();
-  }
+  virtual absl::Status doFinalPreWorkerInit() { return absl::OkStatus(); }
 };
 
 using ActiveUdpListenerFactoryPtr = std::unique_ptr<ActiveUdpListenerFactory>;

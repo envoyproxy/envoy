@@ -684,12 +684,7 @@ bool ListenerImpl::buildUdpListenerWorkerRouter(const Network::Address::Instance
 
 absl::Status ListenerImpl::doFinalPreWorkerInit() {
   if (udp_listener_config_) {
-    for (auto& socket_factory : socket_factories_) {
-      if (socket_factory->socketType() == Network::Socket::Type::Datagram) {
-        RETURN_IF_NOT_OK(
-            udp_listener_config_->listener_factory_->doFinalPreWorkerInit(*socket_factory));
-      }
-    }
+    RETURN_IF_NOT_OK(udp_listener_config_->listener_factory_->doFinalPreWorkerInit());
   }
   return absl::OkStatus();
 }
