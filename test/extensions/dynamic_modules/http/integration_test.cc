@@ -506,9 +506,8 @@ TEST_P(DynamicModulesIntegrationTest, ReentrantStreamCompleteRunsUnderCatchUnwin
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-  EXPECT_EQ(
-      "yes",
-      response->headers().get(Http::LowerCaseString("x-done"))[0]->value().getStringView());
+  EXPECT_EQ("yes",
+            response->headers().get(Http::LowerCaseString("x-done"))[0]->value().getStringView());
 
   // on_stream_complete must run even though the response was completed (eos) from on_scheduled,
   // which re-enters the CatchUnwind-wrapped filter synchronously.

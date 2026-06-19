@@ -4209,9 +4209,8 @@ fn test_catch_unwind_http_reentrant_status_callback_is_not_poisoned() {
     raw_ptr: std::ptr::null_mut(),
   };
   let mut wrapper = CatchUnwind::new(ReentrantFilter);
-  WRAPPER_PTR.with(|p| {
-    p.set(&mut wrapper as *mut CatchUnwind<ReentrantFilter> as *mut std::ffi::c_void)
-  });
+  WRAPPER_PTR
+    .with(|p| p.set(&mut wrapper as *mut CatchUnwind<ReentrantFilter> as *mut std::ffi::c_void));
 
   HttpFilter::on_scheduled(&mut wrapper, &mut envoy_filter, 1);
 
