@@ -13,12 +13,12 @@ envoy_package()
 
 envoy_extension_cc_test(
     name = "fifo_queue_strategy_test",
-    extension_names = ["envoy.queue_strategy.fifo"],
     srcs = ["fifo_queue_strategy_test.cc"],
+    extension_names = ["envoy.queue_strategy.fifo"],
     deps = [
+        "//source/common/protobuf:message_validator_lib",
         "//source/extensions/queue_strategy/fifo:fifo_queue_strategy_impl",
-        "//test/mocks/server:factory_context_mocks",
-        "@com_google_absl//absl/status:status",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
     ],
 )

@@ -1,5 +1,6 @@
-#include "test/mocks/server/factory_context.h"
+#include "source/common/protobuf/message_validator_impl.h"
 #include "source/extensions/queue_strategy/fifo/fifo_queue_strategy.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -7,21 +8,22 @@ namespace Extensions {
 namespace QueueStrategy {
 
 namespace {
-  class FifoQueueItemType : public ConnectionPool::Cancellable, public LinkedObject<FifoQueueItemType> {
+class FifoQueueItemType : public ConnectionPool::Cancellable,
+                          public LinkedObject<FifoQueueItemType> {
 public:
-    FifoQueueItemType(int value):value_(value) {};
-    ~FifoQueueItemType() override = default;
-    int value() const { return value_; }
-    // ConnectionPool::Cancellable
-    void cancel(ConnectionPool::CancelPolicy) override {
-    }
+  FifoQueueItemType(int value) : value_(value) {};
+  ~FifoQueueItemType() override = default;
+  int value() const { return value_; }
+  // ConnectionPool::Cancellable
+  void cancel(ConnectionPool::CancelPolicy) override {}
+
 private:
   int value_;
 };
-}
+} // namespace
 
 using FifoQueueStrategyConfig =
-    envoy::config::cluster::v3::Cluster::FifoQueueStrategyConfig;
+    envoy::extensions::queue_strategy::fifo::v3::FifoQueueStrategyConfig;
 
 TEST(FifoQueueTest, TestQueueFunctions) {
   FifoQueue<FifoQueueItemType> queue;
@@ -32,9 +34,10 @@ TEST(FifoQueueTest, TestQueueFunctions) {
   auto it = queue.begin();
   EXPECT_EQ((**it).value(), 11);
   ++it;
+  EXPECT_NE(it, queue.end());
   EXPECT_EQ((**it).value(), 42);
-  it = queue.end();
-  EXPECT_EQ((**it).value(), 42);
+  ++it;
+  EXPECT_EQ(it, queue.end());
   queue.remove(**queue.begin());
   EXPECT_EQ(queue.next()->value(), 42);
 }
@@ -50,8 +53,8 @@ TEST_F(FifoQueueFactoryTest, CanConstructFactory) {
 
 TEST_F(FifoQueueFactoryTest, CreateQueueStrategyReturnsValidPtr) {
   FifoQueueStrategyConfig config;
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  auto result = factory_.createQueueStrategy(config, "test_prefix", factory_context);
+  auto result = factory_.createQueueStrategy(config, "test_prefix",
+                                             ProtobufMessage::getStrictValidationVisitor());
   EXPECT_TRUE(result.ok());
   EXPECT_NE(result.value(), nullptr);
 }

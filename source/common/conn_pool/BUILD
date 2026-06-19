@@ -21,8 +21,10 @@ envoy_cc_library(
         "//envoy/stats:timespan_interface",
         "//source/common/common:debug_recursion_checker_lib",
         "//source/common/common:linked_object",
+        "//source/common/config:utility_lib",
+        "//source/common/protobuf:message_validator_lib",
+        "//source/common/queue_strategy:queue_strategy_base_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/upstream:upstream_lib",
-        "//source/extensions/queue_strategy/fifo:fifo_queue_strategy_impl",
     ],
 )

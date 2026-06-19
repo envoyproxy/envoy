@@ -150,8 +150,8 @@ MockClusterInfo::MockClusterInfo()
       }));
   ON_CALL(*this, queueStrategyConfig())
       .WillByDefault(
-          Invoke([this]() -> OptRef<const envoy::config::cluster::v3::Cluster::QueueStrategyConfig> {
-            return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::QueueStrategyConfig>(
+          Invoke([this]() -> OptRef<const envoy::config::core::v3::TypedExtensionConfig> {
+            return makeOptRefFromPtr<const envoy::config::core::v3::TypedExtensionConfig>(
                 queue_strategy_config_.get());
           }));
   ON_CALL(*this, clusterType())

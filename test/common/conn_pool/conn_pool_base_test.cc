@@ -1,4 +1,8 @@
+#include "envoy/extensions/queue_strategy/fifo/v3/fifo.pb.h"
+#include "envoy/registry/registry.h"
+
 #include "source/common/conn_pool/conn_pool_base.h"
+#include "source/common/queue_strategy/queue_strategy_base.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/event/mocks.h"
@@ -82,6 +86,44 @@ public:
   AttachContext& context_;
 };
 
+class TestPendingStreamQueue : public Extensions::QueueStrategy::QueueBase<PendingStream> {
+public:
+  using ItemPtrType = std::unique_ptr<PendingStream>;
+  using Iterator = QueueBase<PendingStream>::Iterator;
+
+  const ItemPtrType& next() const override { return this->items_.back(); }
+  bool isOverloaded() const override { return false; }
+
+  Iterator begin() override {
+    auto it = this->items_.rbegin();
+    return Iterator(std::move(it));
+  }
+
+  Iterator end() override {
+    auto it = this->items_.rend();
+    return Iterator(std::move(it));
+  }
+};
+
+class TestPendingStreamQueueFactory
+    : public Extensions::QueueStrategy::QueueStrategyFactory<PendingStream> {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::queue_strategy::fifo::v3::FifoQueueStrategyConfig>();
+  }
+
+  absl::StatusOr<Extensions::QueueStrategy::QueueStrategySharedPtr<PendingStream>>
+  createQueueStrategy(const Protobuf::Message&, const std::string&,
+                      ProtobufMessage::ValidationVisitor&) override {
+    return std::make_shared<TestPendingStreamQueue>();
+  }
+
+  std::string name() const override { return "envoy.queue_strategy.fifo"; }
+};
+
+REGISTER_FACTORY(TestPendingStreamQueueFactory,
+                 Extensions::QueueStrategy::QueueStrategyFactory<PendingStream>);
+
 class TestConnPoolImplBase : public ConnPoolImplBase {
 public:
   using ConnPoolImplBase::ConnPoolImplBase;
@@ -139,6 +181,26 @@ public:
   AttachContext context_;
   std::vector<TestActiveClient*> clients_;
 };
+
+TEST(ConnPoolImplBaseConfigTest, UsesConfiguredQueueStrategy) {
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  envoy::extensions::queue_strategy::fifo::v3::FifoQueueStrategyConfig fifo_config;
+  cluster->queue_strategy_config_ =
+      std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
+  cluster->queue_strategy_config_->set_name("envoy.queue_strategy.fifo");
+  cluster->queue_strategy_config_->mutable_typed_config()->PackFrom(fifo_config);
+  cluster->resetResourceManager(1024, 1024, 1024, 1, 1);
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  auto* upstream_ready_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher);
+  NiceMock<Server::MockOverloadManager> overload_manager;
+  Upstream::ClusterConnectivityState state;
+  Upstream::HostSharedPtr host = Upstream::makeTestHost(cluster, "tcp://127.0.0.1:80");
+
+  TestConnPoolImplBase pool(host, Upstream::ResourcePriority::Default, dispatcher, nullptr, nullptr,
+                            state, overload_manager);
+  EXPECT_NE(nullptr, upstream_ready_cb);
+}
 
 class ConnPoolImplDispatcherBaseTest : public testing::Test {
 public:

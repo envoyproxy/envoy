@@ -1275,10 +1275,12 @@ public:
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 
   /**
-   * @return OptRef<const envoy::config::cluster::v3::Cluster::QueueStrategyConfig>
-   * an optional value of the configuration for the pending requests queue strategy for this cluster.
+   * @return OptRef<const envoy::config::core::v3::TypedExtensionConfig>
+   * an optional value of the configuration for the pending requests queue strategy for this
+   * cluster.
    */
-  virtual OptRef<const envoy::config::cluster::v3::Cluster::QueueStrategyConfig> queueStrategyConfig() const PURE;
+  virtual OptRef<const envoy::config::core::v3::TypedExtensionConfig>
+  queueStrategyConfig() const PURE;
 
   /**
    * @return whether to skip waiting for health checking before draining connections

@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package envoy.extensions.queue_strategy.fifo.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.queue_strategy.fifo.v3";
+option java_outer_classname = "FifoProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/queue_strategy/fifo/v3;fifov3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: FIFO Queue Strategy]
+// [#extension: envoy.queue_strategy.fifo]
+
+// Configuration for the FIFO pending requests queue strategy.
+message FifoQueueStrategyConfig {
+}

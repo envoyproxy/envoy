@@ -4,21 +4,53 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/debug_recursion_checker.h"
+#include "source/common/config/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/extensions/queue_strategy/fifo/fifo_queue_strategy.h"
 
 namespace Envoy {
 namespace ConnectionPool {
 namespace {
+constexpr absl::string_view DefaultQueueStrategy = "envoy.queue_strategy.fifo";
+
 int64_t currentUnusedCapacity(const std::list<ActiveClientPtr>& connecting_clients) {
   int64_t ret = 0;
   for (const auto& client : connecting_clients) {
     ret += client->currentUnusedCapacity();
   }
   return ret;
+}
+
+PendingStreamQueuePtr createPendingStreamQueue(
+    const OptRef<const envoy::config::core::v3::TypedExtensionConfig> queue_strategy_config) {
+  using PendingStreamQueueFactory = Extensions::QueueStrategy::QueueStrategyFactory<PendingStream>;
+
+  PendingStreamQueueFactory* factory = nullptr;
+  ProtobufMessage::ValidationVisitor& validation_visitor =
+      ProtobufMessage::getStrictValidationVisitor();
+  ProtobufTypes::MessagePtr factory_config;
+  if (queue_strategy_config.has_value()) {
+    factory = &Config::Utility::getAndCheckFactory<PendingStreamQueueFactory>(
+        queue_strategy_config.value().get());
+    factory_config = Config::Utility::translateToFactoryConfig(queue_strategy_config.value().get(),
+                                                               validation_visitor, *factory);
+  } else {
+    factory = Config::Utility::getFactoryByName<PendingStreamQueueFactory>(DefaultQueueStrategy);
+    if (factory == nullptr) {
+      ExceptionUtil::throwEnvoyException(
+          fmt::format("Didn't find a registered implementation for default queue strategy: '{}'",
+                      DefaultQueueStrategy));
+    }
+    factory_config = factory->createEmptyConfigProto();
+  }
+
+  return THROW_OR_RETURN_VALUE(
+      factory->createQueueStrategy(*factory_config, "cluster." + std::string(DefaultQueueStrategy),
+                                   validation_visitor),
+      PendingStreamQueuePtr);
 }
 } // namespace
 
@@ -58,7 +90,7 @@ ConnPoolImplBase::ConnPoolImplBase(
     Upstream::ClusterConnectivityState& state, Server::OverloadManager& overload_manager)
     : host_(host), priority_(priority), dispatcher_(dispatcher), socket_options_(options),
       transport_socket_options_(transport_socket_options), cluster_connectivity_state_(state),
-      pending_streams_(std::make_unique<Envoy::Extensions::QueueStrategy::FifoQueue<PendingStream>>()),
+      pending_streams_(createPendingStreamQueue(host_->cluster().queueStrategyConfig())),
       upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })),
       create_new_connection_load_shed_(overload_manager.getLoadShedPoint(
           Server::LoadShedPointName::get().ConnectionPoolNewConnection)),
@@ -722,7 +754,7 @@ void ConnPoolImplBase::purgePendingStreams(
     host_->cluster().trafficStats()->upstream_queue_overloaded_.set(0);
   }
   pending_streams_to_purge_ = std::move(*pending_streams_);
-  pending_streams_ = std::make_unique<Envoy::Extensions::QueueStrategy::FifoQueue<PendingStream>>();
+  pending_streams_ = createPendingStreamQueue(host_->cluster().queueStrategyConfig());
   while (!pending_streams_to_purge_.empty()) {
     PendingStreamPtr stream =
         pending_streams_to_purge_.front()->removeFromList(pending_streams_to_purge_);
