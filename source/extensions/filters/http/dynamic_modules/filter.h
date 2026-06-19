@@ -81,6 +81,13 @@ public:
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details);
 
+  // Drive the response encoder directly for the streaming-response ABI. These set
+  // sent_local_reply_ so the module's own encode hooks are not re-entered for the response it is
+  // producing, matching sendLocalReply.
+  void sendResponseHeaders(ResponseHeaderMapPtr&& headers, bool end_stream);
+  void sendResponseData(Buffer::Instance& data, bool end_stream);
+  void sendResponseTrailers(ResponseTrailerMapPtr&& trailers);
+
   // The callbacks for the filter. Worker-thread only; foreign threads must use `dispatcher()`.
   // They are only valid until onDestroy() is called.
   StreamDecoderFilterCallbacks* decoder_callbacks_ = nullptr;
@@ -274,8 +281,9 @@ private:
   // This helps to avoid reentering the module when sending a local reply. For example, if
   // sendLocalReply() is called, encodeHeaders and encodeData will be called again inline on top of
   // the stack calling it, which can be problematic. For example, with Rust, that might cause
-  // multiple mutable borrows of the same object. In practice, a module shouldn't need encodeHeaders
-  // and encodeData to be called for local reply contents, so we just skip them with this flag.
+  // multiple mutable borrows of the same object. In practice, a module shouldn't need its encode
+  // hooks called for local reply contents, so we just skip them with this flag. The
+  // streaming-response ABI (sendResponseHeaders and friends) sets it for the same reason.
   bool sent_local_reply_ = false;
 
   const DynamicModuleHttpFilterConfigSharedPtr config_ = nullptr;
