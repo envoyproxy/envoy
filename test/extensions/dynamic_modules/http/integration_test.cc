@@ -486,7 +486,7 @@ TEST_P(DynamicModulesIntegrationTest, StreamingResponseDoesNotReenterEncodeHooks
   EXPECT_TRUE(response->headers().get(Http::LowerCaseString("x-reentered")).empty());
 }
 
-// Regression test for CatchUnwind re-entrancy. The filter is wrapped in the SDK's CatchUnwind panic
+// Regression test for CatchUnwind reentrancy. The filter is wrapped in the SDK's CatchUnwind panic
 // guard and completes its response with end-of-stream from on_scheduled. Completing with eos drives
 // FilterManager::onStreamComplete inline, synchronously re-entering the same wrapped filter's
 // on_stream_complete while the on_scheduled catch frame is still on the stack. on_stream_complete
