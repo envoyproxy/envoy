@@ -55,6 +55,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"

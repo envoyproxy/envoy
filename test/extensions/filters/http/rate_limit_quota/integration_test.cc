@@ -28,6 +28,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/integration_stream_decoder.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
