@@ -77,4 +77,23 @@ TEST_P(DynamicModulesListenerSdkIntegrationTest, BufferRead) {
   tcp_client->close();
 }
 
+// Regression test for the listener filter shared-ownership fix. A make_unique-owned listener filter
+// aborted the worker when a module issued an HTTP callout, because sendHttpCallout calls
+// shared_from_this which throws std::bad_weak_ptr on a non-shared-owned object. The production
+// factory now shares ownership via an adapter. The autonomous upstream services the callout so the
+// filter resumes the accept. Rust-only because the bug is in the language-agnostic C++ factory and
+// one module exercises it.
+TEST_P(DynamicModulesListenerSdkIntegrationTest, HttpCalloutOnAcceptDoesNotCrash) {
+  if (GetParam() != "rust") {
+    GTEST_SKIP() << "the http_callout_on_accept filter is only in the rust test module";
+  }
+  autonomous_upstream_ = true;
+  initializeFilter("http_callout_on_accept");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write("ping"));
+  tcp_client->waitForData("ping");
+  tcp_client->close();
+}
+
 } // namespace Envoy
