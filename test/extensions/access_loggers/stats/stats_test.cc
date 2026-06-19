@@ -31,14 +31,11 @@ class MockScopeWithGauge : public Stats::MockScope {
 public:
   using Stats::MockScope::MockScope;
 
-  // Keep the base's non-virtual convenience overloads visible alongside the tag-aware overrides.
-  using Stats::MockScope::gaugeFromStatName;
-  using Stats::MockScope::histogramFromStatName;
-  MOCK_METHOD(Stats::Gauge&, gaugeFromStatName,
+  MOCK_METHOD(Stats::Gauge&, gaugeFromTaggedName,
               (Stats::StatName name, absl::optional<Stats::StatNameTagSpan> name_tags,
                Stats::StatName tagged_name, Stats::Gauge::ImportMode import_mode),
               (override));
-  MOCK_METHOD(Stats::Histogram&, histogramFromStatName,
+  MOCK_METHOD(Stats::Histogram&, histogramFromTaggedName,
               (Stats::StatName name, absl::optional<Stats::StatNameTagSpan> name_tags,
                Stats::StatName tagged_name, Stats::Histogram::Unit unit),
               (override));
@@ -48,7 +45,7 @@ public:
 // AccessLogState destructor to reconstruct the gauge with name_tags.
 //
 // It uses StatNameDynamicStorage to own the storage for tag names and values.
-// This is necessary because the name_tags passed to gaugeFromStatName during
+// This is necessary because the name_tags passed to gaugeFromTaggedName during
 // logging are often backed by temporary storage (stack-allocated in emitLogConst)
 // which is destroyed after the log call returns. By making a copy into
 // tags_storage_, we ensure that iterateTagStatNames returns valid StatNames even
@@ -138,28 +135,28 @@ public:
               std::make_unique<Stats::StatNameDynamicStorage>(name, context_.store_.symbolTable());
           auto scope = std::make_shared<NiceMock<MockScopeWithGauge>>(
               scope_name_storage->statName(), store_);
-          ON_CALL(*scope, gaugeFromStatName(_, _, _, _))
+          ON_CALL(*scope, gaugeFromTaggedName(_, _, _, _))
               .WillByDefault(Invoke([this](Stats::StatName name,
                                            absl::optional<Stats::StatNameTagSpan>, Stats::StatName,
                                            Stats::Gauge::ImportMode import_mode) -> Stats::Gauge& {
                 return this->store_.gauge(this->context_.store_.symbolTable().toString(name),
                                           import_mode);
               }));
-          ON_CALL(*scope, counterFromStatName(_, _, _))
+          ON_CALL(*scope, counterFromTaggedName(_, _, _))
               .WillByDefault(
                   Invoke([this](Stats::StatName name, absl::optional<Stats::StatNameTagSpan>,
                                 Stats::StatName) -> Stats::Counter& {
                     return this->store_.counter(this->context_.store_.symbolTable().toString(name));
                   }));
 
-          ON_CALL(*scope, histogramFromStatName(_, _, _, _))
+          ON_CALL(*scope, histogramFromTaggedName(_, _, _, _))
               .WillByDefault(Invoke(
                   [scope_ptr = scope.get()](Stats::StatName name,
                                             absl::optional<Stats::StatNameTagSpan> name_tags,
                                             Stats::StatName tagged_name,
                                             Stats::Histogram::Unit unit) -> Stats::Histogram& {
-                    return scope_ptr->Stats::MockScope::histogramFromStatName(name, name_tags,
-                                                                              tagged_name, unit);
+                    return scope_ptr->Stats::MockScope::histogramFromTaggedName(name, name_tags,
+                                                                                tagged_name, unit);
                   }));
 
           scope_ = scope;
@@ -435,7 +432,7 @@ TEST_F(StatsAccessLoggerTest, EmptyTagFormatter) {
   EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(nullopt));
   EXPECT_CALL(stream_info_, responseCode())
       .WillRepeatedly(testing::Return(absl::optional<uint32_t>{200}));
-  EXPECT_CALL(*scope_, counterFromStatName(_, _, _))
+  EXPECT_CALL(*scope_, counterFromTaggedName(_, _, _))
       .WillOnce(testing::Invoke([this](Stats::StatName name,
                                        absl::optional<Stats::StatNameTagSpan> name_tags,
                                        Stats::StatName) -> Stats::Counter& {
@@ -855,7 +852,7 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorSubtractsFromSavedGauge) {
       .WillRepeatedly(testing::Return(absl::optional<uint32_t>{200}));
 
   // Initial lookup and add
-  EXPECT_CALL(*mock_scope, gaugeFromStatName(_, _, _, Stats::Gauge::ImportMode::Accumulate))
+  EXPECT_CALL(*mock_scope, gaugeFromTaggedName(_, _, _, Stats::Gauge::ImportMode::Accumulate))
       .WillRepeatedly(Invoke([&](Stats::StatName name,
                                  absl::optional<Stats::StatNameTagSpan> name_tags, Stats::StatName,
                                  Stats::Gauge::ImportMode) -> Stats::Gauge& {
@@ -959,7 +956,8 @@ TEST_F(StatsAccessLoggerTest, StatsScope) {
   // The newly created scope for "test_scope" is stored at the end of `name_storages_` but
   // since `scope_` only stores the last created scope for non-"scope_discovery", it should
   // be exactly `scope_` here.
-  EXPECT_CALL(*scope_, counterFromStatName(_, _, _)).WillOnce(testing::ReturnRef(store_.counter_));
+  EXPECT_CALL(*scope_, counterFromTaggedName(_, _, _))
+      .WillOnce(testing::ReturnRef(store_.counter_));
   EXPECT_CALL(store_.counter_, add(1));
   logger_->log(formatter_context, stream_info);
 }
@@ -1131,7 +1129,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTag) {
   initialize(yaml);
 
   // Case 1: Filter matches (tag foo=bar), so update tag action is executed.
-  EXPECT_CALL(*scope_, counterFromStatName(_, _, _))
+  EXPECT_CALL(*scope_, counterFromTaggedName(_, _, _))
       .WillOnce(testing::Invoke([this](Stats::StatName name,
                                        absl::optional<Stats::StatNameTagSpan> name_tags,
                                        Stats::StatName tagged_name) -> Stats::Counter& {
@@ -1139,7 +1137,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTag) {
         EXPECT_EQ(1, name_tags->size());
         EXPECT_EQ("foo", scope_->symbolTable().toString((*name_tags)[0].first));
         EXPECT_EQ("baz", scope_->symbolTable().toString((*name_tags)[0].second));
-        return scope_->counterFromStatName_(name, name_tags, tagged_name);
+        return scope_->counterFromTaggedName_(name, name_tags, tagged_name);
       }));
   logger_->log(formatter_context_, stream_info_);
 }
@@ -1174,13 +1172,13 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterDropTag) {
   initialize(yaml);
 
   // Case 1: Filter matches (tag foo=bar), so drop tag action is executed.
-  EXPECT_CALL(*scope_, counterFromStatName(_, _, _))
+  EXPECT_CALL(*scope_, counterFromTaggedName(_, _, _))
       .WillOnce(testing::Invoke([this](Stats::StatName name,
                                        absl::optional<Stats::StatNameTagSpan> name_tags,
                                        Stats::StatName tagged_name) -> Stats::Counter& {
         EXPECT_EQ("counter", scope_->symbolTable().toString(name));
         EXPECT_EQ(0, name_tags->size());
-        return scope_->counterFromStatName_(name, name_tags, tagged_name);
+        return scope_->counterFromTaggedName_(name, name_tags, tagged_name);
       }));
   logger_->log(formatter_context_, stream_info_);
 }
@@ -1294,7 +1292,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTagOnGauge) {
   ASSERT_TRUE(mock_scope != nullptr);
 
   // Case 1: Filter matches (tag foo=bar), so update tag action is executed.
-  EXPECT_CALL(*mock_scope, gaugeFromStatName(_, _, _, _))
+  EXPECT_CALL(*mock_scope, gaugeFromTaggedName(_, _, _, _))
       .WillOnce(Invoke([&](Stats::StatName name, absl::optional<Stats::StatNameTagSpan> name_tags,
                            Stats::StatName, Stats::Gauge::ImportMode) -> Stats::Gauge& {
         EXPECT_EQ("gauge", scope_->symbolTable().toString(name));
@@ -1341,7 +1339,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTagOnHistogram) {
   ASSERT_TRUE(mock_scope != nullptr);
 
   // Case 1: Filter matches (tag foo=bar), so update tag action is executed.
-  EXPECT_CALL(*mock_scope, histogramFromStatName(_, _, _, _))
+  EXPECT_CALL(*mock_scope, histogramFromTaggedName(_, _, _, _))
       .WillOnce(
           Invoke([&](Stats::StatName name, absl::optional<Stats::StatNameTagSpan> name_tags,
                      Stats::StatName tagged_name, Stats::Histogram::Unit) -> Stats::Histogram& {
@@ -1349,8 +1347,8 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTagOnHistogram) {
             EXPECT_EQ(1, name_tags->size());
             EXPECT_EQ("foo", scope_->symbolTable().toString((*name_tags)[0].first));
             EXPECT_EQ("baz", scope_->symbolTable().toString((*name_tags)[0].second));
-            return store_.mockScope().histogramFromStatName(name, name_tags, tagged_name,
-                                                            Stats::Histogram::Unit::Bytes);
+            return store_.mockScope().histogramFromTaggedName(name, name_tags, tagged_name,
+                                                              Stats::Histogram::Unit::Bytes);
           }));
   logger_->log(formatter_context_, stream_info_);
 }
