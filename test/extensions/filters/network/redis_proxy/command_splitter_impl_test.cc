@@ -588,7 +588,7 @@ TEST_F(RedisSingleServerRequestTest, HPExpireTimeSuccess) {
 
 // Verify write classification: hexpire/hexpireat/hpexpire/hpexpireat/hpersist are write commands.
 TEST_F(RedisSingleServerRequestTest, HashFieldExpiryWriteCommandsClassification) {
-  for (const std::string& cmd : {"hexpire", "hexpireat", "hpexpire", "hpexpireat", "hpersist"}) {
+  for (const auto* cmd : {"hexpire", "hexpireat", "hpexpire", "hpexpireat", "hpersist"}) {
     EXPECT_FALSE(Common::Redis::SupportedCommands::isReadCommand(cmd))
         << cmd << " should be classified as a write command";
   }
@@ -596,7 +596,7 @@ TEST_F(RedisSingleServerRequestTest, HashFieldExpiryWriteCommandsClassification)
 
 // Verify read classification: httl/hpttl are read commands (not in writeCommands).
 TEST_F(RedisSingleServerRequestTest, HashFieldExpiryReadCommandsClassification) {
-  for (const std::string& cmd : {"httl", "hpttl", "hexpiretime", "hpexpiretime"}) {
+  for (const auto* cmd : {"httl", "hpttl", "hexpiretime", "hpexpiretime"}) {
     EXPECT_TRUE(Common::Redis::SupportedCommands::isReadCommand(cmd))
         << cmd << " should be classified as a read command";
   }
