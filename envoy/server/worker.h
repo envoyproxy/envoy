@@ -1,11 +1,23 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
+#include <list>
+#include <memory>
+#include <string>
 
-#include "envoy/event/dispatcher.h"
+#include "envoy/common/optref.h"
+#include "envoy/common/pure.h"
+#include "envoy/common/random_generator.h"
+#include "envoy/network/connection_handler.h"
+#include "envoy/network/filter.h"
+#include "envoy/network/listener.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/overload/overload_manager.h"
+#include "envoy/stats/scope.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {

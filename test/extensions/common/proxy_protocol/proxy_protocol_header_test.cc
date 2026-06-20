@@ -5,6 +5,7 @@
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 #include "test/mocks/network/connection.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"

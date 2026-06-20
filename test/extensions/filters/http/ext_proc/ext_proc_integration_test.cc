@@ -29,6 +29,7 @@
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
