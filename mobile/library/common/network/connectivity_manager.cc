@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "envoy/common/platform.h"
+#include "envoy/runtime/runtime.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"

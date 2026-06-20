@@ -202,6 +202,7 @@ envoy_cc_test(
         "//source/common/tls:utility_lib",
         "//test/common/tls/test_data:cert_infos",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
 )

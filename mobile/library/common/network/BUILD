@@ -61,6 +61,7 @@ envoy_cc_library(
         "//library/common/system:system_helper_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/network:socket_interface",
+        "@envoy//envoy/runtime:runtime_lib",
         "@envoy//envoy/singleton:manager_interface",
         "@envoy//source/common/common:assert_lib",
         "@envoy//source/common/common:scalar_to_byte_vector_lib",

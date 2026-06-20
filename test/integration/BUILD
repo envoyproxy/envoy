@@ -1198,6 +1198,7 @@ envoy_cc_test_library(
         "//test/common/http/http2:http2_frame",
         "//test/common/upstream:utility_lib",
         "//test/mocks/upstream:cluster_info_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/early_data/v3:pkg_cc_proto",
