@@ -35,6 +35,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 
+#include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time_system.h"
 
