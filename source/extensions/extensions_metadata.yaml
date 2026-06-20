@@ -152,6 +152,13 @@ envoy.extensions.http.cache_v2.simple:
   status: wip
   type_urls:
   - envoy.extensions.http.cache_v2.simple_http_cache.v3.SimpleHttpCacheV2Config
+envoy.extensions.network.socket_interface.sockmap:
+  categories:
+  - envoy.bootstrap
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.network.socket_interface.sockmap.v3.Sockmap
 envoy.clusters.aggregate:
   categories:
   - envoy.clusters
