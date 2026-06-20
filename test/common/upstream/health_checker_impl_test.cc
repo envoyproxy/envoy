@@ -4935,6 +4935,34 @@ TEST_F(TcpHealthCheckerImplTest, ConnectionLocalFailure) {
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.passive_failure").value());
 }
 
+// Tests that a failure to create the health check connection (e.g. a network namespace binding
+// failure that makes the upstream connection factory return a null connection) is handled as a
+// network health check failure instead of crashing on a null dereference. Also exercises the
+// re-armed timeout timer firing against a session that has no client.
+TEST_F(TcpHealthCheckerImplTest, ConnectionCreateFailure) {
+  setupData();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+
+  // The upstream connection cannot be created; the factory returns a null connection.
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, _, _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*timeout_timer_, disableTimer()).Times(testing::AnyNumber());
+  EXPECT_CALL(*timeout_timer_, enableTimer(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*interval_timer_, disableTimer()).Times(testing::AnyNumber());
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _)).Times(testing::AnyNumber());
+
+  // First check fails gracefully instead of crashing.
+  health_checker_->start();
+  // Fire the re-armed timeout timer; onTimeout must tolerate the null client without crashing.
+  timeout_timer_->invokeCallback();
+
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.success").value());
+  EXPECT_GE(cluster_->info_->stats_store_.counter("health_check.failure").value(), 1UL);
+}
+
 TEST_F(TcpHealthCheckerImplTest, SuccessProxyProtocol) {
   InSequence s;
 
