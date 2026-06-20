@@ -10,7 +10,6 @@
 #include "envoy/server/guarddog_config.h"
 #include "envoy/thread/thread.h"
 
-#include "source/common/signal/non_fatal_signal_action.h"
 #include "source/common/signal/non_fatal_signal_handler.h"
 #include "source/extensions/watchdog/backtrace_action/backtrace_action.h"
 #include "source/server/backtrace.h"
@@ -34,20 +33,6 @@ protected:
       : api_(Api::createApiForTest(stats_)), dispatcher_(api_->allocateDispatcher("test")),
         context_({*api_, *dispatcher_, *stats_.rootScope(), "test"}) {}
 
-  NonFatalSignalAction non_fatal_signal_action_;
-  Stats::TestUtil::TestStore stats_;
-  Api::ApiPtr api_;
-  Event::DispatcherPtr dispatcher_;
-  Server::Configuration::GuardDogActionFactoryContext context_;
-  std::unique_ptr<Server::Configuration::GuardDogAction> action_;
-};
-
-class BacktraceActionNoSignalTest : public testing::Test {
-protected:
-  BacktraceActionNoSignalTest()
-      : api_(Api::createApiForTest(stats_)), dispatcher_(api_->allocateDispatcher("test")),
-        context_({*api_, *dispatcher_, *stats_.rootScope(), "test"}) {}
-
   Stats::TestUtil::TestStore stats_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
@@ -63,18 +48,6 @@ TEST_F(BacktraceActionTest, WarnOnEmptyThreadList) {
   EXPECT_LOG_CONTAINS(
       "warn", "no tids were provided",
       action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS, {}, now));
-}
-
-TEST_F(BacktraceActionNoSignalTest, WarnWhenSignalNotInstalled) {
-  envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig config;
-  action_ = std::make_unique<BacktraceAction>(config, context_);
-
-  const auto now = api_->timeSource().monotonicTime();
-  const std::vector<std::pair<Thread::ThreadId, MonotonicTime>> tid_ltt_pairs = {
-      {Thread::ThreadId(10), now}};
-  EXPECT_LOG_CONTAINS("warn", "signal handler not installed",
-                      action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS,
-                                   tid_ltt_pairs, now));
 }
 
 TEST_F(BacktraceActionTest, SingleBacktraceLogged) {
@@ -119,6 +92,9 @@ TEST_F(BacktraceActionTest, SingleBacktraceLogged) {
   BackwardsTrace::setLogToStderr(prev_log_to_stderr);
   dispatcher_->exit();
   thread->join();
+
+  EXPECT_EQ(1U, stats_.counter("watchdog.backtrace_action.backtraces_logged").value());
+  EXPECT_EQ(0U, stats_.counter("watchdog.backtrace_action.backtraces_failed").value());
 }
 
 TEST_F(BacktraceActionTest, MultipleBacktracesLogged) {
@@ -311,7 +287,7 @@ TEST_F(BacktraceActionTest, OnNonFatalSignalNoMatchingSlot) {
   NonFatalSignalHandler::callNonFatalSignalHandlers(SIGUSR2, &info, nullptr);
 }
 
-TEST_F(BacktraceActionNoSignalTest, WarnWhenSignalHandlerNotRegistered) {
+TEST_F(BacktraceActionTest, WarnWhenSignalHandlerNotRegistered) {
   // Fill all handler slots with a no-op handler to force BacktraceAction registration to fail.
   auto noopHandler = +[](int, siginfo_t*, void*) {};
   for (size_t i = 0; i < NonFatalSignalHandler::MaxHandlers; ++i) {

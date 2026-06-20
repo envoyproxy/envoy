@@ -1,7 +1,6 @@
 #include <atomic>
 #include <csignal>
 
-#include "source/common/signal/non_fatal_signal_action.h"
 #include "source/common/signal/non_fatal_signal_handler.h"
 
 #include "gtest/gtest.h"
@@ -96,26 +95,28 @@ TEST_F(NonFatalSignalHandlerTest, OnlyRemovedHandlerIsSkipped) {
   EXPECT_EQ(g_count_c, 1);
 }
 
-TEST(NonFatalSignalActionTest, InstalledAfterConstructionRemovedAfterDestruction) {
-  ASSERT_FALSE(NonFatalSignalAction::isInstalled());
-  {
-    NonFatalSignalAction action;
-    EXPECT_TRUE(NonFatalSignalAction::isInstalled());
-  }
-  EXPECT_FALSE(NonFatalSignalAction::isInstalled());
-}
-
-TEST(NonFatalSignalActionTest, SIGUSR2DispatchesToRegisteredHandlers) {
-  g_count_a = 0;
-  g_last_sig_a = 0;
+TEST(NonFatalSignalHandlerInstallTest, InstalledOnFirstRegistrationRemovedOnLast) {
+  ASSERT_FALSE(NonFatalSignalHandler::isInstalled());
   NonFatalSignalHandler::registerNonFatalSignalHandler(handlerA);
+  EXPECT_TRUE(NonFatalSignalHandler::isInstalled());
 
-  {
-    NonFatalSignalAction action;
-    raise(SIGUSR2);
-  }
+  NonFatalSignalHandler::registerNonFatalSignalHandler(handlerB);
+  EXPECT_TRUE(NonFatalSignalHandler::isInstalled());
 
   NonFatalSignalHandler::removeNonFatalSignalHandler(handlerA);
+  EXPECT_TRUE(NonFatalSignalHandler::isInstalled());
+  NonFatalSignalHandler::removeNonFatalSignalHandler(handlerB);
+  EXPECT_FALSE(NonFatalSignalHandler::isInstalled());
+}
+
+TEST(NonFatalSignalHandlerInstallTest, SIGUSR2DispatchesToRegisteredHandlers) {
+  g_count_a = 0;
+  g_last_sig_a = 0;
+
+  NonFatalSignalHandler::registerNonFatalSignalHandler(handlerA);
+  raise(SIGUSR2);
+  NonFatalSignalHandler::removeNonFatalSignalHandler(handlerA);
+
   EXPECT_GE(g_count_a.load(), 1);
   EXPECT_EQ(g_last_sig_a.load(), SIGUSR2);
 }

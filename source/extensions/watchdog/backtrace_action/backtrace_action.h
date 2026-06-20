@@ -8,6 +8,8 @@
 #include "envoy/event/timer.h"
 #include "envoy/extensions/watchdog/backtrace_action/v3/backtrace_action.pb.h"
 #include "envoy/server/guarddog_config.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 #include "envoy/thread/thread.h"
 
 #include "source/server/backtrace.h"
@@ -16,6 +18,20 @@ namespace Envoy {
 namespace Extensions {
 namespace Watchdog {
 namespace BacktraceAction {
+
+/**
+ * All stats for the backtrace action. @see stats_macros.h
+ */
+#define ALL_BACKTRACE_ACTION_STATS(COUNTER)                                                        \
+  COUNTER(backtraces_logged)                                                                       \
+  COUNTER(backtraces_failed)
+
+/**
+ * Wrapper struct for the backtrace action stats. @see stats_macros.h
+ */
+struct BacktraceActionStats {
+  ALL_BACKTRACE_ACTION_STATS(GENERATE_COUNTER_STRUCT)
+};
 
 /**
  * A GuardDogAction that logs backtraces of stuck threads.
@@ -48,11 +64,19 @@ private:
   // Called in signal handler context; must be async-signal-safe.
   static void onNonFatalSignal(int sig, siginfo_t* info, void* context);
 
+  static BacktraceActionStats generateStats(Stats::Scope& scope);
+
   // Minimum amount of time between backtraces for a given thread.
   std::chrono::milliseconds cooldown_duration_;
 
-  // Guards against duplicate registration of the signal handler onNonFatalSignal.
-  static bool signal_handler_registered_;
+  BacktraceActionStats stats_;
+
+  // Counts number of BacktraceAction instances sharing the onNonFatalSignal handler.
+  static std::atomic<int> instance_count_;
+
+  // Whether onNonFatalSignal is currently registered. Set when the first
+  // instance successfully registers it.
+  static std::atomic<bool> signal_handler_registered_;
 
   // Corresponding timer for each SignalSlot.
   std::array<Event::TimerPtr, MaxSlots> timers_;

@@ -20,7 +20,6 @@ envoy_extension_cc_test(
     deps = [
         "//envoy/common:time_interface",
         "//envoy/server:guarddog_config_interface",
-        "//source/common/signal:non_fatal_sigaction_lib",
         "//source/common/signal:non_fatal_signal_handler_lib",
         "//source/extensions/watchdog/backtrace_action:backtrace_action_lib",
         "//source/extensions/watchdog/backtrace_action:config",

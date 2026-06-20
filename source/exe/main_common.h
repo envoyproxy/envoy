@@ -21,7 +21,6 @@
 #include "source/server/server.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
-#include "source/common/signal/non_fatal_signal_action.h"
 #include "source/common/signal/signal_action.h"
 #include "source/exe/terminate_handler.h"
 #endif
@@ -144,7 +143,6 @@ private:
 
 #ifdef ENVOY_HANDLE_SIGNALS
   Envoy::SignalAction handle_sigs_;
-  Envoy::NonFatalSignalAction handle_non_fatal_sigs_;
   Envoy::TerminateHandler log_on_terminate_;
 #endif
 

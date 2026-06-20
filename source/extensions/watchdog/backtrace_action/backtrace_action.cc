@@ -6,7 +6,6 @@
 
 #include "source/common/common/posix/thread_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/signal/non_fatal_signal_action.h"
 #include "source/common/signal/non_fatal_signal_handler.h"
 #include "source/common/thread/signal_thread.h"
 
@@ -18,26 +17,36 @@ namespace Watchdog {
 namespace BacktraceAction {
 
 std::array<BacktraceAction::SignalSlot, BacktraceAction::MaxSlots> BacktraceAction::signal_slots_;
-bool BacktraceAction::signal_handler_registered_ = false;
+std::atomic<int> BacktraceAction::instance_count_ = 0;
+std::atomic<bool> BacktraceAction::signal_handler_registered_ = false;
+
+BacktraceActionStats BacktraceAction::generateStats(Stats::Scope& scope) {
+  return {ALL_BACKTRACE_ACTION_STATS(POOL_COUNTER_PREFIX(scope, "watchdog.backtrace_action."))};
+}
 
 BacktraceAction::BacktraceAction(
     envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig& config,
     Server::Configuration::GuardDogActionFactoryContext& context)
     : cooldown_duration_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cooldown_duration, 10000))) {
-  if (!signal_handler_registered_) {
-    signal_handler_registered_ =
-        NonFatalSignalHandler::registerNonFatalSignalHandler(onNonFatalSignal);
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cooldown_duration, 10000))),
+      stats_(generateStats(context.stats_)) {
+  if (instance_count_.fetch_add(1, std::memory_order_acq_rel) == 0) {
+    signal_handler_registered_.store(
+        NonFatalSignalHandler::registerNonFatalSignalHandler(onNonFatalSignal),
+        std::memory_order_release);
   }
 
   for (int i = 0; i < MaxSlots; ++i) {
-    timers_[i] = context.dispatcher_.createTimer([i]() {
+    timers_[i] = context.dispatcher_.createTimer([this, i]() {
       auto& slot = signal_slots_[i];
       if (slot.ready.load(std::memory_order_acquire)) {
         ENVOY_LOG_MISC(critical, "Backtrace Action: backtrace for thread {}:",
                        slot.tid.load(std::memory_order_relaxed));
         BackwardsTrace tracer(slot.trace.frames, slot.trace.depth);
         tracer.logTrace();
+        stats_.backtraces_logged_.inc();
+      } else {
+        stats_.backtraces_failed_.inc();
       }
       slot.tid.store(0, std::memory_order_release);
     });
@@ -45,9 +54,10 @@ BacktraceAction::BacktraceAction(
 }
 
 BacktraceAction::~BacktraceAction() {
-  if (signal_handler_registered_) {
+  if (instance_count_.fetch_sub(1, std::memory_order_acq_rel) == 1 &&
+      signal_handler_registered_.load(std::memory_order_acquire)) {
     NonFatalSignalHandler::removeNonFatalSignalHandler(onNonFatalSignal);
-    signal_handler_registered_ = false;
+    signal_handler_registered_.store(false, std::memory_order_release);
   }
 }
 
@@ -78,12 +88,8 @@ void BacktraceAction::run(
     envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent /*event*/,
     const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_last_checkin_pairs,
     MonotonicTime now) {
-  if (!signal_handler_registered_) {
+  if (!signal_handler_registered_.load(std::memory_order_acquire)) {
     ENVOY_LOG_MISC(warn, "Backtrace Action: signal handler not registered.");
-    return;
-  }
-  if (!NonFatalSignalAction::isInstalled()) {
-    ENVOY_LOG_MISC(warn, "Backtrace Action: signal handler not installed.");
     return;
   }
   if (thread_last_checkin_pairs.empty()) {
@@ -122,6 +128,7 @@ void BacktraceAction::run(
         if (!Thread::signalThread(tid, SIGUSR2)) {
           ENVOY_LOG_MISC(warn, "Backtrace Action: failed to signal thread {}.", raw_tid);
           signal_slots_[i].tid.store(0, std::memory_order_relaxed);
+          stats_.backtraces_failed_.inc();
           break;
         }
         timers_[i]->enableTimer(std::chrono::milliseconds(100));

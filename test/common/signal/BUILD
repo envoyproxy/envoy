@@ -31,7 +31,6 @@ envoy_cc_test(
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
-        "//source/common/signal:non_fatal_sigaction_lib",
         "//source/common/signal:non_fatal_signal_handler_lib",
         "//test/test_common:utility_lib",
     ],
