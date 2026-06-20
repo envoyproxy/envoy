@@ -61,12 +61,12 @@ envoy_cc_library(
         "//library/common/system:system_helper_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/network:socket_interface",
-        "@envoy//envoy/runtime:runtime_lib",
         "@envoy//envoy/singleton:manager_interface",
         "@envoy//source/common/common:assert_lib",
         "@envoy//source/common/common:scalar_to_byte_vector_lib",
         "@envoy//source/common/network:addr_family_aware_socket_option_lib",
         "@envoy//source/common/network:socket_option_lib",
+        "@envoy//source/common/runtime:runtime_features_lib",
         "@envoy//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
     ],
 )
