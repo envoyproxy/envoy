@@ -800,5 +800,19 @@ ResolvedUdpSocketConfig::ResolvedUdpSocketConfig(
   }
 }
 
+#if defined(__linux__)
+absl::Status Utility::validateNetworkNamespace(absl::string_view netns) {
+  Api::OsSysCalls& posix = Api::OsSysCallsSingleton::get();
+  const std::string netns_path(netns);
+  auto open_result = posix.open(netns_path.c_str(), O_RDONLY);
+  if (open_result.return_value_ < 0) {
+    return absl::InvalidArgumentError(fmt::format("failed to open network namespace file {}: {}",
+                                                  netns_path, errorDetails(open_result.errno_)));
+  }
+  posix.close(open_result.return_value_);
+  return absl::OkStatus();
+}
+#endif
+
 } // namespace Network
 } // namespace Envoy

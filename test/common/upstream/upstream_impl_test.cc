@@ -3877,6 +3877,46 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
   }
 }
 
+#if defined(__linux__)
+// A cluster whose upstream bind config references a non-existent network namespace is rejected at
+// config admission time rather than crashing later when creating an upstream connection.
+TEST_F(StaticClusterImplTest, UpstreamBindConfigInvalidNetworkNamespace) {
+  envoy::config::cluster::v3::Cluster config;
+  config.set_name("staticcluster");
+  config.mutable_connect_timeout();
+  auto* source_address = config.mutable_upstream_bind_config()->mutable_source_address();
+  source_address->set_address("1.2.3.4");
+  source_address->set_port_value(0);
+  source_address->set_network_namespace_filepath("/run/netns/envoy_does_not_exist_test_ns");
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  EXPECT_THROW_WITH_REGEX(std::shared_ptr<StaticClusterImpl> cluster =
+                              createCluster(config, factory_context),
+                          EnvoyException, "failed to open network namespace file");
+}
+
+// With the runtime guard disabled, the invalid network namespace is not validated at admission, so
+// cluster creation succeeds (preserving the pre-existing behavior).
+TEST_F(StaticClusterImplTest, UpstreamBindConfigInvalidNetworkNamespaceRuntimeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.reject_invalid_bind_network_namespace", "false"}});
+
+  envoy::config::cluster::v3::Cluster config;
+  config.set_name("staticcluster");
+  config.mutable_connect_timeout();
+  auto* source_address = config.mutable_upstream_bind_config()->mutable_source_address();
+  source_address->set_address("1.2.3.4");
+  source_address->set_port_value(0);
+  source_address->set_network_namespace_filepath("/run/netns/envoy_does_not_exist_test_ns");
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  EXPECT_NO_THROW(createCluster(config, factory_context));
+}
+#endif
+
 TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourceAddress) {
   envoy::config::cluster::v3::Cluster config;
   config.set_name("staticcluster");

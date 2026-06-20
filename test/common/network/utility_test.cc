@@ -941,6 +941,33 @@ TEST_F(ExecInNetnsTest, FailtoReturnToOriginalNetns) {
       },
       "failed to restore original netns .*");
 }
+
+TEST_F(ExecInNetnsTest, ValidateNetworkNamespaceSuccess) {
+  testing::StrictMock<Api::MockOsSysCalls> os_syscalls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_syscalls);
+
+  EXPECT_CALL(os_syscalls, open(_, O_RDONLY))
+      .WillOnce(Invoke([](const char*, int) -> Api::SysCallIntResult { return {42, 0}; }));
+  EXPECT_CALL(os_syscalls, close(42)).WillOnce(Invoke([](int) -> Api::SysCallIntResult {
+    return {0, 0};
+  }));
+
+  EXPECT_TRUE(Utility::validateNetworkNamespace("/var/run/netns/ns1").ok());
+}
+
+TEST_F(ExecInNetnsTest, ValidateNetworkNamespaceOpenFail) {
+  testing::StrictMock<Api::MockOsSysCalls> os_syscalls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_syscalls);
+
+  // open() fails (e.g. the namespace does not exist). No close() is expected.
+  EXPECT_CALL(os_syscalls, open(_, O_RDONLY))
+      .WillOnce(Invoke([](const char*, int) -> Api::SysCallIntResult { return {-1, -1}; }));
+
+  auto status = Utility::validateNetworkNamespace("/var/run/netns/does_not_exist");
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_TRUE(status.message().starts_with("failed to open network namespace file"));
+}
 #endif
 
 } // namespace

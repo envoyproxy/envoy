@@ -50,6 +50,7 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/socket_option_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
@@ -224,6 +225,25 @@ buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_con
   return cluster_options;
 }
 
+// Validates that a resolved upstream bind source address with a configured network namespace can
+// actually be entered. This is done at config-admission time so that a misconfigured (e.g.
+// non-existent) network namespace is rejected here rather than causing a failure (historically a
+// crash) deep in the connection creation path. Guarded by a runtime feature so the new rejection
+// can be reverted on a live instance.
+absl::Status
+validateUpstreamBindNetworkNamespace(const Network::Address::InstanceConstSharedPtr& address) {
+#if defined(__linux__)
+  if (address != nullptr && address->networkNamespace().has_value() &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.reject_invalid_bind_network_namespace")) {
+    return Network::Utility::validateNetworkNamespace(address->networkNamespace().value());
+  }
+#else
+  (void)address;
+#endif
+  return absl::OkStatus();
+}
+
 absl::StatusOr<std::vector<::Envoy::Upstream::UpstreamLocalAddress>>
 parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_config,
                 const absl::optional<std::string>& cluster_name,
@@ -240,6 +260,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
           ::Envoy::Network::Address::resolveProtoSocketAddress(bind_config->source_address());
       RETURN_IF_NOT_OK_REF(address_or_error.status());
       upstream_local_address.address_ = address_or_error.value();
+      RETURN_IF_NOT_OK(validateUpstreamBindNetworkNamespace(upstream_local_address.address_));
     }
     upstream_local_address.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
 
@@ -256,6 +277,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
           ::Envoy::Network::Address::resolveProtoSocketAddress(extra_source_address.address());
       RETURN_IF_NOT_OK_REF(address_or_error.status());
       extra_upstream_local_address.address_ = address_or_error.value();
+      RETURN_IF_NOT_OK(validateUpstreamBindNetworkNamespace(extra_upstream_local_address.address_));
 
       extra_upstream_local_address.socket_options_ =
           std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
@@ -280,6 +302,8 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
           ::Envoy::Network::Address::resolveProtoSocketAddress(additional_source_address);
       RETURN_IF_NOT_OK_REF(address_or_error.status());
       additional_upstream_local_address.address_ = address_or_error.value();
+      RETURN_IF_NOT_OK(
+          validateUpstreamBindNetworkNamespace(additional_upstream_local_address.address_));
       additional_upstream_local_address.socket_options_ =
           std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
       ::Envoy::Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
@@ -713,6 +737,15 @@ Host::CreateConnectionData HostImplBase::createConnection(
         address, upstream_local_address.address_,
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
+  }
+
+  // `createClientConnection` can return nullptr, for example when binding the upstream connection
+  // to a configured network namespace fails (e.g. the namespace was removed at runtime). Returning
+  // a null connection lets the caller (connection pools) treat this as a connection failure rather
+  // than crashing on a null dereference below.
+  if (connection == nullptr) {
+    ENVOY_LOG(debug, "Failed to create upstream connection to host {}", address->asString());
+    return {nullptr, host};
   }
 
   connection->connectionInfoSetter().enableSettingInterfaceName(
