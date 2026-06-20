@@ -30,8 +30,6 @@ public:
   void initialize() override {
     setMaxRequestHeadersKb(60);
     setMaxRequestHeadersCount(100);
-    envoy::config::route::v3::RetryPolicy retry_policy;
-
     // If there is a need for another virtual host, it's recommended
     // to add it at the end, so the numbering remains stable.
     auto pass_through = config_helper_.createVirtualHost("pass.through.internal.redirect");
@@ -696,10 +694,14 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithResponseBody) {
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
     config_helper_.prependFilter(R"EOF(
   name: pause-filter-for-quic
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.PauseFilterForQuicConfig
   )EOF");
   } else {
     config_helper_.prependFilter(R"EOF(
   name: pause-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.PauseFilterConfig
   )EOF");
   }
   initialize();

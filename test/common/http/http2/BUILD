@@ -49,6 +49,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/http/http2:codec_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:overload_manager_mocks",
         "@abseil-cpp//absl/types:optional",
         "@quiche//:http2_adapter",
@@ -68,7 +69,6 @@ envoy_cc_test(
         "//test/common/http:common_lib",
         "//test/common/upstream:utility_lib",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/http:conn_pool_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:http_server_properties_cache_mocks",
         "//test/mocks/network:network_mocks",

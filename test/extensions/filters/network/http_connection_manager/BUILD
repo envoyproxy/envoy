@@ -80,6 +80,8 @@ envoy_extension_cc_test(
         ":config_test_base",
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/filters/network/http_connection_manager:config",
+        "//test/integration/filters:test_filters_proto_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
     ],
 )
 
@@ -95,5 +97,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/test_common:registry_lib",
         "@envoy_api//envoy/extensions/filters/common/dependency/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
     ],
 )

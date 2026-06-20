@@ -156,7 +156,7 @@ typed_config:
     UNREFERENCED_PARAMETER(node_uuid);
     UNREFERENCED_PARAMETER(cluster_uuid);
     UNREFERENCED_PARAMETER(tenant_uuid);
-    return std::string();
+    return {};
   }
 
   std::string createHttpRequest(const std::string& method, const std::string& path,
@@ -259,6 +259,7 @@ void ReverseTunnelFilterIntegrationTest::completeReverseTunnelHandshake(
             std::string::npos);
   EXPECT_NE(handshake_request.find("x-envoy-reverse-tunnel-tenant-id: e2e-tenant"),
             std::string::npos);
+  EXPECT_NE(handshake_request.find("x-envoy-reverse-tunnel-initiation-time:"), std::string::npos);
 
   ASSERT_TRUE(connection.write("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"));
 }

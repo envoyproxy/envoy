@@ -18,6 +18,11 @@ void registerApi(std::string&& name, void* api);
  */
 void* retrieveApi(absl::string_view name, bool allow_absent = false);
 
+/**
+ * Unregister an external runtime API.
+ */
+void unregisterApi(absl::string_view name);
+
 } // namespace External
 } // namespace Api
 } // namespace Envoy

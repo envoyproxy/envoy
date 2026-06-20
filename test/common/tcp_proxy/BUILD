@@ -61,13 +61,18 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "tcp_proxy_test",
+    size = "large",
     srcs = [
         "tcp_proxy_test.cc",
     ],
     rbe_pool = "6gig",
+    # MemorySanitizer's instrumentation overhead makes this large parameterized suite exceed the
+    # default 300s cap, so allow 900s and shard the work to keep each shard well under the limit.
+    shard_count = 5,
     deps = [
         ":tcp_proxy_test_base",
         "//source/common/router:string_accessor_lib",
+        "//test/mocks/server:factory_context_mocks",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
@@ -90,6 +95,7 @@ envoy_cc_test(
         "//test/mocks/router:upstream_request",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/tcp:tcp_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",

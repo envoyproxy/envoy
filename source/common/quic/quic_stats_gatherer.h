@@ -67,7 +67,7 @@ public:
 private:
   uint64_t bytes_outstanding_ = 0;
   bool fin_sent_ = false;
-  AccessLog::InstanceSharedPtrVector access_log_handlers_{};
+  AccessLog::InstanceSharedPtrVector access_log_handlers_;
   Http::RequestHeaderMapConstSharedPtr request_header_map_;
   Http::ResponseHeaderMapConstSharedPtr response_header_map_;
   Http::ResponseTrailerMapConstSharedPtr response_trailer_map_;

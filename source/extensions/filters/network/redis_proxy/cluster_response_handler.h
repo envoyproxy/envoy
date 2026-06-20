@@ -50,7 +50,7 @@ protected:
   std::vector<Common::Redis::RespValuePtr> pending_responses_;
 
   explicit BaseClusterScopeResponseHandler(uint32_t shard_count)
-      : num_pending_responses_(shard_count), error_count_(0) {
+      : num_pending_responses_(shard_count) {
     pending_responses_.reserve(shard_count);
   }
 

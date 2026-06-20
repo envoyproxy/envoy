@@ -25,6 +25,7 @@
 #include "test/integration/utility.h"
 #include "test/test_common/registry.h"
 
+#include "absl/functional/any_invocable.h"
 #include "gtest/gtest.h"
 
 using testing::_;
@@ -450,6 +451,55 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
                                        "UPSTREAM_WIRE_BYTES_RECEIVED=5"
                                        "\r?.*",
                                        ip_port_regex, ip_regex)));
+}
+
+// Check that the COMMON_DURATION downstream and upstream connection time points are populated for
+// TCP connections, so each duration renders as a number instead of "-".
+TEST_P(TcpProxyIntegrationTest, AccessLogCommonDuration) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "ds_cx=%COMMON_DURATION(DS_CX_BEG:DS_CX_END:us)% "
+        "us_cx=%COMMON_DURATION(US_CX_BEG:US_CX_END:us)% "
+        "setup=%COMMON_DURATION(DS_CX_BEG:US_CX_BEG:us)%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(fake_upstream_connection->write("hello"));
+  tcp_client->waitForData("hello");
+
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
+  tcp_client->waitForHalfClose();
+  ASSERT_TRUE(tcp_client->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  // Guarantee client is done writing to the log.
+  test_server_.reset();
+  auto log_result = waitForAccessLog(access_log_path);
+
+  EXPECT_THAT(log_result, MatchesRegex(R"EOF(ds_cx=[0-9]+ us_cx=[0-9]+ setup=[0-9]+\r?.*)EOF"));
 }
 
 // Verifies that access log value for `UPSTREAM_TRANSPORT_FAILURE_REASON` matches the failure
@@ -1926,7 +1976,6 @@ public:
     // the connection.
     read_callbacks_->connection().streamInfo().filterState()->setData(
         TcpProxy::ReceiveBeforeConnectKey, std::make_unique<StreamInfo::BoolAccessorImpl>(true),
-        StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
 
@@ -2017,8 +2066,9 @@ TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, UpstreamBufferHighWatermark)
 
   config_helper_.setBufferLimits(upstream_buffer_limit, downstream_buffer_limit);
   std::string data;
-  for (uint32_t i = 0; i < data_size / 4; i++)
+  for (uint32_t i = 0; i < data_size / 4; i++) {
     data += "abcd";
+  }
 
   initialize();
   FakeRawConnectionPtr fake_upstream_connection;
@@ -2529,16 +2579,17 @@ TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeModeWithEarlyData) {
   // buffer. This allows us to track the bytes actually written to the socket.
   EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
       .Times(AtLeast(1))
-      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                           std::function<void()> above_overflow) -> Buffer::Instance* {
-        client_write_buffer =
-            new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
-        ON_CALL(*client_write_buffer, move(_))
-            .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove));
-        ON_CALL(*client_write_buffer, drain(_))
-            .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::trackDrains));
-        return client_write_buffer;
-      }));
+      .WillOnce(
+          Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                     absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+            client_write_buffer = new NiceMock<MockWatermarkBuffer>(
+                std::move(below_low), std::move(above_high), std::move(above_overflow));
+            ON_CALL(*client_write_buffer, move(_))
+                .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove));
+            ON_CALL(*client_write_buffer, drain(_))
+                .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::trackDrains));
+            return client_write_buffer;
+          }));
 
   // Set up the SSL client.
   Network::Address::InstanceConstSharedPtr address =
@@ -3117,6 +3168,65 @@ TEST_P(TcpProxyIntegrationTest, DownstreamClosedWithEndStreamNoData) {
 
   // Close without sending data but with end_stream=true (FIN).
   tcp_client->close();
+}
+
+// Test route delayed route selection based on filter state
+TEST_P(TcpProxyIntegrationTest, DelayRouteSelectionWithSetFilterStateOnData) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tcp_proxy_delay_route_selection",
+                                    "true");
+  fake_upstreams_count_ = 2;
+  config_helper_.addNetworkFilter(R"EOF(
+name: envoy.filters.network.set_filter_state
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+  on_downstream_data:
+  - object_key: envoy.tcp_proxy.cluster
+    format_string:
+      text_format_source:
+        inline_string: "cluster_1"
+)EOF");
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Add cluster_1 configuration (cluster_0 already exists by default)
+    auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+    cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    cluster->set_name("cluster_1");
+
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(1);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    tcp_proxy.set_upstream_connect_mode(
+        envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+    tcp_proxy.mutable_max_early_data_bytes()->set_value(1024);
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // Wait to ensure no connection is established without data.
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_FALSE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection,
+                                                        std::chrono::milliseconds(1000)));
+
+  // Now send actual data.
+  ASSERT_TRUE(tcp_client->write("data"));
+
+  // Connection should now be established.
+  ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(4));
+
+  tcp_client->close();
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_cx_total")->value());
+  EXPECT_EQ(1, test_server_->counter("tcp.tcpproxy_stats.route_delayed_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
 }
 
 } // namespace Envoy

@@ -20,8 +20,8 @@ class QuicServerTransportSocketFactory : public Network::DownstreamTransportSock
                                          public QuicTransportSocketFactoryBase {
 public:
   static absl::StatusOr<std::unique_ptr<QuicServerTransportSocketFactory>>
-  create(bool enable_early_data, Stats::Scope& store, Ssl::ServerContextConfigPtr config,
-         Envoy::Ssl::ContextManager& manager);
+  create(bool enable_early_data, bool enable_resumption, Stats::Scope& store,
+         Ssl::ServerContextConfigPtr config, Envoy::Ssl::ContextManager& manager);
   ~QuicServerTransportSocketFactory() override;
 
   // Network::DownstreamTransportSocketFactory
@@ -37,6 +37,7 @@ public:
   getTlsCertificateAndKey(absl::string_view sni, bool* cert_matched_sni) const;
 
   bool earlyDataEnabled() const { return enable_early_data_; }
+  bool resumptionEnabled() const { return enable_resumption_; }
 
   struct SessionTicketConfig {
     // True when session ticket encryption keys are explicitly configured via
@@ -67,8 +68,8 @@ public:
   }
 
 protected:
-  QuicServerTransportSocketFactory(bool enable_early_data, Stats::Scope& store,
-                                   Ssl::ServerContextConfigPtr config,
+  QuicServerTransportSocketFactory(bool enable_early_data, bool enable_resumption,
+                                   Stats::Scope& store, Ssl::ServerContextConfigPtr config,
                                    Envoy::Ssl::ContextManager& manager,
                                    absl::Status& creation_status);
 
@@ -83,6 +84,7 @@ private:
   mutable absl::Mutex ssl_ctx_mu_;
   Envoy::Ssl::ServerContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
   bool enable_early_data_;
+  bool enable_resumption_;
 };
 
 class QuicServerTransportSocketConfigFactory

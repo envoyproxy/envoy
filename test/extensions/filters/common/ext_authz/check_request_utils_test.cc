@@ -641,7 +641,6 @@ TEST_F(CheckRequestUtilsTest, HeadersAsBytesExistingPartialBodyHeader) {
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
                                                  {":path", "/bar"}};
-  envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(callbacks_, connection())
       .Times(2)
       .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));

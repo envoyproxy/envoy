@@ -43,7 +43,7 @@ INSTANTIATE_TEST_SUITE_P(QuicHttpMultiAddressesIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-static std::string SPATestParamsToString(
+static std::string spaTestParamsToString(
     const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool, bool>>& params) {
   return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)), "_",
                       std::get<1>(params.param) ? "all_clients_impl" : "quiche_client_impl", "_",
@@ -54,7 +54,7 @@ INSTANTIATE_TEST_SUITE_P(
     QuicHttpIntegrationSPATests, QuicHttpIntegrationSPATest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::Values(true, false), testing::Values(true, false)),
-    SPATestParamsToString);
+    spaTestParamsToString);
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
   useAccessLog("%DOWNSTREAM_TLS_VERSION% %DOWNSTREAM_TLS_CIPHER% %DOWNSTREAM_TLS_SESSION_ID%");
@@ -102,6 +102,10 @@ TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
 }
 
 TEST_P(QuicHttpIntegrationTest, CertCompressionEnabled) {
+  // Brotli certificate compression is opt-in, so enable the runtime guard explicitly to exercise
+  // the brotli compression path.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
   initialize();
 
   EXPECT_LOG_CONTAINS_ALL_OF(
@@ -196,7 +200,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
 TEST_P(QuicHttpIntegrationTest, EarlyDataDisabled) {
   // Make sure all connections use the same PersistentQuicInfoImpl.
   concurrency_ = 1;
-  configureEarlyData(false);
+  configureTlsOptions(/*early_data_enabled=*/false, /*resumption_enabled=*/true);
   initialize();
   // Start the first connection.
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -370,7 +374,7 @@ public:
   }
 };
 
-static std::string PortMigrationTestParamsToString(
+static std::string portMigrationTestParamsToString(
     const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
   return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)), "_",
                       std::get<1>(params.param) ? "migration_by_quiche" : "migration_in_house");
@@ -380,7 +384,7 @@ INSTANTIATE_TEST_SUITE_P(
     QuicHttpIntegrationPortMigrationTest, QuicHttpIntegrationPortMigrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::Values(true, false)),
-    PortMigrationTestParamsToString);
+    portMigrationTestParamsToString);
 
 TEST_P(QuicHttpIntegrationPortMigrationTest, PortMigrationOnPathDegrading) {
   setConcurrency(2);
@@ -1436,7 +1440,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
 }
 
 TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
-  configureEarlyData(true);
+  configureTlsOptions(/*early_data_enabled=*/true, /*resumption_enabled=*/true);
   inplaceInitialize(/*add_default_filter_chain=*/false);
 
   auto codec_client_0 = makeRawHttp3Connection(
@@ -1447,7 +1451,8 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
 
   // Modify 1st transport socket factory to disable early data.
   ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
-  configureEarlyData(false, &new_config_helper);
+  configureTlsOptions(/*early_data_enabled=*/false, /*resumption_enabled=*/false,
+                      &new_config_helper);
 
   new_config_helper.setLds("1");
   test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
@@ -1464,6 +1469,37 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
   EnvoyQuicClientSession* quic_session =
       static_cast<EnvoyQuicClientSession*>(codec_client_2->connection());
   EXPECT_FALSE(quic_session->EarlyDataAccepted());
+  codec_client_2->close();
+}
+
+TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableResumption) {
+  configureTlsOptions(/*early_data_enabled=*/true, /*resumption_enabled=*/true);
+  inplaceInitialize(/*add_default_filter_chain=*/false);
+
+  auto codec_client_0 = makeRawHttp3Connection(
+      makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"), absl::nullopt,
+      /*wait_for_1rtt_key*/ true);
+  makeRequestAndWaitForResponse(*codec_client_0);
+  codec_client_0->close();
+
+  // Modify 1st transport socket factory to disable resumption.
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
+  configureTlsOptions(/*early_data_enabled=*/false, /*resumption_enabled=*/false,
+                      &new_config_helper);
+
+  new_config_helper.setLds("1");
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Ge(1));
+
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
+
+  auto codec_client_2 = makeRawHttp3Connection(
+      makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"), absl::nullopt,
+      /*wait_for_1rtt_key*/ true);
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_2->connection());
+  EXPECT_FALSE(quic_session->IsResumption());
+  makeRequestAndWaitForResponse(*codec_client_2);
   codec_client_2->close();
 }
 
