@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -13,5 +14,14 @@ envoy_cc_test(
     srcs = ["wuffs_json_cursor_test.cc"],
     deps = [
         "//source/common/json/wuffs_json:wuffs_json_cursor_lib",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "wuffs_json_speed_test",
+    srcs = ["wuffs_json_speed_test.cc"],
+    deps = [
+        "//source/common/json/wuffs_json:wuffs_json_cursor_lib",
+        "@nlohmann_json//:json",
     ],
 )

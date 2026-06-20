@@ -57,7 +57,13 @@ void appendCodePoint(std::string& out, uint32_t code_point) {
 } // namespace
 
 WuffsJsonCursor::WuffsJsonCursor(Handler& handler, bool track_paths, int max_depth)
-    : handler_(handler), track_paths_(track_paths), max_depth_(max_depth) {
+    : handler_(handler), track_paths_(track_paths),
+      // Cap max_depth_ at kMaxTrackedDepth-1: the per-depth arrays (is_dict_,
+      // expecting_key_, key_stack_, etc.) are fixed-size with kMaxTrackedDepth
+      // slots.
+      // TODO(tyxia): remove this cap once the fixed arrays are replaced with
+      // std::vector sized to max_depth_+1 at construction time.
+      max_depth_(std::min(max_depth, kMaxTrackedDepth - 1)) {
   decoder_ = wuffs_json__decoder::alloc();
   token_buf_ =
       wuffs_base__slice_token__writer(wuffs_base__make_slice_token(token_data_, kTokenBufLen));
@@ -113,11 +119,12 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
   // token in one contiguous buffer. STRING tokens are not affected: Wuffs
   // flushes whatever string content it has before suspending, so no string
   // bytes are ever left in pending_bytes_.
+  std::string pending_storage;
   absl::string_view effective_chunk = chunk;
   if (!pending_bytes_.empty()) {
-    pending_storage_ = std::move(pending_bytes_);
-    pending_storage_.append(chunk.data(), chunk.size());
-    effective_chunk = pending_storage_;
+    pending_storage = std::move(pending_bytes_);
+    pending_storage.append(chunk.data(), chunk.size());
+    effective_chunk = pending_storage;
   }
   pending_bytes_.clear();
 
@@ -145,195 +152,36 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
 
       switch (token_category) {
 
-      // Whitespace, commas, colons, quote delimiters — no semantic value.
       case WUFFS_BASE__TOKEN__VBC__FILLER:
         break;
 
-      // { } [ ] — container open (push) or close (pop).
       case WUFFS_BASE__TOKEN__VBC__STRUCTURE: {
-        const bool is_push = (token_detail & WUFFS_BASE__TOKEN__VBD__STRUCTURE__PUSH) != 0;
-        const bool to_dict = (token_detail & WUFFS_BASE__TOKEN__VBD__STRUCTURE__TO_DICT) != 0;
-        if (is_push) {
-          ++depth_;
-          if (depth_ > max_depth_) {
-            return absl::InvalidArgumentError(
-                absl::StrCat("wuffs json: nesting depth exceeds ", max_depth_));
-          }
-          if (depth_ < kMaxTrackedDepth) {
-            seen_keys_[depth_].clear();
-            is_dict_[depth_] = to_dict;
-            expecting_key_[depth_] = to_dict;
-            if (!to_dict) {
-              array_index_[depth_] = 0;
-            }
-          }
-          if (track_paths_ && depth_ <= kMaxTrackedDepth) {
-            push_key_[depth_] =
-                (depth_ > 1 && depth_ - 1 < kMaxTrackedDepth && is_dict_[depth_ - 1])
-                    ? key_stack_[depth_ - 1]
-                    : "";
-          }
-          // key for onContainerOpen is the parent dict key that triggered this
-          // container. Empty when the parent is an array or at root (depth 1).
-          const absl::string_view parent_key =
-              (depth_ > 1 && depth_ - 1 < kMaxTrackedDepth && is_dict_[depth_ - 1])
-                  ? absl::string_view(key_stack_[depth_ - 1])
-                  : absl::string_view();
-          handler_.onContainerOpen(parent_key, to_dict, depth_, token_start);
-        } else {
-          const int pop_depth = depth_;
-          --depth_;
-          handler_.onContainerClose(pop_depth, body_src_pos_);
-          if (depth_ >= 1 && depth_ < kMaxTrackedDepth && is_dict_[depth_]) {
-            expecting_key_[depth_] = true;
-          }
-          if (depth_ >= 1 && depth_ < kMaxTrackedDepth && !is_dict_[depth_]) {
-            ++array_index_[depth_];
-          }
+        if (auto s = handleStructureToken(token_detail, token_start); !s.ok()) {
+          return s;
         }
         break;
       }
 
-      // JSON string segment — key or value, plain bytes only.
-      // A single logical string may span multiple continued tokens if Wuffs
-      // fills token_buf_ before the closing quote; in_string_chain_ tracks mid-chain state.
       case WUFFS_BASE__TOKEN__VBC__STRING: {
         const absl::string_view raw = effective_chunk.substr(token_start - chunk_base, token_len);
-        if (!in_string_chain_) {
-          // First token of a new string: decide key vs. value.
-          key_buffer_.clear();
-          string_is_key_ = depth_ < kMaxTrackedDepth && is_dict_[depth_] && expecting_key_[depth_];
-          if (string_is_key_) {
-            key_token_start_ = token_start;
-          } else {
-            // key_stack_[depth_] is always current here — onKey fired before this value.
-            const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
-                                                    ? absl::string_view(key_stack_[depth_])
-                                                    : absl::string_view();
-            string_capturing_ = handler_.openStringCapture(value_key, depth_, token_start);
-            string_chunk_active_ = string_capturing_;
-          }
-        }
-        if (string_is_key_) {
-          if ((token_detail & WUFFS_BASE__TOKEN__VBD__STRING__CONVERT_1_DST_1_SRC_COPY) &&
-              key_buffer_.size() + raw.size() > kMaxKeyBytes) {
-            return absl::InvalidArgumentError(
-                absl::StrCat("wuffs json: key exceeds ", kMaxKeyBytes, " bytes"));
-          }
-          if (token_len > 0) {
-            appendStringToken(key_buffer_, raw, token_detail);
-          }
-        } else if (string_chunk_active_ &&
-                   (token_detail & WUFFS_BASE__TOKEN__VBD__STRING__CONVERT_1_DST_1_SRC_COPY) &&
-                   token_len > 0) {
-          // Only COPY tokens carry content; DROP tokens (quote delimiters) are skipped.
-          const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
-                                                  ? absl::string_view(key_stack_[depth_])
-                                                  : absl::string_view();
-          if (!handler_.onStringChunk(value_key, depth_, raw)) {
-            string_chunk_active_ = false;
-          }
-        }
-        in_string_chain_ = continued;
-        if (!in_string_chain_) {
-          if (string_is_key_) {
-            if (depth_ < kMaxTrackedDepth && !seen_keys_[depth_].insert(key_buffer_).second) {
-              return absl::InvalidArgumentError(
-                  absl::StrCat("wuffs json: duplicate key \"", key_buffer_, "\""));
-            }
-            if (depth_ < kMaxTrackedDepth) {
-              key_stack_[depth_] = key_buffer_;
-            }
-            if (auto s = handler_.onKey(key_buffer_, depth_, key_token_start_); !s.ok()) {
-              return s;
-            }
-            if (depth_ < kMaxTrackedDepth) {
-              expecting_key_[depth_] = false;
-            }
-          } else {
-            if (string_capturing_) {
-              const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
-                                                      ? absl::string_view(key_stack_[depth_])
-                                                      : absl::string_view();
-              handler_.closeStringCapture(value_key, depth_, body_src_pos_);
-            }
-            if (depth_ >= 1 && depth_ < kMaxTrackedDepth) {
-              if (is_dict_[depth_]) {
-                expecting_key_[depth_] = true;
-              } else {
-                ++array_index_[depth_];
-              }
-            }
-          }
-          string_capturing_ = false;
-          string_chunk_active_ = false;
+        if (auto s = handleStringToken(raw, token_detail, continued, token_start); !s.ok()) {
+          return s;
         }
         break;
       }
 
-      // TODO(tyxia) Escape here to ensure any unicode token can be used, for example, for
-      // comparison routing, logging purpose. This requires re-escape in the re-encode phase.
-      // Investigate later to see if escape and re-escape are needed.
-      // Backslash escapes (\n, \t, \uXXXX, …) arrive as UNICODE_CODE_POINT tokens with VBD =
-      // decoded code point. in_string_chain_ is managed by surrounding STRING tokens so it is not
-      // updated here.
       case WUFFS_BASE__TOKEN__VBC__UNICODE_CODE_POINT: {
-        // token_len is source bytes (e.g. 6 for \uXXXX); decoded write is 1-4 UTF-8 bytes.
-        const uint32_t code_point = static_cast<uint32_t>(token_detail);
-        const size_t utf8_len = (code_point < 0x80u)      ? 1u
-                                : (code_point < 0x800u)   ? 2u
-                                : (code_point < 0x10000u) ? 3u
-                                                          : 4u;
-        if (string_is_key_) {
-          if (key_buffer_.size() + utf8_len > kMaxKeyBytes) {
-            return absl::InvalidArgumentError(
-                absl::StrCat("wuffs json: key exceeds ", kMaxKeyBytes, " bytes"));
-          }
-          appendCodePoint(key_buffer_, code_point);
-        } else if (string_chunk_active_) {
-          // Encode to a stack buffer; the string_view is valid for this call only.
-          uint8_t buf[4];
-          encodeCodePoint(buf, code_point);
-          const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
-                                                  ? absl::string_view(key_stack_[depth_])
-                                                  : absl::string_view();
-          if (!handler_.onStringChunk(value_key, depth_,
-                                      absl::string_view(reinterpret_cast<char*>(buf), utf8_len))) {
-            string_chunk_active_ = false;
-          }
+        if (auto s = handleUnicodeCodePointToken(token_detail); !s.ok()) {
+          return s;
         }
         break;
       }
 
-      // NUMBER / LITERAL are single ring-buffer slot tokens; `continued` is
-      // always false. Chunk-boundary straddling uses short_read (coroutine
-      // suspends, resumes on next feed(), emits one complete token then).
       case WUFFS_BASE__TOKEN__VBC__NUMBER:
       case WUFFS_BASE__TOKEN__VBC__LITERAL: {
-        const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
-                                                ? absl::string_view(key_stack_[depth_])
-                                                : absl::string_view();
         const absl::string_view raw = effective_chunk.substr(token_start - chunk_base, token_len);
-        if (token_category == WUFFS_BASE__TOKEN__VBC__NUMBER) {
-          if (auto s = handler_.onNumber(value_key, raw, depth_, token_start, body_src_pos_);
-              !s.ok()) {
-            return s;
-          }
-        } else if (raw == "true" || raw == "false") {
-          if (auto s =
-                  handler_.onBoolean(value_key, raw[0] == 't', depth_, token_start, body_src_pos_);
-              !s.ok()) {
-            return s;
-          }
-        } else {
-          handler_.onNull(value_key, depth_, token_start, body_src_pos_);
-        }
-        if (depth_ >= 1 && depth_ < kMaxTrackedDepth) {
-          if (is_dict_[depth_]) {
-            expecting_key_[depth_] = true;
-          } else {
-            ++array_index_[depth_];
-          }
+        if (auto s = handleNumberOrLiteralToken(token_category, raw, token_start); !s.ok()) {
+          return s;
         }
         break;
       }
@@ -363,6 +211,181 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
       break;
     }
     token_buf_.meta.ri = token_buf_.meta.wi = 0; // short_write: reset ring, retry
+  }
+  return absl::OkStatus();
+}
+
+absl::Status WuffsJsonCursor::handleStructureToken(uint64_t token_detail, size_t token_start) {
+  const bool is_push = (token_detail & WUFFS_BASE__TOKEN__VBD__STRUCTURE__PUSH) != 0;
+  const bool to_dict = (token_detail & WUFFS_BASE__TOKEN__VBD__STRUCTURE__TO_DICT) != 0;
+  if (is_push) {
+    ++depth_;
+    if (depth_ > max_depth_) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("wuffs json: nesting depth exceeds ", max_depth_));
+    }
+    if (depth_ < kMaxTrackedDepth) {
+      seen_keys_[depth_].clear();
+      is_dict_[depth_] = to_dict;
+      expecting_key_[depth_] = to_dict;
+      if (!to_dict) {
+        array_index_[depth_] = 0;
+      }
+    }
+    if (track_paths_ && depth_ <= kMaxTrackedDepth) {
+      push_key_[depth_] = (depth_ > 1 && depth_ - 1 < kMaxTrackedDepth && is_dict_[depth_ - 1])
+                              ? key_stack_[depth_ - 1]
+                              : "";
+    }
+    // key for onContainerOpen is the parent dict key that triggered this container.
+    // Empty when the parent is an array or at root (depth 1).
+    const absl::string_view parent_key =
+        (depth_ > 1 && depth_ - 1 < kMaxTrackedDepth && is_dict_[depth_ - 1])
+            ? absl::string_view(key_stack_[depth_ - 1])
+            : absl::string_view();
+    handler_.onContainerOpen(parent_key, to_dict, depth_, token_start);
+  } else {
+    const int pop_depth = depth_;
+    --depth_;
+    handler_.onContainerClose(pop_depth, body_src_pos_);
+    if (depth_ >= 1 && depth_ < kMaxTrackedDepth && is_dict_[depth_]) {
+      expecting_key_[depth_] = true;
+    }
+    if (depth_ >= 1 && depth_ < kMaxTrackedDepth && !is_dict_[depth_]) {
+      ++array_index_[depth_];
+    }
+  }
+  return absl::OkStatus();
+}
+
+absl::Status WuffsJsonCursor::handleStringToken(absl::string_view raw, uint64_t token_detail,
+                                                bool continued, size_t token_start) {
+  if (!in_string_chain_) {
+    key_buffer_.clear();
+    string_is_key_ = depth_ < kMaxTrackedDepth && is_dict_[depth_] && expecting_key_[depth_];
+    if (string_is_key_) {
+      key_token_start_ = token_start;
+    } else {
+      // key_stack_[depth_] is always current here — onKey fired before this value.
+      const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
+                                              ? absl::string_view(key_stack_[depth_])
+                                              : absl::string_view();
+      string_capturing_ = handler_.openStringCapture(value_key, depth_, token_start);
+      string_chunk_active_ = string_capturing_;
+    }
+  }
+  if (string_is_key_) {
+    if ((token_detail & WUFFS_BASE__TOKEN__VBD__STRING__CONVERT_1_DST_1_SRC_COPY) &&
+        key_buffer_.size() + raw.size() > kMaxKeyBytes) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("wuffs json: key exceeds ", kMaxKeyBytes, " bytes"));
+    }
+    if (!raw.empty()) {
+      appendStringToken(key_buffer_, raw, token_detail);
+    }
+  } else if (string_chunk_active_ &&
+             (token_detail & WUFFS_BASE__TOKEN__VBD__STRING__CONVERT_1_DST_1_SRC_COPY) &&
+             !raw.empty()) {
+    const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
+                                            ? absl::string_view(key_stack_[depth_])
+                                            : absl::string_view();
+    if (!handler_.onStringChunk(value_key, depth_, raw)) {
+      string_chunk_active_ = false;
+    }
+  }
+  in_string_chain_ = continued;
+  if (!in_string_chain_) {
+    if (string_is_key_) {
+      if (depth_ < kMaxTrackedDepth && !seen_keys_[depth_].insert(key_buffer_).second) {
+        return absl::InvalidArgumentError(
+            absl::StrCat("wuffs json: duplicate key \"", key_buffer_, "\""));
+      }
+      if (depth_ < kMaxTrackedDepth) {
+        key_stack_[depth_] = key_buffer_;
+      }
+      if (auto s = handler_.onKey(key_buffer_, depth_, key_token_start_); !s.ok()) {
+        return s;
+      }
+      if (depth_ < kMaxTrackedDepth) {
+        expecting_key_[depth_] = false;
+      }
+    } else {
+      const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
+                                              ? absl::string_view(key_stack_[depth_])
+                                              : absl::string_view();
+      handler_.closeStringCapture(value_key, depth_, body_src_pos_);
+      if (depth_ >= 1 && depth_ < kMaxTrackedDepth) {
+        if (is_dict_[depth_]) {
+          expecting_key_[depth_] = true;
+        } else {
+          ++array_index_[depth_];
+        }
+      }
+    }
+    string_capturing_ = false;
+    string_chunk_active_ = false;
+  }
+  return absl::OkStatus();
+}
+
+// TODO(tyxia): Escape here to ensure any unicode token can be used, for example, for
+// comparison routing, logging purpose. This requires re-escape in the re-encode phase.
+// Investigate later to see if escape and re-escape are needed.
+absl::Status WuffsJsonCursor::handleUnicodeCodePointToken(uint64_t token_detail) {
+  // Backslash escapes (\n, \t, \uXXXX, …) arrive with VBD = decoded code point.
+  // in_string_chain_ is managed by surrounding STRING tokens, not updated here.
+  const uint32_t code_point = static_cast<uint32_t>(token_detail);
+  const size_t utf8_len = (code_point < 0x80u)      ? 1u
+                          : (code_point < 0x800u)   ? 2u
+                          : (code_point < 0x10000u) ? 3u
+                                                    : 4u;
+  if (string_is_key_) {
+    if (key_buffer_.size() + utf8_len > kMaxKeyBytes) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("wuffs json: key exceeds ", kMaxKeyBytes, " bytes"));
+    }
+    appendCodePoint(key_buffer_, code_point);
+  } else if (string_chunk_active_) {
+    // Encode to a stack buffer; the string_view is valid for this call only.
+    uint8_t buf[4];
+    encodeCodePoint(buf, code_point);
+    const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
+                                            ? absl::string_view(key_stack_[depth_])
+                                            : absl::string_view();
+    if (!handler_.onStringChunk(value_key, depth_,
+                                absl::string_view(reinterpret_cast<char*>(buf), utf8_len))) {
+      string_chunk_active_ = false;
+    }
+  }
+  return absl::OkStatus();
+}
+
+// NUMBER / LITERAL are single ring-buffer slot tokens; `continued` is always false.
+// Chunk-boundary straddling uses short_read (coroutine suspends, resumes on next feed()).
+absl::Status WuffsJsonCursor::handleNumberOrLiteralToken(int64_t token_category,
+                                                         absl::string_view raw,
+                                                         size_t token_start) {
+  const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
+                                          ? absl::string_view(key_stack_[depth_])
+                                          : absl::string_view();
+  if (token_category == WUFFS_BASE__TOKEN__VBC__NUMBER) {
+    if (auto s = handler_.onNumber(value_key, raw, depth_, token_start, body_src_pos_); !s.ok()) {
+      return s;
+    }
+  } else if (raw == "true" || raw == "false") {
+    if (auto s = handler_.onBoolean(value_key, raw[0] == 't', depth_, token_start, body_src_pos_);
+        !s.ok()) {
+      return s;
+    }
+  } else {
+    handler_.onNull(value_key, depth_, token_start, body_src_pos_);
+  }
+  if (depth_ >= 1 && depth_ < kMaxTrackedDepth) {
+    if (is_dict_[depth_]) {
+      expecting_key_[depth_] = true;
+    } else {
+      ++array_index_[depth_];
+    }
   }
   return absl::OkStatus();
 }

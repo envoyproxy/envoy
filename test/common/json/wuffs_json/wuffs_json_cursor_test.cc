@@ -28,13 +28,14 @@ public:
   std::vector<Field> fields;
   std::string pending_key_;
   std::string pending_str_;
+  bool capturing_{false};
 
   bool openStringCapture(absl::string_view /*key*/, int depth, size_t /*token_start*/) override {
-    if (depth == 1) {
+    capturing_ = (depth == 1);
+    if (capturing_) {
       pending_str_.clear();
-      return true;
     }
-    return false;
+    return capturing_;
   }
 
   bool onStringChunk(absl::string_view /*key*/, int /*depth*/, absl::string_view chunk) override {
@@ -43,7 +44,9 @@ public:
   }
 
   void closeStringCapture(absl::string_view /*key*/, int /*depth*/, size_t /*token_end*/) override {
-    fields.push_back({pending_key_, pending_str_, {}, /*is_string=*/true});
+    if (capturing_) {
+      fields.push_back({pending_key_, pending_str_, {}, /*is_string=*/true});
+    }
   }
 
   absl::Status onKey(absl::string_view key, int depth, size_t /*token_start*/) override {
@@ -100,7 +103,6 @@ public:
 // Byte-range handler
 // Records the first container open/close offsets and the first key/value offsets
 // to verify token_start / token_end byte positions are correct.
-
 class ByteRangeHandler : public WuffsJsonCursor::Handler {
 public:
   static constexpr size_t kNotSet = size_t(-1);
@@ -509,6 +511,53 @@ TEST(WuffsJsonCursorTest, ByteRangeKeyValueField) {
   EXPECT_EQ(json.substr(h.first_key_start, h.first_value_end - h.first_key_start), R"("a":1)");
 }
 
+// closeStringCapture must fire even when openStringCapture returned false, so that
+// passthrough handlers can get [token_start, token_end) for string values without
+// paying the cost of content decoding.
+TEST(WuffsJsonCursorTest, CloseStringCaptureFiresWhenOpenReturnedFalse) {
+  class PassthroughRangeHandler : public WuffsJsonCursor::Handler {
+  public:
+    size_t open_start{size_t(-1)};
+    size_t close_end{size_t(-1)};
+
+    bool openStringCapture(absl::string_view, int, size_t ts) override {
+      open_start = ts;
+      return false;
+    }
+    bool onStringChunk(absl::string_view, int, absl::string_view) override { return true; }
+    void closeStringCapture(absl::string_view, int, size_t te) override { close_end = te; }
+    absl::Status onKey(absl::string_view, int, size_t) override { return absl::OkStatus(); }
+    absl::Status onNumber(absl::string_view, absl::string_view, int, size_t, size_t) override {
+      return absl::OkStatus();
+    }
+    absl::Status onBoolean(absl::string_view, bool, int, size_t, size_t) override {
+      return absl::OkStatus();
+    }
+    void onNull(absl::string_view, int, size_t, size_t) override {}
+    void onContainerOpen(absl::string_view, bool, int, size_t) override {}
+    void onContainerClose(int, size_t) override {}
+  } h;
+
+  constexpr absl::string_view json = R"({"a":"hello"})";
+  EXPECT_TRUE(parse(json, h).ok());
+  ASSERT_NE(h.open_start, size_t(-1));
+  ASSERT_NE(h.close_end, size_t(-1));
+  // [open_start, close_end) must cover the verbatim string token "hello".
+  EXPECT_EQ(json.substr(h.open_start, h.close_end - h.open_start), R"("hello")");
+}
+
+// ByteRangeHandler returns false from openStringCapture; after the fix,
+// closeStringCapture still fires, so first_value_end is populated for string values.
+TEST(WuffsJsonCursorTest, ByteRangeKeyValueFieldString) {
+  constexpr absl::string_view json = R"({"a":"hello"})";
+  ByteRangeHandler h;
+  EXPECT_TRUE(parse(json, h).ok());
+  ASSERT_NE(h.first_key_start, ByteRangeHandler::kNotSet);
+  ASSERT_NE(h.first_value_end, ByteRangeHandler::kNotSet);
+  EXPECT_EQ(json.substr(h.first_key_start, h.first_value_end - h.first_key_start),
+            R"("a":"hello")");
+}
+
 // Depth limit tests
 
 // 8 levels of nesting must be accepted (boundary value for default max_depth=8).
@@ -524,14 +573,28 @@ TEST(WuffsJsonCursorTest, ExceedDefaultMaxDepthRejected) {
   EXPECT_FALSE(parse(R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}}})", h).ok());
 }
 
-// Caller may raise the limit to accept deeper JSON.
-TEST(WuffsJsonCursorTest, CustomMaxDepthAccepted) {
-  CapturingHandler h;
-  WuffsJsonCursor cursor(h, /*track_paths=*/false, /*max_depth=*/12);
-  EXPECT_TRUE(cursor
-                  .feed(R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}}}})",
-                        /*closed=*/true)
-                  .ok());
+// max_depth values above kMaxTrackedDepth-1 (= 8) are silently clamped because
+// the per-depth tracking arrays are fixed-size. Depth-8 is still accepted;
+// depth-9 is rejected even with max_depth=12.
+TEST(WuffsJsonCursorTest, MaxDepthAboveCeilingClampedToEight) {
+  // Depth-8 accepted — max_depth=12 clamps to 8, same as default.
+  {
+    CapturingHandler h;
+    WuffsJsonCursor cursor(h, /*track_paths=*/false, /*max_depth=*/12);
+    EXPECT_TRUE(cursor
+                    .feed(R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}})",
+                          /*closed=*/true)
+                    .ok());
+  }
+  // Depth-9 rejected even with max_depth=12 — effective limit is 8.
+  {
+    CapturingHandler h;
+    WuffsJsonCursor cursor(h, /*track_paths=*/false, /*max_depth=*/12);
+    EXPECT_FALSE(cursor
+                     .feed(R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}}})",
+                           /*closed=*/true)
+                     .ok());
+  }
 }
 
 // Path-tracking tests
@@ -623,6 +686,34 @@ TEST(WuffsJsonCursorTest, StringValueSplitChunkCorrectValue) {
   ASSERT_TRUE(cursor.feed(R"(lo"})", /*closed=*/true).ok());
   ASSERT_EQ(h.fields.size(), 1u);
   EXPECT_EQ(h.fields[0].str_val, "hello");
+}
+
+// NUMBER split across three chunks: "123456" as "12" | "34" | "56".
+// Exercises the compound case where pending_bytes_ is rebuilt twice: chunk1
+// sets pending_bytes_="12", chunk2 stitches "1234" but Wuffs still can't
+// complete the NUMBER (no closing delimiter), chunk3 closes it.
+TEST(WuffsJsonCursorTest, NumberSplitThreeChunksCorrectValue) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  ASSERT_TRUE(cursor.feed(R"({"n":12)", /*closed=*/false).ok());
+  ASSERT_TRUE(cursor.feed(R"(34)", /*closed=*/false).ok());
+  ASSERT_TRUE(cursor.feed(R"(56})", /*closed=*/true).ok());
+  ASSERT_EQ(h.fields.size(), 1u);
+  EXPECT_EQ(h.fields[0].raw_val, "123456");
+}
+
+// \uXXXX escape straddling a chunk boundary within a string value.
+// Wuffs handles mid-escape suspension via coroutine state (no pending_bytes_
+// involved, unlike NUMBER/LITERAL splits): the decoder consumes all available
+// bytes including the \u prefix and resumes on the next chunk from the hex
+// digits. U+0041 = 'A', so "a\u" | "0041b" must decode to "aAb".
+TEST(WuffsJsonCursorTest, UnicodeEscapeSplitChunkCorrectValue) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  ASSERT_TRUE(cursor.feed(R"({"s":"a\u)", /*closed=*/false).ok());
+  ASSERT_TRUE(cursor.feed(R"(0041b"})", /*closed=*/true).ok());
+  ASSERT_EQ(h.fields.size(), 1u);
+  EXPECT_EQ(h.fields[0].str_val, "aAb"); // U+0041 = 'A'
 }
 
 } // namespace

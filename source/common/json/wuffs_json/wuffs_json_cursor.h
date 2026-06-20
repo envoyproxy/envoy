@@ -128,8 +128,8 @@ public:
     // and decides whether to capture this value.
     //
     // Return true to receive content via onStringChunk. Return false to discard:
-    // no onStringChunk calls occur, no allocation is made, and closeStringCapture
-    // is never called — zero cost regardless of string size.
+    // no onStringChunk calls occur and no allocation is made — zero cost regardless
+    // of string size. closeStringCapture always fires either way.
     //
     // `key`         — dict key immediately left of this value, or "" for array elements.
     // `depth`       — nesting depth of this string value.
@@ -149,25 +149,39 @@ public:
     virtual bool onStringChunk(absl::string_view key, int depth, absl::string_view chunk) = 0;
 
     // Called when a non-key string value chain completes (closing '"' seen).
-    // Only fires if openStringCapture returned true for this string.
+    // Always fires, even if openStringCapture returned false — giving every
+    // handler a [token_start, token_end) byte range for every string value
+    // without requiring content decoding.
     // `token_end` is the byte offset immediately past the closing '"'.
     virtual void closeStringCapture(absl::string_view key, int depth, size_t token_end) = 0;
+
+    // Called when a dict key completes.
     // `token_start` is the byte offset of the opening '"' of the key in the body
     // stream. Combined with the token_end delivered by the subsequent value
     // callback (closeStringCapture, onNumber, onBoolean, onNull, or
     // onContainerClose), it gives the half-open byte range [token_start, token_end)
     // covering the complete "key":value field — suitable for verbatim passthrough
     // without DOM parsing.
+    // Return a non-OK Status to abort parsing (e.g. duplicate-key detection).
     virtual absl::Status onKey(absl::string_view key, int depth, size_t token_start) = 0;
-    // JSON scalar types: number, boolean (true/false), and null.
+
+    // Called for JSON number literals (integer or floating-point).
+    // `raw` is the source bytes; parse with absl::SimpleAtoi / SimpleAtod.
     // `token_start` / `token_end` delimit the scalar value token in the body stream.
     // Together with the token_start from the preceding onKey call they cover the
     // complete "key":value field byte range.
+    // Return a non-OK Status to abort parsing.
     virtual absl::Status onNumber(absl::string_view key, absl::string_view raw, int depth,
                                   size_t token_start, size_t token_end) = 0;
+
+    // Called for JSON true / false literals.
+    // Return a non-OK Status to abort parsing.
     virtual absl::Status onBoolean(absl::string_view key, bool value, int depth, size_t token_start,
                                    size_t token_end) = 0;
+
+    // Called for JSON null literals.
     virtual void onNull(absl::string_view key, int depth, size_t token_start, size_t token_end) = 0;
+
     // Called after depth has been incremented for a { or [ open.
     // `key` is the parent dict key that opened this container, or "" when
     // the parent is an array or this is the root container.
@@ -185,14 +199,19 @@ public:
     //   convenience wrapper that hides this depth-1 subtlety.
     virtual void onContainerOpen(absl::string_view key, bool is_dict, int depth,
                                  size_t token_start) = 0;
+
+    // Called with the container's depth before decrement and the byte offset
+    // immediately after the closing } or ].
     virtual void onContainerClose(int depth, size_t token_end) = 0;
   };
 
   // max_depth: maximum nesting depth allowed before feed() returns
   // InvalidArgumentError. Default (kMaxTrackedDepth-1 = 8) covers all known
-  // OpenAI/Anthropic schema paths. Pass a larger value to accept deeper JSON,
-  // but note that key/dup/path tracking is only accurate to kMaxTrackedDepth-1
-  // regardless of max_depth — see TODO below.
+  // OpenAI/Anthropic schema paths. Values below the default tighten the DoS
+  // bound for schemas known to be shallow. Values above the default are silently
+  // clamped to kMaxTrackedDepth-1: the per-depth tracking arrays are fixed-size,
+  // so accepting deeper JSON without losing key/dup/path tracking accuracy
+  // requires replacing them with std::vector — see TODO below.
   explicit WuffsJsonCursor(Handler& handler, bool track_paths = false,
                            int max_depth = kMaxTrackedDepth - 1);
 
@@ -216,8 +235,9 @@ public:
 
 private:
   Handler& handler_;
-  bool track_paths_;
-  int max_depth_;
+  const bool track_paths_;
+  // Runtime
+  const int max_depth_;
 
   wuffs_json__decoder::unique_ptr decoder_;
   static constexpr size_t kTokenBufLen = 256;
@@ -245,6 +265,8 @@ private:
   // cost of per-push heap allocation; evaluate against the request-path perf
   // budget before doing so.
   static constexpr int kMaxTrackedDepth = 9;
+  // 256 bytes covers all known OpenAI/Anthropic/Google JSON schema field names
+  // with generous headroom; acts as a DoS safeguard against unbounded key lengths.
   static constexpr size_t kMaxKeyBytes = 256;
   int depth_{0};
   bool is_dict_[kMaxTrackedDepth]{};
@@ -279,7 +301,6 @@ private:
   // so those bytes must be prepended to the next chunk to form a contiguous
   // buffer. Empty between feed() calls when no token straddles a boundary.
   std::string pending_bytes_;
-  std::string pending_storage_; // retains capacity across feed() calls to avoid reallocation
 
   // TODO(tyxia): Implement Handler : Handler that accepts DecoderConfig (max_body_bytes,
   // max_inline_bytes, max_element_capture_bytes) and a list of ExtractFieldSpec; routes callbacks
@@ -297,6 +318,13 @@ private:
   bool string_chunk_active_{false}; // onStringChunk hasn't returned false yet
   std::string key_buffer_;
   size_t key_token_start_{0};
+
+  absl::Status handleStructureToken(uint64_t token_detail, size_t token_start);
+  absl::Status handleStringToken(absl::string_view raw, uint64_t token_detail, bool continued,
+                                 size_t token_start);
+  absl::Status handleUnicodeCodePointToken(uint64_t token_detail);
+  absl::Status handleNumberOrLiteralToken(int64_t token_category, absl::string_view raw,
+                                          size_t token_start);
 };
 
 } // namespace Wuffs
