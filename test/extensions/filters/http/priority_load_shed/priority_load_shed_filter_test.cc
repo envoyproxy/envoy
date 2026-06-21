@@ -87,7 +87,7 @@ buckets:
   EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.shed").value());
 }
 
-TEST_F(PriorityLoadShedFilterTest, MissingHeaderBypasses) {
+TEST_F(PriorityLoadShedFilterTest, MissingHeaderRejectsWithoutDefault) {
   EXPECT_CALL(overload_manager_, getLoadShedPoint("envoy.load_shed_points.priority.low"))
       .WillOnce(Return(&low_priority_bucket_));
   initializeFilter(R"EOF(
@@ -98,8 +98,11 @@ buckets:
 )EOF");
 
   EXPECT_CALL(low_priority_bucket_, shouldShedLoad()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "missing priority header",
+                                                 _, absl::optional<Grpc::Status::GrpcStatus>(),
+                                                 "priority_load_shed.missing_header"));
   auto headers = defaultHeaders();
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
   EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.header_missing").value());
 }
 
@@ -129,31 +132,7 @@ default_load_shed_point: "envoy.load_shed_points.priority.default"
   EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.shed").value());
 }
 
-TEST_F(PriorityLoadShedFilterTest, MissingHeaderReturnsBadRequestWhenConfigured) {
-  EXPECT_CALL(overload_manager_, getLoadShedPoint("envoy.load_shed_points.priority.low"))
-      .WillOnce(Return(&low_priority_bucket_));
-  EXPECT_CALL(overload_manager_, getLoadShedPoint("envoy.load_shed_points.priority.default"))
-      .WillOnce(Return(&default_bucket_));
-  initializeFilter(R"EOF(
-header_name: "x-message-priority"
-reject_on_missing_header: true
-buckets:
-- value_range: { start: 16, end: 32 }
-  load_shed_point: "envoy.load_shed_points.priority.low"
-default_load_shed_point: "envoy.load_shed_points.priority.default"
-)EOF");
-
-  EXPECT_CALL(default_bucket_, shouldShedLoad()).Times(0);
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "missing priority header",
-                                                 _, absl::optional<Grpc::Status::GrpcStatus>(),
-                                                 "priority_load_shed.missing_header"));
-
-  auto headers = defaultHeaders();
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
-  EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.header_missing").value());
-}
-
-TEST_F(PriorityLoadShedFilterTest, InvalidHeaderBypasses) {
+TEST_F(PriorityLoadShedFilterTest, InvalidHeaderRejectsWithoutDefault) {
   EXPECT_CALL(overload_manager_, getLoadShedPoint("envoy.load_shed_points.priority.low"))
       .WillOnce(Return(&low_priority_bucket_));
   initializeFilter(R"EOF(
@@ -164,9 +143,12 @@ buckets:
 )EOF");
 
   EXPECT_CALL(low_priority_bucket_, shouldShedLoad()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "invalid priority header",
+                                                 _, absl::optional<Grpc::Status::GrpcStatus>(),
+                                                 "priority_load_shed.invalid_header"));
   auto headers = defaultHeaders();
   headers.addCopy("x-message-priority", "not-an-integer");
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
   EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.header_invalid").value());
 }
 
@@ -191,31 +173,6 @@ default_load_shed_point: "envoy.load_shed_points.priority.default"
   EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.passed").value());
 }
 
-TEST_F(PriorityLoadShedFilterTest, InvalidHeaderReturnsBadRequestWhenConfigured) {
-  EXPECT_CALL(overload_manager_, getLoadShedPoint("envoy.load_shed_points.priority.low"))
-      .WillOnce(Return(&low_priority_bucket_));
-  EXPECT_CALL(overload_manager_, getLoadShedPoint("envoy.load_shed_points.priority.default"))
-      .WillOnce(Return(&default_bucket_));
-  initializeFilter(R"EOF(
-header_name: "x-message-priority"
-reject_on_invalid_header: true
-buckets:
-- value_range: { start: 16, end: 32 }
-  load_shed_point: "envoy.load_shed_points.priority.low"
-default_load_shed_point: "envoy.load_shed_points.priority.default"
-)EOF");
-
-  EXPECT_CALL(default_bucket_, shouldShedLoad()).Times(0);
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "invalid priority header",
-                                                 _, absl::optional<Grpc::Status::GrpcStatus>(),
-                                                 "priority_load_shed.invalid_header"));
-
-  auto headers = defaultHeaders();
-  headers.addCopy("x-message-priority", "not-an-integer");
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
-  EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.header_invalid").value());
-}
-
 TEST_F(PriorityLoadShedFilterTest, InvalidHeaderBypassesWithUnresolvedDefaultLoadShedPoint) {
   EXPECT_CALL(overload_manager_, getLoadShedPoint("envoy.load_shed_points.priority.low"))
       .WillOnce(Return(&low_priority_bucket_));
@@ -236,7 +193,7 @@ default_load_shed_point: "envoy.load_shed_points.priority.default"
   EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.bucket_unresolved_point").value());
 }
 
-TEST_F(PriorityLoadShedFilterTest, NegativeHeaderBypasses) {
+TEST_F(PriorityLoadShedFilterTest, NegativeHeaderRejectsWithoutDefault) {
   EXPECT_CALL(overload_manager_, getLoadShedPoint("envoy.load_shed_points.priority.low"))
       .WillOnce(Return(&low_priority_bucket_));
   initializeFilter(R"EOF(
@@ -247,9 +204,12 @@ buckets:
 )EOF");
 
   EXPECT_CALL(low_priority_bucket_, shouldShedLoad()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "invalid priority header",
+                                                 _, absl::optional<Grpc::Status::GrpcStatus>(),
+                                                 "priority_load_shed.invalid_header"));
   auto headers = defaultHeaders();
   headers.addCopy("x-message-priority", "-1");
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
   EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.header_invalid").value());
 }
 
@@ -264,10 +224,13 @@ buckets:
 )EOF");
 
   EXPECT_CALL(low_priority_bucket_, shouldShedLoad()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "invalid priority header",
+                                                 _, absl::optional<Grpc::Status::GrpcStatus>(),
+                                                 "priority_load_shed.invalid_header"));
   auto headers = defaultHeaders();
   headers.addCopy("x-message-priority", "bad-first-value");
   headers.addCopy("x-message-priority", "20");
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
   EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.header_invalid").value());
 }
 
@@ -299,13 +262,18 @@ buckets:
 )EOF");
 
   EXPECT_CALL(low_priority_bucket_, shouldShedLoad()).Times(0);
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "priority value does not match any configured bucket", _,
+                             absl::optional<Grpc::Status::GrpcStatus>(),
+                             "priority_load_shed.bucket_unmatched"));
   auto headers = defaultHeaders();
   headers.addCopy("x-message-priority", "32");
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
   EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.bucket_unmatched").value());
 }
 
-TEST_F(PriorityLoadShedFilterTest, UnmatchedValueBypasses) {
+TEST_F(PriorityLoadShedFilterTest, UnmatchedValueRejectsWithoutDefault) {
   EXPECT_CALL(overload_manager_, getLoadShedPoint("envoy.load_shed_points.priority.low"))
       .WillOnce(Return(&low_priority_bucket_));
   initializeFilter(R"EOF(
@@ -316,9 +284,14 @@ buckets:
 )EOF");
 
   EXPECT_CALL(low_priority_bucket_, shouldShedLoad()).Times(0);
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "priority value does not match any configured bucket", _,
+                             absl::optional<Grpc::Status::GrpcStatus>(),
+                             "priority_load_shed.bucket_unmatched"));
   auto headers = defaultHeaders();
   headers.addCopy("x-message-priority", "5");
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
   EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.bucket_unmatched").value());
 }
 

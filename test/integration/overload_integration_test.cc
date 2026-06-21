@@ -1470,11 +1470,9 @@ name: envoy.filters.http.priority_load_shed
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.priority_load_shed.v3.PriorityLoadShed
   header_name: x-message-priority
-  reject_on_missing_header: true
   buckets:
   - value_range: { start: 0, end: 32 }
     load_shed_point: envoy.load_shed_points.priority.high
-  default_load_shed_point: envoy.load_shed_points.priority.default
 )EOF");
 
   initializeOverloadManager(
@@ -1492,17 +1490,10 @@ typed_config:
         - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
           threshold:
             value: 0.70
-      - name: "envoy.load_shed_points.priority.default"
-        triggers:
-        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
-          threshold:
-            value: 0.10
     )EOF"));
 
   updateResource(0.95);
   test_server_->waitForGauge("overload.envoy.load_shed_points.priority.high.scale_percent",
-                             Eq(100));
-  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.default.scale_percent",
                              Eq(100));
 
   auto codec_client = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -1524,11 +1515,9 @@ name: envoy.filters.http.priority_load_shed
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.priority_load_shed.v3.PriorityLoadShed
   header_name: x-message-priority
-  reject_on_invalid_header: true
   buckets:
   - value_range: { start: 0, end: 32 }
     load_shed_point: envoy.load_shed_points.priority.high
-  default_load_shed_point: envoy.load_shed_points.priority.default
 )EOF");
 
   initializeOverloadManager(
@@ -1546,17 +1535,10 @@ typed_config:
         - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
           threshold:
             value: 0.70
-      - name: "envoy.load_shed_points.priority.default"
-        triggers:
-        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
-          threshold:
-            value: 0.10
     )EOF"));
 
   updateResource(0.95);
   test_server_->waitForGauge("overload.envoy.load_shed_points.priority.high.scale_percent",
-                             Eq(100));
-  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.default.scale_percent",
                              Eq(100));
 
   auto codec_client = makeHttpConnection(makeClientConnection((lookupPort("http"))));
