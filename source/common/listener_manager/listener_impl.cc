@@ -20,6 +20,7 @@
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/common/cpu_affinity.h"
 #include "source/common/config/utility.h"
 #include "source/common/listener_manager/active_raw_udp_listener_config.h"
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
@@ -764,6 +765,12 @@ void ListenerImpl::buildListenSocketOptions(
     if (reuse_port_) {
       addListenSocketOptions(listen_socket_options_list_[i],
                              Network::SocketOptionFactory::buildReusePortOptions());
+      if (reusePortBpfCpuSteeringEnabled(config)) {
+        addListenSocketOptions(
+            listen_socket_options_list_[i],
+            Network::SocketOptionFactory::buildReusePortBpfCpuSteeringOptions(
+                Thread::workerCpuAssignment(parent_.server_.options().concurrency())));
+      }
     }
     if (!address_opts_list[i]->empty()) {
       addListenSocketOptions(listen_socket_options_list_[i], address_opts_list[i]);
@@ -875,6 +882,19 @@ absl::Status ListenerImpl::buildFilterChains(const envoy::config::listener::v3::
       *filter_chain_manager_);
 }
 
+bool ListenerImpl::reusePortBpfCpuSteeringEnabled(
+    const envoy::config::listener::v3::Listener& config) const {
+  // Steering maps each receiving CPU to the worker pinned to it, so it requires worker CPU
+  // affinity. The mapping is fixed at startup, so a listener added later via LDS can steer too.
+  return socket_type_ == Network::Socket::Type::Stream && reuse_port_ &&
+         config.has_connection_balance_config() &&
+         config.connection_balance_config().balance_type_case() ==
+             envoy::config::listener::v3::Listener_ConnectionBalanceConfig::kCpuLocalityBalance &&
+         parent_.server_.bootstrap().enable_worker_cpu_affinity() &&
+         Api::OsSysCallsSingleton::get().supportsReusePortBpfCpuSteering() &&
+         !Thread::workerCpuAssignment(parent_.server_.options().concurrency()).empty();
+}
+
 absl::Status
 ListenerImpl::buildConnectionBalancer(const envoy::config::listener::v3::Listener& config,
                                       const Network::Address::Instance& address) {
@@ -918,6 +938,31 @@ ListenerImpl::buildConnectionBalancer(const envoy::config::listener::v3::Listene
                 config.connection_balance_config().extend_balance(), *listener_factory_context_));
         break;
       }
+      case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::kCpuLocalityBalance:
+        if (reusePortBpfCpuSteeringEnabled(config)) {
+          // The kernel steers each connection to the worker pinned to its receiving CPU, so no
+          // user space balancing is needed.
+          connection_balancers_.emplace(address.asString(),
+                                        std::make_shared<Network::NopConnectionBalancerImpl>());
+        } else {
+          absl::string_view reason;
+          if (!reuse_port_) {
+            reason = "reuse port is disabled";
+          } else if (!parent_.server_.bootstrap().enable_worker_cpu_affinity()) {
+            reason = "worker CPU affinity is not enabled";
+          } else if (!Api::OsSysCallsSingleton::get().supportsReusePortBpfCpuSteering()) {
+            reason = "the kernel does not support reuse port BPF steering";
+          } else {
+            reason = "the worker count exceeds the available CPUs";
+          }
+          ENVOY_LOG(warn,
+                    "CPU locality connection balancer for TCP listener '{}' is not active because "
+                    "{}, so the exact connection balancer is used instead.",
+                    config.name(), reason);
+          connection_balancers_.emplace(address.asString(),
+                                        std::make_shared<Network::ExactConnectionBalancerImpl>());
+        }
+        break;
       case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::BALANCE_TYPE_NOT_SET: {
         return absl::InvalidArgumentError("No valid balance type for connection balance");
       }
