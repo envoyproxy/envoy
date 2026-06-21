@@ -123,6 +123,17 @@ private:
 #define ENVOY_SOCKET_UDP_GRO Network::SocketOptionName()
 #endif
 
+// IP_RECVORIGDSTADDR delivers the ORIGINAL destination address (IP and port) of a
+// UDP datagram redirected by TPROXY, via an IP_ORIGDSTADDR control message. Unlike
+// IP_PKTINFO (which only carries the destination IP, forcing the listener port to be
+// substituted for the port), this preserves the true original destination port — so a
+// single transparent UDP listener can serve any destination port.
+#ifdef IP_RECVORIGDSTADDR
+#define ENVOY_SOCKET_IP_RECVORIGDSTADDR ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IP, IP_RECVORIGDSTADDR)
+#else
+#define ENVOY_SOCKET_IP_RECVORIGDSTADDR Network::SocketOptionName()
+#endif
+
 #ifdef TCP_KEEPCNT
 #define ENVOY_SOCKET_TCP_KEEPCNT ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_TCP, TCP_KEEPCNT)
 #else

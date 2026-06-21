@@ -122,6 +122,14 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpPacketInfoOptions()
   options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_BOUND, ENVOY_SELF_IP_ADDR, ENVOY_SELF_IPV6_ADDR,
       1));
+  // Also request IP_RECVORIGDSTADDR so transparent (TPROXY) UDP listeners receive the
+  // original destination address INCLUDING the port for redirected datagrams. This lets a
+  // single listener serve any destination port (the recv path prefers this over the
+  // IP_PKTINFO address, which lacks the port). Harmless on non-transparent sockets.
+#ifdef IP_RECVORIGDSTADDR
+  options->push_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_BOUND, ENVOY_SOCKET_IP_RECVORIGDSTADDR, 1));
+#endif
   return options;
 }
 

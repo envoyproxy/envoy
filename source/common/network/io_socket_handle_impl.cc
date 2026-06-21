@@ -248,6 +248,35 @@ IoSocketHandleImpl::getOrCreateEnvoyAddressInstance(sockaddr_storage ss, socklen
 
 Address::InstanceConstSharedPtr
 IoSocketHandleImpl::maybeGetDstAddressFromHeader(const cmsghdr& cmsg, uint32_t self_port) {
+#ifdef IP_ORIGDSTADDR
+  // When the socket has IP_RECVORIGDSTADDR set (transparent/TPROXY listeners), the
+  // kernel reports the ORIGINAL destination — both IP and port — for redirected
+  // datagrams. This is preferred over IP_PKTINFO below, which only yields the IP and
+  // would force the listener's own port to be used. Preserving the original port lets
+  // a single transparent listener serve traffic for any destination port.
+  if (cmsg.cmsg_level == IPPROTO_IP && cmsg.cmsg_type == IP_ORIGDSTADDR) {
+    sockaddr_storage ss;
+    auto* orig = reinterpret_cast<const sockaddr_in*>(CMSG_DATA(&cmsg));
+    auto* ipv4_addr = reinterpret_cast<sockaddr_in*>(&ss);
+    memset(ipv4_addr, 0, sizeof(sockaddr_in));
+    ipv4_addr->sin_family = AF_INET;
+    ipv4_addr->sin_addr = orig->sin_addr;
+    ipv4_addr->sin_port = orig->sin_port; // original destination port, as received
+    return getOrCreateEnvoyAddressInstance(ss, sizeof(sockaddr_in));
+  }
+#endif
+#ifdef IPV6_ORIGDSTADDR
+  if (cmsg.cmsg_level == IPPROTO_IPV6 && cmsg.cmsg_type == IPV6_ORIGDSTADDR) {
+    sockaddr_storage ss;
+    auto* orig = reinterpret_cast<const sockaddr_in6*>(CMSG_DATA(&cmsg));
+    auto* ipv6_addr = reinterpret_cast<sockaddr_in6*>(&ss);
+    memset(ipv6_addr, 0, sizeof(sockaddr_in6));
+    ipv6_addr->sin6_family = AF_INET6;
+    ipv6_addr->sin6_addr = orig->sin6_addr;
+    ipv6_addr->sin6_port = orig->sin6_port;
+    return getOrCreateEnvoyAddressInstance(ss, sizeof(sockaddr_in6));
+  }
+#endif
   if (cmsg.cmsg_type == IPV6_PKTINFO) {
     auto info = reinterpret_cast<const in6_pktinfo*>(CMSG_DATA(&cmsg));
     sockaddr_storage ss;
@@ -335,10 +364,24 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
     // Get overflow, local address and gso_size from control message.
     for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr;
          cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
-      if (output.msg_[0].local_address_ == nullptr) {
+      // IP_ORIGDSTADDR (when present) carries the true original destination including
+      // port and must take precedence over IP_PKTINFO, which only carries the IP.
+      // Both control messages may be delivered, in unspecified order, so allow an
+      // ORIGDSTADDR result to override a previously-set IP_PKTINFO address.
+      const bool is_orig_dst_addr =
+#ifdef IP_ORIGDSTADDR
+          (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_ORIGDSTADDR)
+#else
+          false
+#endif
+#ifdef IPV6_ORIGDSTADDR
+          || (cmsg->cmsg_level == IPPROTO_IPV6 && cmsg->cmsg_type == IPV6_ORIGDSTADDR)
+#endif
+          ;
+      if (output.msg_[0].local_address_ == nullptr || is_orig_dst_addr) {
         Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
         if (addr != nullptr) {
-          // This is a IP packet info message.
+          // This is a IP packet info / original destination message.
           output.msg_[0].local_address_ = std::move(addr);
           continue;
         }
@@ -439,7 +482,6 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
     if (hdr.msg_controllen > 0) {
       struct cmsghdr* cmsg;
       for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
-        Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
         if (receive_ecn_ &&
 #ifdef __APPLE__
             ((cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_RECVTOS) ||
@@ -450,10 +492,26 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
           output.msg_[i].tos_ = *(reinterpret_cast<uint8_t*>(CMSG_DATA(cmsg)));
           continue;
         }
-        if (addr != nullptr) {
-          // This is a IP packet info message.
-          output.msg_[i].local_address_ = std::move(addr);
-          continue;
+        // IP_ORIGDSTADDR carries the true original destination (IP + port) and must take
+        // precedence over IP_PKTINFO (IP only); allow it to override an address that a
+        // previously-seen IP_PKTINFO control message may have set.
+        const bool is_orig_dst_addr =
+#ifdef IP_ORIGDSTADDR
+            (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_ORIGDSTADDR)
+#else
+            false
+#endif
+#ifdef IPV6_ORIGDSTADDR
+            || (cmsg->cmsg_level == IPPROTO_IPV6 && cmsg->cmsg_type == IPV6_ORIGDSTADDR)
+#endif
+            ;
+        if (output.msg_[i].local_address_ == nullptr || is_orig_dst_addr) {
+          Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
+          if (addr != nullptr) {
+            // This is a IP packet info / original destination message.
+            output.msg_[i].local_address_ = std::move(addr);
+            continue;
+          }
         }
       }
     }

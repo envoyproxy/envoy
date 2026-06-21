@@ -3,6 +3,7 @@
 #include "envoy/network/listener.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/filter_state_dst_address.h"
 #include "source/common/network/socket_option_factory.h"
 
 namespace Envoy {
@@ -155,14 +156,14 @@ UdpProxyFilter::ClusterInfo::createSession(Network::UdpRecvData::LocalPeerAddres
     return createSessionWithOptionalHost(std::move(addresses), optional_host);
   }
 
-  auto host = chooseHost(addresses.peer_, nullptr);
-  if (host == nullptr) {
-    ENVOY_LOG(debug, "cannot find any valid host.");
-    cluster_.info()->trafficStats()->upstream_cx_none_healthy_.inc();
-    return nullptr;
-  }
-
-  return createSessionWithOptionalHost(std::move(addresses), host);
+  // Defer host selection to UdpActiveSession::createUpstream(), which publishes the
+  // packet's original destination (restored by the transparent/TPROXY listener) into
+  // session filter state before calling chooseHost(). This is required for ORIGINAL_DST
+  // clusters over UDP: there is no downstream Network::Connection to carry the original
+  // destination, so it must be supplied via the session's stream info. Selecting the
+  // host here with a null stream info would fail for ORIGINAL_DST. Any genuine
+  // "no healthy host" failure is still surfaced (and counted) by createUpstream().
+  return createSessionWithOptionalHost(std::move(addresses), nullptr);
 }
 
 UdpProxyFilter::ActiveSession* UdpProxyFilter::ClusterInfo::createSessionWithOptionalHost(
@@ -544,6 +545,19 @@ bool UdpProxyFilter::UdpActiveSession::createUpstream() {
   }
 
   if (!host_) {
+    // For ORIGINAL_DST clusters: UDP has no downstream Network::Connection, so the
+    // original destination address (restored by the transparent/TPROXY listener into
+    // the per-packet local address) is published into session filter state under the
+    // key the ORIGINAL_DST load balancer reads. This lets transparent UDP proxying
+    // forward to the packet's original destination. Without this, the LB finds no
+    // original_dst and rejects the session.
+    if (addresses_.local_ != nullptr) {
+      udp_session_info_.filterState()->setData(
+          "envoy.network.transport_socket.original_dst_address",
+          std::make_shared<Network::AddressObject>(addresses_.local_),
+          StreamInfo::FilterState::StateType::ReadOnly,
+          StreamInfo::FilterState::LifeSpan::Connection);
+    }
     host_ = cluster_.chooseHost(addresses_.peer_, &udp_session_info_);
     if (host_ == nullptr) {
       ENVOY_LOG(debug, "cannot find any valid host.");

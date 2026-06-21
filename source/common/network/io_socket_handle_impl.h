@@ -105,8 +105,12 @@ protected:
   // The minimum cmsg buffer size to filled in destination address, packets dropped and gso
   // size when receiving a packet. It is possible for a received packet to contain both IPv4
   // and IPV6 addresses.
+  // Includes room for IP_ORIGDSTADDR / IPV6_ORIGDSTADDR control messages (full original
+  // destination sockaddr), used by transparent listeners to recover the original port.
   const size_t cmsg_space_{CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
-                           CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(uint16_t))};
+                           CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(uint16_t)) +
+                           CMSG_SPACE(sizeof(struct sockaddr_in)) +
+                           CMSG_SPACE(sizeof(struct sockaddr_in6))};
 
   const bool udp_read_normalize_addresses_;
 
