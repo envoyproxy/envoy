@@ -56,7 +56,8 @@ public:
 
   // Router::Router
   const std::string route(const Network::Address::Instance& destination_address,
-                          const Network::Address::Instance& source_address) const override;
+                          const Network::Address::Instance& source_address,
+                          const Buffer::Instance& data) const override;
   const std::vector<std::string>& allClusterNames() const override;
 
 private:

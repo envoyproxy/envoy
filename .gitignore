@@ -72,3 +72,8 @@ lerna-debug.log*
 node_modules
 dist
 *.bak
+
+# --- QUIC SNI matcher fork: never commit build outputs ---
+/envoy-static
+/envoy-static-patched
+/envoy-static-patched2

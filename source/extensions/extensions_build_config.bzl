@@ -97,6 +97,7 @@ EXTENSIONS = {
     "envoy.matching.inputs.server_name":                "//source/extensions/matching/network/common:inputs_lib",
     "envoy.matching.inputs.transport_protocol":         "//source/extensions/matching/network/common:inputs_lib",
     "envoy.matching.inputs.filter_state":               "//source/extensions/matching/network/common:inputs_lib",
+    "envoy.matching.inputs.quic_sni":                   "//source/extensions/matching/udp/quic_sni:config",
 
     #
     # Generic Inputs

@@ -725,6 +725,7 @@ public:
 
   virtual const Address::Instance& localAddress() const PURE;
   virtual const Address::Instance& remoteAddress() const PURE;
+  virtual const Buffer::Instance& data() const PURE;
 };
 
 } // namespace Network

@@ -121,7 +121,8 @@ public:
   virtual ~UdpProxyFilterConfig() = default;
 
   virtual const std::string route(const Network::Address::Instance& destination_address,
-                                  const Network::Address::Instance& source_address) const PURE;
+                                  const Network::Address::Instance& source_address,
+                                  const Buffer::Instance& data) const PURE;
   virtual const std::vector<std::string>& allClusterNames() const PURE;
   virtual Upstream::ClusterManager& clusterManager() const PURE;
   virtual std::chrono::milliseconds sessionTimeout() const PURE;

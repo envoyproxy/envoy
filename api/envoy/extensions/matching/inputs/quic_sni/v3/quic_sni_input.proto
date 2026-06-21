@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package envoy.extensions.matching.inputs.quic_sni.v3;
+
+option java_package = "io.envoyproxy.envoy.extensions.matching.inputs.quic_sni.v3";
+option java_outer_classname = "QuicSniInputProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/matching/inputs/quic_sni/v3;quic_sniv3";
+
+// Configuration for the QUIC SNI matching input.
+// This input extracts the Server Name Indication (SNI) from QUIC Initial
+// packets. No configuration parameters are needed.
+message QuicSniInput {}

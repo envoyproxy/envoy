@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
@@ -26,7 +27,8 @@ public:
    * @return the cluster name or empty string if there is not matching route for the data.
    */
   virtual const std::string route(const Network::Address::Instance& destination_address,
-                                  const Network::Address::Instance& source_address) const PURE;
+                                  const Network::Address::Instance& source_address,
+                                  const Buffer::Instance& data) const PURE;
 
   /**
    * Returns all cluster names in the router. The UDP proxy filter requires every cluster name for
