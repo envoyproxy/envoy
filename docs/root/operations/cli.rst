@@ -95,8 +95,12 @@ following are the command line options that Envoy supports.
 .. option:: --concurrency <integer>
 
   *(optional)* The number of :ref:`worker threads <arch_overview_threading>` to run. If not
-  specified defaults to the number of hardware threads on the machine. If set to zero, Envoy will
-  still run one worker thread.
+  specified, defaults to the minimum of the number of hardware threads, the CPU affinity (cpuset)
+  size, and the cgroup CPU limit on Linux-based systems; on other platforms it defaults to the
+  number of hardware threads. This makes Envoy respect container CPU limits (for example a
+  Kubernetes ``resources.limits.cpu`` or Docker ``--cpus``) by default. The cgroup component of
+  this detection can be disabled by setting the ``ENVOY_CGROUP_CPU_DETECTION`` environment variable
+  to ``false``. If set to zero, Envoy will still run one worker thread.
 
 .. option:: -l <string>, --log-level <string>
 
@@ -113,10 +117,10 @@ following are the command line options that Envoy supports.
 
 .. option:: --cpuset-threads
 
-   *(optional)* This flag is used to control the number of worker threads if :option:`--concurrency` is
-   not set. If enabled, the assigned cpuset size is used to determine the number of worker threads on
-   Linux-based systems. Otherwise the number of worker threads is set to the number of hardware threads
-   on the machine. You can read more about cpusets in the
+   *(optional)* This flag is no longer required and is retained for backwards compatibility. When
+   :option:`--concurrency` is not set, the assigned cpuset (CPU affinity) size is already used as one
+   of the inputs to the default worker thread count, so passing this flag has no additional effect.
+   You can read more about cpusets in the
    `kernel documentation <https://www.kernel.org/doc/Documentation/cgroup-v1/cpusets.txt>`_.
 
 .. option:: --log-path <path string>

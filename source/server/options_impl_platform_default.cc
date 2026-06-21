@@ -6,7 +6,7 @@
 namespace Envoy {
 
 uint32_t OptionsImplPlatform::getCpuCount() {
-  ENVOY_LOG(warn, "CPU number provided by HW thread count (instead of cpuset).");
+  ENVOY_LOG(debug, "CPU number provided by HW thread count (instead of cpuset).");
   return std::thread::hardware_concurrency();
 }
 
