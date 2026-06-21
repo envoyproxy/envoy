@@ -210,8 +210,10 @@ McpJsonRestBridgePerRouteConfig::McpJsonRestBridgePerRouteConfig(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
         proto_config)
     : proto_config_(proto_config) {
-  for (const auto& tool : proto_config.tool_config().tools()) {
-    tool_entries_[tool.name()] = {tool.http_rule(), tool.text_content_streaming_enabled()};
+  for (const auto& tool_config : proto_config.tool_config()) {
+    for (const auto& tool : tool_config.tools()) {
+      tool_entries_[tool.name()] = {tool.http_rule(), tool.text_content_streaming_enabled()};
+    }
   }
   ENVOY_LOG(debug, "Received MCP JSON REST Bridge per-route config: {}",
             proto_config_.DebugString());
@@ -238,10 +240,12 @@ bool McpJsonRestBridgePerRouteConfig::textContentStreamingEnabled(
 
 absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
 McpJsonRestBridgePerRouteConfig::getToolsListHttpRule() const {
-  if (!proto_config_.tool_config().has_tool_list_http_rule()) {
-    return absl::NotFoundError("tools_list_http_rule is not configured.");
+  for (const auto& tool_config : proto_config_.tool_config()) {
+    if (tool_config.has_tool_list_http_rule()) {
+      return tool_config.tool_list_http_rule();
+    }
   }
-  return proto_config_.tool_config().tool_list_http_rule();
+  return absl::NotFoundError("tools_list_http_rule is not configured.");
 }
 
 Http::FilterHeadersStatus

@@ -6,7 +6,7 @@ from typing import AsyncIterable, Dict, List, Optional, Union
 import httpx
 from . import envoy_engine
 from .async_client.executor import AsyncioExecutor
-from .httpx_utils import get_envoy_headers, map_envoy_error
+from .httpx_utils import get_envoy_headers, map_envoy_error, get_next_socket_tag
 
 
 class AsyncEnvoyStream(httpx.AsyncByteStream):
@@ -61,7 +61,7 @@ class AsyncResponseHandler:
         self.data_queue: asyncio.Queue = asyncio.Queue()
         self.stream_complete = asyncio.Event()
         self.status_code: Optional[int] = None
-        self.headers: Dict[str, Union[str, List[str]]] = {}
+        self.headers: List[tuple] = []
         self.trailers: Dict[str, Union[str, List[str]]] = {}
 
     def on_headers(
@@ -79,9 +79,11 @@ class AsyncResponseHandler:
 
         for key, value in headers.items():
             if not key.startswith(":"):
-                self.headers[key] = (
-                    value[0] if isinstance(value, list) and len(value) == 1 else value
-                )
+                if isinstance(value, list):
+                    for val in value:
+                        self.headers.append((key, val))
+                else:
+                    self.headers.append((key, value))
 
         if not self.headers_future.done():
             self.headers_future.set_result(True)
@@ -142,20 +144,22 @@ class AsyncResponseHandler:
 class AsyncEnvoyClientTransport(httpx.AsyncBaseTransport):
     """An asynchronous transport for httpx that uses Envoy Mobile."""
 
-    def __init__(self, engine: envoy_engine.Engine) -> None:
+    def __init__(self, engine: envoy_engine.Engine, listener_name: str = "") -> None:
         self._engine = engine
+        self._listener_name = listener_name
         self._executor = AsyncioExecutor()
+        self._transport_tag = get_next_socket_tag()
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         # Map headers
         timeout = request.extensions.get("timeout", {}).get("read")
-        envoy_headers = get_envoy_headers(request, timeout=timeout)
+        envoy_headers = get_envoy_headers(request, timeout=timeout, socket_tag=self._transport_tag)
 
         # Create handler
         handler = AsyncResponseHandler(self._executor)
 
         # Start stream
-        proto = self._engine.stream_client().new_stream_prototype()
+        proto = self._engine.stream_client(self._listener_name).new_stream_prototype()
         stream = proto.start(
             on_headers=self._executor.wrap(handler.on_headers),
             on_data=self._executor.wrap(handler.on_data),
@@ -187,7 +191,7 @@ class AsyncEnvoyClientTransport(httpx.AsyncBaseTransport):
 
         # Iterate through the request stream and send all data chunks.
         async for chunk in request.stream:
-            stream.send_data(chunk, False)
+            stream.send_data(chunk)
 
         # Finalize the request. Sending an empty string with `stream.close()`
         # signals `end_stream=True` to Envoy, completing the request side of the stream.

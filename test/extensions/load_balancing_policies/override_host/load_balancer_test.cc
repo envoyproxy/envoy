@@ -549,7 +549,6 @@ TEST_F(OverrideHostLoadBalancerTest, WrongHeaderName) {
 }
 
 TEST_F(OverrideHostLoadBalancerTest, NullptrFromFallbackLb) {
-  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   thread_local_priority_set_.getMockHostSet(0);
   // Do not populate any hosts, so that the fallback LB returns nullptr.

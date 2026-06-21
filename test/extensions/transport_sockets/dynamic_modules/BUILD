@@ -29,6 +29,7 @@ envoy_extension_cc_test(
         "//source/extensions/transport_sockets/dynamic_modules:abi_impl",
         "//source/extensions/transport_sockets/dynamic_modules:config",
         "//source/extensions/transport_sockets/dynamic_modules:transport_socket_lib",
+        "//test/extensions/dynamic_modules:util",
         "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:transport_socket_mocks",
         "//test/mocks/server:factory_context_mocks",

@@ -56,7 +56,6 @@ TEST_F(RealHostDescriptionTest, UnitTest) {
   description_.addressListOrNull();
 
   const envoy::config::core::v3::Metadata metadata;
-  const envoy::config::cluster::v3::Cluster cluster;
   Network::MockTransportSocketFactory socket_factory;
   EXPECT_CALL(*mock_host_, resolveTransportSocketFactory(_, _, _))
       .WillOnce(ReturnRef(socket_factory));

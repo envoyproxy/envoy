@@ -458,7 +458,12 @@ absl::Status MobileEngineBuilder::configureRouteConfig(
   route->mutable_per_request_buffer_limit_bytes()->set_value(4096);
   auto* route_to = route->mutable_route();
   route_to->set_cluster_header("x-envoy-mobile-cluster");
-  route_to->mutable_timeout()->set_seconds(0);
+  if (requestTimeoutMs() > 0) {
+    route_to->mutable_timeout()->set_nanos((requestTimeoutMs() % 1000) * 1000000);
+    route_to->mutable_timeout()->set_seconds(requestTimeoutMs() / 1000);
+  } else {
+    route_to->mutable_timeout()->set_seconds(0);
+  }
   route_to->mutable_retry_policy()->mutable_per_try_idle_timeout()->set_seconds(
       per_try_idle_timeout_seconds_);
   auto* backoff = route_to->mutable_retry_policy()->mutable_retry_back_off();

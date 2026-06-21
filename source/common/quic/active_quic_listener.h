@@ -72,6 +72,9 @@ public:
   void updateListenerConfig(Network::ListenerConfig& config) override;
   void onFilterChainDraining(
       const std::list<const Network::FilterChain*>& draining_filter_chains) override;
+  void onFilterChainDrainStart(
+      const std::list<const Network::FilterChain*>& draining_filter_chains) override;
+  void onListenerDrainStart() override;
 
   void onCloseIdleHttpConnections(bool is_saturated) override;
 

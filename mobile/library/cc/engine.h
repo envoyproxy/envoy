@@ -29,7 +29,12 @@ public:
   ~Engine();
 
   std::string dumpStats();
-  StreamClientSharedPtr streamClient();
+  /**
+   * Creates a new StreamClient.
+   * @param listener_name The name of the API listener to route streams to.
+   *                      If empty, the default listener will be used.
+   */
+  StreamClientSharedPtr streamClient(absl::string_view listener_name = "");
   int64_t getInternalEngineHandle() const;
   void onDefaultNetworkChangeEvent(int network);
   // TODO(abeyad): Remove once migrated to onDefaultNetworkChangeEvent().

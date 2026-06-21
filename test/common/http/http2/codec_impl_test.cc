@@ -5233,6 +5233,50 @@ TEST_P(Http2CodecImplTest, TooManyCookiesHistogram) {
   EXPECT_THAT(cookie_counts, ElementsAre(Ge(10)));
 }
 
+// Verify that the nghttp2 RST_STREAM rate limiter is configurable via stream_reset_burst and
+// stream_reset_rate. When the burst budget is exhausted by incoming RST_STREAM frames, the server
+// should send GOAWAY and close the connection.
+TEST_P(Http2CodecImplTest, StreamResetRateLimitConfigurable) {
+  if (http2_implementation_ == Http2Impl::Oghttp2) {
+    // stream_reset_burst/rate only apply to nghttp2.
+    initialize();
+    return;
+  }
+
+  // Set a very small burst so it is exhausted after a few RST_STREAM frames.
+  const uint32_t burst = 5;
+  server_http2_options_.mutable_stream_reset_burst()->set_value(burst);
+  server_http2_options_.mutable_stream_reset_rate()->set_value(0);
+  initialize();
+
+  // Send `burst + 1` streams that the client immediately resets. Each reset sends a RST_STREAM
+  // to the server and drains one token from its rate-limiter bucket.
+  for (uint32_t i = 0; i < burst + 1; ++i) {
+    MockResponseDecoder response_decoder;
+    RequestEncoder* encoder = (i == 0) ? request_encoder_ : &client_->newStream(response_decoder);
+
+    TestRequestHeaderMapImpl request_headers;
+    HttpTestUtility::addDefaultHeaders(request_headers);
+    EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).RetiresOnSaturation();
+    EXPECT_TRUE(encoder->encodeHeaders(request_headers, false).ok());
+    driveToCompletion();
+
+    MockStreamCallbacks client_stream_callbacks;
+    encoder->getStream().addCallbacks(client_stream_callbacks);
+    EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _))
+        .RetiresOnSaturation();
+    EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::LocalReset, _))
+        .RetiresOnSaturation();
+    encoder->getStream().resetStream(StreamResetReason::LocalReset);
+    // On the last reset the burst is exhausted: nghttp2 sends GOAWAY synchronously during
+    // driveToCompletion, so the expectation must be registered before the drive runs.
+    if (i == burst) {
+      EXPECT_CALL(client_callbacks_, onGoAway(Http::GoAwayErrorCode::Other));
+    }
+    driveToCompletion();
+  }
+}
+
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy

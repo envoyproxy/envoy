@@ -44,6 +44,7 @@
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 
 #include "absl/time/time.h"

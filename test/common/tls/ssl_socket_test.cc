@@ -55,6 +55,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
@@ -8196,6 +8197,30 @@ TEST_P(SslSocketTest, CertificateCompressionDisabled) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
 
   // TLS handshake should succeed without compression algorithms (backward compatibility).
+  TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/true, version_);
+  testUtilV2(test_options);
+}
+
+// Test that TLS handshakes succeed under the production default, without any runtime override.
+// The brotli certificate compression runtime flag defaults to disabled, so this verifies that
+// the default (no override) code path produces a working handshake and guards against an
+// accidental re-flip of the runtime guard.
+TEST_P(SslSocketTest, CertificateCompressionDefaultBehavior) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      server_tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"));
+
+  updateFilterChain(server_tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
+
+  // TLS handshake should succeed using the default (brotli compression disabled) configuration.
   TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/true, version_);
   testUtilV2(test_options);
 }

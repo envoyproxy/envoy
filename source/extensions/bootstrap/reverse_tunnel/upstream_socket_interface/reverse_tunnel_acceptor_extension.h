@@ -200,9 +200,9 @@ public:
    * @param tenant_id tenant identifier supplied by the peer.
    */
   void reportConnection(absl::string_view node_id, absl::string_view cluster_id,
-                        absl::string_view tenant_id) {
+                        absl::string_view tenant_id, int64_t initiation_time_ms) {
     if (reporter_ != nullptr) {
-      reporter_->reportConnectionEvent(node_id, cluster_id, tenant_id);
+      reporter_->reportConnectionEvent(node_id, cluster_id, tenant_id, initiation_time_ms);
     }
   }
 

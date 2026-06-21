@@ -76,11 +76,11 @@ actions:
 
 class RateLimitConfigTest : public testing::Test {
 public:
-  void setupTest(const std::string& yaml) {
+  void setupTest(const std::string& yaml, bool no_limit = true) {
     test::extensions::filters::common::ratelimit_config::TestRateLimitConfig proto_config;
     TestUtility::loadFromYaml(yaml, proto_config);
     config_ = std::make_unique<Envoy::Extensions::Filters::Common::RateLimit::RateLimitConfig>(
-        proto_config.rate_limits(), factory_context_, creation_status_);
+        proto_config.rate_limits(), factory_context_, creation_status_, no_limit);
     stream_info_.downstream_connection_info_provider_->setRemoteAddress(default_remote_address_);
     stream_info_.route_ = route_;
   }
@@ -467,6 +467,119 @@ TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActionsAndIsNegative) {
   EXPECT_TRUE(descriptors[0].is_negative_hits_);
   EXPECT_EQ(3, descriptors[1].hits_addend_.value());
   EXPECT_TRUE(descriptors[1].is_negative_hits_);
+}
+
+// When the limit override is allowed (no_limit = false), it is parsed from dynamic metadata
+// and applied to the generated descriptor.
+TEST_F(RateLimitConfigTest, LimitOverrideApplied) {
+  const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: limited_fake_key
+    limit:
+      dynamic_metadata:
+        metadata_key:
+          key: test.filter.key
+          path:
+          - key: test
+  )EOF";
+
+  setupTest(yaml, /*no_limit=*/false);
+  ASSERT_TRUE(creation_status_.ok());
+
+  const std::string metadata_yaml = R"EOF(
+filter_metadata:
+  test.filter.key:
+    test:
+      requests_per_unit: 42
+      unit: HOUR
+  )EOF";
+  TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
+
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
+  config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+
+  std::vector<Envoy::RateLimit::Descriptor> expected_descriptors = {
+      {{{"generic_key", "limited_fake_key"}}}};
+  expected_descriptors[0].limit_ = {42, envoy::type::v3::RateLimitUnit::HOUR};
+  EXPECT_THAT(expected_descriptors, testing::ContainerEq(descriptors));
+}
+
+// The key regression: the per-descriptor limit override and the per-request hits_addend can
+// be used together on the same rule. See https://github.com/envoyproxy/envoy/issues/45611.
+TEST_F(RateLimitConfigTest, LimitOverrideWithHitsAddend) {
+  const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: limited_fake_key
+    hits_addend:
+      format: "%DYNAMIC_METADATA(test.filter.key:tokens)%"
+    limit:
+      dynamic_metadata:
+        metadata_key:
+          key: test.filter.key
+          path:
+          - key: test
+  )EOF";
+
+  setupTest(yaml, /*no_limit=*/false);
+  ASSERT_TRUE(creation_status_.ok());
+
+  const std::string metadata_yaml = R"EOF(
+filter_metadata:
+  test.filter.key:
+    tokens: 7
+    test:
+      requests_per_unit: 42
+      unit: HOUR
+  )EOF";
+  TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
+
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
+  config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+
+  ASSERT_EQ(1, descriptors.size());
+  // Both the cost (hits_addend) and the per-descriptor limit override are present.
+  EXPECT_EQ(7, descriptors[0].hits_addend_.value());
+  ASSERT_TRUE(descriptors[0].limit_.has_value());
+  EXPECT_EQ(42, descriptors[0].limit_->requests_per_unit_);
+  EXPECT_EQ(envoy::type::v3::RateLimitUnit::HOUR, descriptors[0].limit_->unit_);
+}
+
+// When the override metadata is missing, the descriptor is still produced without a limit.
+TEST_F(RateLimitConfigTest, LimitOverrideNotFound) {
+  const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: limited_fake_key
+    limit:
+      dynamic_metadata:
+        metadata_key:
+          key: unknown.key
+          path:
+          - key: test
+  )EOF";
+
+  setupTest(yaml, /*no_limit=*/false);
+  ASSERT_TRUE(creation_status_.ok());
+
+  const std::string metadata_yaml = R"EOF(
+filter_metadata:
+  test.filter.key:
+    test:
+      requests_per_unit: 42
+      unit: HOUR
+  )EOF";
+  TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
+
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
+  config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+
+  ASSERT_EQ(1, descriptors.size());
+  EXPECT_FALSE(descriptors[0].limit_.has_value());
 }
 
 class RateLimitPolicyTest : public testing::Test {

@@ -183,6 +183,7 @@ message ToolsListLocal {
 }
 
 // Configuration for the MCP tool capability of the server.
+// [#next-free-field: 6]
 message ServerToolConfig {
   // List of MCP tools configurations.
   repeated ToolConfig tools = 1;
@@ -208,6 +209,10 @@ message ServerToolConfig {
     // ToolsListSpecificConfig.
     ToolsListLocal tool_list_local = 4;
   }
+
+  // [#not-implemented-hide:]
+  // Default server info for tools without specific ones.
+  McpServerInfo default_server_info = 5;
 }
 
 // [#not-implemented-hide:]
@@ -318,5 +323,5 @@ message HttpRule {
 
 // Per-route override configuration for the MCP JSON REST Bridge filter.
 message McpJsonRestBridgePerRoute {
-  ServerToolConfig tool_config = 1;
+  repeated ServerToolConfig tool_config = 1;
 }

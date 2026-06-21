@@ -2064,6 +2064,32 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
   envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
 }
 
+// new_scheduler captures weak_from_this. On a make_unique-owned filter that is empty, so commit
+// never posts and onScheduled never runs. Shared ownership delivers the event. This guards the
+// scheduler half of the fix the same way the callout test guards the callout half.
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SchedulerRequiresSharedOwnership) {
+  auto unique_filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
+  unique_filter->onAccept(callbacks_);
+  auto* unique_scheduler =
+      envoy_dynamic_module_callback_listener_filter_scheduler_new(unique_filter.get());
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).Times(0);
+  envoy_dynamic_module_callback_listener_filter_scheduler_commit(unique_scheduler, 1);
+  envoy_dynamic_module_callback_listener_filter_scheduler_delete(unique_scheduler);
+  testing::Mock::VerifyAndClearExpectations(&worker_thread_dispatcher_);
+
+  auto shared_filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  shared_filter->onAccept(callbacks_);
+  auto* shared_scheduler =
+      envoy_dynamic_module_callback_listener_filter_scheduler_new(shared_filter.get());
+  Event::PostCb captured_cb;
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  }));
+  envoy_dynamic_module_callback_listener_filter_scheduler_commit(shared_scheduler, 1);
+  captured_cb();
+  envoy_dynamic_module_callback_listener_filter_scheduler_delete(shared_scheduler);
+}
+
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
        ListenerFilterConfigSchedulerCommitAfterConfigDestroyedDoesNotCrash) {
   auto* scheduler = envoy_dynamic_module_callback_listener_filter_config_scheduler_new(
@@ -2484,6 +2510,40 @@ TEST_F(DynamicModuleListenerFilterHttpCalloutTest, SendHttpCalloutSuccess) {
   filter_.reset();
 }
 
+// sendHttpCallout calls shared_from_this. On a make_unique-owned filter that throws
+// std::bad_weak_ptr. Under shared ownership the call proceeds and returns CannotCreateRequest. The
+// integration test guards the production factory wiring.
+TEST_F(DynamicModuleListenerFilterHttpCalloutTest, HttpCalloutRequiresSharedOwnership) {
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  NiceMock<Http::MockAsyncClient> async_client;
+  ON_CALL(cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillByDefault(testing::Return(&cluster));
+  ON_CALL(cluster, httpAsyncClient()).WillByDefault(testing::ReturnRef(async_client));
+  ON_CALL(async_client, send_(testing::_, testing::_, testing::_))
+      .WillByDefault(testing::Return(nullptr));
+
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {.key_ptr = ":method", .key_length = 7, .value_ptr = "GET", .value_length = 3},
+      {.key_ptr = ":path", .key_length = 5, .value_ptr = "/test", .value_length = 5},
+      {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
+  };
+  uint64_t callout_id = 0;
+
+  auto unique_filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
+  unique_filter->onAccept(callbacks_);
+  EXPECT_THROW(envoy_dynamic_module_callback_listener_filter_http_callout(
+                   unique_filter.get(), &callout_id, {"test_cluster", 12}, headers.data(),
+                   headers.size(), {nullptr, 0}, 5000),
+               std::bad_weak_ptr);
+
+  auto shared_filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  shared_filter->onAccept(callbacks_);
+  EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest,
+            envoy_dynamic_module_callback_listener_filter_http_callout(
+                shared_filter.get(), &callout_id, {"test_cluster", 12}, headers.data(),
+                headers.size(), {nullptr, 0}, 5000));
+}
+
 TEST_F(DynamicModuleListenerFilterHttpCalloutTest, SendHttpCalloutSuccessWithCallback) {
   NiceMock<Upstream::MockThreadLocalCluster> cluster;
   NiceMock<Http::MockAsyncClient> async_client;
@@ -2768,6 +2828,70 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, MetricsFrozenAfterInit) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
             envoy_dynamic_module_callback_listener_filter_config_define_histogram(
                 static_cast<void*>(filter_config_.get()), name, &out_id));
+}
+
+// Verifies metrics can be operated from the filter config context (outside the connection
+// lifecycle), mirroring the per-filter operate callbacks.
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ConfigStatsOperate) {
+  void* config = static_cast<void*>(filter_config_.get());
+
+  size_t counter_id = 0;
+  envoy_dynamic_module_type_module_buffer counter_name = {const_cast<char*>("cfg_counter"), 11};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_define_counter(
+                config, counter_name, &counter_id));
+  size_t gauge_id = 0;
+  envoy_dynamic_module_type_module_buffer gauge_name = {const_cast<char*>("cfg_gauge"), 9};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_define_gauge(config, gauge_name,
+                                                                              &gauge_id));
+  size_t histogram_id = 0;
+  envoy_dynamic_module_type_module_buffer histogram_name = {const_cast<char*>("cfg_histogram"), 13};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_define_histogram(
+                config, histogram_name, &histogram_id));
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_increment_counter(config,
+                                                                                   counter_id, 7));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_listener_filter_config_increment_gauge(config, gauge_id, 10));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_listener_filter_config_decrement_gauge(config, gauge_id, 3));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_record_histogram_value(
+                config, histogram_id, 42));
+
+  EXPECT_EQ(7, stats_.counterFromString("dynamicmodulescustom.cfg_counter").value());
+  EXPECT_EQ(
+      7,
+      stats_.gaugeFromString("dynamicmodulescustom.cfg_gauge", Stats::Gauge::ImportMode::Accumulate)
+          .value());
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_set_gauge(config, gauge_id, 100));
+  EXPECT_EQ(
+      100,
+      stats_.gaugeFromString("dynamicmodulescustom.cfg_gauge", Stats::Gauge::ImportMode::Accumulate)
+          .value());
+
+  const size_t invalid_id = 9999;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_config_increment_counter(config,
+                                                                                   invalid_id, 1));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_listener_filter_config_increment_gauge(config, invalid_id, 1));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_listener_filter_config_decrement_gauge(config, invalid_id, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_config_set_gauge(config, invalid_id, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_config_record_histogram_value(
+                config, invalid_id, 1));
 }
 
 } // namespace ListenerFilters
