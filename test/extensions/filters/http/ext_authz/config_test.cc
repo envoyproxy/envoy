@@ -240,7 +240,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfiguration) {
                                                               context.messageValidationVisitor());
   EXPECT_TRUE(route_config.ok());
 
-  const auto& typed_config = dynamic_cast<const FilterConfigPerRoute&>(*route_config.value());
+  const auto& typed_config = Envoy::Protobuf::DynamicCastMessage<FilterConfigPerRoute>(*route_config.value());
   EXPECT_FALSE(typed_config.disabled());
   EXPECT_TRUE(typed_config.grpcService().has_value());
 
@@ -277,7 +277,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteHttpServiceConfiguration) {
                                                               context.messageValidationVisitor());
   EXPECT_TRUE(route_config.ok());
 
-  const auto& typed_config = dynamic_cast<const FilterConfigPerRoute&>(*route_config.value());
+  const auto& typed_config = Envoy::Protobuf::DynamicCastMessage<FilterConfigPerRoute>(*route_config.value());
   EXPECT_FALSE(typed_config.disabled());
   EXPECT_TRUE(typed_config.httpService().has_value());
   EXPECT_FALSE(typed_config.grpcService().has_value());
@@ -323,14 +323,14 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteServiceTypeSwitching) {
   ProtobufTypes::MessagePtr less_specific_proto = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(less_specific_config_yaml, *less_specific_proto);
   FilterConfigPerRoute less_specific_config(
-      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+      *Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute>(
           less_specific_proto.get()));
 
   // Create more specific configuration with HTTP service
   ProtobufTypes::MessagePtr more_specific_proto = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(more_specific_config_yaml, *more_specific_proto);
   FilterConfigPerRoute more_specific_config(
-      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+      *Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute>(
           more_specific_proto.get()));
 
   // Merge configurations - should use HTTP service from more specific config
@@ -384,14 +384,14 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteServiceTypeSwitchingHttpToGrpc) {
   ProtobufTypes::MessagePtr less_specific_proto = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(less_specific_config_yaml, *less_specific_proto);
   FilterConfigPerRoute less_specific_config(
-      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+      *Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute>(
           less_specific_proto.get()));
 
   // Create more specific configuration with gRPC service
   ProtobufTypes::MessagePtr more_specific_proto = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(more_specific_config_yaml, *more_specific_proto);
   FilterConfigPerRoute more_specific_config(
-      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+      *Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute>(
           more_specific_proto.get()));
 
   // Merge configurations - should use gRPC service from more specific config
@@ -436,7 +436,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteHttpServiceWithTimeout) {
                                                               context.messageValidationVisitor());
   EXPECT_TRUE(route_config.ok());
 
-  const auto& typed_config = dynamic_cast<const FilterConfigPerRoute&>(*route_config.value());
+  const auto& typed_config = Envoy::Protobuf::DynamicCastMessage<FilterConfigPerRoute>(*route_config.value());
   EXPECT_TRUE(typed_config.httpService().has_value());
   EXPECT_FALSE(typed_config.grpcService().has_value());
 
@@ -468,7 +468,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceWithTimeout) {
                                                               context.messageValidationVisitor());
   EXPECT_TRUE(route_config.ok());
 
-  const auto& typed_config = dynamic_cast<const FilterConfigPerRoute&>(*route_config.value());
+  const auto& typed_config = Envoy::Protobuf::DynamicCastMessage<FilterConfigPerRoute>(*route_config.value());
   EXPECT_TRUE(typed_config.grpcService().has_value());
   EXPECT_FALSE(typed_config.httpService().has_value());
 
@@ -503,13 +503,13 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteEmptyContextExtensionsMerging) {
   ProtobufTypes::MessagePtr less_specific_proto = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(less_specific_config_yaml, *less_specific_proto);
   FilterConfigPerRoute less_specific_config(
-      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+      *Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute>(
           less_specific_proto.get()));
 
   ProtobufTypes::MessagePtr more_specific_proto = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(more_specific_config_yaml, *more_specific_proto);
   FilterConfigPerRoute more_specific_config(
-      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+      *Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute>(
           more_specific_proto.get()));
 
   FilterConfigPerRoute merged_config(less_specific_config, more_specific_config);
@@ -553,14 +553,14 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfigurationMerging) {
   ProtobufTypes::MessagePtr less_specific_proto = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(less_specific_config_yaml, *less_specific_proto);
   FilterConfigPerRoute less_specific_config(
-      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+      *Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute>(
           less_specific_proto.get()));
 
   // Create more specific configuration
   ProtobufTypes::MessagePtr more_specific_proto = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(more_specific_config_yaml, *more_specific_proto);
   FilterConfigPerRoute more_specific_config(
-      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+      *Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute>(
           more_specific_proto.get()));
 
   // Merge configurations
@@ -597,7 +597,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfigurationWithoutGrpcServic
                                                               context.messageValidationVisitor());
   EXPECT_TRUE(route_config.ok());
 
-  const auto& typed_config = dynamic_cast<const FilterConfigPerRoute&>(*route_config.value());
+  const auto& typed_config = Envoy::Protobuf::DynamicCastMessage<FilterConfigPerRoute>(*route_config.value());
   EXPECT_FALSE(typed_config.disabled());
   EXPECT_FALSE(typed_config.grpcService().has_value());
 
@@ -620,7 +620,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfigurationDisabled) {
                                                               context.messageValidationVisitor());
   EXPECT_TRUE(route_config.ok());
 
-  const auto& typed_config = dynamic_cast<const FilterConfigPerRoute&>(*route_config.value());
+  const auto& typed_config = Envoy::Protobuf::DynamicCastMessage<FilterConfigPerRoute>(*route_config.value());
   EXPECT_TRUE(typed_config.disabled());
   EXPECT_FALSE(typed_config.grpcService().has_value());
 }
@@ -679,7 +679,7 @@ private:
             ->getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context_.scope(), false)
             .value();
     Grpc::MockAsyncClient* mock_async_client =
-        dynamic_cast<Grpc::MockAsyncClient*>(async_client.get());
+        Envoy::Protobuf::DynamicCastMessage<Grpc::MockAsyncClient>(async_client.get());
     EXPECT_NE(mock_async_client, nullptr);
     // All the request in this thread should be sent through the same async client because the async
     // client is cached.

@@ -541,7 +541,7 @@ void GrpcMuxImpl::processDiscoveryResources(const std::vector<DecodedResourcePtr
           (type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>())) {
         for (const auto& resource : found_resources) {
           const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
+              Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
                   resource.get().resource());
           eds_resources_cache_->setResource(resource.get().name(), cluster_load_assignment);
         }

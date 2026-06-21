@@ -80,7 +80,7 @@ public:
   absl::Status onConfigUpdate(const std::vector<DecodedResourceRef>& resources,
                               const std::string& version_info) override {
     const auto& config =
-        dynamic_cast<const test::common::config::DummyConfig&>(resources[0].get().resource());
+        Envoy::Protobuf::DynamicCastMessage<test::common::config::DummyConfig>(resources[0].get().resource());
     if (checkAndApplyConfigUpdate(config, "dummy_config", version_info)) {
       config_proto_ = config;
     }
@@ -199,7 +199,7 @@ public:
     // Currently, the dummy config provider only supports a single static config. We can extend this
     // to support multiple static configs if needed.
     ASSERT(configs.size() == 1);
-    auto config = dynamic_cast<const test::common::config::DummyConfig&>(*configs[0]);
+    auto config = Envoy::Protobuf::DynamicCastMessage<test::common::config::DummyConfig>(*configs[0]);
     return std::make_unique<StaticDummyConfigProvider>(config, factory_context, *this);
   }
 };
@@ -271,7 +271,7 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
   const auto dummy_config = parseDummyConfigFromYaml("a: a dummy config");
 
   DummyConfigSubscription& subscription =
-      dynamic_cast<DummyDynamicConfigProvider&>(*provider1).subscription();
+      Envoy::Protobuf::DynamicCastMessage<DummyDynamicConfigProvider>(*provider1).subscription();
   const auto decoded_resources = TestUtility::decodeResources({dummy_config}, "a");
   ASSERT_TRUE(subscription.onConfigUpdate(decoded_resources.refvec_, "1").ok());
 
@@ -282,8 +282,8 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
       ConfigProviderManager::NullOptionalArg());
 
   EXPECT_TRUE(provider2->configProtoInfoVector<test::common::config::DummyConfig>().has_value());
-  EXPECT_EQ(&dynamic_cast<DummyDynamicConfigProvider&>(*provider1).subscription(),
-            &dynamic_cast<DummyDynamicConfigProvider&>(*provider2).subscription());
+  EXPECT_EQ(&Envoy::Protobuf::DynamicCastMessage<DummyDynamicConfigProvider>(*provider1).subscription(),
+            &Envoy::Protobuf::DynamicCastMessage<DummyDynamicConfigProvider>(*provider2).subscription());
   EXPECT_EQ(provider1->config<const DummyConfig>().get(),
             provider2->config<const DummyConfig>().get());
 
@@ -293,12 +293,12 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
       config_source_proto, server_factory_context_, init_manager_, "dummy_prefix",
       ConfigProviderManager::NullOptionalArg());
 
-  EXPECT_NE(&dynamic_cast<DummyDynamicConfigProvider&>(*provider1).subscription(),
-            &dynamic_cast<DummyDynamicConfigProvider&>(*provider3).subscription());
+  EXPECT_NE(&Envoy::Protobuf::DynamicCastMessage<DummyDynamicConfigProvider>(*provider1).subscription(),
+            &Envoy::Protobuf::DynamicCastMessage<DummyDynamicConfigProvider>(*provider3).subscription());
   EXPECT_NE(provider1->config<const DummyConfig>().get(),
             provider3->config<const DummyConfig>().get());
 
-  ASSERT_TRUE(dynamic_cast<DummyDynamicConfigProvider&>(*provider3)
+  ASSERT_TRUE(Envoy::Protobuf::DynamicCastMessage<DummyDynamicConfigProvider>(*provider3)
                   .subscription()
                   .onConfigUpdate(decoded_resources.refvec_, "provider3")
                   .ok());
@@ -457,7 +457,7 @@ dynamic_dummy_configs:
 
   timeSystem().setSystemTime(std::chrono::milliseconds(1234567891567));
   DummyConfigSubscription& subscription =
-      dynamic_cast<DummyDynamicConfigProvider&>(*dynamic_provider).subscription();
+      Envoy::Protobuf::DynamicCastMessage<DummyDynamicConfigProvider>(*dynamic_provider).subscription();
   const auto decoded_resources = TestUtility::decodeResources({dummy_config}, "a");
   ASSERT_TRUE(subscription.onConfigUpdate(decoded_resources.refvec_, "v1").ok());
 
@@ -546,7 +546,7 @@ public:
     // implementations.
     for (const auto& resource : resources) {
       const auto& dummy_config =
-          dynamic_cast<const test::common::config::DummyConfig&>(resource.get().resource());
+          Envoy::Protobuf::DynamicCastMessage<test::common::config::DummyConfig>(resource.get().resource());
       proto_map_[version_info] = dummy_config;
       // Propagate the new config proto to all worker threads.
       applyConfigUpdate([&dummy_config](ConfigProvider::ConfigConstSharedPtr prev_config)
@@ -708,7 +708,7 @@ TEST_F(DeltaConfigProviderImplTest, MultipleDeltaSubscriptions) {
       TestUtility::decodeResources({dummy_config_0, dummy_config_1}, "a");
 
   DeltaDummyConfigSubscription& subscription =
-      dynamic_cast<DeltaDummyDynamicConfigProvider&>(*provider1).subscription();
+      Envoy::Protobuf::DynamicCastMessage<DeltaDummyDynamicConfigProvider>(*provider1).subscription();
   ASSERT_TRUE(subscription.onConfigUpdate(decoded_resources.refvec_, "1").ok());
 
   ConfigProviderPtr provider2 = provider_manager_->createXdsConfigProvider(
@@ -717,8 +717,8 @@ TEST_F(DeltaConfigProviderImplTest, MultipleDeltaSubscriptions) {
 
   // Providers, config implementations (i.e., the DummyConfig) and config protos are
   // expected to be shared for a given subscription.
-  EXPECT_EQ(&dynamic_cast<DeltaDummyDynamicConfigProvider&>(*provider1).subscription(),
-            &dynamic_cast<DeltaDummyDynamicConfigProvider&>(*provider2).subscription());
+  EXPECT_EQ(&Envoy::Protobuf::DynamicCastMessage<DeltaDummyDynamicConfigProvider>(*provider1).subscription(),
+            &Envoy::Protobuf::DynamicCastMessage<DeltaDummyDynamicConfigProvider>(*provider2).subscription());
   ASSERT_TRUE(provider2->configProtoInfoVector<test::common::config::DummyConfig>().has_value());
   EXPECT_EQ(
       provider1->configProtoInfoVector<test::common::config::DummyConfig>().value().config_protos_,
@@ -746,7 +746,7 @@ TEST_F(DeltaConfigProviderImplTest, DeltaSubscriptionFailure) {
       config_source_proto, server_factory_context_, init_manager_, "dummy_prefix",
       ConfigProviderManager::NullOptionalArg());
   DeltaDummyConfigSubscription& subscription =
-      dynamic_cast<DeltaDummyDynamicConfigProvider&>(*provider).subscription();
+      Envoy::Protobuf::DynamicCastMessage<DeltaDummyDynamicConfigProvider>(*provider).subscription();
   const auto time = std::chrono::milliseconds(1234567891234);
   timeSystem().setSystemTime(time);
   const EnvoyException ex(fmt::format("config failure"));

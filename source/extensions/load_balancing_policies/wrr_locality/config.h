@@ -36,7 +36,7 @@ public:
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
   loadConfig(Server::Configuration::ServerFactoryContext& context,
              const Protobuf::Message& config) override {
-    const auto& lb_config = dynamic_cast<const WrrLocalityLbProto&>(config);
+    const auto& lb_config = Envoy::Protobuf::DynamicCastMessage<WrrLocalityLbProto>(config);
     Upstream::TypedLoadBalancerFactory* endpoint_picking_policy_factory = nullptr;
     // Iterate through the list of endpoint picking policies to find the first one that we know
     // about.
@@ -48,8 +48,7 @@ public:
 
       if (endpoint_picking_policy_factory != nullptr) {
         // Ensure that the endpoint picking policy is a ClientSideWeightedRoundRobin.
-        auto* client_side_weighted_round_robin_factory = dynamic_cast<
-            ::Envoy::Extensions::LoadBalancingPolicies::ClientSideWeightedRoundRobin::Factory*>(
+        auto* client_side_weighted_round_robin_factory = Envoy::Protobuf::DynamicCastMessage<::Envoy::Extensions::LoadBalancingPolicies::ClientSideWeightedRoundRobin::Factory>(
             endpoint_picking_policy_factory);
         if (client_side_weighted_round_robin_factory == nullptr) {
           return absl::InvalidArgumentError(

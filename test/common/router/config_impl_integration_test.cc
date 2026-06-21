@@ -28,7 +28,7 @@ public:
     RouteConstSharedPtr route(RouteEntryAndRouteConstSharedPtr parent,
                               const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                               uint64_t) const override {
-      ASSERT(dynamic_cast<const RouteEntryImplBase*>(parent.get()) != nullptr);
+      ASSERT(Envoy::Protobuf::DynamicCastMessage<RouteEntryImplBase>(parent.get()) != nullptr);
       return std::make_shared<Router::DynamicRouteEntry>(parent, std::string(cluster_name_));
     }
 
@@ -39,7 +39,7 @@ public:
   ClusterSpecifierPluginSharedPtr
   createClusterSpecifierPlugin(const Protobuf::Message& config,
                                Server::Configuration::ServerFactoryContext&) override {
-    const auto& typed_config = dynamic_cast<const Protobuf::Struct&>(config);
+    const auto& typed_config = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(config);
     return std::make_shared<FakeClusterSpecifierPlugin>(
         typed_config.fields().at("name").string_value());
   }

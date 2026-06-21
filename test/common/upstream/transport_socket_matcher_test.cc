@@ -75,7 +75,7 @@ public:
   absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message& proto,
                                Server::Configuration::TransportSocketFactoryContext&) override {
-    const auto& node = dynamic_cast<const envoy::config::core::v3::Node&>(proto);
+    const auto& node = Envoy::Protobuf::DynamicCastMessage<envoy::config::core::v3::Node>(proto);
     std::string id = "default-foo";
     if (!node.id().empty()) {
       id = node.id();
@@ -113,7 +113,7 @@ public:
                 const envoy::config::core::v3::Metadata* locality_metadata,
                 const std::string& expected) {
     auto& factory = matcher_->resolve(endpoint_metadata, locality_metadata).factory_;
-    const auto& config_factory = dynamic_cast<const FakeTransportSocketFactory&>(factory);
+    const auto& config_factory = Envoy::Protobuf::DynamicCastMessage<FakeTransportSocketFactory>(factory);
     EXPECT_EQ(expected, config_factory.id());
   }
 
@@ -308,7 +308,7 @@ filter_metadata:
 )EOF",
                             endpoint_metadata);
   auto& factory_tls = matcher_->resolve(&endpoint_metadata, nullptr).factory_;
-  const auto& foo_tls = dynamic_cast<const FakeTransportSocketFactory&>(factory_tls);
+  const auto& foo_tls = Envoy::Protobuf::DynamicCastMessage<FakeTransportSocketFactory>(factory_tls);
   EXPECT_EQ("tls_id", foo_tls.id());
 
   // Endpoint metadata selects raw.
@@ -319,7 +319,7 @@ filter_metadata:
 )EOF",
                             endpoint_metadata2);
   auto& factory_raw = matcher_->resolve(&endpoint_metadata2, nullptr).factory_;
-  const auto& foo_raw = dynamic_cast<const FakeTransportSocketFactory&>(factory_raw);
+  const auto& foo_raw = Envoy::Protobuf::DynamicCastMessage<FakeTransportSocketFactory>(factory_raw);
   EXPECT_EQ("raw_id", foo_raw.id());
 }
 
@@ -517,7 +517,7 @@ transport_socket:
   matcher_ = std::move(*result_or);
 
   auto& factory = matcher_->resolve(nullptr, nullptr).factory_;
-  const auto& f = dynamic_cast<const FakeTransportSocketFactory&>(factory);
+  const auto& f = Envoy::Protobuf::DynamicCastMessage<FakeTransportSocketFactory>(factory);
   EXPECT_EQ("default", f.id());
 }
 
@@ -659,7 +659,7 @@ on_no_match:
 
     // Resolve transport socket - should select namespace_a_socket.
     auto result = matcher_->resolve(nullptr, nullptr, transport_socket_options);
-    const auto& factory = dynamic_cast<const FakeTransportSocketFactory&>(result.factory_);
+    const auto& factory = Envoy::Protobuf::DynamicCastMessage<FakeTransportSocketFactory>(result.factory_);
     EXPECT_EQ("namespace_a_id", factory.id());
     EXPECT_EQ("namespace_a_socket", result.name_);
   }
@@ -680,7 +680,7 @@ on_no_match:
         absl::nullopt, std::move(shared_objects));
 
     auto result = matcher_->resolve(nullptr, nullptr, transport_socket_options);
-    const auto& factory = dynamic_cast<const FakeTransportSocketFactory&>(result.factory_);
+    const auto& factory = Envoy::Protobuf::DynamicCastMessage<FakeTransportSocketFactory>(result.factory_);
     EXPECT_EQ("namespace_b_id", factory.id());
     EXPECT_EQ("namespace_b_socket", result.name_);
   }
@@ -688,7 +688,7 @@ on_no_match:
   // Test 3: No TransportSocketOptions. It should fall back to on_no_match.
   {
     auto result = matcher_->resolve(nullptr, nullptr, nullptr);
-    const auto& factory = dynamic_cast<const FakeTransportSocketFactory&>(result.factory_);
+    const auto& factory = Envoy::Protobuf::DynamicCastMessage<FakeTransportSocketFactory>(result.factory_);
     EXPECT_EQ("namespace_a_id", factory.id()); // on_no_match defaults to namespace_a_socket
     EXPECT_EQ("namespace_a_socket", result.name_);
   }
@@ -703,7 +703,7 @@ on_no_match:
         absl::nullopt, std::move(shared_objects));
 
     auto result = matcher_->resolve(nullptr, nullptr, transport_socket_options);
-    const auto& factory = dynamic_cast<const FakeTransportSocketFactory&>(result.factory_);
+    const auto& factory = Envoy::Protobuf::DynamicCastMessage<FakeTransportSocketFactory>(result.factory_);
     EXPECT_EQ("namespace_a_id", factory.id()); // on_no_match defaults to namespace_a_socket
     EXPECT_EQ("namespace_a_socket", result.name_);
   }

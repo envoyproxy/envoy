@@ -54,7 +54,7 @@ SubsetLbFactory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
                         TimeSource& time_source) {
 
   const auto* typed_config =
-      dynamic_cast<const Upstream::SubsetLoadBalancerConfig*>(lb_config.ptr());
+      Envoy::Protobuf::DynamicCastMessage<Upstream::SubsetLoadBalancerConfig>(lb_config.ptr());
   // The load balancing policy configuration will be loaded and validated in the main thread when we
   // load the cluster configuration. So we can assume the configuration is valid here.
   ASSERT(typed_config != nullptr,
@@ -73,8 +73,8 @@ SubsetLbFactory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
 absl::StatusOr<Upstream::LoadBalancerConfigPtr>
 SubsetLbFactory::loadConfig(Server::Configuration::ServerFactoryContext& factory_context,
                             const Protobuf::Message& config) {
-  ASSERT(dynamic_cast<const SubsetLbProto*>(&config) != nullptr);
-  const SubsetLbProto& typed_config = dynamic_cast<const SubsetLbProto&>(config);
+  ASSERT(Envoy::Protobuf::DynamicCastMessage<SubsetLbProto>(&config) != nullptr);
+  const SubsetLbProto& typed_config = Envoy::Protobuf::DynamicCastMessage<SubsetLbProto>(config);
 
   // Load the subset load balancer configuration. This will contains child load balancer
   // config and child load balancer factory.

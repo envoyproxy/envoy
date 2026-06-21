@@ -48,7 +48,7 @@ protected:
       const Matchers::StringMatcher& name_matcher = Matchers::UniversalStringMatcher()) {
     auto message_ptr = config_tracker_.config_tracker_callbacks_["secrets"](name_matcher);
     const auto& secrets_config_dump =
-        dynamic_cast<const envoy::admin::v3::SecretsConfigDump&>(*message_ptr);
+        Envoy::Protobuf::DynamicCastMessage<envoy::admin::v3::SecretsConfigDump>(*message_ptr);
     envoy::admin::v3::SecretsConfigDump expected_secrets_config_dump;
     TestUtility::loadFromYaml(expected_dump_yaml, expected_secrets_config_dump);
     EXPECT_THAT(secrets_config_dump,

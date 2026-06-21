@@ -2838,7 +2838,7 @@ TEST_F(StaticClusterImplTest, RoundRobinWithSlowStart) {
 
   EXPECT_EQ("envoy.load_balancing_policies.round_robin",
             cluster->info()->loadBalancerFactory().name());
-  auto slow_start_config = dynamic_cast<const Upstream::TypedRoundRobinLbConfig*>(
+  auto slow_start_config = Envoy::Protobuf::DynamicCastMessage<Upstream::TypedRoundRobinLbConfig>(
                                cluster->info()->loadBalancerConfig().ptr())
                                ->lb_config_.slow_start_config();
   EXPECT_EQ(std::chrono::milliseconds(60000),
@@ -2881,8 +2881,7 @@ TEST_F(StaticClusterImplTest, LeastRequestWithSlowStart) {
   EXPECT_EQ("envoy.load_balancing_policies.least_request",
             cluster->info()->loadBalancerFactory().name());
   auto slow_start_config =
-      dynamic_cast<
-          const Extensions::LoadBalancingPolicies::LeastRequest::TypedLeastRequestLbConfig*>(
+      Envoy::Protobuf::DynamicCastMessage<Extensions::LoadBalancingPolicies::LeastRequest::TypedLeastRequestLbConfig>(
           cluster->info()->loadBalancerConfig().ptr())
           ->lb_config_.slow_start_config();
   EXPECT_EQ(std::chrono::milliseconds(60000),
@@ -5528,7 +5527,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
   TestFilterConfigFactoryBase factoryBase(
       []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::Struct>(); },
       [&](const Protobuf::Message& msg) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
-        const auto& msg_struct = dynamic_cast<const Protobuf::Struct&>(msg);
+        const auto& msg_struct = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(msg);
         EXPECT_TRUE(msg_struct.fields().find("option") != msg_struct.fields().end());
 
         return protocol_options;

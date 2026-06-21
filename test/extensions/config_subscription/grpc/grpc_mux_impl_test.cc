@@ -664,7 +664,7 @@ TEST_P(GrpcMuxImplTest, WildcardWatch) {
                                             const std::string&) {
           EXPECT_EQ(1, resources.size());
           const auto& expected_assignment =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
+              Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
                   resources[0].get().resource());
           EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
           return absl::OkStatus();
@@ -704,7 +704,7 @@ TEST_P(GrpcMuxImplTest, WatchDemux) {
                                             const std::string&) {
           EXPECT_EQ(1, resources.size());
           const auto& expected_assignment =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
+              Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
                   resources[0].get().resource());
           EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
           return absl::OkStatus();
@@ -731,11 +731,11 @@ TEST_P(GrpcMuxImplTest, WatchDemux) {
                              const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_EQ(2, resources.size());
           const auto& expected_assignment =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
+              Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
                   resources[0].get().resource());
           EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment_y));
           const auto& expected_assignment_1 =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
+              Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
                   resources[1].get().resource());
           EXPECT_TRUE(TestUtility::protoEqual(expected_assignment_1, load_assignment_z));
           return absl::OkStatus();
@@ -745,11 +745,11 @@ TEST_P(GrpcMuxImplTest, WatchDemux) {
                              const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_EQ(2, resources.size());
           const auto& expected_assignment =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
+              Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
                   resources[0].get().resource());
           EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment_x));
           const auto& expected_assignment_1 =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
+              Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
                   resources[1].get().resource());
           EXPECT_TRUE(TestUtility::protoEqual(expected_assignment_1, load_assignment_y));
           return absl::OkStatus();
@@ -1437,7 +1437,7 @@ TEST_P(GrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
                                             const std::string&) {
           EXPECT_EQ(1, resources.size());
           const auto& expected_assignment =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
+              Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
                   resources[0].get().resource());
           EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
           return absl::OkStatus();
@@ -1478,7 +1478,7 @@ TEST_P(GrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
                                             const std::string&) {
           EXPECT_EQ(1, resources.size());
           const auto& expected_assignment =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
+              Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
                   resources[0].get().resource());
           EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
           return absl::OkStatus();

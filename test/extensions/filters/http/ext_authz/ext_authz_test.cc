@@ -6656,7 +6656,7 @@ TEST_F(HttpFilterTest, ShadowModeDeniedSetsFilterStateAndContinues) {
   auto serialized = shadow->serializeAsProto();
   ASSERT_NE(serialized, nullptr);
   const auto& proto =
-      dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ShadowDecision&>(
+      Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::ext_authz::v3::ShadowDecision>(
           *serialized);
   EXPECT_EQ(proto.check_result(),
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::DENIED);
@@ -6819,7 +6819,7 @@ TEST_F(HttpFilterTest, ShadowModeOkSetsFilterState) {
   auto serialized = shadow->serializeAsProto();
   ASSERT_NE(serialized, nullptr);
   const auto& proto =
-      dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ShadowDecision&>(
+      Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::ext_authz::v3::ShadowDecision>(
           *serialized);
   EXPECT_EQ(proto.check_result(),
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::OK);

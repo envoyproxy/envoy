@@ -57,13 +57,13 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidMatcherProto) {
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyProto) {
   RoleBasedAccessControlFilterConfigFactory factory;
-  EXPECT_NE(nullptr, dynamic_cast<envoy::extensions::filters::http::rbac::v3::RBAC*>(
+  EXPECT_NE(nullptr, Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::rbac::v3::RBAC>(
                          factory.createEmptyConfigProto().get()));
 }
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyRouteProto) {
   RoleBasedAccessControlFilterConfigFactory factory;
-  EXPECT_NE(nullptr, dynamic_cast<envoy::extensions::filters::http::rbac::v3::RBACPerRoute*>(
+  EXPECT_NE(nullptr, Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::rbac::v3::RBACPerRoute>(
                          factory.createEmptyRouteConfigProto().get()));
 }
 

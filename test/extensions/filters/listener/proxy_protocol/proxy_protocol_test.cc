@@ -2361,7 +2361,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateSerializeMethods) {
   // Test serializeAsProto
   auto proto = tlv_obj->serializeAsProto();
   ASSERT_NE(nullptr, proto);
-  const auto* struct_proto = dynamic_cast<const Protobuf::Struct*>(proto.get());
+  const auto* struct_proto = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(proto.get());
   ASSERT_NE(nullptr, struct_proto);
   EXPECT_EQ(1, struct_proto->fields().size());
   EXPECT_EQ(1, struct_proto->fields().count("PP2 type authority"));
@@ -3109,7 +3109,7 @@ TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {
   cb(manager);
 
   // Make sure we actually create the correct type!
-  EXPECT_NE(dynamic_cast<ProxyProtocol::Filter*>(added_filter.get()), nullptr);
+  EXPECT_NE(Envoy::Protobuf::DynamicCastMessage<ProxyProtocol::Filter>(added_filter.get()), nullptr);
 }
 
 } // namespace

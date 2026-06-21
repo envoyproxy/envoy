@@ -4124,7 +4124,7 @@ virtual_hosts:
            mock_cluster_specifier_plugin_3](
               const Protobuf::Message& config,
               Server::Configuration::CommonFactoryContext&) -> ClusterSpecifierPluginSharedPtr {
-            const auto& typed_config = dynamic_cast<const Protobuf::Struct&>(config);
+            const auto& typed_config = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(config);
             if (auto iter = typed_config.fields().find("a"); iter == typed_config.fields().end()) {
               return nullptr;
             } else if (iter->second.string_value() == "test1") {
@@ -4202,7 +4202,7 @@ virtual_hosts:
            mock_cluster_specifier_plugin_3](
               const Protobuf::Message& config,
               Server::Configuration::CommonFactoryContext&) -> ClusterSpecifierPluginSharedPtr {
-            const auto& typed_config = dynamic_cast<const Protobuf::Struct&>(config);
+            const auto& typed_config = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(config);
             if (auto iter = typed_config.fields().find("a"); iter == typed_config.fields().end()) {
               return nullptr;
             } else if (iter->second.string_value() == "test1") {
@@ -11864,11 +11864,11 @@ public:
     const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
     absl::InlinedVector<uint32_t, 3> traveled_cfg;
 
-    check(dynamic_cast<const DerivedFilterConfig*>(
+    check(Envoy::Protobuf::DynamicCastMessage<DerivedFilterConfig>(
               route->mostSpecificPerFilterConfig(route_config_name)),
           expected_most_specific_config, "most specific config");
     for (const auto* cfg : route->perFilterConfigs(route_config_name)) {
-      auto* typed_cfg = dynamic_cast<const DerivedFilterConfig*>(cfg);
+      auto* typed_cfg = Envoy::Protobuf::DynamicCastMessage<DerivedFilterConfig>(cfg);
       traveled_cfg.push_back(typed_cfg->config_.seconds());
     }
 
@@ -11890,7 +11890,7 @@ public:
 
     EXPECT_EQ(nullptr, route->mostSpecificPerFilterConfig(route_config_name));
     for (const auto* cfg : route->perFilterConfigs(route_config_name)) {
-      auto* typed_cfg = dynamic_cast<const DerivedFilterConfig*>(cfg);
+      auto* typed_cfg = Envoy::Protobuf::DynamicCastMessage<DerivedFilterConfig>(cfg);
       traveled_cfg.push_back(typed_cfg->config_.seconds());
     }
     EXPECT_EQ(0, traveled_cfg.size());
@@ -12728,7 +12728,7 @@ virtual_hosts:
         return RouteMatchStatus::Continue;
       },
       genHeaders("bat.com", "/", "GET"));
-  EXPECT_NE(nullptr, dynamic_cast<const SslRedirectRoute*>(accepted_route.get()));
+  EXPECT_NE(nullptr, Envoy::Protobuf::DynamicCastMessage<SslRedirectRoute>(accepted_route.get()));
 
   {
     EXPECT_EQ(nullptr, accepted_route->routeEntry());
@@ -12772,7 +12772,7 @@ virtual_hosts:
         return RouteMatchStatus::Continue;
       },
       genHeaders("bat.com", "/", "GET"));
-  EXPECT_NE(nullptr, dynamic_cast<const SslRedirectRoute*>(accepted_route.get()));
+  EXPECT_NE(nullptr, Envoy::Protobuf::DynamicCastMessage<SslRedirectRoute>(accepted_route.get()));
 }
 
 class CommonConfigImplTest : public testing::Test, public ConfigImplTestBase {};
@@ -12798,7 +12798,7 @@ virtual_hosts:
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
 
-  const auto& shared_config = dynamic_cast<const CommonConfigImpl&>(
+  const auto& shared_config = Envoy::Protobuf::DynamicCastMessage<CommonConfigImpl>(
       config.route(genHeaders("bat.com", "/", "GET"), 0)->virtualHost().routeConfig());
 
   EXPECT_EQ(config.mostSpecificHeaderMutationsWins(),

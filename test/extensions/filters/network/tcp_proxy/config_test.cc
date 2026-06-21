@@ -33,7 +33,7 @@ TEST(ConfigTest, InvalidHeadersToAdd) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ConfigFactory factory;
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config =
-      *dynamic_cast<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy*>(
+      *Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
           factory.createEmptyConfigProto().get());
   config.set_stat_prefix("prefix");
   config.set_cluster("cluster");
@@ -58,7 +58,7 @@ TEST(ConfigTest, ConfigTest) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ConfigFactory factory;
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config =
-      *dynamic_cast<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy*>(
+      *Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
           factory.createEmptyConfigProto().get());
   config.set_stat_prefix("prefix");
   config.set_cluster("cluster");
@@ -79,7 +79,7 @@ TEST(ConfigTest, ConfigWithDrainCloseCheck) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ConfigFactory factory;
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config =
-      *dynamic_cast<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy*>(
+      *Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
           factory.createEmptyConfigProto().get());
   config.set_stat_prefix("prefix");
   config.set_cluster("cluster");
@@ -95,7 +95,7 @@ TEST(ConfigTest, TunnelingConfigWithFormatters) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ConfigFactory factory;
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config =
-      *dynamic_cast<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy*>(
+      *Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
           factory.createEmptyConfigProto().get());
   config.set_stat_prefix("prefix");
   config.set_cluster("cluster");
@@ -118,7 +118,7 @@ TEST(ConfigTest, TunnelingConfigWithUnknownFormatter) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ConfigFactory factory;
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config =
-      *dynamic_cast<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy*>(
+      *Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
           factory.createEmptyConfigProto().get());
   config.set_stat_prefix("prefix");
   config.set_cluster("cluster");
