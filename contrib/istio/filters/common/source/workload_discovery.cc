@@ -89,13 +89,13 @@ public:
       if (const auto ipv4 = address->ip()->ipv4(); ipv4) {
         uint32_t value = ipv4->address();
         std::array<uint8_t, 4> output;
-        memcpy(output.data(), &value, 4);
+        memcpy(output.data(), &value, 4); // NOLINT(safe-memcpy)
         return tls_->get(std::string(output.begin(), output.end()));
       } else if (const auto ipv6 = address->ip()->ipv6(); ipv6) {
         const auto* sa = reinterpret_cast<const sockaddr_in6*>(address->sockAddr());
         std::array<uint8_t, 16> output;
         static_assert(sizeof(sa->sin6_addr.s6_addr) == 16);
-        memcpy(output.data(), sa->sin6_addr.s6_addr, 16);
+        memcpy(output.data(), sa->sin6_addr.s6_addr, 16); // NOLINT(safe-memcpy)
         return tls_->get(std::string(output.begin(), output.end()));
       }
     }
