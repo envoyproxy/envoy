@@ -109,7 +109,8 @@ void WorkerImpl::removeFilterChains(uint64_t listener_tag,
       });
 }
 
-void WorkerImpl::start(OptRef<GuardDog> guard_dog, const std::function<void()>& cb) {
+void WorkerImpl::start(OptRef<GuardDog> guard_dog, const std::function<void()>& cb,
+                       absl::optional<uint32_t> cpu_id) {
   ASSERT(!thread_);
 
   // In posix, thread names are limited to 15 characters, so contrive to make
@@ -123,6 +124,7 @@ void WorkerImpl::start(OptRef<GuardDog> guard_dog, const std::function<void()>& 
   // TODO(jmarantz): consider refactoring how this naming works so this naming
   // architecture is centralized, resulting in clearer names.
   Thread::Options options{absl::StrCat("wrk:", dispatcher_->name())};
+  options.cpu_affinity_ = cpu_id;
   thread_ = api_.threadFactory().createThread(
       [this, guard_dog, cb]() -> void { threadRoutine(guard_dog, cb); }, options);
 }

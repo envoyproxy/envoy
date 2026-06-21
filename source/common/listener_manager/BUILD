@@ -45,6 +45,7 @@ envoy_cc_library(
         "//source/common/init:manager_lib",
         "//source/common/init:target_lib",
         "//source/common/network:connection_balancer_lib",
+        "//source/common/network:cpu_affinity_lib",
         "//source/common/network:filter_matcher_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:listener_lib",

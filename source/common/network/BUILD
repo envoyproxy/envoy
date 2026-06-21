@@ -76,6 +76,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "cpu_affinity_lib",
+    srcs = ["cpu_affinity.cc"],
+    hdrs = ["cpu_affinity.h"],
+    deps = [
+        "//source/common/api:os_sys_calls_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "connection_base_lib",
     srcs = ["connection_impl_base.cc"],
     hdrs = ["connection_impl_base.h"],

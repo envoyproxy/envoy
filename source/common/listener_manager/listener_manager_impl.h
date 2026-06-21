@@ -161,7 +161,8 @@ using ListenerImplPtr = std::unique_ptr<ListenerImpl>;
   GAUGE(total_listeners_active, NeverImport)                                                       \
   GAUGE(total_listeners_draining, NeverImport)                                                     \
   GAUGE(total_listeners_warming, NeverImport)                                                      \
-  GAUGE(workers_started, NeverImport)
+  GAUGE(workers_started, NeverImport)                                                              \
+  GAUGE(workers_pinned, NeverImport)
 
 /**
  * Struct definition for all listener manager stats. @see stats_macros.h

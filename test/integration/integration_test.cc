@@ -173,6 +173,25 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   check_listener_stats(0, 1);
 }
 
+// Verify that Envoy starts and serves traffic with worker CPU affinity enabled. On Linux this pins
+// each worker thread to a CPU, on other platforms it is a no-op.
+TEST_P(IntegrationTest, WorkerCpuAffinity) {
+  concurrency_ = 2;
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.set_enable_worker_cpu_affinity(true);
+  });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  codec_client_->close();
+}
+
 class TestConnectionBalanceFactory : public Network::ConnectionBalanceFactory {
 public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

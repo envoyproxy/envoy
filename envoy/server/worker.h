@@ -59,8 +59,10 @@ public:
    * Start the worker thread.
    * @param guard_dog supplies the optional guard dog to use for thread watching.
    * @param cb a callback to run when the worker thread starts running.
+   * @param cpu_id an optional CPU to pin the worker thread to for CPU locality.
    */
-  virtual void start(OptRef<GuardDog> guard_dog, const std::function<void()>& cb) PURE;
+  virtual void start(OptRef<GuardDog> guard_dog, const std::function<void()>& cb,
+                     absl::optional<uint32_t> cpu_id) PURE;
 
   /**
    * Initialize stats for this worker's dispatcher, if available. The worker will output
