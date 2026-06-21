@@ -38,8 +38,8 @@ public:
   using ProtoConfig = envoy::extensions::filters::http::priority_load_shed::v3::PriorityLoadShed;
 
   struct Bucket {
-    int64_t start;
-    int64_t end;
+    int32_t start;
+    int32_t end;
     std::string load_shed_point_name;
     Server::LoadShedPoint* load_shed_point;
   };
@@ -49,11 +49,9 @@ public:
          const std::string& stats_prefix, Stats::Scope& scope);
 
   const Http::LowerCaseString& headerName() const { return header_name_; }
-  const Bucket* findBucket(int64_t value) const;
+  const Bucket* findBucket(int32_t value) const;
   bool hasDefaultLoadShedPoint() const { return !default_load_shed_point_name_.empty(); }
   Server::LoadShedPoint* defaultLoadShedPoint() const { return default_load_shed_point_; }
-  bool rejectOnMissingHeader() const { return reject_on_missing_header_; }
-  bool rejectOnInvalidHeader() const { return reject_on_invalid_header_; }
   PriorityLoadShedStats& stats() { return stats_; }
 
 private:
@@ -65,8 +63,6 @@ private:
   static PriorityLoadShedStats generateStats(const std::string& stats_prefix, Stats::Scope& scope);
 
   const Http::LowerCaseString header_name_;
-  const bool reject_on_missing_header_;
-  const bool reject_on_invalid_header_;
   std::vector<Bucket> buckets_;
   std::string default_load_shed_point_name_;
   Server::LoadShedPoint* default_load_shed_point_{nullptr};

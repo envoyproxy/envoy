@@ -4,8 +4,6 @@ package envoy.extensions.filters.http.priority_load_shed.v3;
 
 import "envoy/type/v3/range.proto";
 
-import "google/protobuf/wrappers.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -19,11 +17,16 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Priority load shedding :ref:`configuration overview <config_http_filters_priority_load_shed>`.
 // [#extension: envoy.filters.http.priority_load_shed]
 
-// [#next-free-field: 6]
+// [#next-free-field: 4]
+// By convention, lower priority values represent higher importance (e.g., 0 = most critical,
+// shed last), but the filter does not enforce any direction. The actual shedding behavior is
+// determined by the load shed points configured in the overload manager for each bucket.
+// Requests with a missing header, invalid value, or a value that does not match any configured
+// bucket are rejected with a ``400`` status code.
 message PriorityLoadShed {
   message Bucket {
     // Numeric range of header values in half-open interval semantics [start, end).
-    type.v3.Int64Range value_range = 1;
+    type.v3.Int32Range value_range = 1;
 
     // Name of the overload manager load shed point used for this bucket.
     string load_shed_point = 2 [(validate.rules).string = {min_len: 1}];
@@ -36,18 +39,7 @@ message PriorityLoadShed {
   // Bucket mappings from header value ranges to load shed points.
   repeated Bucket buckets = 2 [(validate.rules).repeated = {min_items: 1}];
 
-  // Optional load shed point used when the configured header is missing, the header value is
-  // invalid, or the parsed header value does not match any configured bucket.
-  // If unset, missing, invalid, or unmatched values bypass this filter.
-  // This fallback is not used when ``reject_on_missing_header`` rejects a missing header or
-  // ``reject_on_invalid_header`` rejects an invalid header.
+  // Default load shed point used when the priority header is missing or its value does not
+  // match any configured bucket. If unset, such requests are rejected with ``400``.
   string default_load_shed_point = 3;
-
-  // If true, requests without the configured priority header are rejected with ``400`` instead
-  // of using ``default_load_shed_point`` or bypassing the filter.
-  google.protobuf.BoolValue reject_on_missing_header = 4;
-
-  // If true, requests with a non-numeric or negative header value are rejected with ``400``
-  // instead of using ``default_load_shed_point`` or bypassing the filter.
-  google.protobuf.BoolValue reject_on_invalid_header = 5;
 }

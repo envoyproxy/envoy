@@ -8,7 +8,6 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/http/headers.h"
-#include "source/common/protobuf/utility.h"
 #include "source/common/stream_info/utility.h"
 
 #include "absl/strings/numbers.h"
@@ -34,11 +33,7 @@ PriorityLoadShedFilterConfig::create(const ProtoConfig& config,
 PriorityLoadShedFilterConfig::PriorityLoadShedFilterConfig(
     const ProtoConfig& config, Server::LoadShedPointProvider& load_shed_point_provider,
     const std::string& stats_prefix, Stats::Scope& scope, absl::Status& creation_status)
-    : header_name_(config.header_name()), reject_on_missing_header_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-                                              config, reject_on_missing_header, false)),
-      reject_on_invalid_header_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reject_on_invalid_header, false)),
-      stats_(generateStats(stats_prefix, scope)) {
+    : header_name_(config.header_name()), stats_(generateStats(stats_prefix, scope)) {
   if (config.header_name().empty()) {
     creation_status = absl::InvalidArgumentError("header_name must be non-empty");
     return;
@@ -94,10 +89,10 @@ PriorityLoadShedFilterConfig::PriorityLoadShedFilterConfig(
 }
 
 const PriorityLoadShedFilterConfig::Bucket*
-PriorityLoadShedFilterConfig::findBucket(int64_t value) const {
+PriorityLoadShedFilterConfig::findBucket(int32_t value) const {
   const auto it =
       std::upper_bound(buckets_.begin(), buckets_.end(), value,
-                       [](int64_t target, const Bucket& bucket) { return target < bucket.start; });
+                       [](int32_t target, const Bucket& bucket) { return target < bucket.start; });
 
   if (it == buckets_.begin()) {
     return nullptr;
@@ -128,23 +123,17 @@ Http::FilterHeadersStatus PriorityLoadShedFilter::decodeHeaders(Http::RequestHea
   const auto header_values = headers.get(config_->headerName());
   if (header_values.empty()) {
     config_->stats().header_missing_.inc();
-    if (config_->rejectOnMissingHeader()) {
-      return rejectBadRequest("missing priority header", "priority_load_shed.missing_header");
-    }
     if (!config_->hasDefaultLoadShedPoint()) {
-      return Http::FilterHeadersStatus::Continue;
+      return rejectBadRequest("missing priority header", "priority_load_shed.missing_header");
     }
     load_shed_point = config_->defaultLoadShedPoint();
   } else {
-    int64_t header_value = 0;
+    int32_t header_value = 0;
     if (!absl::SimpleAtoi(header_values[0]->value().getStringView(), &header_value) ||
         header_value < 0) {
       config_->stats().header_invalid_.inc();
-      if (config_->rejectOnInvalidHeader()) {
-        return rejectBadRequest("invalid priority header", "priority_load_shed.invalid_header");
-      }
       if (!config_->hasDefaultLoadShedPoint()) {
-        return Http::FilterHeadersStatus::Continue;
+        return rejectBadRequest("invalid priority header", "priority_load_shed.invalid_header");
       }
       load_shed_point = config_->defaultLoadShedPoint();
     } else {
@@ -154,7 +143,8 @@ Http::FilterHeadersStatus PriorityLoadShedFilter::decodeHeaders(Http::RequestHea
       } else {
         config_->stats().bucket_unmatched_.inc();
         if (!config_->hasDefaultLoadShedPoint()) {
-          return Http::FilterHeadersStatus::Continue;
+          return rejectBadRequest("priority value does not match any configured bucket",
+                                  "priority_load_shed.bucket_unmatched");
         }
         load_shed_point = config_->defaultLoadShedPoint();
       }
