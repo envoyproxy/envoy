@@ -33,6 +33,7 @@
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
@@ -47,6 +48,7 @@
 
 using testing::_;
 using testing::Assign;
+using testing::Eq;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
@@ -554,7 +556,7 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
       startTestServer("test/server/test_data/server/stats_sink_bootstrap.yaml", true);
 
   // Wait till stats are flushed to custom sink and validate that the actual flush happens.
-  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_));
+  EXPECT_TRUE(TestUtility::waitForCounter(stats_store_, "stats.flushed", Eq(1), time_system_));
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.state")->value());
   EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
 
@@ -1023,12 +1025,12 @@ TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
     server_->flushStats();
   });
 
-  EXPECT_TRUE(
-      TestUtility::waitForCounterEq(stats_store_, "server.dropped_stat_flushes", 2, time_system_));
+  EXPECT_TRUE(TestUtility::waitForCounter(stats_store_, "server.dropped_stat_flushes", Eq(2),
+                                          time_system_));
 
   server_->dispatcher().post([&] { stats_store_.runMergeCallback(); });
 
-  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_));
+  EXPECT_TRUE(TestUtility::waitForCounter(stats_store_, "stats.flushed", Eq(1), time_system_));
 
   // Trigger another flush after the first one finished. This should go through an no drops should
   // be recorded.
@@ -1036,10 +1038,10 @@ TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
 
   server_->dispatcher().post([&] { stats_store_.runMergeCallback(); });
 
-  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 2, time_system_));
+  EXPECT_TRUE(TestUtility::waitForCounter(stats_store_, "stats.flushed", Eq(2), time_system_));
 
-  EXPECT_TRUE(
-      TestUtility::waitForCounterEq(stats_store_, "server.dropped_stat_flushes", 2, time_system_));
+  EXPECT_TRUE(TestUtility::waitForCounter(stats_store_, "server.dropped_stat_flushes", Eq(2),
+                                          time_system_));
 
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();

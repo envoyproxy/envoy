@@ -24,7 +24,6 @@ namespace ExternalProcessing {
 using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
 using Envoy::Protobuf::Any;
 using Envoy::Protobuf::MapPair;
-
 using namespace std::chrono_literals;
 
 // ExtProcIntegrationTest::
@@ -160,22 +159,25 @@ void ExtProcIntegrationTest::initializeConfig(
 
       // Add filter that dumps streamInfo into headers so we can check our receiving
       // namespaces
-      config_helper_.prependFilter(fmt::format(R"EOF(
-name: stream-info-to-headers-filter
-    )EOF"));
+      config_helper_.prependFilter(R"EOF(
+        name: stream-info-to-headers-filter
+        typed_config:
+          "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+      )EOF");
     }
 
     // Add dynamic_metadata_to_headers filter to inject dynamic metadata used for testing
     if (config_option.add_response_processor) {
-      simple_filter_config_ =
-          std::make_unique<SimpleFilterConfig<DynamicMetadataToHeadersFilter>>();
+      simple_filter_config_ = std::make_unique<UniqueSimpleFilterConfig<
+          DynamicMetadataToHeadersFilter,
+          test::extensions::filters::http::ext_proc::DynamicMetadataToHeadersFilterConfig>>();
       registration_ = std::make_unique<
           Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory>>(
           *simple_filter_config_);
       config_helper_.prependFilter(R"EOF(
         name: dynamic-metadata-to-headers-filter
         typed_config:
-          "@type": type.googleapis.com/google.protobuf.Struct
+          "@type": type.googleapis.com/test.extensions.filters.http.ext_proc.DynamicMetadataToHeadersFilterConfig
     )EOF");
     }
 
@@ -489,8 +491,8 @@ void ExtProcIntegrationTest::processRequestBodyMessage(
   if (check_downstream_flow_control) {
     // Check the flow control counter in downstream, which is triggered on the request
     // path to ext_proc server (i.e., from side stream).
-    test_server_->waitForCounterGe("http.config_test.downstream_flow_control_paused_reading_total",
-                                   1);
+    test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
+                                 testing::Ge(1));
   }
 
   // Send back the response from ext_proc server.
@@ -841,13 +843,19 @@ uint32_t ExtProcIntegrationTest::serverReceiveBodyDuplexStreamed(absl::string_vi
   uint32_t total_req_body_msg = 0;
   while (!end_stream) {
     ProcessingRequest body_request;
-    EXPECT_TRUE(processor_stream->waitForGrpcMessage(*dispatcher_, body_request));
+    if (!processor_stream->waitForGrpcMessage(*dispatcher_, body_request)) {
+      ADD_FAILURE() << "Timed out waiting for gRPC message in serverReceiveBodyDuplexStreamed";
+      return total_req_body_msg;
+    }
     if (response) {
       if (body_request.has_response_trailers()) {
         end_stream = true;
       } else {
-        EXPECT_TRUE(body_request.has_response_body());
-        body_received = absl::StrCat(body_received, body_request.response_body().body());
+        if (!body_request.has_response_body()) {
+          ADD_FAILURE() << "Expected response body message but got unexpected message type";
+          return total_req_body_msg;
+        }
+        absl::StrAppend(&body_received, body_request.response_body().body());
         end_stream = body_request.response_body().end_of_stream();
         total_req_body_msg++;
       }
@@ -855,8 +863,11 @@ uint32_t ExtProcIntegrationTest::serverReceiveBodyDuplexStreamed(absl::string_vi
       if (body_request.has_request_trailers()) {
         end_stream = true;
       } else {
-        EXPECT_TRUE(body_request.has_request_body());
-        body_received = absl::StrCat(body_received, body_request.request_body().body());
+        if (!body_request.has_request_body()) {
+          ADD_FAILURE() << "Expected request body message but got unexpected message type";
+          return total_req_body_msg;
+        }
+        absl::StrAppend(&body_received, body_request.request_body().body());
         end_stream = body_request.request_body().end_of_stream();
         total_req_body_msg++;
       }

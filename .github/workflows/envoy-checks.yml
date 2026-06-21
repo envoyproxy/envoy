@@ -46,6 +46,9 @@ jobs:
       # head-sha: ${{ github.sha }}
 
   build:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+      slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
     permissions:
       actions: read
       contents: read
@@ -62,6 +65,7 @@ jobs:
 
   coverage:
     secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
       gcp-key: ${{ fromJSON(needs.load.outputs.trusted) && secrets.GCP_SERVICE_ACCOUNT_KEY_TRUSTED || secrets.GCP_SERVICE_ACCOUNT_KEY }}
     permissions:
       actions: read
@@ -78,6 +82,8 @@ jobs:
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
   runtime:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read
@@ -93,6 +99,8 @@ jobs:
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
   san:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read

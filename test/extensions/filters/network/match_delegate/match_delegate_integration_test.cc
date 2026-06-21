@@ -107,7 +107,6 @@ public:
     if (!value_.empty()) {
       read_callbacks_->connection().streamInfo().filterState()->setData(
           "test_key", std::make_shared<Router::StringAccessorImpl>(value_),
-          StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::Connection);
     }
     return Network::FilterStatus::Continue;

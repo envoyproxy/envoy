@@ -40,6 +40,7 @@ jobs:
 
   docs:
     secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
       ssh-key-extra: ${{ needs.load.outputs.trusted  && secrets.ENVOY_MOBILE_WEBSITE_DEPLOY_KEY || '' }}
     permissions:
       actions: read

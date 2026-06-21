@@ -1,5 +1,7 @@
 #include "contrib/istio/filters/common/source/workload_discovery.h"
 
+#include <optional>
+
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/factory_context.h"
@@ -7,7 +9,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/non_copyable.h"
-#include "source/common/config/subscription_base.h"
+#include "source/common/config/resource_type_helper.h"
 #include "source/common/grpc/common.h"
 #include "source/common/init/target_impl.h"
 
@@ -81,7 +83,7 @@ public:
     subscription_.start();
   }
 
-  absl::optional<Istio::Common::WorkloadMetadataObject>
+  std::optional<Istio::Common::WorkloadMetadataObject>
   getMetadata(const Network::Address::InstanceConstSharedPtr& address) override {
     if (address && address->ip()) {
       if (const auto ipv4 = address->ip()->ipv4(); ipv4) {
@@ -127,7 +129,7 @@ private:
     }
     size_t total() const { return address_to_workload_.size(); }
     // Returns by-value since the flat map does not provide pointer stability.
-    absl::optional<Istio::Common::WorkloadMetadataObject> get(const std::string& address) {
+    std::optional<Istio::Common::WorkloadMetadataObject> get(const std::string& address) {
       const auto it = address_to_workload_.find(address);
       if (it != address_to_workload_.end()) {
         return it->second;
@@ -137,18 +139,18 @@ private:
     IdToAddress id_to_address_;
     AddressToWorkload address_to_workload_;
   };
-  class WorkloadSubscription : Config::SubscriptionBase<istio::workload::Workload> {
+  class WorkloadSubscription : Config::SubscriptionCallbacks {
   public:
     WorkloadSubscription(WorkloadMetadataProviderImpl& parent)
-        : Config::SubscriptionBase<istio::workload::Workload>(
-              parent.factory_context_.messageValidationVisitor(), "uid"),
-          parent_(parent) {
+        : parent_(parent),
+          resource_type_helper_(parent.factory_context_.messageValidationVisitor(), "uid") {
       subscription_ = THROW_OR_RETURN_VALUE(
           parent.factory_context_.clusterManager()
               .subscriptionFactory()
-              .subscriptionFromConfigSource(parent.config_source_,
-                                            Grpc::Common::typeUrl(getResourceName()),
-                                            *parent.scope_, *this, resource_decoder_, {}),
+              .subscriptionFromConfigSource(
+                  parent.config_source_,
+                  Grpc::Common::typeUrl(resource_type_helper_.getResourceName()), *parent.scope_,
+                  *this, resource_type_helper_.resourceDecoder(), {}),
           Config::SubscriptionPtr);
     }
     void start() { subscription_->start({}); }
@@ -197,6 +199,7 @@ private:
       // TODO: Potential issue with the expiration of the metadata.
     }
     WorkloadMetadataProviderImpl& parent_;
+    const Config::ResourceTypeHelper<istio::workload::Workload> resource_type_helper_;
     Config::SubscriptionPtr subscription_;
   };
 

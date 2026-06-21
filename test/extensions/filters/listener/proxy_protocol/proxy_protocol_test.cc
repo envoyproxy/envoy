@@ -1646,6 +1646,75 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndSanitiseNonUtf8) {
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
+TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndEncodeAsBase64) {
+  // A well-formed ipv4/tcp with a pair of TLV extensions is accepted.
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x39, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  // A TLV of type 0x00 with size of 4 (1 byte is value).
+  constexpr uint8_t tlv1[] = {0x00, 0x00, 0x01, 0xff};
+  // A TLV of type 0x02 with size of 10 bytes (7 bytes are value). Second and last bytes in the
+  // value are non utf8 characters.
+  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0xfe,
+                                            0x6f, 0x2e, 0x63, 0x6f, 0xc1};
+  // A TLV of type 0x0f with size of 6 bytes (3 bytes are value).
+  constexpr uint8_t tlv3[] = {0x0f, 0x00, 0x03, 0xf0, 0x00, 0x0f};
+  // A TLV of type 0xea with size of 25 bytes (22 bytes are value). 7th and 21st bytes are non utf8
+  // characters.
+  constexpr uint8_t tlv_vpc_id[] = {0xea, 0x00, 0x16, 0x01, 0x76, 0x70, 0x63, 0x2d, 0x30,
+                                    0xc0, 0x35, 0x74, 0x65, 0x73, 0x74, 0x32, 0x66, 0x61,
+                                    0x36, 0x63, 0x36, 0x33, 0x68, 0xf9, 0x37};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  auto rule_type_authority = proto_config.add_rules();
+  rule_type_authority->set_tlv_type(0x02);
+  rule_type_authority->mutable_on_tlv_present()->set_key("PP2 type authority");
+  rule_type_authority->mutable_on_tlv_present()->set_value_string_encoding(
+      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
+          BASE64);
+
+  auto rule_vpc_id = proto_config.add_rules();
+  rule_vpc_id->set_tlv_type(0xea);
+  rule_vpc_id->mutable_on_tlv_present()->set_key("PP2 vpc id");
+  rule_vpc_id->mutable_on_tlv_present()->set_value_string_encoding(
+      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
+          BASE64);
+
+  // A rule with default (SANITIZED_UTF8) encoding for comparison: the value will be sanitized
+  // to a valid UTF-8 string.
+  auto rule_tlv1 = proto_config.add_rules();
+  rule_tlv1->set_tlv_type(0x00);
+  rule_tlv1->mutable_on_tlv_present()->set_key("PP2 tlv1");
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv1, sizeof(tlv1));
+  write(tlv_type_authority, sizeof(tlv_type_authority));
+  write(tlv3, sizeof(tlv3));
+  write(tlv_vpc_id, sizeof(tlv_vpc_id));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
+  EXPECT_EQ(1, metadata.size());
+  EXPECT_EQ(1, metadata.count(ProxyProtocol));
+
+  auto fields = metadata.at(ProxyProtocol).fields();
+  EXPECT_EQ(3, fields.size());
+
+  // The raw TLV values (including the non utf8 characters) are encoded as base64.
+  EXPECT_EQ("Zv5vLmNvwQ==", fields.at("PP2 type authority").string_value());
+  EXPECT_EQ("AXZwYy0wwDV0ZXN0MmZhNmM2M2j5Nw==", fields.at("PP2 vpc id").string_value());
+  // The default encoding sanitizes the value to a valid UTF-8 string: the non utf8 byte
+  // 0xff is replaced with the `!` character.
+  EXPECT_EQ("!", fields.at("PP2 tlv1").string_value());
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
 TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndEmitTypedAndUntypedMetadata) {
   // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
@@ -2092,6 +2161,77 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateAsStringAccessor) {
 
   EXPECT_TRUE(
       filter_state->hasDataAtOrAboveLifeSpan(StreamInfo::FilterState::LifeSpan::Connection));
+
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateWithBase64Encoding) {
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x27, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t tlv1[] = {0x0, 0x0, 0x1, 0xff};
+  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0x6f,
+                                            0x6f, 0x2e, 0x63, 0x6f, 0x6d};
+  constexpr uint8_t tlv_vpce[] = {0xea, 0x00, 0x0a, 0x21, 0x76, 0x70, 0x63,
+                                  0x65, 0x2d, 0x30, 0x78, 0x78, 0x78};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.set_tlv_location(
+      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::FILTER_STATE);
+  auto rule1 = proto_config.add_rules();
+  rule1->set_tlv_type(0x02);
+  rule1->mutable_on_tlv_present()->set_key("PP2 type authority");
+  rule1->mutable_on_tlv_present()->set_value_string_encoding(
+      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
+          BASE64);
+  auto rule2 = proto_config.add_rules();
+  rule2->set_tlv_type(0xea);
+  rule2->mutable_on_tlv_present()->set_key("aws_vpce_id");
+  rule2->mutable_on_tlv_present()->set_value_string_encoding(
+      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
+          BASE64);
+  // A rule with default (SANITIZED_UTF8) encoding for comparison: the value will be sanitized
+  // to a valid UTF-8 string.
+  auto rule3 = proto_config.add_rules();
+  rule3->set_tlv_type(0x00);
+  rule3->mutable_on_tlv_present()->set_key("PP2 tlv1");
+  rule3->mutable_on_tlv_present()->set_value_string_encoding(
+      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
+          SANITIZED_UTF8);
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv1, sizeof(tlv1));
+  write(tlv_type_authority, sizeof(tlv_type_authority));
+  write(tlv_vpce, sizeof(tlv_vpce));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  auto& filter_state = server_connection_->streamInfo().filterState();
+
+  constexpr absl::string_view kFilterStateKey = "envoy.network.proxy_protocol.tlv";
+  EXPECT_TRUE(filter_state->hasDataWithName(kFilterStateKey));
+  const auto* tlv_obj = filter_state->getDataReadOnlyGeneric(kFilterStateKey);
+  ASSERT_NE(nullptr, tlv_obj);
+
+  // The raw TLV values are encoded as base64.
+  auto field1 = tlv_obj->getField("PP2 type authority");
+  ASSERT_TRUE(absl::holds_alternative<absl::string_view>(field1));
+  EXPECT_EQ("Zm9vLmNvbQ==", absl::get<absl::string_view>(field1));
+
+  auto field2 = tlv_obj->getField("aws_vpce_id");
+  ASSERT_TRUE(absl::holds_alternative<absl::string_view>(field2));
+  EXPECT_EQ("IXZwY2UtMHh4eA==", absl::get<absl::string_view>(field2));
+
+  // The default encoding sanitizes the value to a valid UTF-8 string: the non utf8 byte
+  // 0xff is replaced with the `!` character.
+  auto field3 = tlv_obj->getField("PP2 tlv1");
+  ASSERT_TRUE(absl::holds_alternative<absl::string_view>(field3));
+  EXPECT_EQ("!", absl::get<absl::string_view>(field3));
 
   disconnect();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);

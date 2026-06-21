@@ -204,6 +204,10 @@ public:
 };
 
 TEST_F(MatchHeadersTest, MayMatchOneOrMoreRequestHeader) {
+  // This test case is of the deprecated behavior related to CVE-2026-26308.
+  // This entire test rule can be deleted when removing this runtime value.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.match_headers_individually", "false"}});
   TestRequestHeaderMapImpl headers{{"some-header", "a"}, {"other-header", "b"}};
 
   const std::string yaml = R"EOF(
@@ -211,7 +215,7 @@ name: match-header
 string_match:
   safe_regex:
     google_re2: {}
-    regex: (a|b)
+    regex: ^(a|b)$
   )EOF";
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
@@ -235,6 +239,41 @@ string_match:
                                                    context_);
   // Make sure that an exact match on "a,b" does in fact work.
   EXPECT_TRUE(HeaderUtility::matchHeaders(headers, header_data));
+}
+
+TEST_F(MatchHeadersTest, MayMatchOneOrMoreRequestHeaderIndividually) {
+  TestRequestHeaderMapImpl headers{{"some-header", "a"}, {"other-header", "b"}};
+
+  const std::string yaml = R"EOF(
+name: match-header
+string_match:
+  safe_regex:
+    google_re2: {}
+    regex: ^(a|b)$
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  header_data.push_back(
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
+  EXPECT_FALSE(HeaderUtility::matchHeaders(headers, header_data));
+
+  headers.addCopy("match-header", "a");
+  // With a single "match-header" this regex will match.
+  EXPECT_TRUE(HeaderUtility::matchHeaders(headers, header_data));
+
+  headers.addCopy("match-header", "b");
+  // With two "match-header" we match "a" and "b" individually, so the regex will
+  // still match.
+  EXPECT_TRUE(HeaderUtility::matchHeaders(headers, header_data));
+
+  header_data[0] = HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(R"EOF(
+name: match-header
+string_match:
+  exact: a,b
+  )EOF"),
+                                                   context_);
+  // The matcher "a,b" will not match, because it matches neither "a" nor "b".
+  EXPECT_FALSE(HeaderUtility::matchHeaders(headers, header_data));
 }
 
 // Tests for matchesHeadersIndividually - validates each header value individually
@@ -355,6 +394,90 @@ name: match-header-B
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers_2, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers_3, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers_4, header_data));
+}
+
+TEST_F(MatchHeadersTest, MatchAnyHeaderSucceedsWithOneOrMoreRulesMatched) {
+  TestRequestHeaderMapImpl matching_both_rules{{"match-header-A", "1"}, {"match-header-B", "2"}};
+  TestRequestHeaderMapImpl matching_rule_1{{"match-header-A", "1"}};
+  TestRequestHeaderMapImpl matching_rule_2{{"match-header-B", "2"}};
+  TestRequestHeaderMapImpl matching_neither{{"match-header-C", "3"}};
+
+  const std::string yamlA = R"EOF(
+name: match-header-A
+  )EOF";
+
+  const std::string yamlB = R"EOF(
+name: match-header-B
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  header_data.push_back(
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yamlA), context_));
+  header_data.push_back(
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yamlB), context_));
+  EXPECT_TRUE(HeaderUtility::matchAnyHeader(matching_both_rules, header_data));
+  EXPECT_TRUE(HeaderUtility::matchAnyHeader(matching_rule_1, header_data));
+  EXPECT_TRUE(HeaderUtility::matchAnyHeader(matching_rule_2, header_data));
+  EXPECT_FALSE(HeaderUtility::matchAnyHeader(matching_neither, header_data));
+}
+
+TEST_F(MatchHeadersTest, MatchAnyHeaderIndividuallyMatches) {
+  TestRequestHeaderMapImpl double_header{{"match-header", "a"}, {"match-header", "b"}};
+
+  const std::string yaml = R"EOF(
+name: match-header
+string_match:
+  exact: b
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  header_data.push_back(
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
+  EXPECT_TRUE(HeaderUtility::matchAnyHeader(double_header, header_data));
+}
+
+TEST_F(MatchHeadersTest, MatchAnyHeaderDoesNotIndividuallyMatchWithDeprecatedBehavior) {
+  // This test case is of the deprecated behavior related to CVE-2026-26308.
+  // This entire test rule can be deleted when removing this runtime value.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.match_headers_individually", "false"}});
+  TestRequestHeaderMapImpl double_header{{"match-header", "a"}, {"match-header", "b"}};
+
+  const std::string yaml = R"EOF(
+name: match-header
+string_match:
+  exact: b
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  header_data.push_back(
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
+  EXPECT_FALSE(HeaderUtility::matchAnyHeader(double_header, header_data));
+}
+
+TEST_F(MatchHeadersTest, MatchAnyHeaderSucceedsWithOneOrMoreRulesMatchedAndSharedPtrConfig) {
+  TestRequestHeaderMapImpl matching_both_rules{{"match-header-A", "1"}, {"match-header-B", "2"}};
+  TestRequestHeaderMapImpl matching_rule_1{{"match-header-A", "1"}};
+  TestRequestHeaderMapImpl matching_rule_2{{"match-header-B", "2"}};
+  TestRequestHeaderMapImpl matching_neither{{"match-header-C", "3"}};
+
+  const std::string yamlA = R"EOF(
+name: match-header-A
+  )EOF";
+
+  const std::string yamlB = R"EOF(
+name: match-header-B
+  )EOF";
+
+  Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher> fields;
+  fields.Add(parseHeaderMatcherFromYaml(yamlA));
+  fields.Add(parseHeaderMatcherFromYaml(yamlB));
+  std::vector<HeaderMatcherSharedPtr> header_data =
+      HeaderUtility::buildHeaderMatcherVector(fields, context_);
+  EXPECT_TRUE(HeaderUtility::matchAnyHeader(matching_both_rules, header_data));
+  EXPECT_TRUE(HeaderUtility::matchAnyHeader(matching_rule_1, header_data));
+  EXPECT_TRUE(HeaderUtility::matchAnyHeader(matching_rule_2, header_data));
+  EXPECT_FALSE(HeaderUtility::matchAnyHeader(matching_neither, header_data));
 }
 
 TEST_F(MatchHeadersTest, HeaderPresence) {

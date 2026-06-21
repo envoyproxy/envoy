@@ -1,6 +1,7 @@
 #include <functional>
 #include <iterator>
 #include <memory>
+#include <ranges>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -1176,9 +1177,9 @@ void runBatchAndDrainBackwards(const std::vector<Buffer::InstancePtr>& input_buf
 
   // Test that we can drain the underlying data in any order.
   // Specifically, we will drain backwards from `output_data`.
-  for (auto it = output_data.rbegin(); it != output_data.rend(); it++) {
-    checkSerializedData<CreateApiKeyRequest>(**it, {output_requests.back()});
-    EXPECT_EQ((**it).length(), 0);
+  for (auto& it : std::ranges::reverse_view(output_data)) {
+    checkSerializedData<CreateApiKeyRequest>(*it, {output_requests.back()});
+    EXPECT_EQ((*it).length(), 0);
     output_requests.pop_back();
   }
 }

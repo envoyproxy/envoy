@@ -421,6 +421,9 @@ private:
   Event::SchedulableCallbackPtr upstream_ready_cb_;
   Common::DebugRecursionChecker recursion_checker_;
   Server::LoadShedPoint* create_new_connection_load_shed_{nullptr};
+
+protected:
+  bool skip_pending_overflow_on_active_rq_;
 };
 
 } // namespace ConnectionPool

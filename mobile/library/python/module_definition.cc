@@ -164,7 +164,7 @@ PYBIND11_MODULE(envoy_engine, m) {
   // -- Engine --
 
   py::class_<Envoy::Platform::Engine, Envoy::Platform::EngineSharedPtr>(m, "Engine")
-      .def("stream_client", &Envoy::Platform::Engine::streamClient)
+      .def("stream_client", &Envoy::Platform::Engine::streamClient, py::arg("listener_name") = "")
       .def("terminate", &Envoy::Platform::Engine::terminate,
            py::call_guard<py::gil_scoped_release>())
       .def("dump_stats", &Envoy::Platform::Engine::dumpStats,
@@ -378,6 +378,12 @@ PYBIND11_MODULE(envoy_engine, m) {
             return self.enableStatsCollection(on);
           },
           py::arg("stats_collection_on"), py::return_value_policy::reference)
+      .def(
+          "enable_worker_thread",
+          [](Envoy::Platform::EngineBuilder& self, bool on) -> Envoy::Platform::EngineBuilder& {
+            return self.enableWorkerThread(on);
+          },
+          py::arg("use_worker_thread_on"), py::return_value_policy::reference)
       .def("build", &Envoy::Platform::EngineBuilder::build,
            py::call_guard<py::gil_scoped_release>());
 }

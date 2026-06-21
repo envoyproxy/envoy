@@ -342,7 +342,7 @@ public:
   MOCK_METHOD(bool, addedViaApi, (), (const));
   MOCK_METHOD(const FilterChainInfoSharedPtr&, filterChainInfo, (), (const));
 
-  envoy::config::core::v3::Metadata metadata_{};
+  envoy::config::core::v3::Metadata metadata_;
   FilterChainInfoSharedPtr filter_chain_info_;
 };
 
@@ -356,7 +356,7 @@ public:
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
 
   std::string filter_chain_name_{"mock"};
-  envoy::config::core::v3::Metadata metadata_{};
+  envoy::config::core::v3::Metadata metadata_;
 };
 
 class MockFilterChainManager : public FilterChainManager {
@@ -579,6 +579,9 @@ public:
   MOCK_METHOD(void, stopListeners,
               (uint64_t listener_tag, const Network::ExtraShutdownListenerOptions& options));
   MOCK_METHOD(void, stopListeners, ());
+  MOCK_METHOD(void, onFilterChainDrain,
+              (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains));
+  MOCK_METHOD(void, onListenerDrain, (uint64_t listener_tag));
   MOCK_METHOD(void, disableListeners, ());
   MOCK_METHOD(void, enableListeners, ());
   MOCK_METHOD(void, setListenerRejectFraction, (UnitFloat), (override));

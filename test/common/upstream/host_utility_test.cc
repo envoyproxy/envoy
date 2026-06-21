@@ -6,6 +6,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/load_balancer_context.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/stats_utility.h"
 #include "test/test_common/test_runtime.h"
 
@@ -438,6 +439,32 @@ TEST_F(PerEndpointMetricsTest, Tags) {
               UnorderedElementsAreArray({
                   Stats::Tag{"envoy.cluster_name", "cluster1"},
                   Stats::Tag{"envoy.endpoint_address", "127.0.0.2:80"},
+              }));
+}
+
+TEST_F(PerEndpointMetricsTest, CustomEndpointStatName) {
+  auto& cluster = makeCluster("cluster1", 0);
+  auto& host = addHost(cluster);
+  host.observability_name_ = "shared.backend/a";
+
+  auto [counters, gauges] = run();
+
+  EXPECT_THAT(metricNamesAndValues(counters),
+              UnorderedElementsAreArray({
+                  std::make_pair("cluster.cluster1.endpoint.shared.backend/a.c1", 11),
+                  std::make_pair("cluster.cluster1.endpoint.shared.backend/a.c2", 12),
+              }));
+  EXPECT_THAT(metricNamesAndValues(gauges),
+              UnorderedElementsAreArray({
+                  std::make_pair("cluster.cluster1.endpoint.shared.backend/a.g1", 13),
+                  std::make_pair("cluster.cluster1.endpoint.shared.backend/a.g2", 14),
+                  std::make_pair("cluster.cluster1.endpoint.shared.backend/a.healthy", 1),
+              }));
+
+  EXPECT_THAT(getMetric("cluster.cluster1.endpoint.shared.backend/a.c1", counters).tags(),
+              UnorderedElementsAreArray({
+                  Stats::Tag{"envoy.cluster_name", "cluster1"},
+                  Stats::Tag{"envoy.endpoint_address", "shared.backend/a"},
               }));
 }
 

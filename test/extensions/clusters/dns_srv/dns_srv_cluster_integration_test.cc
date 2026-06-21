@@ -213,7 +213,7 @@ TEST_P(DnsSrvClusterIntegrationTest, AddRemoveHostsViaSrvResponse) {
   dns.setSrvTargets(
       {Network::DnsResponse(0, 1, port0, "svc0.local", std::chrono::seconds(60))});
   triggerDnsRefresh();
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_total", 1);
+  test_server_->waitForGauge("cluster.cluster_0.membership_total", testing::Eq(1));
   EXPECT_EQ(clusterHostPorts(), (std::set<uint16_t>{port0}));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -228,14 +228,14 @@ TEST_P(DnsSrvClusterIntegrationTest, AddRemoveHostsViaSrvResponse) {
       Network::DnsResponse(0, 1, port1, "svc1.local", std::chrono::seconds(60)),
   });
   triggerDnsRefresh();
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_total", 2);
+  test_server_->waitForGauge("cluster.cluster_0.membership_total", testing::Eq(2));
   EXPECT_EQ(clusterHostPorts(), (std::set<uint16_t>{port0, port1}));
 
   // Remove upstream 0 and trigger a refresh.
   dns.setSrvTargets(
       {Network::DnsResponse(0, 1, port1, "svc1.local", std::chrono::seconds(60))});
   triggerDnsRefresh();
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_total", 1);
+  test_server_->waitForGauge("cluster.cluster_0.membership_total", testing::Eq(1));
   EXPECT_EQ(clusterHostPorts(), (std::set<uint16_t>{port1}));
 }
 
@@ -264,7 +264,7 @@ TEST_P(DnsSrvClusterIntegrationTest, AddRemoveHostsViaChangedAaaaResponse) {
   dns.setSrvTargets(
       {Network::DnsResponse(0, 1, port, "svc.example.com", std::chrono::seconds(60))});
   triggerDnsRefresh();
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_total", 1);
+  test_server_->waitForGauge("cluster.cluster_0.membership_total", testing::Eq(1));
   EXPECT_EQ(clusterHostIps(), (std::set<std::string>{loopback}));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -276,13 +276,13 @@ TEST_P(DnsSrvClusterIntegrationTest, AddRemoveHostsViaChangedAaaaResponse) {
   // Add the extra IP and trigger a refresh.
   dns.setAAddresses({loopback, extra_ip});
   triggerDnsRefresh();
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_total", 2);
+  test_server_->waitForGauge("cluster.cluster_0.membership_total", testing::Eq(2));
   EXPECT_EQ(clusterHostIps(), (std::set<std::string>{loopback, extra_ip}));
 
   // Remove the extra IP and trigger a refresh.
   dns.setAAddresses({loopback});
   triggerDnsRefresh();
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_total", 1);
+  test_server_->waitForGauge("cluster.cluster_0.membership_total", testing::Eq(1));
   EXPECT_EQ(clusterHostIps(), (std::set<std::string>{loopback}));
 }
 

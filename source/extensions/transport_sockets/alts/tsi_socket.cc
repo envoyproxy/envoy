@@ -331,7 +331,7 @@ Network::IoResult TsiSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
   }
 }
 
-void TsiSocket::closeSocket(Network::ConnectionEvent) {
+void TsiSocket::closeSocket(Network::ConnectionEvent, bool) {
   ENVOY_CONN_LOG(debug, "TSI: closing socket", callbacks_->connection());
   if (handshaker_) {
     handshaker_.release()->deferredDelete();

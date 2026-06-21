@@ -73,7 +73,7 @@ TEST_F(ProxyProtocolTest, InjectesHeaderOnlyOnce) {
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1);
   initialize(config, nullptr);
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -105,7 +105,7 @@ TEST_F(ProxyProtocolTest, BytesProcessedIncludesProxyProtocolHeader) {
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1);
   initialize(config, nullptr);
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -143,11 +143,11 @@ TEST_F(ProxyProtocolTest, ReturnsKeepOpenWhenWriteErrorIsAgain) {
   auto msg = Buffer::OwnedImpl("some data");
   {
     InSequence s;
-    EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+    EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
         .WillOnce(Invoke([&](Buffer::Instance&) -> Api::IoCallUint64Result {
           return {0, Network::IoSocketError::getIoSocketEagainError()};
         }));
-    EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+    EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
         .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
           auto length = buffer.length();
           buffer.drain(length);
@@ -202,7 +202,7 @@ TEST_F(ProxyProtocolTest, V1IPV4LocalAddressWhenTransportOptionsAreNull) {
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1);
   initialize(config, nullptr);
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -227,7 +227,7 @@ TEST_F(ProxyProtocolTest, V1IPV4LocalAddressesWhenHeaderOptionsAreNull) {
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1);
   initialize(config, std::make_shared<Network::TransportSocketOptionsImpl>());
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = 43;
         buffer.drain(length);
@@ -252,7 +252,7 @@ TEST_F(ProxyProtocolTest, V1IPV6LocalAddressesWhenHeaderOptionsAreNull) {
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1);
   initialize(config, std::make_shared<Network::TransportSocketOptionsImpl>());
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -286,7 +286,7 @@ TEST_F(ProxyProtocolTest, V1IPV4DownstreamAddresses) {
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1);
   initialize(config, socket_options);
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -320,7 +320,7 @@ TEST_F(ProxyProtocolTest, V1IPV6DownstreamAddresses) {
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1);
   initialize(config, socket_options);
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -345,7 +345,7 @@ TEST_F(ProxyProtocolTest, V2IPV4LocalCommandWhenTransportOptionsAreNull) {
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
   initialize(config, nullptr);
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -370,7 +370,7 @@ TEST_F(ProxyProtocolTest, V2IPV4LocalCommandWhenHeaderOptionsAreNull) {
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
   initialize(config, std::make_shared<Network::TransportSocketOptionsImpl>());
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -404,7 +404,7 @@ TEST_F(ProxyProtocolTest, V2IPV4DownstreamAddresses) {
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
   initialize(config, socket_options);
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -439,7 +439,7 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddresses) {
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
   initialize(config, socket_options);
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -502,7 +502,7 @@ TEST_F(ProxyProtocolTest, V2IPV4DownstreamAddressesAndTLVs) {
   pass_through_tlvs->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE_ALL);
   initialize(config, socket_options);
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -543,7 +543,7 @@ TEST_F(ProxyProtocolTest, V2IPV4PassSpecificTLVs) {
   pass_through_tlvs->add_tlv_type(0x05);
   initialize(config, socket_options);
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -582,7 +582,7 @@ TEST_F(ProxyProtocolTest, V2IPV4PassEmptyTLVs) {
   config.mutable_pass_through_tlvs()->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE);
   initialize(config, socket_options);
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -660,7 +660,7 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddressesAndTLVs) {
   config.mutable_pass_through_tlvs()->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE_ALL);
   initialize(config, socket_options);
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -698,7 +698,7 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddressesAndTLVsWithoutPassConfig) {
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
   initialize(config, socket_options);
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -742,7 +742,7 @@ TEST_F(ProxyProtocolTest, V2CustomTLVsFromConfig) {
   host_added_tlvs->set_value("moredata");
   initialize(config, socket_options);
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -803,7 +803,7 @@ TEST_F(ProxyProtocolTest, V2CustomTLVsFromHostMetadata) {
   config_added_tlvs->set_value("moredata");
   initialize(config, socket_options);
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -867,7 +867,7 @@ TEST_F(ProxyProtocolTest, V2CombinedPrecedenceHostConfigPassthrough) {
   config_added_tlvs->set_value("configValue");
   initialize(config, socket_options);
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -1142,7 +1142,7 @@ TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperlyNoDup
   unique_tlv_entry->set_value("baz");
   initialize(config, socket_options);
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -1198,7 +1198,7 @@ TEST_F(ProxyProtocolTest, V2CustomTLVMetadataInvalidFormat) {
   config.mutable_pass_through_tlvs()->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE_ALL);
   initialize(config, socket_options);
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);
@@ -1257,7 +1257,7 @@ filter_metadata:
   config.mutable_pass_through_tlvs()->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE_ALL);
   initialize(config, socket_options);
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         auto length = buffer.length();
         buffer.drain(length);

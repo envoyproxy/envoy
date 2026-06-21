@@ -32,6 +32,8 @@ using Envoy::Http::HttpStatusIs;
 using testing::Combine;
 using testing::ContainsRegex;
 using testing::EndsWith;
+using testing::Eq;
+using testing::Ge;
 using testing::HasSubstr;
 using testing::Not;
 using testing::StartsWith;
@@ -84,7 +86,7 @@ TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
     socket_option->set_int_value(10000); // Invalid value.
   });
   initialize();
-  test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_failure", Ge(1));
 }
 
 // Verify that we gracefully handle an invalid post-bind socket option when using reuse_port.
@@ -105,7 +107,7 @@ TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
     socket_option->set_int_value(10000); // Invalid value.
   });
   initialize();
-  test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_failure", Ge(1));
 }
 
 // Verify that we gracefully handle an invalid post-listen socket option.
@@ -121,7 +123,7 @@ TEST_P(IntegrationTest, BadPostListenSocketOption) {
     socket_option->set_int_value(10000); // Invalid value.
   });
   initialize();
-  test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_failure", Ge(1));
 }
 
 // Make sure we have correctly specified per-worker performance stats.
@@ -137,15 +139,19 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   // Per-worker listener stats.
   auto check_listener_stats = [this](uint64_t cx_active, uint64_t cx_total) {
     if (version_ == Network::Address::IpVersion::v4) {
-      test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_0.downstream_cx_active", cx_active);
-      test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_1.downstream_cx_active", cx_active);
-      test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_0.downstream_cx_total", cx_total);
-      test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_1.downstream_cx_total", cx_total);
+      test_server_->waitForGauge("listener.127.0.0.1_0.worker_0.downstream_cx_active",
+                                 Eq(cx_active));
+      test_server_->waitForGauge("listener.127.0.0.1_0.worker_1.downstream_cx_active",
+                                 Eq(cx_active));
+      test_server_->waitForCounter("listener.127.0.0.1_0.worker_0.downstream_cx_total",
+                                   Eq(cx_total));
+      test_server_->waitForCounter("listener.127.0.0.1_0.worker_1.downstream_cx_total",
+                                   Eq(cx_total));
     } else {
-      test_server_->waitForGaugeEq("listener.[__1]_0.worker_0.downstream_cx_active", cx_active);
-      test_server_->waitForGaugeEq("listener.[__1]_0.worker_1.downstream_cx_active", cx_active);
-      test_server_->waitForCounterEq("listener.[__1]_0.worker_0.downstream_cx_total", cx_total);
-      test_server_->waitForCounterEq("listener.[__1]_0.worker_1.downstream_cx_total", cx_total);
+      test_server_->waitForGauge("listener.[__1]_0.worker_0.downstream_cx_active", Eq(cx_active));
+      test_server_->waitForGauge("listener.[__1]_0.worker_1.downstream_cx_active", Eq(cx_active));
+      test_server_->waitForCounter("listener.[__1]_0.worker_0.downstream_cx_total", Eq(cx_total));
+      test_server_->waitForCounter("listener.[__1]_0.worker_1.downstream_cx_total", Eq(cx_total));
     }
   };
   check_listener_stats(0, 0);
@@ -207,15 +213,19 @@ TEST_P(IntegrationTest, ConnectionBalanceFactory) {
 
   auto check_listener_stats = [this](uint64_t cx_active, uint64_t cx_total) {
     if (version_ == Network::Address::IpVersion::v4) {
-      test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_0.downstream_cx_active", cx_active);
-      test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_1.downstream_cx_active", cx_active);
-      test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_0.downstream_cx_total", cx_total);
-      test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_1.downstream_cx_total", cx_total);
+      test_server_->waitForGauge("listener.127.0.0.1_0.worker_0.downstream_cx_active",
+                                 Eq(cx_active));
+      test_server_->waitForGauge("listener.127.0.0.1_0.worker_1.downstream_cx_active",
+                                 Eq(cx_active));
+      test_server_->waitForCounter("listener.127.0.0.1_0.worker_0.downstream_cx_total",
+                                   Eq(cx_total));
+      test_server_->waitForCounter("listener.127.0.0.1_0.worker_1.downstream_cx_total",
+                                   Eq(cx_total));
     } else {
-      test_server_->waitForGaugeEq("listener.[__1]_0.worker_0.downstream_cx_active", cx_active);
-      test_server_->waitForGaugeEq("listener.[__1]_0.worker_1.downstream_cx_active", cx_active);
-      test_server_->waitForCounterEq("listener.[__1]_0.worker_0.downstream_cx_total", cx_total);
-      test_server_->waitForCounterEq("listener.[__1]_0.worker_1.downstream_cx_total", cx_total);
+      test_server_->waitForGauge("listener.[__1]_0.worker_0.downstream_cx_active", Eq(cx_active));
+      test_server_->waitForGauge("listener.[__1]_0.worker_1.downstream_cx_active", Eq(cx_active));
+      test_server_->waitForCounter("listener.[__1]_0.worker_0.downstream_cx_total", Eq(cx_total));
+      test_server_->waitForCounter("listener.[__1]_0.worker_1.downstream_cx_total", Eq(cx_total));
     }
   };
   check_listener_stats(0, 0);
@@ -253,8 +263,8 @@ TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
     worker1_stat_name = "listener.[__1]_0.worker_1.downstream_cx_total";
   }
 
-  test_server_->waitForCounterEq(worker0_stat_name, 0);
-  test_server_->waitForCounterEq(worker1_stat_name, 0);
+  test_server_->waitForCounter(worker0_stat_name, Eq(0));
+  test_server_->waitForCounter(worker1_stat_name, Eq(0));
 
   // We set the counters for the two workers to see how many connections each handles.
   uint64_t w0_ctr = 0;
@@ -538,7 +548,12 @@ TEST_P(IntegrationTest, RouterRetryOnResetBeforeRequestBeforeHeaders) {
     ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                      protocol_options);
   });
-  config_helper_.prependFilter("{ name: buffer-continue-filter }", false);
+  config_helper_.prependFilter(R"EOF(
+    name: buffer-continue-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.BufferContinueFilterConfig
+  )EOF",
+                               false);
   testRouterRetryOnResetBeforeRequestBeforeHeaders();
 }
 
@@ -845,8 +860,8 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
   auto response2 = codec_client2->makeRequestWithBody(default_request_headers_, 512);
 
   // Validate one request active, the other pending.
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_pending_active", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_pending_active", Eq(1));
 
   // Response 1.
   upstream_request_->encodeHeaders(default_response_headers_, false);
@@ -857,8 +872,8 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", Ge(1));
 
   // Response 2.
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
@@ -872,8 +887,8 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response2->complete());
   EXPECT_EQ("200", response2->headers().getStatusValue());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 2);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(2));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", Ge(2));
 }
 
 TEST_P(IntegrationTest, TestSmuggling) {
@@ -1812,7 +1827,11 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
              hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
   // This test will trigger an early 413 Payload Too Large response due to buffer limits being
   // exceeded. The following filter is needed since the router filter will never trigger a 413.
-  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
+  config_helper_.prependFilter(R"EOF(
+    name: encoder-decoder-buffer-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
+  )EOF");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -1844,7 +1863,11 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
 // Test configuration of the delayed close timeout on downstream HTTP/1.1 connections. A value of 0
 // disables delayed close processing.
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
-  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
+  config_helper_.prependFilter(R"EOF(
+    name: encoder-decoder-buffer-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
+  )EOF");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1877,7 +1900,11 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
 
 // Test that if the route cache is cleared, it doesn't cause problems.
 TEST_P(IntegrationTest, TestClearingRouteCacheFilter) {
-  config_helper_.prependFilter("{ name: clear-route-cache }");
+  config_helper_.prependFilter(R"EOF(
+    name: clear-route-cache
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.ClearRouteCacheFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
@@ -1902,19 +1929,23 @@ TEST_P(IntegrationTest, NoConnectionPoolsFree) {
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
 
   // Validate none active.
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_pending_active", 0);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_pending_active", Eq(0));
 
   ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ("503", response->headers().getStatusValue());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_503", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_503", Ge(1));
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_pool_overflow")->value(), 1);
 }
 
 TEST_P(IntegrationTest, ProcessObjectHealthy) {
-  config_helper_.prependFilter("{ name: process-context-filter }");
+  config_helper_.prependFilter(R"EOF(
+    name: process-context-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.ProcessContextFilterConfig
+  )EOF");
 
   ProcessObjectForFilter healthy_object(true);
   process_object_ = healthy_object;
@@ -1934,7 +1965,11 @@ TEST_P(IntegrationTest, ProcessObjectHealthy) {
 }
 
 TEST_P(IntegrationTest, ProcessObjectUnealthy) {
-  config_helper_.prependFilter("{ name: process-context-filter }");
+  config_helper_.prependFilter(R"EOF(
+    name: process-context-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.ProcessContextFilterConfig
+  )EOF");
 
   ProcessObjectForFilter unhealthy_object(false);
   process_object_ = unhealthy_object;

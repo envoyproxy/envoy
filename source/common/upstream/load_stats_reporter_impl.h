@@ -14,6 +14,31 @@
 namespace Envoy {
 namespace Upstream {
 
+/**
+ * Implementation of LoadStatsReporter that streams load reports to a management server via gRPC.
+ *
+ * The reporter sends load statistics for clusters as directed by the management server.
+ * The frequency of reports is determined by the load_reporting_interval in the LoadStatsResponse.
+ *
+ * By default, if no runtime flags are set, load reports for a locality are sent only if the
+ * sum of `rq_total_` latched values for hosts in the locality is non-zero during the reporting
+ * interval.
+ *
+ * The following runtime features control the behavior of the load reporter:
+ * - envoy.reloadable_features.report_load_when_rq_active_is_non_zero: If true, load reports
+ *   for a locality are sent if the sum of `rq_active_` values for hosts in the locality is
+ * non-zero, even if no new requests were issued in the interval.
+ * - envoy.reloadable_features.report_load_for_non_zero_stats: If true, load reports for a
+ *   locality are sent if any of the following conditions are met for the sum of host stats in that
+ *   locality:
+ *     - Latched `rq_success_` is non-zero.
+ *     - Latched `rq_error_` is non-zero.
+ *     - Current `rq_active_` is non-zero.
+ *     - Latched `rq_total_` is non-zero.
+ *     - Any custom load metrics are non-zero in `LoadMetricStats`.
+ *
+ * Only one of these runtime features should be enabled at a time.
+ */
 class LoadStatsReporterImpl
     : public LoadStatsReporter,
       public Grpc::AsyncStreamCallbacks<envoy::service::load_stats::v3::LoadStatsResponse>,
@@ -50,7 +75,7 @@ private:
   Grpc::AsyncClient<envoy::service::load_stats::v3::LoadStatsRequest,
                     envoy::service::load_stats::v3::LoadStatsResponse>
       async_client_;
-  Grpc::AsyncStream<envoy::service::load_stats::v3::LoadStatsRequest> stream_{};
+  Grpc::AsyncStream<envoy::service::load_stats::v3::LoadStatsRequest> stream_;
   const Protobuf::MethodDescriptor& service_method_;
   Event::TimerPtr retry_timer_;
   Event::TimerPtr response_timer_;

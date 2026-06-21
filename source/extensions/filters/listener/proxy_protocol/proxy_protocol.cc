@@ -19,6 +19,7 @@
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/common/base64.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/hex.h"
@@ -309,7 +310,6 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
               {socket.connectionInfoProvider().remoteAddress(),
                socket.connectionInfoProvider().localAddress(), parsed_tlvs_},
               absl::make_optional(header_version_)}),
-          StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::Connection);
     } else {
       ENVOY_LOG(
@@ -327,7 +327,6 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
               {proxy_protocol_header_.value().remote_address_,
                proxy_protocol_header_.value().local_address_, parsed_tlvs_},
               absl::make_optional(header_version_)}),
-          StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::Connection);
     }
   }
@@ -606,9 +605,16 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
     absl::string_view tlv_value(reinterpret_cast<char const*>(buf + idx), tlv_value_length);
     auto key_value_pair = config_->isTlvTypeNeeded(tlv_type);
     if (nullptr != key_value_pair) {
-      // Sanitize any non utf8 characters.
-      auto sanitised_tlv_value = MessageUtil::sanitizeUtf8String(tlv_value);
-      std::string sanitised_value(sanitised_tlv_value.data(), sanitised_tlv_value.size());
+      // Encode the TLV value as configured.
+      std::string sanitised_value;
+      if (key_value_pair->value_string_encoding() ==
+          envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
+              BASE64) {
+        sanitised_value = Base64::encode(tlv_value.data(), tlv_value.size());
+      } else {
+        // Default sanitization is to replace non-UTF-8 characters with `!` character.
+        sanitised_value = MessageUtil::sanitizeUtf8String(tlv_value);
+      }
 
       if (config_->tlvLocation() ==
           envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::FILTER_STATE) {
@@ -624,7 +630,6 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
           auto new_obj = std::make_unique<TlvFilterStateObject>();
           tlv_filter_state_obj = new_obj.get();
           cb_->filterState().setData(kFilterStateKey, std::move(new_obj),
-                                     StreamInfo::FilterState::StateType::ReadOnly,
                                      StreamInfo::FilterState::LifeSpan::Connection);
           ENVOY_LOG(trace, "proxy_protocol: Created TLV FilterState object");
         }

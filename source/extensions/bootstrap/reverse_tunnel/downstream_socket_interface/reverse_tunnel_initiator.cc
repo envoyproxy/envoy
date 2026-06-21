@@ -128,6 +128,8 @@ ReverseTunnelInitiator::socket(Envoy::Network::Socket::Type socket_type,
     if (extension_ != nullptr) {
       socket_config.request_path = extension_->handshakeRequestPath();
       socket_config.additional_headers = extension_->handshakeAdditionalHeaders();
+      socket_config.use_http_upgrade = extension_->handshakeUsesHttpUpgrade();
+      socket_config.handshake_headers = extension_->handshakeHeaders();
     }
 
     // Pass config directly to helper method.

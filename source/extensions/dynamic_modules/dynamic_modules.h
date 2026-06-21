@@ -1,8 +1,17 @@
 #pragma once
 
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <string>
+
+#include "envoy/common/optref.h"
+#include "envoy/extensions/dynamic_modules/v3/dynamic_modules.pb.h"
+#include "envoy/init/manager.h"
+#include "envoy/server/factory_context.h"
+#include "envoy/stats/scope.h"
+
+#include "source/extensions/common/wasm/remote_async_datasource.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -10,6 +19,8 @@
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
+
+using ProtoDynamicModuleConfig = envoy::extensions::dynamic_modules::v3::DynamicModuleConfig;
 
 /**
  * A class for loading and managing dynamic modules. This corresponds to a single dlopen handle
@@ -94,10 +105,20 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
  * @param load_globally if true, the dlopen will be called with RTLD_GLOBAL, so the loaded object
  * can share symbols with other dynamically loaded modules. This is useful for modules that need to
  * share symbols with other modules.
+ * @param context optional server-wide factory context. When provided and the module fails to load,
+ * the shared ``dynamic_modules.module_load_error`` counter (tagged with ``config_name``) is
+ * incremented, so every dynamic-module extension that loads by name reports load failures
+ * consistently without repeating the bookkeeping at each call site. Pass the server context
+ * (``ServerFactoryContext``), NOT a listener context — see incrementLoadFailure().
+ * @param stat_name the configured name of the extension instance using the module (e.g.
+ * ``filter_name``, ``transport_socket_name``); used as the ``config_name`` tag. Falls back to
+ * ``default`` if empty. Only used when ``context`` is provided.
  */
-absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
-                                                        const bool do_not_close,
-                                                        const bool load_globally = false);
+absl::StatusOr<DynamicModulePtr>
+newDynamicModuleByName(const absl::string_view module_name, const bool do_not_close,
+                       const bool load_globally = false,
+                       OptRef<Server::Configuration::CommonFactoryContext> context = {},
+                       absl::string_view stat_name = {});
 
 /**
  * Creates a new DynamicModule backed by symbols already present in the process binary (i.e.,
@@ -144,6 +165,85 @@ absl::Status writeDynamicModuleBytesToDisk(absl::string_view module_bytes,
  * @param sha256 the hex-encoded SHA256 hash of the module bytes.
  */
 std::filesystem::path moduleTempPath(absl::string_view sha256);
+
+/**
+ * Verifies that the file at ``path`` has SHA256 digest equal to ``expected_sha256_hex``.
+ *
+ * This is used to defend the cache-hit fast path in remote-module loading: ``moduleTempPath``
+ * is a deterministic location under ``/tmp`` derived from the expected hash. Without this
+ * check, an attacker who can write to ``/tmp`` (a co-tenant container or shared host) can
+ * pre-populate the path with a malicious shared object that Envoy will then dlopen, yielding
+ * attacker-controlled code execution.
+ *
+ * @param path absolute path to the file to verify.
+ * @param expected_sha256_hex the hex-encoded expected SHA256 digest (64 chars). The
+ *        comparison is case-insensitive.
+ * @return OkStatus when the on-disk SHA256 matches; FailedPreconditionError on mismatch;
+ *         InternalError on any I/O failure.
+ */
+absl::Status verifyFileSha256(const std::filesystem::path& path,
+                              absl::string_view expected_sha256_hex);
+
+/**
+ * Holds the state required to keep an in-flight asynchronous remote module fetch alive. This is
+ * returned (inside DynamicModuleLoadResult) when newDynamicModuleByConfig() needs to fetch the
+ * module from a remote source. The caller must keep this object alive until the fetch completes.
+ */
+struct AsyncLoadingState {
+  // Keeps the remote data provider alive for the duration of the fetch (including retries).
+  RemoteAsyncDataProviderPtr remote_provider;
+  // Invoked on the main thread with the loaded module once the remote fetch succeeds. This is the
+  // on_loaded callback that was passed to newDynamicModuleByConfig().
+  std::function<void(DynamicModulePtr)> on_loaded;
+};
+using AsyncLoadingStateSharedPtr = std::shared_ptr<AsyncLoadingState>;
+
+/**
+ * The result of newDynamicModuleByConfig(). Exactly one of the two members is populated:
+ *  - loaded is set when the module was loaded synchronously (local file, by name, or remote
+ *    cache hit). The caller takes ownership of the module and can use it immediately.
+ *  - async is set when the module is being fetched asynchronously from a remote source. The
+ *    on_loaded callback supplied to newDynamicModuleByConfig() is invoked once the fetch
+ *    completes; the caller must keep async alive until then.
+ */
+struct DynamicModuleLoadResult {
+  DynamicModulePtr loaded;
+  AsyncLoadingStateSharedPtr async;
+};
+
+/**
+ * Loads a dynamic module described by the given configuration. This consolidates all the module
+ * sourcing strategies (local file, statically linked by name, and remote HTTP source with on-disk
+ * caching and optional asynchronous fetch) behind a single entry point.
+ *
+ * The local-file and by-name paths are fully synchronous and require neither a factory context nor
+ * an init manager, so extension points that have no access to a factory context (such as the
+ * upstream HTTP conn-pool factory) can call this with only the config. The remote HTTP source path
+ * requires a context, and the asynchronous fetch additionally requires an init manager and an
+ * on_loaded callback; if any of those is missing, a remote source is rejected with an error.
+ *
+ * @param config the dynamic module configuration describing where to source the module from.
+ * @param stat_name the configured name of the extension instance using the module (e.g.
+ * ``filter_name``, ``transport_socket_name``, ``lb_policy_name``). Falls back to ``default`` if
+ * empty.
+ * @param context the factory context, used to access the singleton, cluster, dispatcher and random
+ * generator needed for remote fetches and background caching. Only the members shared by all
+ * extension points (CommonFactoryContext) are required. May be absent; in that case a remote source
+ * is rejected with an error while local-file and by-name sources still load.
+ * @param init_manager the init manager used to register the asynchronous remote fetch target. May
+ * be absent; in that case a remote source that is not already cached is rejected with an error.
+ * @param on_loaded invoked on the main thread with the loaded module once an asynchronous remote
+ * fetch completes successfully. Only used for the asynchronous remote path; ignored for the
+ * synchronous paths (where the module is returned directly via DynamicModuleLoadResult::loaded).
+ * May be empty if the caller does not support asynchronous loading.
+ * @return the load result on success, or an error status if the configuration is invalid or the
+ * module failed to load.
+ */
+absl::StatusOr<DynamicModuleLoadResult>
+newDynamicModuleByConfig(const ProtoDynamicModuleConfig& config, absl::string_view stat_name,
+                         OptRef<Server::Configuration::CommonFactoryContext> context = {},
+                         OptRef<Init::Manager> init_manager = {},
+                         std::function<void(DynamicModulePtr)> on_loaded = nullptr);
 
 } // namespace DynamicModules
 } // namespace Extensions

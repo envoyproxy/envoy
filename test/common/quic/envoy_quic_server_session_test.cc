@@ -15,7 +15,6 @@
 
 #include "test/common/quic/test_proof_source.h"
 #include "test/common/quic/test_utils.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/session_idle_list.h"
 #include "test/mocks/http/stream_decoder.h"
@@ -62,6 +61,7 @@ public:
   }
 
   using EnvoyQuicServerSession::GetCryptoStream;
+  using EnvoyQuicServerSession::GetSSLConfig;
 };
 
 class ProofSourceDetailsSetter {
@@ -1312,6 +1312,14 @@ TEST_F(EnvoyQuicServerSessionTest, TerminateIdleSession) {
   envoy_quic_session_.TerminateIdleSession();
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_FALSE(quic_connection_->connected());
+}
+
+TEST_F(EnvoyQuicServerSessionTest, GetSSLConfigDefault) {
+  installReadFilter();
+  quic::QuicSSLConfig config = envoy_quic_session_.GetSSLConfig();
+  ASSERT_TRUE(config.early_data_enabled.has_value());
+  EXPECT_TRUE(*config.early_data_enabled);
+  EXPECT_FALSE(config.disable_ticket_support);
 }
 
 TEST_F(EnvoyQuicServerSessionTest, SessionIdleCallbacksIdempotency) {

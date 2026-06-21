@@ -81,6 +81,7 @@ node_modules
 
 # Rust
 **/rust/**/target
+target
 
 #############################
 # OS/editor cruft

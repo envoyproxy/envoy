@@ -18,8 +18,9 @@
 
 #include "test/integration/utility.h"
 #include "test/mocks/common.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/file_system_for_test.h"
+#include "test/test_common/thread_factory_for_test.h"
 
 #include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"

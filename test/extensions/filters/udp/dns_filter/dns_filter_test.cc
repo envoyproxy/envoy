@@ -1,13 +1,11 @@
 #include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.h"
 #include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.validate.h"
 
-#include "source/common/common/logger.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_constants.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"

@@ -422,10 +422,20 @@ const UpstreamLookupValues& UpstreamLookupValues::get() {
            [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
              return CelValue::CreateUint64(wrapper.info_.attemptCount().value_or(0));
            }},
-          {UpstreamNumEndpoints, [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+          {UpstreamNumEndpoints,
+           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
              if (const auto cluster_info = wrapper.info_.upstreamClusterInfo()) {
                return CelValue::CreateUint64(
                    cluster_info->endpointStats().membership_total_.value());
+             }
+             return {};
+           }},
+          {UpstreamServerName, [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_.upstreamInfo().has_value()) {
+               auto ssl_info = wrapper.info_.upstreamInfo().value().get().upstreamSslConnection();
+               if (ssl_info != nullptr && !ssl_info->sni().empty()) {
+                 return CelValue::CreateString(&ssl_info->sni());
+               }
              }
              return {};
            }}});

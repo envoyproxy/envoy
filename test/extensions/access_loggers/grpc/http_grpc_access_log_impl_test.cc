@@ -12,8 +12,6 @@
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/common.h"
-#include "test/mocks/grpc/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -243,14 +241,11 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     (*stream_info.metadata_.mutable_filter_metadata())["foo"] = Protobuf::Struct();
     stream_info.filter_state_->setData("string_accessor",
                                        std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                       StreamInfo::FilterState::StateType::ReadOnly,
                                        StreamInfo::FilterState::LifeSpan::FilterChain);
     stream_info.filter_state_->setData("uint32_accessor",
                                        std::make_unique<StreamInfo::UInt32AccessorImpl>(42),
-                                       StreamInfo::FilterState::StateType::ReadOnly,
                                        StreamInfo::FilterState::LifeSpan::FilterChain);
     stream_info.filter_state_->setData("serialized", std::make_unique<TestSerializedFilterState>(),
-                                       StreamInfo::FilterState::StateType::ReadOnly,
                                        StreamInfo::FilterState::LifeSpan::FilterChain);
     stream_info.onRequestComplete();
 
@@ -813,14 +808,11 @@ response: {}
     (*stream_info.metadata_.mutable_filter_metadata())["foo"] = Protobuf::Struct();
     stream_info.filter_state_->setData("string_accessor",
                                        std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                       StreamInfo::FilterState::StateType::ReadOnly,
                                        StreamInfo::FilterState::LifeSpan::FilterChain);
     stream_info.filter_state_->setData("uint32_accessor",
                                        std::make_unique<StreamInfo::UInt32AccessorImpl>(42),
-                                       StreamInfo::FilterState::StateType::ReadOnly,
                                        StreamInfo::FilterState::LifeSpan::FilterChain);
     stream_info.filter_state_->setData("serialized", std::make_unique<TestSerializedFilterState>(),
-                                       StreamInfo::FilterState::StateType::ReadOnly,
                                        StreamInfo::FilterState::LifeSpan::FilterChain);
 
     expectLog(R"EOF(

@@ -11,7 +11,6 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
-#include "test/mocks/tracing/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/test_time.h"
 

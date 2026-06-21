@@ -34,8 +34,8 @@ public:
   MOCK_METHOD(Resource, getResource,
               (const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
                    resource_detectors,
-               Server::Configuration::ServerFactoryContext& context,
-               absl::string_view service_name),
+               Server::Configuration::ServerFactoryContext& context, absl::string_view service_name,
+               const ResourceProviderOptions& options),
               (const));
 };
 
@@ -59,7 +59,7 @@ public:
     resource.attributes_.insert(std::pair<std::string, std::string>("key1", "val1"));
 
     auto mock_resource_provider = NiceMock<MockResourceProvider>();
-    EXPECT_CALL(mock_resource_provider, getResource(_, _, _)).WillRepeatedly(Return(resource));
+    EXPECT_CALL(mock_resource_provider, getResource(_, _, _, _)).WillRepeatedly(Return(resource));
 
     driver_ = std::make_unique<Driver>(opentelemetry_config, context_, mock_resource_provider);
   }
@@ -120,6 +120,138 @@ TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfig) {
 TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfigHttpExporter) {
   setupValidDriverWithHttpExporter();
   EXPECT_NE(driver_, nullptr);
+}
+
+// Verifies that set_telemetry_sdk_resource_attributes=false is passed to ResourceProvider
+TEST_F(OpenTelemetryDriverTest, PassSetTelemetrySdkResourceAttributesFalse) {
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    set_telemetry_sdk_resource_attributes: false
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+  auto mock_client = std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+  mock_client_ = mock_client.get();
+  ON_CALL(*mock_client_factory, createUncachedRawAsyncClient())
+      .WillByDefault(Return(ByMove(std::move(mock_client))));
+  auto& factory_context = context_.server_factory_context_;
+  ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+      .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
+  ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
+
+  Resource resource;
+  auto mock_resource_provider = NiceMock<MockResourceProvider>();
+
+  ResourceProviderOptions expected_options;
+  expected_options.set_telemetry_sdk_resource_attributes = false;
+  EXPECT_CALL(mock_resource_provider, getResource(_, _, _, expected_options))
+      .WillOnce(Return(resource));
+
+  driver_ = std::make_unique<Driver>(opentelemetry_config, context_, mock_resource_provider);
+}
+
+// Verifies that set_telemetry_sdk_resource_attributes defaults to true
+TEST_F(OpenTelemetryDriverTest, PassSetTelemetrySdkResourceAttributesDefaultTrue) {
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+  auto mock_client = std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+  mock_client_ = mock_client.get();
+  ON_CALL(*mock_client_factory, createUncachedRawAsyncClient())
+      .WillByDefault(Return(ByMove(std::move(mock_client))));
+  auto& factory_context = context_.server_factory_context_;
+  ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+      .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
+  ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
+
+  Resource resource;
+  auto mock_resource_provider = NiceMock<MockResourceProvider>();
+
+  ResourceProviderOptions expected_options;
+  EXPECT_CALL(mock_resource_provider, getResource(_, _, _, expected_options))
+      .WillOnce(Return(resource));
+
+  driver_ = std::make_unique<Driver>(opentelemetry_config, context_, mock_resource_provider);
+}
+
+// Verifies that set_service_name_resource_attribute=false is passed to ResourceProvider
+TEST_F(OpenTelemetryDriverTest, PassSetServiceNameResourceAttributeFalse) {
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    set_service_name_resource_attribute: false
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+  auto mock_client = std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+  mock_client_ = mock_client.get();
+  ON_CALL(*mock_client_factory, createUncachedRawAsyncClient())
+      .WillByDefault(Return(ByMove(std::move(mock_client))));
+  auto& factory_context = context_.server_factory_context_;
+  ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+      .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
+  ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
+
+  Resource resource;
+  auto mock_resource_provider = NiceMock<MockResourceProvider>();
+
+  ResourceProviderOptions expected_options;
+  expected_options.set_service_name_resource_attribute = false;
+  EXPECT_CALL(mock_resource_provider, getResource(_, _, _, expected_options))
+      .WillOnce(Return(resource));
+
+  driver_ = std::make_unique<Driver>(opentelemetry_config, context_, mock_resource_provider);
+}
+
+// Verifies that set_service_name_resource_attribute defaults to true
+TEST_F(OpenTelemetryDriverTest, PassSetServiceNameResourceAttributeDefaultTrue) {
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+  auto mock_client = std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+  mock_client_ = mock_client.get();
+  ON_CALL(*mock_client_factory, createUncachedRawAsyncClient())
+      .WillByDefault(Return(ByMove(std::move(mock_client))));
+  auto& factory_context = context_.server_factory_context_;
+  ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+      .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
+  ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
+
+  Resource resource;
+  auto mock_resource_provider = NiceMock<MockResourceProvider>();
+
+  ResourceProviderOptions expected_options;
+  EXPECT_CALL(mock_resource_provider, getResource(_, _, _, expected_options))
+      .WillOnce(Return(resource));
+
+  driver_ = std::make_unique<Driver>(opentelemetry_config, context_, mock_resource_provider);
 }
 
 // Verifies that the tracer cannot be configured with two exporters at the same time
@@ -970,6 +1102,56 @@ TEST_F(OpenTelemetryDriverTest, UseLocalDecisionFalse) {
                          {Tracing::Reason::NotTraceable, false});
   // The `useLocalDecision` should be false because there is a traceparent header in the request.
   EXPECT_FALSE(span->useLocalDecision());
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  EXPECT_CALL(*mock_client_, sendRaw(_, _, _, _, _, _));
+  span->finishSpan();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+// Disabling the local decision keeps a setSampled(false) decision and drops the span.
+TEST_F(OpenTelemetryDriverTest, DisableLocalDecisionWithSampledFalse) {
+  setupValidDriver();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  // The span starts on the local decision and is sampled because there is no traceparent header.
+  EXPECT_TRUE(span->useLocalDecision());
+  EXPECT_TRUE(dynamic_cast<Span*>(span.get())->sampled());
+
+  span->setSampled(false);
+  span->disableLocalDecision();
+  // Disabling the local decision stops the connection manager from re-deriving the decision.
+  EXPECT_FALSE(span->useLocalDecision());
+  EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U)).Times(0);
+  EXPECT_CALL(*mock_client_, sendRaw(_, _, _, _, _, _)).Times(0);
+  span->finishSpan();
+  EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+// Disabling the local decision keeps a setSampled(true) decision and keeps the span.
+TEST_F(OpenTelemetryDriverTest, DisableLocalDecisionWithSampledTrue) {
+  setupValidDriver();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  Tracing::SpanPtr span =
+      driver_->startSpan(mock_tracing_config_, request_headers, stream_info_, operation_name_,
+                         {Tracing::Reason::NotTraceable, false});
+  // The span starts on the local decision and is unsampled because there is no traceparent header.
+  EXPECT_TRUE(span->useLocalDecision());
+  EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
+
+  span->setSampled(true);
+  span->disableLocalDecision();
+  EXPECT_FALSE(span->useLocalDecision());
+  EXPECT_TRUE(dynamic_cast<Span*>(span.get())->sampled());
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .Times(1)

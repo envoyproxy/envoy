@@ -32,6 +32,7 @@
 #include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace {
 envoy::config::bootstrap::v3::Bootstrap&
@@ -1362,7 +1363,7 @@ void ConfigHelper::configDownstreamTransportSocketWithTls(
     envoy::config::bootstrap::v3::Bootstrap& bootstrap,
     std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
         configure_tls_context,
-    bool enable_quic_early_data) {
+    bool enable_quic_early_data, bool enable_quic_resumption) {
   for (auto& listener : *bootstrap.mutable_static_resources()->mutable_listeners()) {
     ASSERT(listener.filter_chains_size() > 0);
     auto* filter_chain = listener.mutable_filter_chains(0);
@@ -1374,6 +1375,7 @@ void ConfigHelper::configDownstreamTransportSocketWithTls(
       configure_tls_context(*quic_transport_socket_config.mutable_downstream_tls_context()
                                  ->mutable_common_tls_context());
       quic_transport_socket_config.mutable_enable_early_data()->set_value(enable_quic_early_data);
+      quic_transport_socket_config.mutable_enable_resumption()->set_value(enable_quic_resumption);
       transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
     } else if (!listener.has_udp_listener_config()) {
       transport_socket->set_name("envoy.transport_sockets.tls");
@@ -1414,7 +1416,8 @@ void ConfigHelper::addQuicDownstreamTransportSocketConfig() {
         initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context,
                       true);
       },
-      true);
+      /*enable_quic_early_data=*/true,
+      /*enable_quic_resumption=*/true);
 }
 
 bool ConfigHelper::setAccessLog(
@@ -1960,11 +1963,11 @@ void EdsHelper::setEdsAndWait(
     const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>& cluster_load_assignments,
     IntegrationTestServerStats& server_stats) {
   // Make sure the last version has been accepted before setting a new one.
-  server_stats.waitForCounterGe("cluster.cluster_0.update_success", update_successes_);
+  server_stats.waitForCounter("cluster.cluster_0.update_success", Ge(update_successes_));
   setEds(cluster_load_assignments);
   // Make sure Envoy has consumed the update now that it is running.
   ++update_successes_;
-  server_stats.waitForCounterGe("cluster.cluster_0.update_success", update_successes_);
+  server_stats.waitForCounter("cluster.cluster_0.update_success", Ge(update_successes_));
   RELEASE_ASSERT(
       update_successes_ == server_stats.counter("cluster.cluster_0.update_success")->value(), "");
 }

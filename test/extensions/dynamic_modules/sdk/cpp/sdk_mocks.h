@@ -71,6 +71,16 @@ public:
               (std::string_view name, std::span<const BufferView> tags_keys), (override));
   MOCK_METHOD((std::pair<MetricID, MetricsResult>), defineCounter,
               (std::string_view name, std::span<const BufferView> tags_keys), (override));
+  MOCK_METHOD(MetricsResult, recordHistogramValue,
+              (MetricID id, uint64_t value, std::span<const BufferView> tags_values), (override));
+  MOCK_METHOD(MetricsResult, setGaugeValue,
+              (MetricID id, uint64_t value, std::span<const BufferView> tags_values), (override));
+  MOCK_METHOD(MetricsResult, incrementGaugeValue,
+              (MetricID id, uint64_t value, std::span<const BufferView> tags_values), (override));
+  MOCK_METHOD(MetricsResult, decrementGaugeValue,
+              (MetricID id, uint64_t value, std::span<const BufferView> tags_values), (override));
+  MOCK_METHOD(MetricsResult, incrementCounterValue,
+              (MetricID id, uint64_t value, std::span<const BufferView> tags_values), (override));
   MOCK_METHOD(bool, logEnabled, (LogLevel level), (override));
   MOCK_METHOD(void, log, (LogLevel level, std::string_view message), (override));
   MOCK_METHOD((std::pair<HttpCalloutInitResult, uint64_t>), httpCallout,
@@ -137,6 +147,36 @@ public:
   MOCK_METHOD(void, continueResponse, (), (override));
   MOCK_METHOD(void, clearRouteCache, (), (override));
   MOCK_METHOD(void, refreshRouteCluster, (), (override));
+  MOCK_METHOD(uint64_t, getBufferLimit, (), (override));
+  MOCK_METHOD(void, setBufferLimit, (uint64_t limit), (override));
+  MOCK_METHOD(std::optional<std::string_view>, getFilterStateTyped, (std::string_view key),
+              (override));
+  MOCK_METHOD(bool, setFilterStateTyped, (std::string_view key, std::string_view value),
+              (override));
+  MOCK_METHOD(uint32_t, getWorkerIndex, (), (override));
+  MOCK_METHOD(bool, setSocketOptionInt,
+              (int64_t level, int64_t name, SocketOptionState state, SocketDirection direction,
+               int64_t value),
+              (override));
+  MOCK_METHOD(bool, setSocketOptionBytes,
+              (int64_t level, int64_t name, SocketOptionState state, SocketDirection direction,
+               std::string_view value),
+              (override));
+  MOCK_METHOD(std::optional<int64_t>, getSocketOptionInt,
+              (int64_t level, int64_t name, SocketOptionState state, SocketDirection direction),
+              (override));
+  MOCK_METHOD(std::optional<std::string_view>, getSocketOptionBytes,
+              (int64_t level, int64_t name, SocketOptionState state, SocketDirection direction),
+              (override));
+  MOCK_METHOD(std::unique_ptr<Span>, getActiveSpan, (), (override));
+  MOCK_METHOD(std::optional<std::string_view>, getClusterName, (), (override));
+  MOCK_METHOD(std::optional<ClusterHostCounts>, getClusterHostCounts, (uint32_t priority),
+              (override));
+  MOCK_METHOD(bool, setUpstreamOverrideHost, (std::string_view host, bool strict), (override));
+  MOCK_METHOD(void, resetStream, (HttpFilterStreamResetReason reason, std::string_view details),
+              (override));
+  MOCK_METHOD(void, sendGoAwayAndClose, (bool graceful), (override));
+  MOCK_METHOD(bool, recreateStream, (std::span<const HeaderView> headers), (override));
   MOCK_METHOD(HeaderMap&, requestHeaders, (), (override));
   MOCK_METHOD(BodyBuffer&, bufferedRequestBody, (), (override));
   MOCK_METHOD(BodyBuffer&, receivedRequestBody, (), (override));

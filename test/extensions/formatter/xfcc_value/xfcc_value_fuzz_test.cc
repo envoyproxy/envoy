@@ -1,4 +1,3 @@
-#include "source/common/common/logger.h"
 #include "source/common/formatter/http_formatter_context.h"
 #include "source/extensions/formatter/xfcc_value/xfcc_value.h"
 

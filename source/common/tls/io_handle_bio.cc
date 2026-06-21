@@ -1,7 +1,10 @@
 #include "source/common/tls/io_handle_bio.h"
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/platform.h"
 #include "envoy/network/io_handle.h"
+
+#include "source/common/runtime/runtime_features.h"
 
 #include "openssl/bio.h"
 #include "openssl/err.h"
@@ -27,7 +30,8 @@ int io_handle_read(BIO* b, char* out, int outl) {
   Envoy::Buffer::RawSlice slice;
   slice.mem_ = out;
   slice.len_ = outl;
-  auto result = bio_io_handle(b)->readv(outl, &slice, 1);
+  auto* io_handle = bio_io_handle(b);
+  auto result = io_handle->readv(outl, &slice, 1);
   BIO_clear_retry_flags(b);
   if (!result.ok()) {
     auto err = result.err_->getErrorCode();
@@ -37,6 +41,20 @@ int io_handle_read(BIO* b, char* out, int outl) {
       ERR_put_error(ERR_LIB_SYS, 0, result.err_->getSystemErrorCode(), __FILE__, __LINE__);
     }
     return -1;
+  }
+  // On EOF (readv returned 0 successfully), check SO_ERROR for a pending TCP RST.
+  // Some peers tear the connection down with RST instead of FIN; readv returns 0
+  // in that case but a connection error is pending on the socket. Push it onto
+  // the error queue so the SSL layer can detect it via drainErrorQueue().
+  if (result.return_value_ == 0 &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ssl_socket_report_connection_reset")) {
+    int so_error = 0;
+    socklen_t so_error_len = sizeof(so_error);
+    auto opt_result = io_handle->getOption(SOL_SOCKET, SO_ERROR, &so_error, &so_error_len);
+    if (opt_result.return_value_ == 0 && so_error != 0) {
+      ERR_put_error(ERR_LIB_SYS, 0, so_error, __FILE__, __LINE__);
+    }
   }
   return result.return_value_;
 }

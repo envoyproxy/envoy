@@ -2,7 +2,9 @@ syntax = "proto3";
 
 package envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3;
 
+import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 
 import "udpa/annotations/status.proto";
 
@@ -27,6 +29,18 @@ message DownstreamReverseConnectionSocketInterface {
 
     // Additional headers to include in the HTTP handshake request.
     repeated config.core.v3.HeaderValueOption additional_headers = 2;
+
+    // Perform the handshake as an HTTP/1.1 ``Upgrade`` exchange (``Upgrade: reverse-tunnel``,
+    // success on ``101``) so HTTP proxies can route the handshake and splice the tunnel
+    // afterward. The responder must set this flag to the same value.
+    // Defaults to ``false``.
+    bool use_http_upgrade = 3;
+
+    // Formatter extensions usable in ``additional_headers`` substitution. See the formatter
+    // extensions documentation for details. When set, ``additional_headers`` values are evaluated
+    // as substitution format strings; when empty, the values are sent literally.
+    // [#extension-category: envoy.formatter]
+    repeated config.core.v3.TypedExtensionConfig formatters = 4;
   }
 
   // Stat prefix to be used for downstream reverse connection socket interface stats.
@@ -40,4 +54,10 @@ message DownstreamReverseConnectionSocketInterface {
   // Optional HTTP handshake configuration. When unset, the initiator envoy uses the defaults
   // provided by ``HttpHandshakeConfig``.
   HttpHandshakeConfig http_handshake = 3;
+
+  // Access log configuration for reverse tunnel initiator lifecycle events.
+  // Logs are emitted on handshake success, handshake failure, and connection close.
+  // Reverse tunnel metadata (``node_id``, ``cluster_id``, ``tenant_id``, upstream cluster, etc.)
+  // is available via ``%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:*)%`` substitutions.
+  repeated config.accesslog.v3.AccessLog access_log = 4;
 }

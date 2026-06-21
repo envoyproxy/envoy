@@ -6,7 +6,7 @@
 #include "source/common/signal/fatal_action.h"
 #include "source/common/signal/fatal_error_handler.h"
 
-#include "test/mocks/server/instance.h"
+#include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"

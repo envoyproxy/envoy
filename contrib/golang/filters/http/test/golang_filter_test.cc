@@ -31,7 +31,6 @@ using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -40,6 +39,7 @@ namespace Golang {
 
 class TestFilter : public Filter {
 public:
+  using Filter::continueStatus;
   using Filter::continueStatusInternal;
   using Filter::Filter;
   DecodingProcessorState& testDecodingState() { return decoding_state_; }
@@ -262,6 +262,69 @@ TEST_F(GolangHttpFilterTest, BufferedDataAfterDestroyDuringContinue) {
       << "envoyGoFilterOnHttpData must not be called after onDestroy";
 
   ASSERT_NE(nullptr, filter->testReq());
+  delete filter->testReq();
+}
+
+// Regression test for #44704: when the Go plugin calls continueStatus() from inside
+// the OnHttpHeader cgo callback, the call must post to the dispatcher rather than
+// transition the C++ state machine inline; otherwise handleHeaderGolangStatus trips
+// its ASSERT(filterState == ProcessingHeader) once the cgo call returns.
+TEST_F(GolangHttpFilterTest, ContinueStatusFromInsideHeaderCgoCallbackPostsToDispatcher) {
+  auto dso_lib = std::make_shared<NiceMock<Dso::MockHttpFilterDsoImpl>>();
+  ON_CALL(*dso_lib, envoyGoFilterNewHttpPluginConfig(_)).WillByDefault(Return(1));
+
+  const auto yaml = R"EOF(
+    library_id: test
+    library_path: test
+    plugin_name: test
+    )EOF";
+  envoy::extensions::filters::http::golang::v3alpha::Config proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> mock_context;
+  auto config = std::make_shared<FilterConfig>(proto_config, dso_lib, "", mock_context);
+  config->newGoPluginConfig();
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> mock_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> mock_enc_callbacks;
+  NiceMock<Envoy::Network::MockConnection> mock_connection;
+  auto addr = (*Network::Address::PipeInstance::create("/test/test.sock")).release();
+  Network::Address::InstanceConstSharedPtr addr_ptr(addr);
+  ON_CALL(mock_callbacks, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{mock_connection}));
+  mock_connection.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_ptr);
+  mock_connection.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_ptr);
+
+  EXPECT_CALL(mock_callbacks.dispatcher_, isThreadSafe()).WillRepeatedly(Return(true));
+
+  // Capture the posted closure instead of running it inline (the default
+  // MockDispatcher::post() ON_CALL invokes the callback synchronously, which would
+  // defeat the point of the regression test).
+  Event::PostCb captured_post;
+  EXPECT_CALL(mock_callbacks.dispatcher_, post(_)).WillOnce([&captured_post](Event::PostCb cb) {
+    captured_post = std::move(cb);
+  });
+
+  auto filter = std::make_shared<TestFilter>(config, dso_lib, 0);
+  filter->setDecoderFilterCallbacks(mock_callbacks);
+  filter->setEncoderFilterCallbacks(mock_enc_callbacks);
+
+  EXPECT_CALL(*dso_lib, envoyGoFilterOnHttpHeader(_, _, _, _))
+      .WillOnce(Invoke([&filter](processState*, int, int, uint64_t) -> uint64_t {
+        auto status = filter->continueStatus(filter->testDecodingState(), GolangStatus::Continue);
+        EXPECT_EQ(CAPIStatus::CAPIOK, status);
+        return static_cast<uint64_t>(GolangStatus::Running);
+      }));
+
+  // No inline continueDecoding while the cgo frame is on the stack: state must still
+  // be ProcessingHeader when handleHeaderGolangStatus runs.
+  EXPECT_CALL(mock_callbacks, continueDecoding()).Times(0);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter->decodeHeaders(request_headers, false));
+  EXPECT_TRUE(captured_post != nullptr) << "continueStatus must defer via dispatcher.post()";
+
+  filter->onDestroy();
   delete filter->testReq();
 }
 

@@ -26,7 +26,7 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/dynamic_modules:config",
         "//source/extensions/load_balancing_policies/dynamic_modules:load_balancer_lib",
         "//test/extensions/dynamic_modules:util",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:host_set_mocks",

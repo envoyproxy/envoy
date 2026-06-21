@@ -1,14 +1,23 @@
 #pragma once
 
-#include "envoy/common/random_generator.h"
-#include "envoy/event/dispatcher.h"
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
+
+#include "envoy/common/pure.h"
+#include "envoy/common/resource.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
-#include "envoy/singleton/manager.h"
-#include "envoy/thread_local/thread_local.h"
+#include "envoy/network/address.h"
+#include "envoy/network/dns.h"
 #include "envoy/upstream/resource_manager.h"
 
 #include "source/common/http/header_utility.h"
-#include "source/common/runtime/runtime_features.h"
+
+#include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
