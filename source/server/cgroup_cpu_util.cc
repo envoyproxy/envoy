@@ -187,8 +187,6 @@ absl::optional<CgroupInfo> CgroupCpuUtil::constructCgroupPath(const std::string&
   // Version is now determined by parsing /proc/self/cgroup, not by trial and error
   info.version = version;
 
-  ENVOY_LOG_MISC(debug, "Constructed cgroup path: {} (version: {})", info.full_path, info.version);
-
   // Result: Combined path in single buffer + final version
   return info;
 }
@@ -208,7 +206,6 @@ absl::optional<CpuFiles> CgroupCpuUtil::accessCgroupV1Files(const CgroupInfo& cg
     cpu_files.version = "v1";
     cpu_files.quota_content = quota_result.value();
     cpu_files.period_content = period_result.value();
-    ENVOY_LOG_MISC(debug, "Using cgroup v1 files at {}", cgroup_info.full_path);
     return cpu_files;
   } else {
     // Expected v1 files don't exist - this is an error
@@ -229,7 +226,6 @@ absl::optional<CpuFiles> CgroupCpuUtil::accessCgroupV2Files(const CgroupInfo& cg
     cpu_files.version = "v2";
     cpu_files.quota_content = result.value();
     cpu_files.period_content = ""; // v2 doesn't use separate period file
-    ENVOY_LOG_MISC(debug, "Using cgroup v2 file at {}", cgroup_info.full_path);
     return cpu_files;
   } else {
     // Expected v2 file doesn't exist - this is an error
@@ -278,7 +274,6 @@ absl::optional<double> CgroupCpuUtil::readActualLimitsV1(const CpuFiles& cpu_fil
 
   // Handle special case: v1 quota = -1 means no limit
   if (quota == -1) {
-    ENVOY_LOG_MISC(debug, "cgroup v1 unlimited CPU (quota = -1)");
     return absl::nullopt; // Unlimited - return nullopt
   }
 
@@ -290,8 +285,6 @@ absl::optional<double> CgroupCpuUtil::readActualLimitsV1(const CpuFiles& cpu_fil
 
   // Calculate CPU ratio as float64
   double cpu_ratio = static_cast<double>(quota) / static_cast<double>(period);
-
-  ENVOY_LOG_MISC(debug, "cgroup v1 CPU ratio: {} (quota={}, period={})", cpu_ratio, quota, period);
 
   return cpu_ratio;
 }
@@ -311,7 +304,6 @@ absl::optional<double> CgroupCpuUtil::readActualLimitsV2(const CpuFiles& cpu_fil
 
   // Handle special case: v2 quota = "max" means no limit
   if (parts[0] == "max") {
-    ENVOY_LOG_MISC(debug, "cgroup v2 unlimited CPU (quota = max)");
     return absl::nullopt; // Unlimited - return nullopt
   }
 
@@ -331,8 +323,6 @@ absl::optional<double> CgroupCpuUtil::readActualLimitsV2(const CpuFiles& cpu_fil
 
   // Calculate CPU ratio as float64
   double cpu_ratio = static_cast<double>(quota) / static_cast<double>(period);
-
-  ENVOY_LOG_MISC(debug, "cgroup v2 CPU ratio: {} (quota={}, period={})", cpu_ratio, quota, period);
 
   return cpu_ratio;
 }
@@ -465,7 +455,6 @@ absl::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Insta
     if (fs_type == "cgroup2") {
       // v2 hierarchy - save mount point but keep searching
       v2_mount_point = mount_point;
-      ENVOY_LOG_MISC(debug, "Found cgroup v2 at {}, continuing search for v1", mount_point);
       continue; // Keep searching, we might find a v1 hierarchy with CPU controller
     }
 
@@ -485,19 +474,16 @@ absl::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Insta
     // v1 hierarchy - check for CPU controller
     if (absl::StrContains(super_options, "cpu")) {
       // Found a v1 CPU controller. This must be the only one, so we're done
-      ENVOY_LOG_MISC(debug, "Found cgroup v1 with CPU controller at {}", mount_point);
       return mount_point; // Return immediately - v1 CPU wins
     }
   }
 
   // Return v2 mount if no v1 with CPU found
   if (!v2_mount_point.empty()) {
-    ENVOY_LOG_MISC(debug, "Using cgroup v2 mount at {}", v2_mount_point);
     return v2_mount_point;
   }
 
   // No cgroup filesystem found
-  ENVOY_LOG_MISC(debug, "No cgroup filesystem mounts found");
   return absl::nullopt;
 }
 
@@ -619,8 +605,6 @@ absl::optional<std::string> CgroupCpuUtil::parseMountInfoLine(absl::string_view 
 
   // Unescape mount point - Linux's show_path escapes special characters
   std::string mount_point = unescapePath(mount_point_escaped);
-
-  ENVOY_LOG_MISC(trace, "Parsed cgroup mount: {} ({})", mount_point, fs_type);
 
   return mount_point;
 }

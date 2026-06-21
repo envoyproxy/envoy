@@ -265,7 +265,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
 
   if (!concurrency.isSet()) {
     // Default to the platform CPU count, regardless of --cpuset-threads. On Linux this is the
-    // min of hardware threads, CPU affinity, and cgroup CPU limit; HW threads elsewhere.
+    // min of hardware threads, CPU affinity, and cgroup CPU limit; hardware threads elsewhere.
     if (cpuset_threads.isSet() && !skip_deprecated_logs.getValue()) {
       ENVOY_LOG(warn, "--cpuset-threads is now the default behavior and no longer required.");
     }

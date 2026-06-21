@@ -573,6 +573,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
+  ENVOY_LOG(debug, "server concurrency set to {}", options_.concurrency());
   if (!options().hotRestartDisabled()) {
     server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
   }
