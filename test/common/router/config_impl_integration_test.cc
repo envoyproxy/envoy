@@ -28,7 +28,7 @@ public:
     RouteConstSharedPtr route(RouteEntryAndRouteConstSharedPtr parent,
                               const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                               uint64_t) const override {
-      ASSERT(Envoy::Protobuf::DynamicCastMessage<RouteEntryImplBase>(parent.get()) != nullptr);
+      ASSERT(dynamic_cast<const RouteEntryImplBase*>(parent.get()) != nullptr);
       return std::make_shared<Router::DynamicRouteEntry>(parent, std::string(cluster_name_));
     }
 

@@ -62,7 +62,8 @@ TEST(BufferFilterFactoryTest, BufferFilterEmptyProto) {
   BufferFilterFactory factory;
   auto empty_proto = factory.createEmptyConfigProto();
   envoy::extensions::filters::http::buffer::v3::Buffer config =
-      *Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::buffer::v3::Buffer>(empty_proto.get());
+      *Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::buffer::v3::Buffer>(
+          empty_proto.get());
 
   config.mutable_max_request_bytes()->set_value(1028);
 
@@ -77,7 +78,8 @@ TEST(BufferFilterFactoryTest, BufferFilterNoMaxRequestBytes) {
   BufferFilterFactory factory;
   auto empty_proto = factory.createEmptyConfigProto();
   envoy::extensions::filters::http::buffer::v3::Buffer config =
-      *Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::buffer::v3::Buffer>(empty_proto.get());
+      *Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::buffer::v3::Buffer>(
+          empty_proto.get());
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProto(config, "stats", context).value(),
@@ -87,7 +89,8 @@ TEST(BufferFilterFactoryTest, BufferFilterNoMaxRequestBytes) {
 TEST(BufferFilterFactoryTest, BufferFilterEmptyRouteProto) {
   BufferFilterFactory factory;
   EXPECT_NO_THROW({
-    EXPECT_NE(nullptr, Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::buffer::v3::BufferPerRoute>(
+    EXPECT_NE(nullptr, Envoy::Protobuf::DynamicCastMessage<
+                           envoy::extensions::filters::http::buffer::v3::BufferPerRoute>(
                            factory.createEmptyRouteConfigProto().get()));
   });
 }
@@ -99,8 +102,8 @@ TEST(BufferFilterFactoryTest, BufferFilterRouteSpecificConfig) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   EXPECT_TRUE(proto_config.get());
 
-  auto& cfg = Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::buffer::v3::BufferPerRoute>(
-      *proto_config.get());
+  auto& cfg = Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::filters::http::buffer::v3::BufferPerRoute>(*proto_config.get());
   cfg.set_disabled(true);
 
   Router::RouteSpecificFilterConfigConstSharedPtr route_config =
@@ -110,7 +113,7 @@ TEST(BufferFilterFactoryTest, BufferFilterRouteSpecificConfig) {
           .value();
   EXPECT_TRUE(route_config.get());
 
-  const auto* inflated = Envoy::Protobuf::DynamicCastMessage<BufferFilterSettings>(route_config.get());
+  const auto* inflated = dynamic_cast<const BufferFilterSettings*>(route_config.get());
   EXPECT_TRUE(inflated);
 }
 
