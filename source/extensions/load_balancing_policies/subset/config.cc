@@ -54,7 +54,7 @@ SubsetLbFactory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
                         TimeSource& time_source) {
 
   const auto* typed_config =
-      Envoy::Protobuf::DynamicCastMessage<Upstream::SubsetLoadBalancerConfig>(lb_config.ptr());
+      dynamic_cast<const Upstream::SubsetLoadBalancerConfig*>(lb_config.ptr());
   // The load balancing policy configuration will be loaded and validated in the main thread when we
   // load the cluster configuration. So we can assume the configuration is valid here.
   ASSERT(typed_config != nullptr,
