@@ -21,7 +21,6 @@ envoy_cc_library(
         "//envoy/stats:stats_macros",
         "//source/common/common:fmt_lib",
         "//source/common/http:header_map_lib",
-        "//source/common/protobuf:utility_lib",
         "//source/common/stream_info:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/priority_load_shed/v3:pkg_cc_proto",
