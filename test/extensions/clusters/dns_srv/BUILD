@@ -17,6 +17,7 @@ envoy_cc_test(
         "//test/integration:http_integration_lib",
         "//test/mocks/network:network_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/extensions/clusters/dns_srv/v3:pkg_cc_proto",
     ],
 )

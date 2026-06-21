@@ -65,9 +65,9 @@ protected:
   }
 
   // Registers an expectation that the resolve timer will be armed (any interval).
-  void expectResolveTimer() {
+  void expectResolveTimer(int times = 1) {
     resolve_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
-    EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
+    EXPECT_CALL(*resolve_timer_, enableTimer(_, _)).Times(times);
   }
 
   // Sets up an expectation for the top-level SRV query and captures its callback.
@@ -537,6 +537,223 @@ TEST_F(DnsSrvClusterTest, NonCaresResolverReturnsInvalidArgumentError) {
   EXPECT_EQ(status_or_cluster.status().code(), absl::StatusCode::kInvalidArgument);
   EXPECT_THAT(status_or_cluster.status().message(),
               testing::HasSubstr("envoy.network.dns_resolver.getaddrinfo"));
+}
+
+// Verifies that when the SRV response changes on a subsequent refresh the cluster correctly
+// adds newly-appearing hosts and removes hosts that are no longer present.
+TEST_F(DnsSrvClusterTest, AddRemoveHostsViaSrvResponse) {
+  constexpr uint32_t srv_priority = 0;
+  constexpr uint32_t srv_weight = 1;
+  constexpr uint32_t port1 = 9000;
+  constexpr uint32_t port2 = 9001;
+  constexpr uint32_t port3 = 9002;
+  constexpr std::chrono::seconds srv_ttl{40};
+
+  // The timer fires twice: once after the first full resolve, once after the second.
+  expectResolveTimer(2);
+
+  // Both SRV rounds share the same query name; capture each callback in sequence.
+  Network::DnsResolver::ResolveCb srv_callback1;
+  Network::DnsResolver::ResolveCb srv_callback2;
+  EXPECT_CALL(*dns_resolver_, resolveSrv("_local_service._tcp.service.consul.", _))
+      .WillOnce(Invoke([&](const std::string&,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        srv_callback1 = cb;
+        return &active_dns_query_;
+      }))
+      .WillOnce(Invoke([&](const std::string&,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        srv_callback2 = cb;
+        return &active_dns_query_;
+      }));
+
+  // svc1 is present in both rounds → its A/AAAA callback is captured twice.
+  Network::DnsResolver::ResolveCb a_svc1_r1;
+  Network::DnsResolver::ResolveCb a_svc1_r2;
+  EXPECT_CALL(*dns_resolver_, resolve("svc1.example.com", Network::DnsLookupFamily::All, _))
+      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        a_svc1_r1 = cb;
+        return &active_dns_query_;
+      }))
+      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        a_svc1_r2 = cb;
+        return &active_dns_query_;
+      }));
+
+  // svc2 only appears in round 1.
+  Network::DnsResolver::ResolveCb a_svc2_r1;
+  EXPECT_CALL(*dns_resolver_, resolve("svc2.example.com", Network::DnsLookupFamily::All, _))
+      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        a_svc2_r1 = cb;
+        return &active_dns_query_;
+      }));
+
+  // svc3 only appears in round 2.
+  Network::DnsResolver::ResolveCb a_svc3_r2;
+  EXPECT_CALL(*dns_resolver_, resolve("svc3.example.com", Network::DnsLookupFamily::All, _))
+      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        a_svc3_r2 = cb;
+        return &active_dns_query_;
+      }));
+
+  createCluster();
+
+  // ---------- Round 1 ----------
+  // SRV returns svc1 (port1) and svc2 (port2).
+  ASSERT_TRUE(srv_callback1 != nullptr);
+  srv_callback1(Network::DnsResolver::ResolutionStatus::Completed, "",
+                {
+                    {srv_priority, srv_weight, port1, "svc1.example.com", srv_ttl},
+                    {srv_priority, srv_weight, port2, "svc2.example.com", srv_ttl},
+                });
+
+  ASSERT_TRUE(a_svc1_r1 != nullptr);
+  a_svc1_r1(Network::DnsResolver::ResolutionStatus::Completed, "",
+            TestUtility::makeDnsResponse({"1.2.3.4"}, srv_ttl));
+
+  ASSERT_TRUE(a_svc2_r1 != nullptr);
+  a_svc2_r1(Network::DnsResolver::ResolutionStatus::Completed, "",
+            TestUtility::makeDnsResponse({"5.6.7.8"}, srv_ttl));
+
+  {
+    const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    ASSERT_EQ(hosts.size(), 2);
+    absl::flat_hash_set<std::string> addresses;
+    for (const auto& h : hosts) {
+      addresses.insert(h->address()->asString());
+    }
+    EXPECT_TRUE(addresses.count("1.2.3.4:" + std::to_string(port1)));
+    EXPECT_TRUE(addresses.count("5.6.7.8:" + std::to_string(port2)));
+  }
+
+  // ---------- Round 2 ----------
+  // Trigger the refresh timer → starts the second SRV resolution.
+  resolve_timer_->invokeCallback();
+
+  // SRV now returns svc1 (kept, same port) and svc3 (new); svc2 is gone.
+  ASSERT_TRUE(srv_callback2 != nullptr);
+  srv_callback2(Network::DnsResolver::ResolutionStatus::Completed, "",
+                {
+                    {srv_priority, srv_weight, port1, "svc1.example.com", srv_ttl},
+                    {srv_priority, srv_weight, port3, "svc3.example.com", srv_ttl},
+                });
+
+  ASSERT_TRUE(a_svc1_r2 != nullptr);
+  a_svc1_r2(Network::DnsResolver::ResolutionStatus::Completed, "",
+            TestUtility::makeDnsResponse({"1.2.3.4"}, srv_ttl));
+
+  ASSERT_TRUE(a_svc3_r2 != nullptr);
+  a_svc3_r2(Network::DnsResolver::ResolutionStatus::Completed, "",
+            TestUtility::makeDnsResponse({"9.10.11.12"}, srv_ttl));
+
+  {
+    const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    ASSERT_EQ(hosts.size(), 2);
+    absl::flat_hash_set<std::string> addresses;
+    for (const auto& h : hosts) {
+      addresses.insert(h->address()->asString());
+    }
+    // svc1 (1.2.3.4:port1) kept; svc3 (9.10.11.12:port3) added; svc2 (5.6.7.8:port2) removed.
+    EXPECT_TRUE(addresses.count("1.2.3.4:" + std::to_string(port1)));
+    EXPECT_TRUE(addresses.count("9.10.11.12:" + std::to_string(port3)));
+    EXPECT_FALSE(addresses.count("5.6.7.8:" + std::to_string(port2)));
+  }
+}
+
+// Verifies that when the A/AAAA response for an SRV target changes on a subsequent refresh
+// the cluster correctly adds newly-appearing addresses and removes stale ones.
+TEST_F(DnsSrvClusterTest, AddRemoveHostsViaChangedAaaaResponse) {
+  constexpr uint32_t srv_priority = 0;
+  constexpr uint32_t srv_weight = 1;
+  constexpr uint32_t srv_port = 9000;
+  constexpr std::chrono::seconds srv_ttl{40};
+
+  expectResolveTimer(2);
+
+  // Both rounds issue the same SRV query; capture both callbacks.
+  Network::DnsResolver::ResolveCb srv_callback1;
+  Network::DnsResolver::ResolveCb srv_callback2;
+  EXPECT_CALL(*dns_resolver_, resolveSrv("_local_service._tcp.service.consul.", _))
+      .WillOnce(Invoke([&](const std::string&,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        srv_callback1 = cb;
+        return &active_dns_query_;
+      }))
+      .WillOnce(Invoke([&](const std::string&,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        srv_callback2 = cb;
+        return &active_dns_query_;
+      }));
+
+  // The same hostname is re-resolved each round with different IP sets.
+  Network::DnsResolver::ResolveCb a_callback_r1;
+  Network::DnsResolver::ResolveCb a_callback_r2;
+  EXPECT_CALL(*dns_resolver_, resolve("svc.example.com", Network::DnsLookupFamily::All, _))
+      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        a_callback_r1 = cb;
+        return &active_dns_query_;
+      }))
+      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        a_callback_r2 = cb;
+        return &active_dns_query_;
+      }));
+
+  createCluster();
+
+  // ---------- Round 1 ----------
+  // SRV returns a single target; A/AAAA resolves to two addresses.
+  ASSERT_TRUE(srv_callback1 != nullptr);
+  srv_callback1(Network::DnsResolver::ResolutionStatus::Completed, "",
+                {{srv_priority, srv_weight, srv_port, "svc.example.com", srv_ttl}});
+
+  ASSERT_TRUE(a_callback_r1 != nullptr);
+  a_callback_r1(Network::DnsResolver::ResolutionStatus::Completed, "",
+                TestUtility::makeDnsResponse({"1.2.3.4", "5.6.7.8"}, srv_ttl));
+
+  {
+    const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    ASSERT_EQ(hosts.size(), 2);
+    absl::flat_hash_set<std::string> ips;
+    for (const auto& h : hosts) {
+      ips.insert(h->address()->ip()->addressAsString());
+    }
+    EXPECT_TRUE(ips.count("1.2.3.4"));
+    EXPECT_TRUE(ips.count("5.6.7.8"));
+  }
+
+  // ---------- Round 2 ----------
+  // Trigger the refresh timer → starts the second SRV resolution.
+  resolve_timer_->invokeCallback();
+
+  // Same SRV response; A/AAAA now returns 5.6.7.8 and 9.10.11.12 (1.2.3.4 is gone).
+  ASSERT_TRUE(srv_callback2 != nullptr);
+  srv_callback2(Network::DnsResolver::ResolutionStatus::Completed, "",
+                {{srv_priority, srv_weight, srv_port, "svc.example.com", srv_ttl}});
+
+  ASSERT_TRUE(a_callback_r2 != nullptr);
+  a_callback_r2(Network::DnsResolver::ResolutionStatus::Completed, "",
+                TestUtility::makeDnsResponse({"5.6.7.8", "9.10.11.12"}, srv_ttl));
+
+  {
+    const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    ASSERT_EQ(hosts.size(), 2);
+    absl::flat_hash_set<std::string> ips;
+    for (const auto& h : hosts) {
+      ips.insert(h->address()->ip()->addressAsString());
+    }
+    EXPECT_FALSE(ips.count("1.2.3.4"));   // removed
+    EXPECT_TRUE(ips.count("5.6.7.8"));    // kept
+    EXPECT_TRUE(ips.count("9.10.11.12")); // added
+    for (const auto& h : hosts) {
+      EXPECT_EQ(h->address()->ip()->port(), srv_port);
+    }
+  }
 }
 
 } // namespace Clusters
