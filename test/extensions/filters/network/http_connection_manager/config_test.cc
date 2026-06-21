@@ -2763,7 +2763,7 @@ TEST_F(HttpConnectionManagerConfigTest, CustomRequestIDExtension) {
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
   auto request_id_extension =
-      Envoy::Protobuf::DynamicCastMessage<TestRequestIDExtension>(config.requestIDExtension().get());
+      dynamic_cast<TestRequestIDExtension*>(config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
   EXPECT_EQ("example", request_id_extension->testField());
 }
@@ -2829,7 +2829,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
-  auto request_id_extension = Envoy::Protobuf::DynamicCastMessage<Extensions::RequestId::UUIDRequestIDExtension>(
+  auto request_id_extension = dynamic_cast<Extensions::RequestId::UUIDRequestIDExtension*>(
       config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
   EXPECT_TRUE(request_id_extension->packTraceReason());
@@ -2857,7 +2857,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
-  auto request_id_extension = Envoy::Protobuf::DynamicCastMessage<Extensions::RequestId::UUIDRequestIDExtension>(
+  auto request_id_extension = dynamic_cast<Extensions::RequestId::UUIDRequestIDExtension*>(
       config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
   EXPECT_FALSE(request_id_extension->packTraceReason());
@@ -3678,8 +3678,8 @@ public:
   createFromProto(const Protobuf::Message& message,
                   Server::Configuration::ServerFactoryContext& server_context) override {
     auto mptr = ::Envoy::Config::Utility::translateAnyToFactoryConfig(
-        Envoy::Protobuf::DynamicCastMessage<Protobuf::Any>(message), server_context.messageValidationVisitor(),
-        *this);
+        Envoy::Protobuf::DynamicCastMessage<Protobuf::Any>(message),
+        server_context.messageValidationVisitor(), *this);
     const auto& proto_config =
         MessageUtil::downcastAndValidate<const ::envoy::extensions::http::header_validators::
                                              envoy_default::v3::HeaderValidatorConfig&>(
@@ -4025,7 +4025,7 @@ TEST_F(HttpConnectionManagerMobileConfigTest, Mobile) {
   EXPECT_CALL(fm, addReadFilter(_))
       .WillOnce(Invoke([&](Network::ReadFilterSharedPtr manager) -> void {
         hcm_filter = manager;
-        hcm = Envoy::Protobuf::DynamicCastMessage<Http::ConnectionManagerImpl>(manager.get());
+        hcm = dynamic_cast<Http::ConnectionManagerImpl*>(manager.get());
       }));
   create_hcm_cb(fm);
   ASSERT(hcm != nullptr);

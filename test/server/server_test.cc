@@ -1533,7 +1533,7 @@ TEST_P(ServerInstanceImplTest, WithProcessContext) {
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
 
   auto context = server_->processContext();
-  auto& object_from_context = Envoy::Protobuf::DynamicCastMessage<TestObject>(context->get().get());
+  auto& object_from_context = dynamic_cast<TestObject&>(context->get().get());
   EXPECT_EQ(&object_from_context, &object);
   EXPECT_TRUE(object_from_context.boolean_flag_);
 
@@ -1553,7 +1553,8 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
   EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
       .WillOnce(
           Invoke([](const Protobuf::Message& config, Configuration::ServerFactoryContext& ctx) {
-            const auto* proto = Envoy::Protobuf::DynamicCastMessage<test::common::config::DummyConfig>(&config);
+            const auto* proto =
+                Envoy::Protobuf::DynamicCastMessage<test::common::config::DummyConfig>(&config);
             EXPECT_NE(nullptr, proto);
             EXPECT_EQ(proto->a(), "foo");
             auto mock_extension = std::make_unique<MockBootstrapExtension>();

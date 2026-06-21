@@ -3109,7 +3109,7 @@ TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {
   cb(manager);
 
   // Make sure we actually create the correct type!
-  EXPECT_NE(Envoy::Protobuf::DynamicCastMessage<ProxyProtocol::Filter>(added_filter.get()), nullptr);
+  EXPECT_NE(dynamic_cast<ProxyProtocol::Filter*>(added_filter.get()), nullptr);
 }
 
 } // namespace
