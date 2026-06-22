@@ -21,9 +21,9 @@ namespace {
 
 const absl::string_view kSecretName = "test";
 
-std::unique_ptr<QuicLbConnectionIdGenerator> createTypedIdGenerator(Factory& factory,
+std::unique_ptr<QuicLbConnectionIdGenerator> createTypedIdGenerator(Context& context,
                                                                     uint32_t worker_index = 0) {
-  QuicConnectionIdGeneratorPtr generator = factory.createQuicConnectionIdGenerator(worker_index);
+  QuicConnectionIdGeneratorPtr generator = context.createQuicConnectionIdGenerator(worker_index);
   return std::unique_ptr<QuicLbConnectionIdGenerator>(
       static_cast<QuicLbConnectionIdGenerator*>(generator.release()));
 }
@@ -55,8 +55,8 @@ encryptionParamaters(uint8_t version_int = 0, std::string key_str = "0123456789a
 class KernelBpfTester {
 public:
   static absl::StatusOr<KernelBpfTester> create(uint32_t concurrency,
-                                                EnvoyQuicConnectionIdGeneratorFactory& factory) {
-    auto opt_or_error = factory.createCompatibleLinuxBpfSocketOption(concurrency);
+                                                EnvoyQuicConnectionIdGeneratorContext& context) {
+    auto opt_or_error = context.createCompatibleLinuxBpfSocketOption(concurrency);
     if (absl::IsUnimplemented(opt_or_error.status())) {
       return KernelBpfTester(concurrency, nullptr);
     }
@@ -294,7 +294,8 @@ TEST(QuicLbTest, Unencrypted) {
       encryptionParamaters(0));
   absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
       Factory::create(cfg, factory_context);
-  auto generator = createTypedIdGenerator(*factory_or_status.value());
+  auto context = factory_or_status.value()->createQuicConnectionIdGeneratorContext();
+  auto generator = createTypedIdGenerator(dynamic_cast<Context&>(*context));
   auto new_cid = generator->GenerateNextConnectionId(quic::QuicConnectionId{});
   EXPECT_TRUE(new_cid.has_value());
   uint8_t expected[1 + sizeof(id_data)];
@@ -326,7 +327,8 @@ TEST(QuicLbTest, Base64ServerId) {
       encryptionParamaters(0));
   absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
       Factory::create(cfg, factory_context);
-  auto generator = createTypedIdGenerator(*factory_or_status.value());
+  auto context = factory_or_status.value()->createQuicConnectionIdGeneratorContext();
+  auto generator = createTypedIdGenerator(dynamic_cast<Context&>(*context));
   auto new_cid = generator->GenerateNextConnectionId(quic::QuicConnectionId{});
   EXPECT_TRUE(new_cid.has_value());
   uint8_t expected[1 + id_data.size()];
@@ -353,7 +355,8 @@ TEST(QuicLbTest, TooLong) {
       encryptionParamaters(0));
   absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
       Factory::create(cfg, factory_context);
-  auto generator = createTypedIdGenerator(*factory_or_status.value());
+  auto context = factory_or_status.value()->createQuicConnectionIdGeneratorContext();
+  auto generator = createTypedIdGenerator(dynamic_cast<Context&>(*context));
   quic::QuicConnectionId id;
   id.set_length(21);
   EXPECT_ENVOY_BUG(generator->appendRoutingId(id), "Connection id long");
@@ -372,11 +375,12 @@ TEST(QuicLbTest, WorkerSelector) {
       encryptionParamaters(0));
   absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
       Factory::create(cfg, factory_context);
+  auto context = factory_or_status.value()->createQuicConnectionIdGeneratorContext();
   constexpr uint32_t concurrency = 8;
   QuicConnectionIdWorkerSelector selector =
-      factory_or_status.value()->getCompatibleConnectionIdWorkerSelector(concurrency);
+      context->getCompatibleConnectionIdWorkerSelector(concurrency);
 
-  auto bpf_tester_or_status = KernelBpfTester::create(concurrency, *(factory_or_status.value()));
+  auto bpf_tester_or_status = KernelBpfTester::create(concurrency, *context);
   ASSERT_OK(bpf_tester_or_status);
   auto& bpf_tester = bpf_tester_or_status.value();
 

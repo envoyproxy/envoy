@@ -71,7 +71,7 @@ absl::StatusOr<uint32_t> runCbpf(const sock_fprog* prog, absl::string_view data,
 }
 #endif
 
-MATCHER_P2(FactoryFunctionsReturnWorkerId, packet, expected_id, "") {
+MATCHER_P2(ContextFunctionsReturnWorkerId, packet, expected_id, "") {
   const uint32_t id = arg.worker_selector_(*packet, 0xffffffff);
 #ifdef SUPPORTS_TESTING_BPF_PROG
   const auto bpf_id_or =
@@ -103,12 +103,12 @@ MATCHER_P2(FactoryFunctionsReturnWorkerId, packet, expected_id, "") {
 
 } // namespace
 
-FactoryFunctions::FactoryFunctions(EnvoyQuicConnectionIdGeneratorFactory& factory,
+ContextFunctions::ContextFunctions(EnvoyQuicConnectionIdGeneratorContext& context,
                                    uint32_t concurrency)
     : concurrency_(concurrency),
-      worker_selector_(factory.getCompatibleConnectionIdWorkerSelector(concurrency_)) {
+      worker_selector_(context.getCompatibleConnectionIdWorkerSelector(concurrency_)) {
 #ifdef SUPPORTS_TESTING_BPF_PROG
-  opt_ = factory.createCompatibleLinuxBpfSocketOption(concurrency).value();
+  opt_ = context.createCompatibleLinuxBpfSocketOption(concurrency).value();
   // Using a mock socket to capture the socket option which otherwise cannot be
   // extracted from the private field in the Socket::Option.
   Network::MockListenSocket mock_socket;
@@ -123,12 +123,12 @@ FactoryFunctions::FactoryFunctions(EnvoyQuicConnectionIdGeneratorFactory& factor
 
 GivenPacket::GivenPacket(const Buffer::Instance& packet) : packet_(packet) {}
 
-testing::Matcher<const FactoryFunctions&> GivenPacket::ReturnsWorkerId(uint32_t id) {
-  return FactoryFunctionsReturnWorkerId(&packet_, id);
+testing::Matcher<const ContextFunctions&> GivenPacket::ReturnsWorkerId(uint32_t id) {
+  return ContextFunctionsReturnWorkerId(&packet_, id);
 }
 
-testing::Matcher<const FactoryFunctions&> GivenPacket::ReturnsDefaultWorkerId() {
-  return FactoryFunctionsReturnWorkerId(&packet_, 0xffffffff);
+testing::Matcher<const ContextFunctions&> GivenPacket::ReturnsDefaultWorkerId() {
+  return ContextFunctionsReturnWorkerId(&packet_, 0xffffffff);
 }
 
 } // namespace Matcher

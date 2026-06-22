@@ -59,18 +59,35 @@ private:
   const WorkerRoutingIdValue worker_id_;
 };
 
-class Factory : public EnvoyQuicConnectionIdGeneratorFactory {
+class Context : public Envoy::Quic::EnvoyQuicConnectionIdGeneratorContext {
+public:
+  explicit Context(ThreadLocal::TypedSlot<QuicLbConnectionIdGenerator::ThreadLocalData>& tls_slot)
+      : tls_slot_(tls_slot) {}
+
+  // EnvoyQuicConnectionIdGeneratorContext.
+  QuicConnectionIdGeneratorPtr createQuicConnectionIdGenerator(uint32_t worker_index) override;
+  absl::StatusOr<Network::Socket::OptionConstSharedPtr>
+  createCompatibleLinuxBpfSocketOption(uint32_t concurrency) override;
+  QuicConnectionIdWorkerSelector
+  getCompatibleConnectionIdWorkerSelector(uint32_t concurrency) override;
+
+private:
+  ThreadLocal::TypedSlot<QuicLbConnectionIdGenerator::ThreadLocalData>& tls_slot_;
+
+#if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
+  sock_fprog prog_;
+  std::vector<sock_filter> filter_;
+#endif
+};
+
+class Factory : public Envoy::Quic::EnvoyQuicConnectionIdGeneratorFactory {
 public:
   static absl::StatusOr<std::unique_ptr<Factory>>
   create(const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config& config,
          Server::Configuration::FactoryContext& context);
 
   // EnvoyQuicConnectionIdGeneratorFactory.
-  QuicConnectionIdGeneratorPtr createQuicConnectionIdGenerator(uint32_t worker_index) override;
-  absl::StatusOr<Network::Socket::OptionConstSharedPtr>
-  createCompatibleLinuxBpfSocketOption(uint32_t concurrency) override;
-  QuicConnectionIdWorkerSelector
-  getCompatibleConnectionIdWorkerSelector(uint32_t concurrency) override;
+  EnvoyQuicConnectionIdGeneratorContextPtr createQuicConnectionIdGeneratorContext() override;
 
 private:
   Factory(const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config& config);
@@ -81,11 +98,6 @@ private:
   Common::CallbackHandlePtr secrets_provider_validation_callback_handle_;
   Common::CallbackHandlePtr secrets_provider_update_callback_handle_;
   ThreadLocal::TypedSlotPtr<QuicLbConnectionIdGenerator::ThreadLocalData> tls_slot_;
-
-#if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
-  sock_fprog prog_;
-  std::vector<sock_filter> filter_;
-#endif
 };
 
 } // namespace QuicLb

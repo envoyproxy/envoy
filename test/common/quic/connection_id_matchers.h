@@ -13,16 +13,16 @@ namespace Matcher {
 
 // A matcher for connection id factories to test both the bpf filter and worker selector
 // functions. Recommended usage is like:
-// EXPECT_THAT(FactoryFunctions(factory, concurrency), GivenPacket(buffer).ReturnsWorkerId(7))
+// EXPECT_THAT(ContextFunctions(Context, concurrency), GivenPacket(buffer).ReturnsWorkerId(7))
 //
 // The matcher always validates the worker selector function, and, if bpf is available,
 // also validates that the bpf program returns the same value.
 //
-// Wrapping in FactoryFunctions is necessary because calling the factory functions directly is
+// Wrapping in ContextFunctions is necessary because calling the Context functions directly is
 // not const.
-class FactoryFunctions {
+class ContextFunctions {
 public:
-  FactoryFunctions(EnvoyQuicConnectionIdGeneratorFactory& factory, uint32_t concurrency);
+  ContextFunctions(EnvoyQuicConnectionIdGeneratorContext& Context, uint32_t concurrency);
 
   const uint32_t concurrency_;
   const QuicConnectionIdWorkerSelector worker_selector_;
@@ -33,8 +33,8 @@ public:
 class GivenPacket {
 public:
   GivenPacket(const Buffer::Instance& packet);
-  testing::Matcher<const FactoryFunctions&> ReturnsWorkerId(uint32_t id);
-  testing::Matcher<const FactoryFunctions&> ReturnsDefaultWorkerId();
+  testing::Matcher<const ContextFunctions&> ReturnsWorkerId(uint32_t id);
+  testing::Matcher<const ContextFunctions&> ReturnsDefaultWorkerId();
 
 private:
   const Buffer::Instance& packet_;

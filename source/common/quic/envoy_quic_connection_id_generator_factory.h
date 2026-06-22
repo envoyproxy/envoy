@@ -5,7 +5,6 @@
 #include "envoy/server/factory_context.h"
 
 #include "quiche/quic/core/connection_id_generator.h"
-#include "quiche/quic/load_balancer/load_balancer_encoder.h"
 
 namespace Envoy {
 namespace Quic {
@@ -20,9 +19,9 @@ using QuicConnectionIdWorkerSelector =
  * A factory interface to provide QUIC connection IDs and compatible BPF code for stable packet
  * routing.
  */
-class EnvoyQuicConnectionIdGeneratorFactory {
+class EnvoyQuicConnectionIdGeneratorContext {
 public:
-  virtual ~EnvoyQuicConnectionIdGeneratorFactory() = default;
+  virtual ~EnvoyQuicConnectionIdGeneratorContext() = default;
 
   /**
    * Create a connection ID generator object.
@@ -46,6 +45,16 @@ public:
    */
   virtual QuicConnectionIdWorkerSelector
   getCompatibleConnectionIdWorkerSelector(uint32_t concurrency) PURE;
+};
+
+using EnvoyQuicConnectionIdGeneratorContextPtr =
+    std::unique_ptr<EnvoyQuicConnectionIdGeneratorContext>;
+
+class EnvoyQuicConnectionIdGeneratorFactory {
+public:
+  virtual ~EnvoyQuicConnectionIdGeneratorFactory() = default;
+
+  virtual EnvoyQuicConnectionIdGeneratorContextPtr createQuicConnectionIdGeneratorContext() PURE;
 };
 
 using EnvoyQuicConnectionIdGeneratorFactoryPtr =
