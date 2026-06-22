@@ -1680,7 +1680,7 @@ TEST_F(HttpFilterTest, ErrorResponseHeaderLimitsEnforcedWithMock) {
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
       .WillOnce(
           Invoke([&](Http::Code, absl::string_view,
-                     std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                     std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                      const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
             // Create a ResponseHeaderMap with a low max_headers_count to trigger the limit.
             Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/3);
@@ -1737,7 +1737,7 @@ TEST_F(HttpFilterTest, ErrorResponseHeaderLimitsEnforcedInSet) {
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
       .WillOnce(
           Invoke([&](Http::Code, absl::string_view,
-                     std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                     std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                      const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
             // Create a ResponseHeaderMap with a limit of 1 to trigger the break in headers_to_set.
             Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/1);
@@ -1822,7 +1822,7 @@ TEST_F(HttpFilterTest, ErrorResponseHeaderLimitsEnforcedInAppend) {
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
       .WillOnce(
           Invoke([&](Http::Code, absl::string_view,
-                     std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                     std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                      const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
             // Create a ResponseHeaderMap with max_headers_count=2 to trigger limit in append loop.
             Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/2);
@@ -6401,7 +6401,7 @@ TEST_F(HttpFilterTest, DeniedResponseLocalReplyExceedsLimit) {
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
       .WillOnce(
           Invoke([&](Http::Code, absl::string_view,
-                     std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                     std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                      const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
             Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/2);
             if (modify_headers) {
@@ -6447,7 +6447,7 @@ TEST_F(HttpFilterTest, DeniedResponseLocalReplyExceedsLimitDisabled) {
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
       .WillOnce(
           Invoke([&](Http::Code, absl::string_view,
-                     std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                     std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                      const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
             Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/2);
             if (modify_headers) {
