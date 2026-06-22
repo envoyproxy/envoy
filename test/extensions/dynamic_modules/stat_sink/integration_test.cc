@@ -55,7 +55,7 @@ sink_config:
                                                 moduleName());
       envoy::extensions::stat_sinks::dynamic_modules::v3::DynamicModuleStatsSink sink_config;
       TestUtility::loadFromYaml(sink_yaml, sink_config);
-      static_cast<void>(sink->mutable_typed_config()->PackFrom(sink_config));
+      std::ignore = sink->mutable_typed_config()->PackFrom(sink_config);
 
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(100));

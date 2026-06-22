@@ -77,7 +77,7 @@ public:
           Protobuf::util::TimeUtil::MillisecondsToDuration(250);
 
       tracing.mutable_provider()->set_name("envoy.tracers.opentelemetry");
-      static_cast<void>(tracing.mutable_provider()->mutable_typed_config()->PackFrom(otel_config));
+      std::ignore = tracing.mutable_provider()->mutable_typed_config()->PackFrom(otel_config);
 
       *hcm.mutable_tracing() = tracing;
     });

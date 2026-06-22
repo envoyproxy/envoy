@@ -290,8 +290,8 @@ public:
           TestUtility::loadFromYaml(http_connection_mgr_config, hcm);
           envoy::extensions::filters::http::router::v3::Router router_config;
           router_config.set_suppress_envoy_headers(routerSuppressEnvoyHeaders());
-          static_cast<void>(
-              hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config));
+          std::ignore =
+              hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
 
           const bool append = mode == HeaderMode::Append;
 
@@ -412,7 +412,7 @@ public:
                 Network::Test::getLoopbackAddressString(std::get<0>(GetParam())),
                 fake_upstreams_[0]->localAddress()->ip()->port()));
 
-        static_cast<void>(discovery_response.add_resources()->PackFrom(cluster_load_assignment));
+        std::ignore = discovery_response.add_resources()->PackFrom(cluster_load_assignment);
         eds_stream_->sendGrpcMessage(discovery_response);
 
         // Wait for the next request to make sure the first response was consumed.
@@ -519,8 +519,7 @@ route_config:
                                   hcm);
         envoy::extensions::filters::http::router::v3::Router router_config;
         router_config.set_suppress_envoy_headers(routerSuppressEnvoyHeaders());
-        static_cast<void>(
-            hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config));
+        std::ignore = hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
       });
   initialize();
   performRequest(

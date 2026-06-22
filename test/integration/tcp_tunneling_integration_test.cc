@@ -243,7 +243,7 @@ TEST_P(ConnectTerminationIntegrationTest, BasicWithClusterconfig) {
         bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_upstream_config();
     envoy::extensions::upstreams::http::tcp::v3::TcpConnectionPoolProto tcp_config;
     upgrade->set_name("envoy.filters.connection_pools.http.tcp");
-    static_cast<void>(upgrade->mutable_typed_config()->PackFrom(tcp_config));
+    std::ignore = upgrade->mutable_typed_config()->PackFrom(tcp_config);
   });
 
   initialize();
@@ -512,10 +512,10 @@ TEST_P(ConnectTerminationIntegrationTest, EarlyConnectDataRejectedWithOverride) 
           if (filter.name() == "envoy.filters.http.router") {
             envoy::extensions::filters::http::router::v3::Router router_config;
             if (filter.has_typed_config()) {
-              static_cast<void>(filter.typed_config().UnpackTo(&router_config));
+              std::ignore = filter.typed_config().UnpackTo(&router_config);
             }
             router_config.mutable_reject_connect_request_early_data()->set_value(true);
-            static_cast<void>(filter.mutable_typed_config()->PackFrom(router_config));
+            std::ignore = filter.mutable_typed_config()->PackFrom(router_config);
             break;
           }
         }
@@ -953,7 +953,7 @@ public:
 
           auto* filter_chain = listener->add_filter_chains();
           auto* filter = filter_chain->add_filters();
-          static_cast<void>(filter->mutable_typed_config()->PackFrom(proxy_config));
+          std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
           filter->set_name("envoy.filters.network.tcp_proxy");
         });
     BaseTcpTunnelingIntegrationTest::SetUp();
@@ -970,7 +970,7 @@ public:
           envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension
               request_id_extension;
           envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_config;
-          static_cast<void>(request_id_extension.mutable_typed_config()->PackFrom(uuid_config));
+          std::ignore = request_id_extension.mutable_typed_config()->PackFrom(uuid_config);
           proxy_config.mutable_tunneling_config()->mutable_request_id_extension()->CopyFrom(
               request_id_extension);
 
@@ -980,7 +980,7 @@ public:
           fal.set_path(tunnel_access_log_path_);
           fal.mutable_log_format()->mutable_text_format_source()->set_inline_string(
               "%DYNAMIC_METADATA(envoy.filters.network.tcp_proxy:tunnel_request_id)%\n");
-          static_cast<void>(proxy_config.add_access_log()->mutable_typed_config()->PackFrom(fal));
+          std::ignore = proxy_config.add_access_log()->mutable_typed_config()->PackFrom(fal);
 
           auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
           for (auto& listener : *listeners) {
@@ -989,7 +989,7 @@ public:
             }
             auto* filter_chain = listener.mutable_filter_chains(0);
             auto* filter = filter_chain->mutable_filters(0);
-            static_cast<void>(filter->mutable_typed_config()->PackFrom(proxy_config));
+            std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
             break;
           }
         });
@@ -1008,7 +1008,7 @@ public:
           envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension
               request_id_extension;
           envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_config;
-          static_cast<void>(request_id_extension.mutable_typed_config()->PackFrom(uuid_config));
+          std::ignore = request_id_extension.mutable_typed_config()->PackFrom(uuid_config);
           proxy_config.mutable_tunneling_config()->mutable_request_id_extension()->CopyFrom(
               request_id_extension);
           proxy_config.mutable_tunneling_config()->set_request_id_header(header_name);
@@ -1018,7 +1018,7 @@ public:
           fal.set_path(log_path);
           fal.mutable_log_format()->mutable_text_format_source()->set_inline_string(
               absl::StrCat("%DYNAMIC_METADATA(envoy.filters.network.tcp_proxy:", md_key, ")%\n"));
-          static_cast<void>(proxy_config.add_access_log()->mutable_typed_config()->PackFrom(fal));
+          std::ignore = proxy_config.add_access_log()->mutable_typed_config()->PackFrom(fal);
 
           auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
           for (auto& listener : *listeners) {
@@ -1027,7 +1027,7 @@ public:
             }
             auto* filter_chain = listener.mutable_filter_chains(0);
             auto* filter = filter_chain->mutable_filters(0);
-            static_cast<void>(filter->mutable_typed_config()->PackFrom(proxy_config));
+            std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
             break;
           }
         });
@@ -1040,7 +1040,7 @@ public:
     auto configuration = test::integration::filters::AddHeaderFilterConfig();
     configuration.set_header_key(key);
     configuration.set_header_value(value);
-    static_cast<void>(filter_config.mutable_typed_config()->PackFrom(configuration));
+    std::ignore = filter_config.mutable_typed_config()->PackFrom(configuration);
     return filter_config;
   }
 
@@ -1049,7 +1049,7 @@ public:
     filter_config.set_name("stop-iteration-and-continue-filter");
     auto configuration = test::integration::filters::StopAndContinueConfig();
     configuration.set_stop_and_buffer(true);
-    static_cast<void>(filter_config.mutable_typed_config()->PackFrom(configuration));
+    std::ignore = filter_config.mutable_typed_config()->PackFrom(configuration);
     return filter_config;
   }
 
@@ -1164,7 +1164,7 @@ TEST_P(TcpTunnelingIntegrationTest, SchemeHeader) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      static_cast<void>(filter->mutable_typed_config()->PackFrom(proxy_config));
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1305,7 +1305,7 @@ TEST_P(TcpTunnelingIntegrationTest, BasicUsePost) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      static_cast<void>(filter->mutable_typed_config()->PackFrom(proxy_config));
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1344,8 +1344,8 @@ TEST_P(TcpTunnelingIntegrationTest, TcpTunnelingAccessLog) {
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%ACCESS_LOG_TYPE%-%UPSTREAM_CONNECTION_ID%\n");
     access_log_config.set_path(access_log_filename);
-    static_cast<void>(
-        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config));
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -1354,7 +1354,7 @@ TEST_P(TcpTunnelingIntegrationTest, TcpTunnelingAccessLog) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      static_cast<void>(filter->mutable_typed_config()->PackFrom(proxy_config));
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1399,8 +1399,8 @@ TEST_P(TcpTunnelingIntegrationTest, BytesMeterAccessLog) {
         "%ACCESS_LOG_TYPE%-%BYTES_RECEIVED%-%BYTES_SENT%-%UPSTREAM_HEADER_BYTES_SENT%-%UPSTREAM_"
         "HEADER_BYTES_RECEIVED%-%UPSTREAM_WIRE_BYTES_SENT%-%UPSTREAM_WIRE_BYTES_RECEIVED%\n");
     access_log_config.set_path(access_log_filename);
-    static_cast<void>(
-        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config));
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -1409,7 +1409,7 @@ TEST_P(TcpTunnelingIntegrationTest, BytesMeterAccessLog) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      static_cast<void>(filter->mutable_typed_config()->PackFrom(proxy_config));
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1472,8 +1472,8 @@ TEST_P(TcpTunnelingIntegrationTest, BasicHeaderEvaluationTunnelingConfig) {
         "RESPONSE_HEADERS=%FILTER_STATE(envoy.tcp_proxy.propagate_response_headers:TYPED)% "
         "RESPONSE_TRAILERS=%FILTER_STATE(envoy.tcp_proxy.propagate_response_trailers:TYPED)%\n");
     access_log_config.set_path(access_log_filename);
-    static_cast<void>(
-        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config));
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -1482,7 +1482,7 @@ TEST_P(TcpTunnelingIntegrationTest, BasicHeaderEvaluationTunnelingConfig) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      static_cast<void>(filter->mutable_typed_config()->PackFrom(proxy_config));
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1538,7 +1538,7 @@ TEST_P(TcpTunnelingIntegrationTest, HeaderEvaluatorConfigUpdate) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      static_cast<void>(filter->mutable_typed_config()->PackFrom(proxy_config));
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1580,7 +1580,7 @@ TEST_P(TcpTunnelingIntegrationTest, HeaderEvaluatorConfigUpdate) {
               .set_number_value(2);
           auto* filter_chain = listener.mutable_filter_chains(0);
           auto* filter = filter_chain->mutable_filters(0);
-          static_cast<void>(filter->mutable_typed_config()->PackFrom(proxy_config));
+          std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
           break;
         }
       });
@@ -1681,8 +1681,8 @@ TEST_P(TcpTunnelingIntegrationTest, NonSuccessConnectResponseIncludesStatusInFai
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%UPSTREAM_TRANSPORT_FAILURE_REASON%\n");
     access_log_config.set_path(access_log_filename);
-    static_cast<void>(
-        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config));
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -1691,7 +1691,7 @@ TEST_P(TcpTunnelingIntegrationTest, NonSuccessConnectResponseIncludesStatusInFai
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      static_cast<void>(filter->mutable_typed_config()->PackFrom(proxy_config));
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1733,8 +1733,8 @@ TEST_P(TcpTunnelingIntegrationTest, CopyValidResponseHeaders) {
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%FILTER_STATE(envoy.tcp_proxy.propagate_response_headers:TYPED)%\n");
     access_log_config.set_path(access_log_filename);
-    static_cast<void>(
-        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config));
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -1743,7 +1743,7 @@ TEST_P(TcpTunnelingIntegrationTest, CopyValidResponseHeaders) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      static_cast<void>(filter->mutable_typed_config()->PackFrom(proxy_config));
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1781,8 +1781,8 @@ TEST_P(TcpTunnelingIntegrationTest, CopyInvalidResponseHeaders) {
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%FILTER_STATE(envoy.tcp_proxy.propagate_response_headers:TYPED)%\n");
     access_log_config.set_path(access_log_filename);
-    static_cast<void>(
-        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config));
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -1791,7 +1791,7 @@ TEST_P(TcpTunnelingIntegrationTest, CopyInvalidResponseHeaders) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      static_cast<void>(filter->mutable_typed_config()->PackFrom(proxy_config));
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1840,8 +1840,8 @@ TEST_P(TcpTunnelingIntegrationTest, CopyInvalidResponseHeadersWithRetry) {
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%FILTER_STATE(envoy.tcp_proxy.propagate_response_headers:TYPED)%\n");
     access_log_config.set_path(access_log_filename);
-    static_cast<void>(
-        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config));
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -1850,7 +1850,7 @@ TEST_P(TcpTunnelingIntegrationTest, CopyInvalidResponseHeadersWithRetry) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      static_cast<void>(filter->mutable_typed_config()->PackFrom(proxy_config));
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1904,8 +1904,8 @@ TEST_P(TcpTunnelingIntegrationTest, CopyResponseTrailers) {
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%FILTER_STATE(envoy.tcp_proxy.propagate_response_trailers:TYPED)%\n");
     access_log_config.set_path(access_log_filename);
-    static_cast<void>(
-        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config));
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -1914,7 +1914,7 @@ TEST_P(TcpTunnelingIntegrationTest, CopyResponseTrailers) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      static_cast<void>(filter->mutable_typed_config()->PackFrom(proxy_config));
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -2047,15 +2047,15 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamConnectingDownstreamDisconnect) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      static_cast<void>(filter->mutable_typed_config()->PackFrom(proxy_config));
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
 
       // Use TLS because it will respond to a TCP half-close during handshake by closing the
       // connection.
       envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
       ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context(), false);
       filter_chain->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
-      static_cast<void>(
-          filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context));
+      std::ignore =
+          filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 
       break;
     }
@@ -2460,8 +2460,8 @@ TEST_P(
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%UPSTREAM_REQUEST_ATTEMPT_COUNT% %RESPONSE_FLAGS%\n");
     access_log_config.set_path(access_log_filename);
-    static_cast<void>(
-        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config));
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -2470,7 +2470,7 @@ TEST_P(
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      static_cast<void>(filter->mutable_typed_config()->PackFrom(proxy_config));
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -2528,8 +2528,8 @@ TEST_P(TcpTunnelingIntegrationTest,
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%UPSTREAM_REQUEST_ATTEMPT_COUNT% %RESPONSE_FLAGS%\n");
     access_log_config.set_path(access_log_filename);
-    static_cast<void>(
-        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config));
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -2538,7 +2538,7 @@ TEST_P(TcpTunnelingIntegrationTest,
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      static_cast<void>(filter->mutable_typed_config()->PackFrom(proxy_config));
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -2636,7 +2636,7 @@ public:
 
           auto* filter_chain = listener->add_filter_chains();
           auto* filter = filter_chain->add_filters();
-          static_cast<void>(filter->mutable_typed_config()->PackFrom(proxy_config));
+          std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
           filter->set_name("envoy.filters.network.tcp_proxy");
         });
     BaseTcpTunnelingIntegrationTest::SetUp();
@@ -2659,7 +2659,7 @@ TEST_P(TcpTunnelingIntegrationTestSimTime, TestIdletimeoutWithLargeOutstandingDa
             *config_blob);
     tcp_proxy_config.mutable_idle_timeout()->CopyFrom(
         ProtobufUtil::TimeUtil::SecondsToDuration(idle_timeout));
-    static_cast<void>(config_blob->PackFrom(tcp_proxy_config));
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
 
   initialize();
@@ -2703,7 +2703,7 @@ TEST_P(TcpTunnelingIntegrationTestSimTime,
     tcp_proxy_config.mutable_idle_timeout()->CopyFrom(
         ProtobufUtil::TimeUtil::SecondsToDuration(idle_timeout));
 
-    static_cast<void>(config_blob->PackFrom(tcp_proxy_config));
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
 
   initialize();

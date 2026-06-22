@@ -110,8 +110,8 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
       code);
   // Test Any configuration.
   Protobuf::Struct some_proto;
-  static_cast<void>(
-      config.mutable_config()->mutable_vm_config()->mutable_configuration()->PackFrom(some_proto));
+  std::ignore =
+      config.mutable_config()->mutable_vm_config()->mutable_configuration()->PackFrom(some_proto);
 
   AccessLog::FilterPtr filter;
 

@@ -410,8 +410,7 @@ use_original_src_ip: true
       session_file_access_log.set_path("unused");
       session_file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
           session_access_log_format);
-      static_cast<void>(
-          session_access_log->mutable_typed_config()->PackFrom(session_file_access_log));
+      std::ignore = session_access_log->mutable_typed_config()->PackFrom(session_file_access_log);
     }
 
     if (!proxy_access_log_format.empty()) {
@@ -422,7 +421,7 @@ use_original_src_ip: true
       proxy_file_access_log.set_path("unused");
       proxy_file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
           proxy_access_log_format);
-      static_cast<void>(proxy_access_log->mutable_typed_config()->PackFrom(proxy_file_access_log));
+      std::ignore = proxy_access_log->mutable_typed_config()->PackFrom(proxy_file_access_log);
     }
     return config;
   }

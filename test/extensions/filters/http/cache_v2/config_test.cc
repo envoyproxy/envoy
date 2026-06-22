@@ -23,8 +23,8 @@ protected:
 };
 
 TEST_F(CacheFilterFactoryTest, Basic) {
-  static_cast<void>(config_.mutable_typed_config()->PackFrom(
-      envoy::extensions::http::cache_v2::simple_http_cache::v3::SimpleHttpCacheV2Config()));
+  std::ignore = config_.mutable_typed_config()->PackFrom(
+      envoy::extensions::http::cache_v2::simple_http_cache::v3::SimpleHttpCacheV2Config());
   Http::FilterFactoryCb cb =
       factory_.createFilterFactoryFromProto(config_, "stats", context_).value();
   Http::StreamFilterSharedPtr filter;
@@ -52,8 +52,8 @@ TEST_F(CacheFilterFactoryTest, NoTypedConfig) {
 }
 
 TEST_F(CacheFilterFactoryTest, UnregisteredTypedConfig) {
-  static_cast<void>(config_.mutable_typed_config()->PackFrom(
-      envoy::extensions::filters::http::cache_v2::v3::CacheV2Config()));
+  std::ignore = config_.mutable_typed_config()->PackFrom(
+      envoy::extensions::filters::http::cache_v2::v3::CacheV2Config());
   EXPECT_THROW(
       factory_.createFilterFactoryFromProto(config_, "stats", context_).status().IgnoreError(),
       EnvoyException);
@@ -75,7 +75,7 @@ public:
 static Registry::RegisterFactory<FailToCreateCacheFactory, HttpCacheFactory> register_;
 
 TEST_F(CacheFilterFactoryTest, FactoryFailsToCreateCache) {
-  static_cast<void>(config_.mutable_typed_config()->PackFrom(Key()));
+  std::ignore = config_.mutable_typed_config()->PackFrom(Key());
   EXPECT_THROW(
       factory_.createFilterFactoryFromProto(config_, "stats", context_).status().IgnoreError(),
       EnvoyException);

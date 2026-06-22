@@ -69,11 +69,10 @@ public:
       const std::string config_value = cluster_config.empty() ? upstream_address : cluster_config;
       Protobuf::StringValue config_proto;
       config_proto.set_value(config_value);
-      static_cast<void>(dec_config.mutable_cluster_config()->PackFrom(config_proto));
+      std::ignore = dec_config.mutable_cluster_config()->PackFrom(config_proto);
 
       cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
-      static_cast<void>(
-          cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(dec_config));
+      std::ignore = cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(dec_config);
     });
 
     HttpIntegrationTest::initialize();
@@ -264,11 +263,11 @@ typed_config:
 
       Protobuf::StringValue config_proto;
       config_proto.set_value(upstream_address);
-      static_cast<void>(reader_config.mutable_cluster_config()->PackFrom(config_proto));
+      std::ignore = reader_config.mutable_cluster_config()->PackFrom(config_proto);
 
       cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
-      static_cast<void>(
-          cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(reader_config));
+      std::ignore =
+          cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(reader_config);
     });
 
     HttpIntegrationTest::initialize();

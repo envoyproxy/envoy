@@ -56,7 +56,7 @@ public:
       auto* discovery = listener_filter->mutable_config_discovery();
       discovery->add_type_urls(filter_config_type_url);
       if (default_config != nullptr) {
-        static_cast<void>(discovery->mutable_default_config()->PackFrom(*default_config));
+        std::ignore = discovery->mutable_default_config()->PackFrom(*default_config);
       }
 
       discovery->set_apply_default_config_without_warming(apply_without_warming);
@@ -89,7 +89,7 @@ public:
           listener_filter->set_name(name);
           auto configuration = test::integration::filters::TestTcpListenerFilterConfig();
           configuration.set_drain_bytes(drain_bytes);
-          static_cast<void>(listener_filter->mutable_typed_config()->PackFrom(configuration));
+          std::ignore = listener_filter->mutable_typed_config()->PackFrom(configuration);
           addListenerFilterMatcher(listener_filter, matcher);
         });
   }
@@ -180,12 +180,12 @@ public:
     envoy::service::discovery::v3::Resource resource;
     resource.set_name(name);
 
-    static_cast<void>(typed_config.mutable_typed_config()->PackFrom(filter_config));
-    static_cast<void>(resource.mutable_resource()->PackFrom(typed_config));
+    std::ignore = typed_config.mutable_typed_config()->PackFrom(filter_config);
+    std::ignore = resource.mutable_resource()->PackFrom(typed_config);
     if (ttl) {
       resource.mutable_ttl()->set_seconds(1);
     }
-    static_cast<void>(response.add_resources()->PackFrom(resource));
+    std::ignore = response.add_resources()->PackFrom(resource);
     if (!second_connection) {
       ecds_stream_->sendGrpcMessage(response);
     } else {
@@ -249,7 +249,7 @@ public:
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
       config.set_stat_prefix("tcp_stats");
       config.set_cluster("cluster_0");
-      static_cast<void>(filter->mutable_typed_config()->PackFrom(config));
+      std::ignore = filter->mutable_typed_config()->PackFrom(config);
     });
 
     ListenerExtensionDiscoveryIntegrationTestBase::initialize();
@@ -650,13 +650,13 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
 
   // With /config_dump, the response has the format: EcdsConfigDump.
   envoy::admin::v3::EcdsConfigDump ecds_config_dump;
-  static_cast<void>(config_dump.configs(2).UnpackTo(&ecds_config_dump));
+  std::ignore = config_dump.configs(2).UnpackTo(&ecds_config_dump);
   EXPECT_EQ("1", ecds_config_dump.ecds_filters(0).version_info());
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("foo", filter_config.name());
   test::integration::filters::TestTcpListenerFilterConfig listener_config;
-  static_cast<void>(filter_config.typed_config().UnpackTo(&listener_config));
+  std::ignore = filter_config.typed_config().UnpackTo(&listener_config);
   EXPECT_EQ(5, listener_config.drain_bytes());
 }
 
@@ -718,18 +718,18 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameFilterType
   TestUtility::loadFromJson(response->body(), config_dump);
   EXPECT_EQ(5, config_dump.configs_size());
   envoy::admin::v3::EcdsConfigDump ecds_config_dump;
-  static_cast<void>(config_dump.configs(2).UnpackTo(&ecds_config_dump));
+  std::ignore = config_dump.configs(2).UnpackTo(&ecds_config_dump);
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   test::integration::filters::TestTcpListenerFilterConfig listener_config;
   // Verify the first filter.
   EXPECT_EQ("1", ecds_config_dump.ecds_filters(0).version_info());
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
-  static_cast<void>(filter_config.typed_config().UnpackTo(&listener_config));
+  std::ignore = filter_config.typed_config().UnpackTo(&listener_config);
   EXPECT_TRUE(verifyConfigDumpData(filter_config, listener_config));
   // Verify the second filter.
   EXPECT_EQ("1", ecds_config_dump.ecds_filters(1).version_info());
   EXPECT_TRUE(ecds_config_dump.ecds_filters(1).ecds_filter().UnpackTo(&filter_config));
-  static_cast<void>(filter_config.typed_config().UnpackTo(&listener_config));
+  std::ignore = filter_config.typed_config().UnpackTo(&listener_config);
   EXPECT_TRUE(verifyConfigDumpData(filter_config, listener_config));
 }
 
@@ -757,13 +757,13 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsConfigDumpWith
   TestUtility::loadFromJson(response->body(), config_dump);
   EXPECT_EQ(1, config_dump.configs_size());
   envoy::admin::v3::EcdsConfigDump::EcdsFilterConfig ecds_msg;
-  static_cast<void>(config_dump.configs(0).UnpackTo(&ecds_msg));
+  std::ignore = config_dump.configs(0).UnpackTo(&ecds_msg);
   EXPECT_EQ("1", ecds_msg.version_info());
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_msg.ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("bar", filter_config.name());
   test::integration::filters::TestTcpListenerFilterConfig listener_config;
-  static_cast<void>(filter_config.typed_config().UnpackTo(&listener_config));
+  std::ignore = filter_config.typed_config().UnpackTo(&listener_config);
   EXPECT_EQ(4, listener_config.drain_bytes());
 }
 
@@ -968,13 +968,13 @@ TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, ConfigDump) {
 
   // With /config_dump, the response has the format: EcdsConfigDump.
   envoy::admin::v3::EcdsConfigDump ecds_config_dump;
-  static_cast<void>(config_dump.configs(2).UnpackTo(&ecds_config_dump));
+  std::ignore = config_dump.configs(2).UnpackTo(&ecds_config_dump);
   EXPECT_EQ("v1", ecds_config_dump.ecds_filters(0).version_info());
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ(filter_name_, filter_config.name());
   test::integration::filters::TestQuicListenerFilterConfig listener_config;
-  static_cast<void>(filter_config.typed_config().UnpackTo(&listener_config));
+  std::ignore = filter_config.typed_config().UnpackTo(&listener_config);
   EXPECT_EQ("abc", listener_config.added_value());
   EXPECT_FALSE(listener_config.allow_server_migration());
   EXPECT_TRUE(listener_config.allow_client_migration());

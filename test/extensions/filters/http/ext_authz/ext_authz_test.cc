@@ -3193,17 +3193,17 @@ TEST_F(HttpFilterTest, MetadataContext) {
             check_request.attributes().metadata_context().filter_metadata().count("hiphop.drums"));
 
   helloworld::HelloRequest hello;
-  static_cast<void>(check_request.attributes()
-                        .metadata_context()
-                        .typed_filter_metadata()
-                        .at("blues.piano")
-                        .UnpackTo(&hello));
+  std::ignore = check_request.attributes()
+                    .metadata_context()
+                    .typed_filter_metadata()
+                    .at("blues.piano")
+                    .UnpackTo(&hello);
   EXPECT_EQ("jack dupree", hello.name());
-  static_cast<void>(check_request.attributes()
-                        .metadata_context()
-                        .typed_filter_metadata()
-                        .at("jazz.sax")
-                        .UnpackTo(&hello));
+  std::ignore = check_request.attributes()
+                    .metadata_context()
+                    .typed_filter_metadata()
+                    .at("jazz.sax")
+                    .UnpackTo(&hello);
   EXPECT_EQ("shorter wayne", hello.name());
 
   EXPECT_EQ(
@@ -3324,17 +3324,17 @@ TEST_F(HttpFilterTest, ConnectionMetadataContext) {
                    "typed.connection.data"));
 
   helloworld::HelloRequest hello;
-  static_cast<void>(check_request.attributes()
-                        .metadata_context()
-                        .typed_filter_metadata()
-                        .at("typed.connection.data")
-                        .UnpackTo(&hello));
+  std::ignore = check_request.attributes()
+                    .metadata_context()
+                    .typed_filter_metadata()
+                    .at("typed.connection.data")
+                    .UnpackTo(&hello);
   EXPECT_EQ("connection_typed", hello.name());
-  static_cast<void>(check_request.attributes()
-                        .metadata_context()
-                        .typed_filter_metadata()
-                        .at("untyped.and.typed.connection.data")
-                        .UnpackTo(&hello));
+  std::ignore = check_request.attributes()
+                    .metadata_context()
+                    .typed_filter_metadata()
+                    .at("untyped.and.typed.connection.data")
+                    .UnpackTo(&hello);
   EXPECT_EQ("connection_typed", hello.name());
 
   EXPECT_EQ(0, check_request.attributes().metadata_context().typed_filter_metadata().count(
@@ -5760,7 +5760,7 @@ TEST_P(HttpFilterTestParam, PerRouteConfigurationIntegrationTest) {
         check_response.mutable_ok_response();
 
         std::string serialized_response;
-        static_cast<void>(check_response.SerializeToString(&serialized_response));
+        std::ignore = check_response.SerializeToString(&serialized_response);
         auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
 
         callbacks.onSuccessRaw(std::move(response), parent_span);
@@ -5836,7 +5836,7 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcClientCreationAndUsage) {
 
         // Serialize the response to a buffer.
         std::string serialized_response;
-        static_cast<void>(check_response.SerializeToString(&serialized_response));
+        std::ignore = check_response.SerializeToString(&serialized_response);
         auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
 
         callbacks.onSuccessRaw(std::move(response), parent_span);
@@ -6144,7 +6144,7 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcClientTimeoutConfiguration) {
             check_response.mutable_ok_response();
 
             std::string serialized_response;
-            static_cast<void>(check_response.SerializeToString(&serialized_response));
+            std::ignore = check_response.SerializeToString(&serialized_response);
             auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
 
             callbacks.onSuccessRaw(std::move(response), parent_span);
@@ -6161,7 +6161,7 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcClientTimeoutConfiguration) {
             check_response.mutable_ok_response();
 
             std::string serialized_response;
-            static_cast<void>(check_response.SerializeToString(&serialized_response));
+            std::ignore = check_response.SerializeToString(&serialized_response);
             auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
 
             callbacks.onSuccessRaw(std::move(response), parent_span);

@@ -421,7 +421,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResource) {
     auto stat_listener = msg->add_static_listeners();
     envoy::config::listener::v3::Listener listener;
     listener.set_name("bar");
-    static_cast<void>(stat_listener->mutable_listener()->PackFrom(listener));
+    std::ignore = stat_listener->mutable_listener()->PackFrom(listener);
     return msg;
   });
   const std::string expected_json = R"EOF({
@@ -593,7 +593,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByMask) {
     auto stat_listener = msg->add_static_listeners();
     envoy::config::listener::v3::Listener listener;
     listener.set_name("bar");
-    static_cast<void>(stat_listener->mutable_listener()->PackFrom(listener));
+    std::ignore = stat_listener->mutable_listener()->PackFrom(listener);
     return msg;
   });
   const std::string expected_json = R"EOF({
@@ -663,7 +663,7 @@ ProtobufTypes::MessagePtr testDumpClustersConfig(const Matchers::StringMatcher&)
   envoy::config::cluster::v3::Cluster inner_cluster;
   inner_cluster.set_name("foo");
   inner_cluster.set_ignore_health_on_host_removal(true);
-  static_cast<void>(static_cluster->mutable_cluster()->PackFrom(inner_cluster));
+  std::ignore = static_cluster->mutable_cluster()->PackFrom(inner_cluster);
 
   auto* dyn_cluster = msg->add_dynamic_active_clusters();
   dyn_cluster->set_version_info("baz");
@@ -672,7 +672,7 @@ ProtobufTypes::MessagePtr testDumpClustersConfig(const Matchers::StringMatcher&)
   inner_dyn_cluster.set_name("bar");
   inner_dyn_cluster.set_ignore_health_on_host_removal(true);
   inner_dyn_cluster.mutable_http2_protocol_options()->set_allow_connect(true);
-  static_cast<void>(dyn_cluster->mutable_cluster()->PackFrom(inner_dyn_cluster));
+  std::ignore = dyn_cluster->mutable_cluster()->PackFrom(inner_dyn_cluster);
   return msg;
 }
 
@@ -753,7 +753,7 @@ TEST_P(AdminInstanceTest, InvalidFieldMaskWithResourceDoesNotCrash) {
     envoy::config::cluster::v3::Cluster inner_cluster;
     inner_cluster.add_transport_socket_matches()->set_name("match1");
     inner_cluster.add_transport_socket_matches()->set_name("match2");
-    static_cast<void>(static_cluster->mutable_cluster()->PackFrom(inner_cluster));
+    std::ignore = static_cluster->mutable_cluster()->PackFrom(inner_cluster);
     return msg;
   });
 
@@ -764,8 +764,7 @@ TEST_P(AdminInstanceTest, InvalidFieldMaskWithResourceDoesNotCrash) {
                 header_map, response));
   std::string expected_mask_text = R"pb(paths: "cluster.transport_socket_matches.name")pb";
   Protobuf::FieldMask expected_mask_proto;
-  static_cast<void>(
-      Protobuf::TextFormat::ParseFromString(expected_mask_text, &expected_mask_proto));
+  std::ignore = Protobuf::TextFormat::ParseFromString(expected_mask_text, &expected_mask_proto);
   EXPECT_EQ(fmt::format("FieldMask {} could not be successfully used.",
                         expected_mask_proto.DebugString()),
             response.toString());
@@ -807,7 +806,7 @@ TEST_P(AdminInstanceTest, FieldMasksWorkWhenFetchingAllResources) {
     auto* static_cluster = msg->add_static_clusters();
     envoy::config::cluster::v3::Cluster inner_cluster;
     inner_cluster.set_name("cluster1");
-    static_cast<void>(static_cluster->mutable_cluster()->PackFrom(inner_cluster));
+    std::ignore = static_cluster->mutable_cluster()->PackFrom(inner_cluster);
     return msg;
   });
   EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?mask=bootstrap", header_map, response));
@@ -844,8 +843,8 @@ ProtobufTypes::MessagePtr testDumpEcdsConfig(const Matchers::StringMatcher&) {
   listener_filter_config.set_name("foo");
   auto listener_config = test::integration::filters::TestTcpListenerFilterConfig();
   listener_config.set_drain_bytes(5);
-  static_cast<void>(listener_filter_config.mutable_typed_config()->PackFrom(listener_config));
-  static_cast<void>(ecds_listener->mutable_ecds_filter()->PackFrom(listener_filter_config));
+  std::ignore = listener_filter_config.mutable_typed_config()->PackFrom(listener_config);
+  std::ignore = ecds_listener->mutable_ecds_filter()->PackFrom(listener_filter_config);
 
   auto* ecds_network = msg->mutable_ecds_filters()->Add();
   ecds_network->set_version_info("1");
@@ -854,8 +853,8 @@ ProtobufTypes::MessagePtr testDumpEcdsConfig(const Matchers::StringMatcher&) {
   network_filter_config.set_name("bar");
   auto network_config = test::integration::filters::TestDrainerNetworkFilterConfig();
   network_config.set_bytes_to_drain(5);
-  static_cast<void>(network_filter_config.mutable_typed_config()->PackFrom(network_config));
-  static_cast<void>(ecds_network->mutable_ecds_filter()->PackFrom(network_filter_config));
+  std::ignore = network_filter_config.mutable_typed_config()->PackFrom(network_config);
+  std::ignore = ecds_network->mutable_ecds_filter()->PackFrom(network_filter_config);
 
   return msg;
 }

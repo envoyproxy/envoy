@@ -41,8 +41,8 @@ public:
       validation_context->mutable_trusted_ca()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
       cluster_config.mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
-      static_cast<void>(
-          cluster_config.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context));
+      std::ignore =
+          cluster_config.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
     });
     if (route_config != nullptr) {
       config_helper_.addConfigModifier(

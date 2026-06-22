@@ -120,9 +120,8 @@ TEST_P(WasmFactoryTest, UnknownRuntime) {
 TEST_P(WasmFactoryTest, StartFailed) {
   Protobuf::StringValue plugin_configuration;
   plugin_configuration.set_value("bad");
-  static_cast<void>(
-      config_.mutable_config()->mutable_vm_config()->mutable_configuration()->PackFrom(
-          plugin_configuration));
+  std::ignore = config_.mutable_config()->mutable_vm_config()->mutable_configuration()->PackFrom(
+      plugin_configuration);
 
   EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config_), Extensions::Common::Wasm::WasmException,
                             "Unable to create Wasm plugin test");
@@ -131,8 +130,7 @@ TEST_P(WasmFactoryTest, StartFailed) {
 TEST_P(WasmFactoryTest, ConfigureFailed) {
   Protobuf::StringValue plugin_configuration;
   plugin_configuration.set_value("bad");
-  static_cast<void>(
-      config_.mutable_config()->mutable_configuration()->PackFrom(plugin_configuration));
+  std::ignore = config_.mutable_config()->mutable_configuration()->PackFrom(plugin_configuration);
 
   EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config_), Extensions::Common::Wasm::WasmException,
                             "Unable to create Wasm plugin test");

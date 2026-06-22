@@ -133,8 +133,8 @@ TEST_F(DynamicModuleTransportSocketConfigTest, ImplementsSecureTransport) {
 
 TEST_F(DynamicModuleTransportSocketConfigTest, WithTransportSocketConfig) {
   auto config = buildProtoConfig(kReferenceModule, "xor");
-  static_cast<void>(
-      config.mutable_transport_socket_config()->PackFrom(ValueUtil::stringValue("config_bytes")));
+  std::ignore =
+      config.mutable_transport_socket_config()->PackFrom(ValueUtil::stringValue("config_bytes"));
   auto factory_or_error = upstream_factory_.createTransportSocketFactory(config, context_);
   EXPECT_TRUE(factory_or_error.ok()) << factory_or_error.status().message();
 }
@@ -218,7 +218,7 @@ public:
     if (config_bytes.has_value()) {
       Protobuf::BytesValue bytes_value;
       bytes_value.set_value(*config_bytes);
-      static_cast<void>(config.mutable_transport_socket_config()->PackFrom(bytes_value));
+      std::ignore = config.mutable_transport_socket_config()->PackFrom(bytes_value);
     }
     auto factory_or_error = factory_.createTransportSocketFactory(config, context_, {});
     EXPECT_TRUE(factory_or_error.ok()) << factory_or_error.status().message();

@@ -131,9 +131,9 @@ public:
     if (valid) {
       envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
       audience.set_url(audience_url);
-      static_cast<void>((*metadata_.mutable_typed_filter_metadata())
-                            [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-                                .PackFrom(audience));
+      std::ignore = (*metadata_.mutable_typed_filter_metadata())
+                        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                            .PackFrom(audience);
     }
     ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
   }
@@ -196,9 +196,9 @@ public:
     setClient(std::move(mock_client));
 
     metadata_.clear_typed_filter_metadata();
-    static_cast<void>((*metadata_.mutable_typed_filter_metadata())
-                          [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-                              .PackFrom(audience));
+    std::ignore = (*metadata_.mutable_typed_filter_metadata())
+                      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                          .PackFrom(audience);
     ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
     configure_client_expectations(*mock_client_ptr);
@@ -279,9 +279,9 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChainIterationWithAccessToken) {
   EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_access_token();
-  static_cast<void>((*metadata_.mutable_typed_filter_metadata())
-                        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-                            .PackFrom(audience));
+  std::ignore = (*metadata_.mutable_typed_filter_metadata())
+                    [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                        .PackFrom(audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
@@ -313,9 +313,9 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChainIterationWithBoundAccessToken) {
 
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_access_token();
-  static_cast<void>((*metadata_.mutable_typed_filter_metadata())
-                        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-                            .PackFrom(audience));
+  std::ignore = (*metadata_.mutable_typed_filter_metadata())
+                    [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                        .PackFrom(audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   const std::string dummy_pem = "dummy cert PEM";
@@ -392,9 +392,9 @@ TEST_F(GcpAuthnFilterTest, AudienceInvalidType) {
 
   Protobuf::Duration invalid_proto;
   invalid_proto.set_seconds(5);
-  static_cast<void>((*metadata_.mutable_typed_filter_metadata())
-                        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-                            .PackFrom(invalid_proto));
+  std::ignore = (*metadata_.mutable_typed_filter_metadata())
+                    [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                        .PackFrom(invalid_proto);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   // The filter should fail to unpack, return nullopt, fail open, and return Continue.
@@ -493,9 +493,9 @@ TEST_F(GcpAuthnFilterTest, BoundJwtCacheMissAndInsert) {
 
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_jwt()->set_url("test");
-  static_cast<void>((*metadata_.mutable_typed_filter_metadata())
-                        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-                            .PackFrom(audience));
+  std::ignore = (*metadata_.mutable_typed_filter_metadata())
+                    [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                        .PackFrom(audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   const std::string dummy_pem = "dummy cert PEM";
@@ -562,9 +562,9 @@ TEST_F(GcpAuthnFilterTest, MtlsClusterFingerprint) {
 
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_jwt()->set_url("test");
-  static_cast<void>((*metadata_.mutable_typed_filter_metadata())
-                        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-                            .PackFrom(audience));
+  std::ignore = (*metadata_.mutable_typed_filter_metadata())
+                    [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                        .PackFrom(audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   const std::string dummy_pem = "dummy cert PEM";
@@ -610,9 +610,9 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithoutFingerprintFails) {
 
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_jwt()->set_url("http://bound_audience");
-  static_cast<void>((*metadata_.mutable_typed_filter_metadata())
-                        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-                            .PackFrom(audience));
+  std::ignore = (*metadata_.mutable_typed_filter_metadata())
+                    [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                        .PackFrom(audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   auto socket_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
@@ -646,9 +646,9 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithEmptyTlsCertificatesFails) {
 
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_jwt()->set_url("http://bound_audience");
-  static_cast<void>((*metadata_.mutable_typed_filter_metadata())
-                        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-                            .PackFrom(audience));
+  std::ignore = (*metadata_.mutable_typed_filter_metadata())
+                    [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                        .PackFrom(audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   auto socket_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
@@ -683,9 +683,9 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithEmptyCertChainFails) {
 
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_jwt()->set_url("http://bound_audience");
-  static_cast<void>((*metadata_.mutable_typed_filter_metadata())
-                        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-                            .PackFrom(audience));
+  std::ignore = (*metadata_.mutable_typed_filter_metadata())
+                    [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                        .PackFrom(audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   auto socket_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
@@ -724,9 +724,9 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithFingerprinterErrorFails) {
 
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_jwt()->set_url("http://bound_audience");
-  static_cast<void>((*metadata_.mutable_typed_filter_metadata())
-                        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-                            .PackFrom(audience));
+  std::ignore = (*metadata_.mutable_typed_filter_metadata())
+                    [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                        .PackFrom(audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   auto socket_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
@@ -767,9 +767,9 @@ TEST_F(GcpAuthnFilterTest, BoundJwtCacheHit) {
 
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_jwt()->set_url("test");
-  static_cast<void>((*metadata_.mutable_typed_filter_metadata())
-                        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-                            .PackFrom(audience));
+  std::ignore = (*metadata_.mutable_typed_filter_metadata())
+                    [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                        .PackFrom(audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   const std::string dummy_pem = "dummy cert PEM";
@@ -824,9 +824,9 @@ TEST_F(GcpAuthnFilterTest, BoundAccessTokenWithoutFingerprintFails) {
 
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_access_token();
-  static_cast<void>((*metadata_.mutable_typed_filter_metadata())
-                        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-                            .PackFrom(audience));
+  std::ignore = (*metadata_.mutable_typed_filter_metadata())
+                    [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                        .PackFrom(audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   auto socket_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
@@ -854,9 +854,9 @@ TEST_F(GcpAuthnFilterTest, BoundAccessTokenCacheHit) {
 
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_access_token();
-  static_cast<void>((*metadata_.mutable_typed_filter_metadata())
-                        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-                            .PackFrom(audience));
+  std::ignore = (*metadata_.mutable_typed_filter_metadata())
+                    [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                        .PackFrom(audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   const std::string dummy_pem = "dummy cert PEM";
@@ -910,9 +910,9 @@ TEST_F(GcpAuthnFilterTest, EmptyAudienceProto) {
   EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
 
   envoy::extensions::filters::http::gcp_authn::v3::Audience empty_audience;
-  static_cast<void>((*metadata_.mutable_typed_filter_metadata())
-                        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-                            .PackFrom(empty_audience));
+  std::ignore = (*metadata_.mutable_typed_filter_metadata())
+                    [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                        .PackFrom(empty_audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);

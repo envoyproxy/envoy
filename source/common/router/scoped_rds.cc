@@ -619,8 +619,8 @@ ScopedRoutesConfigProviderManager::dumpConfigs(const Matchers::StringMatcher& na
         if (!name_matcher.match(it.second->configProto().name())) {
           continue;
         }
-        static_cast<void>(dynamic_config->mutable_scoped_route_configs()->Add()->PackFrom(
-            it.second->configProto()));
+        std::ignore = dynamic_config->mutable_scoped_route_configs()->Add()->PackFrom(
+            it.second->configProto());
       }
       TimestampUtil::systemClockToTimestamp(subscription->lastUpdated(),
                                             *dynamic_config->mutable_last_updated());
@@ -637,8 +637,7 @@ ScopedRoutesConfigProviderManager::dumpConfigs(const Matchers::StringMatcher& na
       if (!name_matcher.match(config_proto->name())) {
         continue;
       }
-      static_cast<void>(
-          inline_config->mutable_scoped_route_configs()->Add()->PackFrom(*config_proto));
+      std::ignore = inline_config->mutable_scoped_route_configs()->Add()->PackFrom(*config_proto);
     }
     TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
                                           *inline_config->mutable_last_updated());

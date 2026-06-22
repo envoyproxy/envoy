@@ -361,7 +361,7 @@ TEST_F(FilterTest, RequestMatchingSucceededWithCelMatcher) {
     }
   )pb";
   google::api::expr::v1alpha1::CheckedExpr checked_expr;
-  static_cast<void>(Protobuf::TextFormat::ParseFromString(cel_expr_str, &checked_expr));
+  std::ignore = Protobuf::TextFormat::ParseFromString(cel_expr_str, &checked_expr);
 
   xds::type::matcher::v3::CelMatcher cel_matcher;
   cel_matcher.mutable_expr_match()->mutable_checked_expr()->MergeFrom(checked_expr);
@@ -372,11 +372,11 @@ TEST_F(FilterTest, RequestMatchingSucceededWithCelMatcher) {
 
   xds::type::matcher::v3::HttpAttributesCelMatchInput cel_match_input;
   single_predicate->mutable_input()->set_name("envoy.matching.inputs.cel_data_input");
-  static_cast<void>(
-      single_predicate->mutable_input()->mutable_typed_config()->PackFrom(cel_match_input));
+  std::ignore =
+      single_predicate->mutable_input()->mutable_typed_config()->PackFrom(cel_match_input);
 
   auto* custom_matcher = single_predicate->mutable_custom_match();
-  static_cast<void>(custom_matcher->mutable_typed_config()->PackFrom(cel_matcher));
+  std::ignore = custom_matcher->mutable_typed_config()->PackFrom(cel_matcher);
 
   std::string on_match_str = R"pb(
     action {
@@ -410,7 +410,7 @@ TEST_F(FilterTest, RequestMatchingSucceededWithCelMatcher) {
     }
   )pb";
   xds::type::matcher::v3::Matcher::OnMatch on_match;
-  static_cast<void>(Protobuf::TextFormat::ParseFromString(on_match_str, &on_match));
+  std::ignore = Protobuf::TextFormat::ParseFromString(on_match_str, &on_match);
   inner_matcher->mutable_on_match()->MergeFrom(on_match);
   config_.mutable_bucket_matchers()->MergeFrom(matcher);
   addMatcherConfig(matcher);

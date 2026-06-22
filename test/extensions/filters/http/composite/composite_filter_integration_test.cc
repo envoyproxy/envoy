@@ -103,7 +103,7 @@ public:
     matcher_input->set_name("request-headers");
     HttpRequestHeaderMatchInput match_input;
     match_input.set_header_name("match-header");
-    static_cast<void>(matcher_input->mutable_typed_config()->PackFrom(match_input));
+    std::ignore = matcher_input->mutable_typed_config()->PackFrom(match_input);
 
     auto map = matcher_tree->mutable_exact_match_map()->mutable_map();
     Matcher_OnMatch match;
@@ -112,7 +112,7 @@ public:
 
     ExecuteFilterAction filter_action;
     base_action_function(filter_action.mutable_typed_config());
-    static_cast<void>(mutable_action->mutable_typed_config()->PackFrom(filter_action));
+    std::ignore = mutable_action->mutable_typed_config()->PackFrom(filter_action);
 
     (*map)["match"] = match;
     return per_route_config;
@@ -136,7 +136,7 @@ public:
       matcher_input->set_name("request-headers");
       HttpRequestHeaderMatchInput match_input;
       match_input.set_header_name("match-header");
-      static_cast<void>(matcher_input->mutable_typed_config()->PackFrom(match_input));
+      std::ignore = matcher_input->mutable_typed_config()->PackFrom(match_input);
 
       auto* map = matcher_tree->mutable_exact_match_map()->mutable_map();
       Matcher_OnMatch on_match;
@@ -144,20 +144,19 @@ public:
       mutable_action->set_name("composite-action");
       ExecuteFilterAction filter_action;
       filter_action.mutable_typed_config()->set_name("set-response-code-filter");
-      static_cast<void>(filter_action.mutable_typed_config()->mutable_typed_config()->PackFrom(
-          set_response_code));
-      static_cast<void>(mutable_action->mutable_typed_config()->PackFrom(filter_action));
+      std::ignore =
+          filter_action.mutable_typed_config()->mutable_typed_config()->PackFrom(set_response_code);
+      std::ignore = mutable_action->mutable_typed_config()->PackFrom(filter_action);
       (*map)["match"] = on_match;
 
-      config_helper_.addConfigModifier(
-          [per_route, filter_name, route_prefix](ConfigHelper::HttpConnectionManager& cm) {
-            auto* vh = cm.mutable_route_config()->mutable_virtual_hosts(0);
-            auto* route = vh->mutable_routes()->Mutable(0);
-            route->mutable_match()->set_prefix(route_prefix);
-            route->mutable_route()->set_cluster("cluster_0");
-            static_cast<void>(
-                (*route->mutable_typed_per_filter_config())[filter_name].PackFrom(per_route));
-          });
+      config_helper_.addConfigModifier([per_route, filter_name,
+                                        route_prefix](ConfigHelper::HttpConnectionManager& cm) {
+        auto* vh = cm.mutable_route_config()->mutable_virtual_hosts(0);
+        auto* route = vh->mutable_routes()->Mutable(0);
+        route->mutable_match()->set_prefix(route_prefix);
+        route->mutable_route()->set_cluster("cluster_0");
+        std::ignore = (*route->mutable_typed_per_filter_config())[filter_name].PackFrom(per_route);
+      });
     } else {
       ProtoConfig set_response_code;
       set_response_code.set_code(code);
@@ -166,17 +165,17 @@ public:
       }
       auto per_route_config = createPerRouteConfig([set_response_code](auto* cfg) {
         cfg->set_name("set-response-code-filter");
-        static_cast<void>(cfg->mutable_typed_config()->PackFrom(set_response_code));
+        std::ignore = cfg->mutable_typed_config()->PackFrom(set_response_code);
       });
-      config_helper_.addConfigModifier([per_route_config, filter_name,
-                                        route_prefix](ConfigHelper::HttpConnectionManager& cm) {
-        auto* vh = cm.mutable_route_config()->mutable_virtual_hosts(0);
-        auto* route = vh->mutable_routes()->Mutable(0);
-        route->mutable_match()->set_prefix(route_prefix);
-        route->mutable_route()->set_cluster("cluster_0");
-        static_cast<void>(
-            (*route->mutable_typed_per_filter_config())[filter_name].PackFrom(per_route_config));
-      });
+      config_helper_.addConfigModifier(
+          [per_route_config, filter_name, route_prefix](ConfigHelper::HttpConnectionManager& cm) {
+            auto* vh = cm.mutable_route_config()->mutable_virtual_hosts(0);
+            auto* route = vh->mutable_routes()->Mutable(0);
+            route->mutable_match()->set_prefix(route_prefix);
+            route->mutable_route()->set_cluster("cluster_0");
+            std::ignore =
+                (*route->mutable_typed_per_filter_config())[filter_name].PackFrom(per_route_config);
+          });
     }
   }
 
@@ -207,8 +206,8 @@ public:
       auto* route = vh->mutable_routes()->Mutable(0);
       route->mutable_match()->set_prefix(route_prefix);
       route->mutable_route()->set_cluster("cluster_0");
-      static_cast<void>((*route->mutable_typed_per_filter_config())[filter_name].PackFrom(
-          set_response_code_per_route_config));
+      std::ignore = (*route->mutable_typed_per_filter_config())[filter_name].PackFrom(
+          set_response_code_per_route_config);
     });
   }
 
@@ -716,9 +715,9 @@ public:
         address->set_address(Network::Test::getLoopbackAddressString(ipVersion()));
         envoy::extensions::upstreams::http::v3::HttpProtocolOptions protocol_options;
         protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
-        static_cast<void>((*server_cluster->mutable_typed_extension_protocol_options())
-                              ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-                                  .PackFrom(protocol_options));
+        std::ignore = (*server_cluster->mutable_typed_extension_protocol_options())
+                          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                              .PackFrom(protocol_options);
       }
     });
 

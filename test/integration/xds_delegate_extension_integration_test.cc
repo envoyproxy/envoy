@@ -39,7 +39,7 @@ public:
         envoy::service::discovery::v3::Resource r;
         r.set_name(decoded_resource.name());
         r.set_version(decoded_resource.version());
-        static_cast<void>(r.mutable_resource()->PackFrom(decoded_resource.resource()));
+        std::ignore = r.mutable_resource()->PackFrom(decoded_resource.resource());
         ResourcesMap[makeKey(source_id, decoded_resource.name())] = std::move(r);
       }
     }
@@ -143,8 +143,8 @@ public:
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* delegate_extension = bootstrap.mutable_xds_delegate_extension();
       delegate_extension->set_name("envoy.config.xds.test_delegate");
-      static_cast<void>(delegate_extension->mutable_typed_config()->PackFrom(
-          test::envoy::config::xds::TestXdsResourcesDelegateConfig()));
+      std::ignore = delegate_extension->mutable_typed_config()->PackFrom(
+          test::envoy::config::xds::TestXdsResourcesDelegateConfig());
     });
   }
 
@@ -245,11 +245,11 @@ TEST_P(XdsDelegateExtensionIntegrationTest, XdsResourcesDelegateOnConfigUpdated)
   EXPECT_EQ("saz", getRuntimeKey("baz"));
   ASSERT_EQ(TestXdsResourcesDelegate::ResourcesMap.size(), 1);
   envoy::service::runtime::v3::Runtime retrieved_rtds_layer;
-  static_cast<void>(
+  std::ignore =
       TestXdsResourcesDelegate::ResourcesMap
           ["xds_cluster+type.googleapis.com/envoy.service.runtime.v3.Runtime+some_rtds_layer"]
               .resource()
-              .UnpackTo(&retrieved_rtds_layer));
+              .UnpackTo(&retrieved_rtds_layer);
   EXPECT_TRUE(TestUtility::protoEqual(retrieved_rtds_layer, some_rtds_layer));
 }
 

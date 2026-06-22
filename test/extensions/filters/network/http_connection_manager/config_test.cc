@@ -338,8 +338,8 @@ http_filters:
   // Simulate tracer provider configuration in the bootstrap config.
   envoy::config::trace::v3::Tracing tracing_config;
   tracing_config.mutable_http()->set_name("zipkin");
-  static_cast<void>(tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
-      envoy::config::trace::v3::ZipkinConfig{}));
+  std::ignore = tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
+      envoy::config::trace::v3::ZipkinConfig{});
   context_.server_factory_context_.http_context_.setDefaultTracingConfig(tracing_config);
 
   // When tracing is not enabled on a given "envoy.filters.network.http_connection_manager" filter,
@@ -420,8 +420,8 @@ http_filters:
   // Simulate tracer provider configuration in the bootstrap config.
   envoy::config::trace::v3::Tracing tracing_config;
   tracing_config.mutable_http()->set_name("zipkin");
-  static_cast<void>(tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
-      envoy::config::trace::v3::ZipkinConfig{}));
+  std::ignore = tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
+      envoy::config::trace::v3::ZipkinConfig{});
   context_.server_factory_context_.http_context_.setDefaultTracingConfig(tracing_config);
 
   // When tracing is enabled on a given "envoy.filters.network.http_connection_manager" filter,
@@ -472,8 +472,8 @@ http_filters:
   // Simulate tracer provider configuration in the bootstrap config.
   envoy::config::trace::v3::Tracing bootstrap_tracing_config;
   bootstrap_tracing_config.mutable_http()->set_name("opentelemetry");
-  static_cast<void>(bootstrap_tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
-      envoy::config::trace::v3::OpenTelemetryConfig{}));
+  std::ignore = bootstrap_tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
+      envoy::config::trace::v3::OpenTelemetryConfig{});
   context_.server_factory_context_.http_context_.setDefaultTracingConfig(bootstrap_tracing_config);
 
   // Set up expected tracer provider configuration.
@@ -483,7 +483,7 @@ http_filters:
   zipkin_config.set_collector_cluster("zipkin");
   zipkin_config.set_collector_endpoint("/api/v2/spans");
   zipkin_config.set_collector_endpoint_version(envoy::config::trace::v3::ZipkinConfig::HTTP_JSON);
-  static_cast<void>(inlined_tracing_config.mutable_typed_config()->PackFrom(zipkin_config));
+  std::ignore = inlined_tracing_config.mutable_typed_config()->PackFrom(zipkin_config);
 
   // When tracing is enabled on a given "envoy.filters.network.http_connection_manager" filter,
   // an actual Tracer must be obtained from the HttpTracerManager.

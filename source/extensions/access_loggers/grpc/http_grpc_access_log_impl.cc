@@ -122,8 +122,8 @@ void HttpGrpcAccessLog::emitLog(const Formatter::Context& context,
 
   if (request_headers.Method() != nullptr) {
     envoy::config::core::v3::RequestMethod method = envoy::config::core::v3::METHOD_UNSPECIFIED;
-    static_cast<void>(envoy::config::core::v3::RequestMethod_Parse(
-        MessageUtil::sanitizeUtf8String(request_headers.getMethodValue()), &method));
+    std::ignore = envoy::config::core::v3::RequestMethod_Parse(
+        MessageUtil::sanitizeUtf8String(request_headers.getMethodValue()), &method);
     request_properties->set_request_method(method);
   }
   if (!request_headers_to_log_.empty()) {

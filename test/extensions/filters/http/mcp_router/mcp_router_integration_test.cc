@@ -93,8 +93,8 @@ public:
       mcp_cluster->set_cluster("mcp_tools_backend");
       mcp_cluster->set_host_rewrite_literal("tools.mcp.example.com");
 
-      static_cast<void>(multicluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(
-          multicluster_config));
+      std::ignore = multicluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(
+          multicluster_config);
     });
 
     // MCP router as terminal filter
@@ -2218,8 +2218,8 @@ public:
       mcp_cluster->set_cluster("mcp_time_backend");
       mcp_cluster->set_host_rewrite_literal("time.mcp.example.com");
 
-      static_cast<void>(multicluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(
-          multicluster_config));
+      std::ignore = multicluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(
+          multicluster_config);
     });
 
     // MCP router with session identity and ENFORCE validation

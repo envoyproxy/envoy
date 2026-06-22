@@ -56,8 +56,8 @@ public:
       resource.attributes_[key] = value;
     }
     if (!metric_conversion_pbtext.empty()) {
-      static_cast<void>(Protobuf::TextFormat::ParseFromString(
-          metric_conversion_pbtext, sink_config.mutable_custom_metric_conversions()));
+      std::ignore = Protobuf::TextFormat::ParseFromString(
+          metric_conversion_pbtext, sink_config.mutable_custom_metric_conversions());
     }
     return std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_);
   }

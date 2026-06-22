@@ -317,9 +317,9 @@ TEST_P(McpFilterIntegrationTest, PerRouteOverrideToReject) {
         envoy::extensions::filters::http::mcp::v3::McpOverride mcp_override;
         mcp_override.set_traffic_mode(
             envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
-        static_cast<void>(
+        std::ignore =
             (*route->mutable_typed_per_filter_config())["envoy.filters.http.mcp"].PackFrom(
-                mcp_override));
+                mcp_override);
       });
 
   initialize();
@@ -367,11 +367,11 @@ TEST_P(McpFilterIntegrationTest, PerRouteDisabled) {
 
         // Set the config to McpOverride (even though we're disabling)
         envoy::extensions::filters::http::mcp::v3::McpOverride mcp_per_route;
-        static_cast<void>(filter_config.mutable_config()->PackFrom(mcp_per_route));
+        std::ignore = filter_config.mutable_config()->PackFrom(mcp_per_route);
 
-        static_cast<void>(
+        std::ignore =
             (*route->mutable_typed_per_filter_config())["envoy.filters.http.mcp"].PackFrom(
-                filter_config));
+                filter_config);
       });
 
   initialize();
@@ -412,10 +412,10 @@ TEST_P(McpFilterIntegrationTest, PerRouteVirtualHostLevel) {
         envoy::config::route::v3::FilterConfig vhost_filter_config;
         vhost_filter_config.set_disabled(true);
         envoy::extensions::filters::http::mcp::v3::McpOverride vhost_mcp_per_route;
-        static_cast<void>(vhost_filter_config.mutable_config()->PackFrom(vhost_mcp_per_route));
-        static_cast<void>(
+        std::ignore = vhost_filter_config.mutable_config()->PackFrom(vhost_mcp_per_route);
+        std::ignore =
             (*virtual_host->mutable_typed_per_filter_config())["envoy.filters.http.mcp"].PackFrom(
-                vhost_filter_config));
+                vhost_filter_config);
       });
 
   initialize();

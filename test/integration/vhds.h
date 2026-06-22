@@ -297,9 +297,9 @@ public:
     auto* resource = ret.add_resources();
     resource->set_name("my_route/vhost_1");
     resource->set_version("4");
-    static_cast<void>(resource->mutable_resource()->PackFrom(
+    std::ignore = resource->mutable_resource()->PackFrom(
         TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
-            virtualHostYaml("my_route/vhost_1", "vhost_1, vhost.first"))));
+            virtualHostYaml("my_route/vhost_1", "vhost_1, vhost.first")));
     resource->add_aliases("my_route/vhost.first");
     ret.set_nonce("test-nonce-0");
 

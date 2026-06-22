@@ -74,8 +74,8 @@ filter_config:
                                ->Mutable(0)
                                ->mutable_typed_per_filter_config();
 
-            static_cast<void>((*config)["envoy.extensions.filters.http.dynamic_modules"].PackFrom(
-                per_route_config_proto));
+            std::ignore = (*config)["envoy.extensions.filters.http.dynamic_modules"].PackFrom(
+                per_route_config_proto);
           });
     }
 

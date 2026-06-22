@@ -936,7 +936,7 @@ routes:
             ->set_cluster_name("xds_cluster");
       }
 
-      static_cast<void>(config_blob->PackFrom(hcm_config));
+      std::ignore = config_blob->PackFrom(hcm_config);
     });
 
     HttpIntegrationTest::initialize();

@@ -170,7 +170,7 @@ createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::
     uhv_config.set_strip_fragment_from_path(!Runtime::runtimeFeatureEnabled(
         "envoy.reloadable_features.http_reject_path_with_fragment"));
     legacy_header_validator_config.set_name("default_envoy_uhv_from_legacy_settings");
-    static_cast<void>(legacy_header_validator_config.mutable_typed_config()->PackFrom(uhv_config));
+    std::ignore = legacy_header_validator_config.mutable_typed_config()->PackFrom(uhv_config);
   }
 
   const ::envoy::config::core::v3::TypedExtensionConfig& header_validator_config =
@@ -518,8 +518,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   if (!final_rid_config.has_typed_config()) {
     // This creates a default version of the UUID extension which is a required extension in the
     // build.
-    static_cast<void>(final_rid_config.mutable_typed_config()->PackFrom(
-        envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig()));
+    std::ignore = final_rid_config.mutable_typed_config()->PackFrom(
+        envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig());
   }
   auto extension_or_error = Http::RequestIDExtensionFactory::fromProto(final_rid_config, context_);
   SET_AND_RETURN_IF_NOT_OK(extension_or_error.status(), creation_status);
@@ -533,7 +533,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
     auto* extension = ip_detection_extensions.Add();
     extension->set_name("envoy.http.original_ip_detection.xff");
-    static_cast<void>(extension->mutable_typed_config()->PackFrom(xff_config));
+    std::ignore = extension->mutable_typed_config()->PackFrom(xff_config);
   } else {
     if (use_remote_address_) {
       creation_status = absl::InvalidArgumentError(

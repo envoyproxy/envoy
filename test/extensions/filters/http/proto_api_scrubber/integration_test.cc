@@ -112,14 +112,14 @@ public:
     // Build CEL input and CEL matcher.
     single->mutable_input()->set_name("envoy.matching.inputs.cel_data_input");
     xds::type::matcher::v3::HttpAttributesCelMatchInput input_config;
-    static_cast<void>(single->mutable_input()->mutable_typed_config()->PackFrom(input_config));
+    std::ignore = single->mutable_input()->mutable_typed_config()->PackFrom(input_config);
     auto* custom_match = single->mutable_custom_match();
     custom_match->set_name("envoy.matching.matchers.cel_matcher");
     xds::type::matcher::v3::CelMatcher cel_matcher;
 
     // Assign the parsed AST to the configuration and return the predicate.
     *cel_matcher.mutable_expr_match()->mutable_cel_expr_parsed() = ast;
-    static_cast<void>(custom_match->mutable_typed_config()->PackFrom(cel_matcher));
+    std::ignore = custom_match->mutable_typed_config()->PackFrom(cel_matcher);
     return predicate;
   }
 
@@ -132,7 +132,7 @@ public:
 
     // Configure the Data Input (The source of the string to be matched)
     single->mutable_input()->set_name(input_extension_name);
-    static_cast<void>(single->mutable_input()->mutable_typed_config()->PackFrom(input_config));
+    std::ignore = single->mutable_input()->mutable_typed_config()->PackFrom(input_config);
 
     // Configure the String Matcher (The logic to apply)
     auto* string_matcher = single->mutable_value_match();
@@ -171,9 +171,9 @@ public:
       auto* matcher_entry = matcher_proto.mutable_matcher_list()->add_matchers();
       *matcher_entry->mutable_predicate() = match_predicate;
       envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction remove_action;
-      static_cast<void>(
+      std::ignore =
           matcher_entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
-              remove_action));
+              remove_action);
       matcher_entry->mutable_on_match()->mutable_action()->set_name("remove_field");
 
       // Apply to all requested fields.
@@ -183,7 +183,7 @@ public:
     }
 
     Protobuf::Any any_config;
-    static_cast<void>(any_config.PackFrom(config));
+    std::ignore = any_config.PackFrom(config);
     return fmt::format(R"EOF(
     name: envoy.filters.http.proto_api_scrubber
     typed_config: {})EOF",
@@ -224,9 +224,9 @@ public:
       auto* matcher_entry = matcher_proto.mutable_matcher_list()->add_matchers();
       *matcher_entry->mutable_predicate() = match_predicate;
       envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction remove_action;
-      static_cast<void>(
+      std::ignore =
           matcher_entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
-              remove_action));
+              remove_action);
       matcher_entry->mutable_on_match()->mutable_action()->set_name("remove_field");
 
       // Apply to the specific field in the message.
@@ -235,7 +235,7 @@ public:
     }
 
     Protobuf::Any any_config;
-    static_cast<void>(any_config.PackFrom(config));
+    std::ignore = any_config.PackFrom(config);
     return fmt::format(R"EOF(
     name: envoy.filters.http.proto_api_scrubber
     typed_config: {})EOF",
@@ -261,15 +261,15 @@ public:
     auto* matcher_entry = matcher_proto.mutable_matcher_list()->add_matchers();
     *matcher_entry->mutable_predicate() = match_predicate;
     envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction remove_action;
-    static_cast<void>(
+    std::ignore =
         matcher_entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
-            remove_action));
+            remove_action);
     matcher_entry->mutable_on_match()->mutable_action()->set_name("remove_field");
 
     *message_config.mutable_config()->mutable_matcher() = matcher_proto;
 
     Protobuf::Any any_config;
-    static_cast<void>(any_config.PackFrom(config));
+    std::ignore = any_config.PackFrom(config);
     return fmt::format(R"EOF(
     name: envoy.filters.http.proto_api_scrubber
     typed_config: {})EOF",
@@ -322,7 +322,7 @@ apikeys::CreateApiKeyRequest makeCreateApiKeyRequest(absl::string_view pb = R"pb
   }
 )pb") {
   apikeys::CreateApiKeyRequest request;
-  static_cast<void>(Protobuf::TextFormat::ParseFromString(pb, &request));
+  std::ignore = Protobuf::TextFormat::ParseFromString(pb, &request);
   return request;
 }
 
@@ -441,7 +441,7 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubAnyField_MessageLevel) {
   scrubber_test::SensitiveMessage sensitive;
   sensitive.set_secret("my_secret");
   sensitive.set_public_field("public_data");
-  static_cast<void>(request.mutable_any_field()->PackFrom(sensitive));
+  std::ignore = request.mutable_any_field()->PackFrom(sensitive);
 
   auto response = sendGrpcRequest(
       request, "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub");
@@ -452,7 +452,7 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubAnyField_MessageLevel) {
   scrubber_test::SensitiveMessage expected_sensitive;
   expected_sensitive.set_public_field("public_data");
   // "secret" is NOT set (scrubbed)
-  static_cast<void>(expected_request.mutable_any_field()->PackFrom(expected_sensitive));
+  std::ignore = expected_request.mutable_any_field()->PackFrom(expected_sensitive);
 
   Buffer::OwnedImpl data;
   data.add(upstream_request_->body());
@@ -482,11 +482,11 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubNestedAny_DeepRecursion) {
   scrubber_test::SensitiveMessage outer_sensitive;
   outer_sensitive.set_secret("outer_secret"); // Should be scrubbed.
   outer_sensitive.set_public_field("outer_public");
-  static_cast<void>(outer_sensitive.mutable_nested_any()->PackFrom(inner_sensitive));
+  std::ignore = outer_sensitive.mutable_nested_any()->PackFrom(inner_sensitive);
 
   // Create Request containing Outer in 'any_field'.
   scrubber_test::ScrubRequest request;
-  static_cast<void>(request.mutable_any_field()->PackFrom(outer_sensitive));
+  std::ignore = request.mutable_any_field()->PackFrom(outer_sensitive);
 
   auto response = sendGrpcRequest(
       request, "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub");
@@ -500,10 +500,10 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubNestedAny_DeepRecursion) {
   scrubber_test::SensitiveMessage expected_outer;
   expected_outer.set_public_field("outer_public");
   // secret cleared.
-  static_cast<void>(expected_outer.mutable_nested_any()->PackFrom(expected_inner));
+  std::ignore = expected_outer.mutable_nested_any()->PackFrom(expected_inner);
 
   scrubber_test::ScrubRequest expected_request;
-  static_cast<void>(expected_request.mutable_any_field()->PackFrom(expected_outer));
+  std::ignore = expected_request.mutable_any_field()->PackFrom(expected_outer);
 
   Buffer::OwnedImpl data;
   data.add(upstream_request_->body());
@@ -540,8 +540,8 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubPathCollision_TopLevelVsAny) {
     auto* entry = scrub_matcher.mutable_matcher_list()->add_matchers();
     *entry->mutable_predicate() = buildCelPredicate("true");
     envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction remove_action;
-    static_cast<void>(entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
-        remove_action));
+    std::ignore = entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
+        remove_action);
     entry->mutable_on_match()->mutable_action()->set_name("remove_field");
   }
   *(*req_map)["duplicate_field"].mutable_matcher() = scrub_matcher;
@@ -558,15 +558,15 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubPathCollision_TopLevelVsAny) {
     auto* entry = keep_matcher.mutable_matcher_list()->add_matchers();
     *entry->mutable_predicate() = buildCelPredicate("false"); // Never matches -> No action -> Keep
     envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction remove_action;
-    static_cast<void>(entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
-        remove_action));
+    std::ignore = entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
+        remove_action);
     entry->mutable_on_match()->mutable_action()->set_name("keep_field");
   }
   *(*message_config.mutable_field_restrictions())["duplicate_field"].mutable_matcher() =
       keep_matcher;
 
   Protobuf::Any any_config;
-  static_cast<void>(any_config.PackFrom(config));
+  std::ignore = any_config.PackFrom(config);
   std::string yaml_config = fmt::format(R"EOF(
     name: envoy.filters.http.proto_api_scrubber
     typed_config: {})EOF",
@@ -582,7 +582,7 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubPathCollision_TopLevelVsAny) {
 
   scrubber_test::SensitiveMessage sensitive;
   sensitive.set_duplicate_field("nested_value"); // Should be kept.
-  static_cast<void>(request.mutable_any_field()->PackFrom(sensitive));
+  std::ignore = request.mutable_any_field()->PackFrom(sensitive);
 
   auto response = sendGrpcRequest(request, method_name);
   waitForNextUpstreamRequest();
@@ -701,7 +701,7 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubGlobalMessageType_InsideAny) {
   scrubber_test::ScrubRequest request;
   scrubber_test::SensitiveMessage sensitive;
   sensitive.set_secret("data");
-  static_cast<void>(request.mutable_any_field()->PackFrom(sensitive));
+  std::ignore = request.mutable_any_field()->PackFrom(sensitive);
 
   auto response = sendGrpcRequest(
       request, "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub");
@@ -1091,9 +1091,9 @@ TEST_P(ProtoApiScrubberIntegrationTest, RejectsBlockedMethod) {
 
   // Use RemoveFieldAction as a placeholder action since the logic only checks for a match.
   envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction remove_action;
-  static_cast<void>(
+  std::ignore =
       matcher_entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
-          remove_action));
+          remove_action);
   matcher_entry->mutable_on_match()->mutable_action()->set_name("block_action");
 
   // Set up the restriction map.
@@ -1103,7 +1103,7 @@ TEST_P(ProtoApiScrubberIntegrationTest, RejectsBlockedMethod) {
 
   // Wrap in Any and convert to JSON for Envoy config.
   Protobuf::Any any_config;
-  static_cast<void>(any_config.PackFrom(config));
+  std::ignore = any_config.PackFrom(config);
   std::string typed_config = fmt::format(R"EOF(
     name: envoy.filters.http.proto_api_scrubber
     typed_config: {})EOF",
