@@ -171,6 +171,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "singleton_subscription_adapter_lib",
+    srcs = ["singleton_subscription_adapter.cc"],
     hdrs = ["singleton_subscription_adapter.h"],
     deps = [
         "//envoy/config:subscription_interface",
