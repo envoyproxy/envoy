@@ -556,16 +556,16 @@ TEST_F(DnsSrvClusterTest, AddRemoveHostsViaSrvResponse) {
   Network::DnsResolver::ResolveCb srv_callback1;
   Network::DnsResolver::ResolveCb srv_callback2;
   EXPECT_CALL(*dns_resolver_, resolveSrv("_local_service._tcp.service.consul.", _))
-      .WillOnce(Invoke([&](const std::string&,
-                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        srv_callback1 = cb;
-        return &active_dns_query_;
-      }))
-      .WillOnce(Invoke([&](const std::string&,
-                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        srv_callback2 = cb;
-        return &active_dns_query_;
-      }));
+      .WillOnce(Invoke(
+          [&](const std::string&, Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+            srv_callback1 = cb;
+            return &active_dns_query_;
+          }))
+      .WillOnce(Invoke(
+          [&](const std::string&, Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+            srv_callback2 = cb;
+            return &active_dns_query_;
+          }));
 
   // svc1 is present in both rounds → its A/AAAA callback is captured twice.
   Network::DnsResolver::ResolveCb a_svc1_r1;
@@ -678,16 +678,16 @@ TEST_F(DnsSrvClusterTest, AddRemoveHostsViaChangedAaaaResponse) {
   Network::DnsResolver::ResolveCb srv_callback1;
   Network::DnsResolver::ResolveCb srv_callback2;
   EXPECT_CALL(*dns_resolver_, resolveSrv("_local_service._tcp.service.consul.", _))
-      .WillOnce(Invoke([&](const std::string&,
-                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        srv_callback1 = cb;
-        return &active_dns_query_;
-      }))
-      .WillOnce(Invoke([&](const std::string&,
-                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        srv_callback2 = cb;
-        return &active_dns_query_;
-      }));
+      .WillOnce(Invoke(
+          [&](const std::string&, Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+            srv_callback1 = cb;
+            return &active_dns_query_;
+          }))
+      .WillOnce(Invoke(
+          [&](const std::string&, Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+            srv_callback2 = cb;
+            return &active_dns_query_;
+          }));
 
   // The same hostname is re-resolved each round with different IP sets.
   Network::DnsResolver::ResolveCb a_callback_r1;
