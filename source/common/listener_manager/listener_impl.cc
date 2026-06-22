@@ -717,7 +717,8 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
         config.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
         validation_visitor_, *listener_factory_context_);
 
-    if (config.udp_listener_config().has_udp_packet_packet_writer_config()) {
+    if (config.udp_listener_config().has_udp_packet_packet_writer_config() &&
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_use_direct_packet_writer")) {
       auto* quic_factory_factory =
           Config::Utility::getFactory<Quic::QuicPacketWriterFactoryFactory>(
               config.udp_listener_config().udp_packet_packet_writer_config());
