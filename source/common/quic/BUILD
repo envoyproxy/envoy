@@ -637,14 +637,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_quic_packet_writer_factory_factory_lib",
-    hdrs = envoy_select_enable_http3(["envoy_quic_packet_writer_factory_factory.h"]),
-    deps = envoy_select_enable_http3([
+    name = "envoy_quic_packet_writer_factory_factory_interface",
+    hdrs = ["envoy_quic_packet_writer_factory_factory.h"],
+    deps = [
         ":envoy_quic_packet_writer_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "//envoy/config:typed_config_interface",
         "//envoy/server:factory_context_interface",
-    ]),
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(

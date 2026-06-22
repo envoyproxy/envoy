@@ -722,10 +722,9 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
           Config::Utility::getFactory<Quic::QuicPacketWriterFactoryFactory>(
               config.udp_listener_config().udp_packet_packet_writer_config());
       if (quic_factory_factory != nullptr) {
-        udp_listener_config_->writer_factory_ =
-            quic_factory_factory->createQuicPacketWriterFactory(
-                config.udp_listener_config().udp_packet_packet_writer_config(),
-                *listener_factory_context_);
+        udp_listener_config_->writer_factory_ = quic_factory_factory->createQuicPacketWriterFactory(
+            config.udp_listener_config().udp_packet_packet_writer_config(),
+            *listener_factory_context_);
       }
     }
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
