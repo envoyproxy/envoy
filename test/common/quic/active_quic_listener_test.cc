@@ -170,7 +170,7 @@ protected:
     ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _, _, _))
         .WillByDefault(
             Invoke([&](Network::IoHandle& io_handle, Stats::Scope& scope, Envoy::Event::Dispatcher&,
-                       absl::AnyInvocable<void() &&>) -> Network::UdpPacketWriterPtr {
+                       absl::AnyInvocable<void()&&>) -> Network::UdpPacketWriterPtr {
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
               return std::make_unique<Quic::UdpGsoBatchWriter>(io_handle, scope);
 #else
@@ -801,7 +801,7 @@ TEST_P(ActiveQuicListenerTest, DirectQuicPacketWriterCreation) {
   // Expect createQuicPacketWriter to be called, and return our dummy writer.
   EXPECT_CALL(quic_packet_writer_factory, createQuicPacketWriter(_, _, _, _))
       .WillOnce(Invoke([](Network::IoHandle&, Stats::Scope&, Envoy::Event::Dispatcher&,
-                          absl::AnyInvocable<void() &&>) -> QuicPacketWriterPtr {
+                          absl::AnyInvocable<void()&&>) -> QuicPacketWriterPtr {
         return std::make_unique<FakeQuicPacketWriter>();
       }));
 
