@@ -48,7 +48,8 @@ public:
   loadConfig(Server::Configuration::ServerFactoryContext&,
              const Protobuf::Message& config) override {
     ASSERT(Envoy::Protobuf::DynamicCastMessage<LeastRequestLbProto>(&config) != nullptr);
-    const LeastRequestLbProto& typed_config = Envoy::Protobuf::DynamicCastMessage<LeastRequestLbProto>(config);
+    const LeastRequestLbProto& typed_config =
+        Envoy::Protobuf::DynamicCastMessage<LeastRequestLbProto>(config);
     return Upstream::LoadBalancerConfigPtr{new TypedLeastRequestLbConfig(typed_config)};
   }
 

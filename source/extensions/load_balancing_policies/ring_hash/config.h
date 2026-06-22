@@ -32,7 +32,8 @@ public:
   loadConfig(Server::Configuration::ServerFactoryContext& context,
              const Protobuf::Message& config) override {
     ASSERT(Envoy::Protobuf::DynamicCastMessage<RingHashLbProto>(&config) != nullptr);
-    const RingHashLbProto& typed_proto = Envoy::Protobuf::DynamicCastMessage<RingHashLbProto>(config);
+    const RingHashLbProto& typed_proto =
+        Envoy::Protobuf::DynamicCastMessage<RingHashLbProto>(config);
     absl::Status creation_status = absl::OkStatus();
     auto typed_config = std::make_unique<Upstream::TypedRingHashLbConfig>(
         typed_proto, context.regexEngine(), creation_status);
