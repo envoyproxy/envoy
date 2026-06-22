@@ -1313,12 +1313,17 @@ absl::Status ListenerManagerImpl::createListenSocketFactory(ListenerImpl& listen
   TRY_ASSERT_MAIN_THREAD {
     Network::SocketCreationOptions creation_options;
     creation_options.mptcp_enabled_ = listener.mptcpEnabled();
+    // Additional factory specific options.
+    Network::Socket::OptionsSharedPtr deferred_options;
+    if (listener.udpListenerConfig().has_value()) {
+      deferred_options = listener.udpListenerConfig()->listenerFactory().socketOptions();
+    }
     for (std::vector<Network::Address::InstanceConstSharedPtr>::size_type i = 0;
          i < listener.addresses().size(); i++) {
       auto factory_or_error = ListenSocketFactoryImpl::create(
           *factory_, listener.addresses()[i], socket_type, listener.listenSocketOptions(i),
           listener.name(), listener.tcpBacklogSize(), bind_type, creation_options,
-          server_.options().concurrency());
+          server_.options().concurrency(), deferred_options);
       if (!factory_or_error.status().ok()) {
         socket_status = factory_or_error.status();
       } else {

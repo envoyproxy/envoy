@@ -81,11 +81,12 @@ absl::StatusOr<std::unique_ptr<ListenSocketFactoryImpl>> ListenSocketFactoryImpl
     Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
     const std::string& listener_name, uint32_t tcp_backlog_size,
     ListenerComponentFactory::BindType bind_type,
-    const Network::SocketCreationOptions& creation_options, uint32_t num_sockets) {
+    const Network::SocketCreationOptions& creation_options, uint32_t num_sockets,
+    Network::Socket::OptionsSharedPtr deferred_options) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<ListenSocketFactoryImpl>(new ListenSocketFactoryImpl(
       factory, address, socket_type, options, listener_name, tcp_backlog_size, bind_type,
-      creation_options, num_sockets, creation_status));
+      creation_options, num_sockets, std::move(deferred_options), creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -96,9 +97,10 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
     const std::string& listener_name, uint32_t tcp_backlog_size,
     ListenerComponentFactory::BindType bind_type,
     const Network::SocketCreationOptions& creation_options, uint32_t num_sockets,
-    absl::Status& creation_status)
+    Network::Socket::OptionsSharedPtr deferred_options, absl::Status& creation_status)
     : factory_(factory), local_address_(address), socket_type_(socket_type), options_(options),
-      listener_name_(listener_name), tcp_backlog_size_(tcp_backlog_size), bind_type_(bind_type),
+      deferred_options_(std::move(deferred_options)), listener_name_(listener_name),
+      tcp_backlog_size_(tcp_backlog_size), bind_type_(bind_type),
       socket_creation_options_(creation_options) {
 
   if (local_address_->type() == Network::Address::Type::Ip) {
@@ -145,6 +147,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
 ListenSocketFactoryImpl::ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone)
     : factory_(factory_to_clone.factory_), local_address_(factory_to_clone.local_address_),
       socket_type_(factory_to_clone.socket_type_), options_(factory_to_clone.options_),
+      deferred_options_(factory_to_clone.deferred_options_),
       listener_name_(factory_to_clone.listener_name_),
       tcp_backlog_size_(factory_to_clone.tcp_backlog_size_),
       bind_type_(factory_to_clone.bind_type_),
@@ -206,8 +209,22 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket(uint32_t worke
 }
 
 absl::Status ListenSocketFactoryImpl::doFinalPreWorkerInit() {
-  if (bind_type_ == ListenerComponentFactory::BindType::NoBind ||
-      socket_type_ != Network::Socket::Type::Stream) {
+  if (bind_type_ == ListenerComponentFactory::BindType::NoBind) {
+    return absl::OkStatus();
+  }
+
+  if (deferred_options_ != nullptr && !deferred_options_->empty()) {
+    for (auto& socket : sockets_) {
+      if (!Network::Socket::applyOptions(deferred_options_, *socket,
+                                         envoy::config::core::v3::SocketOption::STATE_BOUND)) {
+        return absl::InvalidArgumentError(
+            fmt::format("cannot apply deferred socket options on socket: {}",
+                        socket->connectionInfoProvider().localAddress()->asString()));
+      }
+    }
+  }
+
+  if (socket_type_ != Network::Socket::Type::Stream) {
     return absl::OkStatus();
   }
 
@@ -795,12 +812,6 @@ void ListenerImpl::buildListenSocketOptions(
                 /*mapped_v6*/ addresses_[i]->ip()->version() == Network::Address::IpVersion::v6 &&
                 !addresses_[i]->ip()->ipv6()->v6only()));
       }
-
-      // Additional factory specific options.
-      ASSERT(udp_listener_config_->listener_factory_ != nullptr,
-             "buildUdpListenerFactory() must run first");
-      addListenSocketOptions(listen_socket_options_list_[i],
-                             udp_listener_config_->listener_factory_->socketOptions());
     }
   }
 }
