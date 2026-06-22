@@ -191,6 +191,7 @@ is evaluated as a regular expression:
    http.ingress_http.downstream_cx_upgrades_active: 0
    http.ingress_http.downstream_cx_upgrades_total: 0
    http.ingress_http.downstream_flow_control_paused_reading_total: 0
+   http.ingress_http.downstream_flow_control_combined_reading_delay_micros: 0
    http.ingress_http.downstream_flow_control_resumed_reading_total: 0
    http.ingress_http.downstream_rq_1xx: 0
    http.ingress_http.downstream_rq_2xx: 3

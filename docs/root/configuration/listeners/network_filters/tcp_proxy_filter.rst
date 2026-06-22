@@ -233,6 +233,7 @@ The downstream statistics are rooted at *tcp.<stat_prefix>.* with the following 
   downstream_cx_rx_bytes_total, Counter, Total bytes read from the downstream connection
   downstream_cx_rx_bytes_buffered, Gauge, Total bytes currently buffered from the downstream connection
   downstream_flow_control_paused_reading_total, Counter, Total number of times flow control paused reading from downstream
+  downstream_flow_control_combined_reading_delay_micros, Counter, Total time in microseconds accumulated across downstream connections while one or more flow-control read pauses were active
   downstream_flow_control_resumed_reading_total, Counter, Total number of times flow control resumed reading from downstream
   early_data_received_count_total, Counter, Total number of connections where tcp proxy received data before upstream connection establishment is complete
   idle_timeout, Counter, Total number of connections closed due to idle timeout

@@ -28,11 +28,17 @@ namespace Envoy {
 namespace Router {
 
 void UpstreamCodecFilter::onBelowWriteBufferLowWatermark() {
+  upstream_read_pause_tracker_.onResumed(
+      callbacks_->dispatcher().timeSource(),
+      callbacks_->clusterInfo()
+          ->trafficStats()
+          ->upstream_flow_control_combined_reading_delay_micros_);
   callbacks_->clusterInfo()->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
   callbacks_->upstreamCallbacks()->upstream()->readDisable(false);
 }
 
 void UpstreamCodecFilter::onAboveWriteBufferHighWatermark() {
+  upstream_read_pause_tracker_.onPaused(callbacks_->dispatcher().timeSource());
   callbacks_->clusterInfo()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
   callbacks_->upstreamCallbacks()->upstream()->readDisable(true);
 }

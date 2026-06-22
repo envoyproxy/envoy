@@ -99,6 +99,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_retry_success, Counter, Total request retry successes
   upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking or exceeding the :ref:`retry budget <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>`
   upstream_flow_control_paused_reading_total, Counter, Total number of times flow control paused reading from upstream
+  upstream_flow_control_combined_reading_delay_micros, Counter, Total time in microseconds accumulated across upstream streams or connections while one or more flow-control read pauses were active
   upstream_flow_control_resumed_reading_total, Counter, Total number of times flow control resumed reading from upstream
   upstream_flow_control_backed_up_total, Counter, Total number of times the upstream connection backed up and paused reads from downstream
   upstream_flow_control_drained_total, Counter, Total number of times the upstream connection drained and resumed reads from downstream

@@ -76,6 +76,7 @@ const std::vector<Params> params = {
     {"http.egress_dynamodb_iad.user_agent.ios.downstream_cx_total", 2},
     {"auth.clientssl.clientssl_prefix.auth_ip_allowlist", 1},
     {"tcp.tcp_prefix.downstream_flow_control_resumed_reading_total", 1},
+    {"tcp.tcp_prefix.downstream_flow_control_combined_reading_delay_micros", 1},
     {"udp.udp_prefix-with-dashes.downstream_flow_control_resumed_reading_total", 1},
     {"http.fault_connection_manager.fault.fault_cluster.aborts_injected", 2},
     {"http.rds_connection_manager.rds.route_config.123.update_success", 2},

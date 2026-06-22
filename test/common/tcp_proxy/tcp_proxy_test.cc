@@ -3526,6 +3526,61 @@ TEST_P(TcpProxyTest, ReadDisableFalseOnlyWhenActuallyDisabled) {
   EXPECT_FALSE(conn_pool_callbacks_.empty());
 }
 
+TEST_P(TcpProxyTest, DownstreamReadDisableDurationStat) {
+  setup(0, false, true);
+
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true))
+      .WillOnce(Return(Network::Connection::ReadDisableStatus::TransitionedToReadDisabled))
+      .WillOnce(Return(Network::Connection::ReadDisableStatus::StillReadDisabled));
+  filter_->readDisableDownstream(true);
+  EXPECT_EQ(1U, config_->stats().downstream_flow_control_paused_reading_total_.value());
+  EXPECT_EQ(0U, config_->stats().downstream_flow_control_combined_reading_delay_micros_.value());
+
+  timeSystem().advanceTimeWait(std::chrono::microseconds(250));
+  filter_->readDisableDownstream(true);
+  EXPECT_EQ(1U, config_->stats().downstream_flow_control_paused_reading_total_.value());
+
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(false))
+      .WillOnce(Return(Network::Connection::ReadDisableStatus::StillReadDisabled))
+      .WillOnce(Return(Network::Connection::ReadDisableStatus::TransitionedToReadEnabled));
+  timeSystem().advanceTimeWait(std::chrono::microseconds(25));
+  filter_->readDisableDownstream(false);
+  EXPECT_EQ(0U, config_->stats().downstream_flow_control_resumed_reading_total_.value());
+  EXPECT_EQ(0U, config_->stats().downstream_flow_control_combined_reading_delay_micros_.value());
+
+  timeSystem().advanceTimeWait(std::chrono::microseconds(75));
+  filter_->readDisableDownstream(false);
+  EXPECT_EQ(1U, config_->stats().downstream_flow_control_resumed_reading_total_.value());
+  EXPECT_EQ(350U, config_->stats().downstream_flow_control_combined_reading_delay_micros_.value());
+}
+
+TEST_P(TcpProxyTest, UpstreamReadDisableDurationStat) {
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(*upstream_connections_.at(0), readDisable(true));
+  filter_->readDisableUpstream(true);
+  EXPECT_EQ(1U, upstream_hosts_.at(0)
+                    ->cluster_.stats_store_.counter("upstream_flow_control_paused_reading_total")
+                    .value());
+  EXPECT_EQ(
+      0U, upstream_hosts_.at(0)
+              ->cluster_.stats_store_.counter("upstream_flow_control_combined_reading_delay_micros")
+              .value());
+
+  timeSystem().advanceTimeWait(std::chrono::microseconds(410));
+
+  EXPECT_CALL(*upstream_connections_.at(0), readDisable(false));
+  filter_->readDisableUpstream(false);
+  EXPECT_EQ(1U, upstream_hosts_.at(0)
+                    ->cluster_.stats_store_.counter("upstream_flow_control_resumed_reading_total")
+                    .value());
+  EXPECT_EQ(410U, upstream_hosts_.at(0)
+                      ->cluster_.stats_store_
+                      .counter("upstream_flow_control_combined_reading_delay_micros")
+                      .value());
+}
+
 // Test that legacy filter state receive_before_connect works correctly.
 TEST_P(TcpProxyTest, LegacyFilterStateWithNewApi) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();

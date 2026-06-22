@@ -341,7 +341,7 @@ void UpstreamRequest::maybeHandleDeferredReadDisable() {
     // Because readDisable keeps track of how many time it is called with
     // "true" or "false", here it has to be called with "true" the same number
     // of times as it would be called with "false" in the future.
-    parent_.cluster()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
+    recordUpstreamReadPaused();
     upstream_->readDisable(true);
   }
 }
@@ -773,7 +773,7 @@ void UpstreamRequest::readDisableOrDefer(bool disable) {
       // The downstream connection is overrun. Pause reads from upstream.
       // If there are multiple calls to readDisable either the codec (H2) or the
       // underlying Network::Connection (H1) will handle reference counting.
-      parent_.cluster()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
+      recordUpstreamReadPaused();
       upstream_->readDisable(disable);
     } else {
       ++deferred_read_disabling_count_;
@@ -791,8 +791,20 @@ void UpstreamRequest::readDisableOrDefer(bool disable) {
   ASSERT(parent_.downstreamResponseStarted());
   // Pass this on to the stream, which
   // will resume reads if this was the last remaining high watermark.
-  parent_.cluster()->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
+  recordUpstreamReadResumed();
   upstream_->readDisable(disable);
+}
+
+void UpstreamRequest::recordUpstreamReadPaused() {
+  upstream_read_pause_tracker_.onPaused(parent_.callbacks()->dispatcher().timeSource());
+  parent_.cluster()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
+}
+
+void UpstreamRequest::recordUpstreamReadResumed() {
+  upstream_read_pause_tracker_.onResumed(
+      parent_.callbacks()->dispatcher().timeSource(),
+      parent_.cluster()->trafficStats()->upstream_flow_control_combined_reading_delay_micros_);
+  parent_.cluster()->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
 }
 
 void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {

@@ -533,11 +533,18 @@ void Filter::readDisableUpstream(bool disable) {
     return;
   }
   if (disable) {
+    upstream_read_pause_tracker_.onPaused(read_callbacks_->connection().dispatcher().timeSource());
     read_callbacks_->upstreamHost()
         ->cluster()
         .trafficStats()
         ->upstream_flow_control_paused_reading_total_.inc();
   } else {
+    upstream_read_pause_tracker_.onResumed(
+        read_callbacks_->connection().dispatcher().timeSource(),
+        read_callbacks_->upstreamHost()
+            ->cluster()
+            .trafficStats()
+            ->upstream_flow_control_combined_reading_delay_micros_);
     read_callbacks_->upstreamHost()
         ->cluster()
         .trafficStats()
@@ -557,9 +564,14 @@ void Filter::readDisableDownstream(bool disable) {
       read_callbacks_->connection().readDisable(disable);
 
   if (read_disable_status == Network::Connection::ReadDisableStatus::TransitionedToReadDisabled) {
+    downstream_read_pause_tracker_.onPaused(
+        read_callbacks_->connection().dispatcher().timeSource());
     config_->stats().downstream_flow_control_paused_reading_total_.inc();
   } else if (read_disable_status ==
              Network::Connection::ReadDisableStatus::TransitionedToReadEnabled) {
+    downstream_read_pause_tracker_.onResumed(
+        read_callbacks_->connection().dispatcher().timeSource(),
+        config_->stats().downstream_flow_control_combined_reading_delay_micros_);
     config_->stats().downstream_flow_control_resumed_reading_total_.inc();
   }
 }

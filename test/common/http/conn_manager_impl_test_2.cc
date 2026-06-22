@@ -1544,6 +1544,8 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
   decoder_filters_[0]->callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
   EXPECT_EQ(1U, stats_.named_.downstream_flow_control_paused_reading_total_.value());
+  EXPECT_EQ(0U, stats_.named_.downstream_flow_control_combined_reading_delay_micros_.value());
+  test_time_.advanceTimeWait(std::chrono::microseconds(123));
 
   // Resume the flow of data. When the router buffer drains it calls
   // onDecoderFilterBelowWriteBufferLowWatermark which should re-enable reads on the stream.
@@ -1551,12 +1553,20 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
   decoder_filters_[0]->callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
   EXPECT_EQ(1U, stats_.named_.downstream_flow_control_resumed_reading_total_.value());
+  EXPECT_EQ(123U, stats_.named_.downstream_flow_control_combined_reading_delay_micros_.value());
 
   // Backup upstream once again.
   EXPECT_CALL(stream, readDisable(true));
   ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
   decoder_filters_[0]->callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
   EXPECT_EQ(2U, stats_.named_.downstream_flow_control_paused_reading_total_.value());
+  test_time_.advanceTimeWait(std::chrono::microseconds(456));
+
+  EXPECT_CALL(stream, readDisable(false));
+  ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
+  decoder_filters_[0]->callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
+  EXPECT_EQ(2U, stats_.named_.downstream_flow_control_resumed_reading_total_.value());
+  EXPECT_EQ(579U, stats_.named_.downstream_flow_control_combined_reading_delay_micros_.value());
 
   // Send a full response.
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true));
