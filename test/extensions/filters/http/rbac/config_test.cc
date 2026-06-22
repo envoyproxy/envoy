@@ -7,7 +7,6 @@
 #include "source/extensions/filters/http/rbac/rbac_filter.h"
 
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -58,14 +57,17 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidMatcherProto) {
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyProto) {
   RoleBasedAccessControlFilterConfigFactory factory;
-  EXPECT_NE(nullptr, dynamic_cast<envoy::extensions::filters::http::rbac::v3::RBAC*>(
-                         factory.createEmptyConfigProto().get()));
+  EXPECT_NE(nullptr,
+            Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::rbac::v3::RBAC>(
+                factory.createEmptyConfigProto().get()));
 }
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyRouteProto) {
   RoleBasedAccessControlFilterConfigFactory factory;
-  EXPECT_NE(nullptr, dynamic_cast<envoy::extensions::filters::http::rbac::v3::RBACPerRoute*>(
-                         factory.createEmptyRouteConfigProto().get()));
+  EXPECT_NE(
+      nullptr,
+      Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::rbac::v3::RBACPerRoute>(
+          factory.createEmptyRouteConfigProto().get()));
 }
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, InvalidMatcherProto) {

@@ -475,7 +475,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, MissThresholdOneMarksDeadOnFirstInval
       UpstreamReverseConnectionSocketInterface cfg;
   cfg.set_stat_prefix("test_prefix");
   cfg.mutable_ping_failure_threshold()->set_value(1);
-  extension_.reset(new ReverseTunnelAcceptorExtension(*socket_interface_, context_, cfg));
+  extension_ = std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, cfg);
 
   // Provide dispatcher to thread local and set expectations for timers/file events.
   thread_local_.setDispatcher(&dispatcher_);
@@ -617,14 +617,14 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateConnectionReporting) {
         auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
 
         EXPECT_CALL(*reporter, reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
-                                                     testing::Eq(tenant_id)));
+                                                     testing::Eq(tenant_id), testing::_));
 
         return reporter;
       }));
 
   extension_ =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
-  extension_->reportConnection(node_id, cluster_id, tenant_id);
+  extension_->reportConnection(node_id, cluster_id, tenant_id, 0);
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateDisconnectionReporting) {

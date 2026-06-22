@@ -416,7 +416,7 @@ ProtoApiScrubberFilterConfig::getParentType(const Envoy::Protobuf::Field* field)
 void ProtoApiScrubberFilterConfig::buildFieldParentMap(
     const Envoy::Protobuf::FileDescriptorSet& descriptor_set) {
   for (const auto& file : descriptor_set.file()) {
-    std::string package_prefix = file.package();
+    const auto& package_prefix = file.package();
     for (const auto& msg : file.message_type()) {
       populateMapForMessage(msg, package_prefix);
     }

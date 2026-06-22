@@ -6,6 +6,7 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 
+#include "source/common/common/logger.h"
 #include "source/server/admin/handler_ctx.h"
 
 #include "absl/container/flat_hash_map.h"

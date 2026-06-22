@@ -17,6 +17,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -154,7 +156,7 @@ typed_config:
     UNREFERENCED_PARAMETER(node_uuid);
     UNREFERENCED_PARAMETER(cluster_uuid);
     UNREFERENCED_PARAMETER(tenant_uuid);
-    return std::string();
+    return {};
   }
 
   std::string createHttpRequest(const std::string& method, const std::string& path,
@@ -257,6 +259,7 @@ void ReverseTunnelFilterIntegrationTest::completeReverseTunnelHandshake(
             std::string::npos);
   EXPECT_NE(handshake_request.find("x-envoy-reverse-tunnel-tenant-id: e2e-tenant"),
             std::string::npos);
+  EXPECT_NE(handshake_request.find("x-envoy-reverse-tunnel-initiation-time:"), std::string::npos);
 
   ASSERT_TRUE(connection.write("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"));
 }
@@ -414,17 +417,17 @@ void ReverseTunnelFilterIntegrationTest::runEndToEndReverseConnectionHandshakeSc
   ENVOY_LOG_MISC(info, "Waiting for reverse connections to be established.");
   timeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
 
-  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.nodes.e2e-node", 1);
-  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.clusters.e2e-cluster", 1);
+  test_server_->waitForGauge("reverse_tunnel_acceptor.nodes.e2e-node", Ge(1));
+  test_server_->waitForGauge("reverse_tunnel_acceptor.clusters.e2e-cluster", Ge(1));
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 
   BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners", "", Http::CodecType::HTTP1, GetParam());
   EXPECT_TRUE(admin_response->complete());
   EXPECT_EQ("200", admin_response->headers().getStatusValue());
 
-  test_server_->waitForCounterEq("listener_manager.listener_stopped", 2);
+  test_server_->waitForCounter("listener_manager.listener_stopped", Eq(2));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseTunnelFilterIntegrationTest,
@@ -611,7 +614,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, BasicReverseTunnelHandshake) {
   tcp_client->waitForData("HTTP/1.1 200 OK");
 
   // Verify stats show successful reverse tunnel handshake.
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 
   // Send a second request to test socket caching for different node IDs.
   IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("listener_0"));
@@ -622,7 +625,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, BasicReverseTunnelHandshake) {
   tcp_client2->waitForData("HTTP/1.1 200 OK");
 
   // Verify additional handshake was processed.
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 2);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(2));
 
   tcp_client->close();
   tcp_client2->close();
@@ -699,7 +702,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, DrainingAwareHcmSendsGoAwayOnReverseC
   // Advance simulated time past the 1s drain_time so the graceful drain completion timer fires.
   timeSystem().advanceTimeWait(std::chrono::seconds(2));
   // Confirm the full chain completed: workers stopped the listener and called.
-  test_server_->waitForCounterGe("listener_manager.listener_stopped", 1);
+  test_server_->waitForCounter("listener_manager.listener_stopped", Ge(1));
 }
 
 // Test validation with static expected values.
@@ -722,7 +725,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithStaticValuesSuccess) {
   tcp_client->waitForData("HTTP/1.1 200 OK");
   tcp_client->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 }
 
 // Test validation with static expected values.
@@ -744,7 +747,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithStaticValuesFailure) {
   tcp_client->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client->waitForDisconnect();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
 }
 
 // Test validation with only node_id validation.
@@ -765,7 +768,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyNodeId) {
   tcp_client1->waitForData("HTTP/1.1 200 OK");
   tcp_client1->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 
   // Failure: node_id doesn't match.
   std::string http_request_fail = createHttpRequestWithRtHeaders(
@@ -776,7 +779,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyNodeId) {
   tcp_client2->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client2->waitForDisconnect();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
 }
 
 // Test validation with only cluster_id validation.
@@ -797,7 +800,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyClusterId) {
   tcp_client1->waitForData("HTTP/1.1 200 OK");
   tcp_client1->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 
   // Failure: cluster_id doesn't match.
   std::string http_request_fail = createHttpRequestWithRtHeaders(
@@ -808,7 +811,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyClusterId) {
   tcp_client2->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client2->waitForDisconnect();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
 }
 
 // Test validation with only tenant_id validation.
@@ -829,7 +832,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyTenantId) {
   tcp_client1->waitForData("HTTP/1.1 200 OK");
   tcp_client1->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 
   // Failure: tenant_id doesn't match.
   std::string http_request_fail = createHttpRequestWithRtHeaders(
@@ -840,7 +843,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyTenantId) {
   tcp_client2->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client2->waitForDisconnect();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
 }
 
 // Test validation with empty format strings. In this case validation is skipped.
@@ -863,7 +866,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithEmptyFormatters) {
   tcp_client->waitForData("HTTP/1.1 200 OK");
   tcp_client->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 }
 
 // Test validation with dynamic metadata emission.
@@ -886,7 +889,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithDynamicMetadataEmission
   tcp_client->waitForData("HTTP/1.1 200 OK");
   tcp_client->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 }
 
 // Test validation with multiple formatters in format string.
@@ -910,7 +913,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithComplexFormatString) {
 
   // Ensure the validation_failed counter is updated.
   test_server_->waitForCounterExists("reverse_tunnel.handshake.validation_failed");
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
 }
 
 // Test validation passes when formatter returns empty and actual value is empty.
@@ -931,7 +934,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithBothValuesMatching) {
   tcp_client->waitForData("HTTP/1.1 200 OK");
   tcp_client->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 }
 
 // Test validation with FILTER_STATE formatter.
@@ -990,7 +993,7 @@ typed_config:
   tcp_client->waitForData("HTTP/1.1 200 OK");
   tcp_client->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 }
 
 // Test validation with FILTER_STATE formatter.
@@ -1048,7 +1051,7 @@ typed_config:
   tcp_client->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client->waitForDisconnect();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
 }
 
 // Helper network filter to set dynamic metadata for testing.
@@ -1179,7 +1182,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithDynamicMetadataSuccess)
   tcp_client->waitForData("HTTP/1.1 200 OK");
   tcp_client->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 }
 
 // Test validation with DYNAMIC_METADATA formatter.
@@ -1230,7 +1233,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithDynamicMetadataFailure)
   tcp_client->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client->waitForDisconnect();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
 }
 
 // Test validation with mixed FILTER_STATE and DYNAMIC_METADATA formatters.
@@ -1301,7 +1304,7 @@ typed_config:
   tcp_client->waitForData("HTTP/1.1 200 OK");
   tcp_client->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 }
 
 // Test validation with mixed formatters.
@@ -1372,7 +1375,7 @@ typed_config:
   tcp_client->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client->waitForDisconnect();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
 }
 
 // Test validation with mixed formatters.
@@ -1443,7 +1446,7 @@ typed_config:
   tcp_client->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client->waitForDisconnect();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
 }
 
 // Test end-to-end tenant isolation flow.
@@ -1483,7 +1486,7 @@ cluster_type:
   initialize();
 
   test_server_->waitUntilListenersReady();
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
 
   std::string http_request = createHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
                                                             "node1", "cluster1", "tenant1");
@@ -1493,7 +1496,7 @@ cluster_type:
   tcp_client->waitForData("HTTP/1.1 200 OK");
   tcp_client->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 }
 
 // Test multiple tenants are isolated correctly.
@@ -1533,7 +1536,7 @@ cluster_type:
   initialize();
 
   test_server_->waitUntilListenersReady();
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
 
   std::string http_request_tenant_a = createHttpRequestWithRtHeaders(
       "GET", "/reverse_connections/request", "node-a", "cluster-a", "tenant-a");
@@ -1551,7 +1554,7 @@ cluster_type:
   tcp_client_b->waitForData("HTTP/1.1 200 OK");
   tcp_client_b->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 2);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(2));
 }
 
 // Test startup validation fails when tenant isolation enabled but tenant_id_format missing.

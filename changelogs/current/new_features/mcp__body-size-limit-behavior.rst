@@ -1,0 +1,1 @@
+Changed body size limit behavior when the request body exceeds the configured limit. In ``PASS_THROUGH`` mode, the request is allowed through with an ``is_exceeding_limit`` marker in the dynamic metadata. In ``REJECT_NO_MCP`` mode, the request is rejected with a ``400 Bad Request`` if required fields are not found within the limit.

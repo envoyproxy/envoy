@@ -72,6 +72,9 @@ public:
   void updateListenerConfig(Network::ListenerConfig& config) override;
   void onFilterChainDraining(
       const std::list<const Network::FilterChain*>& draining_filter_chains) override;
+  void onFilterChainDrainStart(
+      const std::list<const Network::FilterChain*>& draining_filter_chains) override;
+  void onListenerDrainStart() override;
 
   void onCloseIdleHttpConnections(bool is_saturated) override;
 
@@ -89,7 +92,7 @@ private:
   quic::QuicVersionManager version_manager_;
   std::unique_ptr<EnvoyQuicDispatcher> quic_dispatcher_;
   const bool kernel_worker_routing_;
-  absl::optional<Runtime::FeatureFlag> enabled_{};
+  absl::optional<Runtime::FeatureFlag> enabled_;
   Network::UdpPacketWriter* udp_packet_writer_;
 
   // The number of runs of the event loop in which at least one CHLO was buffered.

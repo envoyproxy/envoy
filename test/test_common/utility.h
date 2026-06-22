@@ -1,40 +1,45 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
 #include <cstdlib>
+#include <initializer_list>
 #include <list>
-#include <random>
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "envoy/api/api.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/time.h"
+#include "envoy/config/subscription.h"
 #include "envoy/network/address.h"
+#include "envoy/network/dns.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/primitive_stats.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
-#include "envoy/thread/thread.h"
 #include "envoy/tracing/trace_context.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/c_smart_ptr.h"
+#include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
-#include "source/common/common/thread.h"
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/common/config/opaque_resource_decoder_impl.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/stats/symbol_table.h"
 
-#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_random_generator.h"
 #include "test/test_common/test_time_system.h"
-#include "test/test_common/thread_factory_for_test.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
 #include "gmock/gmock.h"
@@ -47,6 +52,12 @@ using testing::AssertionSuccess;
 using testing::Invoke; //  NOLINT(misc-unused-using-decls)
 
 namespace Envoy {
+
+namespace DeprecatedStatWaitHelpers {
+
+template <class... Args> constexpr bool always_false = false;
+
+} // namespace DeprecatedStatWaitHelpers
 
 #if defined(__has_feature) &&                                                                      \
     (__has_feature(thread_sanitizer) || __has_feature(memory_sanitizer) ||                         \
@@ -225,36 +236,35 @@ public:
                                                        const std::string& name);
 
   /**
-   * Wait for a counter to == a given value.
+   * Wait for a counter to match a given value matcher.
    * @param store supplies the stats store.
    * @param name supplies the name of the counter to wait for.
-   * @param value supplies the value of the counter.
+   * @param value_matcher supplies the value matcher for the counter.
    * @param time_system the time system to use for waiting.
    * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
    * @param dispatcher the dispatcher to run non-blocking periodically during the wait.
-   * @return AssertionSuccess() if the counter was == to the value within the timeout, else
+   * @return AssertionSuccess() if the counter matched within the timeout, else
    * AssertionFailure().
    */
   static AssertionResult
-  waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
-                   Event::TestTimeSystem& time_system,
-                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
-                   Event::Dispatcher* dispatcher = nullptr);
+  waitForCounter(Stats::Store& store, const std::string& name,
+                 testing::Matcher<uint64_t> value_matcher, Event::TestTimeSystem& time_system,
+                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
+                 Event::Dispatcher* dispatcher = nullptr);
 
-  /**
-   * Wait for a counter to >= a given value.
-   * @param store supplies the stats store.
-   * @param name counter name.
-   * @param value target value.
-   * @param time_system the time system to use for waiting.
-   * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
-   * @return AssertionSuccess() if the counter was >= the value within the timeout, else
-   * AssertionFailure().
-   */
-  static AssertionResult
-  waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
-                   Event::TestTimeSystem& time_system,
-                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+  template <class... Args> static AssertionResult waitForCounterEq(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "TestUtility::waitForCounterEq was removed; use "
+                  "TestUtility::waitForCounter(..., testing::Eq(value), ...) instead.");
+    return AssertionFailure();
+  }
+
+  template <class... Args> static AssertionResult waitForCounterGe(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "TestUtility::waitForCounterGe was removed; use "
+                  "TestUtility::waitForCounter(..., testing::Ge(value), ...) instead.");
+    return AssertionFailure();
+  }
 
   /**
    * Wait for a proactive resource usage in the overload manager to be == a given value.
@@ -274,34 +284,33 @@ public:
       std::chrono::milliseconds timeout);
 
   /**
-   * Wait for a gauge to >= a given value.
+   * Wait for a gauge to match a given value matcher.
    * @param store supplies the stats store.
    * @param name gauge name.
-   * @param value target value.
+   * @param value_matcher supplies the value matcher for the gauge.
    * @param time_system the time system to use for waiting.
    * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
-   * @return AssertionSuccess() if the counter gauge >= to the value within the timeout, else
+   * @return AssertionSuccess() if the gauge matched within the timeout, else
    * AssertionFailure().
    */
   static AssertionResult
-  waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
-                 Event::TestTimeSystem& time_system,
-                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+  waitForGauge(Stats::Store& store, const std::string& name,
+               testing::Matcher<uint64_t> value_matcher, Event::TestTimeSystem& time_system,
+               std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
-  /**
-   * Wait for a gauge to == a given value.
-   * @param store supplies the stats store.
-   * @param name gauge name.
-   * @param value target value.
-   * @param time_system the time system to use for waiting.
-   * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
-   * @return AssertionSuccess() if the gauge was == to the value within the timeout, else
-   * AssertionFailure().
-   */
-  static AssertionResult
-  waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
-                 Event::TestTimeSystem& time_system,
-                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+  template <class... Args> static AssertionResult waitForGaugeEq(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "TestUtility::waitForGaugeEq was removed; use "
+                  "TestUtility::waitForGauge(..., testing::Eq(value), ...) instead.");
+    return AssertionFailure();
+  }
+
+  template <class... Args> static AssertionResult waitForGaugeGe(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "TestUtility::waitForGaugeGe was removed; use "
+                  "TestUtility::waitForGauge(..., testing::Ge(value), ...) instead.");
+    return AssertionFailure();
+  }
 
   /**
    * Wait for a gauge to be destroyed.

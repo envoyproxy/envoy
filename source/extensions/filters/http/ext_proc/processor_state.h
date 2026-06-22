@@ -17,6 +17,7 @@
 #include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
 #include "absl/status/status.h"
+#include "absl/types/optional.h"
 #include "matching_utils.h"
 
 namespace Envoy {
@@ -32,7 +33,6 @@ public:
   bool end_stream = false;
   uint32_t length = 0;
 };
-using QueuedChunkPtr = std::unique_ptr<QueuedChunk>;
 
 class ChunkQueue {
 public:
@@ -43,13 +43,13 @@ public:
   bool empty() const { return queue_.empty(); }
   void push(Buffer::Instance& data, bool end_stream);
   void clear();
-  QueuedChunkPtr pop(Buffer::OwnedImpl& out_data);
+  absl::optional<QueuedChunk> pop(Buffer::OwnedImpl& out_data);
   const QueuedChunk& consolidate();
   Buffer::OwnedImpl& receivedData() { return received_data_; }
-  const std::deque<QueuedChunkPtr>& queue() const { return queue_; }
+  const std::deque<QueuedChunk>& queue() const { return queue_; }
 
 private:
-  std::deque<QueuedChunkPtr> queue_;
+  std::deque<QueuedChunk> queue_;
   // The total size of chunks in the queue.
   uint32_t bytes_enqueued_{};
   // The received data that had not been sent to downstream/upstream.
@@ -123,6 +123,12 @@ public:
   bool bodyReceived() const { return body_received_; }
   void setBodyReceived(bool b) { body_received_ = b; }
   bool partialBodyProcessed() const { return partial_body_processed_; }
+
+  // Check whether external processing is configured.
+  virtual bool noExternalProcess() const {
+    return !send_headers_ && !send_trailers_ &&
+           body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE;
+  }
 
   virtual void setProcessingMode(
       const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode) PURE;
@@ -222,7 +228,7 @@ public:
   // Move the contents of "data" into a QueuedChunk object on the streaming queue.
   void enqueueStreamingChunk(Buffer::Instance& data, bool end_stream);
   // If the queue has chunks, return the head of the queue.
-  QueuedChunkPtr dequeueStreamingChunk(Buffer::OwnedImpl& out_data);
+  absl::optional<QueuedChunk> dequeueStreamingChunk(Buffer::OwnedImpl& out_data);
   // Consolidate all the chunks on the queue into a single one and return a reference.
   const QueuedChunk& consolidateStreamedChunks() { return chunk_queue_.consolidate(); }
   bool queueOverHighLimit() const { return chunk_queue_.bytesEnqueued() > bufferLimit(); }
@@ -301,6 +307,20 @@ public:
   // a body response is received and processed.
   bool isLastResponseAfterBodyResp(bool eos_seen_in_body) const;
 
+  // Check whether this is the last response from the ext_proc server for this
+  // direction.
+  bool isLastResponseForDirection() const { return last_response_for_direction_; }
+
+  void setLastResponseForDirection(bool last_response_for_direction) {
+    last_response_for_direction_ = last_response_for_direction;
+  }
+
+  // Check for this direction, the external processing is either not configured,
+  // or the last response is already received.
+  bool noMoreExternalProcess() const {
+    return (noExternalProcess() || last_response_for_direction_);
+  }
+
 protected:
   void setBodyMode(
       envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode);
@@ -368,6 +388,8 @@ protected:
   // If true, the attributes for this processing state have already been sent.
   bool attributes_sent_ : 1 = false;
   const bool allow_content_length_header_ : 1;
+  // If true, this is the last response from the processor for this direction.
+  bool last_response_for_direction_ : 1 = false;
 
   // The request_headers_ field is guaranteed to hold the pointer to the request
   // headers as set in decodeHeaders. This allows both decoding and encoding states
@@ -635,6 +657,9 @@ public:
   bool isValidTrailersCallbackState() const override;
   bool canFailOpen() const override;
   bool localResponseStarted() const { return local_response_started_; }
+  bool noExternalProcess() const override {
+    return !local_response_started_ && ProcessorState::noExternalProcess();
+  }
 
 private:
   void setProcessingModeInternal(
@@ -735,9 +760,8 @@ public:
   }
 
   // Check whether external processing is configured in the encoding path.
-  bool noExternalProcess() const {
-    return !local_response_streaming_ && !send_headers_ && !send_trailers_ &&
-           body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE;
+  bool noExternalProcess() const override {
+    return !local_response_streaming_ && ProcessorState::noExternalProcess();
   }
 
   void setLocalResponseStreaming();

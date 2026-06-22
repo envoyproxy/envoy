@@ -67,7 +67,7 @@ public:
       return absl::InvalidArgumentError("does not support for quic");
     }
 
-    auto& string_value = dynamic_cast<const Protobuf::StringValue&>(config);
+    auto& string_value = Envoy::Protobuf::DynamicCastMessage<Protobuf::StringValue>(config);
     std::string mode = string_value.value();
     if (mode.empty()) {
       return absl::InvalidArgumentError("invalid cert selection mode");

@@ -16,6 +16,7 @@
 #include "source/common/common/utility.h"
 
 #include "absl/container/inlined_vector.h"
+#include "absl/functional/any_invocable.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
@@ -552,9 +553,9 @@ public:
    *   high watermark.
    * @return a newly created InstancePtr.
    */
-  virtual InstancePtr createBuffer(std::function<void()> below_low_watermark,
-                                   std::function<void()> above_high_watermark,
-                                   std::function<void()> above_overflow_watermark) PURE;
+  virtual InstancePtr createBuffer(absl::AnyInvocable<void()> below_low_watermark,
+                                   absl::AnyInvocable<void()> above_high_watermark,
+                                   absl::AnyInvocable<void()> above_overflow_watermark) PURE;
 
   /**
    * Create and returns a buffer memory account.

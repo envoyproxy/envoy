@@ -128,7 +128,7 @@ private:
       std::string key = absl::StrCat("key_", i);
       std::string value = absl::StrCat("value_", i);
       auto accessor = std::make_shared<Router::StringAccessorImpl>(value);
-      info_.filterState()->setData(key, accessor, StreamInfo::FilterState::StateType::ReadOnly);
+      info_.filterState()->setData(key, accessor);
       filter_state_keys_.push_back(key);
     }
   }

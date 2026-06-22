@@ -107,7 +107,6 @@ public:
     if (!value_.empty()) {
       read_callbacks_->connection().streamInfo().filterState()->setData(
           "test_key", std::make_shared<Router::StringAccessorImpl>(value_),
-          StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::Connection);
     }
     return Network::FilterStatus::Continue;
@@ -153,7 +152,7 @@ public:
   absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::FactoryContext&) override {
-    const auto& config = dynamic_cast<const StringValue&>(proto_config);
+    const auto& config = Envoy::Protobuf::DynamicCastMessage<StringValue>(proto_config);
     return [value = config.value()](auto& filter_manager) {
       auto filter = std::make_shared<SetFilterStateFilter>(value);
       filter_manager.addReadFilter(filter);

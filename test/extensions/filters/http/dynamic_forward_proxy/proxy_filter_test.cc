@@ -629,7 +629,6 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
   const auto pre_address = Network::Utility::parseInternetAddressNoThrow("1.2.3.3", 80);
   filter_state->setData(StreamInfo::UpstreamAddress::key(),
                         std::make_unique<StreamInfo::UpstreamAddress>(pre_address),
-                        StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::Request);
 
   InSequence s;
@@ -722,7 +721,7 @@ public:
 
 class ProxySettingsProxyFilterTest : public ProxyFilterTest {
 public:
-  virtual void setupFilter() override {
+  void setupFilter() override {
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
 
     Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
@@ -842,7 +841,6 @@ TEST_F(ProxyFilterWithFilterStateHostTest, WithFilterStateHostPresent) {
   const std::string filter_state_host = "filter-state-host.example.com";
   filter_state_->setData("envoy.upstream.dynamic_host",
                          std::make_unique<Router::StringAccessorImpl>(filter_state_host),
-                         StreamInfo::FilterState::StateType::ReadOnly,
                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Should use the value from filter state, not host header.
@@ -911,7 +909,6 @@ TEST_F(ProxyFilterWithFilterStateHostDisabledTest, DoesNotUseFilterStateWhenFlag
   const std::string filter_state_host = "filter-state-host.example.com";
   filter_state_->setData("envoy.upstream.dynamic_host",
                          std::make_unique<Router::StringAccessorImpl>(filter_state_host),
-                         StreamInfo::FilterState::StateType::ReadOnly,
                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(callbacks_.stream_info_));
@@ -949,7 +946,6 @@ TEST_F(ProxyFilterWithFilterStateHostDisabledTest, IgnoresFilterStateHostWhenFla
   const std::string filter_state_host = "filter-state-host.example.com";
   filter_state_->setData("envoy.upstream.dynamic_host",
                          std::make_unique<Router::StringAccessorImpl>(filter_state_host),
-                         StreamInfo::FilterState::StateType::ReadOnly,
                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Should use host header "foo", not filter state, when the flag is disabled.
@@ -983,7 +979,6 @@ TEST_F(ProxyFilterWithFilterStateHostTest, WithFilterStatePortPresent) {
   constexpr uint32_t filter_state_port = 9999;
   filter_state_->setData("envoy.upstream.dynamic_port",
                          std::make_unique<StreamInfo::UInt32AccessorImpl>(filter_state_port),
-                         StreamInfo::FilterState::StateType::ReadOnly,
                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Should use "foo" from host header but port from filter state.
@@ -1019,11 +1014,9 @@ TEST_F(ProxyFilterWithFilterStateHostTest, WithFilterStateHostAndPortPresent) {
   constexpr uint32_t filter_state_port = 9999;
   filter_state_->setData("envoy.upstream.dynamic_host",
                          std::make_unique<Router::StringAccessorImpl>(filter_state_host),
-                         StreamInfo::FilterState::StateType::ReadOnly,
                          StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state_->setData("envoy.upstream.dynamic_port",
                          std::make_unique<StreamInfo::UInt32AccessorImpl>(filter_state_port),
-                         StreamInfo::FilterState::StateType::ReadOnly,
                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Should use both host and port from filter state.
@@ -1059,11 +1052,9 @@ TEST_F(ProxyFilterWithFilterStateHostDisabledTest, IgnoresFilterStatePortWhenFla
   constexpr uint32_t filter_state_port = 9999;
   filter_state_->setData("envoy.upstream.dynamic_host",
                          std::make_unique<Router::StringAccessorImpl>(filter_state_host),
-                         StreamInfo::FilterState::StateType::ReadOnly,
                          StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state_->setData("envoy.upstream.dynamic_port",
                          std::make_unique<StreamInfo::UInt32AccessorImpl>(filter_state_port),
-                         StreamInfo::FilterState::StateType::ReadOnly,
                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Should use "foo" from host header and default port 80, ignoring filter state.

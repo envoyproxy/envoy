@@ -30,8 +30,6 @@ public:
   void initialize() override {
     setMaxRequestHeadersKb(60);
     setMaxRequestHeadersCount(100);
-    envoy::config::route::v3::RetryPolicy retry_policy;
-
     // If there is a need for another virtual host, it's recommended
     // to add it at the end, so the numbering remains stable.
     auto pass_through = config_helper_.createVirtualHost("pass.through.internal.redirect");
@@ -696,10 +694,14 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithResponseBody) {
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
     config_helper_.prependFilter(R"EOF(
   name: pause-filter-for-quic
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.PauseFilterForQuicConfig
   )EOF");
   } else {
     config_helper_.prependFilter(R"EOF(
   name: pause-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.PauseFilterConfig
   )EOF");
   }
   initialize();
@@ -783,7 +785,8 @@ TEST_P(RedirectIntegrationTest, InternalRedirectHandledByDirectResponse) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("204", response->headers().getStatusValue());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_internal_redirect_succeeded_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_internal_redirect_succeeded_total",
+                               testing::Eq(1));
   // 302 was never returned downstream
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_2xx")->value());

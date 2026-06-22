@@ -16,9 +16,7 @@
 #include "absl/status/status.h"
 #include "gtest/gtest.h"
 
-using ::envoy::extensions::filters::http::cache_v2::v3::CacheV2Config;
 using ::testing::_;
-using ::testing::AnyNumber;
 using ::testing::Eq;
 using ::testing::Ge;
 using ::testing::Mock;

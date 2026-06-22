@@ -270,13 +270,15 @@ double PeakEwmaLoadBalancer::updateEwmaWithSample(double current_ewma, double ne
 
 void PeakEwmaLoadBalancer::processHostSamples(Upstream::HostConstSharedPtr /* host */,
                                               PeakEwmaHostLbPolicyData* data) {
-  if (!data)
+  if (!data) {
     return;
+  }
 
   // Get the range of new samples to process (atomic ring buffer).
   auto [last_processed, current_write] = data->getNewSampleRange();
-  if (last_processed == current_write)
+  if (last_processed == current_write) {
     return;
+  }
 
   // If ring buffer was fully overwritten, skip to oldest valid slot.
   // Uses unsigned arithmetic (always correct since write_index_ only increments).

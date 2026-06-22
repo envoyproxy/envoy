@@ -30,7 +30,7 @@ public:
     ENVOY_CONN_LOG(debug, "polite: onData {} bytes {} end_stream", read_callbacks_->connection(),
                    data.length(), end_stream);
     if (!read_greeted_) {
-      if (greeting_.length() > 0) {
+      if (!greeting_.empty()) {
         Buffer::OwnedImpl greeter(greeting_);
         read_callbacks_->injectReadDataToFilterChain(greeter, false);
       }
@@ -42,7 +42,7 @@ public:
     ENVOY_CONN_LOG(debug, "polite: onWrite {} bytes {} end_stream", write_callbacks_->connection(),
                    data.length(), end_stream);
     if (!write_greeted_) {
-      if (greeting_.length() > 0) {
+      if (!greeting_.empty()) {
         Buffer::OwnedImpl greeter("please ");
         write_callbacks_->injectWriteDataToFilterChain(greeter, false);
       }
@@ -80,7 +80,7 @@ public:
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::UpstreamFactoryContext&) override {
-    auto config = dynamic_cast<const Protobuf::StringValue&>(proto_config);
+    auto config = Envoy::Protobuf::DynamicCastMessage<Protobuf::StringValue>(proto_config);
     return [this, config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addFilter(std::make_shared<PoliteFilter>(test_parent_, config));
     };
@@ -124,7 +124,7 @@ public:
 
 private:
   // Atomic so that this may be safely accessed from multiple threads
-  std::atomic<absl::optional<bool>> on_new_connection_called_after_on_write_{};
+  std::atomic<absl::optional<bool>> on_new_connection_called_after_on_write_;
 };
 
 class ClusterFilterTcpIntegrationTest : public ClusterFilterIntegrationTestBase,

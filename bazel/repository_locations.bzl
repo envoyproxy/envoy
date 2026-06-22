@@ -46,8 +46,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.3.34",
-        sha256 = "49bb8b3cff6b28d74f9cd18ca9b3607cf4a5b2e81ecb57a04a9bc3fe94ac7ac8",
+        version = "0.3.35",
+        sha256 = "5179bc3f912d9c2dd5a6e5215e98222abe088847f021eba9f0f2e9a006deacaa",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
@@ -290,8 +290,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/SkyAPM/cpp2sky/archive/v{version}.tar.gz"],
     ),
     dd_trace_cpp = dict(
-        version = "2.0.0",
-        sha256 = "e4a0dabc3e186ce99c71685178448f93c501577102cdc50ddbf12cbaaba54713",
+        version = "2.1.0",
+        sha256 = "8152fb69e61518a5b55ecb96edcbb19585f8950b6f070ac98ebd0b6dd6177492",
         strip_prefix = "dd-trace-cpp-{version}",
         urls = ["https://github.com/DataDog/dd-trace-cpp/archive/v{version}.tar.gz"],
     ),
@@ -467,8 +467,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/{version}.tar.gz"],
     ),
     rules_java = dict(
-        version = "7.12.5",
-        sha256 = "17b18cb4f92ab7b94aa343ce78531b73960b1bed2ba166e5b02c9fdf0b0ac270",
+        version = "9.6.1",
+        sha256 = "9de4e178c2c4f98d32aafe5194c3f2b717ae10405caa11bdcb460ac2a6f61516",
         urls = ["https://github.com/bazelbuild/rules_java/releases/download/{version}/rules_java-{version}.tar.gz"],
     ),
     rules_python = dict(
@@ -553,8 +553,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "13384c955f76e3a2b157f7b613ce6c02d594770f",
-        sha256 = "a2310cab30a46e9ccf533cd10632d44852d46784f4192e202cc53b6e353d5876",
+        version = "846ced76db5e1b6297408cc11a8bfe1fc1c0e49f",
+        sha256 = "0e11aec4ebd778fcd3c2775e3693cccbd966af4928e9fa7573c2e2975ccd9c50",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),
@@ -720,14 +720,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-linux-aarch64.tar.gz"],
     ),
     fips_go_linux_amd64 = dict(
-        version = "1.26.2",
-        sha256 = "990e6b4bbba816dc3ee129eaeaf4b42f17c2800b88a2166c265ac1a200262282",
+        version = "1.26.3",
+        sha256 = "2b2cfc7148493da5e73981bffbf3353af381d5f93e789c82c79aff64962eb556",
         strip_prefix = "go",
         urls = ["https://dl.google.com/go/go{version}.linux-amd64.tar.gz"],
     ),
     fips_go_linux_arm64 = dict(
-        version = "1.26.2",
-        sha256 = "c958a1fe1b361391db163a485e21f5f228142d6f8b584f6bef89b26f66dc5b23",
+        version = "1.26.3",
+        sha256 = "9d89a3ea57d141c2b22d70083f2c8459ba3890f2d9e818e7e933b75614936565",
         strip_prefix = "go",
         urls = ["https://dl.google.com/go/go{version}.linux-arm64.tar.gz"],
     ),
@@ -738,8 +738,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/clang+llvm-{version}-powerpc64le-linux-ubuntu-18.04.tar.xz"],
     ),
     fips_go_ppc64le = dict(
-        version = "1.26.2",
-        sha256 = "62b7645dd2404052535617c59e91cf03c7aa28e332dbaddbe4c0d7de7bcc6736",
+        version = "1.26.3",
+        sha256 = "dbd82b50530ead2beb1fd72215117380df3cb16332b51467116dc35b3691dd75",
         strip_prefix = "go",
         urls = ["https://dl.google.com/go/go{version}.linux-ppc64le.tar.gz"],
     ),

@@ -63,40 +63,17 @@ Http1HeaderValidator::validatePathHeaderWithAdditionalCharacters(
   // " < > [ ] ^ ` { } \ |
   // This table is used when the "envoy.uhv.allow_non_compliant_characters_in_path"
   // runtime value is set to "true".
-  static constexpr std::array<uint32_t, 8> kPathHeaderCharTableWithAdditionalCharacters = {
-      // control characters
-      0b00000000000000000000000000000000,
-      // !"#$%&'()*+,-./0123456789:;<=>?
-      0b01101111111111111111111111111110,
-      //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
-      0b11111111111111111111111111111111,
-      //`abcdefghijklmnopqrstuvwxyz{|}~
-      0b11111111111111111111111111111110,
-      // extended ascii
-      0b00000000000000000000000000000000,
-      0b00000000000000000000000000000000,
-      0b00000000000000000000000000000000,
-      0b00000000000000000000000000000000,
-  };
+  // This is the same as all printable characters except ? and #
+  static constexpr ::Envoy::Http::CharTable kPathHeaderCharTableWithAdditionalCharacters =
+      ::Envoy::Http::CharTables::kPrintable & ~::Envoy::Http::CharTable::fromChars("?#");
 
-  // Same table as the kUriQueryAndFragmentCharTable but with the following additional character
+  // Same table as CharTables::kUriQueryAndFragment but with the following additional character
   // allowed " < > [ ] ^ ` { } \ | # This table is used when the
   // "envoy.uhv.allow_non_compliant_characters_in_path" runtime value is set to "true".
-  static constexpr std::array<uint32_t, 8> kQueryAndFragmentCharTableWithAdditionalCharacters = {
-      // control characters
-      0b00000000000000000000000000000000,
-      // !"#$%&'()*+,-./0123456789:;<=>?
-      0b01111111111111111111111111111111,
-      //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
-      0b11111111111111111111111111111111,
-      //`abcdefghijklmnopqrstuvwxyz{|}~
-      0b11111111111111111111111111111110,
-      // extended ascii
-      0b00000000000000000000000000000000,
-      0b00000000000000000000000000000000,
-      0b00000000000000000000000000000000,
-      0b00000000000000000000000000000000,
-  };
+  // This ends up being the same thing as all printable characters.
+  static constexpr ::Envoy::Http::CharTable kQueryAndFragmentCharTableWithAdditionalCharacters =
+      ::Envoy::Http::CharTables::kPrintable;
+
   return HeaderValidator::validatePathHeaderCharacterSet(
       path_header_value, kPathHeaderCharTableWithAdditionalCharacters,
       kQueryAndFragmentCharTableWithAdditionalCharacters);

@@ -1,0 +1,12 @@
+diff --git a/third_party/BUILD.bazel b/third_party/BUILD.bazel
+--- a/third_party/BUILD.bazel
++++ b/third_party/BUILD.bazel
+@@ -29,7 +29,7 @@
+
+ java_import(
+     name = "android_sdk",
+-    jars = ["@bazel_tools//tools/android:android_jar"],
++    jars = ["@androidsdk//:platforms/android-30/android.jar"],
+     neverlink = True,
+     visibility = ["//visibility:public"],
+ )

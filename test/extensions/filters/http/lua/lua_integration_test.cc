@@ -5,13 +5,17 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 
+#include "test/extensions/filters/http/lua/lua_test_filter.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -1412,7 +1416,7 @@ TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
       Config::TestTypeUrl::get().RouteConfiguration,
       {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(UPDATE_ROUTE_CONFIG)},
       "2");
-  test_server_->waitForCounterGe("http.config_test.rds.basic_lua_routes.update_success", 2);
+  test_server_->waitForCounter("http.config_test.rds.basic_lua_routes.update_success", Ge(2));
 
   check_request(hello_headers, "inline_code_from_hello");
   check_request(inline_headers, "new_inline_code_from_inline");
@@ -1704,11 +1708,13 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Protobuf::Any>();
+    return std::make_unique<test::extensions::filters::http::lua::TestTypedMetadataFilterConfig>();
   }
 
   std::string name() const override { return "envoy.test.typed_metadata"; }
-  std::set<std::string> configTypes() override { return {}; };
+  std::set<std::string> configTypes() override {
+    return {"test.extensions.filters.http.lua.TestTypedMetadataFilterConfig"};
+  }
 };
 
 // ``PPV2`` typed metadata filter that mimics the real proxy protocol behavior
@@ -1780,11 +1786,13 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Protobuf::Any>();
+    return std::make_unique<test::extensions::filters::http::lua::PPV2TypedMetadataFilterConfig>();
   }
 
   std::string name() const override { return "envoy.test.ppv2.typed_metadata"; }
-  std::set<std::string> configTypes() override { return {}; };
+  std::set<std::string> configTypes() override {
+    return {"test.extensions.filters.http.lua.PPV2TypedMetadataFilterConfig"};
+  }
 };
 
 TEST_P(LuaIntegrationTest, ConnectionTypedMetadata) {
@@ -1796,7 +1804,7 @@ TEST_P(LuaIntegrationTest, ConnectionTypedMetadata) {
   const std::string FILTER_CONFIG = R"EOF(
 name: envoy.test.typed_metadata
 typed_config:
-  "@type": type.googleapis.com/google.protobuf.Any
+  "@type": type.googleapis.com/test.extensions.filters.http.lua.TestTypedMetadataFilterConfig
 )EOF";
 
   config_helper_.addNetworkFilter(FILTER_CONFIG);
@@ -1911,7 +1919,7 @@ TEST_P(LuaIntegrationTest, ProxyProtocolTypedMetadata) {
   const std::string FILTER_CONFIG = R"EOF(
 name: envoy.test.ppv2.typed_metadata
 typed_config:
-  "@type": type.googleapis.com/google.protobuf.Any
+  "@type": type.googleapis.com/test.extensions.filters.http.lua.PPV2TypedMetadataFilterConfig
 )EOF";
 
   config_helper_.addNetworkFilter(FILTER_CONFIG);
@@ -2713,14 +2721,14 @@ typed_config:
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  test_server_->waitForCounterEq("http.config_test.lua.config1.executions", 2);
-  test_server_->waitForCounterEq("http.config_test.lua.config1.errors", 0);
-  test_server_->waitForCounterEq("http.config_test.lua.config2.executions", 2);
-  test_server_->waitForCounterEq("http.config_test.lua.config2.errors", 0);
-  test_server_->waitForCounterEq("http.config_test.lua.config3.executions", 1);
-  test_server_->waitForCounterEq("http.config_test.lua.config3.errors", 1);
-  test_server_->waitForCounterEq("http.config_test.lua.config4.executions", 0);
-  test_server_->waitForCounterEq("http.config_test.lua.config4.errors", 0);
+  test_server_->waitForCounter("http.config_test.lua.config1.executions", Eq(2));
+  test_server_->waitForCounter("http.config_test.lua.config1.errors", Eq(0));
+  test_server_->waitForCounter("http.config_test.lua.config2.executions", Eq(2));
+  test_server_->waitForCounter("http.config_test.lua.config2.errors", Eq(0));
+  test_server_->waitForCounter("http.config_test.lua.config3.executions", Eq(1));
+  test_server_->waitForCounter("http.config_test.lua.config3.errors", Eq(1));
+  test_server_->waitForCounter("http.config_test.lua.config4.executions", Eq(0));
+  test_server_->waitForCounter("http.config_test.lua.config4.errors", Eq(0));
 
   cleanup();
 }
@@ -2782,15 +2790,15 @@ typed_config:
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   // Verify the counter was incremented correctly (inc + add(2) + inc = 4).
-  test_server_->waitForCounterEq("http.config_test.lua.stats_test.requests", 4);
+  test_server_->waitForCounter("http.config_test.lua.stats_test.requests", Eq(4));
 
   // Verify the gauge value (set(10) + inc - dec - sub(5) = 5).
-  test_server_->waitForGaugeEq("http.config_test.lua.stats_test.active_requests", 5);
+  test_server_->waitForGauge("http.config_test.lua.stats_test.active_requests", Eq(5));
 
   // Verify histogram exists (we can't easily check recorded values in integration tests,
   // but we can verify the histogram was created by checking it appears in stats).
-  test_server_->waitForCounterEq("http.config_test.lua.stats_test.executions", 2);
-  test_server_->waitForCounterEq("http.config_test.lua.stats_test.errors", 0);
+  test_server_->waitForCounter("http.config_test.lua.stats_test.executions", Eq(2));
+  test_server_->waitForCounter("http.config_test.lua.stats_test.errors", Eq(0));
 
   cleanup();
 }

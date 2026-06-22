@@ -1,5 +1,7 @@
 #include "contrib/istio/filters/common/source/workload_discovery.h"
 
+#include <optional>
+
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/factory_context.h"
@@ -81,20 +83,19 @@ public:
     subscription_.start();
   }
 
-  absl::optional<Istio::Common::WorkloadMetadataObject>
-  getMetadata(const Network::Address::InstanceConstSharedPtr& address) override {
+  std::optional<Istio::Common::WorkloadMetadataObject>
+  GetMetadata(const Network::Address::InstanceConstSharedPtr& address) override {
     if (address && address->ip()) {
       if (const auto ipv4 = address->ip()->ipv4(); ipv4) {
         uint32_t value = ipv4->address();
         std::array<uint8_t, 4> output;
-        absl::little_endian::Store32(&output, value);
+        memcpy(output.data(), &value, 4); // NOLINT(safe-memcpy)
         return tls_->get(std::string(output.begin(), output.end()));
       } else if (const auto ipv6 = address->ip()->ipv6(); ipv6) {
-        const uint64_t high = absl::Uint128High64(ipv6->address());
-        const uint64_t low = absl::Uint128Low64(ipv6->address());
+        const auto* sa = reinterpret_cast<const sockaddr_in6*>(address->sockAddr());
         std::array<uint8_t, 16> output;
-        absl::little_endian::Store64(&output, low);
-        absl::little_endian::Store64(&output[8], high);
+        static_assert(sizeof(sa->sin6_addr.s6_addr) == 16);
+        memcpy(output.data(), sa->sin6_addr.s6_addr, 16); // NOLINT(safe-memcpy)
         return tls_->get(std::string(output.begin(), output.end()));
       }
     }
@@ -127,7 +128,7 @@ private:
     }
     size_t total() const { return address_to_workload_.size(); }
     // Returns by-value since the flat map does not provide pointer stability.
-    absl::optional<Istio::Common::WorkloadMetadataObject> get(const std::string& address) {
+    std::optional<Istio::Common::WorkloadMetadataObject> get(const std::string& address) {
       const auto it = address_to_workload_.find(address);
       if (it != address_to_workload_.end()) {
         return it->second;
@@ -272,7 +273,7 @@ public:
 REGISTER_FACTORY(WorkloadDiscoveryFactory, Server::Configuration::BootstrapExtensionFactory);
 
 WorkloadMetadataProviderSharedPtr
-getProvider(Server::Configuration::ServerFactoryContext& context) {
+GetProvider(Server::Configuration::ServerFactoryContext& context) {
   return context.singletonManager().getTyped<WorkloadMetadataProvider>(
       SINGLETON_MANAGER_REGISTERED_NAME(workload_metadata_provider));
 }

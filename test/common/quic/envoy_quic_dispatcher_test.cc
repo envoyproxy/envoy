@@ -2,7 +2,12 @@
 
 #include <memory>
 #include <optional>
+#include <vector>
 
+#include "envoy/buffer/buffer.h"
+
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
 #include "source/common/http/session_idle_list.h"
 #include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/network/listen_socket_impl.h"
@@ -31,6 +36,7 @@
 #include "gtest/gtest.h"
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
 #include "quiche/quic/core/quic_dispatcher.h"
+#include "quiche/quic/core/quic_packets.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_dispatcher_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
@@ -82,7 +88,8 @@ public:
             std::make_unique<Http::SessionIdleList>(*dispatcher_)),
         connection_id_(quic::test::TestConnectionId(1)),
         transport_socket_factory_(*QuicServerTransportSocketFactory::create(
-            true, listener_config_.listenerScope(),
+            /*enable_early_data=*/true, /*enable_resumption=*/true,
+            listener_config_.listenerScope(),
             std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(), ssl_context_manager_)) {
     auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
     envoy_quic_dispatcher_.InitializeWithWriter(writer);
@@ -115,20 +122,22 @@ public:
   void processValidChloPacket(const quic::QuicSocketAddress& peer_addr) {
     // Create a Quic Crypto or TLS1.3 CHLO packet.
     EnvoyQuicClock clock(*dispatcher_);
-    Buffer::OwnedImpl payload =
-        generateChloPacketToSend(quic_version_, quic_config_, connection_id_);
-    Buffer::RawSliceVector slice = payload.getRawSlices();
-    ASSERT(slice.size() == 1);
-    auto encrypted_packet = std::make_unique<quic::QuicEncryptedPacket>(
-        static_cast<char*>(slice[0].mem_), slice[0].len_);
-    std::unique_ptr<quic::QuicReceivedPacket> received_packet =
-        std::unique_ptr<quic::QuicReceivedPacket>(
-            quic::test::ConstructReceivedPacket(*encrypted_packet, clock.Now()));
+    std::vector<Buffer::OwnedImpl> payloads =
+        generateChloPacketsToSend(quic_version_, quic_config_, connection_id_);
+    for (Buffer::OwnedImpl& payload : payloads) {
+      Buffer::RawSliceVector slice = payload.getRawSlices();
+      ASSERT(slice.size() == 1);
+      auto encrypted_packet = std::make_unique<quic::QuicEncryptedPacket>(
+          static_cast<char*>(slice[0].mem_), slice[0].len_);
+      std::unique_ptr<quic::QuicReceivedPacket> received_packet =
+          std::unique_ptr<quic::QuicReceivedPacket>(
+              quic::test::ConstructReceivedPacket(*encrypted_packet, clock.Now()));
 
-    envoy_quic_dispatcher_.ProcessPacket(
-        envoyIpAddressToQuicSocketAddress(
-            listen_socket_->connectionInfoProvider().localAddress()->ip()),
-        peer_addr, *received_packet);
+      envoy_quic_dispatcher_.ProcessPacket(
+          envoyIpAddressToQuicSocketAddress(
+              listen_socket_->connectionInfoProvider().localAddress()->ip()),
+          peer_addr, *received_packet);
+    }
   }
 
   void processValidChloPacketAndCheckStatus(bool should_buffer) {
@@ -419,10 +428,12 @@ TEST_P(EnvoyQuicDispatcherTest, ProcessPacketReturnsTrueForDispatchedPacket) {
                                         ? quic::QuicIpAddress::Loopback4()
                                         : quic::QuicIpAddress::Loopback6(),
                                     54321);
-  auto chlo_packet = wrapPacket(*encryptPacket(*quic::test::GetFirstFlightOfPackets(
-                                    quic_version_, quic_config_, connection_id_)[0]),
-                                clock);
-  EXPECT_TRUE(envoy_quic_dispatcher_.processPacket(self_addr, peer_addr, *chlo_packet));
+  std::vector<std::unique_ptr<quic::QuicReceivedPacket>> chlo_packets =
+      quic::test::GetFirstFlightOfPackets(quic_version_, quic_config_, connection_id_);
+  for (const auto& packet : chlo_packets) {
+    auto wrapped_packet = wrapPacket(*encryptPacket(*packet), clock);
+    EXPECT_TRUE(envoy_quic_dispatcher_.processPacket(self_addr, peer_addr, *wrapped_packet));
+  }
   auto packet = wrapPacket(*testEncryptedPacket(quic_version_, connection_id_, "hello"), clock);
   EXPECT_TRUE(envoy_quic_dispatcher_.processPacket(self_addr, peer_addr, *packet));
   envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
@@ -438,10 +449,12 @@ TEST_P(EnvoyQuicDispatcherTest, ProcessPacketReturnsTrueForDispatchedPacketOnExi
                                         ? quic::QuicIpAddress::Loopback4()
                                         : quic::QuicIpAddress::Loopback6(),
                                     54321);
-  auto chlo_packet = wrapPacket(*encryptPacket(*quic::test::GetFirstFlightOfPackets(
-                                    quic_version_, quic_config_, connection_id_)[0]),
-                                clock);
-  EXPECT_TRUE(envoy_quic_dispatcher_.processPacket(self_addr, peer_addr, *chlo_packet));
+  std::vector<std::unique_ptr<quic::QuicReceivedPacket>> chlo_packets =
+      quic::test::GetFirstFlightOfPackets(quic_version_, quic_config_, connection_id_);
+  for (const auto& packet : chlo_packets) {
+    auto wrapped_packet = wrapPacket(*encryptPacket(*packet), clock);
+    EXPECT_TRUE(envoy_quic_dispatcher_.processPacket(self_addr, peer_addr, *wrapped_packet));
+  }
   envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
   // Stop accepting new connections after processing the CHLO.
   envoy_quic_dispatcher_.StopAcceptingNewConnections();

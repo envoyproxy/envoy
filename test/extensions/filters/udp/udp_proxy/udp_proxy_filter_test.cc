@@ -28,6 +28,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
@@ -197,6 +198,12 @@ public:
                     }
                   }));
         }
+        // After the first successful write the upstream socket's ephemeral local address becomes
+        // available and is captured for access logging. Allow the lookup in any flow.
+        EXPECT_CALL(*socket_->io_handle_, localAddress())
+            .Times(testing::AnyNumber())
+            .WillRepeatedly(
+                Return(Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:12345")));
       }
     }
 
@@ -585,6 +592,38 @@ upstream_socket_config:
 
   EXPECT_TRUE(std::regex_match(output_[0], std::regex(session_access_log_regex)));
   EXPECT_TRUE(std::regex_match(output_[1], std::regex(session_access_log_regex)));
+}
+
+// The non-tunneling UDP proxy session records the upstream remote and local addresses so they are
+// available to access loggers, matching TCP proxy behavior.
+TEST_F(UdpProxyFilterTest, UpstreamAddressAccessLog) {
+  InSequence s;
+
+  const std::string session_access_log_format =
+      "%UPSTREAM_REMOTE_ADDRESS% %UPSTREAM_LOCAL_ADDRESS%";
+
+  setup(accessLogConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+  )EOF",
+                        session_access_log_format, ""),
+        true, false);
+
+  expectSessionCreate(upstream_address_);
+  // The local ephemeral address is only bound after the first successful send to the upstream;
+  // expectWriteToUpstream stubs it to 127.0.0.1:12345.
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+
+  filter_.reset();
+  ASSERT_EQ(output_.size(), 1);
+  EXPECT_EQ(output_[0], "20.0.0.1:443 127.0.0.1:12345");
 }
 
 // Route with source IP.
@@ -2271,15 +2310,13 @@ public:
     if (proxy_port) {
       stream_info_.filterState()->setData(
           "udp.connect.proxy_port",
-          std::make_shared<StreamInfo::UInt32AccessorImpl>(proxy_port.value()),
-          Envoy::StreamInfo::FilterState::StateType::Mutable);
+          std::make_shared<StreamInfo::UInt32AccessorImpl>(proxy_port.value()));
     }
 
     if (target_port) {
       stream_info_.filterState()->setData(
           "udp.connect.target_port",
-          std::make_shared<StreamInfo::UInt32AccessorImpl>(target_port.value()),
-          Envoy::StreamInfo::FilterState::StateType::Mutable);
+          std::make_shared<StreamInfo::UInt32AccessorImpl>(target_port.value()));
     }
   }
 
@@ -2588,6 +2625,8 @@ TEST_F(TunnelingConnectionPoolImplTest, PoolFailure) {
   pool_->onPoolFailure(Http::ConnectionPool::PoolFailureReason::Timeout, "reason", upstream_host_);
   EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHost()->hostname(), upstream_host_name);
   EXPECT_EQ(stream_info_.upstreamInfo()->upstreamTransportFailureReason(), "reason");
+  ASSERT_EQ(stream_info_.upstreamInfo()->upstreamHostsAttempted().size(), 1);
+  EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHostsAttempted()[0], upstream_host_);
 }
 
 TEST_F(TunnelingConnectionPoolImplTest, PoolReady) {
@@ -2600,6 +2639,8 @@ TEST_F(TunnelingConnectionPoolImplTest, PoolReady) {
   EXPECT_CALL(stream_callbacks_, resetIdleTimer());
   pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
   EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHost()->hostname(), upstream_host_name);
+  ASSERT_EQ(stream_info_.upstreamInfo()->upstreamHostsAttempted().size(), 1);
+  EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHostsAttempted()[0], upstream_host_);
 }
 
 TEST_F(TunnelingConnectionPoolImplTest, OnStreamFailure) {
@@ -2740,8 +2781,7 @@ TEST(TunnelingConfigImplTest, HeadersToAdd) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   stream_info.filterState()->setData(
-      "test_key", std::make_shared<Envoy::Router::StringAccessorImpl>("test_val"),
-      Envoy::StreamInfo::FilterState::StateType::Mutable);
+      "test_key", std::make_shared<Envoy::Router::StringAccessorImpl>("test_val"));
 
   TunnelingConfig proto_config;
   auto* header_to_add = proto_config.add_headers_to_add();
@@ -2760,8 +2800,7 @@ TEST(TunnelingConfigImplTest, ProxyHostFromFilterState) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   stream_info.filterState()->setData(
-      "test-proxy-host", std::make_shared<Envoy::Router::StringAccessorImpl>("test.host.com"),
-      Envoy::StreamInfo::FilterState::StateType::Mutable);
+      "test-proxy-host", std::make_shared<Envoy::Router::StringAccessorImpl>("test.host.com"));
 
   TunnelingConfig proto_config;
   proto_config.set_proxy_host("%FILTER_STATE(test-proxy-host:PLAIN)%");
@@ -2775,8 +2814,7 @@ TEST(TunnelingConfigImplTest, TargetHostFromFilterState) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   stream_info.filterState()->setData(
-      "test-proxy-host", std::make_shared<Envoy::Router::StringAccessorImpl>("test.host.com"),
-      Envoy::StreamInfo::FilterState::StateType::Mutable);
+      "test-proxy-host", std::make_shared<Envoy::Router::StringAccessorImpl>("test.host.com"));
 
   TunnelingConfig proto_config;
   proto_config.set_target_host("%FILTER_STATE(test-proxy-host:PLAIN)%");

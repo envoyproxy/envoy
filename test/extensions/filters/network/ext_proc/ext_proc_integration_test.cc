@@ -19,6 +19,7 @@ namespace ExtProc {
 
 using envoy::service::network_ext_proc::v3::ProcessingRequest;
 using envoy::service::network_ext_proc::v3::ProcessingResponse;
+using testing::Ge;
 
 // Test-only filter that sets both typed and untyped connection metadata based on filter config
 class MetadataSetterFilter : public Network::ReadFilter {
@@ -86,7 +87,7 @@ public:
   absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::FactoryContext&) override {
-    const auto& struct_config = dynamic_cast<const Protobuf::Struct&>(proto_config);
+    const auto& struct_config = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(proto_config);
     return [struct_config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<MetadataSetterFilter>(struct_config));
     };
@@ -157,15 +158,15 @@ public:
             auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners(0);
             auto* filter_chain = listeners->mutable_filter_chains(0);
             auto* filters = filter_chain->mutable_filters();
-            for (int i = 0; i < filters->size(); i++) {
-              if ((*filters)[i].name() == "envoy.network_ext_proc.ext_proc_filter") {
+            for (auto& filter : *filters) {
+              if (filter.name() == "envoy.network_ext_proc.ext_proc_filter") {
                 envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
-                (*filters)[i].mutable_typed_config()->UnpackTo(&config);
+                filter.mutable_typed_config()->UnpackTo(&config);
 
                 // Apply the provided modifier function
                 config_modifier(config);
 
-                (*filters)[i].mutable_typed_config()->PackFrom(config);
+                filter.mutable_typed_config()->PackFrom(config);
                 break;
               }
             }
@@ -220,11 +221,11 @@ public:
       auto* filter_chain = listener->mutable_filter_chains(0);
       auto* filters = filter_chain->mutable_filters();
 
-      for (int i = 0; i < filters->size(); i++) {
-        if ((*filters)[i].name() == "test.metadata_setter") {
+      for (auto& filter : *filters) {
+        if (filter.name() == "test.metadata_setter") {
           Protobuf::Struct existing_config;
-          if ((*filters)[i].has_typed_config()) {
-            (*filters)[i].typed_config().UnpackTo(&existing_config);
+          if (filter.has_typed_config()) {
+            filter.typed_config().UnpackTo(&existing_config);
           }
 
           // Set untyped metadata
@@ -264,7 +265,7 @@ public:
                 .set_string_value(typed_value.value());
           }
 
-          (*filters)[i].mutable_typed_config()->PackFrom(existing_config);
+          filter.mutable_typed_config()->PackFrom(existing_config);
           break;
         }
       }
@@ -338,7 +339,7 @@ public:
 
   void verifyCounters(const std::map<std::string, uint64_t>& expected_counters) {
     for (const auto& [name, value] : expected_counters) {
-      test_server_->waitForCounterGe("network_ext_proc.ext_proc_prefix." + name, value);
+      test_server_->waitForCounter("network_ext_proc.ext_proc_prefix." + name, Ge(value));
     }
   }
 
@@ -670,7 +671,7 @@ TEST_P(NetworkExtProcFilterIntegrationTest, GrpcStreamFailure) {
   // Close gRPC stream with an error status instead of Ok
   // This should trigger onGrpcError instead of onGrpcClose
   closeGrpcStream();
-  test_server_->waitForCounterGe("network_ext_proc.ext_proc_prefix.streams_grpc_error", 1);
+  test_server_->waitForCounter("network_ext_proc.ext_proc_prefix.streams_grpc_error", Ge(1));
   ASSERT_FALSE(tcp_client->write("", true));
   tcp_client->waitForDisconnect();
 
@@ -699,7 +700,7 @@ TEST_P(NetworkExtProcFilterIntegrationTest, GrpcStreamFailureWithFailureModeAllo
   closeGrpcStream();
 
   // Wait for the failure_mode_allowed counter to increment
-  test_server_->waitForCounterGe("network_ext_proc.ext_proc_prefix.failure_mode_allowed", 1);
+  test_server_->waitForCounter("network_ext_proc.ext_proc_prefix.failure_mode_allowed", Ge(1));
 
   // Should be able to continue using the connection after stream failure
   ASSERT_TRUE(tcp_client->write("more_data", true));

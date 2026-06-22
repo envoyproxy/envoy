@@ -73,11 +73,12 @@ public:
     return makeOptRefFromPtr(eds_resources_cache_.get());
   }
 
-  absl::Status
-  updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
-                  Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
-                  BackOffStrategyPtr&& backoff_strategy,
-                  const envoy::config::core::v3::ApiConfigSource& ads_config_source) override;
+  absl::Status updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+                               Grpc::RawAsyncClientSharedPtr&& failover_async_client,
+                               Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
+                               const envoy::config::core::v3::ApiConfigSource& ads_config_source,
+                               std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>
+                                   load_stats_reporter_factory = nullptr) override;
 
   Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override;
   Upstream::LoadStatsReporter* loadStatsReporter() const override;
@@ -104,7 +105,7 @@ public:
                  grpc_stream_.get())
           ->currentStreamForTest();
     }
-    return *grpc_stream_.get();
+    return *grpc_stream_;
   }
 
 private:
@@ -261,7 +262,7 @@ private:
     TtlManager ttl_;
     // The identifier for the server that sent the most recent response, or
     // empty if there is none.
-    std::string control_plane_identifier_{};
+    std::string control_plane_identifier_;
     // If true, xDS resources were previously fetched from an xDS source or an xDS delegate.
     bool previously_fetched_data_{false};
   };

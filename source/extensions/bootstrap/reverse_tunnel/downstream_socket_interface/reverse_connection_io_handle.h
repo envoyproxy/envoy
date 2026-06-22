@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/io_handle.h"
 #include "envoy/network/socket.h"
@@ -35,6 +36,7 @@ namespace ReverseConnection {
 // Forward declarations.
 class ReverseTunnelInitiatorExtension;
 class ReverseConnectionIOHandle;
+struct HandshakeHeader;
 
 namespace {
 // HTTP protocol constants.
@@ -85,7 +87,9 @@ struct ReverseConnectionSocketConfig {
   std::string request_path{
       std::string(ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH)};
   std::vector<envoy::config::core::v3::HeaderValueOption>
-      additional_headers; // Additional headers for the handshake request.
+      additional_headers;       // Additional headers for the handshake request.
+  bool use_http_upgrade{false}; // Negotiate handshake as HTTP/1.1 Upgrade -> 101.
+  std::shared_ptr<const std::vector<HandshakeHeader>> handshake_headers;
   // TODO(basundhara-c): Add support for multiple remote clusters using the same
   // ReverseConnectionIOHandle. Currently, each ReverseConnectionIOHandle handles
   // reverse connections for a single upstream cluster since a different ReverseConnectionAddress
@@ -93,10 +97,10 @@ struct ReverseConnectionSocketConfig {
   // multiple remote clusters in the same ReverseConnectionAddress and therefore should be able
   // to use a single ReverseConnectionIOHandle for multiple remote clusters.
   std::vector<RemoteClusterConnectionConfig>
-      remote_clusters;         // List of remote cluster configurations.
-  bool enable_circuit_breaker; // Whether to place a cluster in backoff when reverse connection
-                               // attempts fail.
-  ReverseConnectionSocketConfig() : enable_circuit_breaker(true) {}
+      remote_clusters;               // List of remote cluster configurations.
+  bool enable_circuit_breaker{true}; // Whether to place a cluster in backoff when reverse
+                                     // connection attempts fail.
+  ReverseConnectionSocketConfig() = default;
 };
 
 /**
@@ -315,6 +319,18 @@ public:
     return config_.additional_headers;
   }
 
+  /**
+   * @return whether the handshake is negotiated as an HTTP/1.1 Upgrade exchange.
+   */
+  bool useHttpUpgrade() const { return config_.use_http_upgrade; }
+
+  /**
+   * @return handshake headers (key + append action + value formatter), or nullptr if none.
+   */
+  const std::shared_ptr<const std::vector<HandshakeHeader>>& handshakeHeaders() const {
+    return config_.handshake_headers;
+  }
+
 private:
   /**
    * Get time source for consistent time operations.
@@ -363,6 +379,21 @@ private:
   bool initiateOneReverseConnection(const std::string& cluster_name,
                                     const std::string& host_address,
                                     Upstream::HostConstSharedPtr host);
+
+  /**
+   * Emit an access log entry for a reverse tunnel lifecycle event.
+   * Creates an ephemeral StreamInfo populated with dynamic metadata containing
+   * reverse tunnel identifiers and event details.
+   * @param event the lifecycle event name (e.g., "handshake_success", "handshake_failure",
+   *        "connection_closed")
+   * @param host_address the address of the remote host
+   * @param cluster_name the name of the upstream cluster
+   * @param connection_key the unique key identifying the connection
+   * @param error_message the error message (empty on success)
+   */
+  void emitAccessLog(const std::string& event, const std::string& host_address,
+                     const std::string& cluster_name, const std::string& connection_key,
+                     const std::string& error_message);
 
   /**
    * Clean up all reverse connection resources.

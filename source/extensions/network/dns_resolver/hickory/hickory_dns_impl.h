@@ -57,7 +57,7 @@ using OnDnsResolverResetNetworkingType =
  */
 class HickoryDnsResolverConfig {
 public:
-  static std::shared_ptr<HickoryDnsResolverConfig>
+  static absl::StatusOr<std::shared_ptr<HickoryDnsResolverConfig>>
   create(const envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig&
              proto_config);
 
@@ -77,6 +77,16 @@ public:
 
 private:
   HickoryDnsResolverConfig() = default;
+
+  // Test-only entry point that allows the module name to be overridden so tests can exercise
+  // dynamic-module load, ABI symbol resolution, and Rust-side rejection failure paths that are
+  // unreachable through the public ``create()`` against the statically linked production module.
+  // Accessed via ``HickoryDnsResolverConfigTestPeer``.
+  friend class HickoryDnsResolverConfigTestPeer;
+  static absl::StatusOr<std::shared_ptr<HickoryDnsResolverConfig>> createForModule(
+      const envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig&
+          proto_config,
+      absl::string_view module_name);
 
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
 };
@@ -102,7 +112,6 @@ public:
   DnsResolver::ResolveCb callback_;
   const uint64_t query_id_;
   const std::string dns_name_;
-  bool cancelled_ = false;
   HickoryDnsResolver& parent_;
 };
 
@@ -111,8 +120,15 @@ public:
  * This is a thread-safe resolver: resolve() is called on the dispatcher thread, and the
  * module may deliver results from any thread. The shell posts results back to the correct
  * dispatcher thread.
+ *
+ * Inherits from `std::enable_shared_from_this` so the ABI completion callback can capture
+ * a `std::weak_ptr` into the lambda it posts to the dispatcher. Locking the weak pointer
+ * inside the lambda detects whether the resolver has been destroyed in the window between
+ * posting and execution, avoiding a use-after-free on the dispatcher drain path.
  */
-class HickoryDnsResolver : public DnsResolver, protected Logger::Loggable<Logger::Id::dns> {
+class HickoryDnsResolver : public DnsResolver,
+                           public std::enable_shared_from_this<HickoryDnsResolver>,
+                           protected Logger::Loggable<Logger::Id::dns> {
 public:
   HickoryDnsResolver(HickoryDnsResolverConfigSharedPtr config, Event::Dispatcher& dispatcher,
                      Stats::Scope& root_scope);
@@ -134,6 +150,9 @@ public:
 
 private:
   friend class HickoryPendingResolution;
+  // Test-only access to the private ``shutting_down_`` flag, used to verify the ABI callback's
+  // early-return fast path without racing against destructor teardown.
+  friend class HickoryDnsResolverTestPeer;
   friend void ::envoy_dynamic_module_callback_dns_resolve_complete(
       envoy_dynamic_module_type_dns_resolver_envoy_ptr, uint64_t,
       envoy_dynamic_module_type_dns_resolution_status, envoy_dynamic_module_type_module_buffer,

@@ -83,7 +83,7 @@ envoy_extension_cc_test(
         "//source/extensions/tracers/opentelemetry:trace_exporter",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
-        "//test/test_common:utility_lib",
+        "//test/test_common:logging_lib",
     ],
 )
 

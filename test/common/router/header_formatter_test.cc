@@ -199,7 +199,6 @@ TEST(HeaderParserTest, TestParse) {
       std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
           Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
   filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
-                        StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
@@ -616,7 +615,6 @@ request_headers_to_remove: ["x-nope"]
       std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
           Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
   filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
-                        StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
@@ -1084,7 +1082,6 @@ response_headers_to_remove: ["x-baz-header"]
       std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
           Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
   filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
-                        StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
@@ -1129,7 +1126,6 @@ response_headers_to_remove: ["x-baz-header"]
       std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
           Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
   filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
-                        StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));

@@ -12,6 +12,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -106,7 +107,7 @@ TEST_F(TcpStatsTest, Periodic) {
   EXPECT_EQ(42, gaugeValue("cx_tx_unsent_bytes"));
 
   EXPECT_CALL(*timer_, disableTimer());
-  tcp_stats_socket_->closeSocket(Network::ConnectionEvent::RemoteClose);
+  tcp_stats_socket_->closeSocket(Network::ConnectionEvent::RemoteClose, false);
 }
 
 // Validate that stats are updated when the connection is closed. Gauges should be set to zero,
@@ -117,8 +118,8 @@ TEST_F(TcpStatsTest, CloseSocket) {
   tcp_info_.tcpi_segs_out = 42;
   tcp_info_.tcpi_notsent_bytes = 1;
   tcp_info_.tcpi_unacked = 2;
-  EXPECT_CALL(*inner_socket_, closeSocket(Network::ConnectionEvent::RemoteClose));
-  tcp_stats_socket_->closeSocket(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*inner_socket_, closeSocket(Network::ConnectionEvent::RemoteClose, false));
+  tcp_stats_socket_->closeSocket(Network::ConnectionEvent::RemoteClose, false);
   EXPECT_EQ(42, counterValue("cx_tx_segments"));
   EXPECT_EQ(0, gaugeValue("cx_tx_unsent_bytes"));
   EXPECT_EQ(0, gaugeValue("cx_tx_unacked_segments"));

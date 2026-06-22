@@ -39,9 +39,17 @@ public:
     });
 
     // Add the custom filter.
-    config_helper_.addFilter("name: repick-cluster-filter");
+    config_helper_.addFilter(R"EOF(
+      name: repick-cluster-filter
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.RepickClusterFilterConfig
+    )EOF");
     if (test_header_mutation) {
-      config_helper_.addFilter("name: envoy.filters.http.header_mutation");
+      config_helper_.addFilter(R"EOF(
+        name: envoy.filters.http.header_mutation
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.header_mutation.v3.HeaderMutation
+      )EOF");
     }
 
     // Modify route with weighted cluster configuration.
@@ -132,7 +140,7 @@ public:
     // Make sure Envoy saw upstream connection close.
     std::string target_name =
         absl::StrFormat("cluster.cluster_%d.upstream_cx_active", result.upstream_index.value());
-    test_server_->waitForGaugeEq(target_name, 0);
+    test_server_->waitForGauge(target_name, testing::Eq(0));
   }
 
 private:

@@ -2,6 +2,7 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/extensions/key_value/file_based/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 
 #include "source/common/network/utility.h"
 
@@ -61,7 +62,11 @@ typed_config:
 
   void initialize() override {
     TestEnvironment::writeStringToFileForTest("alt_svc_cache.txt", "");
-    config_helper_.addFilter("{ name: header-to-proxy-filter }");
+    config_helper_.addFilter(R"EOF(
+    name: header-to-proxy-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.HeaderToProxyFilterConfig
+    )EOF");
     if (try_http3_) {
       envoy::config::core::v3::AlternateProtocolsCacheOptions alt_cache;
       alt_cache.set_name("default_alternate_protocols_cache");
@@ -101,6 +106,8 @@ typed_config:
       inner_socket.CopyFrom(*transport_socket);
       if (set_inner_transport_socket_ && inner_socket.name().empty()) {
         inner_socket.set_name("envoy.transport_sockets.raw_buffer");
+        envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer_config;
+        inner_socket.mutable_typed_config()->PackFrom(raw_buffer_config);
       }
       transport_socket->set_name("envoy.transport_sockets.http_11_proxy");
       envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport

@@ -19,6 +19,7 @@
 #include "test/extensions/filters/http/ext_authz/logging_test_filter.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/mocks/server/options.h"
+#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -27,6 +28,8 @@
 
 using test::integration::filters::LoggingTestFilterConfig;
 using testing::AssertionResult;
+using testing::Eq;
+using testing::Ge;
 using testing::Not;
 using testing::TestWithParam;
 using testing::ValuesIn;
@@ -58,9 +61,9 @@ struct GrpcInitializeConfigOpts {
 
 struct WaitForSuccessfulUpstreamResponseOpts {
   // Fields of type Headers must be set at initialization.
-  const Headers headers_to_add = {};
-  const Headers headers_to_append = {};
-  const Headers headers_to_remove = {};
+  const Headers headers_to_add;
+  const Headers headers_to_append;
+  const Headers headers_to_remove;
   const Http::TestRequestHeaderMapImpl new_headers_from_upstream = {};
   const Http::TestRequestHeaderMapImpl headers_to_append_multiple = {};
   bool failure_mode_allowed_header = false;
@@ -703,7 +706,7 @@ attributes:
   Buffer::OwnedImpl request_body_;
   const uint64_t response_size_ = 512;
   const uint64_t max_request_bytes_ = 1024;
-  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config_{};
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config_;
   const std::string base_filter_config_ = R"EOF(
     allowed_headers:
       patterns:
@@ -947,7 +950,7 @@ public:
     cleanup();
   }
 
-  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config_{};
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config_;
   FakeHttpConnectionPtr fake_ext_authz_connection_;
   FakeStreamPtr ext_authz_request_;
   IntegrationStreamDecoderPtr response_;
@@ -1368,8 +1371,8 @@ TEST_P(ExtAuthzGrpcIntegrationTest, Retry) {
   waitForSuccessfulUpstreamResponse("200");
 
   // Verify retry stats are incremented correctly.
-  test_server_->waitForCounterGe("cluster.ext_authz_cluster.upstream_rq_retry", 1);
-  test_server_->waitForCounterGe("cluster.ext_authz_cluster.upstream_rq_total", 2);
+  test_server_->waitForCounter("cluster.ext_authz_cluster.upstream_rq_retry", Ge(1));
+  test_server_->waitForCounter("cluster.ext_authz_cluster.upstream_rq_total", Ge(2));
 
   cleanup();
 }
@@ -1394,7 +1397,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ValidateMutations) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("500", response_->headers().getStatusValue());
-  test_server_->waitForCounterEq("cluster.cluster_0.ext_authz.invalid", 1);
+  test_server_->waitForCounter("cluster.cluster_0.ext_authz.invalid", Eq(1));
 
   cleanup();
 }
@@ -1417,7 +1420,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ValidateMutationsSentinelAppendAction) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("500", response_->headers().getStatusValue());
-  test_server_->waitForCounterEq("cluster.cluster_0.ext_authz.invalid", 1);
+  test_server_->waitForCounter("cluster.cluster_0.ext_authz.invalid", Eq(1));
 
   cleanup();
 }

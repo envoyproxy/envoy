@@ -1,9 +1,10 @@
 use crate::{
   abi, drop_wrapped_c_void_ptr, str_to_module_buffer, strs_to_module_buffers, wrap_into_c_void_ptr,
-  EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId,
+  EnvoyBuffer, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId,
   EnvoyHistogramVecId, NEW_LOAD_BALANCER_CONFIG_FUNCTION,
 };
 use mockall::*;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Arc;
 
 /// Trait for interacting with the Envoy load balancer and its context.
@@ -13,8 +14,8 @@ use std::sync::Arc;
 /// valid during the [`LoadBalancer::choose_host`] callback.
 #[automock]
 pub trait EnvoyLoadBalancer {
-  /// Returns the cluster name.
-  fn get_cluster_name(&self) -> String;
+  /// Returns the cluster name, or `None` if the name is empty.
+  fn get_cluster_name<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
 
   /// Returns the number of all hosts at a given priority.
   fn get_hosts_count(&self, priority: u32) -> usize;
@@ -29,7 +30,8 @@ pub trait EnvoyLoadBalancer {
   fn get_priority_set_size(&self) -> usize;
 
   /// Returns the address of a healthy host by index at a given priority.
-  fn get_healthy_host_address(&self, priority: u32, index: usize) -> Option<String>;
+  fn get_healthy_host_address<'a>(&'a self, priority: u32, index: usize)
+    -> Option<EnvoyBuffer<'a>>;
 
   /// Returns the weight of a healthy host by index at a given priority.
   fn get_healthy_host_weight(&self, priority: u32, index: usize) -> u32;
@@ -52,7 +54,7 @@ pub trait EnvoyLoadBalancer {
   ) -> Option<abi::envoy_dynamic_module_type_host_health>;
 
   /// Returns the address of a host by index within all hosts at a given priority.
-  fn get_host_address(&self, priority: u32, index: usize) -> Option<String>;
+  fn get_host_address<'a>(&'a self, priority: u32, index: usize) -> Option<EnvoyBuffer<'a>>;
 
   /// Returns the weight of a host by index within all hosts at a given priority.
   fn get_host_weight(&self, priority: u32, index: usize) -> u32;
@@ -68,7 +70,11 @@ pub trait EnvoyLoadBalancer {
 
   /// Returns the locality information (region, zone, sub_zone) for a host by index within all
   /// hosts at a given priority. This enables zone-aware and locality-aware load balancing.
-  fn get_host_locality(&self, priority: u32, index: usize) -> Option<(String, String, String)>;
+  fn get_host_locality<'a>(
+    &'a self,
+    priority: u32,
+    index: usize,
+  ) -> Option<(EnvoyBuffer<'a>, EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
 
   /// Stores an opaque value on a host identified by priority and index. This data is stored per
   /// load balancer instance (per worker thread) and can be used for per-host state such as moving
@@ -155,15 +161,23 @@ pub trait EnvoyLoadBalancer {
   /// Only valid during choose_host callback.
   fn context_get_downstream_headers_size(&self) -> usize;
 
-  /// Returns all downstream request headers as a vector of (key, value) pairs.
+  /// Returns all downstream request headers as a vector of borrowed (key, value) pairs.
+  ///
+  /// Returns an empty vector if no headers are available.
   /// Only valid during choose_host callback.
-  fn context_get_downstream_headers(&self) -> Option<Vec<(String, String)>>;
+  fn context_get_downstream_headers<'a>(&'a self) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
 
   /// Returns a downstream request header value by key and index.
-  /// Since a header can have multiple values, the index is used to get the specific value.
-  /// Returns the value and optionally the total number of values for the key.
+  ///
+  /// Since a header key can have multiple values, the `index` parameter selects a specific value.
+  /// Returns `Some((value, total_count))` where `total_count` is the number of values for the key,
+  /// or `None` if the header was not found at the given index.
   /// Only valid during choose_host callback.
-  fn context_get_downstream_header(&self, key: &str, index: usize) -> Option<(String, usize)>;
+  fn context_get_downstream_header<'a>(
+    &'a self,
+    key: &str,
+    index: usize,
+  ) -> Option<(EnvoyBuffer<'a>, usize)>;
 
   /// Returns the maximum number of times host selection should be retried if the chosen host
   /// is rejected by [`context_should_select_another_host`]. Built-in load balancers use this
@@ -182,7 +196,7 @@ pub trait EnvoyLoadBalancer {
   /// Returns `Some((address, strict))` if an override host is set, `None` otherwise. When
   /// `strict` is true, the load balancer should return no host if the override is not valid.
   /// Only valid during choose_host callback.
-  fn context_get_override_host(&self) -> Option<(String, bool)>;
+  fn context_get_override_host<'a>(&'a self) -> Option<(EnvoyBuffer<'a>, bool)>;
 }
 
 /// Implementation of EnvoyLoadBalancer that calls into the Envoy ABI.
@@ -205,7 +219,7 @@ impl EnvoyLoadBalancerImpl {
 }
 
 impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
-  fn get_cluster_name(&self) -> String {
+  fn get_cluster_name(&self) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -213,13 +227,12 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     unsafe {
       abi::envoy_dynamic_module_callback_lb_get_cluster_name(self.lb_ptr, &mut result);
       if !result.ptr.is_null() && result.length > 0 {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          result.ptr as *const _,
+        Some(EnvoyBuffer::new_from_raw(
+          result.ptr as *const u8,
           result.length,
         ))
-        .to_string()
       } else {
-        String::new()
+        None
       }
     }
   }
@@ -240,7 +253,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     unsafe { abi::envoy_dynamic_module_callback_lb_get_priority_set_size(self.lb_ptr) }
   }
 
-  fn get_healthy_host_address(&self, priority: u32, index: usize) -> Option<String> {
+  fn get_healthy_host_address(&self, priority: u32, index: usize) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -254,15 +267,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
       )
     };
     if found && !result.ptr.is_null() && result.length > 0 {
-      unsafe {
-        Some(
-          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            result.ptr as *const _,
-            result.length,
-          ))
-          .to_string(),
-        )
-      }
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
     } else {
       None
     }
@@ -306,7 +311,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     }
   }
 
-  fn get_host_address(&self, priority: u32, index: usize) -> Option<String> {
+  fn get_host_address(&self, priority: u32, index: usize) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -320,15 +325,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
       )
     };
     if found && !result.ptr.is_null() && result.length > 0 {
-      unsafe {
-        Some(
-          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            result.ptr as *const _,
-            result.length,
-          ))
-          .to_string(),
-        )
-      }
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
     } else {
       None
     }
@@ -349,7 +346,11 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     }
   }
 
-  fn get_host_locality(&self, priority: u32, index: usize) -> Option<(String, String, String)> {
+  fn get_host_locality(
+    &self,
+    priority: u32,
+    index: usize,
+  ) -> Option<(EnvoyBuffer<'_>, EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
     let mut region = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -372,38 +373,16 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
         &mut sub_zone,
       )
     };
-    if !found {
-      return None;
-    }
-    unsafe {
-      let region_str = if !region.ptr.is_null() && region.length > 0 {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          region.ptr as *const _,
-          region.length,
-        ))
-        .to_string()
-      } else {
-        String::new()
-      };
-      let zone_str = if !zone.ptr.is_null() && zone.length > 0 {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          zone.ptr as *const _,
-          zone.length,
-        ))
-        .to_string()
-      } else {
-        String::new()
-      };
-      let sub_zone_str = if !sub_zone.ptr.is_null() && sub_zone.length > 0 {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          sub_zone.ptr as *const _,
-          sub_zone.length,
-        ))
-        .to_string()
-      } else {
-        String::new()
-      };
-      Some((region_str, zone_str, sub_zone_str))
+    if found {
+      Some(unsafe {
+        (
+          EnvoyBuffer::new_from_raw(region.ptr as *const u8, region.length),
+          EnvoyBuffer::new_from_raw(zone.ptr as *const u8, zone.length),
+          EnvoyBuffer::new_from_raw(sub_zone.ptr as *const u8, sub_zone.length),
+        )
+      })
+    } else {
+      None
     }
   }
 
@@ -457,11 +436,8 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     if found && !result.ptr.is_null() && result.length > 0 {
       unsafe {
         Some(
-          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            result.ptr as *const _,
-            result.length,
-          ))
-          .to_string(),
+          crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length)
+            .into_owned(),
         )
       }
     } else {
@@ -571,11 +547,8 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     if found && !result.ptr.is_null() && result.length > 0 {
       unsafe {
         Some(
-          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            result.ptr as *const _,
-            result.length,
-          ))
-          .to_string(),
+          crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length)
+            .into_owned(),
         )
       }
     } else {
@@ -608,11 +581,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     };
     if found && !result.ptr.is_null() && result.length > 0 {
       Some(unsafe {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          result.ptr as *const _,
-          result.length,
-        ))
-        .to_string()
+        crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length).into_owned()
       })
     } else {
       None
@@ -647,54 +616,35 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     }
   }
 
-  fn context_get_downstream_headers(&self) -> Option<Vec<(String, String)>> {
+  fn context_get_downstream_headers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
     if self.context_ptr.is_null() {
-      return None;
+      return Vec::default();
     }
     let size = self.context_get_downstream_headers_size();
     if size == 0 {
-      return Some(Vec::new());
+      return Vec::default();
     }
-    let mut headers = vec![
-      abi::envoy_dynamic_module_type_envoy_http_header {
-        key_ptr: std::ptr::null(),
-        key_length: 0,
-        value_ptr: std::ptr::null(),
-        value_length: 0,
-      };
-      size
-    ];
+    let mut headers: Vec<(EnvoyBuffer, EnvoyBuffer)> = Vec::with_capacity(size);
     let success = unsafe {
       abi::envoy_dynamic_module_callback_lb_context_get_downstream_headers(
         self.context_ptr,
-        headers.as_mut_ptr(),
+        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
       )
     };
     if !success {
-      return None;
+      return Vec::default();
     }
-    Some(
-      headers
-        .iter()
-        .map(|h| unsafe {
-          (
-            std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-              h.key_ptr as *const _,
-              h.key_length,
-            ))
-            .to_string(),
-            std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-              h.value_ptr as *const _,
-              h.value_length,
-            ))
-            .to_string(),
-          )
-        })
-        .collect(),
-    )
+    unsafe {
+      headers.set_len(size);
+    }
+    headers
   }
 
-  fn context_get_downstream_header(&self, key: &str, index: usize) -> Option<(String, usize)> {
+  fn context_get_downstream_header(
+    &self,
+    key: &str,
+    index: usize,
+  ) -> Option<(EnvoyBuffer<'_>, usize)> {
     if self.context_ptr.is_null() {
       return None;
     }
@@ -717,16 +667,10 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
       )
     };
     if found {
-      unsafe {
-        Some((
-          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            result.ptr as *const _,
-            result.length,
-          ))
-          .to_string(),
-          count,
-        ))
-      }
+      Some((
+        unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) },
+        count,
+      ))
     } else {
       None
     }
@@ -755,7 +699,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     }
   }
 
-  fn context_get_override_host(&self) -> Option<(String, bool)> {
+  fn context_get_override_host(&self) -> Option<(EnvoyBuffer<'_>, bool)> {
     if self.context_ptr.is_null() {
       return None;
     }
@@ -772,16 +716,10 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
       )
     };
     if found {
-      unsafe {
-        Some((
-          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            address.ptr as *const _,
-            address.length,
-          ))
-          .to_string(),
-          strict,
-        ))
-      }
+      Some((
+        unsafe { EnvoyBuffer::new_from_raw(address.ptr as *const u8, address.length) },
+        strict,
+      ))
     } else {
       None
     }
@@ -1308,21 +1246,27 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_config_new(
   name: abi::envoy_dynamic_module_type_envoy_buffer,
   config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_lb_config_module_ptr {
-  let name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-    name.ptr as *const _,
-    name.length,
-  ));
-  let config_slice = std::slice::from_raw_parts(config.ptr as *const _, config.length);
-  let new_config_fn = NEW_LOAD_BALANCER_CONFIG_FUNCTION
-    .get()
-    .expect("NEW_LOAD_BALANCER_CONFIG_FUNCTION must be set");
-  let envoy_lb_config: Arc<dyn EnvoyLbConfig> = Arc::new(EnvoyLbConfigImpl {
-    raw: lb_config_envoy_ptr,
-  });
-  match new_config_fn(name_str, config_slice, envoy_lb_config) {
-    Some(config) => wrap_into_c_void_ptr!(config),
-    None => std::ptr::null(),
-  }
+  catch_unwind(AssertUnwindSafe(|| {
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
+    };
+    let new_config_fn = NEW_LOAD_BALANCER_CONFIG_FUNCTION
+      .get()
+      .expect("NEW_LOAD_BALANCER_CONFIG_FUNCTION must be set");
+    let envoy_lb_config: Arc<dyn EnvoyLbConfig> = Arc::new(EnvoyLbConfigImpl {
+      raw: lb_config_envoy_ptr,
+    });
+    match new_config_fn(name_str.as_ref(), config_slice, envoy_lb_config) {
+      Some(config) => wrap_into_c_void_ptr!(config),
+      None => std::ptr::null(),
+    }
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_lb_config_new", panic);
+    std::ptr::null()
+  })
 }
 
 /// # Safety
@@ -1333,7 +1277,12 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_config_new(
 pub unsafe extern "C" fn envoy_dynamic_module_on_lb_config_destroy(
   config_ptr: abi::envoy_dynamic_module_type_lb_config_module_ptr,
 ) {
-  drop_wrapped_c_void_ptr!(config_ptr, LoadBalancerConfig);
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    drop_wrapped_c_void_ptr!(config_ptr, LoadBalancerConfig);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_lb_config_destroy", panic);
+  });
 }
 
 /// # Safety
@@ -1345,14 +1294,20 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_new(
   config_ptr: abi::envoy_dynamic_module_type_lb_config_module_ptr,
   lb_envoy_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
 ) -> abi::envoy_dynamic_module_type_lb_module_ptr {
-  // During new_load_balancer, context is not available.
-  let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, std::ptr::null_mut());
-  let lb_config = {
-    let raw = config_ptr as *const *const dyn LoadBalancerConfig;
-    &**raw
-  };
-  let lb = lb_config.new_load_balancer(&envoy_lb);
-  wrap_into_c_void_ptr!(lb)
+  catch_unwind(AssertUnwindSafe(|| {
+    // During new_load_balancer, context is not available.
+    let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, std::ptr::null_mut());
+    let lb_config = {
+      let raw = config_ptr as *const *const dyn LoadBalancerConfig;
+      &**raw
+    };
+    let lb = lb_config.new_load_balancer(&envoy_lb);
+    wrap_into_c_void_ptr!(lb)
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_lb_new", panic);
+    std::ptr::null()
+  })
 }
 
 /// # Safety
@@ -1367,19 +1322,27 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_choose_host(
   result_priority: *mut u32,
   result_index: *mut u32,
 ) -> bool {
-  let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, context_envoy_ptr);
-  let lb = {
-    let raw = lb_module_ptr as *mut *mut dyn LoadBalancer;
-    &mut **raw
-  };
-  match lb.choose_host(&envoy_lb) {
-    Some(selection) => {
-      *result_priority = selection.priority;
-      *result_index = selection.index;
-      true
-    },
-    None => false,
-  }
+  catch_unwind(AssertUnwindSafe(|| {
+    let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, context_envoy_ptr);
+    let lb = {
+      let raw = lb_module_ptr as *mut *mut dyn LoadBalancer;
+      &mut **raw
+    };
+    match lb.choose_host(&envoy_lb) {
+      Some(selection) => {
+        *result_priority = selection.priority;
+        *result_index = selection.index;
+        true
+      },
+      None => false,
+    }
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_lb_choose_host", panic);
+    // Fail-closed: return `false` so Envoy treats this as "no host selected"
+    // rather than reading the (uninitialised) out parameters.
+    false
+  })
 }
 
 /// # Safety
@@ -1393,12 +1356,20 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_on_host_membership_update(
   num_hosts_added: usize,
   num_hosts_removed: usize,
 ) {
-  let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, std::ptr::null_mut());
-  let lb = {
-    let raw = lb_module_ptr as *mut *mut dyn LoadBalancer;
-    &mut **raw
-  };
-  lb.on_host_membership_update(&envoy_lb, num_hosts_added, num_hosts_removed);
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, std::ptr::null_mut());
+    let lb = {
+      let raw = lb_module_ptr as *mut *mut dyn LoadBalancer;
+      &mut **raw
+    };
+    lb.on_host_membership_update(&envoy_lb, num_hosts_added, num_hosts_removed);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_lb_on_host_membership_update",
+      panic,
+    );
+  });
 }
 
 /// # Safety
@@ -1409,5 +1380,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_on_host_membership_update(
 pub unsafe extern "C" fn envoy_dynamic_module_on_lb_destroy(
   lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,
 ) {
-  drop_wrapped_c_void_ptr!(lb_module_ptr, LoadBalancer);
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    drop_wrapped_c_void_ptr!(lb_module_ptr, LoadBalancer);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_lb_destroy", panic);
+  });
 }

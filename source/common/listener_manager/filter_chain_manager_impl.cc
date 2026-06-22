@@ -53,7 +53,7 @@ public:
                                              FilterChainActionFactoryContext&,
                                              ProtobufMessage::ValidationVisitor&) override {
     return std::make_shared<FilterChainNameAction>(
-        dynamic_cast<const Protobuf::StringValue&>(config).value());
+        Envoy::Protobuf::DynamicCastMessage<Protobuf::StringValue>(config).value());
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<Protobuf::StringValue>();

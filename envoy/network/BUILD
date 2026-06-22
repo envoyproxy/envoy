@@ -57,7 +57,7 @@ envoy_cc_library(
         ":listener_interface",
         "//envoy/common:random_generator_interface",
         "//envoy/runtime:runtime_interface",
-        "//envoy/ssl:context_interface",
+        "//envoy/server/overload:thread_local_overload_state",
         "//source/common/common:interval_value",
     ],
 )
@@ -86,6 +86,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "udp_packet_writer_factory_factory_interface",
+    hdrs = ["udp_packet_writer_factory_factory.h"],
+    deps = [
+        ":udp_packet_writer_handler_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "dns_interface",
     hdrs = ["dns.h"],
     deps = [
@@ -98,6 +109,7 @@ envoy_cc_library(
     name = "dns_resolver_interface",
     hdrs = ["dns_resolver.h"],
     deps = [
+        ":dns_interface",
         "//envoy/api:api_interface",
         "//source/common/config:utility_lib",
     ],

@@ -36,8 +36,8 @@ TEST(HealthCheckEventFileSinkFactory, createEmptyHealthCheckEventSink) {
       "envoy.health_check.event_sink.file");
   EXPECT_NE(factory, nullptr);
   auto empty_proto = factory->createEmptyConfigProto();
-  auto config = *dynamic_cast<
-      envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink*>(
+  auto config = *Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink>(
       empty_proto.get());
   EXPECT_TRUE(config.event_log_path().empty());
 }
@@ -64,6 +64,7 @@ TEST(HealthCheckEventFileSink, logTest) {
   cluster_name: fake_cluster
   eject_unhealthy_event:
     failure_type: ACTIVE
+    http_status_code: 503
   timestamp: '2009-02-13T23:31:31.234Z'
   )EOF",
                             event);
@@ -74,7 +75,7 @@ TEST(HealthCheckEventFileSink, logTest) {
       "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
       "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,\"resolver_name\":\"\","
       "\"ipv4_compat\":false,\"network_namespace_filepath\":\"\"}},\"cluster_name\":\"fake_"
-      "cluster\",\"eject_unhealthy_event\":{\"failure_type\":\"ACTIVE\"},"
+      "cluster\",\"eject_unhealthy_event\":{\"failure_type\":\"ACTIVE\",\"http_status_code\":503},"
       "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n");
 
   envoy::data::core::v3::HealthCheckEvent add_event;

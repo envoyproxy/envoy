@@ -237,6 +237,11 @@ quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() const {
                                         position_->filter_chain_.transportSocketFactory())
                                         .earlyDataEnabled()
                                   : true;
+  config.disable_ticket_support = position_.has_value()
+                                      ? !dynamic_cast<const QuicServerTransportSocketFactory&>(
+                                             position_->filter_chain_.transportSocketFactory())
+                                             .resumptionEnabled()
+                                      : false;
   return config;
 }
 
@@ -312,6 +317,7 @@ void EnvoyQuicServerSession::OnStreamClosed(quic::QuicStreamId id) {
   }
 }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void EnvoyQuicServerSession::TerminateIdleSession() {
   ENVOY_BUG(!on_connection_closed_called_,
             "TerminateIdleSession called after session on close called.");
@@ -319,8 +325,10 @@ void EnvoyQuicServerSession::TerminateIdleSession() {
                                 quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
 }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void EnvoyQuicServerSession::OnLastActiveStreamClosed() { MaybeAddSessionToIdleList(); }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void EnvoyQuicServerSession::MaybeAddSessionToIdleList() {
   if (session_idle_list_ == nullptr || is_in_idle_list_) {
     return;
@@ -329,6 +337,7 @@ void EnvoyQuicServerSession::MaybeAddSessionToIdleList() {
   session_idle_list_->AddSession(*this);
 }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void EnvoyQuicServerSession::MaybeRemoveSessionFromIdleList() {
   if (session_idle_list_ == nullptr || !is_in_idle_list_) {
     return;

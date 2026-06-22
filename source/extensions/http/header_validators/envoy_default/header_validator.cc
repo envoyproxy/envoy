@@ -6,7 +6,6 @@
 
 #include "source/common/http/path_utility.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/node_hash_set.h"
@@ -30,7 +29,6 @@ using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderVal
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::PathUtil;
 using ::Envoy::Http::Protocol;
-using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 HeaderValidator::HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
@@ -102,7 +100,7 @@ HeaderValidator::validateMethodHeader(const HeaderString& value) {
   } else {
     is_valid = !method.empty();
     for (auto iter = method.begin(); iter != method.end() && is_valid; ++iter) {
-      is_valid &= testCharInTable(kMethodHeaderCharTable, *iter);
+      is_valid &= kMethodHeaderCharTable.hasChar(*iter);
     }
   }
 
@@ -202,7 +200,7 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
        iter != key_string_view.end() && is_valid && !reject_due_to_underscore; ++iter) {
     c = *iter;
     if (c != '_') {
-      is_valid &= testCharInTable(::Envoy::Http::kGenericHeaderNameCharTable, c);
+      is_valid &= ::Envoy::Http::CharTables::kGenericHeaderName.hasChar(c);
     } else {
       reject_due_to_underscore = reject_header_names_with_underscores;
     }
@@ -241,7 +239,7 @@ HeaderValidator::validateGenericHeaderValue(const HeaderString& value) {
   bool is_valid = true;
 
   for (auto iter = value_string_view.begin(); iter != value_string_view.end() && is_valid; ++iter) {
-    is_valid &= testCharInTable(kGenericHeaderValueCharTable, *iter);
+    is_valid &= kGenericHeaderValueCharTable.hasChar(*iter);
   }
 
   if (!is_valid) {
@@ -376,7 +374,7 @@ HeaderValidator::validateHostHeaderIPv6(absl::string_view host) {
     }
     // Validate each char is hex digit
     for (char c : cur_component) {
-      if (!testCharInTable(kHostIPv6AddressCharTable, c)) {
+      if (!kHostIPv6AddressCharTable.hasChar(c)) {
         return HostHeaderValidationResult::reject(UhvResponseCodeDetail::get().InvalidHost);
       }
     }
@@ -409,7 +407,7 @@ HeaderValidator::validateHostHeaderRegName(absl::string_view host) {
 
   // Validate the reg-name characters
   for (auto iter = address.begin(); iter != address.end() && is_valid; ++iter) {
-    is_valid &= testCharInTable(kHostRegNameCharTable, *iter);
+    is_valid &= kHostRegNameCharTable.hasChar(*iter);
   }
 
   if (!is_valid) {
@@ -424,12 +422,12 @@ HeaderValidator::validateHostHeaderRegName(absl::string_view host) {
 HeaderValidator::HeaderValueValidationResult
 HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
   return validatePathHeaderCharacterSet(value, kPathHeaderCharTable,
-                                        ::Envoy::Http::kUriQueryAndFragmentCharTable);
+                                        ::Envoy::Http::CharTables::kUriQueryAndFragment);
 }
 
 HeaderValidator::HeaderValueValidationResult HeaderValidator::validatePathHeaderCharacterSet(
-    const HeaderString& value, const std::array<uint32_t, 8>& allowed_path_chracters,
-    const std::array<uint32_t, 8>& allowed_query_fragment_characters) {
+    const HeaderString& value, const ::Envoy::Http::CharTable& allowed_path_characters,
+    const ::Envoy::Http::CharTable& allowed_query_fragment_characters) {
   static const HeaderValueValidationResult bad_path_result{
       HeaderValueValidationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidUrl};
   const auto& path = value.getStringView();
@@ -448,7 +446,7 @@ HeaderValidator::HeaderValueValidationResult HeaderValidator::validatePathHeader
       break;
     }
 
-    if (!testCharInTable(allowed_path_chracters, *iter)) {
+    if (!allowed_path_characters.hasChar(*iter)) {
       return bad_path_result;
     }
   }
@@ -461,7 +459,7 @@ HeaderValidator::HeaderValueValidationResult HeaderValidator::validatePathHeader
         break;
       }
 
-      if (!testCharInTable(allowed_query_fragment_characters, *iter)) {
+      if (!allowed_query_fragment_characters.hasChar(*iter)) {
         return bad_path_result;
       }
     }
@@ -476,7 +474,7 @@ HeaderValidator::HeaderValueValidationResult HeaderValidator::validatePathHeader
     // Validate the fragment component of the URI
     ++iter;
     for (; iter != end; ++iter) {
-      if (!testCharInTable(allowed_query_fragment_characters, *iter)) {
+      if (!allowed_query_fragment_characters.hasChar(*iter)) {
         return bad_path_result;
       }
     }
@@ -489,27 +487,14 @@ void HeaderValidator::encodeAdditionalCharactersInPath(
     // TODO(#28780): reuse Utility::PercentEncoding class for this code.
 
     ::Envoy::Http::RequestHeaderMap& header_map) {
-  // " < > ^ ` { } | TAB space extended-ASCII
-  static constexpr std::array<uint32_t, 8> kCharactersToEncode = {
-      // control characters
-      0b00000000010000000000000000000000,
-      // !"#$%&'()*+,-./0123456789:;<=>?
-      0b10100000000000000000000000001010,
-      //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
-      0b00000000000000000000000000000010,
-      //`abcdefghijklmnopqrstuvwxyz{|}~
-      0b10000000000000000000000000011100,
-      // extended ascii
-      0b11111111111111111111111111111111,
-      0b11111111111111111111111111111111,
-      0b11111111111111111111111111111111,
-      0b11111111111111111111111111111111,
-  };
+  static constexpr ::Envoy::Http::CharTable kCharactersToEncode =
+      ::Envoy::Http::CharTables::kExtendedAscii |
+      ::Envoy::Http::CharTable::fromChars("\"<>^`{}|\t ");
 
   absl::string_view path = header_map.getPathValue();
   // Check if URL path contains any characters in the kCharactersToEncode set
   auto char_to_encode = path.begin();
-  for (; char_to_encode != path.end() && !testCharInTable(kCharactersToEncode, *char_to_encode);
+  for (; char_to_encode != path.end() && !kCharactersToEncode.hasChar(*char_to_encode);
        ++char_to_encode) {
     // Return early if we got to query or fragment without finding any characters that has to be
     // encoded.
@@ -527,7 +512,7 @@ void HeaderValidator::encodeAdditionalCharactersInPath(
     if (*char_to_encode == '?' || *char_to_encode == '#') {
       break;
     }
-    if (testCharInTable(kCharactersToEncode, *char_to_encode)) {
+    if (kCharactersToEncode.hasChar(*char_to_encode)) {
       absl::StrAppend(&encoded_path,
                       fmt::format("%{:02X}", static_cast<const unsigned char&>(*char_to_encode)));
     } else {
