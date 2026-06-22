@@ -5,6 +5,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/http/path_utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/common/rbac/matcher_extension.h"
 #include "source/extensions/filters/common/rbac/principal_extension.h"
@@ -387,17 +388,41 @@ bool RequestedServerNameMatcher::matches(const Network::Connection& connection,
 }
 
 bool PathMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap& headers,
-                          const StreamInfo::StreamInfo&) const {
+                          const StreamInfo::StreamInfo& info) const {
   if (headers.Path() == nullptr) {
     return false;
   }
-  return path_matcher_.match(headers.getPathValue());
+  std::string path_without_parameters;
+  absl::string_view path = headers.getPathValue();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.rbac_respect_ignore_path_parameters") &&
+      info.route().has_value() &&
+      info.route()->virtualHost().routeConfig().ignorePathParametersInPathMatching()) {
+    absl::optional<std::string> modified_path = Http::PathUtil::removePathParameters(path);
+    if (modified_path.has_value()) {
+      path_without_parameters = std::move(modified_path).value();
+      path = path_without_parameters;
+    }
+  }
+  return path_matcher_.match(path);
 }
 
 bool UriTemplateMatcher::matches(const Network::Connection&,
                                  const Envoy::Http::RequestHeaderMap& headers,
-                                 const StreamInfo::StreamInfo&) const {
-  return uri_template_matcher_->match(headers.getPathValue());
+                                 const StreamInfo::StreamInfo& info) const {
+  std::string path_without_parameters;
+  absl::string_view path = headers.getPathValue();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.rbac_respect_ignore_path_parameters") &&
+      info.route().has_value() &&
+      info.route()->virtualHost().routeConfig().ignorePathParametersInPathMatching()) {
+    absl::optional<std::string> modified_path = Http::PathUtil::removePathParameters(path);
+    if (modified_path.has_value()) {
+      path_without_parameters = std::move(modified_path).value();
+      path = path_without_parameters;
+    }
+  }
+  return uri_template_matcher_->match(path);
 }
 
 } // namespace RBAC
