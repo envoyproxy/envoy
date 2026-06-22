@@ -57,7 +57,7 @@ public:
                       absl::optional<size_t> max_length = absl::nullopt) {
     DefaultBuiltInStreamInfoCommandParserFactory factory;
     auto parser = factory.createCommandParser();
-    formatter_ = parser->parse(command, sub_command, max_length);
+    formatter_ = parser->parse(command, sub_command, max_length).value();
     if (formatter_ == nullptr) {
       throwEnvoyExceptionOrPanic(fmt::format("Not supported command in StreamInfo: {}", command));
     }

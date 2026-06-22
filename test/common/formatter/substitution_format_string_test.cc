@@ -254,7 +254,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestParseFormattersWithSingleExtension
 
   absl::optional<size_t> max_length = {};
   ASSERT_TRUE(commands[0] != nullptr);
-  auto provider = commands[0]->parse("COMMAND_EXTENSION", "", max_length);
+  auto provider = commands[0]->parse("COMMAND_EXTENSION", "", max_length).value();
   ASSERT_TRUE(provider != nullptr);
 }
 
@@ -293,10 +293,11 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestParseFormattersWithMultipleExtensi
 
   absl::optional<size_t> max_length = {};
   ASSERT_TRUE(commands[0] != nullptr);
-  auto test_command_provider = commands[0]->parse("COMMAND_EXTENSION", "", max_length);
+  auto test_command_provider = commands[0]->parse("COMMAND_EXTENSION", "", max_length).value();
   ASSERT_TRUE(test_command_provider != nullptr);
   ASSERT_TRUE(commands[1] != nullptr);
-  auto additional_command_provider = commands[1]->parse("ADDITIONAL_EXTENSION", "", max_length);
+  auto additional_command_provider =
+      commands[1]->parse("ADDITIONAL_EXTENSION", "", max_length).value();
   ASSERT_TRUE(additional_command_provider != nullptr);
 }
 

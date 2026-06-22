@@ -15,8 +15,8 @@ Protobuf::Value TestFormatter::formatValue(const Context& context,
   return ValueUtil::stringValue(format(context, stream_info).value());
 }
 
-FormatterProviderPtr TestCommandParser::parse(absl::string_view command, absl::string_view,
-                                              absl::optional<size_t>) const {
+FormatterProviderResult TestCommandParser::parse(absl::string_view command, absl::string_view,
+                                                 absl::optional<size_t>) const {
   if (command == "COMMAND_EXTENSION") {
     return std::make_unique<TestFormatter>();
   }
@@ -51,8 +51,8 @@ Protobuf::Value AdditionalFormatter::formatValue(const Context& context,
   return ValueUtil::stringValue(format(context, stream_info).value());
 }
 
-FormatterProviderPtr AdditionalCommandParser::parse(absl::string_view command, absl::string_view,
-                                                    absl::optional<size_t>) const {
+FormatterProviderResult AdditionalCommandParser::parse(absl::string_view command, absl::string_view,
+                                                       absl::optional<size_t>) const {
   if (command == "ADDITIONAL_EXTENSION") {
     return std::make_unique<AdditionalFormatter>();
   }

@@ -318,7 +318,9 @@ SubstitutionFormatParser::parse(absl::string_view format,
     // First try the command parsers provided by the user. This allows the user to override
     // built-in command parsers.
     for (const auto& cmd : command_parsers) {
-      auto formatter = cmd->parse(command, command_arg, max_len);
+      auto formatter_result = cmd->parse(command, command_arg, max_len);
+      RETURN_IF_ERROR(formatter_result.status());
+      auto formatter = std::move(formatter_result).value();
       if (formatter) {
         formatters.push_back(std::move(formatter));
         added = true;
@@ -329,7 +331,9 @@ SubstitutionFormatParser::parse(absl::string_view format,
     // Next, try the built-in command parsers.
     if (!added) {
       for (const auto& cmd : BuiltInCommandParserFactoryHelper::commandParsers()) {
-        auto formatter = cmd->parse(command, command_arg, max_len);
+        auto formatter_result = cmd->parse(command, command_arg, max_len);
+        RETURN_IF_ERROR(formatter_result.status());
+        auto formatter = std::move(formatter_result).value();
         if (formatter) {
           formatters.push_back(std::move(formatter));
           added = true;
