@@ -494,7 +494,9 @@ void McpJsonRestBridgeFilter::buildStreamingPrefixAndSuffix(bool is_error) {
 // Send a local reply for a tools/list call. Construct the response body directly instead of
 // building a JSON object, to minimize copying.
 void McpJsonRestBridgeFilter::serveToolsListLocal(
-    const nlohmann::json& json_rpc, const McpJsonRestBridgePerRouteConfig* per_route_config) {
+    const nlohmann::json& json_rpc,
+    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig&
+        tool_config) {
   std::string request_id_json = "null";
   if (json_rpc.contains("id")) {
     request_id_json = json_rpc["id"].dump();
@@ -502,8 +504,7 @@ void McpJsonRestBridgeFilter::serveToolsListLocal(
     ASSERT(false, "serveToolsListLocal requires an RPC ID");
   }
 
-  const auto& tools =
-      per_route_config ? per_route_config->toolConfig().tools() : config_->toolConfig().tools();
+  const auto& tools = tool_config.tools();
 
   size_t reserve_size = sizeof("{\"jsonrpc\":\"2.0\",\"id\":") - 1 + request_id_json.size() +
                         sizeof(",\"result\":{\"tools\":[") - 1 + sizeof("]}}") - 1;
@@ -595,9 +596,10 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
   }
 
   if (method == McpConstants::Methods::TOOLS_LIST) {
-    bool has_tool_list_local = per_route_config
-                                   ? per_route_config->toolConfig().has_tool_list_local()
-                                   : config_->toolConfig().has_tool_list_local();
+    OptRef<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig>
+        tool_list_local_config =
+            (per_route_config == nullptr) ? config_->toolListLocalConfig()
+                                          : per_route_config->toolListLocalConfig();
     absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
         (per_route_config == nullptr) ? config_->getToolsListHttpRule()
                                       : per_route_config->getToolsListHttpRule();
@@ -619,9 +621,9 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
         decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
       }
       return;
-    } else if (has_tool_list_local) {
+    } else if (tool_list_local_config.has_value()) {
       mcp_operation_ = McpOperation::ToolsListLocal;
-      serveToolsListLocal(json_rpc, per_route_config);
+      serveToolsListLocal(json_rpc, *tool_list_local_config);
       return;
     }
 
