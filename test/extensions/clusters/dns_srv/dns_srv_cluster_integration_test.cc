@@ -63,8 +63,7 @@ public:
     std::set<uint16_t> ports;
     const auto& cluster_map = test_server_->server().clusterManager().clusters();
     const auto& cluster_ref = cluster_map.active_clusters_.find("cluster_0")->second;
-    for (const auto& host :
-         cluster_ref.get().prioritySet().hostSetsPerPriority()[0]->hosts()) {
+    for (const auto& host : cluster_ref.get().prioritySet().hostSetsPerPriority()[0]->hosts()) {
       ports.insert(host->address()->ip()->port());
     }
     return ports;
@@ -75,8 +74,7 @@ public:
     std::set<std::string> ips;
     const auto& cluster_map = test_server_->server().clusterManager().clusters();
     const auto& cluster_ref = cluster_map.active_clusters_.find("cluster_0")->second;
-    for (const auto& host :
-         cluster_ref.get().prioritySet().hostSetsPerPriority()[0]->hosts()) {
+    for (const auto& host : cluster_ref.get().prioritySet().hostSetsPerPriority()[0]->hosts()) {
       ips.insert(host->address()->ip()->addressAsString());
     }
     return ips;
@@ -92,8 +90,7 @@ class ProgrammableDnsResolver {
 public:
   explicit ProgrammableDnsResolver(NiceMock<Network::MockDnsResolverFactory>& factory,
                                    Network::Address::IpVersion ip_version)
-      : resolver_(std::make_shared<NiceMock<Network::MockDnsResolver>>()),
-        ip_version_(ip_version) {
+      : resolver_(std::make_shared<NiceMock<Network::MockDnsResolver>>()), ip_version_(ip_version) {
     EXPECT_CALL(factory, createDnsResolver(_, _, _)).WillRepeatedly(testing::Return(resolver_));
 
     EXPECT_CALL(*resolver_, resolveSrv(_, _))
@@ -115,9 +112,7 @@ public:
             }));
   }
 
-  void setSrvTargets(std::list<Network::DnsResponse> targets) {
-    srv_targets_ = std::move(targets);
-  }
+  void setSrvTargets(std::list<Network::DnsResponse> targets) { srv_targets_ = std::move(targets); }
 
   void setAAddresses(std::list<std::string> addresses) { a_addresses_ = std::move(addresses); }
 
@@ -210,8 +205,7 @@ TEST_P(DnsSrvClusterIntegrationTest, AddRemoveHostsViaSrvResponse) {
   const uint16_t port0 = fake_upstreams_[0]->localAddress()->ip()->port();
   const uint16_t port1 = fake_upstreams_[1]->localAddress()->ip()->port();
 
-  dns.setSrvTargets(
-      {Network::DnsResponse(0, 1, port0, "svc0.local", std::chrono::seconds(60))});
+  dns.setSrvTargets({Network::DnsResponse(0, 1, port0, "svc0.local", std::chrono::seconds(60))});
   triggerDnsRefresh();
   test_server_->waitForGauge("cluster.cluster_0.membership_total", testing::Eq(1));
   EXPECT_EQ(clusterHostPorts(), (std::set<uint16_t>{port0}));
@@ -232,8 +226,7 @@ TEST_P(DnsSrvClusterIntegrationTest, AddRemoveHostsViaSrvResponse) {
   EXPECT_EQ(clusterHostPorts(), (std::set<uint16_t>{port0, port1}));
 
   // Remove upstream 0 and trigger a refresh.
-  dns.setSrvTargets(
-      {Network::DnsResponse(0, 1, port1, "svc1.local", std::chrono::seconds(60))});
+  dns.setSrvTargets({Network::DnsResponse(0, 1, port1, "svc1.local", std::chrono::seconds(60))});
   triggerDnsRefresh();
   test_server_->waitForGauge("cluster.cluster_0.membership_total", testing::Eq(1));
   EXPECT_EQ(clusterHostPorts(), (std::set<uint16_t>{port1}));

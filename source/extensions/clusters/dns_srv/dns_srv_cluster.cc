@@ -162,18 +162,16 @@ void DnsSrvCluster::allTargetsResolved() {
   if (some_targets_resolved) {
     HostVector hosts_added;
     HostVector hosts_removed;
-    HostVector hosts;
 
     info_->configUpdateStats().update_success_.inc();
 
-    if (updateDynamicHostList(new_hosts, hosts, hosts_added, hosts_removed, all_hosts_,
-                              all_new_hosts)) {
-      // Update host map for current resolve target.
+    if (updateDynamicHostList(new_hosts, current_hosts_, hosts_added, hosts_removed,
+                              hosts_by_address_, all_new_hosts)) {
       for (const auto& host : hosts_removed) {
-        all_hosts_.erase(host->address()->asString());
+        hosts_by_address_.erase(host->address()->asString());
       }
       for (const auto& host : hosts_added) {
-        all_hosts_.insert({host->address()->asString(), host});
+        hosts_by_address_.insert({host->address()->asString(), host});
       }
 
       auto weighted_priority_health_ = load_assignment_.policy().weighted_priority_health();
