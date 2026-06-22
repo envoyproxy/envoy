@@ -114,7 +114,7 @@ protected:
   static std::string destPeerMetadataHeader() {
     const Istio::Common::WorkloadMetadataObject dest(
         "dest-pod", "dest-cluster", "dest-ns", "dest-v1", "dest-svc", "v1", "dest-app", "v1",
-        Istio::Common::WorkloadType::Pod, "spiffe://dest");
+        Istio::Common::WorkloadType::Pod, "spiffe://dest", "", "");
     const Protobuf::Struct md = Istio::Common::convertWorkloadMetadataToStruct(dest);
     const std::string bytes = Istio::Common::serializeToStringDeterministic(md);
     return Base64::encode(bytes.data(), bytes.size());
@@ -273,7 +273,7 @@ filter_chains:
 - filters:
   - name: envoy.filters.network.peer_metadata
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.network.peer_metadata.v3.Config
+      "@type": type.googleapis.com/envoy.extensions.network_filters.peer_metadata.Config
       baggage_key: baggage
   - name: envoy.filters.network.tcp_proxy
     typed_config:
@@ -296,7 +296,7 @@ name: encap
 filters:
 - name: envoy.filters.network.upstream.peer_metadata
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.network.peer_metadata.v3.UpstreamConfig
+    "@type": type.googleapis.com/envoy.extensions.network_filters.peer_metadata.UpstreamConfig
 load_assignment:
   cluster_name: encap
   endpoints:

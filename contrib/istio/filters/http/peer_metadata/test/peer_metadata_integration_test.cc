@@ -75,7 +75,7 @@ typed_config:
   static std::string peerMetadata() {
     const WorkloadMetadataObject client("client-pod", "client-cluster", "client-ns", "client-v1",
                                         "client-svc", "v1", "client-app", "v1", WorkloadType::Pod,
-                                        "spiffe://client");
+                                        "spiffe://client", "", "");
     const Protobuf::Struct metadata = Istio::Common::convertWorkloadMetadataToStruct(client);
     const std::string bytes = Istio::Common::serializeToStringDeterministic(metadata);
     return Base64::encode(bytes.data(), bytes.size());

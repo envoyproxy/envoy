@@ -281,11 +281,12 @@ typed_config:
   static WorkloadMetadataObject clientPeer() {
     return WorkloadMetadataObject("client-pod-1", "client-cluster", "client-ns", "client-v1",
                                   "client-svc", "v1", "client-app", "v1", WorkloadType::Pod,
-                                  "spiffe://client");
+                                  "spiffe://client", "", "");
   }
   static WorkloadMetadataObject destPeer() {
     return WorkloadMetadataObject("dest-pod-1", "dest-cluster", "dest-ns", "dest-v1", "dest-svc",
-                                  "v1", "dest-app", "v1", WorkloadType::Pod, "spiffe://dest");
+                                  "v1", "dest-app", "v1", WorkloadType::Pod, "spiffe://dest", "",
+                                  "");
   }
 
   Stats::CounterSharedPtr clientCounter(absl::string_view metric) {
