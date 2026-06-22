@@ -245,6 +245,12 @@ pub trait EnvoyListenerFilter {
   /// Set the string-typed dynamic metadata value with the given namespace and key value.
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str);
 
+  /// Set the dynamic metadata value with the given namespace and key to raw bytes.
+  ///
+  /// The bytes are stored as the metadata value as is, so non-UTF-8 values are preserved. Read
+  /// them back with [`Self::get_dynamic_metadata_string`].
+  fn set_dynamic_metadata_bytes(&mut self, namespace: &str, key: &str, value: &[u8]);
+
   /// Set multiple string-typed dynamic metadata entries under `namespace` in a single call.
   ///
   /// Equivalent to calling [`Self::set_dynamic_metadata_string`] once per entry but resolves the
@@ -471,6 +477,10 @@ pub trait EnvoyListenerFilterScheduler: Send + Sync {
   /// Once this is called, [`ListenerFilter::on_scheduled`] will be called with
   /// the same `event_id` on the worker thread where the filter is running IF
   /// by the time the event is committed, the filter is still alive.
+  ///
+  /// This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+  /// module must join or quiesce any thread that may call this before worker shutdown so a
+  /// scheduled event cannot race the worker dispatcher teardown.
   fn commit(&self, event_id: u64);
 }
 
@@ -959,6 +969,17 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
         str_to_module_buffer(namespace),
         str_to_module_buffer(key),
         str_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_bytes(&mut self, namespace: &str, key: &str, value: &[u8]) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
+        self.raw,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        crate::bytes_to_module_buffer(value),
       )
     }
   }

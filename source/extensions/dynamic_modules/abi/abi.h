@@ -2467,6 +2467,10 @@ envoy_dynamic_module_callback_http_filter_scheduler_new(
  *
  * This can be called multiple times to schedule multiple events to the same filter.
  *
+ * This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+ * module must join or quiesce any thread that may call this before worker shutdown so a scheduled
+ * event cannot race the worker dispatcher teardown.
+ *
  * @param scheduler_module_ptr is the pointer to the HTTP filter scheduler created by
  * envoy_dynamic_module_callback_http_filter_scheduler_new.
  * @param event_id is the ID of the event. This can be used to differentiate between multiple
@@ -4726,6 +4730,10 @@ envoy_dynamic_module_callback_network_filter_scheduler_new(
  *
  * This can be called multiple times to schedule multiple events to the same filter.
  *
+ * This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+ * module must join or quiesce any thread that may call this before worker shutdown so a scheduled
+ * event cannot race the worker dispatcher teardown.
+ *
  * @param scheduler_module_ptr is the pointer to the network filter scheduler created by
  * envoy_dynamic_module_callback_network_filter_scheduler_new.
  * @param event_id is the ID of the event. This can be used to differentiate between multiple
@@ -5961,6 +5969,10 @@ envoy_dynamic_module_callback_listener_filter_scheduler_new(
  * event hook on the worker thread.
  *
  * This can be called multiple times to schedule multiple events to the same filter.
+ *
+ * This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+ * module must join or quiesce any thread that may call this before worker shutdown so a scheduled
+ * event cannot race the worker dispatcher teardown.
  *
  * @param scheduler_module_ptr is the pointer to the listener filter scheduler created by
  * envoy_dynamic_module_callback_listener_filter_scheduler_new.

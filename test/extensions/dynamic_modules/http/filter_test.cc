@@ -388,6 +388,12 @@ TEST_P(DynamicModuleHttpLanguageTests, DynamicMetadataCallbacks) {
     // The empty batch must not have created a namespace.
     EXPECT_EQ(metadata.filter_metadata().find("ns_req_header_batch_empty"),
               metadata.filter_metadata().end());
+    // The non-UTF-8 byte value round-trips through the string value unchanged.
+    auto ns_req_header_bytes = metadata.filter_metadata().find("ns_req_header_bytes");
+    ASSERT_NE(ns_req_header_bytes, metadata.filter_metadata().end());
+    auto bytes_key = ns_req_header_bytes->second.fields().find("key");
+    ASSERT_NE(bytes_key, ns_req_header_bytes->second.fields().end());
+    EXPECT_EQ(bytes_key->second.string_value(), std::string("\xff\x00\xfe", 3));
   }
   auto ns_req_body = metadata.filter_metadata().find("ns_req_body");
   ASSERT_NE(ns_req_body, metadata.filter_metadata().end());

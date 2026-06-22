@@ -197,6 +197,19 @@ impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for DynamicMetadataFilter {
       .get_dynamic_metadata_string("dynamic_modules.empty", "batch_key1")
       .is_none());
 
+    // Set a non-UTF-8 byte value and read it back to prove set_dynamic_metadata_bytes preserves it.
+    envoy_filter.set_dynamic_metadata_bytes(
+      "dynamic_modules.test",
+      "bytes_key",
+      &[0xff, 0x00, 0xfe],
+    );
+    assert_eq!(
+      envoy_filter
+        .get_dynamic_metadata_string("dynamic_modules.test", "bytes_key")
+        .map(|value| value.as_slice().to_vec()),
+      Some(vec![0xff, 0x00, 0xfe])
+    );
+
     abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
   }
 }
