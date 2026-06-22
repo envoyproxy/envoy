@@ -607,8 +607,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/{version}.tar.gz"],
     ),
     proxy_wasm_cpp_host = dict(
-        version = "beb8a4ece9eede4ab21d89d723359607600296d4",
-        sha256 = "dbd2d449fca10c1cd655efe21eee34fe880f4ff5fe7f01562f7829ca8dd4b2bf",
+        version = "09e5f8d6658fdb77f3d5859b27141e79514e371c",
+        sha256 = "366e7598d4931a96fd1c5b0482f87076d863810049aa3a8ce921616592ed3e8c",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
     ),
