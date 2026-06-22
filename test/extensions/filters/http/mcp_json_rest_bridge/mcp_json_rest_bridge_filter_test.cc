@@ -1848,20 +1848,22 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListPerRouteConfig) {
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
       override_config;
 
-  auto* tool1 = override_config.mutable_tool_config()->add_tools();
+  auto* override_tool_config = override_config.add_tool_config();
+
+  auto* tool1 = override_tool_config->add_tools();
   tool1->set_name("simple_tool");
   tool1->mutable_tool_list_config()->set_title("My Tool");
   tool1->mutable_tool_list_config()->set_description("Does something.");
   tool1->mutable_tool_list_config()->set_input_schema("");
 
-  auto* tool2 = override_config.mutable_tool_config()->add_tools();
+  auto* tool2 = override_tool_config->add_tools();
   tool2->set_name("complex_tool");
   tool2->mutable_tool_list_config()->set_title("Complex \"Tool\"");
   tool2->mutable_tool_list_config()->set_description("Has\\nspecial \"chars\" & \\t stuff.");
   tool2->mutable_tool_list_config()->set_input_schema(
       R"({"type": "object", "properties": {"a": {"type": "string"}}})");
 
-  override_config.mutable_tool_config()->mutable_tool_list_local();
+  override_tool_config->mutable_tool_list_local();
 
   McpJsonRestBridgePerRouteConfig override(override_config);
 
@@ -2081,8 +2083,9 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListLocalPerRouteConfig) {
 
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
       override_config;
-  override_config.mutable_tool_config()->mutable_tool_list_local();
-  auto* tool = override_config.mutable_tool_config()->add_tools();
+  auto* override_tool_config = override_config.add_tool_config();
+  override_tool_config->mutable_tool_list_local();
+  auto* tool = override_tool_config->add_tools();
   tool->set_name("my_local_tool");
   tool->mutable_tool_list_config()->set_title("My Local Tool");
   tool->mutable_tool_list_config()->set_description("Does a local thing.");
