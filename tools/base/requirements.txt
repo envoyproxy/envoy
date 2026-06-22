@@ -487,9 +487,9 @@ docutils==0.21.2 \
     #   sphinx
     #   sphinx-rtd-theme
     #   sphinx-tabs
-envoy-base-utils==0.6.8 \
-    --hash=sha256:1b22025c692eb88965dd9af8d40760fbf1756e3902a84a6da28e5f7b0d97673d \
-    --hash=sha256:8658e14a1c60cb9dcc3be0f4db1b65da4773807c717a49314ae79fd55775d642
+envoy-base-utils==0.6.9 \
+    --hash=sha256:664dcc19ee12125398222a7628bdcbb40e265b3846e197e4014434fcd273fd61 \
+    --hash=sha256:b088b7621b5075005c48cdbef5db5675827b7b63550be7d880d395261fdcdb20
     # via
     #   -r requirements.in
     #   envoy-code-check
@@ -503,9 +503,9 @@ envoy-ci-report==0.1.1 \
     --hash=sha256:481115be4d05941b83ffbbd8fdac241f10e9823c076f850d8bef7f0308aa382d \
     --hash=sha256:a38da2e996b266b32ff80f2f404018d1887f156ad086e3fa8fd4233bb4cd6fe7
     # via -r requirements.in
-envoy-code-check==0.6.6 \
-    --hash=sha256:003c8b26557a87f22dfba24bd5026bedf1d2bb8cab8a6cf2bfbdc110c491657f \
-    --hash=sha256:733cc88ce18bb84fadd89e4b8d4972bc2a8f04cd0494d07258db6fb14588a771
+envoy-code-check==0.6.7 \
+    --hash=sha256:76b0edf0b95d8a31b5d78481b3a7f5ae4a2925c04d2158e77cc3549653a4213e \
+    --hash=sha256:7b7fbc99c114f663126be738095945d479e0b4c6f71d3d784bc234d9d9098a8d
     # via -r requirements.in
 envoy-dependency-check==0.2.1 \
     --hash=sha256:a037ab34b7db9893ecf07247c8e9149481148de26f340f1c27e4adfa7a48e227 \
