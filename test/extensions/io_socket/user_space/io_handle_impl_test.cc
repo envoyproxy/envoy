@@ -7,6 +7,7 @@
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/test_common/logging.h"
 
 #include "absl/container/fixed_array.h"
 #include "gmock/gmock.h"

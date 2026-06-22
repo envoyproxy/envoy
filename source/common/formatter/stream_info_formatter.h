@@ -359,7 +359,8 @@ public:
     OriginalHostOnly,
   };
 
-  RequestedServerNameFormatter(absl::string_view fallback, absl::string_view option);
+  static absl::StatusOr<std::unique_ptr<RequestedServerNameFormatter>>
+  create(absl::string_view source, absl::string_view option);
 
   // StreamInfoFormatterProvider
   // Don't hide the other structure of format and formatValue.
@@ -372,8 +373,10 @@ public:
   absl::optional<std::string> getSNIFromStreamInfo(const StreamInfo::StreamInfo& stream_info) const;
 
 private:
-  HostFormatterSource source_;
-  HostFormatterOption option_;
+  RequestedServerNameFormatter(HostFormatterSource source, HostFormatterOption option);
+
+  const HostFormatterSource source_;
+  const HostFormatterOption option_;
 };
 
 class DefaultBuiltInStreamInfoCommandParserFactory : public BuiltInCommandParserFactory {

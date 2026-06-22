@@ -92,6 +92,8 @@ areas:
     title: router
   set_metadata_filter:
     title: set_metadata_filter
+  sockets:
+    title: sockets
   spiffe_validator:
     title: spiffe_validator
   stat_sinks:
@@ -108,3 +110,5 @@ areas:
     title: wasm
   dns:
     title: dns
+  proxy_protocol:
+    title: proxy_protocol

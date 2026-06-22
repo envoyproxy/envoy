@@ -8,6 +8,7 @@
 #include "source/extensions/transport_sockets/internal_upstream/config.h"
 
 #include "test/integration/http_integration.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
 

@@ -1964,6 +1964,103 @@ TEST_F(HttpFilterTest, GrpcFailOnRequestTrailer) {
   expectNoGrpcCall(envoy::config::core::v3::TrafficDirection::OUTBOUND);
 }
 
+// Test that ext_proc filter does not prematurely close the stream when response headers
+// are encoded (and response path requires no external process), but request path's external
+// processing is still in progress.
+TEST_F(HttpFilterTest, DoNotPrematurelyCloseStreamIfDecodingActive) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SKIP"
+    request_body_mode: "STREAMED"
+  )EOF");
+
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, true));
+  EXPECT_TRUE(last_request_.has_protocol_config());
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
+
+  // Encode response headers. Since response processing is SKIP, but decoding path is still
+  // active (waiting for body response), the stream must NOT be closed yet.
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
+
+  // Complete decoding path's external body processing.
+  processRequestBody(absl::nullopt, false);
+  // Now since decoding path is done and encoding has no external process, stream must be closed.
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+
+  filter_->onDestroy();
+}
+
+// Test that when a request body response is pending on the decoding path, and the encoding path
+// receives a response body response from the external processor, the gRPC stream is NOT closed.
+TEST_F(HttpFilterTest, DoNotCloseStreamOnResponseBodyResponseIfDecodingActive) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SKIP"
+    request_body_mode: "STREAMED"
+    response_body_mode: "STREAMED"
+  )EOF");
+
+  // --- Decoding Path Setup ---
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, true));
+  EXPECT_TRUE(last_request_.has_request_body());
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
+
+  // Save the request body message for later processing.
+  auto saved_request_body_req = last_request_;
+
+  // --- Encoding Path Setup ---
+  // Encode response headers (skipped).
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
+
+  // Encode response body.
+  Buffer::OwnedImpl resp_data("bar");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, true));
+  EXPECT_TRUE(last_request_.has_response_body());
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
+
+  // --- Process Response Body Response ---
+  // Let the external processor reply to the response body request.
+  // Note: last_request_ currently holds the response body request, so processResponseBody works.
+  processResponseBody(absl::nullopt, false);
+
+  // The gRPC stream must NOT be closed because the request body's response is still pending!
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
+
+  // --- Process Request Body Response ---
+  // Restore the request body request in last_request_ before processing it.
+  last_request_ = saved_request_body_req;
+  processRequestBody(absl::nullopt, false);
+
+  // Now both decoding and encoding path processing are completed, so the stream must be closed.
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+
+  filter_->onDestroy();
+}
+
 // Sending gRPC calls with random latency To test max and min latency update logic.
 TEST_F(HttpFilterTest, StreamingSendDataRandomGrpcLatency) {
   initialize(R"EOF(
@@ -2014,11 +2111,11 @@ TEST_F(HttpFilterTest, StreamingSendDataRandomGrpcLatency) {
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
-  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
   Buffer::OwnedImpl resp_data("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
-  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
   filter_->onDestroy();
 
   EXPECT_EQ(1, config_->stats().streams_started_.value());
@@ -6179,11 +6276,11 @@ TEST_F(HttpFilterTest, StreamingSendDataRandomGrpcLatencyReturnContinue) {
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
-  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
   Buffer::OwnedImpl resp_data("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
-  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
   filter_->onDestroy();
 
   EXPECT_EQ(1, config_->stats().streams_started_.value());

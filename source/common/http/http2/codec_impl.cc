@@ -2225,6 +2225,16 @@ ConnectionImpl::Http2Options::Http2Options(
   // 512 is chosen to accommodate Envoy's 8Mb max limit of max_request_headers_kb
   // in both headers and trailers
   nghttp2_option_set_max_continuations(options_, 512);
+
+  // Configure the RST_STREAM rate limiter (CVE-2023-44487 / HTTP/2 Rapid Reset protection).
+  // nghttp2 defaults: burst=1000, rate=33/sec. Allow operators to tune these when legitimate
+  // workloads (e.g. gRPC with many short-lived streams that get RST_STREAM on RESOURCE_EXHAUSTED)
+  // exhaust the default token budget faster than it replenishes.
+  if (http2_options.has_stream_reset_burst() || http2_options.has_stream_reset_rate()) {
+    const uint64_t burst = PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, stream_reset_burst, 1000);
+    const uint64_t rate = PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, stream_reset_rate, 33);
+    nghttp2_option_set_stream_reset_rate_limit(options_, burst, rate);
+  }
 #endif
 }
 

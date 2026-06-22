@@ -2338,7 +2338,6 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestHeaders) {
   absl::string_view header_value = reinterpret_cast<const char*>(non_utf_8_bytes);
   request_headers_.addCopy(Http::LowerCaseString{header_key}, header_value);
 
-  envoy::service::auth::v3::CheckRequest check_request;
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest& check_request,
@@ -6656,9 +6655,8 @@ TEST_F(HttpFilterTest, ShadowModeDeniedSetsFilterStateAndContinues) {
   // Exercise serializeAsProto (populates all non-empty branches) and serializeAsString.
   auto serialized = shadow->serializeAsProto();
   ASSERT_NE(serialized, nullptr);
-  const auto& proto =
-      dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ShadowDecision&>(
-          *serialized);
+  const auto& proto = Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::filters::http::ext_authz::v3::ShadowDecision>(*serialized);
   EXPECT_EQ(proto.check_result(),
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::DENIED);
   EXPECT_EQ(proto.status_code(), 401);
@@ -6819,9 +6817,8 @@ TEST_F(HttpFilterTest, ShadowModeOkSetsFilterState) {
   // Exercise serializeAsProto on the OK branch.
   auto serialized = shadow->serializeAsProto();
   ASSERT_NE(serialized, nullptr);
-  const auto& proto =
-      dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ShadowDecision&>(
-          *serialized);
+  const auto& proto = Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::filters::http::ext_authz::v3::ShadowDecision>(*serialized);
   EXPECT_EQ(proto.check_result(),
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::OK);
   EXPECT_EQ(proto.status_code(), 200);

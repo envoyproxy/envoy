@@ -9,6 +9,7 @@
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/logging.h"
 
 namespace Envoy {
 namespace Extensions {

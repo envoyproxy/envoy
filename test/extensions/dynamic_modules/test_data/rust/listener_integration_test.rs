@@ -17,6 +17,8 @@ fn new_listener_filter_config_fn<EC: EnvoyListenerFilterConfig, ELF: EnvoyListen
   match name {
     "write_to_socket" => Some(Box::new(WriteToSocketFilterConfig)),
     "buffer_read" => Some(Box::new(BufferReadFilterConfig)),
+    "http_callout_on_accept" => Some(Box::new(HttpCalloutOnAcceptFilterConfig)),
+    "dynamic_metadata" => Some(Box::new(DynamicMetadataFilterConfig)),
     _ => panic!("unknown filter name: {name}"),
   }
 }
@@ -91,5 +93,110 @@ impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for BufferReadFilter {
 
   fn max_read_bytes(&mut self, _envoy_filter: &mut ELF) -> usize {
     4
+  }
+}
+
+// =============================================================================
+// HTTP Callout On Accept Test Filter
+// =============================================================================
+
+// Issues an HTTP callout on accept and resumes the chain when it completes. The callout calls
+// shared_from_this on the filter, which throws std::bad_weak_ptr and aborts the worker unless the
+// production factory shares ownership. The callout targets cluster_0, served by the test autonomous
+// upstream.
+struct HttpCalloutOnAcceptFilterConfig;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for HttpCalloutOnAcceptFilterConfig {
+  fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+    Box::new(HttpCalloutOnAcceptFilter)
+  }
+}
+
+struct HttpCalloutOnAcceptFilter;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for HttpCalloutOnAcceptFilter {
+  fn on_accept(
+    &mut self,
+    envoy_filter: &mut ELF,
+  ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+    let (result, _id) = envoy_filter.send_http_callout(
+      "cluster_0",
+      vec![
+        (":method", b"GET"),
+        (":path", b"/"),
+        ("host", b"example.com"),
+      ],
+      None,
+      5000,
+    );
+    // Always wait for the callout. The accept resumes only from on_http_callout_done, so the test
+    // echo proves the round trip ran. The autonomous upstream makes the callout succeed.
+    assert_eq!(
+      result,
+      abi::envoy_dynamic_module_type_http_callout_init_result::Success
+    );
+    abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration
+  }
+
+  fn on_http_callout_done(
+    &mut self,
+    envoy_filter: &mut ELF,
+    _callout_id: u64,
+    _result: abi::envoy_dynamic_module_type_http_callout_result,
+    _response_headers: Vec<(EnvoyBuffer, EnvoyBuffer)>,
+    _response_body: Vec<EnvoyBuffer>,
+  ) {
+    envoy_filter.continue_filter_chain(true);
+  }
+}
+
+// =============================================================================
+// Dynamic Metadata Test Filter
+// =============================================================================
+
+// Sets several string entries under one namespace via the batch setter on accept, then reads them
+// back to prove the batch and the getter round trip through the ABI. An empty batch must not create
+// a namespace.
+struct DynamicMetadataFilterConfig;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for DynamicMetadataFilterConfig {
+  fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+    Box::new(DynamicMetadataFilter)
+  }
+}
+
+struct DynamicMetadataFilter;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for DynamicMetadataFilter {
+  fn on_accept(
+    &mut self,
+    envoy_filter: &mut ELF,
+  ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+    envoy_filter.set_dynamic_metadata_string_batch(
+      "dynamic_modules.test",
+      &[
+        ("batch_key1", "batch_value1"),
+        ("batch_key2", "batch_value2"),
+      ],
+    );
+    envoy_filter.set_dynamic_metadata_string_batch("dynamic_modules.empty", &[]);
+
+    assert_eq!(
+      envoy_filter
+        .get_dynamic_metadata_string("dynamic_modules.test", "batch_key1")
+        .map(|value| value.as_slice().to_vec()),
+      Some(b"batch_value1".to_vec())
+    );
+    assert_eq!(
+      envoy_filter
+        .get_dynamic_metadata_string("dynamic_modules.test", "batch_key2")
+        .map(|value| value.as_slice().to_vec()),
+      Some(b"batch_value2".to_vec())
+    );
+    assert!(envoy_filter
+      .get_dynamic_metadata_string("dynamic_modules.empty", "batch_key1")
+      .is_none());
+
+    abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
   }
 }
