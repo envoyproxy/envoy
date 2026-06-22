@@ -84,6 +84,18 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
+// Test peer that exposes private members of SslSocket for targeted regression tests
+// of drainErrorQueue's selection logic.
+class SslSocketPeer {
+public:
+  static void drainErrorQueue(SslSocket& socket) { socket.drainErrorQueue(); }
+  static const absl::optional<Api::IoError::IoErrorCode>& detectedIoError(const SslSocket& socket) {
+    return socket.detected_io_error_;
+  }
+  static absl::string_view failureReason(const SslSocket& socket) { return socket.failure_reason_; }
+};
+
 namespace {
 
 /**
@@ -8443,6 +8455,121 @@ TEST_P(SslSocketTest, TlsConnectionResetDetectionDisabledByRuntime) {
       }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+// Regression test for issue #45011. When BoringSSL's error queue contains BOTH a TLS
+// protocol-level failure (e.g. SSL_R_CERTIFICATE_VERIFY_FAILED) and a trailing
+// ECONNRESET pushed by io_handle_bio's SO_ERROR probe, drainErrorQueue must surface the
+// TLS protocol error as the root cause and must NOT set detected_io_error_ to
+// ConnectionReset. Otherwise the user-visible failure cause (the cert verify error in
+// transport_failure_reason) gets clobbered by the symptomatic peer RST.
+TEST_P(SslSocketTest, DrainErrorQueuePrefersCertVerifyOverEconnreset) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+)EOF";
+
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      client_factory_context;
+  ON_CALL(client_factory_context.server_context_, api()).WillByDefault(ReturnRef(*api_));
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
+  auto client_cfg = *ClientContextConfigImpl::create(client_tls_context, client_factory_context);
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  ContextManagerImpl manager(server_factory_context);
+  Stats::TestUtil::TestStore client_stats_store;
+  auto client_ssl_socket_factory = *ClientSslSocketFactory::create(std::move(client_cfg), manager,
+                                                                   *client_stats_store.rootScope());
+
+  auto transport_socket = client_ssl_socket_factory->createTransportSocket(nullptr, nullptr);
+  ASSERT_NE(transport_socket, nullptr);
+  auto* ssl_socket = dynamic_cast<SslSocket*>(transport_socket.get());
+  ASSERT_NE(ssl_socket, nullptr);
+
+  // The fix is gated on the ssl_socket_report_connection_reset runtime feature (defaults to
+  // true) so the ECONNRESET branch in drainErrorQueue is exercised at all.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ssl_socket_report_connection_reset", "true"}});
+
+  // Start from a clean queue to avoid prior-test pollution.
+  ERR_clear_error();
+  // Seed the queue in the same order io_handle_bio would: the TLS protocol error first
+  // (raised by BoringSSL while parsing the server's bad cert), then the trailing
+  // ECONNRESET that the SO_ERROR probe pushes when the peer RSTs.
+  ERR_put_error(ERR_LIB_SSL, 0, SSL_R_CERTIFICATE_VERIFY_FAILED, __FILE__, __LINE__);
+  ERR_put_error(ERR_LIB_SYS, 0, ECONNRESET, __FILE__, __LINE__);
+
+  SslSocketPeer::drainErrorQueue(*ssl_socket);
+
+  // The trailing ECONNRESET must NOT be reported as the detected IO error; otherwise the
+  // upstream connection failure path reports a generic "remote connection failure" and the
+  // CERTIFICATE_VERIFY_FAILED diagnostic in transport_failure_reason is lost.
+  const auto& detected = SslSocketPeer::detectedIoError(*ssl_socket);
+  EXPECT_FALSE(detected.has_value())
+      << "detected_io_error_ was set to "
+      << (detected.has_value() ? static_cast<int>(*detected) : -1)
+      << "; expected unset so the TLS cert-verify failure remains the surfaced root cause.";
+
+  // The cert verify failure must still be visible in the failure reason so operators can
+  // continue to diagnose TLS issues via transport_failure_reason in access logs.
+  EXPECT_THAT(std::string(SslSocketPeer::failureReason(*ssl_socket)),
+              ContainsRegex("TLS_error:.*CERTIFICATE_VERIFY_FAILED"));
+}
+
+// Broader contract guard: the same suppression must apply to *any* non-ECONNRESET error
+// in the queue, not just the cert-verify reasons. Uses SSL_R_NO_SHARED_CIPHER (a TLS
+// protocol error unrelated to cert validation) to lock in that the gate is
+// "ECONNRESET wins only if it was the sole queued error", not "ECONNRESET loses only
+// to cert-verify failures".
+TEST_P(SslSocketTest, DrainErrorQueuePrefersOtherTlsErrorOverEconnreset) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+)EOF";
+
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      client_factory_context;
+  ON_CALL(client_factory_context.server_context_, api()).WillByDefault(ReturnRef(*api_));
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
+  auto client_cfg = *ClientContextConfigImpl::create(client_tls_context, client_factory_context);
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  ContextManagerImpl manager(server_factory_context);
+  Stats::TestUtil::TestStore client_stats_store;
+  auto client_ssl_socket_factory = *ClientSslSocketFactory::create(std::move(client_cfg), manager,
+                                                                   *client_stats_store.rootScope());
+
+  auto transport_socket = client_ssl_socket_factory->createTransportSocket(nullptr, nullptr);
+  ASSERT_NE(transport_socket, nullptr);
+  auto* ssl_socket = dynamic_cast<SslSocket*>(transport_socket.get());
+  ASSERT_NE(ssl_socket, nullptr);
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ssl_socket_report_connection_reset", "true"}});
+
+  ERR_clear_error();
+  ERR_put_error(ERR_LIB_SSL, 0, SSL_R_NO_SHARED_CIPHER, __FILE__, __LINE__);
+  ERR_put_error(ERR_LIB_SYS, 0, ECONNRESET, __FILE__, __LINE__);
+
+  SslSocketPeer::drainErrorQueue(*ssl_socket);
+
+  const auto& detected = SslSocketPeer::detectedIoError(*ssl_socket);
+  EXPECT_FALSE(detected.has_value())
+      << "detected_io_error_ was set to "
+      << (detected.has_value() ? static_cast<int>(*detected) : -1)
+      << "; expected unset so the TLS protocol error remains the surfaced root cause.";
+  EXPECT_THAT(std::string(SslSocketPeer::failureReason(*ssl_socket)),
+              ContainsRegex("TLS_error:.*NO_SHARED_CIPHER"));
 }
 
 } // namespace Tls
