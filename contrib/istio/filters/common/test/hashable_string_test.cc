@@ -13,6 +13,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+// NOLINT(namespace-envoy)
 namespace Istio {
 namespace Common {
 namespace {
