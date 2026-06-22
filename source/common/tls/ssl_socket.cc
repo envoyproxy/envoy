@@ -211,9 +211,11 @@ PostIoAction SslSocket::doHandshake() {
   auto ret = info_->doHandshake();
   if (ret == PostIoAction::KeepOpen) {
     if (info_->state() == Ssl::SocketState::HandshakeBlockedOnAsyncOperation && !read_disabled_) {
-      // Connection close events can only be detected if the connection has reading disabled,
-      // because the handshaker won't actually read any data (such as EOF) when the handshake is
-      // blocked on an async operation.
+      // Connection close events can only be detected if the connection has reading disabled.
+      // If reading is disabled, the connection registers for close events directly.
+      // If reading is enabled, the connection registers for read events, but `doRead()` doesn't
+      // process any data (including an EOF) when the handshake is in this state, so the connection
+      // close isn't detected.
       read_disabled_ = true;
       callbacks_->connection().readDisable(true);
     } else if (info_->state() != Ssl::SocketState::HandshakeBlockedOnAsyncOperation &&
