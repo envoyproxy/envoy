@@ -36,5 +36,26 @@ private:
   Network::UdpPacketWriterPtr envoy_udp_packet_writer_;
 };
 
+using QuicPacketWriterPtr = std::unique_ptr<quic::QuicPacketWriter>;
+
+class QuicPacketWriterFactory : public Network::UdpPacketWriterFactory {
+ public:
+  ~QuicPacketWriterFactory() override = default;
+
+  virtual QuicPacketWriterPtr createQuicPacketWriter(
+      Network::IoHandle& io_handle, Stats::Scope& scope,
+      Envoy::Event::Dispatcher& dispatcher,
+      absl::AnyInvocable<void() &&> on_can_write_cb) PURE;
+
+  Network::UdpPacketWriterPtr createUdpPacketWriter(
+      Network::IoHandle&, Stats::Scope&, Envoy::Event::Dispatcher&,
+      absl::AnyInvocable<void() &&>) override {
+    IS_ENVOY_BUG("createUdpPacketWriter called on QuicPacketWriterFactory");
+    return nullptr;
+  }
+};
+
+using QuicPacketWriterFactoryPtr = std::unique_ptr<QuicPacketWriterFactory>;
+
 } // namespace Quic
 } // namespace Envoy

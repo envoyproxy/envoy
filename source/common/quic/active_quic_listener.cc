@@ -104,23 +104,42 @@ ActiveQuicListener::ActiveQuicListener(
 
   absl::AnyInvocable<void() &&> on_can_write_cb = [&]() { quic_dispatcher_->OnCanWrite(); };
 
-  // Create udp_packet_writer
-  Network::UdpPacketWriterPtr udp_packet_writer =
-      listener_config.udpListenerConfig()->packetWriterFactory().createUdpPacketWriter(
-          listen_socket_.ioHandle(), listener_config.listenerScope(), dispatcher,
-          std::move(on_can_write_cb));
-  udp_packet_writer_ = udp_packet_writer.get();
+  // Create quic_packet_writer
+  auto& writer_factory =
+      listener_config.udpListenerConfig()->packetWriterFactory();
+  quic::QuicPacketWriter* quic_packet_writer = nullptr;
 
-  // Some packet writers (like `UdpGsoBatchWriter`) already directly implement
-  // `quic::QuicPacketWriter` and can be used directly here. Other types need
-  // `EnvoyQuicPacketWriter` as an adapter.
-  auto* quic_packet_writer = dynamic_cast<quic::QuicPacketWriter*>(udp_packet_writer.get());
-  if (quic_packet_writer != nullptr) {
-    quic_dispatcher_->InitializeWithWriter(quic_packet_writer);
-    udp_packet_writer.release();
+  const bool use_direct_packet_writer = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.quic_use_direct_packet_writer");
+
+  if (use_direct_packet_writer &&
+      dynamic_cast<QuicPacketWriterFactory*>(&writer_factory) != nullptr) {
+    auto* quic_factory =
+        dynamic_cast<QuicPacketWriterFactory*>(&writer_factory);
+    QuicPacketWriterPtr quic_writer = quic_factory->createQuicPacketWriter(
+        listen_socket_.ioHandle(), listener_config.listenerScope(), dispatcher,
+        std::move(on_can_write_cb));
+    quic_packet_writer = quic_writer.release();
+    udp_packet_writer_ =
+        dynamic_cast<Network::UdpPacketWriter*>(quic_packet_writer);
   } else {
-    quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(std::move(udp_packet_writer)));
+    Network::UdpPacketWriterPtr udp_packet_writer =
+        writer_factory.createUdpPacketWriter(
+            listen_socket_.ioHandle(), listener_config.listenerScope(),
+            dispatcher, std::move(on_can_write_cb));
+    udp_packet_writer_ = udp_packet_writer.get();
+
+    quic_packet_writer =
+        dynamic_cast<quic::QuicPacketWriter*>(udp_packet_writer.get());
+    if (quic_packet_writer != nullptr) {
+      udp_packet_writer.release();
+    } else {
+      quic_packet_writer =
+          new EnvoyQuicPacketWriter(std::move(udp_packet_writer));
+    }
   }
+
+  quic_dispatcher_->InitializeWithWriter(quic_packet_writer);
 
   if (listener_config.udpListenerConfig()) {
     const auto& save_cmsg_configs =
