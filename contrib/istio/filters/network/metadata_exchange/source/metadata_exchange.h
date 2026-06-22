@@ -18,8 +18,7 @@
 #include "contrib/istio/filters/common/source/workload_discovery.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace NetworkFilters {
+namespace Tcp {
 namespace MetadataExchange {
 
 using ::Envoy::Extensions::Filters::Common::Expr::CelStatePrototype;
@@ -98,7 +97,7 @@ class MetadataExchangeFilter : public Network::Filter,
 public:
   MetadataExchangeFilter(MetadataExchangeConfigSharedPtr config,
                          const LocalInfo::LocalInfo& local_info)
-      : config_(config), local_info_(local_info) {}
+      : config_(config), local_info_(local_info), conn_state_(ConnProtocolNotRead) {}
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -155,10 +154,9 @@ private:
     NeedMoreDataProxyHeader,   // Need more data to be read
     Done,                      // Alpn Protocol Found and all the read is done
     Invalid,                   // Invalid state, all operations fail
-  } conn_state_{};
+  } conn_state_;
 };
 
 } // namespace MetadataExchange
-} // namespace NetworkFilters
-} // namespace Extensions
+} // namespace Tcp
 } // namespace Envoy

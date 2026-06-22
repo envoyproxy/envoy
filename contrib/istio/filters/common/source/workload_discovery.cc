@@ -84,7 +84,7 @@ public:
   }
 
   std::optional<Istio::Common::WorkloadMetadataObject>
-  getMetadata(const Network::Address::InstanceConstSharedPtr& address) override {
+  GetMetadata(const Network::Address::InstanceConstSharedPtr& address) override {
     if (address && address->ip()) {
       if (const auto ipv4 = address->ip()->ipv4(); ipv4) {
         uint32_t value = ipv4->address();
@@ -273,7 +273,7 @@ public:
 REGISTER_FACTORY(WorkloadDiscoveryFactory, Server::Configuration::BootstrapExtensionFactory);
 
 WorkloadMetadataProviderSharedPtr
-getProvider(Server::Configuration::ServerFactoryContext& context) {
+GetProvider(Server::Configuration::ServerFactoryContext& context) {
   return context.singletonManager().getTyped<WorkloadMetadataProvider>(
       SINGLETON_MANAGER_REGISTERED_NAME(workload_metadata_provider));
 }
