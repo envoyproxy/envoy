@@ -14,6 +14,18 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+// SelectionHandle subclass used by the "cancel" mode to observe handshake
+// cancellation.
+class CancellableSelectionHandle : public Ssl::SelectionHandle {
+public:
+  explicit CancellableSelectionHandle(Stats::Counter& cancelled_counter)
+      : cancelled_counter_(cancelled_counter) {}
+  ~CancellableSelectionHandle() override { cancelled_counter_.inc(); }
+
+private:
+  Stats::Counter& cancelled_counter_;
+};
+
 class AsyncTlsCertificateSelector : public Ssl::TlsCertificateSelector,
                                     protected Logger::Loggable<Logger::Id::connection> {
 public:

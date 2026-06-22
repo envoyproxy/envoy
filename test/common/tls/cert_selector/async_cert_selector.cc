@@ -40,6 +40,18 @@ AsyncTlsCertificateSelector::selectTlsContext(const SSL_CLIENT_HELLO&,
     return {Ssl::SelectionResult::SelectionStatus::Pending, nullptr, false};
   }
 
+  if (mode_ == "cancel") {
+    // Expects the calling code to cancel the lookup before the 10 second timer fires.
+    ENVOY_LOG_MISC(info, "debug: select cert cancel");
+    stats_.cert_selection_cancel_.inc();
+    cb_ = std::move(cb);
+    selection_timer_ = cb_->dispatcher().createTimer(
+        [] { IS_ENVOY_BUG("timer fired when it was expected to be canceled"); });
+    selection_timer_->enableTimer(std::chrono::seconds(10));
+    return {Ssl::SelectionResult::SelectionStatus::Pending, nullptr, false,
+            std::make_shared<CancellableSelectionHandle>(stats_.cert_selection_cancelled_)};
+  }
+
   stats_.cert_selection_failed_.inc();
   return {Ssl::SelectionResult::SelectionStatus::Failed, nullptr, false};
 };

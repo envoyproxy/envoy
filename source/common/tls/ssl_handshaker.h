@@ -162,7 +162,7 @@ public:
 private:
   Ssl::HandshakeCallbacks* handshake_callbacks_;
 
-  Ssl::SocketState state_{Ssl::SocketState::PreHandshake};
+  Ssl::SocketState state_{Ssl::SocketState::HandshakeWaitingForConnectionData};
   mutable SslExtendedSocketInfoImpl extended_socket_info_;
   std::vector<bssl::UniquePtr<X509>> validated_chain_;
 };

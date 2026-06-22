@@ -467,7 +467,7 @@ typed_config:
   const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
       connection->ssl().get());
   ASSERT(socket);
-  while (socket->state() == Ssl::SocketState::PreHandshake) {
+  while (socket->state() == Ssl::SocketState::HandshakeWaitingForConnectionData) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   ASSERT_EQ(connection->state(), Network::Connection::State::Open);
@@ -521,7 +521,7 @@ typed_config:
   const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
       connection->ssl().get());
   ASSERT(socket);
-  while (socket->state() == Ssl::SocketState::PreHandshake) {
+  while (socket->state() == Ssl::SocketState::HandshakeWaitingForConnectionData) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   ASSERT_EQ(connection->state(), Network::Connection::State::Open);
@@ -562,7 +562,7 @@ typed_config:
   const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
       connection->ssl().get());
   ASSERT(socket);
-  while (socket->state() == Ssl::SocketState::PreHandshake) {
+  while (socket->state() == Ssl::SocketState::HandshakeWaitingForConnectionData) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =
@@ -612,7 +612,7 @@ typed_config:
   const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
       connection->ssl().get());
   ASSERT(socket);
-  while (socket->state() == Ssl::SocketState::PreHandshake) {
+  while (socket->state() == Ssl::SocketState::HandshakeWaitingForConnectionData) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =
@@ -1477,6 +1477,38 @@ typed_config:
                                TestUtility::DefaultTimeout, dispatcher_.get());
 
   connection.reset();
+}
+
+// Verifies that when the downstream connection is closed while the handshake
+// is paused on async cert selection, the `SelectionHandle` returned by the
+// selector is destroyed.
+BORINGSSL_TEST_P(SslIntegrationTest, AsyncCertSelectionCancellationObservedOnDownstreamClose) {
+  tls_cert_selector_yaml_ = R"EOF(
+name: test-tls-context-provider
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.StringValue
+  value: cancel
+  )EOF";
+  initialize();
+
+  Network::ClientConnectionPtr connection = makeSslClientConnection({});
+  ConnectionStatusCallbacks callbacks;
+  connection->addConnectionCallbacks(callbacks);
+  connection->connect();
+  const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+      connection->ssl().get());
+  ASSERT(socket);
+
+  test_server_->waitForCounter("aysnc_cert_selection.cert_selection_cancel", Eq(1),
+                               TestUtility::DefaultTimeout, dispatcher_.get());
+  EXPECT_EQ(test_server_->counter("aysnc_cert_selection.cert_selection_cancelled")->value(), 0);
+
+  ASSERT_EQ(connection->state(), Network::Connection::State::Open);
+  connection->close(Network::ConnectionCloseType::NoFlush);
+  connection.reset();
+
+  test_server_->waitForCounter("aysnc_cert_selection.cert_selection_cancelled", Eq(1),
+                               std::chrono::seconds(2), dispatcher_.get());
 }
 
 } // namespace Ssl
