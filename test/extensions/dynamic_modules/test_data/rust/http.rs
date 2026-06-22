@@ -632,6 +632,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SpanCallbacksFilter {
       span.set_operation("operation");
       span.log("event");
       span.set_sampled(true);
+      span.disable_local_decision();
       let _ = span.get_baggage("key");
       span.set_baggage("key", "value");
       let _ = span.get_trace_id();
@@ -726,6 +727,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     envoy_filter
       .set_dynamic_metadata_string_batch("ns_req_header_batch", &[("k1", "v1"), ("k2", "v2")]);
     envoy_filter.set_dynamic_metadata_string_batch("ns_req_header_batch_empty", &[]);
+
+    // Set a non-UTF-8 byte value, asserted end-to-end by the C++ integration test in filter_test.cc.
+    envoy_filter.set_dynamic_metadata_bytes("ns_req_header_bytes", "key", &[0xff, 0x00, 0xfe]);
 
     // Try getting metadata from rotuer cluster and host.
     let metadata = envoy_filter.get_metadata_string(

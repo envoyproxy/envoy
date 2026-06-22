@@ -677,9 +677,12 @@ Protobuf::Value EnvironmentFormatter::formatValue(const StreamInfo::StreamInfo&)
   return str_;
 }
 
-RequestedServerNameFormatter::RequestedServerNameFormatter(absl::string_view source,
-                                                           absl::string_view option) {
+RequestedServerNameFormatter::RequestedServerNameFormatter(HostFormatterSource source,
+                                                           HostFormatterOption option)
+    : source_(source), option_(option) {}
 
+absl::StatusOr<std::unique_ptr<RequestedServerNameFormatter>>
+RequestedServerNameFormatter::create(absl::string_view source, absl::string_view option) {
   HostFormatterSource host_source = SNI;
   HostFormatterOption option_enum = OriginalHostOrHost;
 
@@ -692,9 +695,10 @@ RequestedServerNameFormatter::RequestedServerNameFormatter(absl::string_view sou
   } else if (source.empty()) {
     host_source = SNI;
   } else {
-    throw EnvoyException(fmt::format("Invalid REQUESTED_SERVER_NAME option: '{}', only "
-                                     "'SNI_ONLY'/'SNI_FIRST'/'HOST_FIRST' are allowed",
-                                     source));
+    return absl::InvalidArgumentError(
+        fmt::format("Invalid REQUESTED_SERVER_NAME option: '{}', only "
+                    "'SNI_ONLY'/'SNI_FIRST'/'HOST_FIRST' are allowed",
+                    source));
   }
 
   if (option == "ORIG_OR_HOST") {
@@ -706,12 +710,13 @@ RequestedServerNameFormatter::RequestedServerNameFormatter(absl::string_view sou
   } else if (option.empty()) {
     option_enum = OriginalHostOrHost;
   } else {
-    throw EnvoyException(fmt::format("Invalid REQUESTED_SERVER_NAME option: '{}', only "
-                                     "'ORIG_OR_HOST'/'HOST'/'ORIG' are allowed",
-                                     option));
+    return absl::InvalidArgumentError(
+        fmt::format("Invalid REQUESTED_SERVER_NAME option: '{}', only "
+                    "'ORIG_OR_HOST'/'HOST'/'ORIG' are allowed",
+                    option));
   }
-  source_ = host_source;
-  option_ = option_enum;
+  return std::unique_ptr<RequestedServerNameFormatter>(
+      new RequestedServerNameFormatter(host_source, option_enum));
 }
 
 absl::optional<std::string>
@@ -1932,8 +1937,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                  absl::string_view option;
                                  SubstitutionFormatUtils::parseSubcommand(format, ':', fallback,
                                                                           option);
-                                 return std::make_unique<RequestedServerNameFormatter>(fallback,
-                                                                                       option);
+                                 return RequestedServerNameFormatter::create(fallback, option);
                                }}},
                              {"ROUTE_NAME",
                               {CommandSyntaxChecker::COMMAND_ONLY,

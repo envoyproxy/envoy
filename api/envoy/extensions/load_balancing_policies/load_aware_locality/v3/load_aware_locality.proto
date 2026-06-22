@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package envoy.extensions.load_balancing_policies.load_aware_locality.v3;
+
+import "envoy/config/cluster/v3/cluster.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.load_aware_locality.v3";
+option java_outer_classname = "LoadAwareLocalityProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/load_aware_locality/v3;load_aware_localityv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Load-Aware Locality-Picking Load Balancing Policy]
+// [#extension: envoy.load_balancing_policies.load_aware_locality]
+
+// Configuration for the load_aware_locality LB policy which uses ORCA utilization data
+// to route traffic between localities based on available headroom.
+// [#next-free-field: 10]
+message LoadAwareLocality {
+  // The child LB policy to create for endpoint-picking within each locality.
+  config.cluster.v3.LoadBalancingPolicy endpoint_picking_policy = 1
+      [(validate.rules).message = {required: true}];
+
+  // How frequently ORCA weights and locality utilization are recomputed on the
+  // main thread. Must be at least 100ms. Defaults to 1s.
+  google.protobuf.Duration weight_update_period = 2
+      [(validate.rules).duration = {gte {nanos: 100000000}}];
+
+  // By default, endpoint utilization is computed based on the
+  // :ref:`application_utilization <envoy_v3_api_field_.xds.data.orca.v3.OrcaLoadReport.application_utilization>`
+  // field reported by the endpoint. If that field is not set, then utilization
+  // will instead be computed by taking the max of the values of the metrics
+  // specified here. For map fields in the ORCA proto, the string will be of
+  // the form ``<map_field_name>.<map_key>``. For example, the string
+  // ``named_metrics.foo`` will mean to look for the key ``foo`` in the ORCA
+  // :ref:`named_metrics <envoy_v3_api_field_.xds.data.orca.v3.OrcaLoadReport.named_metrics>`
+  // field. If none of the specified metrics are present in the load report,
+  // then :ref:`cpu_utilization <envoy_v3_api_field_.xds.data.orca.v3.OrcaLoadReport.cpu_utilization>`
+  // is used instead.
+  repeated string metric_names_for_computing_utilization = 3;
+
+  // When the local locality's utilization is at most this threshold above the
+  // remote average, route 100% of traffic to the local locality. This avoids
+  // unnecessary cross-zone routing when utilization is roughly balanced.
+  // One-sided: if the local zone is less loaded than remote, all-local routing
+  // always applies. Must be in [0, 1]. Defaults to 0.1.
+  google.protobuf.DoubleValue utilization_variance_threshold = 4
+      [(validate.rules).double = {lte: 1.0 gte: 0.0}];
+
+  // EWMA time constant for per-locality utilization smoothing. The per-tick
+  // smoothing factor alpha is derived as ``1 - exp(-weight_update_period /
+  // smoothing_time_constant)``, so settling time is consistent regardless of
+  // the configured tick rate. Larger values produce more stable weights;
+  // smaller values react faster. Must be greater than 0s. Defaults to 5s
+  // (~95% settling within ~15s).
+  google.protobuf.Duration smoothing_time_constant = 5 [(validate.rules).duration = {gt {}}];
+
+  // Minimum fraction of traffic sent to non-local localities to keep ORCA
+  // data fresh when the local-preference check would otherwise route 100% of
+  // traffic to the local locality. The deficit is redistributed across remote
+  // localities proportionally to their host count. Must be in [0, 1). Set to
+  // 0 to disable (safe only when ORCA reports arrive out-of-band, or when
+  // cross-zone traffic must be strictly avoided). Defaults to 0.03 (3%).
+  //
+  // Probe fraction is a global value split across all remote localities.
+  // At very high remote-locality counts combined with low aggregate request
+  // rates, per-host sample intervals can exceed ``weight_expiration_period``.
+  // See the architecture overview for the scaling matrix.
+  google.protobuf.DoubleValue remote_probe_fraction = 6
+      [(validate.rules).double = {lt: 1.0 gte: 0.0}];
+
+  // Per-host ORCA sample validity window. Hosts that have not reported load
+  // metrics within this duration are excluded from their locality's
+  // utilization aggregation. The locality's EWMA state continues normally
+  // over the remaining reporting hosts. If every host in a locality is
+  // stale, the locality falls back to host-count-proportional weighting
+  // (the same path used when all localities are overloaded). Set to 0s to
+  // disable expiration. Defaults to 3 minutes.
+  google.protobuf.Duration weight_expiration_period = 7 [(validate.rules).duration = {gte {}}];
+
+  // Whether to enable out-of-band utilization reporting collection from
+  // the endpoints. By default, per-request utilization reporting is used.
+  google.protobuf.BoolValue enable_oob_load_report = 8;
+
+  // Load reporting interval to request from the server. Note that the
+  // server may not provide reports as frequently as the client requests.
+  // Used only when enable_oob_load_report is true. Default is 10 seconds.
+  google.protobuf.Duration oob_reporting_period = 9;
+}

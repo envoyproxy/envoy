@@ -568,7 +568,7 @@ message KeepaliveSettings {
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
 
-// [#next-free-field: 21]
+// [#next-free-field: 23]
 message Http2ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http2ProtocolOptions";
@@ -807,6 +807,26 @@ message Http2ProtocolOptions {
   // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.5:
   // obs-text = %x80-FF
   google.protobuf.BoolValue disallow_obs_text = 20;
+
+  // Configures the initial token count for the RST_STREAM rate limiter used by the ``nghttp2``
+  // server-side connection. This uses a token-bucket algorithm where each received RST_STREAM
+  // frame consumes one token, and tokens are replenished at :ref:`stream_reset_rate
+  // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_reset_rate>` per second.
+  // When no tokens remain, ``nghttp2`` sends GOAWAY with ``INTERNAL_ERROR`` to close the
+  // connection, protecting against CVE-2023-44487 (HTTP/2 Rapid Reset). Defaults to ``1000``.
+  //
+  // This option only applies when using ``nghttp2`` as a server. It has no effect on ``oghttp2``
+  // or on client-side connections.
+  google.protobuf.UInt64Value stream_reset_burst = 21;
+
+  // Configures the token replenishment rate (tokens per second) for the RST_STREAM rate limiter
+  // used by the ``nghttp2`` server-side connection. See :ref:`stream_reset_burst
+  // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_reset_burst>` for details.
+  // Defaults to ``33``.
+  //
+  // This option only applies when using ``nghttp2`` as a server. It has no effect on ``oghttp2``
+  // or on client-side connections.
+  google.protobuf.UInt64Value stream_reset_rate = 22;
 }
 
 // [#not-implemented-hide:]

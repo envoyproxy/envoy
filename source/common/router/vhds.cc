@@ -119,7 +119,8 @@ absl::Status VhdsSubscription::onConfigUpdate(
       continue;
     }
     added_vhosts.emplace_back(
-        dynamic_cast<const envoy::config::route::v3::VirtualHost&>(resource.get().resource()));
+        Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::VirtualHost>(
+            resource.get().resource()));
   }
   if (config_update_info_->onVhdsUpdate(added_vhosts, std::move(added_resource_ids),
                                         removed_resources, version_info)) {

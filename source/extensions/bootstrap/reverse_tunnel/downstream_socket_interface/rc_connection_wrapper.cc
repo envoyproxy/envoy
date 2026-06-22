@@ -149,6 +149,14 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
   headers->addCopy(cluster_hdr, std::string(cluster_id));
   headers->addCopy(tenant_hdr, std::string(tenant_id));
   headers->addCopy(upstream_cluster_hdr, cluster_name_);
+
+  const Http::LowerCaseString& initiation_time_hdr =
+      ::Envoy::Extensions::Bootstrap::ReverseConnection::reverseTunnelInitiationTimeHeader();
+  auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    connection_->dispatcher().timeSource().systemTime().time_since_epoch())
+                    .count();
+  headers->addCopy(initiation_time_hdr, absl::StrCat(now_ms));
+
   using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
   const auto apply_header = [&headers](const Http::LowerCaseString& key, absl::string_view value,
                                        HeaderValueOption::HeaderAppendAction action) {

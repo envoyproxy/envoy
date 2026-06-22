@@ -172,7 +172,7 @@ class StringActionFactory : public ActionFactory<absl::string_view> {
 public:
   ActionConstSharedPtr createAction(const Protobuf::Message& config, absl::string_view&,
                                     ProtobufMessage::ValidationVisitor&) override {
-    const auto& string = dynamic_cast<const Protobuf::StringValue&>(config);
+    const auto& string = Envoy::Protobuf::DynamicCastMessage<Protobuf::StringValue>(config);
     return std::make_shared<StringAction>(string.value());
   }
 
@@ -236,7 +236,7 @@ public:
   InputMatcherFactoryCb
   createInputMatcherFactoryCb(const Protobuf::Message& config,
                               Server::Configuration::ServerFactoryContext&) override {
-    const auto& string = dynamic_cast<const Protobuf::StringValue&>(config);
+    const auto& string = Envoy::Protobuf::DynamicCastMessage<Protobuf::StringValue>(config);
     return [string]() { return std::make_unique<CustomStringMatcher>(string.value()); };
   }
 

@@ -464,6 +464,28 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnResponseHeaders) {
       response->headers().get(Http::LowerCaseString("some_header"))[0]->value().getStringView());
 }
 
+// Regression test for the streaming-response re-entry fix. The filter produces its response with
+// send_response_headers and stamps a marker from on_response_headers. Before the fix the streaming
+// response re-entered that hook and leaked the marker onto the module's own response. Rust-only
+// because the streaming_response_reentry filter lives in the rust test module.
+TEST_P(DynamicModulesIntegrationTest, StreamingResponseDoesNotReenterEncodeHooks) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the streaming_response_reentry filter is only in the rust test module";
+  }
+  initializeFilter("streaming_response_reentry");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, true);
+  auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_FALSE(response->headers().get(Http::LowerCaseString("x-produced")).empty());
+  // The module's response hook must not run for the response it produced.
+  EXPECT_TRUE(response->headers().get(Http::LowerCaseString("x-reentered")).empty());
+}
+
 TEST_P(DynamicModulesIntegrationTest, HttpCalloutsNonExistentCluster) {
   initializeFilter("http_callouts", "missing");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));

@@ -349,7 +349,11 @@ TEST_P(ListenerIntegrationTest, RejectsUnknownHttpFilter) {
                           cluster: cluster_0
               http_filters:
                 - name: filter.unknown
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.Empty
                 - name: envoy.filters.http.router
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
         )EOF");
     sendLdsResponse({listener}, "2");
   };
@@ -389,7 +393,11 @@ TEST_P(ListenerIntegrationTest, IgnoreUnknownOptionalHttpFilter) {
               http_filters:
                 - name: filter.unknown
                   is_optional: true
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.Empty
                 - name: envoy.filters.http.router
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
         )EOF");
     sendLdsResponse({listener}, "2");
   };

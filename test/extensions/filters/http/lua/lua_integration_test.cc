@@ -8,6 +8,7 @@
 #include "test/extensions/filters/http/lua/lua_test_filter.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
