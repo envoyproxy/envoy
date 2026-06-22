@@ -11,7 +11,7 @@
 
 #include "absl/strings/str_join.h"
 
-namespace Envoy {
+// NOLINT(namespace-envoy)
 namespace Istio {
 namespace Common {
 
@@ -83,33 +83,35 @@ std::string WorkloadMetadataObject::baggage() const {
     parts.push_back("k8s." + std::string(workload_type) + ".name=" + std::string(workload_name_));
   }
 
-  const auto appName = field(AppNameToken).value_or("");
-  const auto serviceName = field(ServiceNameToken).value_or(appName);
+  const auto appName = field(Istio::Common::AppNameToken).value_or("");
+  const auto serviceName = field(Istio::Common::ServiceNameToken).value_or(appName);
 
   if (!serviceName.empty()) {
-    parts.push_back(absl::StrCat(ServiceNameBaggageToken, "=", serviceName));
+    parts.push_back(absl::StrCat(Istio::Common::ServiceNameBaggageToken, "=", serviceName));
   }
 
   if (!appName.empty() && appName != serviceName) {
-    parts.push_back(absl::StrCat(AppNameBaggageToken, "=", appName));
+    parts.push_back(absl::StrCat(Istio::Common::AppNameBaggageToken, "=", appName));
   }
 
-  const auto appVersion = field(AppVersionToken).value_or("");
-  const auto serviceVersion = field(ServiceVersionToken).value_or(appVersion);
+  const auto appVersion = field(Istio::Common::AppVersionToken).value_or("");
+  const auto serviceVersion = field(Istio::Common::ServiceVersionToken).value_or(appVersion);
 
   if (!serviceVersion.empty()) {
-    parts.push_back(absl::StrCat(ServiceVersionBaggageToken, "=", serviceVersion));
+    parts.push_back(absl::StrCat(Istio::Common::ServiceVersionBaggageToken, "=", serviceVersion));
   }
 
   if (!appVersion.empty() && appVersion != serviceVersion) {
-    parts.push_back(absl::StrCat(AppVersionBaggageToken, "=", appVersion));
+    parts.push_back(absl::StrCat(Istio::Common::AppVersionBaggageToken, "=", appVersion));
   }
 
   // Map the workload metadata fields to baggage tokens
   const std::vector<std::pair<absl::string_view, absl::string_view>> field_to_baggage = {
-      {NamespaceNameToken, NamespaceNameBaggageToken}, {ClusterNameToken, ClusterNameBaggageToken},
-      {InstanceNameToken, InstanceNameBaggageToken},   {RegionToken, LocalityRegionBaggageToken},
-      {ZoneToken, LocalityZoneBaggageToken},
+      {Istio::Common::NamespaceNameToken, Istio::Common::NamespaceNameBaggageToken},
+      {Istio::Common::ClusterNameToken, Istio::Common::ClusterNameBaggageToken},
+      {Istio::Common::InstanceNameToken, Istio::Common::InstanceNameBaggageToken},
+      {Istio::Common::RegionToken, Istio::Common::LocalityRegionBaggageToken},
+      {Istio::Common::ZoneToken, Istio::Common::LocalityZoneBaggageToken},
   };
 
   for (const auto& [field_name, baggage_key] : field_to_baggage) {
@@ -533,4 +535,3 @@ convertBaggageToWorkloadMetadata(absl::string_view data, absl::string_view ident
 
 } // namespace Common
 } // namespace Istio
-} // namespace Envoy

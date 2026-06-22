@@ -9,31 +9,33 @@
 
 #include "source/common/common/hash.h"
 
-namespace Envoy {
+// NOLINT(namespace-envoy)
 namespace Istio {
 namespace Common {
 
-HashableString::HashableString(absl::string_view value) : Router::StringAccessorImpl(value) {}
+HashableString::HashableString(absl::string_view value)
+    : Envoy::Router::StringAccessorImpl(value) {}
 
-std::optional<uint64_t> HashableString::hash() const { return HashUtil::xxHash64(asString()); }
+std::optional<uint64_t> HashableString::hash() const {
+  return Envoy::HashUtil::xxHash64(asString());
+}
 
 namespace {
 
-class HashableStringObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+class HashableStringObjectFactory : public Envoy::StreamInfo::FilterState::ObjectFactory {
 public:
   // ObjectFactory
   std::string name() const override { return "istio.hashable_string"; }
 
-  std::unique_ptr<StreamInfo::FilterState::Object>
+  std::unique_ptr<Envoy::StreamInfo::FilterState::Object>
   createFromBytes(absl::string_view data) const override {
     return std::make_unique<HashableString>(data);
   }
 };
 
-REGISTER_FACTORY(HashableStringObjectFactory, StreamInfo::FilterState::ObjectFactory);
+REGISTER_FACTORY(HashableStringObjectFactory, Envoy::StreamInfo::FilterState::ObjectFactory);
 
 } // namespace
 
 } // namespace Common
 } // namespace Istio
-} // namespace Envoy
