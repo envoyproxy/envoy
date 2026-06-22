@@ -9,6 +9,7 @@
 #include "source/common/signal/signal_action.h"
 
 #include "test/common/memory/memory_test_utility.h"
+#include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {

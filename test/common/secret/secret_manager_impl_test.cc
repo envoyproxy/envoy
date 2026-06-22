@@ -880,7 +880,6 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSecrets) {
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
 
-  envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Random::MockRandomGenerator> random;
@@ -956,7 +955,6 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticValidationContext) {
   auto secret_manager = std::make_unique<SecretManagerImpl>(config_tracker_);
   time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
-  envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Random::MockRandomGenerator> random;
@@ -1003,7 +1001,6 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSessionTicketsContext) {
   auto secret_manager = std::make_unique<SecretManagerImpl>(config_tracker_);
   time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
-  envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Random::MockRandomGenerator> random;

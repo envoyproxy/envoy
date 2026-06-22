@@ -933,6 +933,48 @@ TEST_F(HttpHealthCheckerImplTest, LastHealthCheckHttpStatusRecorded) {
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->lastHealthCheckHttpStatus());
 }
 
+// Verify that lastHealthCheckHttpStatus is cleared on a network-level health check
+// failure. Without this, the HDS report would continue to ship a stale code (e.g.
+// 200 from the prior successful response) even after the upstream became unreachable.
+TEST_F(HttpHealthCheckerImplTest, LastHealthCheckHttpStatusClearedOnNetworkFailure) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, _)).Times(2);
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  // First, a successful 200 response records the HTTP status.
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).Times(2);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillRepeatedly(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(200U,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->lastHealthCheckHttpStatus());
+
+  // A timeout (network failure) on the next probe must clear the recorded status,
+  // so the HDS report does not ship the stale 200 from the prior cycle.
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->invokeCallback();
+  EXPECT_CALL(*test_sessions_[0]->client_connection_,
+              close(Network::ConnectionCloseType::Abort, _));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  test_sessions_[0]->timeout_timer_->invokeCallback();
+  EXPECT_FALSE(cluster_->prioritySet()
+                   .getMockHostSet(0)
+                   ->hosts_[0]
+                   ->lastHealthCheckHttpStatus()
+                   .has_value());
+}
+
 TEST_F(HttpHealthCheckerImplTest, Degraded) {
   setupNoServiceValidationHC();
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(2);
@@ -6889,7 +6931,6 @@ TEST(HealthCheckProto, Validation) {
         prefix: locations
       path: /healthcheck
     )EOF";
-    envoy::config::core::v3::HealthCheck health_check_proto;
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
@@ -6905,7 +6946,6 @@ TEST(HealthCheckProto, Validation) {
         prefix: locations
       path: /healthcheck
     )EOF";
-    envoy::config::core::v3::HealthCheck health_check_proto;
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
@@ -6921,7 +6961,6 @@ TEST(HealthCheckProto, Validation) {
         prefix: locations
       path: /healthcheck
     )EOF";
-    envoy::config::core::v3::HealthCheck health_check_proto;
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
@@ -6937,7 +6976,6 @@ TEST(HealthCheckProto, Validation) {
         prefix: locations
       path: /healthcheck
     )EOF";
-    envoy::config::core::v3::HealthCheck health_check_proto;
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
@@ -6951,7 +6989,6 @@ TEST(HealthCheckProto, Validation) {
         prefix: locations
       path: /healthcheck
     )EOF";
-    envoy::config::core::v3::HealthCheck health_check_proto;
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value is required.*");
   }
@@ -6965,7 +7002,6 @@ TEST(HealthCheckProto, Validation) {
         prefix: locations
       path: /healthcheck
     )EOF";
-    envoy::config::core::v3::HealthCheck health_check_proto;
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value is required.*");
   }

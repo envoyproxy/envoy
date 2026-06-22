@@ -632,6 +632,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SpanCallbacksFilter {
       span.set_operation("operation");
       span.log("event");
       span.set_sampled(true);
+      span.disable_local_decision();
       let _ = span.get_baggage("key");
       span.set_baggage("key", "value");
       let _ = span.get_trace_id();

@@ -3,23 +3,27 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
 #include "absl/debugging/leak_check.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/type/matcher/v3/string.pb.h"
 #include "library/cc/engine.h"
 #include "library/common/engine_types.h"
 #include "library/common/internal_engine.h"
 #include "source/common/common/base_logger.h"
-#include "source/server/options_impl_base.h"
 #include "source/common/runtime/runtime_features.h"
-#include "envoy/type/matcher/v3/string.pb.h"
+#include "source/server/options_impl_base.h"
 
 namespace Envoy {
 namespace Platform {
@@ -154,6 +158,11 @@ public:
     return static_cast<T&>(*this);
   }
 
+  T& addApiListener(const envoy::config::listener::v3::Listener& listener) {
+    custom_listeners_.push_back(listener);
+    return static_cast<T&>(*this);
+  }
+
   absl::StatusOr<std::shared_ptr<Engine>> build() {
     auto bootstrap = static_cast<T*>(this)->generateBootstrap();
     if (!bootstrap.ok()) {
@@ -184,55 +193,35 @@ public:
 
   absl::StatusOr<std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>> generateBootstrap() {
     auto bootstrap = std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
-
-    // Set up the HCM, make sure a route config is provided.
-    ::envoy::extensions::filters::network::http_connection_manager::v3::
-        EnvoyMobileHttpConnectionManager api_listener_config;
-    auto* hcm = api_listener_config.mutable_config();
-    hcm->set_stat_prefix("hcm");
-    hcm->set_server_header_transformation(
-        ::envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-            PASS_THROUGH);
-    ::envoy::extensions::filters::network::http_connection_manager::v3::
-        HttpConnectionManager_Tracing tracing;
-    if (auto status = static_cast<T*>(this)->configureTracing(&tracing); !status.ok()) {
-      return status;
-    }
-    if (tracing.ByteSizeLong() > 0) {
-      *hcm->mutable_tracing() = std::move(tracing);
-    }
-    hcm->mutable_stream_idle_timeout()->set_seconds(stream_idle_timeout_seconds_);
-    if (auto status = static_cast<T*>(this)->configureRouteConfig(hcm->mutable_route_config());
-        !status.ok()) {
-      return status;
-    }
-
-    if (auto status = static_cast<T*>(this)->configureHttpFilters(
-            [hcm]() { return hcm->add_http_filters(); });
-        !status.ok()) {
-      return status;
-    }
-
-    // Add the router filter to the HCM last.
-    auto* router_filter = hcm->add_http_filters();
-    router_filter->set_name("envoy.router");
-    ::envoy::extensions::filters::http::router::v3::Router router_config;
-    static_cast<T*>(this)->configureCustomRouterFilter(router_config);
-    router_filter->mutable_typed_config()->PackFrom(router_config);
-
     auto* static_resources = bootstrap->mutable_static_resources();
 
-    // Finally create the base API listener, and point it at the HCM.
-    auto* base_listener = static_resources->add_listeners();
-    base_listener->set_name("base_api_listener");
-    auto* base_address = base_listener->mutable_address();
-    base_address->mutable_socket_address()->set_protocol(
-        ::envoy::config::core::v3::SocketAddress::TCP);
-    base_address->mutable_socket_address()->set_address("0.0.0.0");
-    base_address->mutable_socket_address()->set_port_value(10000);
-    base_listener->mutable_per_connection_buffer_limit_bytes()->set_value(
-        per_connection_buffer_limit_bytes_);
-    base_listener->mutable_api_listener()->mutable_api_listener()->PackFrom(api_listener_config);
+    if (custom_listeners_.empty()) {
+      auto default_listener_or_status = buildDefaultListener("base_api_listener");
+      if (!default_listener_or_status.ok()) {
+        return default_listener_or_status.status();
+      }
+      *static_resources->add_listeners() = std::move(default_listener_or_status.value());
+    } else {
+      // Validate custom listeners
+      absl::flat_hash_set<absl::string_view> listener_names;
+      for (const auto& listener : custom_listeners_) {
+        if (listener.name().empty()) {
+          return absl::InvalidArgumentError("Custom listener must have a name.");
+        }
+        if (!listener.has_api_listener()) {
+          return absl::InvalidArgumentError(
+              absl::StrCat("Custom listener ", listener.name(), " must have an api_listener."));
+        }
+        if (!listener_names.insert(listener.name()).second) {
+          return absl::InvalidArgumentError(
+              absl::StrCat("Duplicate listener name: ", listener.name()));
+        }
+      }
+      // Copy custom listeners
+      for (const auto& listener : custom_listeners_) {
+        *static_resources->add_listeners() = listener;
+      }
+    }
 
     // Add all clusters to the bootstrap, there should be at least one.
     if (auto status =
@@ -279,6 +268,60 @@ protected:
   absl::Status configXds(envoy::config::bootstrap::v3::Bootstrap* bootstrap) {
     (void)bootstrap;
     return absl::OkStatus();
+  }
+
+  absl::StatusOr<envoy::config::listener::v3::Listener>
+  buildDefaultListener(const std::string& name) {
+    envoy::config::listener::v3::Listener listener;
+    listener.set_name(name);
+
+    auto* address = listener.mutable_address();
+    address->mutable_socket_address()->set_protocol(::envoy::config::core::v3::SocketAddress::TCP);
+    address->mutable_socket_address()->set_address("0.0.0.0");
+    address->mutable_socket_address()->set_port_value(10000);
+    listener.mutable_per_connection_buffer_limit_bytes()->set_value(
+        per_connection_buffer_limit_bytes_);
+
+    ::envoy::extensions::filters::network::http_connection_manager::v3::
+        EnvoyMobileHttpConnectionManager api_listener_config;
+    auto* hcm = api_listener_config.mutable_config();
+    hcm->set_stat_prefix("hcm");
+    hcm->set_server_header_transformation(
+        ::envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+            PASS_THROUGH);
+
+    ::envoy::extensions::filters::network::http_connection_manager::v3::
+        HttpConnectionManager_Tracing tracing;
+    if (auto status = static_cast<T*>(this)->configureTracing(&tracing); !status.ok()) {
+      return status;
+    }
+    if (tracing.ByteSizeLong() > 0) {
+      *hcm->mutable_tracing() = std::move(tracing);
+    }
+
+    hcm->mutable_stream_idle_timeout()->set_seconds(stream_idle_timeout_seconds_);
+
+    if (auto status = static_cast<T*>(this)->configureRouteConfig(hcm->mutable_route_config());
+        !status.ok()) {
+      return status;
+    }
+
+    auto add_filter_callback = [hcm]() { return hcm->add_http_filters(); };
+    if (auto status = static_cast<T*>(this)->configureHttpFilters(add_filter_callback);
+        !status.ok()) {
+      return status;
+    }
+
+    // Add the router filter to the HCM last.
+    auto* router_filter = hcm->add_http_filters();
+    router_filter->set_name("envoy.router");
+    ::envoy::extensions::filters::http::router::v3::Router router_config;
+    static_cast<T*>(this)->configureCustomRouterFilter(router_config);
+    router_filter->mutable_typed_config()->PackFrom(router_config);
+
+    listener.mutable_api_listener()->mutable_api_listener()->PackFrom(api_listener_config);
+
+    return listener;
   }
 
 protected:
@@ -373,6 +416,7 @@ private:
   int request_timeout_ms_ = 0;
   std::vector<std::pair<std::string, bool>> reloadable_runtime_guards_;
   std::vector<std::pair<std::string, bool>> restart_runtime_guards_;
+  std::vector<envoy::config::listener::v3::Listener> custom_listeners_;
 
   // Common fields for InternalEngine
   Logger::Logger::Levels log_level_ = Logger::Logger::Levels::info;

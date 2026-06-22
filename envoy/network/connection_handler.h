@@ -12,7 +12,6 @@
 #include "envoy/network/listener.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/overload/thread_local_overload_state.h"
-#include "envoy/ssl/context.h"
 
 #include "source/common/common/interval_value.h"
 

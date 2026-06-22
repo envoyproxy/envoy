@@ -75,10 +75,15 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
 
   return [filter_cfg = filter_config.value(),
           listener_filter_matcher](Network::ListenerFilterManager& filter_manager) -> void {
+    // The manager owns filters as a unique_ptr, but the async callout and scheduler paths call
+    // shared_from_this. Hold the filter in a shared_ptr and hand the manager a forwarding adapter.
     auto filter =
-        std::make_unique<Extensions::DynamicModules::ListenerFilters::DynamicModuleListenerFilter>(
+        std::make_shared<Extensions::DynamicModules::ListenerFilters::DynamicModuleListenerFilter>(
             filter_cfg);
-    filter_manager.addAcceptFilter(listener_filter_matcher, std::move(filter));
+    filter_manager.addAcceptFilter(
+        listener_filter_matcher,
+        std::make_unique<Extensions::DynamicModules::ListenerFilters::SharedListenerFilterAdapter>(
+            std::move(filter)));
   };
 }
 

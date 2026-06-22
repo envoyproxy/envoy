@@ -19,6 +19,7 @@
 #include "test/extensions/filters/http/ext_authz/logging_test_filter.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/mocks/server/options.h"
+#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
