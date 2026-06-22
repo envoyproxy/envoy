@@ -6,11 +6,11 @@
 
 #include "source/common/router/string_accessor_impl.h"
 
-namespace Envoy {
+// NOLINT(namespace-envoy)
 namespace Istio {
 namespace Common {
 
-class HashableString : public Router::StringAccessorImpl, public Hashable {
+class HashableString : public Envoy::Router::StringAccessorImpl, public Envoy::Hashable {
 public:
   HashableString(absl::string_view value);
 
@@ -20,4 +20,3 @@ public:
 
 } // namespace Common
 } // namespace Istio
-} // namespace Envoy
