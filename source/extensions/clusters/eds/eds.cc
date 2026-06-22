@@ -466,7 +466,8 @@ void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReas
           "Did not receive EDS response on time, using cached ClusterLoadAssignment for cluster {}",
           edsServiceName());
       envoy::config::endpoint::v3::ClusterLoadAssignment cached_load_assignment =
-          Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(*cached_resource);
+          Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+              *cached_resource);
       info_->configUpdateStats().assignment_use_cached_.inc();
       using_cached_resource_ = true;
       update(std::move(cached_load_assignment));

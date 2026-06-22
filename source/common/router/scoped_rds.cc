@@ -657,7 +657,8 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createXdsConfigProvider(
            &typed_optarg](const uint64_t manager_identifier,
                           ConfigProviderManagerImplBase& config_provider_manager)
               -> Envoy::Config::ConfigSubscriptionCommonBaseSharedPtr {
-            const auto& scoped_rds_config_source = Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds>(
+            const auto& scoped_rds_config_source = Envoy::Protobuf::DynamicCastMessage<
+                envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds>(
                 config_source_proto);
             return std::make_shared<ScopedRdsConfigSubscription>(
                 scoped_rds_config_source, manager_identifier, typed_optarg.scoped_routes_name_,
