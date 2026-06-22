@@ -1752,6 +1752,21 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                        return connection_info.subjectPeerCertificate();
                                      });
                                }}},
+                             {"UPSTREAM_CLIENT_CERT_REQUESTED",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       const auto result =
+                                           connection_info.serverSentCertificateRequest();
+                                       if (!result.has_value()) {
+                                         return absl::optional<std::string>(absl::nullopt);
+                                       }
+                                       return absl::optional<std::string>(*result ? "true"
+                                                                                  : "false");
+                                     });
+                               }}},
                              {"DOWNSTREAM_LOCAL_ADDRESS",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, absl::optional<size_t>) {

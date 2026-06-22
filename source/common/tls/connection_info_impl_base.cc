@@ -5,6 +5,7 @@
 #include "source/common/common/hex.h"
 #include "source/common/http/utility.h"
 #include "source/common/tls/cert_validator/san_matcher.h"
+#include "source/common/tls/context_impl.h"
 
 #include "absl/strings/str_replace.h"
 #include "openssl/safestack.h"
@@ -388,6 +389,15 @@ const std::string& ConnectionInfoImplBase::sni() const {
     }
     return std::string{};
   });
+}
+
+absl::optional<bool> ConnectionInfoImplBase::serverSentCertificateRequest() const {
+  auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
+      SSL_get_ex_data(ssl(), ContextImpl::sslExtendedSocketInfoIndex()));
+  if (extended_socket_info == nullptr) {
+    return absl::nullopt;
+  }
+  return extended_socket_info->serverSentCertificateRequest();
 }
 
 const std::string& ConnectionInfoImplBase::serialNumberPeerCertificate() const {

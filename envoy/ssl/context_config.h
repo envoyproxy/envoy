@@ -159,6 +159,18 @@ public:
   virtual size_t maxSessionKeys() const PURE;
 
   /**
+   * @return true if the enforcement that handshake will fail if the keyUsage extension is present
+   * and incompatible with the TLS usage is enabled.
+   */
+  virtual bool enforceRsaKeyUsage() const PURE;
+
+  /**
+   * @return true if the upstream must send a CertificateRequest during the TLS handshake,
+   * ensuring mTLS is actually negotiated and not silently downgraded to one-way TLS.
+   */
+  virtual bool requireCertificateRequest() const PURE;
+
+  /**
    * @return an optional factory which can be used to create TLS context provider instances.
    */
   virtual OptRef<UpstreamTlsCertificateSelectorFactory> tlsCertificateSelectorFactory() const PURE;

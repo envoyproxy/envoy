@@ -421,6 +421,316 @@ TEST(TlsCertificateSelectorFactoryQuicTest, QUICFactory) {
   EXPECT_FALSE(server_cfg.ok());
 }
 
+// Tests that CertificateRequest tracking works correctly with static or custom selectors.
+
+using SelectionStatus = Ssl::SelectionResult::SelectionStatus;
+
+struct CertReqCustomSelectorParams {
+  Network::Address::IpVersion ip_version;
+  SelectionStatus mode; // static (no selector) or custom selector
+};
+
+std::string certReqCustomSelectorParamsToString(
+    const ::testing::TestParamInfo<CertReqCustomSelectorParams>& p) {
+  return fmt::format("{}_{}", TestUtility::ipVersionToString(p.param.ip_version),
+                     p.param.mode == SelectionStatus::Pending ? "Async" : "Sync");
+}
+
+class UpstreamCustomSelectorCertRequestTest
+    : public testing::TestWithParam<CertReqCustomSelectorParams> {
+protected:
+  UpstreamCustomSelectorCertRequestTest()
+      : registered_factory_(provider_factory_), upstream_registered_factory_(provider_factory_),
+        version_(GetParam().ip_version) {}
+
+  // Run a handshake where the server requires client cert (sends CertificateRequest)
+  // and the client has require_certificate_request=true. Should succeed.
+  void runSuccessTest() {
+    const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+    const std::string client_ctx_yaml = R"EOF(
+  require_certificate_request: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+    custom_tls_certificate_selector:
+      name: test-tls-context-provider
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+)EOF";
+
+    runHandshake(server_ctx_yaml, client_ctx_yaml, /*expect_success=*/true);
+  }
+
+  // Run a handshake where the server does NOT send CertificateRequest, but the
+  // client has require_certificate_request=true. Should fail with fail_no_cert_request.
+  void runFailureTest() {
+    const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+    const std::string client_ctx_yaml = R"EOF(
+  require_certificate_request: true
+  common_tls_context:
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+    custom_tls_certificate_selector:
+      name: test-tls-context-provider
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+)EOF";
+
+    runHandshake(server_ctx_yaml, client_ctx_yaml, /*expect_success=*/false);
+  }
+
+  // Observability only (runtime flag, no enforcement) + server sends CertRequest.
+  // Verifies cert_requested=true through the custom selector path without enforcement.
+  void runTrackingOnlySuccessTest() {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.tls_upstream_record_cert_request", "true"}});
+
+    const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+    const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+    custom_tls_certificate_selector:
+      name: test-tls-context-provider
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+)EOF";
+
+    runHandshake(server_ctx_yaml, client_ctx_yaml, /*expect_success=*/true,
+                 /*expected_cert_requested=*/absl::optional<bool>(true));
+  }
+
+  // Observability only (runtime flag, no enforcement) + server does NOT send CertRequest.
+  // Verifies cert_requested=false through the custom selector path without enforcement.
+  void runTrackingOnlyNoCertRequestTest() {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.tls_upstream_record_cert_request", "true"}});
+
+    const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+    const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+    custom_tls_certificate_selector:
+      name: test-tls-context-provider
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+)EOF";
+
+    runHandshake(server_ctx_yaml, client_ctx_yaml, /*expect_success=*/true,
+                 /*expected_cert_requested=*/absl::optional<bool>(false));
+  }
+
+private:
+  void runHandshake(const std::string& server_ctx_yaml_template,
+                    const std::string& client_ctx_yaml_template, bool expect_success,
+                    absl::optional<bool> expected_cert_requested = absl::nullopt) {
+    Event::SimulatedTimeSystem time_system;
+    Stats::TestUtil::TestStore server_stats_store;
+    Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
+    NiceMock<Runtime::MockLoader> runtime;
+    testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+        transport_socket_factory_context;
+    ON_CALL(transport_socket_factory_context.server_context_, api())
+        .WillByDefault(ReturnRef(*server_api));
+
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml_template),
+                              server_tls_context);
+    auto server_cfg = *ServerContextConfigImpl::create(server_tls_context,
+                                                       transport_socket_factory_context, {}, false);
+
+    Event::DispatcherPtr dispatcher = server_api->allocateDispatcher("test_thread");
+    provider_factory_.mod_ = GetParam().mode;
+
+    NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+    Tls::ContextManagerImpl manager(server_factory_context);
+    auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
+        std::move(server_cfg), manager, *server_stats_store.rootScope());
+
+    auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(version_));
+    Network::MockTcpListenerCallbacks callbacks;
+    NiceMock<Network::MockListenerConfig> listener_config;
+    Server::ThreadLocalOverloadStateOptRef overload_state;
+    Network::ListenerPtr listener =
+        createListener(socket, callbacks, runtime, listener_config, overload_state,
+                       server_api->randomGenerator(), *dispatcher);
+
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml_template),
+                              client_tls_context);
+
+    Stats::TestUtil::TestStore client_stats_store;
+    Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
+    testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+        client_factory_context;
+    ON_CALL(client_factory_context.server_context_, api()).WillByDefault(ReturnRef(*client_api));
+
+    auto client_cfg = *ClientContextConfigImpl::create(client_tls_context, client_factory_context);
+    auto client_ssl_socket_factory = *ClientSslSocketFactory::create(
+        std::move(client_cfg), manager, *client_stats_store.rootScope());
+    Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
+        socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
+        client_ssl_socket_factory->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
+
+    Network::ConnectionPtr server_connection;
+    Network::MockConnectionCallbacks server_connection_callbacks;
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    EXPECT_CALL(callbacks, onAccept_(_))
+        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+          auto ssl_socket = server_ssl_socket_factory->createDownstreamTransportSocket();
+          server_connection = dispatcher->createServerConnection(
+              std::move(socket), std::move(ssl_socket), stream_info);
+          server_connection->addConnectionCallbacks(server_connection_callbacks);
+        }));
+    EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
+
+    Network::MockConnectionCallbacks client_connection_callbacks;
+    client_connection->addConnectionCallbacks(client_connection_callbacks);
+    client_connection->connect();
+
+    size_t done_count = 0;
+    auto finish = [&]() {
+      if (++done_count == 2) {
+        dispatcher->exit();
+      }
+    };
+
+    if (expect_success) {
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) {
+            client_connection->close(Network::ConnectionCloseType::NoFlush);
+            finish();
+          }));
+      EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) {
+            server_connection->close(Network::ConnectionCloseType::NoFlush);
+            finish();
+          }));
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+      EXPECT_CALL(server_connection_callbacks, onEvent(_));
+    } else {
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) { finish(); }));
+      EXPECT_CALL(server_connection_callbacks, onEvent(_))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) { finish(); }));
+    }
+
+    dispatcher->run(Event::Dispatcher::RunType::Block);
+
+    if (!expect_success) {
+      EXPECT_EQ(1UL, client_stats_store.counter("ssl.fail_no_cert_request").value());
+    } else {
+      EXPECT_EQ(0UL, client_stats_store.counter("ssl.fail_no_cert_request").value());
+    }
+
+    if (expected_cert_requested.has_value()) {
+      EXPECT_EQ(expected_cert_requested, client_connection->ssl()->serverSentCertificateRequest());
+    }
+  }
+
+  TestTlsCertificateSelectorFactory provider_factory_;
+  Registry::InjectFactory<Ssl::TlsCertificateSelectorConfigFactory> registered_factory_;
+  Registry::InjectFactory<Ssl::UpstreamTlsCertificateSelectorConfigFactory>
+      upstream_registered_factory_;
+  Network::Address::IpVersion version_;
+};
+
+// Server sends CertificateRequest + require_certificate_request + custom upstream selector
+// -> handshake should succeed because cert_cb fires on top-level context before selector runs.
+TEST_P(UpstreamCustomSelectorCertRequestTest, RequireCertRequestSucceedsWithSelector) {
+  runSuccessTest();
+}
+
+// Server does NOT send CertificateRequest + require_certificate_request + upstream selector
+// -> handshake should fail with ssl.fail_no_cert_request regardless of selector mode.
+TEST_P(UpstreamCustomSelectorCertRequestTest,
+       RequireCertRequestFailsWithSelectorWhenNoCertRequest) {
+  runFailureTest();
+}
+
+// Runtime flag only (no enforcement) + server sends CertRequest + custom selector
+// -> succeeds, cert_requested=true.
+TEST_P(UpstreamCustomSelectorCertRequestTest,
+       TrackingOnlySucceedsWithSelectorServerSentCertRequest) {
+  runTrackingOnlySuccessTest();
+}
+
+// Runtime flag only (no enforcement) + server does NOT send CertRequest + custom selector
+// -> succeeds, cert_requested=false.
+TEST_P(UpstreamCustomSelectorCertRequestTest,
+       TrackingOnlySucceedsWithSelectorServerDidNotSendCertRequest) {
+  runTrackingOnlyNoCertRequestTest();
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsSelectorMode, UpstreamCustomSelectorCertRequestTest,
+                         testing::ValuesIn([] {
+                           std::vector<CertReqCustomSelectorParams> params;
+                           for (auto ip : TestEnvironment::getIpVersionsForTest()) {
+                             params.push_back({ip, SelectionStatus::Success}); // sync
+                             params.push_back({ip, SelectionStatus::Pending}); // async
+                           }
+                           return params;
+                         }()),
+                         certReqCustomSelectorParamsToString);
+
 } // namespace
 } // namespace Tls
 } // namespace TransportSockets

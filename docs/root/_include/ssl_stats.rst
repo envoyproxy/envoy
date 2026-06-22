@@ -10,6 +10,7 @@
    fail_verify_error, Counter, Total TLS connections that failed CA verification
    fail_verify_san, Counter, Total TLS connections that failed SAN verification
    fail_verify_cert_hash, Counter, Total TLS connections that failed certificate pinning verification
+   fail_no_cert_request, Counter, Total upstream TLS connections rejected because the server did not send a CertificateRequest
    ocsp_staple_failed, Counter, Total TLS connections that failed compliance with the OCSP policy
    ocsp_staple_omitted, Counter, Total TLS connections that succeeded without stapling an OCSP response
    ocsp_staple_responses, Counter, Total TLS connections where a valid OCSP response was available (irrespective of whether the client requested stapling)

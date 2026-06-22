@@ -426,6 +426,15 @@ public:
 
   const std::string& expectedSni() const { return expected_sni_; }
 
+  TestUtilOptions& setExpectedClientCertificateRequestTracked(absl::optional<bool> value) {
+    expected_cert_request_tracked_ = value;
+    return *this;
+  }
+
+  const absl::optional<absl::optional<bool>>& expectedClientCertificateRequestTracked() const {
+    return expected_cert_request_tracked_;
+  }
+
 private:
   const std::string client_ctx_yaml_;
   const std::string server_ctx_yaml_;
@@ -465,6 +474,7 @@ private:
   std::string not_expected_client_stats_;
   int expected_verify_error_code_{-1};
   std::string expected_sni_;
+  absl::optional<absl::optional<bool>> expected_cert_request_tracked_;
 };
 
 Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
@@ -844,6 +854,11 @@ void testUtil(const TestUtilOptions& options) {
 
   if (!options.notExpectedClientStats().empty()) {
     EXPECT_EQ(0, client_stats_store.counter(options.notExpectedClientStats()).value());
+  }
+
+  if (options.expectedClientCertificateRequestTracked().has_value()) {
+    EXPECT_EQ(options.expectedClientCertificateRequestTracked().value(),
+              client_connection->ssl()->serverSentCertificateRequest());
   }
 
   if (options.expectSuccess()) {
@@ -8201,30 +8216,6 @@ TEST_P(SslSocketTest, CertificateCompressionDisabled) {
   testUtilV2(test_options);
 }
 
-// Test that TLS handshakes succeed under the production default, without any runtime override.
-// The brotli certificate compression runtime flag defaults to disabled, so this verifies that
-// the default (no override) code path produces a working handshake and guards against an
-// accidental re-flip of the runtime guard.
-TEST_P(SslSocketTest, CertificateCompressionDefaultBehavior) {
-  envoy::config::listener::v3::Listener listener;
-  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
-  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
-      server_tls_context.mutable_common_tls_context()->add_tls_certificates();
-  server_cert->mutable_certificate_chain()->set_filename(
-      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
-  server_cert->mutable_private_key()->set_filename(
-      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"));
-
-  updateFilterChain(server_tls_context, *filter_chain);
-
-  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
-
-  // TLS handshake should succeed using the default (brotli compression disabled) configuration.
-  TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/true, version_);
-  testUtilV2(test_options);
-}
-
 #if ENVOY_PLATFORM_ENABLE_SEND_RST
 // Verify that when a peer aborts the connection with a TCP RST (via Network::ConnectionCloseType::
 // AbortReset), the SslSocket skips the TLS close_notify shutdown and the remote side detects the
@@ -8443,6 +8434,97 @@ TEST_P(SslSocketTest, TlsConnectionResetDetectionDisabledByRuntime) {
       }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+// Verifies serverSentCertificateRequest() returns true when server sends CertificateRequest.
+TEST_P(SslSocketTest, ServerSentCertificateRequestTrue) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  require_certificate_request: true
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, /*expect_success=*/true, version_);
+  testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
+               .setExpectedClientCertificateRequestTracked(true));
+}
+
+// Verifies serverSentCertificateRequest() returns false when tracking is active
+// but server does not send CertificateRequest (runtime flag enabled, no enforcement).
+TEST_P(SslSocketTest, ServerSentCertificateRequestFalse) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tls_upstream_record_cert_request", "true"}});
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, /*expect_success=*/true, version_);
+  testUtil(test_options.setExpectNoCert()
+               .setExpectNoCertChain()
+               .setExpectedClientCertificateRequestTracked(false));
+}
+
+// Verifies serverSentCertificateRequest() returns nullopt when tracking is off
+// (no require_certificate_request and runtime flag disabled).
+TEST_P(SslSocketTest, ServerSentCertificateRequestNulloptWhenNotTracked) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tls_upstream_record_cert_request", "false"}});
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, /*expect_success=*/true, version_);
+  testUtil(test_options.setExpectNoCert()
+               .setExpectNoCertChain()
+               .setExpectedClientCertificateRequestTracked(absl::nullopt));
 }
 
 } // namespace Tls

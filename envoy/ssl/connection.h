@@ -278,6 +278,10 @@ public:
    * @return std::string the SNI used to establish the connection.
    **/
   virtual const std::string& sni() const PURE;
+
+  /** Returns true if the upstream sent a TLS CertificateRequest during the handshake,
+   *  false if tracked but not sent, or absl::nullopt if not tracked (feature not enabled). **/
+  virtual absl::optional<bool> serverSentCertificateRequest() const PURE;
 };
 
 using ConnectionInfoConstSharedPtr = std::shared_ptr<const ConnectionInfo>;
