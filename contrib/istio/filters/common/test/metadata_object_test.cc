@@ -1,3 +1,4 @@
+// NOLINT(namespace-envoy)
 #include <optional>
 
 #include "envoy/registry/registry.h"
@@ -6,7 +7,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-// NOLINT(namespace-envoy)
 namespace Istio {
 namespace Common {
 
