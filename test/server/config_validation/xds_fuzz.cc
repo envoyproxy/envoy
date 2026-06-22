@@ -388,7 +388,7 @@ void XdsFuzzTest::verifyState() {
 envoy::admin::v3::ListenersConfigDump XdsFuzzTest::getListenersConfigDump() {
   auto message_ptr = test_server_->server().admin()->getConfigTracker().getCallbacksMap().at(
       "listeners")(Matchers::UniversalStringMatcher());
-  return dynamic_cast<const envoy::admin::v3::ListenersConfigDump&>(*message_ptr);
+  return Envoy::Protobuf::DynamicCastMessage<envoy::admin::v3::ListenersConfigDump>(*message_ptr);
 }
 
 std::vector<envoy::config::route::v3::RouteConfiguration> XdsFuzzTest::getRoutesConfigDump() {
@@ -400,7 +400,7 @@ std::vector<envoy::config::route::v3::RouteConfiguration> XdsFuzzTest::getRoutes
   }
 
   auto message_ptr = map.at("routes")(Matchers::UniversalStringMatcher());
-  auto dump = dynamic_cast<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
+  auto dump = Envoy::Protobuf::DynamicCastMessage<envoy::admin::v3::RoutesConfigDump>(*message_ptr);
 
   // Since the route config dump gives the RouteConfigurations as an Any, go through and cast them
   // back to RouteConfigurations.

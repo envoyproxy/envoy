@@ -87,7 +87,7 @@ public:
   absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::FactoryContext&) override {
-    const auto& struct_config = dynamic_cast<const Protobuf::Struct&>(proto_config);
+    const auto& struct_config = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(proto_config);
     return [struct_config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<MetadataSetterFilter>(struct_config));
     };
