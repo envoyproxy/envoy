@@ -50,6 +50,11 @@ public:
     return proto_config_.request_storage_mode();
   }
 
+  const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig&
+  toolConfig() const {
+    return proto_config_.tool_config();
+  }
+
   bool textContentStreamingEnabled(absl::string_view tool_name) const;
 
   bool traceContextExtraction() const { return proto_config_.has_trace_context_extraction(); }
@@ -81,6 +86,11 @@ public:
   getHttpRule(absl::string_view tool_name) const;
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
   getToolsListHttpRule() const;
+
+  const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig&
+  toolConfig() const {
+    return proto_config_.tool_config();
+  }
 
   bool textContentStreamingEnabled(absl::string_view tool_name) const;
 
@@ -119,6 +129,10 @@ private:
   void handleMcpMethod(const nlohmann::json& json_rpc, Http::RequestHeaderMapOptRef request_headers,
                        const McpJsonRestBridgePerRouteConfig* per_route_config);
 
+  // Serves a local tools/list response using tools' ToolsListSpecificConfig.
+  void serveToolsListLocal(const nlohmann::json& json_rpc,
+                           const McpJsonRestBridgePerRouteConfig* per_route_config);
+
   // Modifies the response from upstream into JSON-RPC response.
   void encodeJsonRpcData(Http::ResponseHeaderMapOptRef response_headers);
 
@@ -151,10 +165,12 @@ private:
     InitializationAck = 3,
     // Clients send a tools/list request to discover available tools.
     ToolsList = 4,
+    // Clients send a tools/list request that is handled locally.
+    ToolsListLocal = 5,
     // Clients send a tools/call request to invoke a tool.
-    ToolsCall = 5,
+    ToolsCall = 6,
     // MCP operation failed.
-    OperationFailed = 6,
+    OperationFailed = 7,
   };
   McpOperation mcp_operation_ = McpOperation::Unspecified;
   absl::optional<nlohmann::json> session_id_;
