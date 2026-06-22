@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/optref.h"
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
@@ -50,9 +51,14 @@ public:
     return proto_config_.request_storage_mode();
   }
 
-  const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig&
-  toolConfig() const {
-    return proto_config_.tool_config();
+  // Returns the tool config to serve a local tools/list response, or nullopt when local serving is
+  // not configured.
+  OptRef<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig>
+  toolListLocalConfig() const {
+    if (proto_config_.tool_config().has_tool_list_local()) {
+      return proto_config_.tool_config();
+    }
+    return absl::nullopt;
   }
 
   bool textContentStreamingEnabled(absl::string_view tool_name) const;
@@ -87,9 +93,16 @@ public:
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
   getToolsListHttpRule() const;
 
-  const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig&
-  toolConfig() const {
-    return proto_config_.tool_config();
+  // Returns the first tool config with local tools/list serving configured, or nullopt when none
+  // is configured.
+  OptRef<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig>
+  toolListLocalConfig() const {
+    for (const auto& tool_config : proto_config_.tool_config()) {
+      if (tool_config.has_tool_list_local()) {
+        return tool_config;
+      }
+    }
+    return absl::nullopt;
   }
 
   bool textContentStreamingEnabled(absl::string_view tool_name) const;
@@ -130,8 +143,10 @@ private:
                        const McpJsonRestBridgePerRouteConfig* per_route_config);
 
   // Serves a local tools/list response using tools' ToolsListSpecificConfig.
-  void serveToolsListLocal(const nlohmann::json& json_rpc,
-                           const McpJsonRestBridgePerRouteConfig* per_route_config);
+  void serveToolsListLocal(
+      const nlohmann::json& json_rpc,
+      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig&
+          tool_config);
 
   // Modifies the response from upstream into JSON-RPC response.
   void encodeJsonRpcData(Http::ResponseHeaderMapOptRef response_headers);
