@@ -107,32 +107,29 @@ bazel test //test/... --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 bazel test //test/... --test_env=HEAPCHECK=
 ```
 
-Sanitizers:
+Build output goes to `/tmp/envoy-docker-build/` by default (override with
+`ENVOY_DOCKER_BUILD_DIR`).
+
+**Advanced testing (only run when explicitly asked by the user):**
+
+The following operations are resource-intensive. Do **not** run them unless the user specifically
+requests it:
 
 ```bash
+# Sanitizers
 bazel test -c dbg --config=asan //test/...           # AddressSanitizer + UBSan
 bazel test -c dbg --config=docker-tsan //test/...    # ThreadSanitizer
 bazel test -c dbg --config=docker-msan //test/...    # MemorySanitizer
-```
 
-Running a test under GDB:
+# Coverage
+test/run_envoy_bazel_coverage.sh                     # full coverage
+VALIDATE_COVERAGE=false test/run_envoy_bazel_coverage.sh //test/common/http/...
 
-```bash
+# Debugging under GDB
 bazel build -c dbg //test/common/http:async_client_impl_test
 bazel build -c dbg //test/common/http:async_client_impl_test.dwp
 gdb bazel-bin/test/common/http/async_client_impl_test
 ```
-
-Coverage:
-
-```bash
-test/run_envoy_bazel_coverage.sh                    # full coverage
-# Or for a specific target:
-VALIDATE_COVERAGE=false test/run_envoy_bazel_coverage.sh //test/common/http/...
-```
-
-Build output goes to `/tmp/envoy-docker-build/` by default (override with
-`ENVOY_DOCKER_BUILD_DIR`).
 
 ### 4. Format and lint checks (required before every commit)
 
@@ -423,7 +420,55 @@ Changing the default behavior of `ext_authz` and `ext_proc` is strictly forbidde
 - API should use `v3alpha`
 - Config in `api/contrib/envoy/`, build config in `contrib/contrib_build_config.bzl`
 
-## CI and GitHub Actions
+## Understanding CI
+
+Envoy uses a checks-based CI system. Results appear as **GitHub Check Runs** on PRs, not as
+simple workflow pass/fail statuses.
+
+**CI pipeline stages:**
+
+1. **`Request`** — triggers on PR events, loads configuration
+2. **`Envoy/Prechecks`** — fast checks that run first:
+   - `format` — code formatting, linting, spelling (runs `ci/format_pre.sh`)
+   - `deps` — dependency validation
+   - `publish` — docs build
+   - `external` — external dependency checks
+3. **`Envoy/Checks`** — heavier checks that run after prechecks:
+   - `build` — compilation and unit/integration tests
+   - `coverage` — code coverage analysis
+   - `san` — sanitizer builds (ASAN, TSAN, MSAN)
+   - `runtime` — runtime guard validation
+
+**Checking CI status on a PR:**
+
+```bash
+# View all check runs for a PR
+gh pr checks <PR-number>
+
+# View specific workflow run details
+gh run view <run-id> --log-failed
+```
+
+**Recreating CI locally (Docker-based):**
+
+The CI runs inside a Docker container. To reproduce the CI environment locally:
+
+```bash
+# Enter the same Docker environment CI uses
+./ci/run_envoy_docker.sh bash
+
+# Inside the container, run specific CI targets:
+./ci/do_ci.sh format                              # format/lint checks (prechecks)
+./ci/do_ci.sh debug //test/common/http/...        # build + test (checks)
+./ci/do_ci.sh asan //test/common/http/...         # sanitizer build (checks)
+./ci/do_ci.sh coverage //test/common/http/...     # coverage (checks)
+```
+
+When CI fails, check the failed check run name to determine which `do_ci.sh` target to
+reproduce locally. Format failures come from `Envoy/Prechecks`; build/test failures come
+from `Envoy/Checks`.
+
+## CI and GitHub Actions (for workflow file authors)
 
 - In `if:` conditions, do **not** wrap expressions in `${{ }}` — the `if` field evaluates
   expressions implicitly. Use `${{ }}` only in string contexts (`run:`, `with:`, `env:`).
@@ -463,7 +508,7 @@ Key rules:
 
 ## IDE setup
 
-Generate a compilation database for clangd / clang-tidy / YouCompleteMe:
+Generate a compilation database for clangd / clang-tidy / YouCompleteMe (only when asked):
 
 ```bash
 TEST_TMPDIR=/tmp tools/gen_compilation_database.py
@@ -471,22 +516,8 @@ TEST_TMPDIR=/tmp tools/gen_compilation_database.py
 
 ## Performance profiling
 
-CPU or heap profiling with gperftools:
-
-```bash
-# Build with gperftools
-bazel build --define tcmalloc=gperftools //source/exe:envoy-static
-
-# Collect CPU profile
-CPUPROFILE=/tmp/envoy.cpuprof bazel-bin/source/exe/envoy-static <args>
-
-# Collect heap profile
-HEAPPROFILE=/tmp/envoy.heapprof bazel-bin/source/exe/envoy-static <args>
-
-# Analyze with pprof
-pprof -text bazel-bin/source/exe/envoy-static /tmp/envoy.cpuprof
-pprof -http=localhost:9999 bazel-bin/source/exe/envoy-static /tmp/envoy.heapprof
-```
+Do **not** run profiling unless the user explicitly asks. See `bazel/PPROF.md` for instructions
+on CPU/heap profiling with gperftools and Perfetto tracing.
 
 ## Repository structure
 
