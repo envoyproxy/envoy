@@ -156,20 +156,13 @@ void TagProducerImpl::reserveResources(const envoy::config::metrics::v3::StatsCo
 
 namespace {
 
-// Returns the set of tag names whose default extractors are overwritten by a custom extractor.
-// Only custom extractors with a non-empty regex or a fixed value override the default Envoy
-// extractors; an empty/unset regex falls back to the default and overrides nothing.
+// Returns the set of tag names declared in stats_tags whose default extractors should be skipped.
 absl::flat_hash_set<absl::string_view>
 overriddenDefaultTagNames(const envoy::config::metrics::v3::StatsConfig& config) {
   absl::flat_hash_set<absl::string_view> overridden_names;
   if (config.allow_default_tag_overrides().value()) {
     for (const auto& tag_specifier : config.stats_tags()) {
-      const auto tag_value_case = tag_specifier.tag_value_case();
-      if (tag_value_case == envoy::config::metrics::v3::TagSpecifier::TagValueCase::kFixedValue ||
-          (tag_value_case == envoy::config::metrics::v3::TagSpecifier::TagValueCase::kRegex &&
-           !tag_specifier.regex().empty())) {
-        overridden_names.insert(tag_specifier.tag_name());
-      }
+      overridden_names.insert(tag_specifier.tag_name());
     }
   }
   return overridden_names;

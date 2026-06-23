@@ -207,14 +207,19 @@ TEST_F(TagProducerTest, OverrideWithFixedValueReplacesDefaultTag) {
 }
 
 TEST_F(TagProducerTest, OverrideEmptyRegexReenablesDefault) {
+  // An empty regex carries no extractor of its own, so extractor validation re-adds the default
+  // via addExtractorsMatching. The default extractor is therefore restored exactly once (no
+  // duplicate-tag warning) and still wins.
   stats_config_.mutable_allow_default_tag_overrides()->set_value(true);
-  stats_config_.mutable_use_all_default_tags()->set_value(false);
   auto& specifier = *stats_config_.mutable_stats_tags()->Add();
   specifier.set_tag_name(tag_name_values_.CLUSTER_NAME);
   auto producer = TagProducerImpl::createTagProducer(stats_config_, {}).value();
   TagVector tags;
-  producer->produceTags(kClusterStatName, tags);
+  EXPECT_NO_LOGS(producer->produceTags(kClusterStatName, tags));
   EXPECT_EQ(findTag(tags, tag_name_values_.CLUSTER_NAME), "foo");
+  EXPECT_EQ(1, std::count_if(tags.begin(), tags.end(), [this](const Tag& tag) {
+              return tag.name_ == tag_name_values_.CLUSTER_NAME;
+            }));
 }
 
 TEST_F(TagProducerTest, OverrideNoOpWhenDefaultsDisabled) {

@@ -114,11 +114,6 @@ message StatsConfig {
   // <envoy_v3_api_field_config.metrics.v3.StatsConfig.use_all_default_tags>` enabled, so it is not
   // necessary to disable all defaults and re-declare every extractor.
   //
-  // Only a :ref:`stats_tags <envoy_v3_api_field_config.metrics.v3.StatsConfig.stats_tags>`
-  // specifier that defines its own extractor can override a default: one with a non-empty
-  // ``regex``, or one with a ``fixed_value``. A specifier that leaves ``regex`` empty or unset
-  // simply falls back to the default extractor, so it overrides nothing.
-  //
   // Has no effect when ``use_all_default_tags`` is ``false`` (no default extractors are added in
   // that case). If not provided, the value is assumed to be false, preserving existing behavior
   // where the default extractor takes precedence over custom extractors with the same ``tag_name``.
