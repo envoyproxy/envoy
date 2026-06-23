@@ -214,7 +214,10 @@ void SslSocket::drainErrorQueue() {
   bool saw_counted_error = false;
   bool saw_cert_verify_failed = false;
   bool saw_no_client_cert = false;
+  bool saw_econnreset = false;
+  bool saw_non_econnreset_error = false;
   while (uint64_t err = ERR_get_error()) {
+    bool is_econnreset = false;
     if (ERR_GET_LIB(err) == ERR_LIB_SSL) {
       if (ERR_GET_REASON(err) == SSL_R_PEER_DID_NOT_RETURN_A_CERTIFICATE) {
         ctx_->stats().fail_verify_no_cert_.inc();
@@ -225,15 +228,21 @@ void SslSocket::drainErrorQueue() {
         saw_cert_verify_failed = true;
       }
     } else if (ERR_GET_LIB(err) == ERR_LIB_SYS) {
-      if (ERR_GET_REASON(err) == ECONNRESET &&
-          Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.ssl_socket_report_connection_reset")) {
-        detected_io_error_ = Api::IoError::IoErrorCode::ConnectionReset;
+      if (ERR_GET_REASON(err) == ECONNRESET) {
+        // Only a candidate: any other queued error (TLS protocol failure or
+        // unrelated syscall error) is by definition the root cause, and the
+        // trailing peer-originated RST is just the symptom. The final decision
+        // is made after the loop has visited every queued error.
+        saw_econnreset = true;
+        is_econnreset = true;
       }
       // Any syscall errors that result in connection closure are already tracked in other
       // connection related stats. We will still retain the specific syscall failure for
       // transport failure reasons.
       saw_counted_error = true;
+    }
+    if (!is_econnreset) {
+      saw_non_econnreset_error = true;
     }
     saw_error = true;
 
@@ -249,6 +258,17 @@ void SslSocket::drainErrorQueue() {
 
   if (!saw_error) {
     return;
+  }
+
+  // Surface a peer-originated RST (pushed onto the queue by io_handle_bio's SO_ERROR probe)
+  // only when no other error was queued. Any other queued error means the disconnect was
+  // caused by that error and the trailing RST is just the peer's reaction; reporting the
+  // RST as the transport error would clobber the more diagnostic
+  // ``transport failure reason: TLS_error:...`` signal operators rely on (issue #45011).
+  if (saw_econnreset && !saw_non_econnreset_error &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ssl_socket_report_connection_reset")) {
+    detected_io_error_ = Api::IoError::IoErrorCode::ConnectionReset;
   }
 
   // Append detailed error info for certificate-related failures.

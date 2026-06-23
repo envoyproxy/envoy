@@ -538,6 +538,39 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseWithCustomResponseCodeDetails) {
                                                    {test_details.data(), test_details.size()});
 }
 
+// The streaming-response ABI forwards to the encoder and sets sent_local_reply_. Each test pins the
+// forwarded encoder call, then drives the matching encode hook and asserts it returns Continue
+// without touching the null fixture config, which both proves the suppression and would crash
+// before the fix.
+TEST_F(DynamicModuleHttpFilterTest, SendResponseHeadersSuppressesEncodeHook) {
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false));
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {.key_ptr = ":status", .key_length = 7, .value_ptr = "200", .value_length = 3}};
+  envoy_dynamic_module_callback_http_send_response_headers(filter_.get(), headers.data(),
+                                                           headers.size(), false);
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter_->encodeHeaders(response_headers_, false));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SendResponseDataSuppressesEncodeHook) {
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+  absl::string_view data = "chunk";
+  envoy_dynamic_module_callback_http_send_response_data(filter_.get(), {data.data(), data.size()},
+                                                        true);
+  Buffer::OwnedImpl buffer("more");
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(buffer, false));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SendResponseTrailersSuppressesEncodeHook) {
+  EXPECT_CALL(decoder_callbacks_, encodeTrailers_(_));
+  std::vector<envoy_dynamic_module_type_module_http_header> trailers = {
+      {.key_ptr = "x-trailer", .key_length = 9, .value_ptr = "v", .value_length = 1}};
+  envoy_dynamic_module_callback_http_send_response_trailers(filter_.get(), trailers.data(),
+                                                            trailers.size());
+  EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue,
+            filter_->encodeTrailers(response_trailers_));
+}
+
 TEST_F(DynamicModuleHttpFilterTest, AddCustomFlag) {
   // Test with empty response.
   EXPECT_CALL(decoder_callbacks_.stream_info_, addCustomFlag(testing::Eq("XXX")));
@@ -2170,6 +2203,16 @@ TEST(ABIImpl, GetAttributes) {
       &filter, envoy_dynamic_module_type_attribute_id_DestinationAddress, &result_buffer));
   EXPECT_EQ(std::string(result_buffer.ptr, result_buffer.length), "127.0.0.2:4321");
 
+  // envoy_dynamic_module_type_attribute_id_ConnectionRequestedServerName, empty SNI => not found.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionRequestedServerName,
+      &result_buffer));
+  info.downstream_connection_info_provider_->setRequestedServerName("example.com");
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionRequestedServerName,
+      &result_buffer));
+  EXPECT_EQ(std::string(result_buffer.ptr, result_buffer.length), "example.com");
+
   // envoy_dynamic_module_type_attribute_id_RequestId
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
       &filter, envoy_dynamic_module_type_attribute_id_RequestId, &result_buffer));
@@ -2983,6 +3026,18 @@ TEST_F(DynamicModuleHttpFilterTest, SpanSetSampled) {
   envoy_dynamic_module_callback_http_span_set_sampled(span, true);
 }
 
+TEST_F(DynamicModuleHttpFilterTest, SpanDisableLocalDecision) {
+  NiceMock<Tracing::MockSpan> mock_span;
+  EXPECT_CALL(decoder_callbacks_, activeSpan()).WillOnce(testing::ReturnRef(mock_span));
+
+  EXPECT_CALL(mock_span, disableLocalDecision());
+
+  auto* span = envoy_dynamic_module_callback_http_get_active_span(filter_.get());
+  ASSERT_NE(span, nullptr);
+
+  envoy_dynamic_module_callback_http_span_disable_local_decision(span);
+}
+
 TEST_F(DynamicModuleHttpFilterTest, SpanGetBaggage) {
   NiceMock<Tracing::MockSpan> mock_span;
   EXPECT_CALL(decoder_callbacks_, activeSpan()).WillOnce(testing::ReturnRef(mock_span));
@@ -3125,6 +3180,7 @@ TEST_F(DynamicModuleHttpFilterTest, TracingCallbacksWithNullSpan) {
   envoy_dynamic_module_callback_http_span_set_operation(nullptr, {key.data(), key.size()});
   envoy_dynamic_module_callback_http_span_log(nullptr, nullptr, {key.data(), key.size()});
   envoy_dynamic_module_callback_http_span_set_sampled(nullptr, true);
+  envoy_dynamic_module_callback_http_span_disable_local_decision(nullptr);
   envoy_dynamic_module_callback_http_span_set_baggage(nullptr, {key.data(), key.size()},
                                                       {value.data(), value.size()});
   EXPECT_FALSE(envoy_dynamic_module_callback_http_span_get_baggage(

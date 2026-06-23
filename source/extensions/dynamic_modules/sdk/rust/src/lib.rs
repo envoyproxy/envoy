@@ -217,7 +217,8 @@ pub unsafe fn is_validation_mode() -> bool {
 /// # Safety
 ///
 /// The `function_ptr` must point to a valid function that remains valid for the lifetime of the
-/// process.
+/// process. A module that registers functions must be loaded with `do_not_close` set to `true` to
+/// avoid being unloaded while the registry still hands out the pointer.
 pub unsafe fn register_function(key: &str, function_ptr: *const std::ffi::c_void) -> bool {
   unsafe {
     abi::envoy_dynamic_module_callback_register_function(
@@ -265,9 +266,11 @@ pub fn get_function(key: &str) -> Option<*const std::ffi::c_void> {
 ///
 /// # Safety
 ///
-/// The `data_ptr` must point to valid data that remains valid for the lifetime of the process.
-/// Callers are responsible for agreeing on the data type out-of-band, since the registry stores
-/// opaque pointers.
+/// The `data_ptr` must point to data that remains valid while reachable through the registry. A
+/// module that registers a pointer into its own memory must either be loaded with `do_not_close`
+/// set to `true` or overwrite the pointer on each reload before any consumer reads it. Callers
+/// are responsible for agreeing on the data type out-of-band, since the registry stores opaque
+/// pointers.
 pub unsafe fn register_shared_data(key: &str, data_ptr: *const std::ffi::c_void) -> bool {
   unsafe {
     abi::envoy_dynamic_module_callback_register_shared_data(

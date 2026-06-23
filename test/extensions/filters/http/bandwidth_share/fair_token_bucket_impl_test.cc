@@ -1,3 +1,5 @@
+#include <limits>
+
 #include "source/extensions/filters/http/bandwidth_share/fair_token_bucket_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
@@ -60,6 +62,16 @@ TEST_F(ClientTest, InitializationAndTimeBothFillTheBucket) {
   time_system_.advanceTimeAsyncImpl(std::chrono::seconds(1));
   // When the bucket has refilled, all tokens are available again.
   EXPECT_EQ(950, client.consume(950));
+}
+
+TEST_F(ClientTest, AllowsRatesAboveNanosecondsPerSecondWithoutOverflow) {
+  const uint64_t max_tokens = std::numeric_limits<uint64_t>::max() / 1000000000UL + 1;
+  std::shared_ptr<Bucket> bucket = Bucket::create(max_tokens, time_system_);
+  Client client(bucket, "foo", 1);
+
+  const uint64_t tokens_per_interval = max_tokens * 50 / 1000;
+  EXPECT_EQ(max_tokens - tokens_per_interval, client.consume(max_tokens));
+  EXPECT_EQ(tokens_per_interval, client.consume(max_tokens));
 }
 
 TEST_F(ClientTest, CompetingRequestsGetAppropriateShares) {

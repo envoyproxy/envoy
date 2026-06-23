@@ -12,6 +12,7 @@
 #include "test/common/tls/test_data/long_validity_cert_info.h"
 #include "test/common/tls/test_data/san_dns_cert_info.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 

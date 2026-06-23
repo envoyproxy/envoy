@@ -233,7 +233,7 @@ The following core load shed points are supported:
 
   * - envoy.load_shed_points.http_connection_manager_decode_headers
     - Envoy will reject new HTTP streams by sending a local reply. This occurs
-      right after the http codec has finished parsing headers but before the
+      right after the HTTP codec has finished parsing headers but before the
       :ref:`HTTP Filter Chain is instantiated <life_of_a_request>`.
 
   * - envoy.load_shed_points.http1_server_abort_dispatch

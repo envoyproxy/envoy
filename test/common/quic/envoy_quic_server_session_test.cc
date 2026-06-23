@@ -62,6 +62,7 @@ public:
   }
 
   using EnvoyQuicServerSession::GetCryptoStream;
+  using EnvoyQuicServerSession::GetSSLConfig;
 };
 
 class ProofSourceDetailsSetter {
@@ -1338,6 +1339,14 @@ TEST_F(EnvoyQuicServerSessionTest, TerminateIdleSession) {
   envoy_quic_session_.TerminateIdleSession();
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_FALSE(quic_connection_->connected());
+}
+
+TEST_F(EnvoyQuicServerSessionTest, GetSSLConfigDefault) {
+  installReadFilter();
+  quic::QuicSSLConfig config = envoy_quic_session_.GetSSLConfig();
+  ASSERT_TRUE(config.early_data_enabled.has_value());
+  EXPECT_TRUE(*config.early_data_enabled);
+  EXPECT_FALSE(config.disable_ticket_support);
 }
 
 TEST_F(EnvoyQuicServerSessionTest, SessionIdleCallbacksIdempotency) {

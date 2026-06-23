@@ -8,7 +8,7 @@
 
 #include "source/common/protobuf/protobuf.h"
 
-namespace Envoy {
+// NOLINT(namespace-envoy)
 namespace Istio {
 namespace Common {
 
@@ -110,8 +110,8 @@ public:
                                   absl::string_view canonical_name,
                                   absl::string_view canonical_revision, absl::string_view app_name,
                                   absl::string_view app_version, WorkloadType workload_type,
-                                  absl::string_view identity, absl::string_view region = "",
-                                  absl::string_view zone = "")
+                                  absl::string_view identity, absl::string_view region,
+                                  absl::string_view zone)
       : instance_name_(instance_name), cluster_name_(cluster_name), namespace_name_(namespace_name),
         workload_name_(workload_name), canonical_name_(canonical_name),
         canonical_revision_(canonical_revision), app_name_(app_name), app_version_(app_version),
@@ -184,4 +184,3 @@ convertBaggageToWorkloadMetadata(absl::string_view baggage, absl::string_view id
 
 } // namespace Common
 } // namespace Istio
-} // namespace Envoy

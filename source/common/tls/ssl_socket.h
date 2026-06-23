@@ -82,6 +82,8 @@ protected:
   SSL* rawSsl() const { return info_->ssl(); }
 
 private:
+  friend class SslSocketPeer;
+
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx,
             const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options);
   absl::Status initialize(InitialState state, Ssl::HandshakerFactoryCb handshaker_factory_cb,

@@ -690,6 +690,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:retry_priority_factory_mocks",
         "//test/mocks/upstream:retry_priority_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/synchronization",
@@ -1008,6 +1009,7 @@ envoy_cc_test(
         "//test/integration/filters:stop_iteration_and_continue",
         "//test/integration/filters:stop_iteration_headers_inject_body",
         "//test/integration/filters:wait_for_whole_request_and_response_config_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -1196,6 +1198,7 @@ envoy_cc_test_library(
         "//test/common/http/http2:http2_frame",
         "//test/common/upstream:utility_lib",
         "//test/mocks/upstream:cluster_info_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/early_data/v3:pkg_cc_proto",
@@ -1509,11 +1512,13 @@ envoy_cc_test_library(
         "//test/mocks/server:instance_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:file_system_for_test_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:printers_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:test_time_system_interface",
+        "//test/test_common:thread_factory_for_test_lib",
         "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
@@ -2167,6 +2172,7 @@ envoy_cc_test(
         "//test/integration/filters:add_header_filter_config_lib",
         "//test/integration/filters:add_header_filter_proto_cc_proto",
         "//test/integration/filters:stop_iteration_and_continue",
+        "//test/test_common:logging_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
@@ -2232,6 +2238,7 @@ envoy_cc_test(
         "//envoy/server:filter_config_interface",
         "//envoy/tcp:conn_pool_interface",
         "//test/server:utility_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
@@ -2411,6 +2418,7 @@ H1_FUZZ_LIB_DEPS = [
     "//test/fuzz:fuzz_runner_lib",
     "//test/integration:integration_lib",
     "//test/test_common:environment_lib",
+    "//test/test_common:file_system_for_test_lib",
 ]
 
 envoy_cc_test_library(
@@ -2480,6 +2488,7 @@ H2_FUZZ_LIB_DEPS = [
     "//test/fuzz:utility_lib",
     "//test/integration:integration_lib",
     "//test/test_common:environment_lib",
+    "//test/test_common:file_system_for_test_lib",
 ]
 
 envoy_cc_test_library(
@@ -2817,6 +2826,7 @@ envoy_cc_test(
     ],
     deps = envoy_select_enable_http3([
         ":quic_http_integration_test_lib",
+        "//test/test_common:logging_lib",
     ]),
 )
 

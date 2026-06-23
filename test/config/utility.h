@@ -369,7 +369,7 @@ public:
       envoy::config::bootstrap::v3::Bootstrap& bootstrap,
       std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
           configure_tls_context,
-      bool enable_quic_early_data = true);
+      bool enable_quic_early_data = true, bool enable_quic_resumption = true);
 
   // Add the default SSL configuration.
   void addSslConfig(const ServerSslOptions& options);

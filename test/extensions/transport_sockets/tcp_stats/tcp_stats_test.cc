@@ -12,6 +12,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

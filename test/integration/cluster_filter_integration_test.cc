@@ -80,7 +80,7 @@ public:
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::UpstreamFactoryContext&) override {
-    auto config = dynamic_cast<const Protobuf::StringValue&>(proto_config);
+    auto config = Envoy::Protobuf::DynamicCastMessage<Protobuf::StringValue>(proto_config);
     return [this, config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addFilter(std::make_shared<PoliteFilter>(test_parent_, config));
     };
