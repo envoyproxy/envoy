@@ -17,9 +17,27 @@
 
 namespace Envoy {
 
+namespace {
+// Buffers a cgroup CPU detection diagnostic, flushed once logging is initialized.
+void recordLog(std::string log) { CgroupDetectorSingleton::get().recordLog(std::move(log)); }
+} // namespace
+
 // Implementation of CgroupDetector interface
 absl::optional<uint32_t> CgroupDetectorImpl::getCpuLimit(Filesystem::Instance& fs) {
   return CgroupCpuUtil::getCpuLimit(fs);
+}
+
+void CgroupDetectorImpl::recordLog(absl::string_view log) {
+  absl::MutexLock lock(&mutex_);
+  logs_.push_back(std::string(log));
+}
+
+void CgroupDetectorImpl::flushLogs() {
+  absl::MutexLock lock(&mutex_);
+  for (const auto& log : logs_) {
+    ENVOY_LOG_MISC(debug, "{}", log);
+  }
+  logs_.clear();
 }
 
 // Returns the CPU limit from `cgroup` subsystem, following Go runtime behavior.
@@ -187,6 +205,8 @@ absl::optional<CgroupInfo> CgroupCpuUtil::constructCgroupPath(const std::string&
   // Version is now determined by parsing /proc/self/cgroup, not by trial and error
   info.version = version;
 
+  recordLog(fmt::format("Constructed cgroup path: {} (version: {})", info.full_path, info.version));
+
   // Result: Combined path in single buffer + final version
   return info;
 }
@@ -206,6 +226,7 @@ absl::optional<CpuFiles> CgroupCpuUtil::accessCgroupV1Files(const CgroupInfo& cg
     cpu_files.version = "v1";
     cpu_files.quota_content = quota_result.value();
     cpu_files.period_content = period_result.value();
+    recordLog(fmt::format("Using cgroup v1 files at {}", cgroup_info.full_path));
     return cpu_files;
   } else {
     // Expected v1 files don't exist - this is an error
@@ -226,6 +247,7 @@ absl::optional<CpuFiles> CgroupCpuUtil::accessCgroupV2Files(const CgroupInfo& cg
     cpu_files.version = "v2";
     cpu_files.quota_content = result.value();
     cpu_files.period_content = ""; // v2 doesn't use separate period file
+    recordLog(fmt::format("Using cgroup v2 file at {}", cgroup_info.full_path));
     return cpu_files;
   } else {
     // Expected v2 file doesn't exist - this is an error
@@ -274,6 +296,7 @@ absl::optional<double> CgroupCpuUtil::readActualLimitsV1(const CpuFiles& cpu_fil
 
   // Handle special case: v1 quota = -1 means no limit
   if (quota == -1) {
+    recordLog("cgroup v1 unlimited CPU (quota = -1)");
     return absl::nullopt; // Unlimited - return nullopt
   }
 
@@ -285,6 +308,8 @@ absl::optional<double> CgroupCpuUtil::readActualLimitsV1(const CpuFiles& cpu_fil
 
   // Calculate CPU ratio as float64
   double cpu_ratio = static_cast<double>(quota) / static_cast<double>(period);
+
+  recordLog(fmt::format("cgroup v1 CPU ratio: {} (quota={}, period={})", cpu_ratio, quota, period));
 
   return cpu_ratio;
 }
@@ -304,6 +329,7 @@ absl::optional<double> CgroupCpuUtil::readActualLimitsV2(const CpuFiles& cpu_fil
 
   // Handle special case: v2 quota = "max" means no limit
   if (parts[0] == "max") {
+    recordLog("cgroup v2 unlimited CPU (quota = max)");
     return absl::nullopt; // Unlimited - return nullopt
   }
 
@@ -323,6 +349,8 @@ absl::optional<double> CgroupCpuUtil::readActualLimitsV2(const CpuFiles& cpu_fil
 
   // Calculate CPU ratio as float64
   double cpu_ratio = static_cast<double>(quota) / static_cast<double>(period);
+
+  recordLog(fmt::format("cgroup v2 CPU ratio: {} (quota={}, period={})", cpu_ratio, quota, period));
 
   return cpu_ratio;
 }
@@ -455,6 +483,7 @@ absl::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Insta
     if (fs_type == "cgroup2") {
       // v2 hierarchy - save mount point but keep searching
       v2_mount_point = mount_point;
+      recordLog(fmt::format("Found cgroup v2 at {}, continuing search for v1", mount_point));
       continue; // Keep searching, we might find a v1 hierarchy with CPU controller
     }
 
@@ -474,16 +503,19 @@ absl::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Insta
     // v1 hierarchy - check for CPU controller
     if (absl::StrContains(super_options, "cpu")) {
       // Found a v1 CPU controller. This must be the only one, so we're done
+      recordLog(fmt::format("Found cgroup v1 with CPU controller at {}", mount_point));
       return mount_point; // Return immediately - v1 CPU wins
     }
   }
 
   // Return v2 mount if no v1 with CPU found
   if (!v2_mount_point.empty()) {
+    recordLog(fmt::format("Using cgroup v2 mount at {}", v2_mount_point));
     return v2_mount_point;
   }
 
   // No cgroup filesystem found
+  recordLog("No cgroup filesystem mounts found");
   return absl::nullopt;
 }
 
@@ -605,6 +637,8 @@ absl::optional<std::string> CgroupCpuUtil::parseMountInfoLine(absl::string_view 
 
   // Unescape mount point - Linux's show_path escapes special characters
   std::string mount_point = unescapePath(mount_point_escaped);
+
+  recordLog(fmt::format("Parsed cgroup mount: {} ({})", mount_point, fs_type));
 
   return mount_point;
 }

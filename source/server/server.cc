@@ -52,6 +52,7 @@
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/upstream/cluster_manager_impl.h"
 #include "source/common/version/version.h"
+#include "source/server/cgroup_cpu_util.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/listener_manager_factory.h"
@@ -574,6 +575,8 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
       server_stats_->initialization_time_ms_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
   ENVOY_LOG(debug, "server concurrency set to {}", options_.concurrency());
+  // Emit cgroup CPU detection diagnostics buffered before logging was initialized.
+  CgroupDetectorSingleton::get().flushLogs();
   if (!options().hotRestartDisabled()) {
     server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
   }

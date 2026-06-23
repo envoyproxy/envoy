@@ -1,12 +1,16 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 #include "envoy/filesystem/filesystem.h"
 
 #include "source/common/singleton/threadsafe_singleton.h"
 
+#include "absl/base/thread_annotations.h"
 #include "absl/strings/string_view.h"
+#include "absl/synchronization/mutex.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -32,6 +36,15 @@ public:
 class CgroupDetectorImpl : public CgroupDetector {
 public:
   absl::optional<uint32_t> getCpuLimit(Filesystem::Instance& fs) override;
+
+  // Detection runs in the OptionsImpl constructor before logging is configured, so diagnostics are
+  // buffered via recordLog() and emitted by flushLogs() once logging is initialized.
+  void recordLog(absl::string_view log);
+  void flushLogs();
+
+private:
+  absl::Mutex mutex_;
+  std::vector<std::string> logs_ ABSL_GUARDED_BY(mutex_);
 };
 
 using CgroupDetectorSingleton = ThreadSafeSingleton<CgroupDetectorImpl>;
