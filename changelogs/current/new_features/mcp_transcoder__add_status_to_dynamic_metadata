@@ -13,8 +13,8 @@
       missing configuration (e.g., an unconfigured `tools/list` request).
     - Export `backend_response_code` to dynamic metadata when the backend returns
       a response (both on success and failures), aiding in debugging.
-    - Consolidate error handling in a helper `handleError` which handles local
-      reply generation, status updates, and metadata writing.
+    - Consolidate error handling in `sendErrorResponse` and `sendLocalReplyInternal`
+      helpers which handle local reply generation, status updates, and metadata writing.
     - Delay dynamic metadata writing until the success path is determined to prevent
       spurious "OK" status writes on requests that fail validation.
     - Prioritize HTTP status codes over JSON parse errors when reporting backend
