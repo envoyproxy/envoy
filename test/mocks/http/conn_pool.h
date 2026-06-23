@@ -39,9 +39,11 @@ public:
   MOCK_METHOD(bool, maybePreconnect, (float));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
   MOCK_METHOD(absl::string_view, protocolDescription, (), (const));
+  MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, socketOptions, (), (override));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_;
   IdleCb idle_cb_;
+  Network::ConnectionSocket::OptionsSharedPtr socket_options_;
 };
 
 } // namespace ConnectionPool
