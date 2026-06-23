@@ -249,7 +249,7 @@ def envoy_dependencies(skip_targets = []):
     _rust_deps()
     _kafka_deps()
     _com_github_wamr()
-    _com_github_wasmtime()
+    _wasmtime()
 
     switched_rules_by_language(
         name = "com_google_googleapis_imports",
@@ -805,9 +805,7 @@ def _proxy_wasm_cpp_host():
     external_http_archive(
         name = "proxy_wasm_cpp_host",
         patch_args = ["-p1"],
-        patches = [
-            "@envoy//bazel:proxy_wasm_cpp_host.patch",
-        ],
+        patches = ["@envoy//bazel:proxy_wasm_cpp_host.patch"],
     )
 
 def _emsdk():
@@ -853,10 +851,14 @@ def _com_github_wamr():
 def _toolchains_llvm():
     external_http_archive(name = "toolchains_llvm")
 
-def _com_github_wasmtime():
+def _wasmtime():
     external_http_archive(
-        name = "com_github_wasmtime",
+        name = "wasmtime",
         build_file = "@proxy_wasm_cpp_host//:bazel/external/wasmtime.BUILD",
+        patches = [
+            "@proxy_wasm_cpp_host//:bazel/external/prefixed_wasmtime.patch",
+        ],
+        patch_args = ["-p1"],
     )
 
 def _intel_dlb():
