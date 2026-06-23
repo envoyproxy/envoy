@@ -34,8 +34,10 @@ void CgroupDetectorImpl::logResult() {
   if (detected_limit_.has_value()) {
     ENVOY_LOG_MISC(debug, "cgroup CPU limit detected: {}", *detected_limit_);
   } else {
-    ENVOY_LOG_MISC(debug, "no cgroup CPU limit detected; using host CPU count");
+    ENVOY_LOG_MISC(debug, "no cgroup CPU limit detected");
   }
+  // Consume the result so a later server in the same process (e.g. tests) doesn't re-log it.
+  ran_ = false;
 }
 
 // Returns the CPU limit from `cgroup` subsystem, following Go runtime behavior.
