@@ -486,6 +486,11 @@ DecryptResult decrypt(const std::string& encrypted, const std::string& secret) {
   return {std::string(plaintext.begin(), plaintext.end()), std::nullopt};
 }
 
+std::chrono::seconds applyCookieExpirationMargin(std::chrono::seconds expires_in,
+                                                 std::chrono::seconds margin) {
+  return margin >= expires_in ? std::chrono::seconds(0) : expires_in - margin;
+}
+
 } // namespace
 
 FilterConfig::FilterConfig(
@@ -515,6 +520,8 @@ FilterConfig::FilterConfig(
       default_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_expires_in, 0)),
       default_refresh_token_expires_in_(
           PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_refresh_token_expires_in, 604800)),
+      cookie_expiration_margin_(
+          PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, cookie_expiration_margin, 0)),
       csrf_token_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, csrf_token_expires_in,
                                                              DEFAULT_CSRF_TOKEN_EXPIRES_IN)),
       code_verifier_token_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(
@@ -1208,11 +1215,19 @@ void OAuth2Filter::updateTokens(const std::string& access_token, const std::stri
     refresh_token_ = "";
   }
 
-  expires_in_ = std::to_string(expires_in.count());
-  expires_refresh_token_in_ = getExpiresTimeForRefreshToken(refresh_token, expires_in);
-  expires_id_token_in_ = getExpiresTimeForIdToken(id_token, expires_in);
+  const auto cookie_expires_in =
+      applyCookieExpirationMargin(expires_in, config_->cookieExpirationMargin());
+  expires_in_ = std::to_string(cookie_expires_in.count());
+  expires_refresh_token_in_ = std::to_string(
+      applyCookieExpirationMargin(getExpiresTimeForRefreshToken(refresh_token, expires_in),
+                                  config_->cookieExpirationMargin())
+          .count());
+  expires_id_token_in_ =
+      std::to_string(applyCookieExpirationMargin(getExpiresTimeForIdToken(id_token, expires_in),
+                                                 config_->cookieExpirationMargin())
+                         .count());
 
-  const auto new_epoch = time_source_.systemTime() + expires_in;
+  const auto new_epoch = time_source_.systemTime() + cookie_expires_in;
   new_expires_ = std::to_string(
       std::chrono::duration_cast<std::chrono::seconds>(new_epoch.time_since_epoch()).count());
 }
@@ -1233,7 +1248,7 @@ std::string OAuth2Filter::getEncodedToken() const {
   return encoded_token;
 }
 
-std::string
+std::chrono::seconds
 OAuth2Filter::getExpiresTimeForRefreshToken(const std::string& refresh_token,
                                             const std::chrono::seconds& expires_in) const {
   if (config_->useRefreshToken()) {
@@ -1245,31 +1260,29 @@ OAuth2Filter::getExpiresTimeForRefreshToken(const std::string& refresh_token,
               .time_since_epoch();
 
       if (now < expiration_from_jwt) {
-        const auto expiration_epoch = expiration_from_jwt - now;
-        return std::to_string(expiration_epoch.count());
+        return expiration_from_jwt - now;
       } else {
         ENVOY_STREAM_LOG(debug,
                          "The expiration time in the refresh token is less than the current time",
                          *decoder_callbacks_);
-        return "0";
+        return std::chrono::seconds(0);
       }
     }
     ENVOY_STREAM_LOG(debug,
                      "The refresh token is not a JWT or exp claim is omitted. The lifetime of the "
                      "refresh token will be taken from filter configuration",
                      *decoder_callbacks_);
-    const std::chrono::seconds default_refresh_token_expires_in =
-        config_->defaultRefreshTokenExpiresIn();
-    return std::to_string(default_refresh_token_expires_in.count());
+    return config_->defaultRefreshTokenExpiresIn();
   }
 
-  return std::to_string(expires_in.count());
+  return expires_in;
 }
 
-std::string OAuth2Filter::getExpiresTimeForIdToken(const std::string& id_token,
-                                                   const std::chrono::seconds& expires_in) const {
+std::chrono::seconds
+OAuth2Filter::getExpiresTimeForIdToken(const std::string& id_token,
+                                       const std::chrono::seconds& expires_in) const {
   if (config_->useAccessTokenExpiryForIdTokenCookie()) {
-    return std::to_string(expires_in.count());
+    return expires_in;
   }
   if (!id_token.empty()) {
     JwtVerify::Jwt jwt;
@@ -1280,12 +1293,11 @@ std::string OAuth2Filter::getExpiresTimeForIdToken(const std::string& id_token,
               .time_since_epoch();
 
       if (now < expiration_from_jwt) {
-        const auto expiration_epoch = expiration_from_jwt - now;
-        return std::to_string(expiration_epoch.count());
+        return expiration_from_jwt - now;
       } else {
         ENVOY_STREAM_LOG(debug, "The expiration time in the id token is less than the current time",
                          *decoder_callbacks_);
-        return "0";
+        return std::chrono::seconds(0);
       }
     }
     ENVOY_STREAM_LOG(debug,
@@ -1293,9 +1305,9 @@ std::string OAuth2Filter::getExpiresTimeForIdToken(const std::string& id_token,
                      "required by the OpenID Connect 1.0 specification. "
                      "The lifetime of the id token will be aligned with the access token",
                      *decoder_callbacks_);
-    return std::to_string(expires_in.count());
+    return expires_in;
   }
-  return std::to_string(expires_in.count());
+  return expires_in;
 }
 
 std::string OAuth2Filter::buildCookieTail(const FilterConfig::CookieSettings& settings,

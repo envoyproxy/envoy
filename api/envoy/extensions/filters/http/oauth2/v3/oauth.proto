@@ -151,7 +151,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 31]
+// [#next-free-field: 32]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -349,6 +349,16 @@ message OAuth2Config {
   // the ID token and you want the ID token cookie to remain valid for that full duration.
   // Default is false (use the ID token's own ``exp`` claim when available).
   bool use_access_token_expiry_for_id_token_cookie = 30;
+
+  // Optional duration to subtract from OAuth2 cookie lifetimes.
+  //
+  // When set, the OAuth2 filter sets cookies that contain or validate OAuth2 tokens to expire this
+  // much earlier than their corresponding token lifetime. This can be used to trigger
+  // re-authentication or refresh before upstream services receive a token that is about to expire.
+  //
+  // If the margin is greater than or equal to a token lifetime, the cookie lifetime is set to
+  // ``0s``.
+  google.protobuf.Duration cookie_expiration_margin = 31 [(validate.rules).duration = {gte {}}];
 }
 
 // Per-route OAuth2 config.
