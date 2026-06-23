@@ -152,6 +152,7 @@ message OAuth2Credentials {
 // Defines how an OAuth token is forwarded upstream.
 message OAuth2TokenForwarding {
   // The upstream request header that will carry the token.
+  // Pseudo-headers (names starting with ``:``) and the ``Host`` header are not allowed.
   string header = 1
       [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 }
@@ -214,7 +215,7 @@ message OAuth2Config {
   // Forward the OAuth token as a Bearer to upstream web service.
   bool forward_bearer_token = 7;
 
-    // Forward the OIDC ID token to the upstream.
+  // Forward the OIDC ID token to the upstream.
   //
   // If the configured header is ``Authorization``, Envoy forwards the ID token using the
   // ``Bearer `` prefix. For any other header, Envoy forwards the raw token value.
