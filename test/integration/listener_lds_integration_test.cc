@@ -820,6 +820,13 @@ TEST_P(ListenerMultiAddressesIntegrationTest,
   // Make a connection to the listener from version 1.
   codec_client_ = makeHttpConnection(lookupPort("address1"));
 
+  // Ensure Envoy has accepted the connection before starting reloads.
+  if (version_ == Network::Address::IpVersion::v4) {
+    test_server_->waitForCounter("listener.127.0.0.1_0.downstream_cx_total", Ge(1));
+  } else {
+    test_server_->waitForCounter("listener.[__1]_0.downstream_cx_total", Ge(1));
+  }
+
   for (int version = 2; version <= 10; version++) {
     // Touch the metadata to get a different hash.
     (*(*listener_config_.mutable_metadata()->mutable_filter_metadata())["random_filter_name"]
