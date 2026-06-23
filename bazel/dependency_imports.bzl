@@ -100,7 +100,7 @@ def envoy_dependency_imports(
         exec_triple = "s390x-unknown-linux-gnu",
         extra_target_triples = [
             "wasm32-unknown-unknown",
-            "wasm32-wasi",
+            "wasm32-wasip1",
         ],
         versions = [rust_common.default_version],
     )
@@ -110,7 +110,7 @@ def envoy_dependency_imports(
         versions = [RUST_VERSION],
         extra_target_triples = [
             "wasm32-unknown-unknown",
-            "wasm32-wasi",
+            "wasm32-wasip1",
             # Unconditionally specify the target triples for x-compilations.
             # Note that the toolchain won't be fetched/used unless the target triple is actually used in the build.
             "x86_64-unknown-linux-gnu",
