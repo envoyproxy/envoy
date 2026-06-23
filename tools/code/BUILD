@@ -70,8 +70,8 @@ genrule(
     cmd = """
     $(location :check) \
         --fix \
-        -l warn \
-        -v warn \
+        -l info \
+        -v info \
         -x mobile/dist/envoy-pom.xml \
         -x bazel/repo.bzl \
         --codeowners=$(location //:CODEOWNERS) \
