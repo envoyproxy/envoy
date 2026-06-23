@@ -179,6 +179,25 @@ TEST_F(RouterUpstreamFilterTest, UpstreamFilterChainInheritsConnectionManagerSta
   EXPECT_EQ("prefix", config_->upstream_ctx_->scope().symbolTable().toString(
                           config_->upstream_ctx_->scope().prefix()));
 }
+
+// With the runtime guard disabled the upstream filter chain uses the legacy root scope (empty
+// prefix).
+TEST_F(RouterUpstreamFilterTest, UpstreamFilterChainLegacyRootScopeWhenGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.router_upstream_filters_scoped_stat_prefix", "false"}});
+
+  HttpFilter codec_filter;
+  codec_filter.set_name("envoy.filters.http.upstream_codec");
+  envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec upstream_codec_config;
+  codec_filter.mutable_typed_config()->PackFrom(upstream_codec_config);
+
+  init({codec_filter});
+
+  ASSERT_NE(nullptr, config_->upstream_ctx_);
+  EXPECT_EQ("", config_->upstream_ctx_->scope().symbolTable().toString(
+                    config_->upstream_ctx_->scope().prefix()));
+}
 } // namespace
 } // namespace Router
 } // namespace Envoy
