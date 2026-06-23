@@ -58,8 +58,8 @@ class BodyFormatterCommandParser : public Formatter::CommandParser {
 public:
   BodyFormatterCommandParser() = default;
 
-  Formatter::FormatterProviderPtr parse(absl::string_view command, absl::string_view command_arg,
-                                        absl::optional<size_t>) const override {
+  Formatter::FormatterProviderResult parse(absl::string_view command, absl::string_view command_arg,
+                                           absl::optional<size_t>) const override {
 
     if (command == "REQUEST_BODY") {
       return std::make_unique<BodyFormatterProvider>(command_arg, true);

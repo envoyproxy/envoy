@@ -83,8 +83,8 @@ public:
   using ProviderFuncTable = absl::flat_hash_map<std::string, ProviderFunc>;
 
   // CommandParser
-  Formatter::FormatterProviderPtr parse(absl::string_view command, absl::string_view command_arg,
-                                        absl::optional<size_t> max_length) const override {
+  Formatter::FormatterProviderResult parse(absl::string_view command, absl::string_view command_arg,
+                                           absl::optional<size_t> max_length) const override {
     const auto& provider_table = providerFuncTable();
     const auto func_it = provider_table.find(std::string(command));
     if (func_it == provider_table.end()) {
