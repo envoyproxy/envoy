@@ -64,7 +64,7 @@ config_env() {
     docker buildx create --use --name envoy-builder --platform "${DOCKER_PLATFORM}" --driver-opt "image=moby/buildkit:${BUILDKIT_VERSION}"
 }
 
-BUILD_TYPES=("" "-debug" "-contrib" "-contrib-debug" "-contrib-distroless" "-distroless" "-tools")
+BUILD_TYPES=("" "-debug" "-contrib" "-contrib-debug" "-contrib-distroless" "-distroless" "-distroless-fips" "-tools")
 
 if [[ "$DOCKER_PLATFORM" == "linux/amd64" ]]; then
     BUILD_TYPES+=("-google-vrp")
@@ -97,6 +97,7 @@ build_args() {
 
     target="${build_type/-debug/}"
     target="${target/-contrib/}"
+    target="${target/-fips/}"
     printf ' -f distribution/docker/Dockerfile-envoy --target %s' "envoy${target}"
 
     if [[ "${build_type}" == *-contrib* ]]; then
@@ -105,6 +106,10 @@ build_args() {
 
     if [[ "${build_type}" == *-debug ]]; then
         printf ' --build-arg ENVOY_BINARY_PREFIX=dbg/'
+    fi
+
+    if [[ "${build_type}" == *-fips* ]]; then
+        printf ' --build-arg ENVOY_RELEASE_TARBALL=release.fips.tar.zst'
     fi
 }
 

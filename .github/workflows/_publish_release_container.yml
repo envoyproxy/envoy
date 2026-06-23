@@ -119,6 +119,15 @@ jobs:
             additional-tags:
             - distroless-dev-${{ github.sha }}
           - name: ${{ inputs.dockerhub-repo }}
+            tag: distroless-fips-dev
+            registry: docker.io/envoyproxy
+            architectures:
+            - amd64
+            - arm64
+            artifact-pattern: envoy-distroless-fips.{arch}.tar
+            additional-tags:
+            - distroless-fips-dev-${{ github.sha }}
+          - name: ${{ inputs.dockerhub-repo }}
             tag: google-vrp-dev
             registry: docker.io/envoyproxy
             architectures:
@@ -208,6 +217,15 @@ jobs:
             artifact-pattern: envoy-distroless.{arch}.tar
             additional-tags:
             - distroless-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
+          - name: ${{ inputs.dockerhub-repo }}
+            tag: distroless-fips-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
+            registry: docker.io/envoyproxy
+            architectures:
+            - amd64
+            - arm64
+            artifact-pattern: envoy-distroless-fips.{arch}.tar
+            additional-tags:
+            - distroless-fips-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
           - name: ${{ inputs.dockerhub-repo }}
             tag: google-vrp-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
             registry: docker.io/envoyproxy

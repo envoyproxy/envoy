@@ -10,7 +10,8 @@ ADD configs/envoyproxy_io_proxy.yaml /etc/envoy/envoy.yaml
 # See https://github.com/docker/buildx/issues/510 for why this _must_ be this way
 ARG TARGETPLATFORM
 ENV TARGETPLATFORM="${TARGETPLATFORM:-linux/amd64}"
-ADD "${TARGETPLATFORM}/release.tar.zst" /usr/local/bin/
+ARG ENVOY_RELEASE_TARBALL=release.tar.zst
+ADD "${TARGETPLATFORM}/${ENVOY_RELEASE_TARBALL}" /usr/local/bin/
 
 
 # STAGE: envoy-base

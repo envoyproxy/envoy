@@ -854,7 +854,7 @@ case $CI_TARGET in
                  "${PUBLISH_ARGS[@]}"
         ;;
 
-    release|release.server_only|release.test_only)
+    release|release.server_only|release.server_only.fips|release.test_only)
         if [[ "$CI_TARGET" == "release" || "$CI_TARGET" == "release.test_only" ]]; then
             # When testing memory consumption, we want to test against exact byte-counts
             # where possible. As these differ between platforms and compile options, we
@@ -873,6 +873,9 @@ case $CI_TARGET in
         BAZEL_RELEASE_OPTIONS=(
             --stripopt=--strip-all
             -c opt)
+        if [[ "$CI_TARGET" == "release.server_only.fips" ]]; then
+            BAZEL_RELEASE_OPTIONS+=(--config=aws-lc-fips)
+        fi
         if [[ "$CI_TARGET" == "release" || "$CI_TARGET" == "release.test_only" ]]; then
             # Run release tests
             echo "Testing with:"
@@ -909,9 +912,13 @@ case $CI_TARGET in
               --remote_download_outputs=toplevel \
               //distribution/binary:release
         # Copy release binaries to binary export directory
+        RELEASE_TARBALL_NAME="release.tar.zst"
+        if [[ "$CI_TARGET" == "release.server_only.fips" ]]; then
+            RELEASE_TARBALL_NAME="release.fips.tar.zst"
+        fi
         cp -a \
            "bazel-bin/distribution/binary/release.tar.zst" \
-           "${ENVOY_BINARY_DIR}/release.tar.zst"
+           "${ENVOY_BINARY_DIR}/${RELEASE_TARBALL_NAME}"
         # Grab the schema_validator_tool
         # TODO(phlax): bundle this with the release when #26390 is resolved
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
