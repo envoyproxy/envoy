@@ -30,7 +30,7 @@ std::string readWasmModule(const char* path) {
   return content;
 }
 
-bool writeWasmModule(absl::string_view module, absl::string_view path) {
+bool writeWasmModule(absl::string_view module, const char* path) {
   auto file = std::fstream(path, std::ios::out | std::ios::binary);
   file.write(module.data(), module.size());
   file.close();
