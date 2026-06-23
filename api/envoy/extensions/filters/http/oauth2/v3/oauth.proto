@@ -218,7 +218,7 @@ message OAuth2Config {
   // Forward the OIDC ID token to the upstream.
   //
   // If the configured header is ``Authorization``, Envoy forwards the ID token using the
-  // ``Bearer `` prefix. For any other header, Envoy forwards the raw token value.
+  // ``Bearer`` prefix. For any other header, Envoy forwards the raw token value.
   // If not specified, the ID token will not be forwarded.
   //
   // This can not be configured with :ref:`forward_bearer_token
