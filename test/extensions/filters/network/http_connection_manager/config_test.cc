@@ -28,6 +28,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 
@@ -3677,8 +3678,8 @@ public:
   createFromProto(const Protobuf::Message& message,
                   Server::Configuration::ServerFactoryContext& server_context) override {
     auto mptr = ::Envoy::Config::Utility::translateAnyToFactoryConfig(
-        dynamic_cast<const Protobuf::Any&>(message), server_context.messageValidationVisitor(),
-        *this);
+        Envoy::Protobuf::DynamicCastMessage<Protobuf::Any>(message),
+        server_context.messageValidationVisitor(), *this);
     const auto& proto_config =
         MessageUtil::downcastAndValidate<const ::envoy::extensions::http::header_validators::
                                              envoy_default::v3::HeaderValidatorConfig&>(

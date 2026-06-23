@@ -170,9 +170,9 @@ TEST_F(GrpcStatsFilterConfigTest, StatsConnectUnaryBodies) {
 
   const auto* data =
       stream_info_.filterState()->getDataReadOnly<GrpcStatsObject>("envoy.filters.http.grpc_stats");
-  auto filter_object =
-      *dynamic_cast<envoy::extensions::filters::http::grpc_stats::v3::FilterObject*>(
-          data->serializeAsProto().get());
+  auto filter_object = *Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::filters::http::grpc_stats::v3::FilterObject>(
+      data->serializeAsProto().get());
   EXPECT_EQ(1U, data->request_message_count);
   EXPECT_EQ(1U, data->response_message_count);
   EXPECT_EQ(1U, filter_object.request_message_count());
@@ -570,9 +570,9 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
   EXPECT_EQ(2U, data->request_message_count);
   EXPECT_EQ(3U, data->response_message_count);
 
-  auto filter_object =
-      *dynamic_cast<envoy::extensions::filters::http::grpc_stats::v3::FilterObject*>(
-          data->serializeAsProto().get());
+  auto filter_object = *Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::filters::http::grpc_stats::v3::FilterObject>(
+      data->serializeAsProto().get());
   EXPECT_EQ(2U, filter_object.request_message_count());
   EXPECT_EQ(3U, filter_object.response_message_count());
   EXPECT_EQ("2,3", data->serializeAsString().value());

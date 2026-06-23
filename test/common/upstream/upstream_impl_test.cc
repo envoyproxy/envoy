@@ -5528,7 +5528,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
   TestFilterConfigFactoryBase factoryBase(
       []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::Struct>(); },
       [&](const Protobuf::Message& msg) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
-        const auto& msg_struct = dynamic_cast<const Protobuf::Struct&>(msg);
+        const auto& msg_struct = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(msg);
         EXPECT_TRUE(msg_struct.fields().find("option") != msg_struct.fields().end());
 
         return protocol_options;

@@ -18,6 +18,7 @@ fn new_listener_filter_config_fn<EC: EnvoyListenerFilterConfig, ELF: EnvoyListen
     "write_to_socket" => Some(Box::new(WriteToSocketFilterConfig)),
     "buffer_read" => Some(Box::new(BufferReadFilterConfig)),
     "http_callout_on_accept" => Some(Box::new(HttpCalloutOnAcceptFilterConfig)),
+    "dynamic_metadata" => Some(Box::new(DynamicMetadataFilterConfig)),
     _ => panic!("unknown filter name: {name}"),
   }
 }
@@ -146,5 +147,69 @@ impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for HttpCalloutOnAcceptFilter
     _response_body: Vec<EnvoyBuffer>,
   ) {
     envoy_filter.continue_filter_chain(true);
+  }
+}
+
+// =============================================================================
+// Dynamic Metadata Test Filter
+// =============================================================================
+
+// Sets several string entries under one namespace via the batch setter on accept, then reads them
+// back to prove the batch and the getter round trip through the ABI. An empty batch must not create
+// a namespace.
+struct DynamicMetadataFilterConfig;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for DynamicMetadataFilterConfig {
+  fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+    Box::new(DynamicMetadataFilter)
+  }
+}
+
+struct DynamicMetadataFilter;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for DynamicMetadataFilter {
+  fn on_accept(
+    &mut self,
+    envoy_filter: &mut ELF,
+  ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+    envoy_filter.set_dynamic_metadata_string_batch(
+      "dynamic_modules.test",
+      &[
+        ("batch_key1", "batch_value1"),
+        ("batch_key2", "batch_value2"),
+      ],
+    );
+    envoy_filter.set_dynamic_metadata_string_batch("dynamic_modules.empty", &[]);
+
+    assert_eq!(
+      envoy_filter
+        .get_dynamic_metadata_string("dynamic_modules.test", "batch_key1")
+        .map(|value| value.as_slice().to_vec()),
+      Some(b"batch_value1".to_vec())
+    );
+    assert_eq!(
+      envoy_filter
+        .get_dynamic_metadata_string("dynamic_modules.test", "batch_key2")
+        .map(|value| value.as_slice().to_vec()),
+      Some(b"batch_value2".to_vec())
+    );
+    assert!(envoy_filter
+      .get_dynamic_metadata_string("dynamic_modules.empty", "batch_key1")
+      .is_none());
+
+    // Set a non-UTF-8 byte value and read it back to prove set_dynamic_metadata_bytes preserves it.
+    envoy_filter.set_dynamic_metadata_bytes(
+      "dynamic_modules.test",
+      "bytes_key",
+      &[0xff, 0x00, 0xfe],
+    );
+    assert_eq!(
+      envoy_filter
+        .get_dynamic_metadata_string("dynamic_modules.test", "bytes_key")
+        .map(|value| value.as_slice().to_vec()),
+      Some(vec![0xff, 0x00, 0xfe])
+    );
+
+    abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
   }
 }

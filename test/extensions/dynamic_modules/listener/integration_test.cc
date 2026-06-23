@@ -96,4 +96,18 @@ TEST_P(DynamicModulesListenerSdkIntegrationTest, HttpCalloutOnAcceptDoesNotCrash
   tcp_client->close();
 }
 
+TEST_P(DynamicModulesListenerSdkIntegrationTest, DynamicMetadataBatch) {
+  if (GetParam() != "rust") {
+    GTEST_SKIP() << "the dynamic_metadata filter is only in the rust test module";
+  }
+  initializeFilter("dynamic_metadata");
+
+  // The filter sets batch metadata and reads it back on accept, asserting in the module. A failure
+  // there stops the chain and the echo upstream never returns the payload.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write("ping"));
+  tcp_client->waitForData("ping");
+  tcp_client->close();
+}
+
 } // namespace Envoy

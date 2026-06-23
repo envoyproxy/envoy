@@ -36,8 +36,8 @@ TEST(HealthCheckEventFileSinkFactory, createEmptyHealthCheckEventSink) {
       "envoy.health_check.event_sink.file");
   EXPECT_NE(factory, nullptr);
   auto empty_proto = factory->createEmptyConfigProto();
-  auto config = *dynamic_cast<
-      envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink*>(
+  auto config = *Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink>(
       empty_proto.get());
   EXPECT_TRUE(config.event_log_path().empty());
 }

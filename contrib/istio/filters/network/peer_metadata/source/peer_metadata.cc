@@ -17,7 +17,7 @@ using CelState = ::Envoy::Extensions::Filters::Common::Expr::CelState;
 using CelStateType = ::Envoy::Extensions::Filters::Common::Expr::CelStateType;
 
 std::string baggageValue(const LocalInfo::LocalInfo& local_info) {
-  const auto obj = Istio::Common::convertStructToWorkloadMetadata(local_info.node().metadata());
+  const auto obj = ::Istio::Common::convertStructToWorkloadMetadata(local_info.node().metadata());
   return obj->baggage();
 }
 
@@ -78,7 +78,7 @@ Network::FilterStatus Filter::onWrite(Buffer::Instance& buffer, bool) {
     // for peer metadata anymore, if the upstream sent it, we'd have it by
     // now. So we can check if the peer metadata is available or not, and if
     // no peer metadata available, we can give up waiting for it.
-    std::optional<Protobuf::Any> peer_metadata = discoverPeerMetadata();
+    std::optional<Envoy::Protobuf::Any> peer_metadata = discoverPeerMetadata();
     if (peer_metadata) {
       propagatePeerMetadata(*peer_metadata);
     } else {
@@ -117,7 +117,12 @@ bool Filter::disableDiscovery() const {
   return discoveryDisabled(metadata);
 }
 
-std::optional<Protobuf::Any> Filter::discoverPeerMetadata() {
+// discoveryPeerMetadata is called to check if the baggage HTTP2 CONNECT
+// response headers have been populated already in the filter state.
+//
+// NOTE: It's safe to call this function during any step of processing - it
+// will not do anything if the filter is not in the right state.
+std::optional<Envoy::Protobuf::Any> Filter::discoverPeerMetadata() {
   ENVOY_LOG(trace, "Trying to discover peer metadata from filter state set by TCP Proxy");
   ASSERT(write_callbacks_);
 
@@ -153,21 +158,24 @@ std::optional<Protobuf::Any> Filter::discoverPeerMetadata() {
     }
   }
 
-  std::unique_ptr<Istio::Common::WorkloadMetadataObject> metadata =
-      Istio::Common::convertBaggageToWorkloadMetadata(baggage[0]->value().getStringView(),
-                                                      identity);
+  std::unique_ptr<::Istio::Common::WorkloadMetadataObject> metadata =
+      ::Istio::Common::convertBaggageToWorkloadMetadata(baggage[0]->value().getStringView(),
+                                                        identity);
 
-  Protobuf::Struct data = Istio::Common::convertWorkloadMetadataToStruct(*metadata);
-  Protobuf::Any wrapped;
+  Envoy::Protobuf::Struct data = ::Istio::Common::convertWorkloadMetadataToStruct(*metadata);
+  Envoy::Protobuf::Any wrapped;
   wrapped.PackFrom(data);
   return wrapped;
 }
 
-void Filter::propagatePeerMetadata(const Protobuf::Any& peer_metadata) {
+void Filter::propagatePeerMetadata(const Envoy::Protobuf::Any& peer_metadata) {
   ENVOY_LOG(trace, "Sending peer metadata downstream with the data stream");
   ASSERT(write_callbacks_);
 
   if (state_ != PeerMetadataState::WaitingForData) {
+    // It's only safe and correct to send the peer metadata downstream with
+    // the data if we haven't done that already, otherwise the downstream
+    // could be very confused by the data they received.
     ENVOY_LOG(trace, "Filter has already sent the peer metadata downstream");
     return;
   }
@@ -205,6 +213,9 @@ Network::FilterStatus UpstreamFilter::onData(Buffer::Instance& buffer, bool end_
     if (consumePeerMetadata(buffer, end_stream)) {
       state_ = PeerMetadataState::PassThrough;
     } else {
+      // If we got here it means that we are waiting for more data to arrive.
+      // NOTE: if error happened, we will not get here, consumePeerMetadata
+      // will just return true and we will enter PassThrough state.
       return Network::FilterStatus::StopIteration;
     }
     break;
@@ -221,6 +232,21 @@ void UpstreamFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks&
   callbacks_ = &callbacks;
 }
 
+// We want to enable baggage based peer metadata discovery if all of the following is true
+// - the upstream host is an internal listener, and specifically connect_originate or
+//   inner_connect_originate internal listener - those are the only listeners that
+//   support baggage-based peer metadata discovery
+// - communication with upstream happens in plain text, e.g., there is no TLS upstream
+//   transport socket or PROXY transport socket there - we need it in the current
+//   implemetation of the baggage-based peer metadata discovery because we inject peer
+//   metadata into the data stream and transport sockets that modify the data stream
+//   interfere with that (NOTE: in the future release we are planning to lift this
+//   limitation by communicating over shared memory instead).
+//
+// We can easily check if the upstream host is an internal listener, so checking the first
+// condition is easy. We can't easily check the second condition in the filter itself, so
+// instead we rely on istiod providing that information in form of the host metadata on the
+// endpoint or cluster level.
 bool UpstreamFilter::disableDiscovery() const {
   ASSERT(callbacks_);
 
@@ -253,7 +279,7 @@ bool UpstreamFilter::disableDiscovery() const {
 
 bool UpstreamFilter::consumePeerMetadata(Buffer::Instance& buffer, bool end_stream) {
   ENVOY_LOG(trace, "Trying to consume peer metadata from the data stream");
-  using namespace Istio::Common;
+  using namespace ::Istio::Common;
 
   ASSERT(callbacks_);
 
@@ -306,14 +332,14 @@ bool UpstreamFilter::consumePeerMetadata(Buffer::Instance& buffer, bool end_stre
   absl::string_view data{static_cast<const char*>(buffer.linearize(peer_metadata_size)),
                          peer_metadata_size};
   data = data.substr(sizeof(PeerMetadataHeader));
-  Protobuf::Any any;
+  Envoy::Protobuf::Any any;
   if (!any.ParseFromArray(data.data(), data.size())) {
     ENVOY_LOG(trace, "Failed to parse peer metadata proto from the data stream");
     populateNoPeerMetadata();
     return true;
   }
 
-  Protobuf::Struct peer_metadata;
+  Envoy::Protobuf::Struct peer_metadata;
   if (!any.UnpackTo(&peer_metadata)) {
     ENVOY_LOG(trace, "Failed to unpack peer metadata struct");
     populateNoPeerMetadata();
@@ -334,15 +360,24 @@ const CelStatePrototype& UpstreamFilter::peerInfoPrototype() {
   return *prototype;
 }
 
-void UpstreamFilter::populatePeerMetadata(const Istio::Common::WorkloadMetadataObject& peer) {
+void UpstreamFilter::populatePeerMetadata(const ::Istio::Common::WorkloadMetadataObject& peer) {
   ENVOY_LOG(trace, "Populating peer metadata in the upstream filter state");
   ASSERT(callbacks_);
 
-  auto proto = Istio::Common::convertWorkloadMetadataToStruct(peer);
+  auto proto = ::Istio::Common::convertWorkloadMetadataToStruct(peer);
   auto cel = std::make_shared<CelState>(peerInfoPrototype());
   cel->setValue(absl::string_view(proto.SerializeAsString()));
   callbacks_->connection().streamInfo().filterState()->setData(
-      Istio::Common::UpstreamPeer, std::move(cel), StreamInfo::FilterState::LifeSpan::Connection);
+      ::Istio::Common::UpstreamPeer, std::move(cel), StreamInfo::FilterState::LifeSpan::Connection);
+  // Also store the WorkloadMetadataObject under the *_obj key, mirroring the
+  // metadata_exchange network filter. istio.stats reads the object directly
+  // (peerInfoRead/peerInfo prefer it); its CelState fallback uses BaggageToken
+  // keys that are incompatible with convertWorkloadMetadataToStruct's output, so
+  // without this the peer identity is lost over HBONE.
+  callbacks_->connection().streamInfo().filterState()->setData(
+      ::Istio::Common::UpstreamPeerObj,
+      std::make_shared<::Istio::Common::WorkloadMetadataObject>(peer),
+      StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 void UpstreamFilter::populateNoPeerMetadata() {
@@ -350,7 +385,7 @@ void UpstreamFilter::populateNoPeerMetadata() {
   ASSERT(callbacks_);
 
   callbacks_->connection().streamInfo().filterState()->setData(
-      Istio::Common::NoPeer, std::make_shared<StreamInfo::BoolAccessorImpl>(true),
+      ::Istio::Common::NoPeer, std::make_shared<StreamInfo::BoolAccessorImpl>(true),
       StreamInfo::FilterState::LifeSpan::Connection);
 }
 

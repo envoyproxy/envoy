@@ -7,6 +7,8 @@
 #include <initializer_list>
 #include <memory>
 
+#include "test/test_common/logging.h"
+
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 
 namespace Envoy {

@@ -6655,9 +6655,8 @@ TEST_F(HttpFilterTest, ShadowModeDeniedSetsFilterStateAndContinues) {
   // Exercise serializeAsProto (populates all non-empty branches) and serializeAsString.
   auto serialized = shadow->serializeAsProto();
   ASSERT_NE(serialized, nullptr);
-  const auto& proto =
-      dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ShadowDecision&>(
-          *serialized);
+  const auto& proto = Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::filters::http::ext_authz::v3::ShadowDecision>(*serialized);
   EXPECT_EQ(proto.check_result(),
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::DENIED);
   EXPECT_EQ(proto.status_code(), 401);
@@ -6818,9 +6817,8 @@ TEST_F(HttpFilterTest, ShadowModeOkSetsFilterState) {
   // Exercise serializeAsProto on the OK branch.
   auto serialized = shadow->serializeAsProto();
   ASSERT_NE(serialized, nullptr);
-  const auto& proto =
-      dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ShadowDecision&>(
-          *serialized);
+  const auto& proto = Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::filters::http::ext_authz::v3::ShadowDecision>(*serialized);
   EXPECT_EQ(proto.check_result(),
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::OK);
   EXPECT_EQ(proto.status_code(), 200);

@@ -9,6 +9,7 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/io/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"

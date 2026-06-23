@@ -7,7 +7,9 @@
 #include "envoy/http/header_map.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
 #include "source/common/common/json_escape_string.h"
+#include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -327,8 +329,9 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
 
   if (mcp_operation_ == McpOperation::Initialization ||
       mcp_operation_ == McpOperation::InitializationAck ||
-      mcp_operation_ == McpOperation::OperationFailed) {
-    // sendLocalReply was called in handleMcpMethod for these operations.
+      mcp_operation_ == McpOperation::OperationFailed ||
+      mcp_operation_ == McpOperation::ToolsListLocal) {
+    // sendLocalReply/encodeHeaders was called in handleMcpMethod for these operations.
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
@@ -344,6 +347,8 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
   // The response for InitializedNotification is empty body so we don't need
   // to modify the response headers.
   case McpOperation::InitializationAck:
+  // ToolsListLocal sends a local reply, so the headers are already correct.
+  case McpOperation::ToolsListLocal:
     return Http::FilterHeadersStatus::Continue;
   default:
     break;
@@ -371,10 +376,12 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
 
 Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& data,
                                                            bool end_stream) {
-  // No need to encode the response body for Initialization and InitializationAck.
+  // No need to encode the response body for Initialization and InitializationAck. ToolsListLocal is
+  // a local response, and the response body is already encoded.
   if (mcp_operation_ == McpOperation::Unspecified ||
       mcp_operation_ == McpOperation::Initialization ||
-      mcp_operation_ == McpOperation::InitializationAck) {
+      mcp_operation_ == McpOperation::InitializationAck ||
+      mcp_operation_ == McpOperation::ToolsListLocal) {
     return Http::FilterDataStatus::Continue;
   }
 
@@ -484,6 +491,89 @@ void McpJsonRestBridgeFilter::buildStreamingPrefixAndSuffix(bool is_error) {
   streaming_json_suffix_ = ref_json.substr(pos + marker.size() - 1);
 }
 
+// Send a local reply for a tools/list call. Construct the response body directly instead of
+// building a JSON object, to minimize copying.
+void McpJsonRestBridgeFilter::serveToolsListLocal(
+    const nlohmann::json& json_rpc,
+    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig&
+        tool_config) {
+  std::string request_id_json = "null";
+  if (json_rpc.contains("id")) {
+    request_id_json = json_rpc["id"].dump();
+  } else {
+    ASSERT(false, "serveToolsListLocal requires an RPC ID");
+  }
+
+  const auto& tools = tool_config.tools();
+
+  size_t reserve_size = sizeof("{\"jsonrpc\":\"2.0\",\"id\":") - 1 + request_id_json.size() +
+                        sizeof(",\"result\":{\"tools\":[") - 1 + sizeof("]}}") - 1;
+
+  for (const auto& tool_proto : tools) {
+    const auto* tool = &tool_proto;
+    reserve_size += sizeof("{\"name\":") - 1 + nlohmann::json(tool->name()).dump().size();
+
+    if (!tool->tool_list_config().title().empty()) {
+      reserve_size += sizeof(",\"title\":") - 1 +
+                      nlohmann::json(tool->tool_list_config().title()).dump().size();
+    }
+
+    reserve_size += sizeof(",\"description\":") - 1 +
+                    nlohmann::json(tool->tool_list_config().description()).dump().size() +
+                    sizeof(",\"inputSchema\":") - 1;
+
+    if (!tool->tool_list_config().input_schema().empty()) {
+      reserve_size += tool->tool_list_config().input_schema().size();
+    } else {
+      reserve_size += sizeof("{\"type\":\"object\"}") - 1;
+    }
+    reserve_size += sizeof("}") - 1 + sizeof(",") - 1;
+  }
+
+  std::string response_data;
+  response_data.reserve(reserve_size);
+  absl::StrAppend(&response_data, "{\"jsonrpc\":\"2.0\",\"id\":", request_id_json,
+                  ",\"result\":{\"tools\":[");
+
+  bool first_tool = true;
+  for (const auto& tool_proto : tools) {
+    const auto* tool = &tool_proto;
+    if (!first_tool) {
+      absl::StrAppend(&response_data, ",");
+    }
+    first_tool = false;
+
+    absl::StrAppend(&response_data, "{\"name\":", nlohmann::json(tool->name()).dump());
+
+    if (!tool->tool_list_config().title().empty()) {
+      absl::StrAppend(&response_data,
+                      ",\"title\":", nlohmann::json(tool->tool_list_config().title()).dump());
+    }
+
+    absl::StrAppend(&response_data, ",\"description\":",
+                    nlohmann::json(tool->tool_list_config().description()).dump(),
+                    ",\"inputSchema\":");
+
+    // WARNING: assumes input_schema is trusted to be a valid JSON fragment. Does not validate.
+    if (!tool->tool_list_config().input_schema().empty()) {
+      absl::StrAppend(&response_data, tool->tool_list_config().input_schema());
+    } else {
+      absl::StrAppend(&response_data, "{\"type\":\"object\"}");
+    }
+
+    absl::StrAppend(&response_data, "}");
+  }
+
+  absl::StrAppend(&response_data, "]}}");
+
+  decoder_callbacks_->sendLocalReply(
+      Http::Code::OK, response_data,
+      [](Http::ResponseHeaderMap& headers) {
+        headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+      },
+      Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_tools_list");
+}
+
 void McpJsonRestBridgeFilter::handleMcpMethod(
     const nlohmann::json& json_rpc, Http::RequestHeaderMapOptRef request_headers,
     const McpJsonRestBridgePerRouteConfig* per_route_config) {
@@ -505,8 +595,11 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
     setDynamicMetadata(method, json_rpc);
   }
 
-  // TODO(guoyilin42): Consider supporting local response for tools/list in addition to the GET.
   if (method == McpConstants::Methods::TOOLS_LIST) {
+    OptRef<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig>
+        tool_list_local_config =
+            (per_route_config == nullptr) ? config_->toolListLocalConfig()
+                                          : per_route_config->toolListLocalConfig();
     absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
         (per_route_config == nullptr) ? config_->getToolsListHttpRule()
                                       : per_route_config->getToolsListHttpRule();
@@ -527,12 +620,17 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
       if (decoder_callbacks_->downstreamCallbacks().has_value()) {
         decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
       }
-    } else {
-      // TODO(guoyilin42): Handle this more elegantly to avoid an unnecessary copy here. This can
-      // be addressed later when the JSON parser is updated.
-      mcp_operation_ = McpOperation::Unspecified;
-      request_body_str_ = json_rpc.dump();
+      return;
+    } else if (tool_list_local_config.has_value()) {
+      mcp_operation_ = McpOperation::ToolsListLocal;
+      serveToolsListLocal(json_rpc, *tool_list_local_config);
+      return;
     }
+
+    // TODO(guoyilin42): Handle this more elegantly to avoid an unnecessary copy here. This can
+    // be addressed later when the JSON parser is updated.
+    mcp_operation_ = McpOperation::Unspecified;
+    request_body_str_ = json_rpc.dump();
   } else if (method == McpConstants::Methods::INITIALIZE) {
     mcp_operation_ = McpOperation::Initialization;
     if (json_rpc.contains(McpConstants::PARAMS_FIELD) &&

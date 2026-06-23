@@ -13,6 +13,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/tcp_tunneling_integration.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"

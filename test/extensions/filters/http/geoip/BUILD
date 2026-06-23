@@ -77,6 +77,7 @@ envoy_extension_cc_test(
         "//source/extensions/geoip_providers/maxmind:config",
         "//source/extensions/geoip_providers/maxmind:provider_impl",
         "//test/integration:http_integration_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/geoip/v3:pkg_cc_proto",
     ],

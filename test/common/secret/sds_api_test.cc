@@ -21,6 +21,7 @@
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"

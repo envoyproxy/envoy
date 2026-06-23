@@ -2467,6 +2467,10 @@ envoy_dynamic_module_callback_http_filter_scheduler_new(
  *
  * This can be called multiple times to schedule multiple events to the same filter.
  *
+ * This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+ * module must join or quiesce any thread that may call this before worker shutdown so a scheduled
+ * event cannot race the worker dispatcher teardown.
+ *
  * @param scheduler_module_ptr is the pointer to the HTTP filter scheduler created by
  * envoy_dynamic_module_callback_http_filter_scheduler_new.
  * @param event_id is the ID of the event. This can be used to differentiate between multiple
@@ -4254,6 +4258,25 @@ bool envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer key, bool* result);
 
+/**
+ * envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch is called by the module
+ * to set multiple string-valued dynamic metadata entries under a single namespace in one call. It
+ * is equivalent to calling envoy_dynamic_module_callback_network_set_dynamic_metadata_string once
+ * per entry but resolves the namespace and merges into the metadata struct only once. Existing
+ * entries with the same key are overwritten. Within a single call, a later entry overwrites an
+ * earlier entry with the same key. An empty array is a no-op and does not create the namespace.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param entries is the pointer to an array of key-value pairs whose values are set as strings. It
+ * may be null only when entries_size is zero.
+ * @param entries_size is the number of entries in the array.
+ */
+void envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
+
 // ------------------------------ HTTP Callouts -------------------------------
 
 /**
@@ -4706,6 +4729,10 @@ envoy_dynamic_module_callback_network_filter_scheduler_new(
  * event hook on the worker thread.
  *
  * This can be called multiple times to schedule multiple events to the same filter.
+ *
+ * This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+ * module must join or quiesce any thread that may call this before worker shutdown so a scheduled
+ * event cannot race the worker dispatcher teardown.
  *
  * @param scheduler_module_ptr is the pointer to the network filter scheduler created by
  * envoy_dynamic_module_callback_network_filter_scheduler_new.
@@ -5651,6 +5678,26 @@ void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(
     envoy_dynamic_module_type_module_buffer key, double value);
 
 /**
+ * envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch is called by the
+ * module to set multiple string-valued dynamic metadata entries under a single namespace in one
+ * call. It is equivalent to calling
+ * envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string once per entry but
+ * resolves the namespace and merges into the metadata struct only once. Existing entries with the
+ * same key are overwritten. Within a single call, a later entry overwrites an earlier entry with
+ * the same key. An empty array is a no-op and does not create the namespace.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_namespace is the namespace of the metadata.
+ * @param entries is the pointer to an array of key-value pairs whose values are set as strings. It
+ * may be null only when entries_size is zero.
+ * @param entries_size is the number of entries in the array.
+ */
+void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
+
+/**
  * envoy_dynamic_module_callback_listener_filter_max_read_bytes is called by the
  * module to determine the maximum number of bytes to read from the socket.
  *
@@ -5922,6 +5969,10 @@ envoy_dynamic_module_callback_listener_filter_scheduler_new(
  * event hook on the worker thread.
  *
  * This can be called multiple times to schedule multiple events to the same filter.
+ *
+ * This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+ * module must join or quiesce any thread that may call this before worker shutdown so a scheduled
+ * event cannot race the worker dispatcher teardown.
  *
  * @param scheduler_module_ptr is the pointer to the listener filter scheduler created by
  * envoy_dynamic_module_callback_listener_filter_scheduler_new.

@@ -315,7 +315,7 @@ std::string encodePeerMetadataHeaderOnly(const PeerMetadataHeader& header) {
 std::string encodeMetadataOnly(absl::string_view baggage, absl::string_view identity) {
   std::unique_ptr<Istio::Common::WorkloadMetadataObject> metadata =
       Istio::Common::convertBaggageToWorkloadMetadata(baggage, identity);
-  Protobuf::Struct data = convertWorkloadMetadataToStruct(*metadata);
+  Protobuf::Struct data = ::Istio::Common::convertWorkloadMetadataToStruct(*metadata);
   Protobuf::Any wrapped;
   wrapped.PackFrom(data);
   return wrapped.SerializeAsString();
