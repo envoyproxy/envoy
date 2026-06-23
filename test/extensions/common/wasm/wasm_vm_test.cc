@@ -184,7 +184,6 @@ public:
     std::string_view precompiled = {};
     // clang-format on
 
-    // Load precompiled module on Linux-x86_64, since it's only support there.
     if (GetParam() /* allow_precompiled */) {
       // Section name is expected to be available in the tested runtimes.
       const auto section_name = wasm_vm_->getPrecompiledSectionName();
@@ -206,13 +205,7 @@ protected:
   WasmVmPtr wasm_vm_;
 };
 
-INSTANTIATE_TEST_SUITE_P(AllowPrecompiled, WasmVmTest,
-#if defined(__linux__) && defined(__x86_64__)
-                         testing::Values(false, true)
-#else
-                         testing::Values(false)
-#endif
-);
+INSTANTIATE_TEST_SUITE_P(AllowPrecompiled, WasmVmTest, testing::Values(false, true));
 
 TEST_P(WasmVmTest, V8BadCode) {
   wasm_vm_ = createWasmVm("envoy.wasm.runtime.v8");
