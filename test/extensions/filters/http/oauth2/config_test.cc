@@ -581,13 +581,14 @@ TEST(ConfigTest, ForwardIdTokenRejectsHostHeader) {
 TEST(ConfigTest, ForwardIdTokenRejectsPassThroughMatcherOnSameHeader) {
   // Matching the pass-through rule on the forwarded ID token header (case-insensitively) is
   // rejected, since pass-through skips sanitization and would let a client spoof the ID token.
-  expectForwardIdTokenConfigError("  forward_id_token:\n"
-                                  "    header: x-id-token\n"
-                                  "  pass_through_matcher:\n"
-                                  "  - name: X-Id-Token\n"
-                                  "    present_match: true",
-                                  "invalid forward_id_token configuration: pass_through_matcher can "
-                                  "not match on the forwarded ID token header 'x-id-token'");
+  expectForwardIdTokenConfigError(
+      "  forward_id_token:\n"
+      "    header: x-id-token\n"
+      "  pass_through_matcher:\n"
+      "  - name: X-Id-Token\n"
+      "    present_match: true",
+      "invalid forward_id_token configuration: pass_through_matcher can "
+      "not match on the forwarded ID token header 'x-id-token'");
 }
 
 // A custom (non-Authorization) header for forward_id_token can coexist with forward_bearer_token.

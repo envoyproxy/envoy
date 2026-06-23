@@ -91,9 +91,9 @@ createFilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Con
         "allowed"));
   }
 
-  // The forward_id_token header is owned by Envoy. Reject configs whose pass_through_matcher keys on
-  // it: otherwise a client could control the pass-through decision (and thus bypass OAuth entirely)
-  // simply by sending that header.
+  // The forward_id_token header is owned by Envoy. Reject configs whose pass_through_matcher keys
+  // on it: otherwise a client could control the pass-through decision (and thus bypass OAuth
+  // entirely) simply by sending that header.
   if (proto_config.has_forward_id_token()) {
     const Http::LowerCaseString id_token_header(proto_config.forward_id_token().header());
     for (const auto& matcher : proto_config.pass_through_matcher()) {
