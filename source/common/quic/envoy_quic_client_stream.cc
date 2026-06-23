@@ -79,7 +79,7 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
         headers.getUpgradeValue() == Http::Headers::get().ProtocolValues.WebTransport) {
       ENVOY_STREAM_LOG(debug, "Deferring WebTransport CONNECT until peer HTTP/3 SETTINGS received.",
                        *this);
-      // TODO(wbpcode): could we avoid this copy by keep the reference only here because the
+      // TODO(wbpcode): could we avoid this copy by keeping the reference only here because the
       // request headers should never be released before the stream is closed?
       pending_webtransport_headers_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>(headers);
       pending_webtransport_end_stream_ = end_stream;

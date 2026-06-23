@@ -30,7 +30,7 @@ namespace Envoy {
 namespace Http {
 
 // TODO(wbpcode): The webtransport::Session should be used ideally. However, the
-// webtransport::Session does not provided the SetVisitor method which is necessary for bridging the
+// webtransport::Session does not provide the SetVisitor method which is necessary for bridging the
 // downstream and upstream session.
 class WebTransportSession {
 public:
