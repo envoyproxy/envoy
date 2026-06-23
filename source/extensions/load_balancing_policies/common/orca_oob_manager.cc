@@ -262,8 +262,12 @@ void OrcaOobManager::OobSession::connectAndStream() {
   ASSERT(codec_client_ == nullptr);
   resetState();
 
-  // Hosts in a priority set always have a resolved address.
+  // Hosts in a priority set always have a resolved address. Guard against a custom Host
+  // implementation returning nullptr by falling back to the primary address.
   Network::Address::InstanceConstSharedPtr dial_address = host_->orcaReportingAddress();
+  if (dial_address == nullptr) {
+    dial_address = host_->address();
+  }
   ASSERT(dial_address != nullptr);
   if (parent_.config_.port_value != 0) {
     if (dial_address->ip() != nullptr) {
