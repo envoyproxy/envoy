@@ -59,7 +59,7 @@ public:
   explicit FileContentCommandParser(Server::Configuration::ServerFactoryContext& server_context)
       : server_context_(server_context) {}
 
-  Envoy::Formatter::FormatterProviderResult
+  absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
   parse(absl::string_view command, absl::string_view subcommand,
         absl::optional<size_t> max_length) const override {
     if (command != FileContentCommand) {

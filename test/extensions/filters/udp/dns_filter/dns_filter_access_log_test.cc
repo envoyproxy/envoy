@@ -11,18 +11,12 @@
 #include "test/mocks/server/listener_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "dns_filter_test_utils.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-using testing::_;
-using testing::AtLeast;
-using testing::Invoke;
-using testing::NiceMock;
-using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -30,7 +24,16 @@ namespace UdpFilters {
 namespace DnsFilter {
 namespace {
 
+using Envoy::StatusHelpers::IsOkAndHolds;
 using ResponseValidator = Utils::DnsResponseValidator;
+using testing::_;
+using testing::AtLeast;
+using testing::Invoke;
+using testing::IsNull;
+using testing::NiceMock;
+using testing::NotNull;
+using testing::Return;
+using testing::ReturnRef;
 
 Api::IoCallUint64Result makeNoError(uint64_t rc) {
   return {rc, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
@@ -595,22 +598,22 @@ TEST(DnsFilterCommandParserTest, EmptyCommandArg) {
   auto parser = createDnsFilterCommandParser();
 
   // All DNS commands should work without command args
-  EXPECT_NE(parser->parse("QUERY_NAME", "", absl::nullopt).value(), nullptr);
-  EXPECT_NE(parser->parse("QUERY_TYPE", "", absl::nullopt).value(), nullptr);
-  EXPECT_NE(parser->parse("QUERY_CLASS", "", absl::nullopt).value(), nullptr);
-  EXPECT_NE(parser->parse("ANSWER_COUNT", "", absl::nullopt).value(), nullptr);
-  EXPECT_NE(parser->parse("RESPONSE_CODE", "", absl::nullopt).value(), nullptr);
-  EXPECT_NE(parser->parse("PARSE_STATUS", "", absl::nullopt).value(), nullptr);
+  ASSERT_THAT(parser->parse("QUERY_NAME", "", absl::nullopt), IsOkAndHolds(NotNull()));
+  ASSERT_THAT(parser->parse("QUERY_TYPE", "", absl::nullopt), IsOkAndHolds(NotNull()));
+  ASSERT_THAT(parser->parse("QUERY_CLASS", "", absl::nullopt), IsOkAndHolds(NotNull()));
+  ASSERT_THAT(parser->parse("ANSWER_COUNT", "", absl::nullopt), IsOkAndHolds(NotNull()));
+  ASSERT_THAT(parser->parse("RESPONSE_CODE", "", absl::nullopt), IsOkAndHolds(NotNull()));
+  ASSERT_THAT(parser->parse("PARSE_STATUS", "", absl::nullopt), IsOkAndHolds(NotNull()));
 }
 
 TEST(DnsFilterCommandParserTest, CaseSensitiveCommands) {
   auto parser = createDnsFilterCommandParser();
 
   // Commands should be case-sensitive
-  EXPECT_NE(parser->parse("QUERY_NAME", "", absl::nullopt).value(), nullptr);
-  EXPECT_EQ(parser->parse("query_name", "", absl::nullopt).value(), nullptr);
-  EXPECT_EQ(parser->parse("Query_Name", "", absl::nullopt).value(), nullptr);
-  EXPECT_EQ(parser->parse("QUERYNAME", "", absl::nullopt).value(), nullptr);
+  ASSERT_THAT(parser->parse("QUERY_NAME", "", absl::nullopt), IsOkAndHolds(NotNull()));
+  ASSERT_THAT(parser->parse("query_name", "", absl::nullopt), IsOkAndHolds(IsNull()));
+  ASSERT_THAT(parser->parse("Query_Name", "", absl::nullopt), IsOkAndHolds(IsNull()));
+  ASSERT_THAT(parser->parse("QUERYNAME", "", absl::nullopt), IsOkAndHolds(IsNull()));
 }
 
 TEST(DnsFilterCommandParserTest, FormatValueStringType) {

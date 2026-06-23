@@ -69,7 +69,6 @@ public:
 };
 
 using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;
-using FormatterProviderResult = absl::StatusOr<std::unique_ptr<FormatterProvider>>;
 
 class CommandParser {
 public:
@@ -83,11 +82,12 @@ public:
    * @param max_length length to which the output produced by FormatterProvider
    *                   should be truncated to (optional).
    *
-   * @return FormatterProviderResult substitution provider for the parsed command or an error
-   * status.
+   * @return absl::StatusOr<FormatterProviderPtr> substitution provider for the parsed command or an
+   * error status.
    */
-  virtual FormatterProviderResult parse(absl::string_view command, absl::string_view command_arg,
-                                        absl::optional<size_t> max_length) const PURE;
+  virtual absl::StatusOr<FormatterProviderPtr> parse(absl::string_view command,
+                                                     absl::string_view command_arg,
+                                                     absl::optional<size_t> max_length) const PURE;
 };
 
 using CommandParserPtr = std::unique_ptr<CommandParser>;
