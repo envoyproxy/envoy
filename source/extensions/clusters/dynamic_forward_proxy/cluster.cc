@@ -180,8 +180,10 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
   // Inherit configuration from the parent DFP cluster.
   envoy::config::cluster::v3::Cluster config = orig_cluster_config_;
 
-  // Overwrite the name and lb policy.
+  // Overwrite the name and lb policy. Clear the inherited DFP cluster type so each branch below
+  // establishes a fresh discovery type instead of carrying the parent's DFP ClusterConfig.
   config.set_name(cluster_name);
+  config.clear_cluster_type();
   config.set_lb_policy(sub_cluster_lb_policy_);
 
   if (sub_cluster_dns_config_.has_value()) {
@@ -192,7 +194,6 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
     config.mutable_cluster_type()->set_name("envoy.cluster.dns");
     config.mutable_cluster_type()->mutable_typed_config()->PackFrom(dns_config);
   } else {
-    config.clear_cluster_type();
     config.set_type(
         envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_STRICT_DNS);
   }

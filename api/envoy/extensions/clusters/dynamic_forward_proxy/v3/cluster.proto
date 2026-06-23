@@ -77,7 +77,8 @@ message ClusterConfig {
   bool allow_coalesced_connections = 3;
 }
 
-// Configuration for sub clusters. Hard code STRICT_DNS cluster type now.
+// Configuration for sub clusters. Sub clusters default to the ``STRICT_DNS`` discovery type, or
+// use the ``DnsCluster`` extension when ``dns_cluster_config`` is set.
 // [#next-free-field: 6]
 message SubClustersConfig {
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
