@@ -10,6 +10,7 @@
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"
+#include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

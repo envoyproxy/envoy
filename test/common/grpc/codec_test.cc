@@ -188,8 +188,8 @@ TEST(GrpcCodecTest, decodeSingleFrame) {
   EXPECT_EQ(static_cast<uint64_t>(request.ByteSize()), frames[0].length_);
 
   helloworld::HelloRequest result;
-  result.ParseFromArray(frames[0].data_->linearize(frames[0].data_->length()),
-                        frames[0].data_->length());
+  std::ignore = result.ParseFromArray(frames[0].data_->linearize(frames[0].data_->length()),
+                                      frames[0].data_->length());
   EXPECT_EQ("hello", result.name());
 }
 
@@ -216,7 +216,8 @@ TEST(GrpcCodecTest, decodeMultipleFrame) {
     EXPECT_EQ(static_cast<uint64_t>(request.ByteSize()), frame.length_);
 
     helloworld::HelloRequest result;
-    result.ParseFromArray(frame.data_->linearize(frame.data_->length()), frame.data_->length());
+    std::ignore =
+        result.ParseFromArray(frame.data_->linearize(frame.data_->length()), frame.data_->length());
     EXPECT_EQ("hello", result.name());
   }
 }

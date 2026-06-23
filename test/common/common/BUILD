@@ -658,6 +658,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:bit_array_lib",
         "//source/common/common:random_generator_lib",
+        "//test/test_common:logging_lib",
     ],
 )
 

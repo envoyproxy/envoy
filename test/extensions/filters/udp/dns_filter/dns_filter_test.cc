@@ -93,7 +93,7 @@ public:
     EXPECT_EQ(typed_dns_resolver_config_.typed_config().type_url(),
               "type.googleapis.com/"
               "envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig");
-    typed_dns_resolver_config_.typed_config().UnpackTo(&cares_);
+    std::ignore = typed_dns_resolver_config_.typed_config().UnpackTo(&cares_);
     dns_resolver_options_.MergeFrom(cares_.dns_resolver_options());
   }
 

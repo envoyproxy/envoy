@@ -765,8 +765,9 @@ TEST_F(ActiveQuicListenerFactoryTest, DebugVisitorConfigured) {
   envoy::config::listener::v3::QuicProtocolOptions quic_config;
   quic_config.mutable_connection_debug_visitor_config()->set_name(
       "envoy.quic.connection_debug_visitor.mock");
-  quic_config.mutable_connection_debug_visitor_config()->mutable_typed_config()->PackFrom(
-      test::common::config::DummyConfig());
+  std::ignore =
+      quic_config.mutable_connection_debug_visitor_config()->mutable_typed_config()->PackFrom(
+          test::common::config::DummyConfig());
   auto listener_factory = createQuicListenerFactory(quic_config);
   auto debug_visitor_factory =
       ActiveQuicListenerFactoryPeer::debugVisitorFactory(listener_factory.get());

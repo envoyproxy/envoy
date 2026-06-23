@@ -6791,7 +6791,7 @@ TEST(HealthCheckEventLoggerImplTest, OneEventLogger) {
   auto event_log = health_check_config.mutable_event_logger()->Add();
   envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink config;
   config.set_event_log_path("foo");
-  event_log->mutable_typed_config()->PackFrom(config);
+  std::ignore = event_log->mutable_typed_config()->PackFrom(config);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
   StringViewSaver file_log_data;
@@ -6931,7 +6931,6 @@ TEST(HealthCheckProto, Validation) {
         prefix: locations
       path: /healthcheck
     )EOF";
-    envoy::config::core::v3::HealthCheck health_check_proto;
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
@@ -6947,7 +6946,6 @@ TEST(HealthCheckProto, Validation) {
         prefix: locations
       path: /healthcheck
     )EOF";
-    envoy::config::core::v3::HealthCheck health_check_proto;
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
@@ -6963,7 +6961,6 @@ TEST(HealthCheckProto, Validation) {
         prefix: locations
       path: /healthcheck
     )EOF";
-    envoy::config::core::v3::HealthCheck health_check_proto;
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
@@ -6979,7 +6976,6 @@ TEST(HealthCheckProto, Validation) {
         prefix: locations
       path: /healthcheck
     )EOF";
-    envoy::config::core::v3::HealthCheck health_check_proto;
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
@@ -6993,7 +6989,6 @@ TEST(HealthCheckProto, Validation) {
         prefix: locations
       path: /healthcheck
     )EOF";
-    envoy::config::core::v3::HealthCheck health_check_proto;
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value is required.*");
   }
@@ -7007,7 +7002,6 @@ TEST(HealthCheckProto, Validation) {
         prefix: locations
       path: /healthcheck
     )EOF";
-    envoy::config::core::v3::HealthCheck health_check_proto;
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value is required.*");
   }

@@ -177,7 +177,6 @@ message ServerInfo {
   google.protobuf.StringValue fallback_protocol_version = 3;
 }
 
-// [#not-implemented-hide:]
 // Configuration for sending locally-generated responses to tools/list requests.
 message ToolsListLocal {
 }
@@ -204,7 +203,6 @@ message ServerToolConfig {
     // https://modelcontextprotocol.io/specification/2025-11-25/schema#listtoolsresult
     HttpRule tool_list_http_rule = 3;
 
-    // [#not-implemented-hide:]
     // If provided: The extension sends a local response, according to each tool's
     // ToolsListSpecificConfig.
     ToolsListLocal tool_list_local = 4;
@@ -215,7 +213,6 @@ message ServerToolConfig {
   McpServerInfo default_server_info = 5;
 }
 
-// [#not-implemented-hide:]
 // Configuration for a tool's entry in tools/list responses.
 message ToolsListSpecificConfig {
   // Optional, human-readable name of the tool for display purposes.
@@ -247,7 +244,6 @@ message ToolConfig {
   // The HTTP configuration rules that apply to the normal backend.
   HttpRule http_rule = 2;
 
-  // [#not-implemented-hide:]
   // Config for this tool's entry in a local tools/list response. Used when tool_list_local is set
   // in the ServerToolConfig.
   ToolsListSpecificConfig tool_list_config = 3;

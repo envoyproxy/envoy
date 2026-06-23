@@ -64,7 +64,7 @@ vhds:
       auto* resource = to_ret.Add();
       resource->set_name(vhost.name());
       resource->set_version("1");
-      resource->mutable_resource()->PackFrom(vhost);
+      std::ignore = resource->mutable_resource()->PackFrom(vhost);
     }
 
     return to_ret;

@@ -127,14 +127,14 @@ TEST_P(UpstreamAccessLogTest, UpstreamFilterState) {
     envoy::config::core::v3::TransportSocket inner_socket;
     inner_socket.set_name("envoy.transport_sockets.raw_buffer");
     envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer_config;
-    inner_socket.mutable_typed_config()->PackFrom(raw_buffer_config);
+    std::ignore = inner_socket.mutable_typed_config()->PackFrom(raw_buffer_config);
     test::integration::upstream_socket::v3::Config proto_config;
     proto_config.mutable_transport_socket()->MergeFrom(inner_socket);
 
     auto* cluster_transport_socket =
         bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
     cluster_transport_socket->set_name("envoy.test.integration.upstreamt_socket");
-    cluster_transport_socket->mutable_typed_config()->PackFrom(proto_config);
+    std::ignore = cluster_transport_socket->mutable_typed_config()->PackFrom(proto_config);
   });
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -152,8 +152,8 @@ TEST_P(UpstreamAccessLogTest, UpstreamFilterState) {
         access_log_config.set_path(log_file);
         access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
             "%UPSTREAM_FILTER_STATE(test_key)%\n");
-        upstream_log_config->mutable_typed_config()->PackFrom(access_log_config);
-        typed_config->PackFrom(router_config);
+        std::ignore = upstream_log_config->mutable_typed_config()->PackFrom(access_log_config);
+        std::ignore = typed_config->PackFrom(router_config);
       });
 
   initialize();
@@ -202,8 +202,8 @@ TEST_P(UpstreamAccessLogTest, Retry) {
         access_log_config.set_path(log_file);
         access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
             "%RESPONSE_CODE% %ACCESS_LOG_TYPE%\n");
-        upstream_log_config->mutable_typed_config()->PackFrom(access_log_config);
-        typed_config->PackFrom(router_config);
+        std::ignore = upstream_log_config->mutable_typed_config()->PackFrom(access_log_config);
+        std::ignore = typed_config->PackFrom(router_config);
       });
 
   initialize();
@@ -280,8 +280,8 @@ TEST_P(UpstreamAccessLogTest, Periodic) {
         access_log_config.set_path(log_file);
         access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
             "%ACCESS_LOG_TYPE%\n");
-        upstream_log_config->mutable_typed_config()->PackFrom(access_log_config);
-        typed_config->PackFrom(router_config);
+        std::ignore = upstream_log_config->mutable_typed_config()->PackFrom(access_log_config);
+        std::ignore = typed_config->PackFrom(router_config);
       });
 
   initialize();

@@ -55,6 +55,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:cluster_update_callbacks_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:thread_local_cluster_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",

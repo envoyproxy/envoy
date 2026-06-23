@@ -493,9 +493,9 @@ ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::s
   envoy::extensions::upstreams::http::v3::HttpProtocolOptions protocol_options;
   protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
 
-  (*cluster.mutable_typed_extension_protocol_options())
-      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-          .PackFrom(protocol_options);
+  std::ignore = (*cluster.mutable_typed_extension_protocol_options())
+                    ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                        .PackFrom(protocol_options);
   return cluster;
 }
 
@@ -537,9 +537,9 @@ ConfigHelper::buildCluster(const std::string& name,
 
   envoy::extensions::upstreams::http::v3::HttpProtocolOptions protocol_options;
   protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
-  (*cluster.mutable_typed_extension_protocol_options())
-      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-          .PackFrom(protocol_options);
+  std::ignore = (*cluster.mutable_typed_extension_protocol_options())
+                    ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                        .PackFrom(protocol_options);
 
   return cluster;
 }
@@ -557,7 +557,7 @@ ConfigHelper::buildTlsCluster(const std::string& name,
       ->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
   socket->set_name("envoy.transport_sockets.tls");
-  socket->mutable_typed_config()->PackFrom(tls_socket);
+  std::ignore = socket->mutable_typed_config()->PackFrom(tls_socket);
   return cluster;
 }
 
@@ -971,9 +971,9 @@ void ConfigHelper::configureUpstreamTls(
             ->mutable_alternate_protocols_cache_options()
             ->CopyFrom(alternate_protocol_cache_config.value());
       }
-      (*cluster->mutable_typed_extension_protocol_options())
-          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-              .PackFrom(new_protocol_options);
+      std::ignore = (*cluster->mutable_typed_extension_protocol_options())
+                        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                            .PackFrom(new_protocol_options);
     }
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
     auto* validation_context =
@@ -989,10 +989,12 @@ void ConfigHelper::configureUpstreamTls(
       envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport quic_context;
       quic_context.mutable_upstream_tls_context()->CopyFrom(tls_context);
       cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
-      cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(quic_context);
+      std::ignore =
+          cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(quic_context);
     } else {
       cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
-      cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+      std::ignore =
+          cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
     }
   });
 }
@@ -1025,9 +1027,9 @@ void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& clust
       protocol_options.mutable_auto_config();
     }
   }
-  (*cluster.mutable_typed_extension_protocol_options())
-      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-          .PackFrom(protocol_options);
+  std::ignore = (*cluster.mutable_typed_extension_protocol_options())
+                    ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                        .PackFrom(protocol_options);
 }
 
 void ConfigHelper::setHttp2(envoy::config::cluster::v3::Cluster& cluster) {
@@ -1085,7 +1087,8 @@ void ConfigHelper::setAsyncLb(bool hang) {
         "envoy.load_balancing_policies.async_round_robin");
     test::integration::lb::AsyncRoundRobin lb_config;
     lb_config.set_hang(hang);
-    policy->mutable_typed_extension_config()->mutable_typed_config()->PackFrom(lb_config);
+    std::ignore =
+        policy->mutable_typed_extension_config()->mutable_typed_config()->PackFrom(lb_config);
   }
 }
 
@@ -1329,7 +1332,7 @@ void ConfigHelper::prependFilter(const std::string& config, bool downstream) {
     if (old_protocol_options.http_filters().empty()) {
       auto* codec_filter = old_protocol_options.add_http_filters();
       codec_filter->set_name("envoy.filters.http.upstream_codec");
-      codec_filter->mutable_typed_config()->PackFrom(
+      std::ignore = codec_filter->mutable_typed_config()->PackFrom(
           envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
     }
     auto* filter_list_back = old_protocol_options.add_http_filters();
@@ -1342,9 +1345,9 @@ void ConfigHelper::prependFilter(const std::string& config, bool downstream) {
     for (int i = old_protocol_options.http_filters_size() - 1; i > 0; --i) {
       old_protocol_options.mutable_http_filters()->SwapElements(i, i - 1);
     }
-    (*cluster->mutable_typed_extension_protocol_options())
-        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-            .PackFrom(old_protocol_options);
+    std::ignore = (*cluster->mutable_typed_extension_protocol_options())
+                      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                          .PackFrom(old_protocol_options);
   }
 }
 
@@ -1376,12 +1379,13 @@ void ConfigHelper::configDownstreamTransportSocketWithTls(
                                  ->mutable_common_tls_context());
       quic_transport_socket_config.mutable_enable_early_data()->set_value(enable_quic_early_data);
       quic_transport_socket_config.mutable_enable_resumption()->set_value(enable_quic_resumption);
-      transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+      std::ignore =
+          transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
     } else if (!listener.has_udp_listener_config()) {
       transport_socket->set_name("envoy.transport_sockets.tls");
       envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
       configure_tls_context(*tls_context.mutable_common_tls_context());
-      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
     }
   }
 }
@@ -1399,7 +1403,8 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   }
   tls_context.set_prefer_client_ciphers(options.prefer_client_ciphers_);
   filter_chain->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
-  filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+  std::ignore =
+      filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
 void ConfigHelper::addQuicDownstreamTransportSocketConfig() {
@@ -1442,7 +1447,8 @@ bool ConfigHelper::setAccessLog(
     }
   }
   access_log_config.set_path(filename);
-  hcm_config.mutable_access_log(0)->mutable_typed_config()->PackFrom(access_log_config);
+  std::ignore =
+      hcm_config.mutable_access_log(0)->mutable_typed_config()->PackFrom(access_log_config);
   storeHttpConnectionManager(hcm_config);
   return true;
 }
@@ -1458,11 +1464,11 @@ bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::strin
         std::string(format));
   }
   access_log_config.set_path(filename);
-  bootstrap_.mutable_static_resources()
-      ->mutable_listeners(0)
-      ->add_access_log()
-      ->mutable_typed_config()
-      ->PackFrom(access_log_config);
+  std::ignore = bootstrap_.mutable_static_resources()
+                    ->mutable_listeners(0)
+                    ->add_access_log()
+                    ->mutable_typed_config()
+                    ->PackFrom(access_log_config);
   return true;
 }
 
@@ -1776,7 +1782,7 @@ void ConfigHelper::setLds(absl::string_view version_info) {
   lds.set_version_info(std::string(version_info));
   for (auto& listener : bootstrap_.static_resources().listeners()) {
     Protobuf::Any* resource = lds.add_resources();
-    resource->PackFrom(listener);
+    std::ignore = resource->PackFrom(listener);
   }
 
   const std::string lds_filename =
@@ -1928,7 +1934,7 @@ void CdsHelper::setCds(const std::vector<envoy::config::cluster::v3::Cluster>& c
   cds_response.set_version_info(std::to_string(cds_version_++));
   cds_response.set_type_url(Config::TestTypeUrl::get().Cluster);
   for (const auto& cluster : clusters) {
-    cds_response.add_resources()->PackFrom(cluster);
+    std::ignore = cds_response.add_resources()->PackFrom(cluster);
   }
   // Past the initial write, need move semantics to trigger inotify move event that the
   // FilesystemSubscriptionImpl is subscribed to.
@@ -1950,7 +1956,7 @@ void EdsHelper::setEds(const std::vector<envoy::config::endpoint::v3::ClusterLoa
   eds_response.set_version_info(std::to_string(eds_version_++));
   eds_response.set_type_url(Config::TestTypeUrl::get().ClusterLoadAssignment);
   for (const auto& cluster_load_assignment : cluster_load_assignments) {
-    eds_response.add_resources()->PackFrom(cluster_load_assignment);
+    std::ignore = eds_response.add_resources()->PackFrom(cluster_load_assignment);
   }
   // Past the initial write, need move semantics to trigger inotify move event that the
   // FilesystemSubscriptionImpl is subscribed to.

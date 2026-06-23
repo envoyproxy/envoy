@@ -89,8 +89,6 @@ protected:
   createStrictDnsCluster(const envoy::config::cluster::v3::Cluster& cluster_config,
                          ClusterFactoryContext& factory_context,
                          std::shared_ptr<Network::DnsResolver> dns_resolver) {
-    envoy::extensions::clusters::dns::v3::DnsCluster dns_cluster{};
-
     ClusterFactoryContextImpl::LazyCreateDnsResolver resolver_fn = [&]() { return dns_resolver; };
     auto status_or_cluster =
         ClusterFactoryImplBase::create(cluster_config, factory_context.serverFactoryContext(),
@@ -4083,7 +4081,7 @@ TEST_F(StaticClusterImplTest, CustomUpstreamLocalAddressSelector) {
   Protobuf::Empty empty;
   auto address_selector_config =
       server_context_.cluster_manager_.mutableBindConfig().mutable_local_address_selector();
-  address_selector_config->mutable_typed_config()->PackFrom(empty);
+  std::ignore = address_selector_config->mutable_typed_config()->PackFrom(empty);
   address_selector_config->set_name("test.upstream.local.address.selector");
   server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
       "1.2.3.5");
@@ -5530,7 +5528,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
   TestFilterConfigFactoryBase factoryBase(
       []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::Struct>(); },
       [&](const Protobuf::Message& msg) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
-        const auto& msg_struct = dynamic_cast<const Protobuf::Struct&>(msg);
+        const auto& msg_struct = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(msg);
         EXPECT_TRUE(msg_struct.fields().find("option") != msg_struct.fields().end());
 
         return protocol_options;

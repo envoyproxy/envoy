@@ -476,7 +476,7 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
   cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
 
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
@@ -510,7 +510,7 @@ TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
     cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
 
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-    typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+    std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
     typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
     Network::DnsResolverFactory& dns_resolver_factory =
         createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
@@ -533,7 +533,7 @@ TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   // copy over dns_resolver_options_
   cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
@@ -595,7 +595,7 @@ TEST_F(DnsImplConstructor, SupportsMultipleCustomResolversAndDnsOptions) {
   cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
 
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
@@ -683,7 +683,7 @@ TEST_F(DnsImplConstructor, SupportCustomAddressInstances) {
   cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
 
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
@@ -710,7 +710,7 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
   cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
 
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
@@ -757,7 +757,7 @@ public:
     // Copy over the dns_resolver_options_.
     cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options);
     // setup the typed config
-    typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+    std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
     typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
     return typed_dns_resolver_config;
@@ -2192,7 +2192,7 @@ TEST_F(DnsImplConstructor, VerifyDefaultTimeoutAndTries) {
   cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
 
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
@@ -2249,7 +2249,7 @@ TEST_F(DnsImplConstructor, VerifyCustomTimeoutAndTries) {
   cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
 
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);

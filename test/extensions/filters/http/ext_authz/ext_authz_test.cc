@@ -2338,7 +2338,6 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestHeaders) {
   absl::string_view header_value = reinterpret_cast<const char*>(non_utf_8_bytes);
   request_headers_.addCopy(Http::LowerCaseString{header_key}, header_value);
 
-  envoy::service::auth::v3::CheckRequest check_request;
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest& check_request,
@@ -3194,18 +3193,17 @@ TEST_F(HttpFilterTest, MetadataContext) {
             check_request.attributes().metadata_context().filter_metadata().count("hiphop.drums"));
 
   helloworld::HelloRequest hello;
-  check_request.attributes()
-      .metadata_context()
-      .typed_filter_metadata()
-      .at("blues.piano")
-      .UnpackTo(&hello);
+  std::ignore = check_request.attributes()
+                    .metadata_context()
+                    .typed_filter_metadata()
+                    .at("blues.piano")
+                    .UnpackTo(&hello);
   EXPECT_EQ("jack dupree", hello.name());
-
-  check_request.attributes()
-      .metadata_context()
-      .typed_filter_metadata()
-      .at("jazz.sax")
-      .UnpackTo(&hello);
+  std::ignore = check_request.attributes()
+                    .metadata_context()
+                    .typed_filter_metadata()
+                    .at("jazz.sax")
+                    .UnpackTo(&hello);
   EXPECT_EQ("shorter wayne", hello.name());
 
   EXPECT_EQ(
@@ -3326,18 +3324,17 @@ TEST_F(HttpFilterTest, ConnectionMetadataContext) {
                    "typed.connection.data"));
 
   helloworld::HelloRequest hello;
-  check_request.attributes()
-      .metadata_context()
-      .typed_filter_metadata()
-      .at("typed.connection.data")
-      .UnpackTo(&hello);
+  std::ignore = check_request.attributes()
+                    .metadata_context()
+                    .typed_filter_metadata()
+                    .at("typed.connection.data")
+                    .UnpackTo(&hello);
   EXPECT_EQ("connection_typed", hello.name());
-
-  check_request.attributes()
-      .metadata_context()
-      .typed_filter_metadata()
-      .at("untyped.and.typed.connection.data")
-      .UnpackTo(&hello);
+  std::ignore = check_request.attributes()
+                    .metadata_context()
+                    .typed_filter_metadata()
+                    .at("untyped.and.typed.connection.data")
+                    .UnpackTo(&hello);
   EXPECT_EQ("connection_typed", hello.name());
 
   EXPECT_EQ(0, check_request.attributes().metadata_context().typed_filter_metadata().count(
@@ -5763,7 +5760,7 @@ TEST_P(HttpFilterTestParam, PerRouteConfigurationIntegrationTest) {
         check_response.mutable_ok_response();
 
         std::string serialized_response;
-        check_response.SerializeToString(&serialized_response);
+        std::ignore = check_response.SerializeToString(&serialized_response);
         auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
 
         callbacks.onSuccessRaw(std::move(response), parent_span);
@@ -5839,7 +5836,7 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcClientCreationAndUsage) {
 
         // Serialize the response to a buffer.
         std::string serialized_response;
-        check_response.SerializeToString(&serialized_response);
+        std::ignore = check_response.SerializeToString(&serialized_response);
         auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
 
         callbacks.onSuccessRaw(std::move(response), parent_span);
@@ -6147,7 +6144,7 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcClientTimeoutConfiguration) {
             check_response.mutable_ok_response();
 
             std::string serialized_response;
-            check_response.SerializeToString(&serialized_response);
+            std::ignore = check_response.SerializeToString(&serialized_response);
             auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
 
             callbacks.onSuccessRaw(std::move(response), parent_span);
@@ -6164,7 +6161,7 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcClientTimeoutConfiguration) {
             check_response.mutable_ok_response();
 
             std::string serialized_response;
-            check_response.SerializeToString(&serialized_response);
+            std::ignore = check_response.SerializeToString(&serialized_response);
             auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
 
             callbacks.onSuccessRaw(std::move(response), parent_span);
@@ -6656,9 +6653,8 @@ TEST_F(HttpFilterTest, ShadowModeDeniedSetsFilterStateAndContinues) {
   // Exercise serializeAsProto (populates all non-empty branches) and serializeAsString.
   auto serialized = shadow->serializeAsProto();
   ASSERT_NE(serialized, nullptr);
-  const auto& proto =
-      dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ShadowDecision&>(
-          *serialized);
+  const auto& proto = Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::filters::http::ext_authz::v3::ShadowDecision>(*serialized);
   EXPECT_EQ(proto.check_result(),
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::DENIED);
   EXPECT_EQ(proto.status_code(), 401);
@@ -6819,9 +6815,8 @@ TEST_F(HttpFilterTest, ShadowModeOkSetsFilterState) {
   // Exercise serializeAsProto on the OK branch.
   auto serialized = shadow->serializeAsProto();
   ASSERT_NE(serialized, nullptr);
-  const auto& proto =
-      dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ShadowDecision&>(
-          *serialized);
+  const auto& proto = Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::filters::http::ext_authz::v3::ShadowDecision>(*serialized);
   EXPECT_EQ(proto.check_result(),
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::OK);
   EXPECT_EQ(proto.status_code(), 200);
