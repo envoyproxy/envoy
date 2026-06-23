@@ -658,6 +658,76 @@ TEST_F(OriginalDstClusterTest, Membership2) {
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 }
 
+// Verifies that ORIGINAL_DST clusters expose all retained hosts as healthy hosts,
+// both upon initial addition and during partial cleanup rounds when some hosts become stale.
+TEST_F(OriginalDstClusterTest, AllRetainedHostsExposedAsHealthy) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 1.250s
+    type: ORIGINAL_DST
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  setupFromYaml(yaml);
+
+  OriginalDstCluster::LoadBalancer lb(handle_, cluster_->prioritySet());
+  Event::PostCb post_cb;
+
+  // Set up downstream connection 1 and trigger chooseHost to asynchronously add host1
+  NiceMock<Network::MockConnection> connection1;
+  TestLoadBalancerContext lb_context1(&connection1);
+  connection1.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11"));
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
+  HostConstSharedPtr host1 = lb.chooseHost(&lb_context1).host;
+  post_cb();
+
+  // Set up downstream connection 2 and trigger chooseHost to asynchronously add host2
+  NiceMock<Network::MockConnection> connection2;
+  TestLoadBalancerContext lb_context2(&connection2);
+  connection2.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.10.11.12"));
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
+  HostConstSharedPtr host2 = lb.chooseHost(&lb_context2).host;
+  post_cb();
+
+  // Verify that both added hosts are present and exposed as healthy
+  const auto& host_set = *cluster_->prioritySet().hostSetsPerPriority()[0];
+  EXPECT_EQ(2UL, host_set.hosts().size());
+  EXPECT_EQ(2UL, host_set.healthyHosts().size());
+
+  // Mark both hosts as used_ = false by firing the cleanup timer
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  cleanup_timer_->invokeCallback();
+  EXPECT_EQ(2UL, host_set.hosts().size());
+  EXPECT_EQ(2UL, host_set.healthyHosts().size());
+
+  // Re-select host1 to simulate active traffic
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+  EXPECT_EQ(lb.chooseHost(&lb_context1).host, host1);
+
+  // Cleanup timeout: host2 is removed as stale, host1 is retained
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  EXPECT_CALL(membership_updated_, ready());
+  cleanup_timer_->invokeCallback();
+
+  // Verify host1 is retained in both hosts() and healthyHosts()
+  EXPECT_EQ(1UL, host_set.hosts().size());
+  EXPECT_EQ(1UL, host_set.healthyHosts().size());
+  EXPECT_EQ(host_set.hosts()[0], host1);
+  EXPECT_EQ(host_set.healthyHosts()[0], host1);
+}
+
 TEST_F(OriginalDstClusterTest, Connection) {
   std::string yaml = R"EOF(
     name: name
