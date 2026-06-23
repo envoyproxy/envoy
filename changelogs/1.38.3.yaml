@@ -1,0 +1,17 @@
+date: June 23, 2026
+
+behavior_changes:
+- area: build
+  change: |
+    The contrib extension ``envoy.network.connection_balance.dlb`` (Intel DLB
+    connection balancer) has been disabled at the Bazel layer for all builds and
+    platforms due to a breakage at the source archive.
+
+    See https://github.com/envoyproxy/envoy/issues/45491 for local workarounds.
+
+minor_behavior_changes:
+- area: tls
+  change: |
+    Runtime guard ``envoy.reloadable_features.tls_certificate_compression_brotli`` is now disabled by
+    default. When disabled, QUIC retains zlib-only certificate compression and TCP TLS performs no
+    certificate compression. It can be re-enabled by setting the runtime guard to ``true``.
