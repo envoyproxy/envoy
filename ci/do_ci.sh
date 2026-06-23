@@ -470,7 +470,7 @@ case $CI_TARGET in
                 -c fastbuild \
                 "${TEST_TARGETS[@]}"
         fi
-        if [[ -z "$ENVOY_SKIP_CTO_WASMTIME" ]]; then
+        if [[ -n "$ENVOY_SKIP_CTO_WASMTIME" ]]; then
             exit 0
         fi
         echo "Building and testing with wasm=wasmtime and jemalloc: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
