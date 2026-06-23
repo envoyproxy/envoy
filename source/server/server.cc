@@ -575,8 +575,9 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
       server_stats_->initialization_time_ms_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
   ENVOY_LOG(debug, "server concurrency set to {}", options_.concurrency());
-  // Emit cgroup CPU detection diagnostics buffered before logging was initialized.
-  CgroupDetectorSingleton::get().flushLogs();
+  // Logging is now initialized; emit the cgroup CPU detection result stashed during the
+  // OptionsImpl constructor.
+  CgroupDetectorSingleton::get().logResult();
   if (!options().hotRestartDisabled()) {
     server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
   }

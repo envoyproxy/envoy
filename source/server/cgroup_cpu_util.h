@@ -1,8 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
-#include <vector>
 
 #include "envoy/filesystem/filesystem.h"
 
@@ -37,14 +35,15 @@ class CgroupDetectorImpl : public CgroupDetector {
 public:
   absl::optional<uint32_t> getCpuLimit(Filesystem::Instance& fs) override;
 
-  // Detection runs in the OptionsImpl constructor before logging is configured, so diagnostics are
-  // buffered via recordLog() and emitted by flushLogs() once logging is initialized.
-  void recordLog(absl::string_view log);
-  void flushLogs();
+  // Detection runs in the OptionsImpl constructor before logging is configured. The result is
+  // stashed and logged by logResult() once logging is initialized, so the diagnostic doesn't leak
+  // to stderr during early startup.
+  void logResult();
 
 private:
   absl::Mutex mutex_;
-  std::vector<std::string> logs_ ABSL_GUARDED_BY(mutex_);
+  bool ran_ ABSL_GUARDED_BY(mutex_) = false;
+  absl::optional<uint32_t> detected_limit_ ABSL_GUARDED_BY(mutex_);
 };
 
 using CgroupDetectorSingleton = ThreadSafeSingleton<CgroupDetectorImpl>;
