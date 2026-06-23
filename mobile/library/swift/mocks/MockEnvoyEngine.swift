@@ -39,6 +39,8 @@ extension MockEnvoyEngine: EnvoyEngine {
     return ""
   }
 
+  func drainConnectionsBySocketTag(_ tag: UInt32) {}
+
   func terminate() {}
 
   func resetConnectivityState() {}
