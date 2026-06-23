@@ -762,7 +762,7 @@ TEST_P(ProxyFilterIntegrationTest, DISABLED_ParallelRequestSecondHandleOrphanedW
   // Kick off request1. DNS starts and blocks.
   // request1's handle is registered in pending_resolutions_.
   auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  test_server_->waitForCounterEq("dns_cache.foo.dns_query_attempt", 1);
+  test_server_->waitForCounter("dns_cache.foo.dns_query_attempt", Eq(1));
 
   // Register request2's handle while DNS is still in flight.
   // Both handles are now in pending_resolutions_ on the worker thread.

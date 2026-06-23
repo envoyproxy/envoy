@@ -173,13 +173,13 @@ DnsCacheImpl::loadDnsCacheEntryWithForceRefresh(absl::string_view raw_host, uint
     auto it = primary_hosts_.find(host);
     // If the host is in the map and has already completed its first resolution, then we know that
     // the DNS resolution has finished and we can notify the worker thread.
-    if (!ignore_cached_entries && it != primary_hosts_.end() && it->second->host_info_->firstResolveComplete()) {
-      ENVOY_LOG(debug,
-                "host '{}' resolved during handle registration, posting deferred notify", host);
+    if (!ignore_cached_entries && it != primary_hosts_.end() &&
+         it->second->host_info_->firstResolveComplete()) {
+      ENVOY_LOG(debug, "host '{}' resolved during handle registration, posting deferred notify",
+                host);
       auto resolved_info = std::make_shared<HostMapUpdateInfo>(host, it->second->host_info_);
-      tls_host_info.dispatcher_.post([&tls_host_info, resolved_info]() {
-        tls_host_info.onHostMapUpdate(resolved_info);
-      });
+      tls_host_info.dispatcher_.post(
+        [&tls_host_info, resolved_info]() { tls_host_info.onHostMapUpdate(resolved_info); });
     }
   }
   return {LoadDnsCacheEntryStatus::Loading, std::move(handle), absl::nullopt};

@@ -2551,8 +2551,9 @@ TEST_F(DnsCacheImplTest, LoadDnsCacheEntryRaceWithInlineResolve) {
 
   // Because of the inline resolve, onLoadDnsCacheComplete is posted as a deferred callback inside
   // loadDnsCacheEntry, instead of being called later in finishResolve.
-  // This is the "race" that we're testing for: the callback is posted before the handle is inserted into pending_resolutions_.
-  // L171-183 detects this case and posts a deferred onHostMapUpdate, which calls onLoadDnsCacheComplete with the resolved host info.
+  // This is the "race" that we're testing for: the callback is posted before the handle is inserted
+  // into pending_resolutions_. L171-183 detects this case and posts a deferred onHostMapUpdate,
+  // which calls onLoadDnsCacheComplete with the resolved host info.
   EXPECT_CALL(callbacks,
               onLoadDnsCacheComplete(DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
 
@@ -2571,8 +2572,9 @@ TEST_F(DnsCacheImplTest, LoadDnsCacheEntryNoRaceWithAsyncResolve) {
   MockLoadDnsCacheEntryCallbacks callbacks;
   Network::DnsResolver::ResolveCb resolve_cb;
   // Same LIFO timer ordering as LoadDnsCacheEntryRaceWithInlineResolve:
-  // timeout_timer created 1st → captured by 2nd createTimer_() call → PrimaryHostInfo::timeout_timer_
-  // refresh_timer created 2nd → captured by 1st createTimer_() call → PrimaryHostInfo::refresh_timer_
+  // timeout_timer created 1st → captured by 2nd createTimer_() call →
+  // PrimaryHostInfo::timeout_timer_ refresh_timer created 2nd → captured by 1st createTimer_() call
+  // → PrimaryHostInfo::refresh_timer_
   Event::MockTimer* timeout_timer = new Event::MockTimer(&context_.server_context_.dispatcher_);
   Event::MockTimer* refresh_timer = new Event::MockTimer(&context_.server_context_.dispatcher_);
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
