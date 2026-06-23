@@ -12,10 +12,13 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
+#include "envoy/server/listener_manager.h"
 #include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
+#include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/common/hash.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
 #include "source/common/init/manager_impl.h"
@@ -23,10 +26,15 @@
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/lc_trie.h"
 #include "source/server/factory_context_impl.h"
-
+#include "source/server/generic_factory_context.h"
+#include "source/common/listener_manager/fcds_api.h"
+#include "source/server/transport_socket_config_impl.h"
 #include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
+namespace Init {
+class TargetImpl;
+}
 namespace Server {
 
 class FilterChainFactoryBuilder {
@@ -166,6 +174,144 @@ private:
   const Network::FilterChainInfoSharedPtr filter_chain_info_;
 };
 
+class FcdsDummyListenerInfo : public Network::ListenerInfo {
+public:
+  const envoy::config::core::v3::Metadata& metadata() const override {
+    static const envoy::config::core::v3::Metadata empty_metadata;
+    return empty_metadata;
+  }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    static const Envoy::Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory>
+        typed_metadata({});
+    return typed_metadata;
+  }
+  envoy::config::core::v3::TrafficDirection direction() const override {
+    return envoy::config::core::v3::TrafficDirection::UNSPECIFIED;
+  }
+  bool isQuic() const override { return false; }
+  bool shouldBypassOverloadManager() const override { return false; }
+};
+
+class FcdsFilterChainFactoryContextImpl : public Configuration::FilterChainFactoryContext,
+                                          public Network::DrainDecision {
+public:
+  FcdsFilterChainFactoryContextImpl(Server::Configuration::ServerFactoryContext& server_context)
+      : server_context_(server_context),
+        scope_(server_context_.scope().createScope("fcds_filter_chain")),
+        filter_chain_scope_(server_context_.scope().createScope("fcds_filter_chain.listener")) {}
+
+  // DrainDecision
+  bool drainClose(Network::DrainDirection) const override { return is_draining_.load(); }
+  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection,
+                                              DrainCloseCb) const override {
+    IS_ENVOY_BUG("Unexpected function call");
+    return nullptr;
+  }
+
+  // Configuration::FactoryContext
+  Network::DrainDecision& drainDecision() override { return *this; }
+  Init::Manager& initManager() override { return init_manager_; }
+  Stats::Scope& scope() override { return *scope_; }
+  const Network::ListenerInfo& listenerInfo() const override {
+    static const FcdsDummyListenerInfo dummy_listener_info;
+    return dummy_listener_info;
+  }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return server_context_.messageValidationContext().dynamicValidationVisitor();
+  }
+  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_context_; }
+  Stats::Scope& listenerScope() override { return *filter_chain_scope_; }
+
+  void startDraining() override { is_draining_.store(true); }
+
+private:
+  Server::Configuration::ServerFactoryContext& server_context_;
+  Stats::ScopeSharedPtr scope_;
+  Stats::ScopeSharedPtr filter_chain_scope_;
+  Init::ManagerImpl init_manager_{"fcds_filter_chain"};
+  std::atomic<bool> is_draining_{false};
+};
+
+class FcdsFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
+public:
+  FcdsFilterChainFactoryBuilder(
+      Server::Configuration::ServerFactoryContext& server_context,
+      ListenerComponentFactory& listener_component_factory,
+      Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
+      : validator_(server_context.messageValidationContext().dynamicValidationVisitor()),
+        listener_component_factory_(listener_component_factory), factory_context_(factory_context) {
+  }
+
+  absl::StatusOr<Network::DrainableFilterChainSharedPtr>
+  buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
+                   FilterChainFactoryContextCreator& context_creator,
+                   bool added_via_api) const override;
+
+private:
+  ProtobufMessage::ValidationVisitor& validator_;
+  ListenerComponentFactory& listener_component_factory_;
+  Server::Configuration::TransportSocketFactoryContextImpl& factory_context_;
+};
+
+inline constexpr char FcdsSharedFilterChainManagerName[] =
+    "fcds_shared_filter_chain_manager_singleton";
+
+class FcdsSharedFilterChainManager : public Singleton::Instance,
+                                     public std::enable_shared_from_this<FcdsSharedFilterChainManager>,
+                                     public FilterChainFactoryContextCreator {
+public:
+  FcdsSharedFilterChainManager(Server::Configuration::ServerFactoryContext& server_context,
+                               ListenerComponentFactory& listener_component_factory);
+  ~FcdsSharedFilterChainManager() override;
+
+  virtual absl::StatusOr<Network::DrainableFilterChainSharedPtr>
+  createOrUpdateSharedFilterChain(const envoy::config::listener::v3::FilterChain& config);
+
+  virtual Network::DrainableFilterChainSharedPtr
+  findSharedFilterChain(const std::string& name) const;
+
+  // Subscribes a listener callback for a filter chain name.
+  virtual absl::StatusOr<FcdsSubscriptionHandlePtr>
+  subscribe(const envoy::config::listener::v3::Listener::FcdsConfig& fcds_config,
+            const std::string& filter_chain_name, FilterChainUpdateCallbacks& callbacks,
+            Init::TargetImpl& init_target);
+
+  // Unsubscribes a listener callback.
+  virtual void unsubscribe(const envoy::config::listener::v3::Listener::FcdsConfig& fcds_config,
+                           const std::string& filter_chain_name,
+                           FilterChainUpdateCallbacks& callbacks);
+
+  // FilterChainFactoryContextCreator
+  Configuration::FilterChainFactoryContextPtr createFilterChainFactoryContext(
+      const ::envoy::config::listener::v3::FilterChain* const filter_chain) override;
+
+private:
+  Server::Configuration::ServerFactoryContext& server_context_;
+  ListenerComponentFactory& listener_component_factory_;
+  Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_;
+
+  absl::flat_hash_map<std::string, FcdsApiImpl*> name_to_subscription_;
+
+  struct SubscriptionKey {
+    uint64_t config_source_hash;
+    std::string filter_chain_name;
+
+    bool operator==(const SubscriptionKey& other) const {
+      return config_source_hash == other.config_source_hash &&
+             filter_chain_name == other.filter_chain_name;
+    }
+  };
+
+  struct SubscriptionKeyHash {
+    std::size_t operator()(const SubscriptionKey& key) const {
+      return HashUtil::xxHash64(key.filter_chain_name, key.config_source_hash);
+    }
+  };
+
+  absl::flat_hash_map<SubscriptionKey, std::unique_ptr<FcdsApiImpl>, SubscriptionKeyHash>
+      subscriptions_;
+};
+
 /**
  * Implementation of FilterChainManager. It owns and exchange filter chains.
  */
@@ -202,15 +348,26 @@ public:
       FilterChainFactoryBuilder& filter_chain_factory_builder,
       FilterChainFactoryContextCreator& context_creator);
 
+  absl::Status
+  updateFilterChains(const std::vector<Network::DrainableFilterChainSharedPtr>& added_or_updated,
+                     const std::vector<std::string>& removed);
+
   static bool isWildcardServerName(const std::string& name);
 
   const std::vector<Network::DrainableFilterChainSharedPtr>& drainingFilterChains() const {
     return draining_filter_chains_;
   }
+  std::vector<Network::DrainableFilterChainSharedPtr> takeDrainingFilterChains() {
+    return std::move(draining_filter_chains_);
+  }
 
   // Return the current view of filter chains, keyed by filter chain message. Used by the owning
   // listener to calculate the intersection of filter chains with another listener.
   const FcContextMap& filterChainsByMessage() const { return fc_contexts_; }
+  const absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr>&
+  filterChainsByName() const {
+    return filter_chains_by_name_;
+  }
   const absl::optional<envoy::config::listener::v3::FilterChain>&
   defaultFilterChainMessage() const {
     return default_filter_chain_message_;

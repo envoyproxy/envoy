@@ -1,11 +1,14 @@
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
+#include "envoy/singleton/manager.h"
 
 #include "source/common/common/cleanup.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
+#include "source/common/listener_manager/fcds_api.h"
 #include "source/common/matcher/matcher.h"
 #include "source/common/network/matching/data_impl.h"
 #include "source/common/network/matching/inputs.h"
@@ -20,6 +23,8 @@
 
 namespace Envoy {
 namespace Server {
+
+SINGLETON_MANAGER_REGISTRATION(fcds_shared_filter_chain_manager);
 
 namespace FilterChain {
 
@@ -126,6 +131,20 @@ absl::Status FilterChainManagerImpl::addFilterChains(
   uint32_t new_filter_chain_size = 0;
   FilterChainsByName filter_chains_by_name;
 
+  const auto* origin = getOriginFilterChainManager();
+  if (origin != nullptr) {
+    for (const auto& pair : origin->filter_chains_by_name_) {
+      if (pair.second->addedViaApi()) {
+        filter_chains_by_name.insert(pair);
+      }
+    }
+    for (const auto& message_and_filter_chain : origin->fc_contexts_) {
+      if (message_and_filter_chain.second->addedViaApi()) {
+        fc_contexts_.insert(message_and_filter_chain);
+      }
+    }
+  }
+
   for (const auto& filter_chain : filter_chain_span) {
     RETURN_IF_NOT_OK(verifyNoDuplicateMatchers(filter_chain_matcher, filter_chains, *filter_chain));
 
@@ -150,7 +169,6 @@ absl::Status FilterChainManagerImpl::addFilterChains(
                                                    filter_chain_factory_builder, context_creator));
   maybeConstructMatcher(filter_chain_matcher, filter_chains_by_name, parent_context_);
 
-  const auto* origin = getOriginFilterChainManager();
   if (origin != nullptr) {
     for (const auto& message_and_filter_chain : origin->fc_contexts_) {
       if (fc_contexts_.find(message_and_filter_chain.first) == fc_contexts_.end()) {
@@ -845,6 +863,178 @@ Configuration::FilterChainFactoryContextPtr FilterChainManagerImpl::createFilter
   // TODO(lambdai): add stats
   UNREFERENCED_PARAMETER(filter_chain);
   return std::make_unique<PerFilterChainFactoryContextImpl>(parent_context_, init_manager_);
+}
+
+absl::Status FilterChainManagerImpl::updateFilterChains(
+    const std::vector<Network::DrainableFilterChainSharedPtr>& added_or_updated,
+    const std::vector<std::string>& removed) {
+
+  uint32_t newly_built = 0;
+
+  // 1. Process removed filter chains
+  for (const auto& name : removed) {
+    auto iter = filter_chains_by_name_.find(name);
+    if (iter != filter_chains_by_name_.end()) {
+      draining_filter_chains_.push_back(iter->second);
+      filter_chains_by_name_.erase(iter);
+    }
+  }
+
+  // 2. Process added or updated filter chains
+  for (const auto& filter_chain_impl : added_or_updated) {
+    std::string name(filter_chain_impl->name());
+    if (name.empty()) {
+      return absl::InvalidArgumentError("Dynamic FCDS update: filter chain name is required.");
+    }
+
+    auto existing_iter = filter_chains_by_name_.find(name);
+    if (existing_iter != filter_chains_by_name_.end()) {
+      draining_filter_chains_.push_back(existing_iter->second);
+      filter_chains_by_name_.erase(existing_iter);
+    }
+
+    newly_built++;
+    filter_chains_by_name_[name] = filter_chain_impl;
+  }
+
+  ENVOY_LOG(debug, "FCDS update applied: active filter chains count {}, newly built {}",
+            filter_chains_by_name_.size(), newly_built);
+  return absl::OkStatus();
+}
+
+absl::StatusOr<Network::DrainableFilterChainSharedPtr>
+FcdsFilterChainFactoryBuilder::buildFilterChain(
+    const envoy::config::listener::v3::FilterChain& filter_chain,
+    FilterChainFactoryContextCreator& context_creator, bool added_via_api) const {
+
+  auto transport_socket = filter_chain.transport_socket();
+  if (!filter_chain.has_transport_socket()) {
+    envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
+    transport_socket.mutable_typed_config()->PackFrom(raw_buffer);
+    transport_socket.set_name("envoy.transport_sockets.raw_buffer");
+  }
+
+  auto& config_factory = Config::Utility::getAndCheckFactory<
+      Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket);
+
+  ProtobufTypes::MessagePtr message =
+      Config::Utility::translateToFactoryConfig(transport_socket, validator_, config_factory);
+
+  std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
+                                        filter_chain.filter_chain_match().server_names().end());
+
+  auto factory_or_error = config_factory.createTransportSocketFactory(*message, factory_context_,
+                                                                      std::move(server_names));
+  RETURN_IF_NOT_OK(factory_or_error.status());
+
+  auto filter_chain_factory_context =
+      context_creator.createFilterChainFactoryContext(&filter_chain);
+  auto factory_list_or_error = listener_component_factory_.createNetworkFilterFactoryList(
+      filter_chain.filters(), *filter_chain_factory_context);
+  RETURN_IF_NOT_OK(factory_list_or_error.status());
+
+  auto filter_chain_res = std::make_shared<FilterChainImpl>(
+      std::move(factory_or_error.value()), std::move(*factory_list_or_error),
+      std::chrono::milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(filter_chain, transport_socket_connect_timeout, 0)),
+      added_via_api, filter_chain);
+
+  filter_chain_res->setFilterChainFactoryContext(std::move(filter_chain_factory_context));
+  return filter_chain_res;
+}
+
+absl::StatusOr<Network::DrainableFilterChainSharedPtr>
+FcdsSharedFilterChainManager::createOrUpdateSharedFilterChain(
+    const envoy::config::listener::v3::FilterChain& config) {
+  FcdsFilterChainFactoryBuilder builder(server_context_, listener_component_factory_,
+                                        *transport_factory_context_);
+
+  auto filter_chain_or_error = builder.buildFilterChain(config, *this, true);
+  RETURN_IF_NOT_OK(filter_chain_or_error.status());
+
+  return filter_chain_or_error.value();
+}
+
+Network::DrainableFilterChainSharedPtr
+FcdsSharedFilterChainManager::findSharedFilterChain(const std::string& name) const {
+  auto iter = name_to_subscription_.find(name);
+  if (iter != name_to_subscription_.end()) {
+    return iter->second->filterChain();
+  }
+  return nullptr;
+}
+
+FcdsSharedFilterChainManager::FcdsSharedFilterChainManager(
+    Server::Configuration::ServerFactoryContext& server_context,
+    ListenerComponentFactory& listener_component_factory)
+    : server_context_(server_context), listener_component_factory_(listener_component_factory),
+      transport_factory_context_(
+          std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
+              server_context,
+              server_context.messageValidationContext().dynamicValidationVisitor())) {}
+
+FcdsSharedFilterChainManager::~FcdsSharedFilterChainManager() = default;
+
+Configuration::FilterChainFactoryContextPtr
+FcdsSharedFilterChainManager::createFilterChainFactoryContext(
+    const ::envoy::config::listener::v3::FilterChain* const filter_chain) {
+  UNREFERENCED_PARAMETER(filter_chain);
+  return std::make_unique<FcdsFilterChainFactoryContextImpl>(server_context_);
+}
+
+class FcdsSubscriptionHandleImpl : public FcdsSubscriptionHandle {
+public:
+  FcdsSubscriptionHandleImpl(std::shared_ptr<FcdsSharedFilterChainManager> shared_manager,
+                             const envoy::config::listener::v3::Listener::FcdsConfig& fcds_config,
+                             const std::string& filter_chain_name,
+                             FilterChainUpdateCallbacks& callbacks)
+      : shared_manager_(std::move(shared_manager)), fcds_config_(fcds_config),
+        filter_chain_name_(filter_chain_name), callbacks_(callbacks) {}
+
+  ~FcdsSubscriptionHandleImpl() override {
+    shared_manager_->unsubscribe(fcds_config_, filter_chain_name_, callbacks_);
+  }
+
+private:
+  const std::shared_ptr<FcdsSharedFilterChainManager> shared_manager_;
+  const envoy::config::listener::v3::Listener::FcdsConfig fcds_config_;
+  const std::string filter_chain_name_;
+  FilterChainUpdateCallbacks& callbacks_;
+};
+
+absl::StatusOr<FcdsSubscriptionHandlePtr> FcdsSharedFilterChainManager::subscribe(
+    const envoy::config::listener::v3::Listener::FcdsConfig& fcds_config,
+    const std::string& filter_chain_name, FilterChainUpdateCallbacks& callbacks,
+    Init::TargetImpl& init_target) {
+  const uint64_t config_hash = MessageUtil::hash(fcds_config);
+  const SubscriptionKey key{config_hash, filter_chain_name};
+  auto iter = subscriptions_.find(key);
+  if (iter == subscriptions_.end()) {
+    auto api = std::make_unique<FcdsApiImpl>(
+        fcds_config, filter_chain_name, *this, server_context_.clusterManager(),
+        server_context_.scope(),
+        server_context_.messageValidationContext().dynamicValidationVisitor());
+    iter = subscriptions_.emplace(key, std::move(api)).first;
+  }
+
+  name_to_subscription_[filter_chain_name] = iter->second.get();
+  RETURN_IF_NOT_OK(iter->second->subscribeClient(callbacks, init_target));
+  return std::make_unique<FcdsSubscriptionHandleImpl>(shared_from_this(), fcds_config, filter_chain_name, callbacks);
+}
+
+void FcdsSharedFilterChainManager::unsubscribe(
+    const envoy::config::listener::v3::Listener::FcdsConfig& fcds_config,
+    const std::string& filter_chain_name, FilterChainUpdateCallbacks& callbacks) {
+  const uint64_t config_hash = MessageUtil::hash(fcds_config);
+  const SubscriptionKey key{config_hash, filter_chain_name};
+  auto iter = subscriptions_.find(key);
+  if (iter != subscriptions_.end()) {
+    iter->second->unsubscribeClient(callbacks);
+    if (!iter->second->hasClients()) {
+      name_to_subscription_.erase(filter_chain_name);
+      subscriptions_.erase(iter);
+    }
+  }
 }
 
 } // namespace Server

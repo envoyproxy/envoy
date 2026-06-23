@@ -20,6 +20,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
+#include "source/common/listener_manager/fcds_api.h"
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/common/listener_manager/listener_info_impl.h"
 #include "source/common/quic/quic_stat_names.h"
@@ -200,6 +201,7 @@ private:
  */
 class ListenerImpl final : public Network::ListenerConfig,
                            public Network::FilterChainFactory,
+                           public FilterChainUpdateCallbacks,
                            Logger::Loggable<Logger::Id::config> {
 public:
   /**
@@ -336,6 +338,11 @@ public:
     ASSERT(listener_factory_context_ != nullptr);
     return listener_factory_context_->listener_factory_context_base_->listener_info_;
   }
+
+  // FilterChainUpdateCallbacks
+  absl::Status
+  onFilterChainUpdate(const std::vector<Network::DrainableFilterChainSharedPtr>& added_or_updated,
+                      const std::vector<std::string>& removed) override;
 
   void ensureSocketOptions(Network::Socket::OptionsSharedPtr& options) {
     if (options == nullptr) {
@@ -502,6 +509,12 @@ private:
   // Important: local_init_watcher_ must be the last field in the class to avoid unexpected
   // watcher callback during the destroy of ListenerImpl.
   Init::WatcherImpl local_init_watcher_;
+  std::vector<std::unique_ptr<Init::TargetImpl>> fcds_targets_;
+  std::vector<FcdsSubscriptionHandlePtr> fcds_subscriptions_;
+
+  static absl::flat_hash_set<std::string>
+  getFilterChainNamesFromMatcher(const xds::type::matcher::v3::Matcher& matcher);
+
   std::shared_ptr<Server::Configuration::TransportSocketFactoryContextImpl>
       transport_factory_context_;
 

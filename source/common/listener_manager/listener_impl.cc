@@ -74,6 +74,52 @@ bool shouldBindToPort(const envoy::config::listener::v3::Listener& config) {
   return PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, bind_to_port, true) &&
          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true);
 }
+
+void findFilterChainNames(const xds::type::matcher::v3::Matcher& matcher,
+                          absl::flat_hash_set<std::string>& names);
+
+void findFilterChainNamesInOnMatch(const xds::type::matcher::v3::Matcher::OnMatch& on_match,
+                                   absl::flat_hash_set<std::string>& names) {
+  if (on_match.has_matcher()) {
+    findFilterChainNames(on_match.matcher(), names);
+  } else if (on_match.has_action()) {
+    const auto& action = on_match.action();
+    if (action.name() == "filter-chain-name") {
+      Protobuf::StringValue string_value;
+      if (MessageUtil::unpackTo(action.typed_config(), string_value).ok()) {
+        names.insert(string_value.value());
+      }
+    }
+  }
+}
+
+void findFilterChainNames(const xds::type::matcher::v3::Matcher& matcher,
+                          absl::flat_hash_set<std::string>& names) {
+  if (matcher.has_matcher_list()) {
+    for (const auto& matcher_element : matcher.matcher_list().matchers()) {
+      if (matcher_element.has_on_match()) {
+        findFilterChainNamesInOnMatch(matcher_element.on_match(), names);
+      }
+    }
+  }
+
+  if (matcher.has_matcher_tree()) {
+    const auto& tree = matcher.matcher_tree();
+    if (tree.has_exact_match_map()) {
+      for (const auto& pair : tree.exact_match_map().map()) {
+        findFilterChainNamesInOnMatch(pair.second, names);
+      }
+    } else if (tree.has_prefix_match_map()) {
+      for (const auto& pair : tree.prefix_match_map().map()) {
+        findFilterChainNamesInOnMatch(pair.second, names);
+      }
+    }
+  }
+
+  if (matcher.has_on_no_match()) {
+    findFilterChainNamesInOnMatch(matcher.on_no_match(), names);
+  }
+}
 } // namespace
 
 absl::StatusOr<std::unique_ptr<ListenSocketFactoryImpl>> ListenSocketFactoryImpl::create(
@@ -472,6 +518,37 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       addresses_, listener_factory_context_->parentFactoryContext(), initManager()),
 
   buildAccessLog(config);
+
+  if (config.has_fcds_config()) {
+    if (!config.has_filter_chain_matcher()) {
+      creation_status = absl::InvalidArgumentError(
+          fmt::format("listener {}: FCDS requires a filter chain matcher.", name_));
+      return;
+    }
+
+    const auto filter_chain_names = getFilterChainNamesFromMatcher(config.filter_chain_matcher());
+
+    std::shared_ptr<FcdsSharedFilterChainManager> shared_manager =
+        listener_factory_context_->parentFactoryContext()
+            .serverFactoryContext()
+            .singletonManager()
+            .getTyped<FcdsSharedFilterChainManager>(FcdsSharedFilterChainManagerName);
+    ASSERT(shared_manager != nullptr);
+
+    for (const auto& name : filter_chain_names) {
+      auto target = std::make_unique<Init::TargetImpl>(
+          fmt::format("FCDS {} for listener {}", name, name_), []() {});
+      auto handle_or_error = shared_manager->subscribe(config.fcds_config(), name, *this, *target);
+      if (!handle_or_error.ok()) {
+        creation_status = handle_or_error.status();
+        return;
+      }
+      initManager().add(*target);
+      fcds_targets_.push_back(std::move(target));
+      fcds_subscriptions_.push_back(std::move(handle_or_error.value()));
+    }
+  }
+
   SET_AND_RETURN_IF_NOT_OK(validateConfig(), creation_status);
 
   // buildUdpListenerFactory() must come before buildListenSocketOptions() because the UDP
@@ -550,6 +627,30 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       quic_stat_names_(parent_.quicStatNames()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
           POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
+  if (config.has_fcds_config()) {
+    const auto filter_chain_names = getFilterChainNamesFromMatcher(config.filter_chain_matcher());
+
+    std::shared_ptr<FcdsSharedFilterChainManager> shared_manager =
+        listener_factory_context_->parentFactoryContext()
+            .serverFactoryContext()
+            .singletonManager()
+            .getTyped<FcdsSharedFilterChainManager>(FcdsSharedFilterChainManagerName);
+    ASSERT(shared_manager != nullptr);
+
+    for (const auto& name : filter_chain_names) {
+      auto target = std::make_unique<Init::TargetImpl>(
+          fmt::format("FCDS {} for listener {}", name, name_), []() {});
+      auto handle_or_error = shared_manager->subscribe(config.fcds_config(), name, *this, *target);
+      if (!handle_or_error.ok()) {
+        creation_status = handle_or_error.status();
+        return;
+      }
+      initManager().add(*target);
+      fcds_targets_.push_back(std::move(target));
+      fcds_subscriptions_.push_back(std::move(handle_or_error.value()));
+    }
+  }
+
   buildAccessLog(config);
   SET_AND_RETURN_IF_NOT_OK(validateConfig(), creation_status);
   SET_AND_RETURN_IF_NOT_OK(createListenerFilterFactories(config), creation_status);
@@ -1358,6 +1459,39 @@ bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v
   // Without message reflection, err on the side of reloads.
   return false;
 #endif
+}
+
+absl::flat_hash_set<std::string>
+ListenerImpl::getFilterChainNamesFromMatcher(const xds::type::matcher::v3::Matcher& matcher) {
+  absl::flat_hash_set<std::string> names;
+  findFilterChainNames(matcher, names);
+  return names;
+}
+
+absl::Status ListenerImpl::onFilterChainUpdate(
+    const std::vector<Network::DrainableFilterChainSharedPtr>& added_or_updated,
+    const std::vector<std::string>& removed) {
+
+  ENVOY_LOG(info, "FCDS updating filter chains in-place: added/updated: {}, removed: {}",
+            added_or_updated.size(), removed.size());
+
+  // 1. Update filter chains directly in our manager
+  RETURN_IF_NOT_OK(filter_chain_manager_->updateFilterChains(added_or_updated, removed));
+
+  // 2. Push the updated config to all workers in-place
+  if (parent_.isWorkerStarted()) {
+    parent_.updateListenerOnWorkers(*this);
+
+    // 3. Drain the removed or modified filter chains in-place
+    auto draining_chains = filter_chain_manager_->takeDrainingFilterChains();
+    parent_.drainFilterChains(*this, std::move(draining_chains));
+  } else {
+    // If workers are not started, no connections can exist on the old filter chains.
+    // Discard them immediately to prevent accumulation during warming.
+    filter_chain_manager_->takeDrainingFilterChains();
+  }
+
+  return absl::OkStatus();
 }
 
 } // namespace Server

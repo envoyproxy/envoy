@@ -400,8 +400,9 @@ DrainManagerPtr ProdListenerComponentFactory::createDrainManager(
 }
 
 DrainingFilterChainsManager::DrainingFilterChainsManager(ListenerImplPtr&& draining_listener,
+                                                         uint64_t listener_tag,
                                                          uint64_t workers_pending_removal)
-    : draining_listener_(std::move(draining_listener)),
+    : draining_listener_(std::move(draining_listener)), listener_tag_(listener_tag),
       workers_pending_removal_(workers_pending_removal) {}
 
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
@@ -415,6 +416,12 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
   if (!factory_) {
     factory_ = std::make_unique<ProdListenerComponentFactory>(server);
   }
+  fcds_shared_filter_chain_manager_ =
+      server_.singletonManager().getTyped<FcdsSharedFilterChainManager>(
+          FcdsSharedFilterChainManagerName, [this]() -> Singleton::InstanceSharedPtr {
+            return std::make_shared<FcdsSharedFilterChainManager>(server_.serverFactoryContext(),
+                                                                  *factory_);
+          });
   if (server.admin().has_value()) {
     listeners_config_tracker_entry_ = server.admin()->getConfigTracker().add(
         "listeners", [this](const Matchers::StringMatcher& name_matcher) {
@@ -922,12 +929,39 @@ void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
   notifyListenerUpdateCallbacks(listener.name(), **existing_active_listener);
 }
 
+absl::Status ListenerManagerImpl::registerWarmingListener(ListenerImplPtr&& new_listener,
+                                                          ListenerImpl& origin) {
+
+  RETURN_IF_NOT_OK(setupSocketFactoryForListener(*new_listener, origin));
+
+  ListenerImpl& new_listener_ref = *new_listener;
+  if (workers_started_) {
+    new_listener->debugLog("add warming listener for FCDS update");
+    auto existing_warming_listener = getListenerByName(warming_listeners_, origin.name());
+    if (existing_warming_listener != warming_listeners_.end()) {
+      *existing_warming_listener = std::move(new_listener);
+    } else {
+      warming_listeners_.emplace_back(std::move(new_listener));
+    }
+    updateWarmingActiveGauges();
+  } else {
+    new_listener->debugLog("update active listener for FCDS update");
+    auto existing_active_listener = getListenerByName(active_listeners_, origin.name());
+    ASSERT(existing_active_listener != active_listeners_.end());
+    *existing_active_listener = std::move(new_listener);
+  }
+
+  new_listener_ref.initialize();
+  return absl::OkStatus();
+}
+
 void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
                                             ListenerImpl& new_listener) {
   // First add the listener to the draining list.
+  uint64_t tag = draining_listener->listenerTag();
   std::list<DrainingFilterChainsManager>::iterator draining_group =
       draining_filter_chains_manager_.emplace(draining_filter_chains_manager_.begin(),
-                                              std::move(draining_listener), workers_.size());
+                                              std::move(draining_listener), tag, workers_.size());
   draining_group->getDrainingListener().diffFilterChain(
       new_listener, [&draining_group](Network::DrainableFilterChain& filter_chain) mutable {
         filter_chain.startDraining();
@@ -977,6 +1011,60 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
         }
       });
   updateWarmingActiveGauges();
+}
+
+void ListenerManagerImpl::drainFilterChains(
+    ListenerImpl& listener,
+    std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains) {
+  if (draining_filter_chains.empty()) {
+    return;
+  }
+
+  // 1. Create a draining group in draining_filter_chains_manager_ with nullptr listener
+  std::list<DrainingFilterChainsManager>::iterator draining_group =
+      draining_filter_chains_manager_.emplace(draining_filter_chains_manager_.begin(), nullptr,
+                                              listener.listenerTag(), workers_.size());
+
+  // 2. Keep the shared pointers alive and start draining
+  for (auto& fc : draining_filter_chains) {
+    fc->startDraining();
+    draining_group->addFilterChainToDrain(*fc);
+    draining_group->addSharedFilterChainToKeepAlive(fc);
+  }
+
+  auto filter_chain_size = draining_group->numDrainingFilterChains();
+  stats_.total_filter_chains_draining_.add(filter_chain_size);
+  listener.debugLog(absl::StrCat("draining ", filter_chain_size,
+                                 " dynamic filter chains in listener ", listener.name()));
+
+  // 3. Notify connection handlers on the workers
+  for (const auto& worker : workers_) {
+    worker->onFilterChainDrain(listener.listenerTag(), draining_group->getDrainingFilterChains());
+  }
+
+  // 4. Start the drain sequence
+  draining_group->startDrainSequence(
+      server_.options().drainTime(), server_.dispatcher(),
+      [this, draining_group, tag = listener.listenerTag()]() -> void {
+        for (const auto& worker : workers_) {
+          worker->removeFilterChains(tag, draining_group->getDrainingFilterChains(),
+                                     [this, draining_group]() -> void {
+                                       server_.dispatcher().post([this, draining_group]() -> void {
+                                         if (draining_group->decWorkersPendingRemoval() == 0) {
+                                           stats_.total_filter_chains_draining_.sub(
+                                               draining_group->numDrainingFilterChains());
+                                           draining_filter_chains_manager_.erase(draining_group);
+                                         }
+                                       });
+                                     });
+        }
+      });
+}
+
+void ListenerManagerImpl::updateListenerOnWorkers(ListenerImpl& listener) {
+  for (const auto& worker : workers_) {
+    addListenerToWorker(*worker, listener.listenerTag(), listener, nullptr);
+  }
 }
 
 uint64_t ListenerManagerImpl::numConnections() const {

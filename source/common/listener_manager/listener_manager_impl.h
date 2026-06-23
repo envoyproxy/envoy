@@ -175,9 +175,9 @@ struct ListenerManagerStats {
  */
 class DrainingFilterChainsManager {
 public:
-  DrainingFilterChainsManager(ListenerImplPtr&& draining_listener,
+  DrainingFilterChainsManager(ListenerImplPtr&& draining_listener, uint64_t listener_tag,
                               uint64_t workers_pending_removal);
-  uint64_t getDrainingListenerTag() const { return draining_listener_->listenerTag(); }
+  uint64_t getDrainingListenerTag() const { return listener_tag_; }
   const std::list<const Network::FilterChain*>& getDrainingFilterChains() const {
     return draining_filter_chains_;
   }
@@ -198,10 +198,16 @@ public:
     draining_filter_chains_.push_back(&filter_chain);
   }
 
+  void addSharedFilterChainToKeepAlive(Network::DrainableFilterChainSharedPtr filter_chain) {
+    draining_filter_chain_shared_ptrs_.push_back(filter_chain);
+  }
+
   uint32_t numDrainingFilterChains() const { return draining_filter_chains_.size(); }
 
 private:
   ListenerImplPtr draining_listener_;
+  uint64_t listener_tag_;
+  std::vector<Network::DrainableFilterChainSharedPtr> draining_filter_chain_shared_ptrs_;
   std::list<const Network::FilterChain*> draining_filter_chains_;
 
   uint64_t workers_pending_removal_;
@@ -220,6 +226,11 @@ public:
 
   void onListenerWarmed(ListenerImpl& listener);
   void inPlaceFilterChainUpdate(ListenerImpl& listener);
+  absl::Status registerWarmingListener(ListenerImplPtr&& new_listener, ListenerImpl& origin);
+  void
+  drainFilterChains(ListenerImpl& listener,
+                    std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains);
+  void updateListenerOnWorkers(ListenerImpl& listener);
 
   // Server::ListenerManager
   absl::StatusOr<bool> addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
@@ -386,6 +397,7 @@ private:
   Quic::QuicStatNames& quic_stat_names_;
   absl::flat_hash_set<uint64_t> stopped_listener_tags_;
   std::list<ListenerUpdateCallbacks*> update_callbacks_;
+  std::shared_ptr<FcdsSharedFilterChainManager> fcds_shared_filter_chain_manager_;
 };
 
 class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {

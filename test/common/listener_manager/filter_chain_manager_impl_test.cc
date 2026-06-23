@@ -25,6 +25,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/drain_manager.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/listener_component_factory.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/server/utility.h"
 #include "test/test_common/environment.h"
@@ -42,11 +43,22 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Server {
 
+class MockFcdsSharedFilterChainManager : public FcdsSharedFilterChainManager {
+public:
+  MockFcdsSharedFilterChainManager(Server::Configuration::ServerFactoryContext& server_context,
+                                   ListenerComponentFactory& listener_component_factory)
+      : FcdsSharedFilterChainManager(server_context, listener_component_factory) {}
+
+  MOCK_METHOD(absl::StatusOr<Network::DrainableFilterChainSharedPtr>,
+              createOrUpdateSharedFilterChain,
+              (const envoy::config::listener::v3::FilterChain& config), (override));
+};
+
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 public:
   MockFilterChainFactoryBuilder() {
     ON_CALL(*this, buildFilterChain(_, _, _))
-        .WillByDefault(Return(std::make_shared<Network::MockFilterChain>()));
+        .WillByDefault(Return(std::make_shared<NiceMock<Network::MockFilterChain>>()));
   }
 
   MOCK_METHOD(absl::StatusOr<Network::DrainableFilterChainSharedPtr>, buildFilterChain,
@@ -59,6 +71,13 @@ class FilterChainManagerImplTest : public testing::TestWithParam<bool> {
 public:
   void SetUp() override {
     addresses_.emplace_back(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
+    shared_filter_chain_manager_ = std::make_shared<NiceMock<MockFcdsSharedFilterChainManager>>(
+        parent_context_.server_factory_context_, listener_component_factory_);
+    parent_context_.server_factory_context_.singleton_manager_
+        ->getTyped<FcdsSharedFilterChainManager>(
+            FcdsSharedFilterChainManagerName,
+            [this]() -> Singleton::InstanceSharedPtr { return shared_filter_chain_manager_; });
+
     filter_chain_manager_ =
         std::make_unique<FilterChainManagerImpl>(addresses_, parent_context_, init_manager_);
     local_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234);
@@ -152,15 +171,17 @@ public:
   envoy::config::listener::v3::FilterChain filter_chain_template_;
   xds::type::matcher::v3::Matcher matcher_;
   std::shared_ptr<Network::MockFilterChain> build_out_filter_chain_{
-      std::make_shared<Network::MockFilterChain>()};
+      std::make_shared<NiceMock<Network::MockFilterChain>>()};
   envoy::config::listener::v3::FilterChain fallback_filter_chain_;
   std::shared_ptr<Network::MockFilterChain> build_out_fallback_filter_chain_{
-      std::make_shared<Network::MockFilterChain>()};
+      std::make_shared<NiceMock<Network::MockFilterChain>>()};
 
   NiceMock<MockFilterChainFactoryBuilder> filter_chain_factory_builder_;
   NiceMock<Server::Configuration::MockFactoryContext> parent_context_;
   std::vector<Network::Address::InstanceConstSharedPtr> addresses_;
   // Test target.
+  NiceMock<MockListenerComponentFactory> listener_component_factory_;
+  std::shared_ptr<NiceMock<MockFcdsSharedFilterChainManager>> shared_filter_chain_manager_;
   std::unique_ptr<FilterChainManagerImpl> filter_chain_manager_;
 };
 
@@ -200,7 +221,7 @@ TEST_P(FilterChainManagerImplTest, FilterChainUseFallbackIfNoFilterChainMatches)
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
       .WillOnce(Return(build_out_fallback_filter_chain_));
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
-      .WillOnce(Return(std::make_shared<Network::MockFilterChain>()))
+      .WillOnce(Return(std::make_shared<NiceMock<Network::MockFilterChain>>()))
       .RetiresOnSaturation();
   addSingleFilterChainHelper(filter_chain_template_, &fallback_filter_chain_);
 
@@ -272,7 +293,7 @@ TEST_P(FilterChainManagerImplTest, UpdateFilterChainsBetweenVersions) {
     filter_chain_messages.push_back(std::move(new_filter_chain));
   }
 
-  auto filter_chain = std::make_shared<Network::MockFilterChain>();
+  auto filter_chain = std::make_shared<NiceMock<Network::MockFilterChain>>();
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
       .WillOnce(Return(filter_chain));
   EXPECT_TRUE(filter_chain_manager_
@@ -347,6 +368,88 @@ TEST_P(FilterChainManagerImplTest, DuplicateFilterChainMatchFails) {
             "{\"destination_port\":10000,\"server_names\":[\"example.com\"]}"
 #endif
   );
+}
+
+TEST_P(FilterChainManagerImplTest, UpdateFilterChainsDynamic) {
+  if (!GetParam()) {
+    return;
+  }
+  // 1. Setup static filter chain first.
+  envoy::config::listener::v3::FilterChain static_chain = filter_chain_template_;
+  static_chain.set_name("static_chain");
+  static_chain.mutable_filter_chain_match()->mutable_destination_port()->set_value(10001);
+
+  auto build_out_static_chain = std::make_shared<NiceMock<Network::MockFilterChain>>();
+  ON_CALL(*build_out_static_chain, addedViaApi()).WillByDefault(Return(false));
+  EXPECT_CALL(filter_chain_factory_builder_,
+              buildFilterChain(testing::Property(&envoy::config::listener::v3::FilterChain::name,
+                                                 "static_chain"),
+                               _, false))
+      .WillOnce(Return(build_out_static_chain));
+
+  EXPECT_TRUE(filter_chain_manager_
+                  ->addFilterChains(GetParam() ? &matcher_ : nullptr, {&static_chain}, nullptr,
+                                    filter_chain_factory_builder_, *filter_chain_manager_)
+                  .ok());
+
+  // 2. Clone the manager.
+  auto cloned_manager = std::make_unique<FilterChainManagerImpl>(
+      addresses_, parent_context_, init_manager_, *filter_chain_manager_);
+
+  // Re-run addFilterChains as in buildFilterChains to pull static chain from origin
+  EXPECT_TRUE(cloned_manager
+                  ->addFilterChains(GetParam() ? &matcher_ : nullptr, {&static_chain}, nullptr,
+                                    filter_chain_factory_builder_, *cloned_manager)
+                  .ok());
+
+  // Verify it has the active static filter chain.
+  EXPECT_EQ(cloned_manager->filterChainsByMessage().size(), 1);
+
+  // 3. Dynamic FCDS update: add a new dynamic filter chain "dynamic_chain_1"
+  auto build_out_dynamic_chain_1 = std::make_shared<NiceMock<Network::MockFilterChain>>();
+  ON_CALL(*build_out_dynamic_chain_1, name()).WillByDefault(Return("dynamic_chain_1"));
+  ON_CALL(*build_out_dynamic_chain_1, addedViaApi()).WillByDefault(Return(true));
+
+  EXPECT_TRUE(cloned_manager->updateFilterChains({build_out_dynamic_chain_1}, {}).ok());
+
+  // Verify both static and dynamic chains are active.
+  EXPECT_EQ(cloned_manager->filterChainsByMessage().size(), 1);
+  EXPECT_EQ(cloned_manager->filterChainsByName().size(), 2);
+
+  // 4. LDS update on the cloned manager: rebuild static chains.
+  // It should preserve the dynamic "dynamic_chain_1".
+  auto cloned_manager_after_lds = std::make_unique<FilterChainManagerImpl>(
+      addresses_, parent_context_, init_manager_, *cloned_manager);
+
+  // Re-add the static chain
+  EXPECT_TRUE(cloned_manager_after_lds
+                  ->addFilterChains(GetParam() ? &matcher_ : nullptr, {&static_chain}, nullptr,
+                                    filter_chain_factory_builder_, *cloned_manager_after_lds)
+                  .ok());
+
+  // Verify both static and dynamic chains are preserved.
+  EXPECT_EQ(cloned_manager_after_lds->filterChainsByMessage().size(), 1);
+  EXPECT_EQ(cloned_manager_after_lds->filterChainsByName().size(), 2);
+
+  // 5. Dynamic FCDS update: update "dynamic_chain_1"
+  auto build_out_dynamic_chain_1_updated = std::make_shared<NiceMock<Network::MockFilterChain>>();
+  ON_CALL(*build_out_dynamic_chain_1_updated, name()).WillByDefault(Return("dynamic_chain_1"));
+  ON_CALL(*build_out_dynamic_chain_1_updated, addedViaApi()).WillByDefault(Return(true));
+
+  EXPECT_TRUE(cloned_manager_after_lds
+                  ->updateFilterChains({build_out_dynamic_chain_1_updated}, {"dynamic_chain_2"})
+                  .ok());
+
+  // Verify the old version of "dynamic_chain_1" is draining
+  EXPECT_EQ(cloned_manager_after_lds->drainingFilterChains().size(), 1);
+  EXPECT_EQ(cloned_manager_after_lds->drainingFilterChains()[0], build_out_dynamic_chain_1);
+
+  // 6. Dynamic FCDS update: remove "dynamic_chain_1"
+  EXPECT_TRUE(cloned_manager_after_lds->updateFilterChains({}, {"dynamic_chain_1"}).ok());
+
+  // Verify the updated version is now also draining
+  EXPECT_EQ(cloned_manager_after_lds->drainingFilterChains().size(), 2);
+  EXPECT_EQ(cloned_manager_after_lds->drainingFilterChains()[1], build_out_dynamic_chain_1_updated);
 }
 
 INSTANTIATE_TEST_SUITE_P(Matcher, FilterChainManagerImplTest, ::testing::Values(true, false));
