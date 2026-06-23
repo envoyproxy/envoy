@@ -18,12 +18,15 @@ namespace Tls {
 // cancellation.
 class CancellableSelectionHandle : public Ssl::SelectionHandle {
 public:
-  explicit CancellableSelectionHandle(Stats::Counter& cancelled_counter)
-      : cancelled_counter_(cancelled_counter) {}
+  CancellableSelectionHandle(Stats::Counter& cancelled_counter,
+                             Ssl::CertificateSelectionCallbackPtr cb, Event::TimerPtr timer)
+      : cancelled_counter_(cancelled_counter), cb_(std::move(cb)), timer_(std::move(timer)) {}
   ~CancellableSelectionHandle() override { cancelled_counter_.inc(); }
 
 private:
   Stats::Counter& cancelled_counter_;
+  Ssl::CertificateSelectionCallbackPtr cb_;
+  Event::TimerPtr timer_;
 };
 
 class AsyncTlsCertificateSelector : public Ssl::TlsCertificateSelector,
