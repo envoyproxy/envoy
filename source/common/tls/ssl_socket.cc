@@ -202,6 +202,15 @@ void SslSocket::onSuccess(SSL* ssl) {
     callbacks_->connection().streamInfo().downstreamTiming().onDownstreamHandshakeComplete(
         callbacks_->connection().dispatcher().timeSource());
   }
+
+  // There is at least one assertion that reads are enabled when the connected event is raised, so
+  // ensure we are in the correct state. The same operation would happen in
+  // `SslSocket::doHandshake()`, but it wouldn't happen until after the event was raised.
+  if (read_disabled_) {
+    read_disabled_ = false;
+    callbacks_->connection().readDisable(false);
+  }
+
   callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 }
 
