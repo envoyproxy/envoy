@@ -5,6 +5,7 @@ import pathlib
 import sys
 from calendar import monthrange
 from datetime import datetime
+from functools import cached_property
 
 import aiohttp
 
@@ -17,6 +18,7 @@ PAGE_SIZE = 2000
 MAX_CONCURRENCY = 4
 MAX_RETRIES = 10
 BACKOFF_BASE = 10
+REQUEST_TIMEOUT = 300
 
 
 class NvdDownloaderError(Exception):
@@ -59,7 +61,7 @@ class NvdDownloader(runner.Runner):
     def overwrite(self):
         return self.args.overwrite
 
-    @property
+    @cached_property
     def semaphore(self):
         return asyncio.Semaphore(self.args.max_concurrency)
 
@@ -96,18 +98,29 @@ class NvdDownloader(runner.Runner):
         url = self.nvd_url(start_date, end_date, start_index)
         self.log.debug(f"FETCH ({start_date.strftime('%Y-%m')}): {start_index}\n  {url}")
         for attempt in range(1, MAX_RETRIES + 1):
-            async with self.semaphore:
-                async with session.get(url) as resp:
-                    if resp.status == 429:  # rate limited
-                        wait_time = BACKOFF_BASE * attempt
-                        self.log.warning(
-                            f"429 Too Many Requests ({start_date.strftime('%Y-%m')}/{start_index}): attempt {attempt}/{MAX_RETRIES}, "
-                            f"backing off {wait_time}s...")
-                        await asyncio.sleep(wait_time)
-                        continue  # retry
+            try:
+                async with self.semaphore:
+                    async with session.get(url) as resp:
+                        if resp.status == 429:  # rate limited
+                            wait_time = BACKOFF_BASE * attempt
+                            self.log.warning(
+                                f"429 Too Many Requests ({start_date.strftime('%Y-%m')}/{start_index}): attempt {attempt}/{MAX_RETRIES}, "
+                                f"backing off {wait_time}s...")
+                            await asyncio.sleep(wait_time)
+                            continue  # retry
 
-                    resp.raise_for_status()
-                    return start_date, end_date, start_index, await resp.json()
+                        resp.raise_for_status()
+                        return start_date, end_date, start_index, await resp.json()
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                if attempt == MAX_RETRIES:
+                    raise
+                wait_time = BACKOFF_BASE * attempt
+                self.log.warning(
+                    f"Transient error fetching ({start_date.strftime('%Y-%m')}/{start_index}): {e!r}; "
+                    f"attempt {attempt}/{MAX_RETRIES}, backing off {wait_time}s...")
+                await asyncio.sleep(wait_time)
+        raise NvdDownloaderError(
+            f"Exceeded {MAX_RETRIES} retries for {start_date.strftime('%Y-%m')}/{start_index}")
 
     async def fetch_range(self, session, start_date, end_date):
         """Fetch all pages for a given 120-day (or smaller) date range."""
@@ -128,7 +141,8 @@ class NvdDownloader(runner.Runner):
 
     async def fetch_window(self, start_date, end_date):
         """Fetch CVEs for an arbitrary larger window, chunked into 120-day ranges."""
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             current = start_date
             while current < end_date:
                 if current.strftime("%Y-%m") in self.skip:
