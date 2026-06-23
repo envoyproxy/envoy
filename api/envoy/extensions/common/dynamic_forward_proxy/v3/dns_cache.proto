@@ -150,7 +150,7 @@ message DnsCacheConfig {
   // Configuration to flush the DNS cache to long term storage.
   config.common.key_value.v3.KeyValueStoreConfig key_value_config = 13;
 
-  // Optional matcher to deny DNS resolution results that match specific IP address ranges.
+  // Optional matcher to filter out DNS resolution results that match specific IP address ranges.
   // If a DNS response contains addresses matching this matcher, those addresses will be
   // removed from the response. If all addresses are removed, the resolution is treated
   // as a failure and the host will retain any previously resolved address.
