@@ -2519,9 +2519,9 @@ TEST_F(DnsCacheImplTest, IterateHostMap) {
   }
 }
 
-// Tests for deny_address_matcher feature.
+// Tests for resolved_address_filter feature.
 TEST_F(DnsCacheImplTest, DenyAddressRangesFiltersMatchingAddresses) {
-  auto* range = config_.mutable_deny_address_matcher()->add_ranges();
+  auto* range = config_.mutable_resolved_address_filter()->add_ranges();
   range->set_address_prefix("127.0.0.0");
   range->mutable_prefix_len()->set_value(8);
   initialize();
@@ -2555,14 +2555,15 @@ TEST_F(DnsCacheImplTest, DenyAddressRangesFiltersMatchingAddresses) {
   resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({"127.0.0.1", "10.0.0.1"}));
 
-  // Verify the dns_address_denied counter.
-  EXPECT_EQ(1,
-            TestUtility::findCounter(context_.store_, "dns_cache.foo.dns_address_denied")->value());
+  // Verify the dns_address_filter_out counter.
+  EXPECT_EQ(
+      1,
+      TestUtility::findCounter(context_.store_, "dns_cache.foo.dns_address_filter_out")->value());
 }
 
 TEST_F(DnsCacheImplTest, DenyAddressRangesAllDenied) {
   // Deny all IPv4 via 0.0.0.0/0.
-  auto* range = config_.mutable_deny_address_matcher()->add_ranges();
+  auto* range = config_.mutable_resolved_address_filter()->add_ranges();
   range->set_address_prefix("0.0.0.0");
   range->mutable_prefix_len()->set_value(0);
   initialize();
@@ -2592,12 +2593,13 @@ TEST_F(DnsCacheImplTest, DenyAddressRangesAllDenied) {
   resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.2"}));
 
-  EXPECT_EQ(2,
-            TestUtility::findCounter(context_.store_, "dns_cache.foo.dns_address_denied")->value());
+  EXPECT_EQ(
+      2,
+      TestUtility::findCounter(context_.store_, "dns_cache.foo.dns_address_filter_out")->value());
 }
 
 TEST_F(DnsCacheImplTest, DenyAddressRangesNoMatch) {
-  auto* range = config_.mutable_deny_address_matcher()->add_ranges();
+  auto* range = config_.mutable_resolved_address_filter()->add_ranges();
   range->set_address_prefix("192.168.0.0");
   range->mutable_prefix_len()->set_value(16);
   initialize();
@@ -2631,19 +2633,20 @@ TEST_F(DnsCacheImplTest, DenyAddressRangesNoMatch) {
              TestUtility::makeDnsResponse({"8.8.8.8", "8.8.4.4"}));
 
   // Counter should not be incremented.
-  EXPECT_EQ(0,
-            TestUtility::findCounter(context_.store_, "dns_cache.foo.dns_address_denied")->value());
+  EXPECT_EQ(
+      0,
+      TestUtility::findCounter(context_.store_, "dns_cache.foo.dns_address_filter_out")->value());
 }
 
 TEST_F(DnsCacheImplTest, DenyAddressRangesMultipleRanges) {
   // Deny loopback, RFC1918 10.0.0.0/8, and link-local 169.254.0.0/16.
-  auto* range1 = config_.mutable_deny_address_matcher()->add_ranges();
+  auto* range1 = config_.mutable_resolved_address_filter()->add_ranges();
   range1->set_address_prefix("127.0.0.0");
   range1->mutable_prefix_len()->set_value(8);
-  auto* range2 = config_.mutable_deny_address_matcher()->add_ranges();
+  auto* range2 = config_.mutable_resolved_address_filter()->add_ranges();
   range2->set_address_prefix("10.0.0.0");
   range2->mutable_prefix_len()->set_value(8);
-  auto* range3 = config_.mutable_deny_address_matcher()->add_ranges();
+  auto* range3 = config_.mutable_resolved_address_filter()->add_ranges();
   range3->set_address_prefix("169.254.0.0");
   range3->mutable_prefix_len()->set_value(16);
   initialize();
@@ -2676,8 +2679,9 @@ TEST_F(DnsCacheImplTest, DenyAddressRangesMultipleRanges) {
   resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({"127.0.0.1", "10.0.0.1", "169.254.1.1", "8.8.8.8"}));
 
-  EXPECT_EQ(3,
-            TestUtility::findCounter(context_.store_, "dns_cache.foo.dns_address_denied")->value());
+  EXPECT_EQ(
+      3,
+      TestUtility::findCounter(context_.store_, "dns_cache.foo.dns_address_filter_out")->value());
 }
 
 TEST_F(DnsCacheImplTest, DenyAddressRangesEmptyConfigNoOp) {
@@ -2717,10 +2721,10 @@ TEST_F(DnsCacheImplTest, DenyAddressRangesEmptyConfigNoOp) {
 TEST_F(DnsCacheImplTest, DenyAddressMatcherInvertMatch) {
   // With invert_match=true, only addresses matching the ranges are allowed (allow-list mode).
   // Allow only 8.8.8.0/24 — everything else is denied.
-  auto* range = config_.mutable_deny_address_matcher()->add_ranges();
+  auto* range = config_.mutable_resolved_address_filter()->add_ranges();
   range->set_address_prefix("8.8.8.0");
   range->mutable_prefix_len()->set_value(24);
-  config_.mutable_deny_address_matcher()->set_invert_match(true);
+  config_.mutable_resolved_address_filter()->set_invert_match(true);
   initialize();
   InSequence s;
 
@@ -2751,8 +2755,9 @@ TEST_F(DnsCacheImplTest, DenyAddressMatcherInvertMatch) {
   resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({"127.0.0.1", "8.8.8.8"}));
 
-  EXPECT_EQ(1,
-            TestUtility::findCounter(context_.store_, "dns_cache.foo.dns_address_denied")->value());
+  EXPECT_EQ(
+      1,
+      TestUtility::findCounter(context_.store_, "dns_cache.foo.dns_address_filter_out")->value());
 }
 
 } // namespace
