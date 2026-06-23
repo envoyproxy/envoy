@@ -915,10 +915,7 @@ def _proxy_wasm_cpp_host():
     external_http_archive(
         name = "proxy_wasm_cpp_host",
         patch_args = ["-p1"],
-        patches = [
-            "@envoy//bazel:proxy_wasm_cpp_host.patch",
-            "@envoy//bazel:proxy_wasm_cpp_host-s390x.patch",
-        ],
+        patches = ["@envoy//bazel:proxy_wasm_cpp_host.patch"],
         repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
@@ -981,6 +978,10 @@ def _wasmtime():
         name = "wasmtime",
         build_file = "@proxy_wasm_cpp_host//:bazel/external/wasmtime.BUILD",
         repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        patches = [
+            "@proxy_wasm_cpp_host//:bazel/external/prefixed_wasmtime.patch",
+        ],
+        patch_args = ["-p1"],
     )
 
 def _dlb():
