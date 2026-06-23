@@ -10,7 +10,9 @@ quality, style, and process requirements.
 
 ## Critical rules
 
-1. **Always sign off commits.** Use `git commit -s` — never manually write a `Signed-off-by` trailer.
+1. **Always sign off commits.** The human user must sign off commits via `git commit -s` — never
+   manually write a `Signed-off-by` trailer. The sign-off attests that the committer (the user)
+   has the right to submit the code under the project's license.
 2. **Always run format and lint checks before committing.** Use `tools/local_fix_format.sh` for
    a quick local check, or run `./ci/do_ci.sh format` inside Docker for the full CI check suite.
    CI checks C++, BUILD, YAML, Markdown, shell, Go, Python formatting and spelling. Format
@@ -33,27 +35,27 @@ quality, style, and process requirements.
 
 ### 1. Before starting work
 
+Read `CONTRIBUTING.md` for the full contribution process. Key points:
 - **Major features (>100 LOC or user-facing):** Open a GitHub issue first to discuss design.
-  Check if someone else is already working on it. For new extensions, read `EXTENSION_POLICY.md`.
+  For new extensions, read `EXTENSION_POLICY.md`.
 - **Small patches and bug fixes:** No prior communication needed.
 - Install git hooks: `./support/bootstrap` (enables automatic DCO sign-off and format checks).
 
 ### 2. Writing code
 
-Follow the C++ style rules summarized below. Key points:
-- All code in the top-level `Envoy` namespace
-- 100-column line limit, enforced by clang-format
-- `#pragma once` for header guards
-- camelCase functions, `trailing_underscore_` members, PascalCase enums
-- `unique_ptr` over `shared_ptr`; references over pointers when non-null
-- No exceptions on the data plane
-- Use `ASSERT`, `RELEASE_ASSERT`, or `ENVOY_BUG` macros appropriately (see STYLE.md)
+Follow `STYLE.md` for the full C++ coding style. After writing C++ code, run `clang-format`
+to fix formatting automatically rather than trying to hand-format:
+
+```bash
+clang-format -i <file>
+```
 
 Tests must:
 - Live in `test/` mirroring the `source/` structure
 - Achieve 100% coverage for new code
 - Use `StrictMock` by default, `SimulatedTimeSystem` for time, port 0 for network
-- Be hermetic and deterministic — no real network, no real time, no randomness
+- Unit tests must be hermetic and deterministic — no real time, no randomness
+- Integration tests (in `test/integration/`) use real network on localhost
 
 ### 3. Building and testing
 
@@ -258,10 +260,10 @@ Platform Specific Features: <if applicable>
 note fragment under `changelogs/current/`. Name the file `<area>__<short-description>.rst`.
 Use sections defined in `changelogs/changelogs.yaml`.
 
-**Deprecations:** If deprecating APIs or code, add a fragment under the `deprecated` section
-in `changelogs/current/` and mention it in the PR description.
+**Deprecations:** If deprecating user-facing configuration, add a fragment under the `deprecated`
+section in `changelogs/current/` and mention it in the PR description.
 
-Prefer pushing to a personal fork rather than creating branches in the main repo.
+**Always** push to a personal fork. Do not create branches in the main repo.
 
 ### 7. Waiting for CI and review
 
@@ -270,14 +272,14 @@ Prefer pushing to a personal fork rather than creating branches in the main repo
 - To re-run failed CI tasks, add a `/retest` comment on the PR.
 - To re-run all CI (e.g. stuck tasks): `git commit -s --allow-empty -m 'Kick CI' && git push`
 - Maintainers typically review within one business day.
-- PRs with no activity for 7 days may be closed.
+- PRs with no activity for 14+ days may be closed.
 
 ### 8. Addressing review comments
 
 - **Never amend or force-push** after a reviewer has looked at the PR. Create new commits.
 - **Never rebase.** If you need to incorporate upstream changes:
   ```bash
-  git checkout main && git pull && git checkout my-branch && git merge main
+  git fetch origin main && git merge origin/main
   ```
 - Update the PR title and commit message if the PR changed significantly during review.
 - If the reviewer asked for a runtime guard, add one (see "Runtime guarding" below).
@@ -289,31 +291,10 @@ final commit message. Make sure it's up to date before merge.
 
 ## C++ coding style
 
-Envoy follows the [Google C++ style guide](https://google.github.io/styleguide/cppguide.html)
-with these deviations:
-
-- **Standard:** C++20. Requires Clang >= 18 or GCC >= 13.
-- **Line limit:** 100 columns
-- **Formatting:** Enforced by clang-format
-- **Header guards:** Use `#pragma once`
-- **Namespace:** All code inside top-level `Envoy` namespace
-- **Function names:** camelCase starting with lowercase: `doFoo()`
-- **Member variables:** trailing underscore: `int foo_;`
-- **Enum values:** PascalCase: `RoundRobin`
-- **Constants:** `ConstantVar` or `CONSTANT_VAR` (not `kConstantVar`)
-- **Smart pointer aliases:** `using FooPtr = std::unique_ptr<Foo>;`
-- **References over pointers:** Prefer references when the value cannot be null
-- **Move semantics:** Use `&&` parameters and `std::move()` at call sites
-- **Prefer `unique_ptr` over `shared_ptr`** for clearer ownership
-- **Explicitly sized integers:** Use `uint64_t` instead of `size_t` for disk/network data
-- **No non-PoD static/global variables** (includes `std::string`)
-- **Anonymous namespaces** over `static` for file-local functions
-- **Braces required** for all control statements, including single-line `if`
-- **TODO format:** `TODO(github_username): description`
-- **Exceptions:** Allowed on control plane (discouraged in new code), disallowed on data plane
-- **Doxygen:** Use `@param` and `@return` for API-level comments
-- **Thread annotations:** Use `ABSL_GUARDED_BY` for shared state guarded by locks
-- **Test-only methods:** Name them `fooForTest()` if they must be outside `test/`
+Read `STYLE.md` for the full C++ coding style. Envoy follows the
+[Google C++ style guide](https://google.github.io/styleguide/cppguide.html) with project-specific
+deviations documented there. Run `clang-format` on all C++ files after editing — do not
+hand-format.
 
 ### Inclusive language
 
@@ -322,17 +303,6 @@ The following terms are **not allowed**:
 - ~~blacklist~~ -> denylist / blocklist
 - ~~master~~ -> primary / main
 - ~~slave~~ -> secondary / replica
-
-### Error handling
-
-- All error code returns must be checked
-- Handle errors gracefully when caused by untrusted network traffic, likely environmental errors,
-  or third-party dependency return codes
-- `RELEASE_ASSERT`: fatal check (use for unrecoverable conditions)
-- `ASSERT`: fatal in debug only (use for invariants and documentation)
-- `ENVOY_BUG`: logs + stat in release, fatal in debug (use for conditions needing detectability)
-- OOM events are considered fatal — never silently ignore them
-- Prefer crashing over complex error recovery for unlikely post-initialization errors
 
 ## BUILD files and Bazel rules
 
@@ -393,12 +363,9 @@ Both code paths must have 100% test coverage. Release notes must document how to
 
 ## Deprecation process
 
-1. First release cycle: deprecated feature logs a warning
-2. Second release cycle: configuration load failure (unless runtime override)
-3. After API major version deprecation: full removal
-
-Add deprecation fragments under `changelogs/current/` in the `deprecated` section.
-Changing the default behavior of `ext_authz` and `ext_proc` is strictly forbidden.
+Deprecated features must log a warning. Add deprecation fragments under `changelogs/current/`
+in the `deprecated` section. Changing the default behavior of `ext_authz` and `ext_proc` is
+strictly forbidden. See `CONTRIBUTING.md` for the full deprecation and breaking change policy.
 
 ## Extension policy
 
