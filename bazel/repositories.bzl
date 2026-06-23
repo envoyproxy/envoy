@@ -849,8 +849,6 @@ EOF""",
 def _quiche():
     external_http_archive(
         name = "quiche",
-        patches = ["@envoy//bazel/external:quiche.patch"],
-        patch_args = ["-p1"],
         patch_cmds = ["find quiche/ -type f -name \"*.bazel\" -delete"],
         build_file = "@envoy//bazel/external:quiche.BUILD",
         repo_mapping = {"@com_google_absl": "@abseil-cpp"},
