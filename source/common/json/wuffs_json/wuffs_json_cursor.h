@@ -91,7 +91,7 @@ public:
   //
   //   closeStringCapture(key, depth, token_end)
   //     Called when a non-key string chain completes (closing " seen).
-  //     Only fires if openStringCapture returned true for this string.
+  //     Always fires, even if openStringCapture returned false.
   //     `token_end` is the byte offset immediately past the closing ".
   //
   //   onKey(key, depth)
@@ -260,7 +260,7 @@ private:
   // below are stack-allocated at compile time.
   //
   // TODO(tyxia): replace the fixed arrays with std::vector<T> to support
-  // dynamic dpeth so that max_depth_ can exceed kMaxTrackedDepth-1 without
+  // dynamic depth so that max_depth_ can exceed kMaxTrackedDepth-1 without
   // losing tracking accuracy. This removes the hard compile-time cap at the
   // cost of per-push heap allocation; evaluate against the request-path perf
   // budget before doing so.

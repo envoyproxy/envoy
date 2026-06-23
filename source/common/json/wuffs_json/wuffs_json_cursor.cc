@@ -329,7 +329,7 @@ absl::Status WuffsJsonCursor::handleStringToken(absl::string_view raw, uint64_t 
 }
 
 // TODO(tyxia): Escape here to ensure any unicode token can be used, for example, for
-// comparison routing, logging purpose. This requires re-escape in the re-encode phase.
+// comparison routing, logging purposes. This requires re-escape in the re-encode phase.
 // Investigate later to see if escape and re-escape are needed.
 absl::Status WuffsJsonCursor::handleUnicodeCodePointToken(uint64_t token_detail) {
   // Backslash escapes (\n, \t, \uXXXX, …) arrive with VBD = decoded code point.
