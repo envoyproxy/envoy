@@ -236,16 +236,30 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   return host;
 }
 
-LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create(LoadBalancerParams) {
-  auto lb = std::make_unique<LoadBalancerImpl>(stats_, random_, hash_policy_);
+void ThreadAwareLoadBalancerBase::LoadBalancerImpl::refresh() {
+  // The per priority state is shared across all threads and refreshed on main thread. We need to
+  // copy the latest per priority state to the worker thread load balancer instance under lock.
+  absl::ReaderMutexLock lock(factory_->mutex_);
+  healthy_per_priority_load_ = factory_->healthy_per_priority_load_;
+  degraded_per_priority_load_ = factory_->degraded_per_priority_load_;
+  per_priority_state_ = factory_->per_priority_state_;
+}
 
-  // We must protect current_lb_ via a RW lock since it is accessed and written to by multiple
-  // threads. All complex processing has already been precalculated however.
-  absl::ReaderMutexLock lock(mutex_);
-  lb->healthy_per_priority_load_ = healthy_per_priority_load_;
-  lb->degraded_per_priority_load_ = degraded_per_priority_load_;
-  lb->per_priority_state_ = per_priority_state_;
-  return lb;
+ThreadAwareLoadBalancerBase::LoadBalancerImpl::LoadBalancerImpl(
+    std::shared_ptr<LoadBalancerFactoryImpl> factory, ClusterLbStats& stats,
+    Random::RandomGenerator& random, HashPolicySharedPtr hash_policy,
+    const Upstream::PrioritySet& priority_set)
+    : factory_(std::move(factory)), stats_(stats), random_(random),
+      hash_policy_(std::move(hash_policy)) {
+  member_update_cb_ =
+      priority_set.addMemberUpdateCb([this](const HostVector&, const HostVector&) { refresh(); });
+  refresh();
+}
+
+LoadBalancerPtr
+ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create(LoadBalancerParams params) {
+  return std::make_unique<LoadBalancerImpl>(shared_from_this(), stats_, random_, hash_policy_,
+                                            params.priority_set);
 }
 
 double ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::hostOverloadFactor(
@@ -379,15 +393,19 @@ TypedHashLbConfigBase::TypedHashLbConfigBase(absl::Span<const HashPolicyProto* c
 absl::Status TypedHashLbConfigBase::validateEndpoints(const PriorityState& priorities) const {
 
   for (const auto& [hosts, locality_weights_map] : priorities) {
-    // Sum should be at most uint32_t max value, so we can validate it by accumulating into uint64_t
-    // and making sure there was no overflow.
-    uint64_t host_sum = 0;
-    for (const auto& host : *hosts) {
-      host_sum += host->weight();
-      if (host_sum > std::numeric_limits<uint32_t>::max()) {
-        return absl::InvalidArgumentError(
-            fmt::format("The sum of weights of all upstream hosts in a locality exceeds {}",
-                        std::numeric_limits<uint32_t>::max()));
+    // Non-contiguous priorities can leave null entries in the priority vector.
+    // Only skip the host-weight check; locality weights are still validated.
+    if (hosts != nullptr) {
+      // Sum should be at most uint32_t max value, so we can validate it by accumulating into
+      // uint64_t and making sure there was no overflow.
+      uint64_t host_sum = 0;
+      for (const auto& host : *hosts) {
+        host_sum += host->weight();
+        if (host_sum > std::numeric_limits<uint32_t>::max()) {
+          return absl::InvalidArgumentError(
+              fmt::format("The sum of weights of all upstream hosts in a locality exceeds {}",
+                          std::numeric_limits<uint32_t>::max()));
+        }
       }
     }
 

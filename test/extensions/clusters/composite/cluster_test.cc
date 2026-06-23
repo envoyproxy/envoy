@@ -49,7 +49,7 @@ public:
     absl::Status creation_status = absl::OkStatus();
     cluster_ = std::shared_ptr<Cluster>(
         new Cluster(cluster_config_, config_, factory_context, creation_status));
-    THROW_IF_NOT_OK(creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
   }
 
   envoy::config::cluster::v3::Cluster cluster_config_;
@@ -582,7 +582,7 @@ TEST_F(CompositeClusterTest, FactoryCreateMethod) {
   envoy::extensions::clusters::composite::v3::ClusterConfig typed_config;
   auto* entry = typed_config.add_clusters();
   entry->set_name("factory_cluster_1");
-  cluster_type->mutable_typed_config()->PackFrom(typed_config);
+  std::ignore = cluster_type->mutable_typed_config()->PackFrom(typed_config);
 
   auto result = factory.create(cluster_config, factory_context);
   EXPECT_TRUE(result.ok());

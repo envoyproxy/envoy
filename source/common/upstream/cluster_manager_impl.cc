@@ -1510,8 +1510,15 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
                             hosts_added, hosts_removed, weighted_priority_health,
                             overprovisioning_factor, std::move(cross_priority_host_map));
   // If an LB is thread aware, create a new worker local LB on membership changes.
-  if (lb_factory_ != nullptr && lb_factory_->recreateOnHostChange()) {
+  if (lb_factory_ != nullptr && lb_factory_->recreateOnHostChangeDeprecated()) {
     ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", name);
+    // Now only out-of-tree LB implementations may return true for recreateOnHostChangeDeprecated,
+    // and they should be refactored to not require LB recreation.
+    ENVOY_LOG_FIRST_N(
+        warn, 200,
+        "Re-creating local LB for TLS cluster ({}) is deprecated and the LB should be refactored "
+        "to not require this",
+        name);
     lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
   }
 }
@@ -1720,13 +1727,13 @@ ClusterManagerImpl::dumpClusterConfigs(const Matchers::StringMatcher& name_match
     }
     if (!cluster.added_via_api_) {
       auto& static_cluster = *config_dump->mutable_static_clusters()->Add();
-      static_cluster.mutable_cluster()->PackFrom(cluster.cluster_config_);
+      std::ignore = static_cluster.mutable_cluster()->PackFrom(cluster.cluster_config_);
       TimestampUtil::systemClockToTimestamp(cluster.last_updated_,
                                             *(static_cluster.mutable_last_updated()));
     } else {
       auto& dynamic_cluster = *config_dump->mutable_dynamic_active_clusters()->Add();
       dynamic_cluster.set_version_info(cluster.version_info_);
-      dynamic_cluster.mutable_cluster()->PackFrom(cluster.cluster_config_);
+      std::ignore = dynamic_cluster.mutable_cluster()->PackFrom(cluster.cluster_config_);
       TimestampUtil::systemClockToTimestamp(cluster.last_updated_,
                                             *(dynamic_cluster.mutable_last_updated()));
     }
@@ -1739,7 +1746,7 @@ ClusterManagerImpl::dumpClusterConfigs(const Matchers::StringMatcher& name_match
     }
     auto& dynamic_cluster = *config_dump->mutable_dynamic_warming_clusters()->Add();
     dynamic_cluster.set_version_info(cluster.version_info_);
-    dynamic_cluster.mutable_cluster()->PackFrom(cluster.cluster_config_);
+    std::ignore = dynamic_cluster.mutable_cluster()->PackFrom(cluster.cluster_config_);
     TimestampUtil::systemClockToTimestamp(cluster.last_updated_,
                                           *(dynamic_cluster.mutable_last_updated()));
   }
@@ -2022,8 +2029,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
         pool->addIdleCallback([&parent = parent_, host, priority, hash_key]() {
           parent.httpConnPoolIsIdle(host, priority, hash_key);
         });
-
-        pool->setLifetimeCallbacks(lb_->lifetimeCallbacks(), hash_key);
 
         return pool;
       });

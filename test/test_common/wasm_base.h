@@ -77,7 +77,7 @@ public:
     vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
     Protobuf::StringValue vm_configuration_string;
     vm_configuration_string.set_value(vm_configuration_);
-    vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
+    std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
     vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
 
     plugin_ = std::make_shared<Extensions::Common::Wasm::Plugin>(
@@ -138,8 +138,8 @@ private:
   bool fail_open_ = false;
   absl::optional<bool> allow_on_headers_stop_iteration_ = absl::nullopt;
   std::string plugin_configuration_ = "";
-  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_ = {};
-  envoy::extensions::wasm::v3::EnvironmentVariables envs_ = {};
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_;
+  envoy::extensions::wasm::v3::EnvironmentVariables envs_;
 };
 
 template <typename Base = testing::Test> class WasmHttpFilterTestBase : public WasmTestBase<Base> {

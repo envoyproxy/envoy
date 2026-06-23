@@ -11,7 +11,9 @@
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/local_reply/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/overload_manager.h"
+#include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/server/server_lifecycle_notifier.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
@@ -587,7 +589,7 @@ TEST_P(WasmCommonTest, VmCache) {
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
   Protobuf::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
-  vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
+  std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
   std::string code;
   if (std::get<0>(GetParam()) != "null") {
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -649,6 +651,44 @@ TEST_P(WasmCommonTest, VmCache) {
   proxy_wasm::clearWasmCachesForTesting();
 }
 
+// Changing environment variables must produce a distinct VM, not a cache hit.
+TEST_P(WasmCommonTest, VmCacheEnvVarChange) {
+  // NullVm doesn't support key_values environment variables.
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  NiceMock<Init::MockManager> init_manager;
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  auto* vm_config = plugin_config.mutable_vm_config();
+  vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+  const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm"));
+  EXPECT_FALSE(code.empty());
+  vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
+
+  auto plugin1 = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_, nullptr);
+  WasmHandleSharedPtr wasm_handle1;
+  createWasm(plugin1, scope_, cluster_manager_, init_manager, *dispatcher_, *api_,
+             lifecycle_notifier_, remote_data_provider_,
+             [&wasm_handle1](const WasmHandleSharedPtr& w) { wasm_handle1 = w; });
+  EXPECT_NE(wasm_handle1, nullptr);
+
+  // Same config but with an env var added — must produce a new VM, not a cache hit.
+  (*vm_config->mutable_environment_variables()->mutable_key_values())["K"] = "V";
+  auto plugin2 = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_, nullptr);
+  WasmHandleSharedPtr wasm_handle2;
+  createWasm(plugin2, scope_, cluster_manager_, init_manager, *dispatcher_, *api_,
+             lifecycle_notifier_, remote_data_provider_,
+             [&wasm_handle2](const WasmHandleSharedPtr& w) { wasm_handle2 = w; });
+  EXPECT_NE(wasm_handle2, nullptr);
+  EXPECT_NE(wasm_handle1, wasm_handle2);
+
+  proxy_wasm::clearWasmCachesForTesting();
+}
+
 TEST_P(WasmCommonTest, RemoteCode) {
   if (std::get<0>(GetParam()) == "null") {
     return;
@@ -676,7 +716,7 @@ TEST_P(WasmCommonTest, RemoteCode) {
     vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
     Protobuf::BytesValue vm_configuration_bytes;
     vm_configuration_bytes.set_value(vm_configuration);
-    vm_config->mutable_configuration()->PackFrom(vm_configuration_bytes);
+    std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_bytes);
     std::string sha256 = Extensions::Common::Wasm::sha256(code);
     std::string sha256Hex =
         Hex::encode(reinterpret_cast<const uint8_t*>(&*sha256.begin()), sha256.size());
@@ -779,7 +819,7 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
   Protobuf::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
-  vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
+  std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
   std::string sha256 = Extensions::Common::Wasm::sha256(code);
   std::string sha256Hex =
       Hex::encode(reinterpret_cast<const uint8_t*>(&*sha256.begin()), sha256.size());

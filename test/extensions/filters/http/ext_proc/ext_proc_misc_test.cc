@@ -82,7 +82,7 @@ protected:
       std::string ext_proc_filter_name = "envoy.filters.http.ext_proc";
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
       ext_proc_filter.set_name(ext_proc_filter_name);
-      ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
+      std::ignore = ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
     });
 
@@ -173,10 +173,10 @@ protected:
     EXPECT_EQ(std::to_string(status_code), response.headers().getStatusValue());
   }
 
-  bool IsEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
+  bool isEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
 
   void websocketExtProcTest() {
-    if (!IsEnvoyGrpc()) {
+    if (!isEnvoyGrpc()) {
       return;
     }
 
@@ -218,7 +218,7 @@ body_format:
     verifyDownstreamResponse(*response, 200);
   }
 
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_;
   std::vector<FakeUpstream*> grpc_upstreams_;
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
@@ -232,7 +232,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcMiscInte
 
 // Test sending empty last body chunk with end_of_stream = true.
 TEST_P(ExtProcMiscIntegrationTest, SendEmptyLastBodyChunk) {
-  if (IsEnvoyGrpc()) {
+  if (isEnvoyGrpc()) {
     return;
   }
 

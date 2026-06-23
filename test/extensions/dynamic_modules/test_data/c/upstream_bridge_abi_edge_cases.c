@@ -60,12 +60,23 @@ envoy_dynamic_module_on_upstream_http_tcp_bridge_new(
   envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer(bridge_envoy_ptr,
                                                                              &req_buf, &req_buf_len);
 
+  // Exercise the buffer chunks-size getters when the buffers are empty.
+  size_t req_chunks =
+      envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer_chunks_size(
+          bridge_envoy_ptr);
+  (void)req_chunks;
+
   // Exercise get_response_buffer with new envoy_buffer* signature when response_buffer_ is null.
   envoy_dynamic_module_type_envoy_buffer resp_buf;
   size_t resp_buf_len = 0;
   envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer(bridge_envoy_ptr,
                                                                             &resp_buf,
                                                                             &resp_buf_len);
+
+  size_t resp_chunks =
+      envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer_chunks_size(
+          bridge_envoy_ptr);
+  (void)resp_chunks;
 
   return (envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr)0x2;
 }

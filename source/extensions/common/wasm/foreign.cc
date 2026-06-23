@@ -124,7 +124,7 @@ RegisterForeignFunction registerVerifySignatureForeignFunction(
 
         auto size = verification_result.ByteSizeLong();
         auto result = alloc_result(size);
-        verification_result.SerializeToArray(result, static_cast<int>(size));
+        std::ignore = verification_result.SerializeToArray(result, static_cast<int>(size));
         return WasmResult::Ok;
       }
       return WasmResult::BadArgument;
@@ -161,7 +161,7 @@ RegisterForeignFunction registerSignForeignFunction(
 
         auto size = signing_result.ByteSizeLong();
         auto result = alloc_result(size);
-        signing_result.SerializeToArray(result, static_cast<int>(size));
+        std::ignore = signing_result.SerializeToArray(result, static_cast<int>(size));
         return WasmResult::Ok;
       }
       return WasmResult::BadArgument;
@@ -262,7 +262,7 @@ protected:
     const Filters::Common::Expr::Builder* builder() const { return builder_.get(); }
 
   private:
-    const Filters::Common::Expr::BuilderConstPtr builder_{};
+    const Filters::Common::Expr::BuilderConstPtr builder_;
     uint32_t next_expr_token_ = 0;
     absl::flat_hash_map<uint32_t, ExpressionData> expr_;
   };

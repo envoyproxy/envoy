@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -92,7 +93,6 @@ public:
         std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers));
     auto filter_state = stream_info_.filterState();
     filter_state->setData(TcpProxy::TunnelResponseHeaders::key(), headers,
-                          StreamInfo::FilterState::StateType::Mutable,
                           StreamInfo::FilterState::LifeSpan::Connection);
   }
 
@@ -315,7 +315,7 @@ std::string encodePeerMetadataHeaderOnly(const PeerMetadataHeader& header) {
 std::string encodeMetadataOnly(absl::string_view baggage, absl::string_view identity) {
   std::unique_ptr<Istio::Common::WorkloadMetadataObject> metadata =
       Istio::Common::convertBaggageToWorkloadMetadata(baggage, identity);
-  Protobuf::Struct data = convertWorkloadMetadataToStruct(*metadata);
+  Protobuf::Struct data = ::Istio::Common::convertWorkloadMetadataToStruct(*metadata);
   Protobuf::Any wrapped;
   wrapped.PackFrom(data);
   return wrapped.SerializeAsString();
@@ -346,24 +346,24 @@ public:
     return upstream_host_->cluster_.metadata_;
   }
 
-  absl::optional<Istio::Common::WorkloadMetadataObject> peerInfoFromFilterState() const {
+  std::optional<Istio::Common::WorkloadMetadataObject> peerInfoFromFilterState() const {
     const auto& filter_state = stream_info_.filterState();
     const auto* cel_state =
         filter_state.getDataReadOnly<Extensions::Filters::Common::Expr::CelState>(
             Istio::Common::UpstreamPeer);
     if (!cel_state) {
-      return absl::nullopt;
+      return std::nullopt;
     }
 
     Protobuf::Struct obj;
     if (!obj.ParseFromString(absl::string_view(cel_state->value()))) {
-      return absl::nullopt;
+      return std::nullopt;
     }
 
     std::unique_ptr<Istio::Common::WorkloadMetadataObject> peer_info =
         Istio::Common::convertStructToWorkloadMetadata(obj);
     if (!peer_info) {
-      return absl::nullopt;
+      return std::nullopt;
     }
 
     return *peer_info;

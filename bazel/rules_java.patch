@@ -1,3 +1,17 @@
+diff --git a/MODULE.bazel b/MODULE.bazel
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -105,10 +105,6 @@
+
+ [register_toolchains("@" + name + "_toolchain_config_repo//:all") for name in REMOTE_JDK_REPOS]
+
+-# Compatibility layer
+-compat = use_extension("//java:rules_java_deps.bzl", "compatibility_proxy")
+-use_repo(compat, "compatibility_proxy")
+-
+ # Dev dependencies
+ bazel_dep(name = "rules_pkg", version = "0.9.1", dev_dependency = True)
+ bazel_dep(name = "stardoc", version = "0.8.0", dev_dependency = True)
 diff --git a/java/repositories.bzl b/java/repositories.bzl
 index 27f4f85..15b5306 100644
 --- a/java/repositories.bzl

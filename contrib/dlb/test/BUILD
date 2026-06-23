@@ -8,6 +8,11 @@ licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
 
+# Disabled along with the envoy.network.connection_balance.dlb extension —
+# see https://github.com/envoyproxy/envoy/issues/45491 and the matching
+# patch in //contrib:contrib_build_config.bzl. The "manual" tag excludes
+# this test from wildcard builds and tests under //contrib/..., avoiding
+# the broken @dlb fetch. Drop it when the upstream mirror is healthy.
 envoy_cc_test(
     name = "config_test",
     srcs = select({
@@ -15,6 +20,7 @@ envoy_cc_test(
         "//conditions:default": [],
     }),
     rbe_pool = "6gig",
+    tags = ["manual"],
     deps = [
         "//contrib/dlb/source:connection_balancer",
         "//source/common/protobuf:utility_lib",

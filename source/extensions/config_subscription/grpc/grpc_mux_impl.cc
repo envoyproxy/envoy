@@ -300,11 +300,12 @@ GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
   return watch;
 }
 
-absl::Status
-GrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
-                             Grpc::RawAsyncClientSharedPtr&& failover_async_client,
-                             Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
-                             const envoy::config::core::v3::ApiConfigSource& ads_config_source) {
+absl::Status GrpcMuxImpl::updateMuxSource(
+    Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+    Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
+    BackOffStrategyPtr&& backoff_strategy,
+    const envoy::config::core::v3::ApiConfigSource& ads_config_source,
+    std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory) {
   // Process the rate limit settings.
   absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
       Utility::parseRateLimitSettings(ads_config_source);
@@ -320,6 +321,9 @@ GrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_clien
   grpc_stream_ = createGrpcStreamObject(std::move(primary_async_client),
                                         std::move(failover_async_client), service_method, scope,
                                         std::move(backoff_strategy), *rate_limit_settings_or_error);
+
+  load_stats_reporter_factory_ = std::move(load_stats_reporter_factory);
+
   // No need to update the config_validators_ as they may contain some state
   // that needs to be kept across different GrpcMux objects.
 
@@ -537,8 +541,8 @@ void GrpcMuxImpl::processDiscoveryResources(const std::vector<DecodedResourcePtr
           (type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>())) {
         for (const auto& resource : found_resources) {
           const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
-                  resource.get().resource());
+              Envoy::Protobuf::DynamicCastMessage<
+                  envoy::config::endpoint::v3::ClusterLoadAssignment>(resource.get().resource());
           eds_resources_cache_->setResource(resource.get().name(), cluster_load_assignment);
         }
         // No need to remove resources from the cache, as currently only non-collection

@@ -1,11 +1,23 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
+#include <list>
+#include <memory>
+#include <string>
 
-#include "envoy/event/dispatcher.h"
+#include "envoy/common/optref.h"
+#include "envoy/common/pure.h"
+#include "envoy/common/random_generator.h"
+#include "envoy/network/connection_handler.h"
+#include "envoy/network/filter.h"
+#include "envoy/network/listener.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/overload/overload_manager.h"
+#include "envoy/stats/scope.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {
@@ -93,6 +105,25 @@ public:
   virtual void stopListener(Network::ListenerConfig& listener,
                             const Network::ExtraShutdownListenerOptions& options,
                             std::function<void()> completion) PURE;
+
+  /**
+   * Notify all connections in the given filter chains of the listener that they are being
+   * drained. This is intended to be invoked at the start of a drain sequence (before the
+   * drain timer expires). Connections are not closed. This is a fire-and-forget operation
+   * that is posted to the worker's dispatcher.
+   * @param listener_tag supplies the tag passed to addListener().
+   * @param filter_chains supplies the filter chains whose connections should be notified.
+   */
+  virtual void onFilterChainDrain(uint64_t listener_tag,
+                                  const std::list<const Network::FilterChain*>& filter_chains) PURE;
+
+  /**
+   * Notify all connections of the given listener that they are being drained. Connections
+   * are not closed. This is a fire-and-forget operation that is posted to the worker's
+   * dispatcher.
+   * @param listener supplies the listener whose connections should be notified.
+   */
+  virtual void onListenerDrain(Network::ListenerConfig& listener) PURE;
 };
 
 using WorkerPtr = std::unique_ptr<Worker>;

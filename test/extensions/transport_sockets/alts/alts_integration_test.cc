@@ -326,11 +326,13 @@ public:
         alts_config.add_peer_service_accounts(server_peer_identity_);
       }
       alts_config.set_handshaker_service(fakeHandshakerServerAddress(server_connect_handshaker_));
-      transport_socket->mutable_typed_config()->PackFrom(alts_config);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(alts_config);
     });
 
     config_helper_.prependFilter(R"EOF(
     name: decode-dynamic-metadata-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.DecodeDynamicMetadataFilterConfig
     )EOF");
 
     HttpIntegrationTest::initialize();

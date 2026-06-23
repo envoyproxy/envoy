@@ -713,7 +713,7 @@ TEST(ConfigTest, PerConnectionClusterWithTopLevelMetadataMatchConfig) {
   NiceMock<Network::MockConnection> connection;
   connection.stream_info_.filterState()->setData(
       "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   const auto route = config_obj.getRouteFromEntries(connection);
   EXPECT_NE(nullptr, route);
@@ -781,7 +781,7 @@ TEST(ConfigTest, AccessLogConfig) {
     file_access_log.set_path("some_path");
     file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "the format specifier");
-    log->mutable_typed_config()->PackFrom(file_access_log);
+    std::ignore = log->mutable_typed_config()->PackFrom(file_access_log);
   }
 
   log = config.mutable_access_log()->Add();
@@ -789,7 +789,7 @@ TEST(ConfigTest, AccessLogConfig) {
   {
     envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("another path");
-    log->mutable_typed_config()->PackFrom(file_access_log);
+    std::ignore = log->mutable_typed_config()->PackFrom(file_access_log);
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
@@ -1003,7 +1003,6 @@ TEST_F(TcpProxyHashingTest, HashWithFilterState) {
   {
     initializeFilter();
     connection_.stream_info_.filter_state_->setData("foo", std::make_unique<HashableObj>(),
-                                                    StreamInfo::FilterState::StateType::ReadOnly,
                                                     StreamInfo::FilterState::LifeSpan::FilterChain);
     EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
                 tcpConnPool(_, _, _))

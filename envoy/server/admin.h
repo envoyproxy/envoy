@@ -1,15 +1,22 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
+#include <vector>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
+#include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/query_params.h"
-#include "envoy/network/listen_socket.h"
+#include "envoy/network/address.h"
+#include "envoy/network/connection_handler.h"
+#include "envoy/network/socket.h"
 #include "envoy/server/config_tracker.h"
 
 #include "absl/strings/string_view.h"
@@ -111,7 +118,7 @@ public:
     Type type_;
     std::string id_;   // HTML form ID and query-param name (JS var name rules).
     std::string help_; // Rendered into home-page HTML and /help text.
-    std::vector<absl::string_view> enum_choices_{};
+    std::vector<absl::string_view> enum_choices_;
   };
   using ParamDescriptorVec = std::vector<ParamDescriptor>;
 
@@ -163,7 +170,7 @@ public:
     const GenRequestFn handler_;
     const bool removable_;
     const bool mutates_server_state_;
-    const ParamDescriptorVec params_{};
+    const ParamDescriptorVec params_;
   };
 
   /**

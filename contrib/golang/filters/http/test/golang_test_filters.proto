@@ -1,0 +1,6 @@
+syntax = "proto3";
+
+package contrib.golang.filters.http.test;
+
+message RetrieveDynamicMetadataFilterConfig {
+}

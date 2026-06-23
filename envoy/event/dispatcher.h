@@ -4,12 +4,9 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
-#include "envoy/config/core/v3/resolver.pb.h"
-#include "envoy/config/core/v3/udp_socket_config.pb.h"
 #include "envoy/event/dispatcher_thread_deletable.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/scaled_timer.h"
@@ -18,17 +15,11 @@
 #include "envoy/event/timer.h"
 #include "envoy/filesystem/watcher.h"
 #include "envoy/network/connection.h"
-#include "envoy/network/connection_handler.h"
-#include "envoy/network/dns.h"
 #include "envoy/network/listen_socket.h"
-#include "envoy/network/listener.h"
 #include "envoy/network/transport_socket.h"
-#include "envoy/server/overload/thread_local_overload_state.h"
 #include "envoy/server/watchdog.h"
 #include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/stream_info.h"
-#include "envoy/thread/thread.h"
 
 #include "absl/functional/any_invocable.h"
 

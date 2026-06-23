@@ -15,7 +15,6 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
@@ -673,7 +672,6 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingAction) {
 
   filter_state->setData(MatchedActionsFilterStateKey,
                         std::make_shared<MatchedActionInfo>("rootFilterName", "oldActionName"),
-                        StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
 
   Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
@@ -704,7 +702,6 @@ TEST_F(FilterTest, MatchingActionShouldNotCollitionWithOtherRootFilter) {
 
   filter_state->setData(MatchedActionsFilterStateKey,
                         std::make_shared<MatchedActionInfo>("otherRootFilterName", "anyActionName"),
-                        StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
 
   Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
@@ -1746,7 +1743,7 @@ TEST(ConfigTest, CompileNamedFilterChainsFailsOnFactoryError) {
   auto* typed = chain.add_typed_config();
   typed->set_name("envoy.filters.http.test.fail_factory");
   Protobuf::Struct struct_config;
-  typed->mutable_typed_config()->PackFrom(struct_config);
+  std::ignore = typed->mutable_typed_config()->PackFrom(struct_config);
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   CompositeFilterFactory factory;

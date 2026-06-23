@@ -1,7 +1,6 @@
 #include <chrono>
 #include <memory>
 
-#include "source/common/http/conn_pool_base.h"
 #include "source/common/http/http3/conn_pool.h"
 #include "source/common/quic/quic_client_transport_socket_factory.h"
 
@@ -10,12 +9,12 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/http/conn_pool.h"
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
 
 using testing::NiceMock;
@@ -53,6 +52,20 @@ public:
     factory_->initialize();
     quic_info_ = Quic::createPersistentQuicInfoForCluster(dispatcher_, mockHost().cluster_,
                                                           context_.server_context_);
+
+    // Create dummy peer sockets for sending the packets to.
+    //
+    // This is necessary once ClientHello does not fit in a single packet
+    // anymore, as on Linux sending the first packet to an unreachable port
+    // always succeeds, but sending subsequent packets returns ECONNREFUSED.
+    // And that error will ultimately fail the tests.
+    dummy_peer_v4_ = std::make_unique<Network::Test::UdpSyncPeer>(Network::Address::IpVersion::v4);
+    dummy_peer_v6_ = std::make_unique<Network::Test::UdpSyncPeer>(Network::Address::IpVersion::v6);
+
+    test_address_ = dummy_peer_v4_->localAddress();
+    address_list_ = std::make_shared<Upstream::HostDescription::AddressVector>(
+        Upstream::HostDescription::AddressVector{dummy_peer_v4_->localAddress(),
+                                                 dummy_peer_v6_->localAddress()});
   }
 
   void initialize() {
@@ -78,7 +91,7 @@ public:
                          transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
                          makeOptRef<PoolConnectResultCallback>(connect_result_callback_),
                          *quic_info_, {observers_}, overload_manager_, happy_eyeballs_);
-    EXPECT_EQ(3000, Http3ConnPoolImplPeer::getServerId(*pool_).port());
+    EXPECT_EQ(test_address_->ip()->port(), Http3ConnPoolImplPeer::getServerId(*pool_).port());
   }
 
   void createNewStream();
@@ -92,12 +105,8 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Upstream::ClusterConnectivityState state_;
   NiceMock<Server::MockOverloadManager> overload_manager_;
-  Network::Address::InstanceConstSharedPtr test_address_ =
-      *Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
-  std::shared_ptr<Upstream::HostDescription::AddressVector> address_list_{
-      new Upstream::HostDescription::AddressVector{
-          *Network::Utility::resolveUrl("tcp://127.0.0.1:3000"),
-          *Network::Utility::resolveUrl("tcp://[::]:3000")}};
+  Network::Address::InstanceConstSharedPtr test_address_;
+  std::shared_ptr<Upstream::HostDescription::AddressVector> address_list_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
   Ssl::ClientContextSharedPtr ssl_context_{new Ssl::MockClientContext()};
@@ -110,6 +119,8 @@ public:
   std::shared_ptr<Network::MockSocketOption> socket_option_{new Network::MockSocketOption()};
   absl::Status creation_status_;
   bool happy_eyeballs_ = false;
+  std::unique_ptr<Network::Test::UdpSyncPeer> dummy_peer_v4_;
+  std::unique_ptr<Network::Test::UdpSyncPeer> dummy_peer_v6_;
 };
 
 class MockQuicClientTransportSocketFactory : public Quic::QuicClientTransportSocketFactory {
@@ -306,61 +317,6 @@ TEST_F(Http3ConnPoolImplTest, GetNetworkChangeEvents) {
   observers_.onNetworkConnected(-1);
   observers_.onNetworkMadeDefault(-1);
   observers_.onNetworkDisconnected(-1);
-}
-
-// Connected fires onConnectionOpen, then GOAWAY on an idle connection closes it
-// which fires onConnectionDraining. Exercises the full MultiplexedActiveClientBase
-// callback path through the HTTP/3 pool.
-TEST_F(Http3ConnPoolImplTest, LifetimeCallbackOpenAndGoAwayDraining) {
-  EXPECT_CALL(mockHost(), address()).WillRepeatedly(Return(test_address_));
-  initialize();
-
-  Http::ConnectionPool::MockConnectionLifetimeCallbacks lifetime_callbacks;
-  std::vector<uint8_t> hash_key = {1, 2, 3};
-  pool_->setLifetimeCallbacks(
-      makeOptRef<Http::ConnectionPool::ConnectionLifetimeCallbacks>(lifetime_callbacks), hash_key);
-
-  MockResponseDecoder decoder;
-  ConnPoolCallbacks callbacks;
-  mockHost().cluster_.cluster_socket_options_ = std::make_shared<Network::Socket::Options>();
-  std::shared_ptr<Network::MockSocketOption> cluster_socket_option{new Network::MockSocketOption()};
-  mockHost().cluster_.cluster_socket_options_->push_back(cluster_socket_option);
-  EXPECT_CALL(*mockHost().cluster_.upstream_local_address_selector_,
-              getUpstreamLocalAddressImpl(_, _))
-      .WillOnce(Invoke(
-          [&](const Network::Address::InstanceConstSharedPtr& address,
-              OptRef<const Network::TransportSocketOptions>) -> Upstream::UpstreamLocalAddress {
-            EXPECT_EQ(address, test_address_);
-            Network::ConnectionSocket::OptionsSharedPtr options =
-                std::make_shared<Network::ConnectionSocket::Options>();
-            Network::Socket::appendOptions(options, mockHost().cluster_.cluster_socket_options_);
-            return Upstream::UpstreamLocalAddress({nullptr, options});
-          }));
-  EXPECT_CALL(*cluster_socket_option, setOption(_, _)).Times(3u);
-  EXPECT_CALL(*socket_option_, setOption(_, _)).Times(3u);
-  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
-  auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
-  ConnectionPool::Cancellable* cancellable = pool_->newStream(
-      decoder, callbacks, {/*can_send_early_data_=*/false, /*can_use_http3_=*/true});
-  EXPECT_NE(nullptr, cancellable);
-  async_connect_callback->invokeCallback();
-
-  std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
-      Http3ConnPoolImplPeer::connectingClients(*pool_);
-  EXPECT_EQ(1u, clients.size());
-  auto* client = static_cast<MultiplexedActiveClientBase*>(clients.front().get());
-
-  // ConnectedZeroRtt event fires onConnectionOpen.
-  EXPECT_CALL(lifetime_callbacks,
-              onConnectionOpen(testing::Ref(*pool_), testing::ContainerEq(hash_key), testing::_));
-  client->onEvent(Network::ConnectionEvent::ConnectedZeroRtt);
-
-  // GOAWAY on idle connection -> closes -> LocalClose -> onConnectionDraining.
-  EXPECT_CALL(lifetime_callbacks, onConnectionDraining(testing::Ref(*pool_),
-                                                       testing::ContainerEq(hash_key), testing::_));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_));
-  client->onGoAway(Http::GoAwayErrorCode::NoError);
-  dispatcher_.to_delete_.clear();
 }
 
 } // namespace Http3

@@ -20,6 +20,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
@@ -78,7 +79,7 @@ protected:
     }
     extension_.reset();
     socket_interface_.reset();
-    while (dispatcher_.to_delete_.size()) {
+    while (!dispatcher_.to_delete_.empty()) {
       dispatcher_.to_delete_.pop_front();
     }
   }

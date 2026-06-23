@@ -214,8 +214,12 @@ HeaderFilter::HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& con
 
 bool HeaderFilter::evaluate(const Formatter::Context& context,
                             const StreamInfo::StreamInfo&) const {
-  return header_data_->matchesHeaders(
-      context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers));
+  const auto& headers =
+      context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers);
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.match_headers_individually")) {
+    return header_data_->matchesHeaders(headers);
+  }
+  return header_data_->matchesHeadersIndividually(headers);
 }
 
 ResponseFlagFilter::ResponseFlagFilter(

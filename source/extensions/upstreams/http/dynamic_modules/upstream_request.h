@@ -137,8 +137,8 @@ public:
 
   // Accessors for ABI callbacks.
   const Envoy::Http::RequestHeaderMap* requestHeaders() const { return request_headers_; }
-  Buffer::Instance* requestBuffer() { return request_buffer_; }
-  Buffer::Instance* responseBuffer() { return response_buffer_; }
+  Buffer::Instance* requestBuffer() { return &request_buffer_; }
+  Buffer::Instance* responseBuffer() { return &response_buffer_; }
 
   // Called by ABI callbacks to send data upstream.
   void sendUpstreamData(absl::string_view data, bool end_stream);
@@ -174,8 +174,11 @@ private:
   bool downstream_complete_ = false;
 
   const Envoy::Http::RequestHeaderMap* request_headers_ = nullptr;
-  Buffer::Instance* request_buffer_ = nullptr;
-  Buffer::Instance* response_buffer_ = nullptr;
+  // Owned copies of the data passed to the module so the buffer pointer never outlives its storage.
+  // The module may destroy this bridge during the encode callbacks, so these are members rather
+  // than call scoped locals and are never written after the module call returns.
+  Buffer::OwnedImpl request_buffer_;
+  Buffer::OwnedImpl response_buffer_;
 
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
 };

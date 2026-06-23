@@ -39,6 +39,7 @@ envoy_extension_cc_test(
         "//source/common/stream_info:filter_state_lib",
         "//source/extensions/io_socket/user_space:io_handle_impl_lib",
         "//test/mocks/event:event_mocks",
+        "//test/test_common:logging_lib",
     ],
 )
 

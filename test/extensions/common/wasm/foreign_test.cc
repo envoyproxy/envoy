@@ -9,7 +9,6 @@
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"
 #include "test/test_common/wasm_base.h"
@@ -91,7 +90,7 @@ TEST_F(ForeignTest, ForeignFunctionSetEnvoyFilterTest) {
 
   args.set_path("invalid.path");
   args.set_value("unicorns");
-  args.SerializeToString(&in);
+  std::ignore = args.SerializeToString(&in);
   result = function(wasm, in, [](size_t size) { return malloc(size); });
   EXPECT_EQ(result, WasmResult::NotFound);
 
@@ -101,7 +100,7 @@ TEST_F(ForeignTest, ForeignFunctionSetEnvoyFilterTest) {
   args.set_path(TcpProxy::PerConnectionCluster::key());
   args.set_value("unicorns");
   args.set_span(envoy::source::extensions::common::wasm::LifeSpan::DownstreamRequest);
-  args.SerializeToString(&in);
+  std::ignore = args.SerializeToString(&in);
   result = function(wasm, in, [](size_t size) { return malloc(size); });
   EXPECT_EQ(result, WasmResult::Ok);
   EXPECT_TRUE(stream_info->filterState()->hasData<TcpProxy::PerConnectionCluster>(
@@ -110,7 +109,7 @@ TEST_F(ForeignTest, ForeignFunctionSetEnvoyFilterTest) {
   args.set_path(Upstream::OriginalDstClusterFilterStateKey);
   args.set_value("1.2.3.4:80");
   args.set_span(envoy::source::extensions::common::wasm::LifeSpan::DownstreamRequest);
-  args.SerializeToString(&in);
+  std::ignore = args.SerializeToString(&in);
   result = function(wasm, in, [](size_t size) { return malloc(size); });
   EXPECT_EQ(result, WasmResult::Ok);
   EXPECT_TRUE(stream_info->filterState()->hasData<Network::AddressObject>(

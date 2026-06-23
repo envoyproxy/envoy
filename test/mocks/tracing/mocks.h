@@ -42,6 +42,7 @@ public:
   MOCK_METHOD(void, injectContext,
               (Tracing::TraceContext & request_headers, const Tracing::UpstreamContext& upstream));
   MOCK_METHOD(void, setSampled, (bool sampled));
+  MOCK_METHOD(void, disableLocalDecision, ());
   MOCK_METHOD(bool, exportedSpan, (), (const, override));
   MOCK_METHOD(bool, useLocalDecision, (), (const));
   MOCK_METHOD(void, setBaggage, (absl::string_view key, absl::string_view value));

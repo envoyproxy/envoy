@@ -97,6 +97,7 @@ std::string decrypt(absl::string_view encrypted, absl::string_view secret) {
   // Resize to actual plaintext length
   plaintext.resize(plaintext_len);
 
+  // NOLINTNEXTLINE(modernize-return-braced-init-list)
   return std::string(plaintext.begin(), plaintext.end());
 }
 
@@ -116,7 +117,7 @@ public:
     secret.mutable_generic_secret()->mutable_secret()->set_inline_string(std::string(value));
 
     envoy::service::discovery::v3::DiscoveryResponse response_pb;
-    response_pb.add_resources()->PackFrom(secret);
+    std::ignore = response_pb.add_resources()->PackFrom(secret);
     response_pb.set_type_url(
         envoy::extensions::transport_sockets::tls::v3::Secret::descriptor()->name());
     return response_pb;
@@ -139,7 +140,7 @@ public:
     response.set_version_info(version);
     response.set_type_url(Config::TestTypeUrl::get().Listener);
     for (const auto& listener_config : listener_configs) {
-      response.add_resources()->PackFrom(listener_config);
+      std::ignore = response.add_resources()->PackFrom(listener_config);
     }
     ASSERT_NE(nullptr, lds_stream_);
     lds_stream_->sendGrpcMessage(response);
@@ -668,6 +669,8 @@ TEST_P(OauthIntegrationTest, LoadListenerAfterServerIsInitialized) {
                           cluster: cluster_0
               http_filters:
                 - name: envoy.filters.http.router
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
         )EOF");
 
     // dummy listener is being sent so that lds api gets marked as ready, which

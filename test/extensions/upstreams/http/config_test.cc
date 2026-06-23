@@ -8,7 +8,7 @@
 #include "test/extensions/upstreams/http/config.pb.h"
 #include "test/extensions/upstreams/http/config.pb.validate.h"
 #include "test/mocks/http/header_validator.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -160,8 +160,8 @@ public:
   createFromProto(const Protobuf::Message& message,
                   Server::Configuration::ServerFactoryContext& server_context) override {
     auto mptr = ::Envoy::Config::Utility::translateAnyToFactoryConfig(
-        dynamic_cast<const Protobuf::Any&>(message), server_context.messageValidationVisitor(),
-        *this);
+        Envoy::Protobuf::DynamicCastMessage<Protobuf::Any>(message),
+        server_context.messageValidationVisitor(), *this);
     const auto& proto_config =
         MessageUtil::downcastAndValidate<const ::envoy::extensions::http::header_validators::
                                              envoy_default::v3::HeaderValidatorConfig&>(

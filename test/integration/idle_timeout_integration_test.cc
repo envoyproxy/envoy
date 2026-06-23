@@ -316,6 +316,8 @@ TEST_P(IdleTimeoutIntegrationTest, IdleStreamTimeoutWithRouteReselect) {
 TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutWithLargeBuffer) {
   config_helper_.prependFilter(R"EOF(
   name: backpressure-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.BackpressureFilterConfig
   )EOF");
   enable_per_stream_idle_timeout_ = true;
   initialize();
@@ -568,6 +570,8 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutIsNotDisarmedByEncode1xxHeaders
 TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutResetFromFilter) {
   config_helper_.prependFilter(R"EOF(
   name: reset-idle-timer-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.ResetIdleTimerFilterConfig
   )EOF");
   enable_per_stream_idle_timeout_ = true;
 
@@ -679,7 +683,7 @@ public:
       // Add custom upstream filter
       auto* filter = cluster->add_filters();
       filter->set_name("envoy.test.upstream_idle_timeout_verifier");
-      filter->mutable_typed_config()->PackFrom(Protobuf::Struct());
+      std::ignore = filter->mutable_typed_config()->PackFrom(Protobuf::Struct());
 
       // Set idle timeout
       ConfigHelper::HttpProtocolOptions protocol_options;

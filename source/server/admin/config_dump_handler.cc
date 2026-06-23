@@ -114,7 +114,7 @@ bool trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
         return false;
       }
       // Pack it back into the Any resource.
-      any_message.PackFrom(*inner_message);
+      std::ignore = any_message.PackFrom(*inner_message);
       reflection->MutableMessage(&message, any_field)->CopyFrom(any_message);
     }
   }
@@ -229,7 +229,7 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResourc
         }
       }
       auto* config = dump.add_configs();
-      config->PackFrom(msg);
+      std::ignore = config->PackFrom(msg);
     }
 
     // We found the desired resource so there is no need to continue iterating over
@@ -272,7 +272,7 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addAllConf
     }
 
     auto* config = dump.add_configs();
-    config->PackFrom(*message);
+    std::ignore = config->PackFrom(*message);
   }
   if (dump.configs().empty() && mask.has_value()) {
     return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
@@ -343,10 +343,10 @@ ConfigDumpHandler::dumpEndpointConfigs(const Matchers::StringMatcher& name_match
     }
     if (cluster_info->addedViaApi()) {
       auto& dynamic_endpoint = *endpoint_config_dump->mutable_dynamic_endpoint_configs()->Add();
-      dynamic_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
+      std::ignore = dynamic_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
     } else {
       auto& static_endpoint = *endpoint_config_dump->mutable_static_endpoint_configs()->Add();
-      static_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
+      std::ignore = static_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
     }
   });
   return endpoint_config_dump;

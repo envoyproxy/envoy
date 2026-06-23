@@ -74,7 +74,7 @@ public:
       header->mutable_header()->set_value("%HOSTNAME%");
 
       tracing.mutable_provider()->set_name("envoy.tracers.opentelemetry");
-      tracing.mutable_provider()->mutable_typed_config()->PackFrom(otel_config);
+      std::ignore = tracing.mutable_provider()->mutable_typed_config()->PackFrom(otel_config);
 
       *hcm.mutable_tracing() = tracing;
     });

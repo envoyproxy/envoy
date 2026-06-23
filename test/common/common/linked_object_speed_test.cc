@@ -14,12 +14,12 @@ namespace Envoy {
 
 struct StdListObject : public LinkedObject<StdListObject> {
   explicit StdListObject(int v = 0) : value(v) {}
-  int value;
+  int value = 0;
 };
 
 struct IntrusiveObject : public IntrusiveListNode<IntrusiveObject> {
   explicit IntrusiveObject(int v = 0) : value(v) {}
-  int value;
+  int value = 0;
 };
 
 // Benchmark inserting N items at the front of a std::list<unique_ptr<T>>.

@@ -2,6 +2,7 @@
 
 #include <numeric>
 #include <string>
+#include <type_traits>
 
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
@@ -180,7 +181,7 @@ public:
       printer.SetHideUnknownFields(true);
       for (const auto& message : source) {
         std::string text_message;
-        printer.PrintToString(message, &text_message);
+        std::ignore = printer.PrintToString(message, &text_message);
         absl::StrAppend(&text, text_message);
       }
     }
@@ -272,6 +273,8 @@ public:
   static void loadFromJson(absl::string_view json, Protobuf::Struct& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
+  static absl::Status loadFromYamlNoThrow(const std::string& yaml, Protobuf::Message& message,
+                                          ProtobufMessage::ValidationVisitor& validation_visitor);
 #endif
 
   // This function attempts to load Envoy configuration from the specified file
@@ -377,7 +380,8 @@ public:
   static const MessageType&
   downcastAndValidate(const Protobuf::Message& config,
                       ProtobufMessage::ValidationVisitor& validation_visitor) {
-    const auto& typed_config = dynamic_cast<MessageType>(config);
+    const auto& typed_config =
+        Envoy::Protobuf::DynamicCastMessage<std::remove_reference_t<MessageType>>(config);
     validate(typed_config, validation_visitor);
     return typed_config;
   }

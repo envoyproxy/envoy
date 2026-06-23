@@ -15,7 +15,7 @@
 #include "test/extensions/filters/http/rbac/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 
 #include "xds/type/matcher/v3/matcher.pb.h"
 
@@ -322,7 +322,7 @@ on_no_match:
   }
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
-  NiceMock<Network::MockConnection> connection_{};
+  NiceMock<Network::MockConnection> connection_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
   Stats::TestUtil::TestStore stats_store_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
@@ -1085,7 +1085,7 @@ TEST_F(RoleBasedAccessControlFilterTest, MatcherRouteLocalOverride) {
   xds::type::matcher::v3::Matcher matcher;
   auto matcher_on_no_match_action = matcher.mutable_on_no_match()->mutable_action();
   matcher_on_no_match_action->set_name("action");
-  matcher_on_no_match_action->mutable_typed_config()->PackFrom(action);
+  std::ignore = matcher_on_no_match_action->mutable_typed_config()->PackFrom(action);
   *route_config.mutable_rbac()->mutable_matcher() = matcher;
   ActionValidationVisitor validation_visitor;
   NiceMock<Filters::Common::RBAC::MockMatcherEngine> engine{route_config.rbac().matcher(), context_,
@@ -1253,7 +1253,7 @@ public:
 
       *matcher_ext_config->mutable_name() = "envoy.rbac.matchers.upstream.upstream_ip_port";
 
-      matcher_ext_config->mutable_typed_config()->PackFrom(matcher);
+      std::ignore = matcher_ext_config->mutable_typed_config()->PackFrom(matcher);
     }
 
     policy.add_principals()->set_any(true);
@@ -1279,7 +1279,7 @@ public:
         std::make_unique<StreamInfo::UpstreamAddress>(
             Envoy::Network::Utility::parseInternetAddressAndPortNoThrow(upstream_ips.back(),
                                                                         false)),
-        StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
+        StreamInfo::FilterState::LifeSpan::Request);
   }
 };
 

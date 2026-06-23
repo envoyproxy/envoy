@@ -28,7 +28,7 @@ public:
 
           auto* extension = hcm.add_original_ip_detection_extensions();
           extension->set_name("envoy.http.original_ip_detection.custom_header");
-          extension->mutable_typed_config()->PackFrom(config);
+          std::ignore = extension->mutable_typed_config()->PackFrom(config);
 
           hcm.mutable_use_remote_address()->set_value(false);
         });
