@@ -87,6 +87,11 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     },
     "streaming_terminal_filter" => Some(Box::new(StreamingTerminalFilterConfig {})),
     "streaming_response_reentry" => Some(Box::new(StreamingResponseReentryFilterConfig {})),
+    "reentrant_stream_complete" => Some(Box::new(ReentrantStreamCompleteFilterConfig {
+      stream_complete_total: envoy_filter_config
+        .define_counter("reentrant_stream_complete_total")
+        .unwrap(),
+    })),
     "buffer_limit_filter" => Some(Box::new(BufferLimitFilterConfig {})),
     "http_stream_basic" => Some(Box::new(HttpStreamBasicConfig {
       cluster_name: String::from_utf8(config.to_owned()).unwrap(),
@@ -1525,6 +1530,61 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingResponseReentryHttpFilte
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
     envoy_filter.set_response_header("x-reentered", b"yes");
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+}
+
+// =============================================================================
+// Reentrant on_stream_complete Test Filter
+// =============================================================================
+
+// Completes its response with end-of-stream from on_scheduled. Completing with eos drives
+// FilterManager::onStreamComplete inline (before the scheduled callback returns), which synchronously
+// re-enters the same CatchUnwind-wrapped filter's on_stream_complete. If the filter isn't kept
+// alive across the re-entry, on_stream_complete is skipped and the counter isn't incremented.
+struct ReentrantStreamCompleteFilterConfig {
+  stream_complete_total: EnvoyCounterId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for ReentrantStreamCompleteFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    // The bug under test only manifests through the CatchUnwind panic guard, so the filter must be
+    // wrapped here rather than returned bare.
+    Box::new(CatchUnwind::new(ReentrantStreamCompleteFilter {
+      stream_complete_total: self.stream_complete_total,
+    }))
+  }
+}
+
+struct ReentrantStreamCompleteFilter {
+  stream_complete_total: EnvoyCounterId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ReentrantStreamCompleteFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    // Defer the response so it is completed from inside a callback rather than inline here.
+    let scheduler = envoy_filter.new_scheduler();
+    _ = std::thread::spawn(move || {
+      scheduler.commit(1);
+    });
+    envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  }
+
+  fn on_scheduled(&mut self, envoy_filter: &mut EHF, _event_id: u64) {
+    // Completing the response with eos re-enters on_stream_complete before this returns. Use the
+    // streaming response ABI (headers then eos data) rather than a local reply so the only re-entry
+    // is into on_stream_complete (the encode hooks are gated by sent_local_reply_).
+    envoy_filter.send_response_headers(&[(":status", b"200"), ("x-done", b"yes")], false);
+    envoy_filter.send_response_data(b"body", true);
+  }
+
+  fn on_stream_complete(&mut self, envoy_filter: &mut EHF) {
+    envoy_filter
+      .increment_counter(self.stream_complete_total, 1)
+      .unwrap();
   }
 }
 
