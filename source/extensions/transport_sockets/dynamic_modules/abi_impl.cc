@@ -2,6 +2,7 @@
 
 #include "envoy/api/io_error.h"
 #include "envoy/common/platform.h"
+#include "envoy/event/file_event.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 
@@ -88,6 +89,15 @@ void envoy_dynamic_module_callback_transport_socket_io_shutdown_write(
   callbacks->ioHandle().shutdown(ENVOY_SHUT_WR);
 }
 
+int envoy_dynamic_module_callback_transport_socket_get_fd(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr) {
+  Network::TransportSocketCallbacks* callbacks = toSocket(transport_socket_envoy_ptr)->callbacks();
+  if (callbacks == nullptr) {
+    return -1;
+  }
+  return static_cast<int>(callbacks->ioHandle().fdDoNotUse());
+}
+
 void envoy_dynamic_module_callback_transport_socket_read_buffer_add(
     envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
     const char* data, size_t length) {
@@ -129,6 +139,15 @@ void envoy_dynamic_module_callback_transport_socket_write_buffer_get_slices(
   *slices_count = count;
 }
 
+size_t envoy_dynamic_module_callback_transport_socket_write_buffer_length(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr) {
+  Buffer::Instance* buffer = toSocket(transport_socket_envoy_ptr)->currentWriteBuffer();
+  if (buffer == nullptr) {
+    return 0;
+  }
+  return buffer->length();
+}
+
 void envoy_dynamic_module_callback_transport_socket_raise_event(
     envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
     envoy_dynamic_module_type_network_connection_event event) {
@@ -168,6 +187,16 @@ void envoy_dynamic_module_callback_transport_socket_set_is_readable(
     return;
   }
   callbacks->setTransportSocketIsReadable();
+}
+
+void envoy_dynamic_module_callback_transport_socket_set_is_writable(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr) {
+  Network::TransportSocketCallbacks* callbacks = toSocket(transport_socket_envoy_ptr)->callbacks();
+  if (callbacks == nullptr) {
+    return;
+  }
+  // TransportSocketCallbacks has no `writability` setter, so re-arm the write event directly.
+  callbacks->ioHandle().activateFileEvents(Event::FileReadyType::Write);
 }
 
 void envoy_dynamic_module_callback_transport_socket_flush_write_buffer(

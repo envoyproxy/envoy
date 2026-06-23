@@ -191,7 +191,8 @@ public:
                                                   bool) const override {
     return {};
   }
-  std::string newUri(const Http::RequestHeaderMap& headers) const override;
+  std::string newUri(const Http::RequestHeaderMap& headers,
+                     const StreamInfo::StreamInfo& stream_info) const override;
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
   absl::string_view formatBody(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
@@ -820,7 +821,8 @@ public:
   const EarlyDataPolicy& earlyDataPolicy() const override { return *early_data_policy_; }
 
   // Router::DirectResponseEntry
-  std::string newUri(const Http::RequestHeaderMap& headers) const override;
+  std::string newUri(const Http::RequestHeaderMap& headers,
+                     const StreamInfo::StreamInfo& stream_info) const override;
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return direct_response_code_.value(); }
   absl::string_view formatBody(const Http::RequestHeaderMap& request_headers,
@@ -972,7 +974,7 @@ private:
   const OptionalTimeouts optional_timeouts_;
   Runtime::Loader& loader_;
   std::unique_ptr<const RuntimeData> runtime_;
-  std::unique_ptr<const ::Envoy::Http::Utility::RedirectConfig> redirect_config_;
+  std::unique_ptr<::Envoy::Http::Utility::RedirectConfig> redirect_config_;
   std::unique_ptr<const HedgePolicyImpl> hedge_policy_;
   RetryPolicyConstSharedPtr retry_policy_;
   std::unique_ptr<const InternalRedirectPolicyImpl> internal_redirect_policy_;

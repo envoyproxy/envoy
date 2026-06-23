@@ -9,6 +9,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/utility.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_replace.h"
 #include "re2/re2.h"
@@ -192,7 +193,7 @@ UpstreamHostMetadataFormatter::UpstreamHostMetadataFormatter(
                           return host->metadata().get();
                         }) {}
 
-std::unique_ptr<FilterStateFormatter>
+absl::StatusOr<std::unique_ptr<FilterStateFormatter>>
 FilterStateFormatter::create(absl::string_view format, absl::optional<size_t> max_length,
                              bool is_upstream) {
   absl::string_view key, serialize_type, field_name;
@@ -202,7 +203,7 @@ FilterStateFormatter::create(absl::string_view format, absl::optional<size_t> ma
 
   SubstitutionFormatUtils::parseSubcommand(format, ':', key, serialize_type, field_name);
   if (key.empty()) {
-    throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
+    return absl::InvalidArgumentError("Invalid filter state configuration, key cannot be empty.");
   }
 
   if (serialize_type.empty()) {
@@ -210,18 +211,26 @@ FilterStateFormatter::create(absl::string_view format, absl::optional<size_t> ma
   }
   if (serialize_type != PLAIN_SERIALIZATION && serialize_type != TYPED_SERIALIZATION &&
       serialize_type != FIELD_SERIALIZATION) {
-    throw EnvoyException("Invalid filter state serialize type, only "
-                         "support PLAIN/TYPED/FIELD.");
+    return absl::InvalidArgumentError("Invalid filter state serialize type, only "
+                                      "support PLAIN/TYPED/FIELD.");
   }
   if ((serialize_type == FIELD_SERIALIZATION) ^ !field_name.empty()) {
-    throw EnvoyException("Invalid filter state serialize type, FIELD "
-                         "should be used with the field name.");
+    return absl::InvalidArgumentError("Invalid filter state serialize type, FIELD "
+                                      "should be used with the field name.");
   }
 
   const bool serialize_as_string = serialize_type == PLAIN_SERIALIZATION;
 
-  return std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string, is_upstream,
-                                                field_name);
+  return std::unique_ptr<FilterStateFormatter>(
+      new FilterStateFormatter(key, max_length, serialize_as_string, is_upstream, field_name));
+}
+
+absl::StatusOr<std::unique_ptr<FilterStateFormatter>>
+FilterStateFormatter::createForTest(absl::string_view key, absl::optional<size_t> max_length,
+                                    bool serialize_as_string, bool is_upstream,
+                                    absl::string_view field_name) {
+  return std::unique_ptr<FilterStateFormatter>(
+      new FilterStateFormatter(key, max_length, serialize_as_string, is_upstream, field_name));
 }
 
 FilterStateFormatter::FilterStateFormatter(absl::string_view key, absl::optional<size_t> max_length,
@@ -489,13 +498,14 @@ CommonDurationFormatter::getTimePointGetterByName(absl::string_view name) {
   };
 }
 
-std::unique_ptr<CommonDurationFormatter>
+absl::StatusOr<std::unique_ptr<CommonDurationFormatter>>
 CommonDurationFormatter::create(absl::string_view sub_command) {
   // Split the sub_command by ':'.
   absl::InlinedVector<absl::string_view, 3> parsed_sub_commands = absl::StrSplit(sub_command, ':');
 
   if (parsed_sub_commands.size() < 2 || parsed_sub_commands.size() > 3) {
-    throw EnvoyException(fmt::format("Invalid common duration configuration: {}.", sub_command));
+    return absl::InvalidArgumentError(
+        fmt::format("Invalid common duration configuration: {}.", sub_command));
   }
 
   absl::string_view start = parsed_sub_commands[0];
@@ -513,15 +523,16 @@ CommonDurationFormatter::create(absl::string_view sub_command) {
     } else if (precision_str == NanosecondsPrecision) {
       precision = DurationPrecision::Nanoseconds;
     } else {
-      throw EnvoyException(fmt::format("Invalid common duration precision: {}.", precision_str));
+      return absl::InvalidArgumentError(
+          fmt::format("Invalid common duration precision: {}.", precision_str));
     }
   }
 
   TimePointGetter start_getter = getTimePointGetterByName(start);
   TimePointGetter end_getter = getTimePointGetterByName(end);
 
-  return std::make_unique<CommonDurationFormatter>(std::move(start_getter), std::move(end_getter),
-                                                   precision);
+  return std::unique_ptr<CommonDurationFormatter>(
+      new CommonDurationFormatter(std::move(start_getter), std::move(end_getter), precision));
 }
 
 absl::optional<uint64_t>
@@ -620,15 +631,22 @@ UpstreamPeerCertVEndFormatter::UpstreamPeerCertVEndFormatter(absl::string_view f
                                    : absl::optional<SystemTime>();
                       })) {}
 
+absl::Status SystemTimeFormatter::checkConstructPreconditions(absl::string_view format) {
+  // Validate the input specifier here. The formatted string may be destined for a header, and
+  // should not contain invalid characters {NUL, LR, CF}.
+  if (RE2::PartialMatch(format, getSystemTimeFormatNewlinePattern())) {
+    return absl::InvalidArgumentError(
+        "Invalid header configuration. Format string contains newline.");
+  }
+  return absl::OkStatus();
+}
+
 SystemTimeFormatter::SystemTimeFormatter(absl::string_view format, TimeFieldExtractorPtr f,
                                          bool local_time)
     : date_formatter_(format, local_time), time_field_extractor_(std::move(f)),
       local_time_(local_time) {
-  // Validate the input specifier here. The formatted string may be destined for a header, and
-  // should not contain invalid characters {NUL, LR, CF}.
-  if (re2::RE2::PartialMatch(format, getSystemTimeFormatNewlinePattern())) {
-    throw EnvoyException("Invalid header configuration. Format string contains newline.");
-  }
+  // Sanity checking that pre-constructor validation was not skipped.
+  ASSERT(checkConstructPreconditions(format).ok());
 }
 
 absl::optional<std::string>
@@ -669,9 +687,12 @@ Protobuf::Value EnvironmentFormatter::formatValue(const StreamInfo::StreamInfo&)
   return str_;
 }
 
-RequestedServerNameFormatter::RequestedServerNameFormatter(absl::string_view source,
-                                                           absl::string_view option) {
+RequestedServerNameFormatter::RequestedServerNameFormatter(HostFormatterSource source,
+                                                           HostFormatterOption option)
+    : source_(source), option_(option) {}
 
+absl::StatusOr<std::unique_ptr<RequestedServerNameFormatter>>
+RequestedServerNameFormatter::create(absl::string_view source, absl::string_view option) {
   HostFormatterSource host_source = SNI;
   HostFormatterOption option_enum = OriginalHostOrHost;
 
@@ -684,9 +705,10 @@ RequestedServerNameFormatter::RequestedServerNameFormatter(absl::string_view sou
   } else if (source.empty()) {
     host_source = SNI;
   } else {
-    throw EnvoyException(fmt::format("Invalid REQUESTED_SERVER_NAME option: '{}', only "
-                                     "'SNI_ONLY'/'SNI_FIRST'/'HOST_FIRST' are allowed",
-                                     source));
+    return absl::InvalidArgumentError(
+        fmt::format("Invalid REQUESTED_SERVER_NAME option: '{}', only "
+                    "'SNI_ONLY'/'SNI_FIRST'/'HOST_FIRST' are allowed",
+                    source));
   }
 
   if (option == "ORIG_OR_HOST") {
@@ -698,12 +720,13 @@ RequestedServerNameFormatter::RequestedServerNameFormatter(absl::string_view sou
   } else if (option.empty()) {
     option_enum = OriginalHostOrHost;
   } else {
-    throw EnvoyException(fmt::format("Invalid REQUESTED_SERVER_NAME option: '{}', only "
-                                     "'ORIG_OR_HOST'/'HOST'/'ORIG' are allowed",
-                                     option));
+    return absl::InvalidArgumentError(
+        fmt::format("Invalid REQUESTED_SERVER_NAME option: '{}', only "
+                    "'ORIG_OR_HOST'/'HOST'/'ORIG' are allowed",
+                    option));
   }
-  source_ = host_source;
-  option_ = option_enum;
+  return std::unique_ptr<RequestedServerNameFormatter>(
+      new RequestedServerNameFormatter(host_source, option_enum));
 }
 
 absl::optional<std::string>
@@ -1924,8 +1947,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                  absl::string_view option;
                                  SubstitutionFormatUtils::parseSubcommand(format, ':', fallback,
                                                                           option);
-                                 return std::make_unique<RequestedServerNameFormatter>(fallback,
-                                                                                       option);
+                                 return RequestedServerNameFormatter::create(fallback, option);
                                }}},
                              {"ROUTE_NAME",
                               {CommandSyntaxChecker::COMMAND_ONLY,
@@ -2433,7 +2455,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"START_TIME",
                               {CommandSyntaxChecker::PARAMS_OPTIONAL,
                                [](absl::string_view format, absl::optional<size_t>) {
-                                 return std::make_unique<SystemTimeFormatter>(
+                                 return SystemTimeFormatter::make(
                                      format,
                                      std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
                                          [](const StreamInfo::StreamInfo& stream_info)
@@ -2444,7 +2466,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"START_TIME_LOCAL",
                               {CommandSyntaxChecker::PARAMS_OPTIONAL,
                                [](absl::string_view format, absl::optional<size_t>) {
-                                 return std::make_unique<SystemTimeFormatter>(
+                                 return SystemTimeFormatter::make(
                                      format,
                                      std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
                                          [](const StreamInfo::StreamInfo& stream_info)
@@ -2456,7 +2478,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"EMIT_TIME",
                               {CommandSyntaxChecker::PARAMS_OPTIONAL,
                                [](absl::string_view format, absl::optional<size_t>) {
-                                 return std::make_unique<SystemTimeFormatter>(
+                                 return SystemTimeFormatter::make(
                                      format,
                                      std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
                                          [](const StreamInfo::StreamInfo& stream_info)
@@ -2467,7 +2489,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"EMIT_TIME_LOCAL",
                               {CommandSyntaxChecker::PARAMS_OPTIONAL,
                                [](absl::string_view format, absl::optional<size_t>) {
-                                 return std::make_unique<SystemTimeFormatter>(
+                                 return SystemTimeFormatter::make(
                                      format,
                                      std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
                                          [](const StreamInfo::StreamInfo& stream_info)
@@ -2526,22 +2548,23 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"DOWNSTREAM_PEER_CERT_V_START",
                               {CommandSyntaxChecker::PARAMS_OPTIONAL,
                                [](absl::string_view format, absl::optional<size_t>) {
-                                 return std::make_unique<DownstreamPeerCertVStartFormatter>(format);
+                                 return makeTimeFormatter<DownstreamPeerCertVStartFormatter>(
+                                     format);
                                }}},
                              {"DOWNSTREAM_PEER_CERT_V_END",
                               {CommandSyntaxChecker::PARAMS_OPTIONAL,
                                [](absl::string_view format, absl::optional<size_t>) {
-                                 return std::make_unique<DownstreamPeerCertVEndFormatter>(format);
+                                 return makeTimeFormatter<DownstreamPeerCertVEndFormatter>(format);
                                }}},
                              {"UPSTREAM_PEER_CERT_V_START",
                               {CommandSyntaxChecker::PARAMS_OPTIONAL,
                                [](absl::string_view format, absl::optional<size_t>) {
-                                 return std::make_unique<UpstreamPeerCertVStartFormatter>(format);
+                                 return makeTimeFormatter<UpstreamPeerCertVStartFormatter>(format);
                                }}},
                              {"UPSTREAM_PEER_CERT_V_END",
                               {CommandSyntaxChecker::PARAMS_OPTIONAL,
                                [](absl::string_view format, absl::optional<size_t>) {
-                                 return std::make_unique<UpstreamPeerCertVEndFormatter>(format);
+                                 return makeTimeFormatter<UpstreamPeerCertVEndFormatter>(format);
                                }}},
                              {"ENVIRONMENT",
                               {CommandSyntaxChecker::PARAMS_REQUIRED |

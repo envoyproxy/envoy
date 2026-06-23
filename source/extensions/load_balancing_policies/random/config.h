@@ -42,8 +42,8 @@ public:
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
   loadConfig(Server::Configuration::ServerFactoryContext&,
              const Protobuf::Message& config) override {
-    ASSERT(dynamic_cast<const RandomLbProto*>(&config) != nullptr);
-    const RandomLbProto& typed_config = dynamic_cast<const RandomLbProto&>(config);
+    ASSERT(Envoy::Protobuf::DynamicCastMessage<RandomLbProto>(&config) != nullptr);
+    const RandomLbProto& typed_config = Envoy::Protobuf::DynamicCastMessage<RandomLbProto>(config);
     return Upstream::LoadBalancerConfigPtr{new TypedRandomLbConfig(typed_config)};
   }
 

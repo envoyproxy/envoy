@@ -578,6 +578,9 @@ public:
   MOCK_METHOD(void, stopListeners,
               (uint64_t listener_tag, const Network::ExtraShutdownListenerOptions& options));
   MOCK_METHOD(void, stopListeners, ());
+  MOCK_METHOD(void, onFilterChainDrain,
+              (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains));
+  MOCK_METHOD(void, onListenerDrain, (uint64_t listener_tag));
   MOCK_METHOD(void, disableListeners, ());
   MOCK_METHOD(void, enableListeners, ());
   MOCK_METHOD(void, setListenerRejectFraction, (UnitFloat), (override));

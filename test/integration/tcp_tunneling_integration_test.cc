@@ -13,6 +13,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/tcp_tunneling_integration.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
@@ -1150,7 +1151,6 @@ TEST_P(TcpTunnelingIntegrationTest, SchemeHeader) {
   if (!(GetParam().upstream_protocol == Http::CodecType::HTTP2)) {
     return;
   }
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
     proxy_config.set_stat_prefix("tcp_stats");
@@ -2568,6 +2568,30 @@ TEST_P(TcpTunnelingIntegrationTest,
   const std::string expected_log =
       "2 " + std::string(StreamInfo::ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE);
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(expected_log));
+}
+
+TEST_P(TcpTunnelingIntegrationTest, UpstreamRstAfterCompleteResponseNotPropagatedDownstream) {
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+  initialize();
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Send a complete response with Connection: close, then RST.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"connection", "close"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(5, true);
+
+  // Upstream RSTs after completing the response.
+  ASSERT_TRUE(fake_upstream_connection_->close(Network::ConnectionCloseType::AbortReset));
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
+  // Client should receive the full response data, not EOF.
+  ASSERT_TRUE(tcp_client_->waitForData(5));
+  tcp_client_->close();
 }
 
 INSTANTIATE_TEST_SUITE_P(

@@ -64,7 +64,6 @@ TEST_P(TcpConnPoolTest, TestNoTunnelingConfig) {
 }
 
 TEST_P(TcpConnPoolTest, TestTunnelingDisabledByFilterState) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
   const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
 
@@ -81,7 +80,6 @@ TEST_P(TcpConnPoolTest, TestTunnelingDisabledByFilterState) {
 }
 
 TEST_P(TcpConnPoolTest, TestTunnelingNotDisabledIfFilterStateHasFalseValue) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
   const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
 
@@ -101,7 +99,6 @@ TEST_P(TcpConnPoolTest, TestTunnelingNotDisabledIfFilterStateHasFalseValue) {
 }
 
 TEST_P(TcpConnPoolTest, TestNoConnPool) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
   const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
   if (!useUpstreamFilters()) {
@@ -117,7 +114,6 @@ TEST_P(TcpConnPoolTest, Http2Config) {
   auto info = std::make_shared<Upstream::MockClusterInfo>();
   const std::string fake_cluster_name = "fake_cluster";
 
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
   const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
   if (!useUpstreamFilters()) {
@@ -136,7 +132,6 @@ TEST_P(TcpConnPoolTest, Http3Config) {
       .Times(AnyNumber())
       .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP3));
   EXPECT_CALL(thread_local_cluster_, info).Times(AnyNumber()).WillRepeatedly(Return(info));
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
   const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
   if (!useUpstreamFilters()) {

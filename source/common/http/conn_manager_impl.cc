@@ -211,11 +211,11 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     connection_idle_timer_->enableTimer(config_->idleTimeout().value());
   }
 
-  if (config_->maxConnectionDuration()) {
+  if (auto max_connection_duration = config_->maxConnectionDuration(); max_connection_duration) {
     connection_duration_timer_ =
         dispatcher_->createScaledTimer(Event::ScaledTimerType::HttpDownstreamMaxConnectionTimeout,
                                        [this]() -> void { onConnectionDurationTimeout(); });
-    connection_duration_timer_->enableTimer(config_->maxConnectionDuration().value());
+    connection_duration_timer_->enableTimer(max_connection_duration.value());
   }
 
   read_callbacks_->connection().setDelayedCloseTimeout(config_->delayedCloseTimeout());
@@ -2516,7 +2516,6 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
     StreamInfo::FilterStateSharedPtr filter_state) {
   ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   ResponseEncoder* response_encoder = response_encoder_;
-  response_encoder_ = nullptr;
 
   Buffer::InstancePtr request_data = std::make_unique<Buffer::OwnedImpl>();
   const auto& buffered_request_data = filter_manager_.bufferedRequestData();
@@ -2524,6 +2523,10 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   if (proxy_body) {
     request_data->move(*buffered_request_data);
   }
+
+  // Null after move(): draining the WatermarkBuffer may synchronously fire
+  // onDecoderFilterBelowWriteBufferLowWatermark which needs a valid encoder.
+  response_encoder_ = nullptr;
 
   response_encoder->getStream().removeCallbacks(*this);
 

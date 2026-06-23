@@ -1,3 +1,5 @@
+#include <sys/socket.h>
+
 #include <functional>
 
 #include "source/common/io/io_uring_impl.h"
@@ -29,7 +31,7 @@ class IoUringImplTest : public ::testing::Test {
 public:
   IoUringImplTest() : api_(Api::createApiForTest()), should_skip_(!isIoUringSupported()) {
     if (!should_skip_) {
-      io_uring_ = std::make_unique<IoUringImpl>(2, false);
+      io_uring_ = std::make_unique<IoUringImpl>(2, false, false, 0);
     }
   }
 
@@ -324,6 +326,46 @@ TEST_F(IoUringImplTest, PrepareReadvAllDataFitsOneChunk) {
   EXPECT_STREQ(static_cast<char*>(iov.iov_base), "test text");
 }
 
+TEST_F(IoUringImplTest, HasReadyCompletions) {
+  std::string test_file =
+      TestEnvironment::writeStringToFileForTest("has_ready_completions", "test text", true);
+  os_fd_t fd = open(test_file.c_str(), O_RDONLY);
+  ASSERT_TRUE(fd >= 0);
+
+  auto dispatcher = api_->allocateDispatcher("test_thread");
+
+  uint8_t buffer[4096]{};
+  struct iovec iov;
+  iov.iov_base = buffer;
+  iov.iov_len = 4096;
+
+  // The completion queue is empty before anything is submitted.
+  EXPECT_FALSE(io_uring_->hasReadyCompletions());
+
+  os_fd_t event_fd = io_uring_->registerEventfd();
+  const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
+  bool checked = false;
+  auto file_event = dispatcher->createFileEvent(
+      event_fd,
+      [this, &checked, d = dispatcher.get()](uint32_t) {
+        // The completion sits in the queue until it is reaped, then the queue is empty again.
+        EXPECT_TRUE(io_uring_->hasReadyCompletions());
+        io_uring_->forEveryCompletion(
+            [](Request*, int32_t res, bool) { EXPECT_EQ(res, strlen("test text")); });
+        EXPECT_FALSE(io_uring_->hasReadyCompletions());
+        checked = true;
+        d->exit();
+        return absl::OkStatus();
+      },
+      trigger, Event::FileReadyType::Read);
+
+  io_uring_->prepareReadv(fd, &iov, 1, 0, nullptr);
+  io_uring_->submit();
+
+  waitForCondition(*dispatcher, [&checked]() { return checked; });
+  EXPECT_TRUE(checked);
+}
+
 TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
   std::string test_file =
       TestEnvironment::writeStringToFileForTest("prepare_readv_overflow", "abcdefhg", true);
@@ -388,8 +430,8 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
   EXPECT_EQ(static_cast<char*>(iov2.iov_base)[0], 'c');
   EXPECT_EQ(static_cast<char*>(iov2.iov_base)[1], 'd');
 
-  // Only 2 completions are expected because the completion queue can contain
-  // no more than 2 entries.
+  // Only 2 completions are expected because the submission queue holds at most 2 entries, so the
+  // third readv was rejected before submission.
   waitForCondition(*dispatcher, [&completions_nr]() { return completions_nr == 2; });
 
   // Check a new event gets handled in the next dispatcher run.
@@ -402,6 +444,91 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
 
   EXPECT_EQ(static_cast<char*>(iov3.iov_base)[0], 'e');
   EXPECT_EQ(static_cast<char*>(iov3.iov_base)[1], 'f');
+}
+
+TEST_F(IoUringImplTest, MultishotDisabledHasNoBufferPool) {
+  // The fixture io_uring is created with `multishot` disabled.
+  EXPECT_FALSE(io_uring_->isMultishotEnabled());
+  EXPECT_EQ(io_uring_->bufferPool(), nullptr);
+}
+
+TEST_F(IoUringImplTest, MultishotEnabledExposesBufferPool) {
+  auto io_uring = std::make_unique<IoUringImpl>(8, false, true, 4096);
+  if (!io_uring->isMultishotEnabled()) {
+    GTEST_SKIP() << "provided buffer rings not supported on this kernel";
+  }
+  IoUringBufferPoolSharedPtr pool = io_uring->bufferPool();
+  ASSERT_NE(pool, nullptr);
+  EXPECT_EQ(pool->bufferSize(), 4096);
+}
+
+TEST_F(IoUringImplTest, MultishotRecvDeliversDataInProvidedBuffer) {
+  auto io_uring = std::make_unique<IoUringImpl>(8, false, true, 4096);
+  if (!io_uring->isMultishotEnabled()) {
+    GTEST_SKIP() << "provided buffer rings not supported on this kernel";
+  }
+  IoUringBufferPoolSharedPtr pool = io_uring->bufferPool();
+
+  os_fd_t fds[2];
+  ASSERT_EQ(::socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+
+  auto dispatcher = api_->allocateDispatcher("test_thread");
+  os_fd_t event_fd = io_uring->registerEventfd();
+  const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
+
+  int32_t completions_nr = 0;
+  int32_t result = 0;
+  int32_t buffer_id = -1;
+  bool more = false;
+  auto file_event = dispatcher->createFileEvent(
+      event_fd,
+      [&](uint32_t) {
+        io_uring->forEveryCompletion([&](Request* req, int32_t res, bool) {
+          completions_nr++;
+          result = res;
+          buffer_id = req->bufferId();
+          more = req->moreCompletions();
+        });
+        return absl::OkStatus();
+      },
+      trigger, Event::FileReadyType::Read);
+
+  MockIoUringSocket socket;
+  Request req(Request::RequestType::Read, socket);
+  EXPECT_EQ(io_uring->prepareReadMultishot(fds[0], &req), IoUringResult::Ok);
+  EXPECT_EQ(io_uring->submit(), IoUringResult::Ok);
+
+  const std::string data = "hello multishot";
+  ASSERT_EQ(::write(fds[1], data.data(), data.size()), static_cast<ssize_t>(data.size()));
+
+  waitForCondition(*dispatcher, [&completions_nr]() { return completions_nr == 1; });
+
+  EXPECT_EQ(result, static_cast<int32_t>(data.size()));
+  ASSERT_GE(buffer_id, 0);
+  // The `multishot` read stays armed, so the kernel signals more completions are coming.
+  EXPECT_TRUE(more);
+  EXPECT_EQ(0, memcmp(pool->getBuffer(buffer_id), data.data(), data.size()));
+
+  // Releasing the buffer to the kernel must be safe and lets it be reused.
+  pool->releaseBuffer(pool->getBuffer(buffer_id));
+
+  io_uring->unregisterEventfd();
+  ::close(fds[0]);
+  ::close(fds[1]);
+}
+
+TEST_F(IoUringImplTest, MultishotReleaseBufferRejectsOutOfBoundsPointer) {
+  auto io_uring = std::make_unique<IoUringImpl>(8, false, true, 4096);
+  if (!io_uring->isMultishotEnabled()) {
+    GTEST_SKIP() << "provided buffer rings not supported on this kernel";
+  }
+  IoUringBufferPoolSharedPtr pool = io_uring->bufferPool();
+  ASSERT_NE(pool, nullptr);
+
+  // A pointer that does not belong to the pool is flagged as a bug instead of driving an out of
+  // bounds add into the ring.
+  uint8_t stray = 0;
+  EXPECT_ENVOY_BUG(pool->releaseBuffer(&stray), "released buffer pointer is out of range");
 }
 
 } // namespace

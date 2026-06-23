@@ -189,6 +189,7 @@ ECDHE
 ECDS
 ECDSA
 ECONNREFUSED
+ECONNRESET
 EDESTRUCTION
 EDF
 EINVAL
@@ -1503,6 +1504,7 @@ tchars
 tcmalloc
 tcpdump
 teardown
+teardowns
 tempdir
 templated
 templating
