@@ -156,5 +156,5 @@ message DnsCacheConfig {
   // as a failure and the host will retain any previously resolved address.
   // This can be used as an SSRF protection mechanism to prevent DNS rebinding attacks
   // that resolve to internal/private IP addresses.
-  type.matcher.v3.AddressMatcher deny_address_matcher = 16;
+  type.matcher.v3.AddressMatcher resolved_address_filter = 16;
 }
