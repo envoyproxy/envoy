@@ -73,7 +73,7 @@ protected:
 
     auto* reporter_config = custom_config.mutable_reporter_config();
     reporter_config->set_name(MOCK_REPORTER);
-    reporter_config->mutable_typed_config()->PackFrom(Protobuf::StringValue{});
+    std::ignore = reporter_config->mutable_typed_config()->PackFrom(Protobuf::StringValue{});
 
     return custom_config;
   }

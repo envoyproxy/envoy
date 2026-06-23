@@ -192,7 +192,7 @@ protected:
     envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info("1");
     discovery_response.set_type_url(Config::TestTypeUrl::get().Secret);
-    discovery_response.add_resources()->PackFrom(secret);
+    std::ignore = discovery_response.add_resources()->PackFrom(secret);
 
     xds_stream_->sendGrpcMessage(discovery_response);
   }
@@ -249,13 +249,13 @@ public:
               *ts->mutable_typed_config());
           configureSdsSecretConfig(quic_config.mutable_downstream_tls_context()
                                        ->mutable_session_ticket_keys_sds_secret_config());
-          ts->mutable_typed_config()->PackFrom(quic_config);
+          std::ignore = ts->mutable_typed_config()->PackFrom(quic_config);
         } else {
           auto tls_context = MessageUtil::anyConvert<
               envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext>(
               *ts->mutable_typed_config());
           configureSdsSecretConfig(tls_context.mutable_session_ticket_keys_sds_secret_config());
-          ts->mutable_typed_config()->PackFrom(tls_context);
+          std::ignore = ts->mutable_typed_config()->PackFrom(tls_context);
         }
       });
     }
@@ -769,7 +769,8 @@ public:
                                             ->mutable_clusters(dataPlaneUpstreamIndex())
                                             ->mutable_transport_socket();
       upstream_transport_socket->set_name("envoy.transport_sockets.tls");
-      upstream_transport_socket->mutable_typed_config()->PackFrom(upstream_tls_context);
+      std::ignore =
+          upstream_transport_socket->mutable_typed_config()->PackFrom(upstream_tls_context);
     });
 
     HttpIntegrationTest::initialize();
@@ -982,10 +983,10 @@ public:
         envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport quic_context;
         quic_context.mutable_upstream_tls_context()->CopyFrom(tls_context);
         transport_socket->set_name("envoy.transport_sockets.quic");
-        transport_socket->mutable_typed_config()->PackFrom(quic_context);
+        std::ignore = transport_socket->mutable_typed_config()->PackFrom(quic_context);
       } else {
         transport_socket->set_name("envoy.transport_sockets.tls");
-        transport_socket->mutable_typed_config()->PackFrom(tls_context);
+        std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
       }
     });
 
@@ -1125,7 +1126,7 @@ public:
       setUpSdsConfig(secret_config, "client_cert");
 
       transport_socket->set_name("envoy.transport_sockets.tls");
-      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
 
       // Set up the Bootstrap's CDS config to fetch from the CDS cluster.
       const std::string cds_yaml = R"EOF(
@@ -1182,7 +1183,7 @@ public:
     envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info("1");
     discovery_response.set_type_url(Config::TestTypeUrl::get().Secret);
-    discovery_response.add_resources()->PackFrom(secret);
+    std::ignore = discovery_response.add_resources()->PackFrom(secret);
     sds_stream.sendGrpcMessage(discovery_response);
   }
 
@@ -1294,7 +1295,7 @@ public:
       setUpSdsConfig(secret_config, "client_cert", sds_cluster_name_);
 
       transport_socket->set_name("envoy.transport_sockets.tls");
-      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
 
       // Set up the Bootstrap's CDS config to fetch from the CDS cluster.
       const std::string cds_yaml = R"EOF(
@@ -1358,7 +1359,7 @@ public:
     envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info("1");
     discovery_response.set_type_url(Config::TestTypeUrl::get().Secret);
-    discovery_response.add_resources()->PackFrom(secret);
+    std::ignore = discovery_response.add_resources()->PackFrom(secret);
     sds_stream.sendGrpcMessage(discovery_response);
   }
 

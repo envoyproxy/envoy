@@ -112,7 +112,7 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
 
     auto* tracing = cm.mutable_tracing();
     tracing->mutable_provider()->set_name("tracer-test-filter");
-    tracing->mutable_provider()->mutable_typed_config()->PackFrom(test_config);
+    std::ignore = tracing->mutable_provider()->mutable_typed_config()->PackFrom(test_config);
   });
 
   ENVOY_LOG(trace, "GetAndCloseStreamWithTracing initializing http integration test");
@@ -180,7 +180,7 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithTracing) {
 
     auto* tracing = cm.mutable_tracing();
     tracing->mutable_provider()->set_name("tracer-test-filter");
-    tracing->mutable_provider()->mutable_typed_config()->PackFrom(test_config);
+    std::ignore = tracing->mutable_provider()->mutable_typed_config()->PackFrom(test_config);
   });
 
   HttpIntegrationTest::initialize();
@@ -1659,19 +1659,19 @@ public:
       if (old_protocol_options.http_filters().empty()) {
         auto* http_filter = old_protocol_options.add_http_filters();
         http_filter->set_name("envoy.filters.http.upstream_codec");
-        http_filter->mutable_typed_config()->PackFrom(
+        std::ignore = http_filter->mutable_typed_config()->PackFrom(
             envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::
                 default_instance());
       }
       auto* ext_proc_filter = old_protocol_options.add_http_filters();
       ext_proc_filter->set_name("envoy.filters.http.ext_proc");
-      ext_proc_filter->mutable_typed_config()->PackFrom(proto_config_);
+      std::ignore = ext_proc_filter->mutable_typed_config()->PackFrom(proto_config_);
       for (int i = old_protocol_options.http_filters_size() - 1; i > 0; --i) {
         old_protocol_options.mutable_http_filters()->SwapElements(i, i - 1);
       }
-      (*cluster->mutable_typed_extension_protocol_options())
-          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-              .PackFrom(old_protocol_options);
+      std::ignore = (*cluster->mutable_typed_extension_protocol_options())
+                        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                            .PackFrom(old_protocol_options);
     });
   }
 
@@ -2375,7 +2375,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithTracing) {
 
     auto* tracing = cm.mutable_tracing();
     tracing->mutable_provider()->set_name("tracer-test-filter");
-    tracing->mutable_provider()->mutable_typed_config()->PackFrom(test_config);
+    std::ignore = tracing->mutable_provider()->mutable_typed_config()->PackFrom(test_config);
   });
 
   HttpIntegrationTest::initialize();
@@ -2882,7 +2882,7 @@ TEST_P(ExtProcIntegrationTest, PerRouteGrpcService) {
       logging_filter_config.set_upstream_cluster_name("ext_proc_server_1");
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;
       logging_filter.set_name("logging-test-filter");
-      logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
+      std::ignore = logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
 
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(logging_filter));
     }
@@ -3787,7 +3787,7 @@ TEST_P(ExtProcIntegrationTest, SendClusterMetadata) {
     (*metadata->mutable_filter_metadata())["cluster_ns_untyped"] = struct_val;
 
     Protobuf::Any any_val;
-    any_val.PackFrom(struct_val);
+    std::ignore = any_val.PackFrom(struct_val);
     (*metadata->mutable_typed_filter_metadata())["cluster_ns_typed"] = any_val;
   });
 
@@ -4024,7 +4024,7 @@ TEST_P(ExtProcIntegrationTest, MappedAttributeBuilder) {
   (*mapped_response_attributes)["user.port"] = "source.port";
   auto* modifier_config = proto_config_.mutable_processing_request_modifier();
   modifier_config->set_name("envoy.extensions.http.ext_proc.mapped_attribute_builder");
-  modifier_config->mutable_typed_config()->PackFrom(builder);
+  std::ignore = modifier_config->mutable_typed_config()->PackFrom(builder);
 
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -4111,7 +4111,7 @@ TEST_P(ExtProcIntegrationTest, MappedAttributeBuilderOverrides) {
     (*mapped_attributes)["remapped.method"] = "request.method";
     auto* modifier_config = per_route.mutable_overrides()->mutable_processing_request_modifier();
     modifier_config->set_name("envoy.extensions.http.ext_proc.mapped_attribute_builder");
-    modifier_config->mutable_typed_config()->PackFrom(builder);
+    std::ignore = modifier_config->mutable_typed_config()->PackFrom(builder);
 
     setPerRouteConfig(route, per_route);
   });
@@ -4266,7 +4266,7 @@ TEST_P(ExtProcIntegrationTest, RetryOnDifferentHost) {
   auto* host_predicate = retry_policy->add_retry_host_predicate();
   host_predicate->set_name("envoy.retry_host_predicates.previous_hosts");
   envoy::extensions::retry::host::previous_hosts::v3::PreviousHostsPredicate previous_hosts_config;
-  host_predicate->mutable_typed_config()->PackFrom(previous_hosts_config);
+  std::ignore = host_predicate->mutable_typed_config()->PackFrom(previous_hosts_config);
   // First cluster has 2 endpoints now.
   grpc_upstream_count_ = 3;
   initializeConfig({}, {{0, 2}, {1, 1}});
@@ -5107,7 +5107,7 @@ TEST_P(ExtProcIntegrationTest, AccessLogExtProcInCompositeFilter) {
         // "composite" is the composite filter name.
         access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
             "%FILTER_STATE(composite:TYPED)%\n");
-        access_log->mutable_typed_config()->PackFrom(access_log_config);
+        std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
       });
   HttpIntegrationTest::initialize();
   // Adding the match-header so the HTTP request hits the ext_proc filter path.

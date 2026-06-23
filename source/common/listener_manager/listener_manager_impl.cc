@@ -566,7 +566,7 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
     TimestampUtil::systemClockToTimestamp(server_.api().timeSource().systemTime(),
                                           *(it->second->mutable_last_update_attempt()));
     it->second->set_details(add_or_update_status.status().message());
-    it->second->mutable_failed_configuration()->PackFrom(config);
+    std::ignore = it->second->mutable_failed_configuration()->PackFrom(config);
   }
   return add_or_update_status;
 }
@@ -1179,7 +1179,7 @@ ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
   auto transport_socket = filter_chain.transport_socket();
   if (!filter_chain.has_transport_socket()) {
     envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
-    transport_socket.mutable_typed_config()->PackFrom(raw_buffer);
+    std::ignore = transport_socket.mutable_typed_config()->PackFrom(raw_buffer);
     transport_socket.set_name("envoy.transport_sockets.raw_buffer");
   }
 

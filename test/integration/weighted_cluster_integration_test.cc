@@ -86,8 +86,9 @@ public:
                       value: "cluster-0"
             )EOF";
             TestUtility::loadFromYaml(header_mutation_config, header_mutation);
-            (*cluster->mutable_typed_per_filter_config())["envoy.filters.http.header_mutation"]
-                .PackFrom(header_mutation);
+            std::ignore =
+                (*cluster->mutable_typed_per_filter_config())["envoy.filters.http.header_mutation"]
+                    .PackFrom(header_mutation);
           }
 
           // Add a cluster with `cluster_header` specified.

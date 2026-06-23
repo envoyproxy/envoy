@@ -59,7 +59,7 @@ public:
       auto* resource = to_ret.Add();
       resource->set_name(resource_name);
       resource->set_version("1");
-      resource->mutable_resource()->PackFrom(lb_endpoint);
+      std::ignore = resource->mutable_resource()->PackFrom(lb_endpoint);
     }
 
     return to_ret;

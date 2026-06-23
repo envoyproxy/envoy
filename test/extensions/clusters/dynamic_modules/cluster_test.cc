@@ -260,7 +260,7 @@ TEST_F(DynamicModuleClusterTest, MalformedClusterConfig) {
   auto* any = cluster_config.mutable_cluster_config();
   any->set_type_url("type.googleapis.com/google.protobuf.StringValue");
   any->set_value("invalid_binary_data_that_cannot_be_unpacked_as_string_value");
-  cluster.mutable_cluster_type()->mutable_typed_config()->PackFrom(cluster_config);
+  std::ignore = cluster.mutable_cluster_type()->mutable_typed_config()->PackFrom(cluster_config);
 
   Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr, false);
   DynamicModuleClusterFactory factory;

@@ -386,7 +386,7 @@ createUpstreamLocalAddressSelector(
     // Create the default local address selector if one was not specified.
     envoy::config::upstream::local_address_selector::v3::DefaultLocalAddressSelector default_config;
     envoy::config::core::v3::TypedExtensionConfig typed_extension;
-    typed_extension.mutable_typed_config()->PackFrom(default_config);
+    std::ignore = typed_extension.mutable_typed_config()->PackFrom(default_config);
     local_address_selector_factory =
         Config::Utility::getAndCheckFactory<UpstreamLocalAddressSelectorFactory>(typed_extension,
                                                                                  false);
@@ -1503,7 +1503,7 @@ absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> createTransportSocket
   auto transport_socket = config.transport_socket();
   if (!config.has_transport_socket()) {
     envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
-    transport_socket.mutable_typed_config()->PackFrom(raw_buffer);
+    std::ignore = transport_socket.mutable_typed_config()->PackFrom(raw_buffer);
     transport_socket.set_name("envoy.transport_sockets.raw_buffer");
   }
 

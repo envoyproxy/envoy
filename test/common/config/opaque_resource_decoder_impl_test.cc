@@ -17,7 +17,7 @@ public:
   std::pair<ProtobufTypes::MessagePtr, std::string>
   decodeTypedResource(const envoy::config::endpoint::v3::ClusterLoadAssignment& typed_resource) {
     Protobuf::Any opaque_resource;
-    opaque_resource.PackFrom(typed_resource);
+    std::ignore = opaque_resource.PackFrom(typed_resource);
     auto decoded_resource = resource_decoder_.decodeResource(opaque_resource);
     const std::string name = resource_decoder_.resourceName(*decoded_resource);
     return {std::move(decoded_resource), name};
@@ -62,7 +62,7 @@ TEST_F(OpaqueResourceDecoderImplTest, ValidateIgnored) {
   // add a field that doesn't exist in the proto definition:
   unknown->AddFixed32(1000, 1);
   Protobuf::Any opaque_resource;
-  opaque_resource.PackFrom(strange_resource);
+  std::ignore = opaque_resource.PackFrom(strange_resource);
   const auto decoded_resource = resource_decoder.decodeResource(opaque_resource);
   EXPECT_THAT(*decoded_resource, ProtoEq(strange_resource));
   EXPECT_EQ("fare", resource_decoder_.resourceName(*decoded_resource));

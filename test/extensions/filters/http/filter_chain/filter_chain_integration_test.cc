@@ -104,9 +104,9 @@ typed_config:
         envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
     mutation->mutable_append()->mutable_header()->set_key("x-new-header");
     mutation->mutable_append()->mutable_header()->set_value("value-from-inline-custom-chain");
-    filter->mutable_typed_config()->PackFrom(header_mutation_config);
+    std::ignore = filter->mutable_typed_config()->PackFrom(header_mutation_config);
 
-    (*typed_per_filter_config)["envoy.filters.http.filter_chain"].PackFrom(per_route);
+    std::ignore = (*typed_per_filter_config)["envoy.filters.http.filter_chain"].PackFrom(per_route);
   });
 
   initialize();

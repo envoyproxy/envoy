@@ -949,7 +949,7 @@ TEST_F(HttpFilterTest, ProcessingRequestModifierOverrides) {
   Envoy::Protobuf::Struct empty;
   auto* modifier_config = route_proto.mutable_overrides()->mutable_processing_request_modifier();
   modifier_config->set_name("test_processing_request_modifier");
-  modifier_config->mutable_typed_config()->PackFrom(empty);
+  std::ignore = modifier_config->mutable_typed_config()->PackFrom(empty);
 
   FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
@@ -4290,17 +4290,16 @@ TEST_F(HttpFilterTest, SendDynamicMetadata) {
   EXPECT_EQ(0, last_request_.metadata_context().filter_metadata().count("typed.connection.data"));
 
   envoy::extensions::filters::http::ext_proc::v3::ExtProcOverrides typed_any;
-  last_request_.metadata_context()
-      .typed_filter_metadata()
-      .at("typed.connection.data")
-      .UnpackTo(&typed_any);
+  std::ignore = last_request_.metadata_context()
+                    .typed_filter_metadata()
+                    .at("typed.connection.data")
+                    .UnpackTo(&typed_any);
   ASSERT_EQ(1, typed_any.request_attributes().size());
   EXPECT_EQ("connection_typed", typed_any.request_attributes()[0]);
-
-  last_request_.metadata_context()
-      .typed_filter_metadata()
-      .at("untyped.and.typed.connection.data")
-      .UnpackTo(&typed_any);
+  std::ignore = last_request_.metadata_context()
+                    .typed_filter_metadata()
+                    .at("untyped.and.typed.connection.data")
+                    .UnpackTo(&typed_any);
   ASSERT_EQ(1, typed_any.request_attributes().size());
   EXPECT_EQ("connection_typed", typed_any.request_attributes()[0]);
 
