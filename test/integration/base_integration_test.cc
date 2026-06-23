@@ -213,7 +213,7 @@ std::string BaseIntegrationTest::finalizeConfigWithPorts(ConfigHelper& config_he
     lds.set_version_info("0");
     for (auto& listener : config_helper.bootstrap().static_resources().listeners()) {
       Protobuf::Any* resource = lds.add_resources();
-      resource->PackFrom(listener);
+      std::ignore = resource->PackFrom(listener);
     }
 #ifdef ENVOY_ENABLE_YAML
     TestEnvironment::writeStringToFileForTest(

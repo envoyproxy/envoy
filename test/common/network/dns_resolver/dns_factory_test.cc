@@ -17,7 +17,7 @@ public:
     EXPECT_EQ(typed_dns_resolver_config.typed_config().type_url(),
               "type.googleapis.com/"
               "envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig");
-    typed_dns_resolver_config.typed_config().UnpackTo(&cares);
+    std::ignore = typed_dns_resolver_config.typed_config().UnpackTo(&cares);
   }
 
   // Verify the c-ares object is default.
@@ -162,7 +162,7 @@ TEST_F(DnsFactoryTest, CheckTypedDnsResolverConfigExistWithBootstrap) {
   Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 8080),
                                              resolvers);
   cares.add_resolvers()->MergeFrom(resolvers);
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   bootstrap_config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
   EXPECT_TRUE(bootstrap_config.has_typed_dns_resolver_config());

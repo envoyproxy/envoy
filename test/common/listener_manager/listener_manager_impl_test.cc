@@ -115,7 +115,7 @@ class ListenerManagerImplForInPlaceFilterChainUpdateTest : public Event::Simulat
 public:
   envoy::config::listener::v3::Listener createDefaultListener() {
     envoy::config::listener::v3::Listener listener_proto;
-    Protobuf::TextFormat::ParseFromString(R"EOF(
+    std::ignore = Protobuf::TextFormat::ParseFromString(R"EOF(
     name: "foo"
     address: {
       socket_address: {
@@ -125,7 +125,7 @@ public:
     }
     filter_chains: {}
   )EOF",
-                                          &listener_proto);
+                                                        &listener_proto);
     return listener_proto;
   }
 
@@ -8529,7 +8529,7 @@ TEST(ListenerMessageUtilTest, ListenerMessageHaveDifferentFilterChainsAreEquival
 TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, InvalidAddress) {
   // Worker is not started yet.
   envoy::config::listener::v3::Listener listener_proto;
-  Protobuf::TextFormat::ParseFromString(R"EOF(
+  std::ignore = Protobuf::TextFormat::ParseFromString(R"EOF(
     name: "foo"
     address: {
       socket_address: {
@@ -8539,7 +8539,7 @@ TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, InvalidAddress) {
     }
     filter_chains: {}
   )EOF",
-                                        &listener_proto);
+                                                      &listener_proto);
   EXPECT_EQ(manager_->addOrUpdateListener(listener_proto, "", true).status().message(),
             "malformed IP address: 127.0.0.1.0");
 }

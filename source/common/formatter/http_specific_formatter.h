@@ -1,11 +1,9 @@
 #pragma once
 
-#include <bitset>
+#include <cstddef>
 #include <functional>
-#include <list>
-#include <regex>
+#include <memory>
 #include <string>
-#include <vector>
 
 #include "envoy/formatter/substitution_formatter.h"
 #include "envoy/stream_info/stream_info.h"
@@ -14,6 +12,8 @@
 #include "source/common/formatter/substitution_format_utility.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -161,6 +161,10 @@ public:
     Number,
   };
 
+  static absl::StatusOr<std::unique_ptr<GrpcStatusFormatter>>
+  create(const std::string& main_header, const std::string& alternative_header,
+         absl::optional<size_t> max_length, absl::string_view format);
+
   GrpcStatusFormatter(const std::string& main_header, const std::string& alternative_header,
                       absl::optional<size_t> max_length, Format format);
 
@@ -170,9 +174,9 @@ public:
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
 
-  static Format parseFormat(absl::string_view format);
-
 private:
+  static absl::StatusOr<Format> parseFormat(absl::string_view format);
+
   const Format format_;
 };
 

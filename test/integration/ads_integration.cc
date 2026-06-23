@@ -99,7 +99,7 @@ AdsIntegrationTestBase::buildLbEndpointResource(const std::string& lb_endpoint_r
   envoy::config::endpoint::v3::LbEndpoint lb_endpoint =
       ConfigHelper::buildLbEndpoint(Network::Test::getLoopbackAddressString(ipVersion()),
                                     fake_upstreams_[0]->localAddress()->ip()->port());
-  resource.mutable_resource()->PackFrom(lb_endpoint);
+  std::ignore = resource.mutable_resource()->PackFrom(lb_endpoint);
   return resource;
 }
 
@@ -192,7 +192,8 @@ void AdsIntegrationTestBase::initializeAds(const bool rate_limiting) {
           TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     }
     ads_cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
-    ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
+    std::ignore =
+        ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
   });
   HttpIntegrationTest::initialize();
   if (xds_stream_ == nullptr) {

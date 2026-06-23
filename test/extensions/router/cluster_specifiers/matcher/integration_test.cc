@@ -68,14 +68,14 @@ cluster_matcher:
               ->mutable_routes(0)
               ->mutable_route()
               ->clear_cluster();
-          hcm.mutable_route_config()
-              ->mutable_virtual_hosts(0)
-              ->mutable_routes(0)
-              ->mutable_route()
-              ->mutable_inline_cluster_specifier_plugin()
-              ->mutable_extension()
-              ->mutable_typed_config()
-              ->PackFrom(config);
+          std::ignore = hcm.mutable_route_config()
+                            ->mutable_virtual_hosts(0)
+                            ->mutable_routes(0)
+                            ->mutable_route()
+                            ->mutable_inline_cluster_specifier_plugin()
+                            ->mutable_extension()
+                            ->mutable_typed_config()
+                            ->PackFrom(config);
           *hcm.mutable_route_config()
                ->mutable_virtual_hosts(0)
                ->mutable_routes(0)

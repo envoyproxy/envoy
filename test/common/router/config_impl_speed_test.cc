@@ -118,7 +118,7 @@ static RouteConfiguration genMatcherTreeRouteConfig(benchmark::State& state) {
     // Create the matcher action
     auto& matcher_action = (*map)[path];
     matcher_action.mutable_action()->set_name("route");
-    matcher_action.mutable_action()->mutable_typed_config()->PackFrom(route);
+    std::ignore = matcher_action.mutable_action()->mutable_typed_config()->PackFrom(route);
   }
 
   return route_config;
@@ -189,7 +189,7 @@ static RouteConfiguration genPrefixMatcherTreeRouteConfig(benchmark::State& stat
     // Create the matcher action for this shelf
     auto& matcher_action = (*map)[shelf_prefix];
     matcher_action.mutable_action()->set_name("route");
-    matcher_action.mutable_action()->mutable_typed_config()->PackFrom(route_list);
+    std::ignore = matcher_action.mutable_action()->mutable_typed_config()->PackFrom(route_list);
   }
 
   return route_config;

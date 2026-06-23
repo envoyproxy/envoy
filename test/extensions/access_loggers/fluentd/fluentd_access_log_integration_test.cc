@@ -108,8 +108,8 @@ public:
             *formatter = proto;
           }
 
-          access_log->mutable_typed_config()->PackFrom(access_log_config);
-          config_blob->PackFrom(tcp_proxy_config);
+          std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+          std::ignore = config_blob->PackFrom(tcp_proxy_config);
         });
 
     BaseIntegrationTest::initialize();

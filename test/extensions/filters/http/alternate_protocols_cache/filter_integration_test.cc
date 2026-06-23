@@ -35,9 +35,10 @@ protected:
     config.mutable_flush_interval()->set_nanos(0);
     envoy::config::common::key_value::v3::KeyValueStoreConfig kv_config;
     kv_config.mutable_config()->set_name("envoy.key_value.file_based");
-    kv_config.mutable_config()->mutable_typed_config()->PackFrom(config);
+    std::ignore = kv_config.mutable_config()->mutable_typed_config()->PackFrom(config);
     alt_cache.mutable_key_value_store_config()->set_name("envoy.common.key_value");
-    alt_cache.mutable_key_value_store_config()->mutable_typed_config()->PackFrom(kv_config);
+    std::ignore =
+        alt_cache.mutable_key_value_store_config()->mutable_typed_config()->PackFrom(kv_config);
 
     const std::string filter = fmt::format(R"EOF(
 name: alternate_protocols_cache

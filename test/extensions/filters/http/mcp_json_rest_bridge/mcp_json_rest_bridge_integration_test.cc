@@ -720,8 +720,9 @@ TEST_P(McpJsonRestBridgeIntegrationTest, PerRouteConfigOverridesHttpRule) {
     tool->mutable_http_rule()->set_post("/v1/{parent=projects/*}/keys_override");
     tool->mutable_http_rule()->set_body("key");
 
-    (*route->mutable_typed_per_filter_config())["envoy.filters.http.mcp_json_rest_bridge"].PackFrom(
-        per_route);
+    std::ignore =
+        (*route->mutable_typed_per_filter_config())["envoy.filters.http.mcp_json_rest_bridge"]
+            .PackFrom(per_route);
   });
 
   initializeFilter(config);

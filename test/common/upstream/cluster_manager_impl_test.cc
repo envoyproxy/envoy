@@ -57,7 +57,7 @@ void verifyCaresDnsConfigAndUnpack(
   EXPECT_EQ(
       typed_dns_resolver_config.typed_config().type_url(),
       "type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig");
-  typed_dns_resolver_config.typed_config().UnpackTo(&cares);
+  std::ignore = typed_dns_resolver_config.typed_config().UnpackTo(&cares);
 }
 
 class AlpnSocketFactory : public Network::RawBufferSocketFactory {
@@ -864,7 +864,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecified) {
                                              resolvers);
   cares.add_resolvers()->MergeFrom(resolvers);
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
@@ -909,7 +909,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedMultipleResolvers) {
   Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.5", 81),
                                              resolvers);
   cares.add_resolvers()->MergeFrom(resolvers);
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
@@ -952,7 +952,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedOveridingDeprecatedReso
                                              resolvers);
   cares.add_resolvers()->MergeFrom(resolvers);
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters

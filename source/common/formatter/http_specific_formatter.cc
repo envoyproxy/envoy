@@ -1,5 +1,10 @@
 #include "source/common/formatter/http_specific_formatter.h"
 
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
+
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
@@ -15,6 +20,11 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/utility.h"
+
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Formatter {
@@ -211,11 +221,22 @@ absl::optional<std::string> SpanIDFormatter::format(const Context& context,
   return span_id;
 }
 
-GrpcStatusFormatter::Format GrpcStatusFormatter::parseFormat(absl::string_view format) {
+absl::StatusOr<std::unique_ptr<GrpcStatusFormatter>>
+GrpcStatusFormatter::create(const std::string& main_header, const std::string& alternative_header,
+                            absl::optional<size_t> max_length, absl::string_view format) {
+  absl::StatusOr<GrpcStatusFormatter::Format> format_or_status = parseFormat(format);
+  if (!format_or_status.ok()) {
+    return format_or_status.status();
+  }
+  return std::unique_ptr<GrpcStatusFormatter>(new GrpcStatusFormatter(
+      main_header, alternative_header, max_length, format_or_status.value()));
+}
+
+absl::StatusOr<GrpcStatusFormatter::Format>
+GrpcStatusFormatter::parseFormat(absl::string_view format) {
   if (format.empty() || format == "CAMEL_STRING") {
     return GrpcStatusFormatter::CamelString;
   }
-
   if (format == "SNAKE_STRING") {
     return GrpcStatusFormatter::SnakeString;
   }
@@ -223,7 +244,10 @@ GrpcStatusFormatter::Format GrpcStatusFormatter::parseFormat(absl::string_view f
     return GrpcStatusFormatter::Number;
   }
 
-  throw EnvoyException("GrpcStatusFormatter only supports CAMEL_STRING, SNAKE_STRING or NUMBER.");
+  return absl::InvalidArgumentError(
+      fmt::format("GrpcStatusFormatter only supports CAMEL_STRING, SNAKE_STRING or NUMBER. "
+                  "Got: {}",
+                  format));
 }
 
 GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
@@ -519,8 +543,10 @@ BuiltInHttpCommandParser::getKnownFormatters() {
        {"GRPC_STATUS",
         {CommandSyntaxChecker::PARAMS_OPTIONAL,
          [](absl::string_view format, absl::optional<size_t>) {
-           return std::make_unique<GrpcStatusFormatter>("grpc-status", "", absl::optional<size_t>(),
-                                                        GrpcStatusFormatter::parseFormat(format));
+           auto result =
+               GrpcStatusFormatter::create("grpc-status", "", absl::optional<size_t>(), format);
+           THROW_IF_NOT_OK_REF(result.status());
+           return std::move(result).value();
          }}},
        {"GRPC_STATUS_NUMBER",
         {CommandSyntaxChecker::COMMAND_ONLY,

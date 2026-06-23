@@ -35,10 +35,9 @@ public:
 
       upstream_http_options->set_auto_sni(auto_sni_);
       upstream_http_options->set_auto_san_validation(auto_san_validation_);
-
-      (*cluster->mutable_typed_extension_protocol_options())
-          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-              .PackFrom(protocol_options);
+      std::ignore = (*cluster->mutable_typed_extension_protocol_options())
+                        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                            .PackFrom(protocol_options);
     });
 
     HttpIntegrationTest::initialize();

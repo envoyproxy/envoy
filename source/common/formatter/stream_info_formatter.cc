@@ -193,7 +193,7 @@ UpstreamHostMetadataFormatter::UpstreamHostMetadataFormatter(
                           return host->metadata().get();
                         }) {}
 
-std::unique_ptr<FilterStateFormatter>
+absl::StatusOr<std::unique_ptr<FilterStateFormatter>>
 FilterStateFormatter::create(absl::string_view format, absl::optional<size_t> max_length,
                              bool is_upstream) {
   absl::string_view key, serialize_type, field_name;
@@ -203,7 +203,7 @@ FilterStateFormatter::create(absl::string_view format, absl::optional<size_t> ma
 
   SubstitutionFormatUtils::parseSubcommand(format, ':', key, serialize_type, field_name);
   if (key.empty()) {
-    throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
+    return absl::InvalidArgumentError("Invalid filter state configuration, key cannot be empty.");
   }
 
   if (serialize_type.empty()) {
@@ -211,18 +211,26 @@ FilterStateFormatter::create(absl::string_view format, absl::optional<size_t> ma
   }
   if (serialize_type != PLAIN_SERIALIZATION && serialize_type != TYPED_SERIALIZATION &&
       serialize_type != FIELD_SERIALIZATION) {
-    throw EnvoyException("Invalid filter state serialize type, only "
-                         "support PLAIN/TYPED/FIELD.");
+    return absl::InvalidArgumentError("Invalid filter state serialize type, only "
+                                      "support PLAIN/TYPED/FIELD.");
   }
   if ((serialize_type == FIELD_SERIALIZATION) ^ !field_name.empty()) {
-    throw EnvoyException("Invalid filter state serialize type, FIELD "
-                         "should be used with the field name.");
+    return absl::InvalidArgumentError("Invalid filter state serialize type, FIELD "
+                                      "should be used with the field name.");
   }
 
   const bool serialize_as_string = serialize_type == PLAIN_SERIALIZATION;
 
-  return std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string, is_upstream,
-                                                field_name);
+  return std::unique_ptr<FilterStateFormatter>(
+      new FilterStateFormatter(key, max_length, serialize_as_string, is_upstream, field_name));
+}
+
+absl::StatusOr<std::unique_ptr<FilterStateFormatter>>
+FilterStateFormatter::createForTest(absl::string_view key, absl::optional<size_t> max_length,
+                                    bool serialize_as_string, bool is_upstream,
+                                    absl::string_view field_name) {
+  return std::unique_ptr<FilterStateFormatter>(
+      new FilterStateFormatter(key, max_length, serialize_as_string, is_upstream, field_name));
 }
 
 FilterStateFormatter::FilterStateFormatter(absl::string_view key, absl::optional<size_t> max_length,
@@ -490,13 +498,14 @@ CommonDurationFormatter::getTimePointGetterByName(absl::string_view name) {
   };
 }
 
-std::unique_ptr<CommonDurationFormatter>
+absl::StatusOr<std::unique_ptr<CommonDurationFormatter>>
 CommonDurationFormatter::create(absl::string_view sub_command) {
   // Split the sub_command by ':'.
   absl::InlinedVector<absl::string_view, 3> parsed_sub_commands = absl::StrSplit(sub_command, ':');
 
   if (parsed_sub_commands.size() < 2 || parsed_sub_commands.size() > 3) {
-    throw EnvoyException(fmt::format("Invalid common duration configuration: {}.", sub_command));
+    return absl::InvalidArgumentError(
+        fmt::format("Invalid common duration configuration: {}.", sub_command));
   }
 
   absl::string_view start = parsed_sub_commands[0];
@@ -514,15 +523,16 @@ CommonDurationFormatter::create(absl::string_view sub_command) {
     } else if (precision_str == NanosecondsPrecision) {
       precision = DurationPrecision::Nanoseconds;
     } else {
-      throw EnvoyException(fmt::format("Invalid common duration precision: {}.", precision_str));
+      return absl::InvalidArgumentError(
+          fmt::format("Invalid common duration precision: {}.", precision_str));
     }
   }
 
   TimePointGetter start_getter = getTimePointGetterByName(start);
   TimePointGetter end_getter = getTimePointGetterByName(end);
 
-  return std::make_unique<CommonDurationFormatter>(std::move(start_getter), std::move(end_getter),
-                                                   precision);
+  return std::unique_ptr<CommonDurationFormatter>(
+      new CommonDurationFormatter(std::move(start_getter), std::move(end_getter), precision));
 }
 
 absl::optional<uint64_t>
