@@ -338,6 +338,8 @@ public:
   struct {
     // per https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
     const std::string Bytestream{"bytestream"};
+    // per https://datatracker.ietf.org/doc/draft-ietf-webtrans-overview/
+    const std::string WebTransport{"webtransport"};
   } ProtocolValues;
 
   struct {

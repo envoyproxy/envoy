@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "test/test_common/utility.h"
 
 #include "contrib/kafka/filters/network/source/tagged_fields.h"
@@ -306,7 +308,7 @@ TEST(NullableStringDeserializer, ShouldDeserializeEmptyString) {
 
 TEST(NullableStringDeserializer, ShouldDeserializeAbsentString) {
   // given
-  const NullableString value = absl::nullopt;
+  const NullableString value = std::nullopt;
   serializeThenDeserializeAndCheckEquality<NullableStringDeserializer>(value);
 }
 
@@ -341,7 +343,7 @@ TEST(NullableCompactStringDeserializer, ShouldDeserializeEmptyString) {
 
 TEST(NullableCompactStringDeserializer, ShouldDeserializeAbsentString) {
   // given
-  const NullableString value = absl::nullopt;
+  const NullableString value = std::nullopt;
   serializeCompactThenDeserializeAndCheckEquality<NullableCompactStringDeserializer>(value);
 }
 
@@ -413,7 +415,7 @@ TEST(NullableBytesDeserializer, ShouldDeserializeEmptyBytes) {
 }
 
 TEST(NullableBytesDeserializer, ShouldDeserializeNullBytes) {
-  const NullableBytes value = absl::nullopt;
+  const NullableBytes value = std::nullopt;
   serializeThenDeserializeAndCheckEquality<NullableBytesDeserializer>(value);
 }
 
@@ -445,7 +447,7 @@ TEST(NullableCompactBytesDeserializer, ShouldDeserializeEmptyBytes) {
 }
 
 TEST(NullableCompactBytesDeserializer, ShouldDeserializeNullBytes) {
-  const NullableBytes value = absl::nullopt;
+  const NullableBytes value = std::nullopt;
   serializeCompactThenDeserializeAndCheckEquality<NullableCompactBytesDeserializer>(value);
 }
 
@@ -502,7 +504,7 @@ TEST(NullableArrayDeserializer, ShouldConsumeCorrectAmountOfData) {
 }
 
 TEST(NullableArrayDeserializer, ShouldConsumeNullArray) {
-  const NullableArray<std::string> value = absl::nullopt;
+  const NullableArray<std::string> value = std::nullopt;
   serializeThenDeserializeAndCheckEquality<NullableArrayDeserializer<StringDeserializer>>(value);
 }
 
@@ -530,7 +532,7 @@ TEST(NullableCompactArrayDeserializer, ShouldConsumeCorrectAmountOfData) {
 }
 
 TEST(NullableCompactArrayDeserializer, ShouldConsumeNullArray) {
-  const NullableArray<int32_t> value = absl::nullopt;
+  const NullableArray<int32_t> value = std::nullopt;
   serializeCompactThenDeserializeAndCheckEquality<
       NullableCompactArrayDeserializer<Int32Deserializer>>(value);
 }
@@ -556,7 +558,7 @@ TEST(NullableStructDeserializer, ShouldConsumeCorrectAmountOfData) {
 }
 
 TEST(NullableStructDeserializer, ShouldConsumeNullStruct) {
-  const ExampleNSD::ResponseType value = absl::nullopt;
+  const ExampleNSD::ResponseType value = std::nullopt;
   serializeThenDeserializeAndCheckEquality<ExampleNSD>(value);
 }
 

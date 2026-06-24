@@ -1,5 +1,7 @@
 #include "contrib/kafka/filters/network/source/mesh/upstream_config.h"
 
+#include <optional>
+
 #include "envoy/common/exception.h"
 
 #include "source/common/common/assert.h"
@@ -88,16 +90,16 @@ UpstreamKafkaConfigurationImpl::UpstreamKafkaConfigurationImpl(const KafkaMeshPr
   ASSERT(config.consumer_proxy_mode() == KafkaMesh::StatefulConsumerProxy);
 }
 
-absl::optional<ClusterConfig>
+std::optional<ClusterConfig>
 UpstreamKafkaConfigurationImpl::computeClusterConfigForTopic(const std::string& topic) const {
   // We find the first matching prefix (this is why ordering is important).
   for (const auto& it : topic_prefix_to_cluster_config_) {
     if (absl::StartsWith(topic, it.first)) {
       const ClusterConfig cluster_config = it.second;
-      return absl::make_optional(cluster_config);
+      return std::make_optional(cluster_config);
     }
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 std::pair<std::string, int32_t> UpstreamKafkaConfigurationImpl::getAdvertisedAddress() const {

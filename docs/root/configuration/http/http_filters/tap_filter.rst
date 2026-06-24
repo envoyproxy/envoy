@@ -169,9 +169,9 @@ conditions are met, the request will be tapped and streamed out to the admin end
 
 .. attention::
 
-  Searching for patterns in HTTP body is potentially cpu intensive. For each specified pattern, http body is scanned byte by byte to find a match.
+  Searching for patterns in HTTP body is potentially cpu intensive. For each specified pattern, HTTP body is scanned byte by byte to find a match.
   If multiple patterns are specified, the process is repeated for each pattern. If location of a pattern is known, ``bytes_limit`` should be specified
-  to scan only part of the http body.
+  to scan only part of the HTTP body.
 
 Output format
 -------------

@@ -21,6 +21,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.transport_sockets.dynamic_modules"],
     rbe_pool = "6gig",
     deps = [
+        "//envoy/event:file_event_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/network:io_socket_error_lib",
         "//source/common/network:utility_lib",
@@ -28,6 +29,7 @@ envoy_extension_cc_test(
         "//source/extensions/transport_sockets/dynamic_modules:abi_impl",
         "//source/extensions/transport_sockets/dynamic_modules:config",
         "//source/extensions/transport_sockets/dynamic_modules:transport_socket_lib",
+        "//test/extensions/dynamic_modules:util",
         "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:transport_socket_mocks",
         "//test/mocks/server:factory_context_mocks",

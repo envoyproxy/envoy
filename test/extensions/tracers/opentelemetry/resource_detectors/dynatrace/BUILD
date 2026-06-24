@@ -36,6 +36,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/tracers/opentelemetry/resource_detectors/dynatrace:config",
         "//source/extensions/tracers/opentelemetry/resource_detectors/dynatrace:dynatrace_resource_detector_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/tracers/opentelemetry/resource_detectors/v3:pkg_cc_proto",
     ],

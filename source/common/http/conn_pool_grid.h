@@ -206,6 +206,7 @@ public:
   bool isIdle() const override;
   void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override;
   Upstream::HostDescriptionConstSharedPtr host() const override;
+  const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() override { return options_; }
   bool maybePreconnect(float preconnect_ratio) override;
   absl::string_view protocolDescription() const override { return "connection grid"; }
 

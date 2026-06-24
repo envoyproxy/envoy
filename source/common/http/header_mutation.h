@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
-#include "envoy/formatter/substitution_formatter_base.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/http/header_evaluator.h"
 #include "envoy/server/factory_context.h"
 

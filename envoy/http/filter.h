@@ -238,6 +238,11 @@ public:
   // Returns a handle to the upstream stream's stream info.
   virtual StreamInfo::StreamInfo& upstreamStreamInfo() PURE;
 
+  // Returns the WebTransport session of the *downstream* stream paired with this upstream request,
+  // if any. Used by the upstream WebTransport codec to obtain the downstream session so it can
+  // bridge the two. Defaults to an empty OptRef for non-WebTransport streams.
+  virtual OptRef<WebTransportSession> downstreamWebTransportSession() { return {}; }
+
   // Returns a handle to the generic upstream.
   virtual OptRef<Router::GenericUpstream> upstream() PURE;
 
@@ -400,6 +405,14 @@ public:
    * method.
    */
   virtual void refreshRouteCluster() PURE;
+
+  /**
+   * Re-initialize the cached cluster info using the currently selected target cluster
+   * name from the matched route, without invoking cluster re-selection in specifiers.
+   * Useful to pull newly fetched cluster metadata (like from on-demand discovery) into
+   * the active stream.
+   */
+  virtual void recreateClusterInfo() PURE;
 
   /**
    * Schedules a request for a RouteConfiguration update from the management server.
@@ -602,6 +615,17 @@ public:
  */
 class StreamDecoderFilterCallbacks : public virtual StreamFilterCallbacks {
 public:
+  /**
+   * @return the WebTransport session of the stream this decoder filter chain is bound to, if any.
+   *
+   * For the downstream HTTP connection manager this returns the downstream codec stream's
+   * WebTransport session. It lets the upstream WebTransport codec obtain the downstream session
+   * (via the router/upstream-callbacks chain) and bridge the two directly, without going through
+   * filter state. Filters/chains not carrying a WebTransport session inherit the default empty
+   * OptRef.
+   */
+  virtual OptRef<WebTransportSession> webTransportSession() { return {}; }
+
   /**
    * Continue iterating through the filter chain with buffered headers and body data. This routine
    * can only be called if the filter has previously returned StopIteration from decodeHeaders()

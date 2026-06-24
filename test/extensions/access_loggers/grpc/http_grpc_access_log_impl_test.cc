@@ -216,7 +216,7 @@ public:
     auto any = std::make_unique<Protobuf::Any>();
     Protobuf::Duration value;
     value.set_seconds(10);
-    any->PackFrom(value);
+    std::ignore = any->PackFrom(value);
     return any;
   }
 };

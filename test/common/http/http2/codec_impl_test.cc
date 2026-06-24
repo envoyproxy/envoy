@@ -38,6 +38,7 @@ using testing::AtLeast;
 using testing::ElementsAre;
 using testing::EndsWith;
 using testing::Eq;
+using testing::Ge;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
@@ -1570,7 +1571,8 @@ TEST_P(Http2CodecImplTest, DumpsStreamlessConnectionWithoutAllocatingMemory) {
                "outbound_control_frames_: 0, max_outbound_control_frames_: 1000, "
                "consecutive_inbound_frames_with_empty_payload_: 0, "
                "max_consecutive_inbound_frames_with_empty_payload_: 1, opened_streams_: 0, "
-               "inbound_priority_frames_: 0, max_inbound_priority_frames_per_stream_: 100, "
+               "active_streams_: 0, inbound_priority_frames_: 0, "
+               "max_inbound_priority_frames_per_stream_: 100, "
                "inbound_window_update_frames_: 1, outbound_data_frames_: 0, "
                "max_inbound_window_update_frames_per_data_frame_sent_: 10\n"
                "  Number of active streams: 0, current_stream_id_: null Dumping 0 Active Streams:\n"
@@ -5138,6 +5140,142 @@ TEST_P(Http2CodecImplTest, InvalidHeadersFrameInvalid) {
   }
 }
 #endif
+
+TEST_P(Http2CodecImplTest, HeaderListSizeTooLargeHistogram) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_record_histograms", true);
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_include_cookies_in_limits", false);
+  max_request_headers_kb_ = 5;
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  for (int i = 0; i < 60; i++) {
+    request_headers.addCopy("cookie", std::string(100, 'a'));
+  }
+
+  // Request should succeed since cookie size is not counted toward size limit.
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  std::vector<uint64_t> header_sizes =
+      server_stats_store_.histogramValues("http2.header_list_size", false);
+  EXPECT_EQ(header_sizes.size(), 1);
+  EXPECT_THAT(header_sizes, ElementsAre(Ge(6000)));
+}
+
+TEST_P(Http2CodecImplTest, CookieSizeHistogram) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_record_histograms", true);
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_include_cookies_in_limits", false);
+  max_request_headers_kb_ = 5;
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  for (int i = 0; i < 60; i++) {
+    request_headers.addCopy("cookie", std::string(100, 'a'));
+  }
+
+  // Request should succeed since cookie size is not counted toward size limit.
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  auto cookie_sizes = server_stats_store_.histogramValues("http2.cookie_size", false);
+  EXPECT_EQ(cookie_sizes.size(), 1);
+  EXPECT_THAT(cookie_sizes, ElementsAre(Ge(6000)));
+}
+
+TEST_P(Http2CodecImplTest, TooManyHeadersHistogram) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_record_histograms", true);
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_include_cookies_in_limits", false);
+  max_request_headers_count_ = 10;
+  max_request_headers_kb_ = 100;
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  for (int i = 0; i < 10; i++) {
+    request_headers.addCopy(absl::StrCat("header", i), "value");
+  }
+
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  auto header_counts = server_stats_store_.histogramValues("http2.header_count", false);
+  EXPECT_EQ(header_counts.size(), 1);
+  EXPECT_THAT(header_counts, ElementsAre(Ge(10)));
+}
+
+TEST_P(Http2CodecImplTest, TooManyCookiesHistogram) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_record_histograms", true);
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_include_cookies_in_limits", false);
+  max_request_headers_count_ = 10;
+  max_request_headers_kb_ = 100;
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  for (int i = 0; i < 10; i++) {
+    request_headers.addCopy("cookie", "value");
+  }
+
+  // Request should succeed since cookie size is not counted toward size limit.
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  std::vector<uint64_t> cookie_counts =
+      server_stats_store_.histogramValues("http2.cookie_count", false);
+  EXPECT_EQ(cookie_counts.size(), 1);
+  EXPECT_THAT(cookie_counts, ElementsAre(Ge(10)));
+}
+
+// Verify that the nghttp2 RST_STREAM rate limiter is configurable via stream_reset_burst and
+// stream_reset_rate. When the burst budget is exhausted by incoming RST_STREAM frames, the server
+// should send GOAWAY and close the connection.
+TEST_P(Http2CodecImplTest, StreamResetRateLimitConfigurable) {
+  if (http2_implementation_ == Http2Impl::Oghttp2) {
+    // stream_reset_burst/rate only apply to nghttp2.
+    initialize();
+    return;
+  }
+
+  // Set a very small burst so it is exhausted after a few RST_STREAM frames.
+  const uint32_t burst = 5;
+  server_http2_options_.mutable_stream_reset_burst()->set_value(burst);
+  server_http2_options_.mutable_stream_reset_rate()->set_value(0);
+  initialize();
+
+  // Send `burst + 1` streams that the client immediately resets. Each reset sends a RST_STREAM
+  // to the server and drains one token from its rate-limiter bucket.
+  for (uint32_t i = 0; i < burst + 1; ++i) {
+    MockResponseDecoder response_decoder;
+    RequestEncoder* encoder = (i == 0) ? request_encoder_ : &client_->newStream(response_decoder);
+
+    TestRequestHeaderMapImpl request_headers;
+    HttpTestUtility::addDefaultHeaders(request_headers);
+    EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).RetiresOnSaturation();
+    EXPECT_TRUE(encoder->encodeHeaders(request_headers, false).ok());
+    driveToCompletion();
+
+    MockStreamCallbacks client_stream_callbacks;
+    encoder->getStream().addCallbacks(client_stream_callbacks);
+    EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _))
+        .RetiresOnSaturation();
+    EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::LocalReset, _))
+        .RetiresOnSaturation();
+    encoder->getStream().resetStream(StreamResetReason::LocalReset);
+    // On the last reset the burst is exhausted: nghttp2 sends GOAWAY synchronously during
+    // driveToCompletion, so the expectation must be registered before the drive runs.
+    if (i == burst) {
+      EXPECT_CALL(client_callbacks_, onGoAway(Http::GoAwayErrorCode::Other));
+    }
+    driveToCompletion();
+  }
+}
 
 } // namespace Http2
 } // namespace Http

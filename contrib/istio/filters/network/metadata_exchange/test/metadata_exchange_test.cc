@@ -17,8 +17,7 @@ using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
-namespace Extensions {
-namespace NetworkFilters {
+namespace Tcp {
 namespace MetadataExchange {
 namespace {
 
@@ -140,6 +139,5 @@ TEST_F(MetadataExchangeFilterTest, MetadataExchangeNotFound) {
 }
 
 } // namespace MetadataExchange
-} // namespace NetworkFilters
-} // namespace Extensions
+} // namespace Tcp
 } // namespace Envoy

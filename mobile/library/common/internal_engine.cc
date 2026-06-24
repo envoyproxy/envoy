@@ -1,21 +1,28 @@
 #include "library/common/internal_engine.h"
 
+#include <memory>
+#include <utility>
+
 #include <sys/resource.h>
 
+#include "absl/strings/string_view.h"
+#include "absl/synchronization/notification.h"
+#include "envoy/network/connection_handler.h"
+#include "library/common/engine_types.h"
+#include "library/common/extensions/listener_managers/api_listener_manager/api_listener_manager.h"
+#include "library/common/http/client.h"
+#include "library/common/mobile_process_wide.h"
+#include "library/common/network/network_types.h"
+#include "library/common/network/proxy_api.h"
+#include "library/common/stats/utility.h"
+#include "library/common/types/c_types.h"
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/runtime/runtime_features.h"
-
-#include "absl/strings/string_view.h"
-#include "absl/synchronization/notification.h"
-#include "library/common/mobile_process_wide.h"
-#include "library/common/network/network_types.h"
-#include "library/common/network/proxy_api.h"
-#include "library/common/stats/utility.h"
-#include "library/common/extensions/listener_managers/api_listener_manager/api_listener_manager.h"
 
 namespace Envoy {
 namespace {
@@ -111,10 +118,57 @@ envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
 
 envoy_status_t InternalEngine::startStream(envoy_stream_t stream,
                                            EnvoyStreamCallbacks&& stream_callbacks,
-                                           bool explicit_flow_control) {
-  return requestDispatcher().post([this, stream, stream_callbacks = std::move(stream_callbacks),
-                                   explicit_flow_control]() mutable {
-    http_client_handle_->startStream(stream, std::move(stream_callbacks), explicit_flow_control);
+                                           bool explicit_flow_control,
+                                           absl::string_view listener_name) {
+  EnvoyStreamCallbacks wrapped_callbacks;
+  wrapped_callbacks.on_headers_ = std::move(stream_callbacks.on_headers_);
+  wrapped_callbacks.on_data_ = std::move(stream_callbacks.on_data_);
+  wrapped_callbacks.on_trailers_ = std::move(stream_callbacks.on_trailers_);
+  wrapped_callbacks.on_send_window_available_ =
+      std::move(stream_callbacks.on_send_window_available_);
+
+  wrapped_callbacks.on_complete_ =
+      [this, stream, on_complete = std::move(stream_callbacks.on_complete_)](
+          envoy_stream_intel stream_intel, envoy_final_stream_intel final_stream_intel) mutable {
+        removeActiveStream(stream);
+        if (on_complete) {
+          on_complete(stream_intel, final_stream_intel);
+        }
+      };
+  wrapped_callbacks.on_error_ = [this, stream, on_error = std::move(stream_callbacks.on_error_)](
+                                    const EnvoyError& error, envoy_stream_intel stream_intel,
+                                    envoy_final_stream_intel final_stream_intel) mutable {
+    removeActiveStream(stream);
+    if (on_error) {
+      on_error(error, stream_intel, final_stream_intel);
+    }
+  };
+  wrapped_callbacks.on_cancel_ = [this, stream, on_cancel = std::move(stream_callbacks.on_cancel_)](
+                                     envoy_stream_intel stream_intel,
+                                     envoy_final_stream_intel final_stream_intel) mutable {
+    removeActiveStream(stream);
+    if (on_cancel) {
+      on_cancel(stream_intel, final_stream_intel);
+    }
+  };
+
+  return requestDispatcher().post([this, stream, wrapped_callbacks = std::move(wrapped_callbacks),
+                                   explicit_flow_control,
+                                   name = std::string(listener_name)]() mutable {
+    auto* api_mgr = dynamic_cast<Server::ApiListenerManagerImpl*>(&server_->listenerManager());
+    ASSERT(api_mgr != nullptr);
+    Http::Client* client = api_mgr->httpClient(name);
+    if (client == nullptr) {
+      EnvoyError error;
+      error.error_code_ = ENVOY_STREAM_RESET;
+      error.message_ = "Listener not found: " + name;
+      envoy_stream_intel stream_intel{};
+      envoy_final_stream_intel final_stream_intel{};
+      wrapped_callbacks.on_error_(error, stream_intel, final_stream_intel);
+      return;
+    }
+    active_streams_[stream] = client;
+    client->startStream(stream, std::move(wrapped_callbacks), explicit_flow_control);
   });
 }
 
@@ -122,31 +176,54 @@ envoy_status_t InternalEngine::sendHeaders(envoy_stream_t stream, Http::RequestH
                                            bool end_stream, bool idempotent) {
   return requestDispatcher().post(
       [this, stream, headers = std::move(headers), end_stream, idempotent]() mutable {
-        http_client_handle_->sendHeaders(stream, std::move(headers), end_stream, idempotent);
+        auto it = active_streams_.find(stream);
+        if (it != active_streams_.end()) {
+          it->second->sendHeaders(stream, std::move(headers), end_stream, idempotent);
+        }
       });
 }
 
 envoy_status_t InternalEngine::readData(envoy_stream_t stream, size_t bytes_to_read) {
-  return requestDispatcher().post(
-      [this, stream, bytes_to_read]() { http_client_handle_->readData(stream, bytes_to_read); });
+  return requestDispatcher().post([this, stream, bytes_to_read]() {
+    auto it = active_streams_.find(stream);
+    if (it != active_streams_.end()) {
+      it->second->readData(stream, bytes_to_read);
+    }
+  });
 }
 
 envoy_status_t InternalEngine::sendData(envoy_stream_t stream, Buffer::InstancePtr buffer,
                                         bool end_stream) {
   return requestDispatcher().post([this, stream, buffer = std::move(buffer), end_stream]() mutable {
-    http_client_handle_->sendData(stream, std::move(buffer), end_stream);
+    auto it = active_streams_.find(stream);
+    if (it != active_streams_.end()) {
+      it->second->sendData(stream, std::move(buffer), end_stream);
+    }
   });
 }
 
 envoy_status_t InternalEngine::sendTrailers(envoy_stream_t stream,
                                             Http::RequestTrailerMapPtr trailers) {
   return requestDispatcher().post([this, stream, trailers = std::move(trailers)]() mutable {
-    http_client_handle_->sendTrailers(stream, std::move(trailers));
+    auto it = active_streams_.find(stream);
+    if (it != active_streams_.end()) {
+      it->second->sendTrailers(stream, std::move(trailers));
+    }
   });
 }
 
 envoy_status_t InternalEngine::cancelStream(envoy_stream_t stream) {
-  return requestDispatcher().post([this, stream]() { http_client_handle_->cancelStream(stream); });
+  return requestDispatcher().post([this, stream]() {
+    auto it = active_streams_.find(stream);
+    if (it != active_streams_.end()) {
+      it->second->cancelStream(stream);
+    }
+  });
+}
+
+void InternalEngine::removeActiveStream(envoy_stream_t stream) {
+  ASSERT(requestDispatcher().isThreadSafe());
+  active_streams_.erase(stream);
 }
 
 // This function takes a `std::shared_ptr` instead of `std::unique_ptr` because `std::function` is a
@@ -200,7 +277,6 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
           auto* api_mgr =
               dynamic_cast<Server::ApiListenerManagerImpl*>(&server_->listenerManager());
           ASSERT(api_mgr != nullptr);
-          http_client_handle_ = &api_mgr->httpClient();
           request_dispatcher_->drain(api_mgr->httpClientDispatcher());
         }
       });
@@ -271,16 +347,7 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
           // on-the-fly without risking contention on system with lots of threads.
           // It also comes with ease of programming.
           stat_name_set_ = client_scope_->symbolTable().makeSet("pulse");
-          if (!use_worker_thread_) {
-            auto api_listener =
-                server_->listenerManager().apiListener()->get().createHttpApiListener(
-                    server_->dispatcher());
-            ASSERT(api_listener != nullptr);
-            http_client_ = std::make_unique<Http::Client>(
-                std::move(api_listener), *main_dispatcher_, server_->serverFactoryContext().scope(),
-                server_->api().randomGenerator());
-            http_client_handle_ = http_client_.get();
-          }
+
           main_dispatcher_->drain(server_->dispatcher());
           engine_running_.Notify();
           callbacks_->on_engine_running_();
@@ -293,10 +360,6 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
 
   // Ensure destructors run on Envoy's main thread.
   postinit_callback_handler_.reset(nullptr);
-  if (http_client_) {
-    http_client_.reset();
-    http_client_handle_ = nullptr;
-  }
   connectivity_manager_.reset();
   client_scope_.reset();
   stat_name_set_.reset();
@@ -340,16 +403,16 @@ envoy_status_t InternalEngine::terminate() {
 
     ASSERT(event_dispatcher_);
     ASSERT(main_dispatcher_);
-    if (!use_worker_thread_) {
-      main_dispatcher_->post([this]() { http_client_->shutdownApiListener(); });
-    }
-
-    // Exit the event loop and finish up in Engine::run(...)
     if (thread_factory_->currentPthreadId() == main_thread_->pthreadId()) {
       // TODO(goaway): figure out some way to support this.
       PANIC("Terminating the engine from its own main thread is currently unsupported.");
     } else {
-      if (use_worker_thread_) {
+      if (!use_worker_thread_) {
+        main_dispatcher_->post([this]() {
+          server_->listenerManager().stopListeners(Server::ListenerManager::StopListenersType::All,
+                                                   Network::ExtraShutdownListenerOptions{});
+        });
+      } else {
         server_->listenerManager().stopListeners(Server::ListenerManager::StopListenersType::All,
                                                  Network::ExtraShutdownListenerOptions{});
       }

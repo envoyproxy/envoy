@@ -39,7 +39,7 @@ protected:
     envoy::extensions::transport_sockets::dynamic_modules::v3::DynamicModuleTransportSocket config;
     config.mutable_dynamic_module_config()->set_name(kReferenceModule);
     config.set_transport_socket_name(name);
-    transport_socket.mutable_typed_config()->PackFrom(config);
+    std::ignore = transport_socket.mutable_typed_config()->PackFrom(config);
     return transport_socket;
   }
 
@@ -145,7 +145,8 @@ TEST_P(DynamicModuleTransportSocketIntegrationTest, UpstreamXorTransform) {
   tcp_client->close();
 }
 
-// Large transfers exercise the read and write loops across multiple I/O operations.
+// Large transfers exercise the read and write loops across multiple I/O operations, including the
+// write buffer length check.
 TEST_P(DynamicModuleTransportSocketIntegrationTest, DownstreamLargeData) {
   initializeWithDownstreamSocket("xor");
 

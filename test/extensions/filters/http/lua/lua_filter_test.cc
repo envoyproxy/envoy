@@ -2494,7 +2494,7 @@ TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadata) {
   typed_meta_value->mutable_struct_value()->MergeFrom(typed_metadata_struct);
 
   Protobuf::Any typed_config;
-  typed_config.PackFrom(main_struct);
+  std::ignore = typed_config.PackFrom(main_struct);
 
   // Add the typed metadata to the stream info
   stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
@@ -2577,7 +2577,7 @@ TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadataComplex) {
   addresses_value->mutable_list_value()->MergeFrom(addresses);
 
   Protobuf::Any typed_config;
-  typed_config.PackFrom(main_struct);
+  std::ignore = typed_config.PackFrom(main_struct);
 
   // Add the typed metadata to the stream info
   stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
@@ -3907,7 +3907,7 @@ TEST_F(LuaHttpFilterTest, GetStreamInfoTypedMetadata) {
   // Pack the Struct into an Any
   Protobuf::Any typed_config;
   typed_config.set_type_url("type.googleapis.com/google.protobuf.Struct");
-  typed_config.PackFrom(main_struct);
+  std::ignore = typed_config.PackFrom(main_struct);
 
   stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
       {"envoy.filters.http.set_metadata", typed_config});
@@ -3989,7 +3989,7 @@ TEST_F(LuaHttpFilterTest, GetStreamInfoComplexTypedMetadata) {
   // Pack the Struct into an Any
   Protobuf::Any typed_config;
   typed_config.set_type_url("type.googleapis.com/google.protobuf.Struct");
-  typed_config.PackFrom(main_struct);
+  std::ignore = typed_config.PackFrom(main_struct);
 
   stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
       {"envoy.filters.http.complex_metadata", typed_config});

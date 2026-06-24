@@ -215,8 +215,7 @@ private:
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
       return std::make_unique<LoadBalancer>(cluster_);
     }
-    // The DFP load balancer does not need to be recreated on host changes.
-    bool recreateOnHostChange() const override { return false; }
+    bool recreateOnHostChangeDeprecated() const override { return false; }
 
   private:
     std::weak_ptr<const Cluster> cluster_;

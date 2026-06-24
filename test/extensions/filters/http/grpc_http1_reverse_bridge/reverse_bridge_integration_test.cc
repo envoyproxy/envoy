@@ -46,8 +46,9 @@ typed_config:
     envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfigPerRoute
         route_config;
     route_config.set_disabled(true);
-    (*vhost.mutable_routes(0)->mutable_typed_per_filter_config())["grpc_http1_reverse_bridge"]
-        .PackFrom(route_config);
+    std::ignore =
+        (*vhost.mutable_routes(0)->mutable_typed_per_filter_config())["grpc_http1_reverse_bridge"]
+            .PackFrom(route_config);
     config_helper_.addVirtualHost(vhost);
 
     HttpIntegrationTest::initialize();

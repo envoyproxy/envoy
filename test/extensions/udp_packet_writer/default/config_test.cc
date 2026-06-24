@@ -24,7 +24,7 @@ TEST(FactoryTest, CreateUdpPacketWriterFactory) {
   Network::UdpDefaultWriterFactoryFactory factory;
   envoy::extensions::udp_packet_writer::v3::UdpDefaultWriterFactory writer_config;
   envoy::config::core::v3::TypedExtensionConfig config;
-  config.mutable_typed_config()->PackFrom(writer_config);
+  std::ignore = config.mutable_typed_config()->PackFrom(writer_config);
   testing::NiceMock<Server::Configuration::MockListenerFactoryContext> listener_context;
   EXPECT_TRUE(factory.createUdpPacketWriterFactory(config, listener_context) != nullptr);
 }

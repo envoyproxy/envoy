@@ -1838,7 +1838,7 @@ message HedgePolicy {
   bool hedge_on_per_try_timeout = 3;
 }
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message RedirectAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RedirectAction";
 
@@ -1934,6 +1934,21 @@ message RedirectAction {
     //   would do a case-insensitive match and transform path ``/aaa/XxX/bbb`` to
     //   ``/aaa/yyy/bbb``.
     type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 9;
+
+    // The path portion of the URL will be set to this value and supports
+    // :ref:`substitution format specifiers <config_access_log_format>` and CEL
+    // expressions.
+    //
+    // For example, with the following config:
+    //
+    // .. code-block:: yaml
+    //
+    //   path_rewrite: "/new/%REQ(x-version)%"
+    //
+    // Would redirect to ``/new/v2`` given a request header ``x-version: v2``.
+    // If the substitution produces an empty string the path redirect is ignored
+    // and the original path is preserved.
+    string path_rewrite = 10;
   }
 
   // The HTTP status code to use in the redirect response. The default response
@@ -2700,9 +2715,13 @@ message RateLimit {
   // <config_http_filters_rate_limit_rate_limit_override>` for more information.
   //
   // .. note::
-  //   This is not supported if the rate limit action is configured in the ``typed_per_filter_config`` like
-  //   :ref:`VirtualHost.typed_per_filter_config<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` or
-  //   :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`, etc.
+  //   For the global HTTP :ref:`rate limit filter
+  //   <config_http_filters_rate_limit>`, this is supported both at the route/virtual host
+  //   level and when the rate limit configuration is supplied via the filter's
+  //   ``rate_limits`` field or the ``typed_per_filter_config``
+  //   (:ref:`RateLimitPerRoute <envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimitPerRoute>`).
+  //   This is not supported by the :ref:`local rate limit filter
+  //   <config_http_filters_local_rate_limit>`.
   Override limit = 4;
 
   // An optional hits addend to be appended to the descriptor produced by this rate limit

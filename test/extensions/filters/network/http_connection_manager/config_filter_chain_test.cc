@@ -279,7 +279,7 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
     auto* filter = websocket_config->add_filters();
     filter->set_name("envoy.filters.http.router");
     envoy::extensions::filters::http::router::v3::Router config;
-    filter->mutable_typed_config()->PackFrom(config);
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
   }
 
   auto foo_config = hcm_config.add_upgrade_configs();
@@ -288,19 +288,19 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
     auto* filter = foo_config->add_filters();
     filter->set_name("encoder-decoder-buffer-filter");
     test::integration::filters::EncoderDecoderBufferFilterConfig config;
-    filter->mutable_typed_config()->PackFrom(config);
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
   }
   {
     auto* filter = foo_config->add_filters();
     filter->set_name("encoder-decoder-buffer-filter");
     test::integration::filters::EncoderDecoderBufferFilterConfig config;
-    filter->mutable_typed_config()->PackFrom(config);
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
   }
   {
     auto* filter = foo_config->add_filters();
     filter->set_name("envoy.filters.http.router");
     envoy::extensions::filters::http::router::v3::Router config;
-    filter->mutable_typed_config()->PackFrom(config);
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
   }
 
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
@@ -339,7 +339,7 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChainWithRouterNotLast) {
     auto* filter = websocket_config->add_filters();
     filter->set_name("envoy.filters.http.router");
     envoy::extensions::filters::http::router::v3::Router config;
-    filter->mutable_typed_config()->PackFrom(config);
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
   }
 
   auto foo_config = hcm_config.add_upgrade_configs();
@@ -348,13 +348,13 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChainWithRouterNotLast) {
     auto* filter = foo_config->add_filters();
     filter->set_name("envoy.filters.http.router");
     envoy::extensions::filters::http::router::v3::Router config;
-    filter->mutable_typed_config()->PackFrom(config);
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
   }
   {
     auto* filter = foo_config->add_filters();
     filter->set_name("encoder-decoder-buffer-filter");
     test::integration::filters::EncoderDecoderBufferFilterConfig config;
-    filter->mutable_typed_config()->PackFrom(config);
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
   }
 
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,

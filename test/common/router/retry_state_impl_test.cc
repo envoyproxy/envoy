@@ -1445,6 +1445,35 @@ TEST_F(RouterRetryStateImplTest, ParseRetryGrpcOn) {
   EXPECT_FALSE(result.second);
 }
 
+TEST_F(RouterRetryStateImplTest, GetUnknownRetryOnTokens) {
+  // All valid HTTP tokens: no unknowns.
+  EXPECT_TRUE(RetryStateImpl::getUnknownRetryOnTokens("5xx,gateway-error,connect-failure").empty());
+
+  // All valid gRPC tokens: no unknowns.
+  EXPECT_TRUE(RetryStateImpl::getUnknownRetryOnTokens("cancelled,deadline-exceeded").empty());
+
+  // Mixed valid HTTP and gRPC tokens: no unknowns.
+  EXPECT_TRUE(RetryStateImpl::getUnknownRetryOnTokens("5xx,cancelled").empty());
+
+  // One unknown token among valid ones.
+  auto unknown = RetryStateImpl::getUnknownRetryOnTokens("5xx,typo,connect-failure");
+  EXPECT_EQ(unknown.size(), 1);
+  EXPECT_EQ(unknown[0], "typo");
+
+  // Multiple unknown tokens.
+  unknown = RetryStateImpl::getUnknownRetryOnTokens("bad1,5xx,bad2");
+  EXPECT_EQ(unknown.size(), 2);
+  EXPECT_EQ(unknown[0], "bad1");
+  EXPECT_EQ(unknown[1], "bad2");
+
+  // All unknown tokens.
+  unknown = RetryStateImpl::getUnknownRetryOnTokens("foo,bar");
+  EXPECT_EQ(unknown.size(), 2);
+
+  // Empty config: no unknowns.
+  EXPECT_TRUE(RetryStateImpl::getUnknownRetryOnTokens("").empty());
+}
+
 TEST_F(RouterRetryStateImplTest, RemoveAllRetryHeaders) {
   // Make sure retry related headers are removed when the policy is enabled.
   {

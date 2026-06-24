@@ -232,7 +232,7 @@ Current supported substitution commands include:
 
 ``%UPSTREAM_WIRE_BYTES_SENT%``
   HTTP
-    Total number of bytes sent to the upstream by the http stream.
+    Total number of bytes sent to the upstream by the HTTP stream.
 
   TCP
     Total number of bytes sent to the upstream by the tcp proxy.
@@ -242,7 +242,7 @@ Current supported substitution commands include:
 
 ``%UPSTREAM_WIRE_BYTES_RECEIVED%``
   HTTP
-    Total number of bytes received from the upstream by the http stream.
+    Total number of bytes received from the upstream by the HTTP stream.
 
   TCP
     Total number of bytes received from the upstream by the tcp proxy.
@@ -252,7 +252,7 @@ Current supported substitution commands include:
 
 ``%UPSTREAM_HEADER_BYTES_SENT%``
   HTTP
-    Number of header bytes sent to the upstream by the http stream.
+    Number of header bytes sent to the upstream by the HTTP stream.
 
   TCP
     Total number of HTTP header bytes sent to the upstream stream, for TCP tunneling flows. Not supported for non-tunneling.
@@ -262,14 +262,14 @@ Current supported substitution commands include:
 
 ``%UPSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%``
   HTTP
-    Number of decompressed header bytes sent to the upstream by the http stream.
+    Number of decompressed header bytes sent to the upstream by the HTTP stream.
 
   TCP/UDP
     Not implemented. It will appear as ``0`` in the access logs.
 
 ``%UPSTREAM_HEADER_BYTES_RECEIVED%``
   HTTP
-    Number of header bytes received from the upstream by the http stream.
+    Number of header bytes received from the upstream by the HTTP stream.
 
   TCP
     Total number of HTTP header bytes received from the upstream stream, for TCP tunneling flows. Not supported for non-tunneling.
@@ -279,7 +279,7 @@ Current supported substitution commands include:
 
 ``%UPSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED%``
   HTTP
-    Number of decompressed header bytes received from the upstream by the http stream.
+    Number of decompressed header bytes received from the upstream by the HTTP stream.
 
   TCP/UDP
     Not implemented. It will appear as ``0`` in the access logs.
@@ -287,7 +287,7 @@ Current supported substitution commands include:
 
 ``%DOWNSTREAM_WIRE_BYTES_SENT%``
   HTTP
-    Total number of bytes sent to the downstream by the http stream.
+    Total number of bytes sent to the downstream by the HTTP stream.
 
   TCP
     Total number of bytes sent to the downstream by the tcp proxy.
@@ -297,7 +297,7 @@ Current supported substitution commands include:
 
 ``%DOWNSTREAM_WIRE_BYTES_RECEIVED%``
   HTTP
-    Total number of bytes received from the downstream by the http stream. Envoy over counts sizes of received HTTP/1.1 pipelined requests by adding up bytes of requests in the pipeline to the one currently being processed.
+    Total number of bytes received from the downstream by the HTTP stream. Envoy over counts sizes of received HTTP/1.1 pipelined requests by adding up bytes of requests in the pipeline to the one currently being processed.
 
   TCP
     Total number of bytes received from the downstream by the tcp proxy.
@@ -307,21 +307,21 @@ Current supported substitution commands include:
 
 ``%DOWNSTREAM_HEADER_BYTES_SENT%``
   HTTP
-    Number of header bytes sent to the downstream by the http stream.
+    Number of header bytes sent to the downstream by the HTTP stream.
 
   TCP/UDP
     Not implemented. It will appear as ``0`` in the access logs.
 
 ``%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%``
   HTTP
-    Number of decompressed header bytes sent to the downstream by the http stream.
+    Number of decompressed header bytes sent to the downstream by the HTTP stream.
 
   TCP/UDP
     Not implemented. It will appear as ``0`` in the access logs.
 
 ``%DOWNSTREAM_HEADER_BYTES_RECEIVED%``
   HTTP
-    Number of header bytes received from the downstream by the http stream.
+    Number of header bytes received from the downstream by the HTTP stream.
 
   TCP/UDP
     Not implemented. It will appear as ``0`` in the access logs.
@@ -330,7 +330,7 @@ Current supported substitution commands include:
 
 ``%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED%``
   HTTP
-    Number of decompressed header bytes received from the downstream by the http stream.
+    Number of decompressed header bytes received from the downstream by the HTTP stream.
 
   TCP/UDP
     Not implemented. It will appear as ``0`` in the access logs.

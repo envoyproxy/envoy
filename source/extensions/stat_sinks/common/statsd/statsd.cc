@@ -266,14 +266,14 @@ TcpStatsdSink::TlsSink::~TlsSink() {
   }
 }
 
-void TcpStatsdSink::TlsSink::beginFlush(bool expect_empty_buffer) {
+void TcpStatsdSink::TlsSink::beginFlush(bool expect_empty_buffer, uint64_t slice_size) {
   ASSERT(!expect_empty_buffer || buffer_.length() == 0);
   ASSERT(current_slice_mem_ == nullptr);
   ASSERT(!current_buffer_reservation_.has_value());
 
-  current_buffer_reservation_.emplace(buffer_.reserveSingleSlice(FLUSH_SLICE_SIZE_BYTES));
+  current_buffer_reservation_.emplace(buffer_.reserveSingleSlice(slice_size));
 
-  ASSERT(current_buffer_reservation_->slice().len_ >= FLUSH_SLICE_SIZE_BYTES);
+  ASSERT(current_buffer_reservation_->slice().len_ >= slice_size);
   current_slice_mem_ = reinterpret_cast<char*>(current_buffer_reservation_->slice().mem_);
 }
 
@@ -284,7 +284,7 @@ void TcpStatsdSink::TlsSink::commonFlush(const std::string& name, uint64_t value
   const uint32_t max_size = name.size() + parent_.getPrefix().size() + 36;
   if (current_buffer_reservation_->slice().len_ - usedBuffer() < max_size) {
     endFlush(false);
-    beginFlush(false);
+    beginFlush(false, std::max<uint64_t>(FLUSH_SLICE_SIZE_BYTES, max_size));
   }
 
   // Produces something like "envoy.{}:{}|c\n"

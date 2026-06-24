@@ -310,7 +310,7 @@ TEST_F(EdsTest, DeltaOnConfigUpdateSuccess) {
 
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
   auto* resource = resources.Add();
-  resource->mutable_resource()->PackFrom(cluster_load_assignment);
+  std::ignore = resource->mutable_resource()->PackFrom(cluster_load_assignment);
   resource->set_version("v1");
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(
@@ -3491,7 +3491,7 @@ TEST_F(XdstpConfigsEdsTest, DeltaOnConfigUpdateSuccess) {
 
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
   auto* resource = resources.Add();
-  resource->mutable_resource()->PackFrom(cluster_load_assignment);
+  std::ignore = resource->mutable_resource()->PackFrom(cluster_load_assignment);
   resource->set_version("v1");
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(

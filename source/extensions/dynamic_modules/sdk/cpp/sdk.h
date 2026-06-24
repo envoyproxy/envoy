@@ -989,6 +989,66 @@ public:
   defineCounter(std::string_view name, std::span<const BufferView> tags_keys = {}) = 0;
 
   /**
+   * Records a histogram value with optional tags. Unlike HttpFilterHandle::recordHistogramValue,
+   * this does not require a per-stream filter and can be called outside of the request lifecycle,
+   * for example from a scheduled background task.
+   * @param id The metric ID.
+   * @param value The value to record.
+   * @param tags_values Optional span of tag values.
+   * @return MetricsResult indicating success or failure.
+   */
+  virtual MetricsResult recordHistogramValue(MetricID id, uint64_t value,
+                                             std::span<const BufferView> tags_values = {}) = 0;
+
+  /**
+   * Sets a gauge value with optional tags. Unlike HttpFilterHandle::setGaugeValue, this does not
+   * require a per-stream filter and can be called outside of the request lifecycle, for example
+   * from a scheduled background task.
+   * @param id The metric ID.
+   * @param value The gauge value.
+   * @param tags_values Optional span of tag values.
+   * @return MetricsResult indicating success or failure.
+   */
+  virtual MetricsResult setGaugeValue(MetricID id, uint64_t value,
+                                      std::span<const BufferView> tags_values = {}) = 0;
+
+  /**
+   * Increments a gauge value with optional tags. Unlike HttpFilterHandle::incrementGaugeValue, this
+   * does not require a per-stream filter and can be called outside of the request lifecycle, for
+   * example from a scheduled background task.
+   * @param id The metric ID.
+   * @param value The increment amount.
+   * @param tags_values Optional span of tag values.
+   * @return MetricsResult indicating success or failure.
+   */
+  virtual MetricsResult incrementGaugeValue(MetricID id, uint64_t value,
+                                            std::span<const BufferView> tags_values = {}) = 0;
+
+  /**
+   * Decrements a gauge value with optional tags. Unlike HttpFilterHandle::decrementGaugeValue, this
+   * does not require a per-stream filter and can be called outside of the request lifecycle, for
+   * example from a scheduled background task.
+   * @param id The metric ID.
+   * @param value The decrement amount.
+   * @param tags_values Optional span of tag values.
+   * @return MetricsResult indicating success or failure.
+   */
+  virtual MetricsResult decrementGaugeValue(MetricID id, uint64_t value,
+                                            std::span<const BufferView> tags_values = {}) = 0;
+
+  /**
+   * Increments a counter value with optional tags. Unlike HttpFilterHandle::incrementCounterValue,
+   * this does not require a per-stream filter and can be called outside of the request lifecycle,
+   * for example from a scheduled background task.
+   * @param id The metric ID.
+   * @param value The increment amount.
+   * @param tags_values Optional span of tag values.
+   * @return MetricsResult indicating success or failure.
+   */
+  virtual MetricsResult incrementCounterValue(MetricID id, uint64_t value,
+                                              std::span<const BufferView> tags_values = {}) = 0;
+
+  /**
    * Checks if logging is enabled for the given log level.
    * @param level The log level to check.
    * @return True if logging is enabled, false otherwise.

@@ -11,6 +11,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/logging.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/synchronization/barrier.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -65,13 +66,14 @@ TEST(Logger, StreamFineGrainLoggerRegistration) {
                                   lock, false};
   Logger::Context::enableFineGrainLogger();
   TestFilterLog filter;
-  getFineGrainLogContext().removeFineGrainLogEntryForTest(__FILE__);
+  const std::string key = absl::StrCat(__FILE__, ":filter");
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(key);
 
   // Make sure fine-grain logger is initialized even the log level is trace.
   filter.logStreamTraceMessage();
   filter.logStreamTraceMessage();
   filter.logStreamTraceMessage();
-  SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
+  SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(key);
   ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::warn);
 }
@@ -82,13 +84,14 @@ TEST(Logger, EventFineGrainLoggerRegistration) {
                                   lock, false};
   Logger::Context::enableFineGrainLogger();
   TestFilterLog filter;
-  getFineGrainLogContext().removeFineGrainLogEntryForTest(__FILE__);
+  const std::string key = absl::StrCat(__FILE__, ":filter");
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(key);
 
   // Make sure fine-grain logger is initialized even the log level is trace.
   filter.logEventTraceMessage();
   filter.logEventTraceMessage();
   filter.logEventTraceMessage();
-  SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
+  SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(key);
   ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::warn);
 }
@@ -99,13 +102,14 @@ TEST(Logger, ConnFineGrainLoggerRegistration) {
                                   lock, false};
   Logger::Context::enableFineGrainLogger();
   TestFilterLog filter;
-  getFineGrainLogContext().removeFineGrainLogEntryForTest(__FILE__);
+  const std::string key = absl::StrCat(__FILE__, ":filter");
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(key);
 
   // Make sure fine-grain logger is initialized even the log level is trace.
   filter.logConnTraceMessage();
   filter.logConnTraceMessage();
   filter.logConnTraceMessage();
-  SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
+  SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(key);
   ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::warn);
 }
@@ -172,7 +176,12 @@ TEST(Logger, LogAsStatement) {
 TEST(Logger, CheckLoggerLevel) {
   class LogTestClass : public Logger::Loggable<Logger::Id::misc> {
   public:
-    void setLevel(const spdlog::level::level_enum level) { ENVOY_LOGGER().set_level(level); }
+    void setLevel(const spdlog::level::level_enum level) {
+      if (Logger::Context::useFineGrainLogger()) {
+        getFineGrainLogContext().setAllFineGrainLoggers(level);
+      }
+      ENVOY_LOGGER().set_level(level);
+    }
     uint32_t executeAtTraceLevel() {
       if (ENVOY_LOG_CHECK_LEVEL(trace)) {
         //  Logger's level was at least trace
@@ -405,7 +414,7 @@ TEST(FineGrainLog, Global) {
   FINE_GRAIN_STREAM_LOG(warn, "Fake warning {} of stream", stream_, 1);
 
   FINE_GRAIN_LOG(critical, "Critical message for later flush.");
-  FINE_GRAIN_FLUSH_LOG();
+  FINE_GRAIN_FLUSH_LOG("");
 }
 
 TEST(FineGrainLog, FastPath) {
@@ -464,6 +473,20 @@ TEST(FineGrainLog, ListIteration) {
   }
 }
 
+TEST(FineGrainLog, SetLevelWithLoggerName) {
+  Envoy::Thread::MutexBasicLockable lock;
+  Logger::Context logging_context{spdlog::level::info, Logger::Context::getFineGrainLogFormat(),
+                                  lock, false, true};
+  const std::string key = absl::StrCat(__FILE__, ":misc");
+  ENVOY_LOG_MISC(info, "test message for misc logger with info level");
+  bool res = getFineGrainLogContext().setFineGrainLogger(key, spdlog::level::debug);
+  EXPECT_EQ(res, true);
+  SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(key);
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->level(), spdlog::level::debug);
+  ENVOY_LOG_MISC(debug, "test message for misc logger with debug level");
+}
+
 TEST(FineGrainLog, Context) {
   FINE_GRAIN_LOG(info, "Info: context API needs test.");
   bool enable_fine_grain_logging = Logger::Context::useFineGrainLogger();
@@ -474,6 +497,59 @@ TEST(FineGrainLog, Context) {
   Logger::Context::enableFineGrainLogger();
   EXPECT_EQ(Logger::Context::useFineGrainLogger(), true);
   EXPECT_EQ(Logger::Context::getFineGrainLogFormat(), "[%Y-%m-%d %T.%e][%t][%l] [%g:%#] %v");
+}
+
+class TestFlushLoggable : public Logger::Loggable<Logger::Id::main> {
+public:
+  void doFlush() { ENVOY_FLUSH_LOG(); }
+};
+
+TEST(FineGrainLog, envoyFlushLogMacro) {
+  Logger::Context::enableFineGrainLogger();
+  TestFlushLoggable loggable;
+  loggable.doFlush();
+
+  Logger::Context::disableFineGrainLogger();
+  loggable.doFlush();
+}
+
+namespace {
+// Helper function that uses ENVOY_LOG_TO_LOGGER.
+// In a real application, this might be a method in a base class or a shared utility.
+void sharedLogHelper(spdlog::logger& logger, absl::string_view message) {
+  ENVOY_LOG_TO_LOGGER(logger, info, "{}", message);
+}
+} // namespace
+
+TEST(FineGrainLog, CachingCorrectnessWithDynamicNames) {
+  Envoy::Thread::MutexBasicLockable lock;
+  // Initialize logging context with fine-grain logging enabled.
+  // Use a custom format that includes the logger name (%n) so we can verify it.
+  Logger::Context logging_context{spdlog::level::info, "[%n] %v", lock, false, true};
+
+  // We will use two different standard loggers.
+  spdlog::logger& admin_logger = Logger::Registry::getLog(Logger::Id::admin);
+  spdlog::logger& upstream_logger = Logger::Registry::getLog(Logger::Id::upstream);
+
+  // Define the keys that Fine-Grain logger will use.
+  const std::string admin_key = absl::StrCat(__FILE__, ":admin");
+  const std::string upstream_key = absl::StrCat(__FILE__, ":upstream");
+
+  // Ensure we start with a clean state for this file's loggers.
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(admin_key);
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(upstream_key);
+
+  // Call the helper with the admin logger.
+  EXPECT_LOG_CONTAINS("", absl::StrCat("[", admin_key, "] message 1"),
+                      sharedLogHelper(admin_logger, "message 1"));
+
+  // Call the helper with the upstream logger.
+  EXPECT_LOG_CONTAINS("", absl::StrCat("[", upstream_key, "] message 2"),
+                      sharedLogHelper(upstream_logger, "message 2"));
+
+  // Call the helper with the admin logger again.
+  EXPECT_LOG_CONTAINS("", absl::StrCat("[", admin_key, "] message 3"),
+                      sharedLogHelper(admin_logger, "message 3"));
 }
 
 } // namespace Envoy

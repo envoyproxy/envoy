@@ -1743,7 +1743,7 @@ TEST(ConfigTest, CompileNamedFilterChainsFailsOnFactoryError) {
   auto* typed = chain.add_typed_config();
   typed->set_name("envoy.filters.http.test.fail_factory");
   Protobuf::Struct struct_config;
-  typed->mutable_typed_config()->PackFrom(struct_config);
+  std::ignore = typed->mutable_typed_config()->PackFrom(struct_config);
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   CompositeFilterFactory factory;

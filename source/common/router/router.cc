@@ -533,7 +533,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           std::string new_uri;
           ASSERT(downstream_headers_ != nullptr);
           if (downstream_headers_->Path()) {
-            new_uri = direct_response->newUri(*downstream_headers_);
+            new_uri = direct_response->newUri(*downstream_headers_, callbacks_->streamInfo());
           }
           // See https://tools.ietf.org/html/rfc7231#section-7.1.2.
           const auto add_location =
@@ -2331,7 +2331,11 @@ bool Filter::convertRequestHeadersForInternalRedirect(
       downstream_headers.getMethodValue() != Http::Headers::get().MethodValues.Head) {
     downstream_headers.setMethod(Http::Headers::get().MethodValues.Get);
     downstream_headers.remove(Http::Headers::get().ContentLength);
-    callbacks_->modifyDecodingBuffer([](Buffer::Instance& data) { data.drain(data.length()); });
+    // Requests without any body never allocate a decoding buffer, so we only drain when one exists.
+    // For example, a POST request with end_stream on headers will not allocate a decoding buffer.
+    if (callbacks_->decodingBuffer()) {
+      callbacks_->modifyDecodingBuffer([](Buffer::Instance& data) { data.drain(data.length()); });
+    }
   }
 
   num_internal_redirect->increment();

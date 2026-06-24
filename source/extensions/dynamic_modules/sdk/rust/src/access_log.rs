@@ -120,6 +120,65 @@ impl ConfigContext {
     }
   }
 
+  /// Increment a counter by the given value from the config context.
+  ///
+  /// Unlike [`MetricsContext::increment_counter`], this can be called outside of a log event, for
+  /// example from a scheduled background task.
+  pub fn increment_counter(&self, handle: CounterHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_increment_counter(
+        self.envoy_ptr,
+        handle.id,
+        value,
+      )
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  }
+
+  /// Set a gauge to the given value from the config context.
+  pub fn set_gauge(&self, handle: GaugeHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_set_gauge(self.envoy_ptr, handle.id, value)
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  }
+
+  /// Increment a gauge by the given value from the config context.
+  pub fn increment_gauge(&self, handle: GaugeHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_increment_gauge(
+        self.envoy_ptr,
+        handle.id,
+        value,
+      )
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  }
+
+  /// Decrement a gauge by the given value from the config context.
+  pub fn decrement_gauge(&self, handle: GaugeHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_decrement_gauge(
+        self.envoy_ptr,
+        handle.id,
+        value,
+      )
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  }
+
+  /// Record a value in a histogram from the config context.
+  pub fn record_histogram(&self, handle: HistogramHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_record_histogram_value(
+        self.envoy_ptr,
+        handle.id,
+        value,
+      )
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  }
+
   /// Get the raw Envoy pointer. Used internally.
   #[doc(hidden)]
   pub fn envoy_ptr(&self) -> *mut c_void {
@@ -636,8 +695,10 @@ impl LogContext {
   /// * `key` - The key within the filter namespace (e.g., "rbac_policy").
   ///
   /// # Returns
-  /// The string value if it exists, None otherwise.
-  /// Note: Only string values are currently supported.
+  /// The string value if it exists and is string-typed, None otherwise. Use
+  /// [`get_dynamic_metadata_number`](Self::get_dynamic_metadata_number) or
+  /// [`get_dynamic_metadata_bool`](Self::get_dynamic_metadata_bool) for number- and bool-typed
+  /// values.
   pub fn get_dynamic_metadata(&self, filter_name: &str, key: &str) -> Option<EnvoyBuffer<'_>> {
     let filter_buf = abi::envoy_dynamic_module_type_module_buffer {
       ptr: filter_name.as_ptr() as *const _,
@@ -660,6 +721,70 @@ impl LogContext {
       )
     } {
       Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
+    } else {
+      None
+    }
+  }
+
+  /// Get a number value from dynamic metadata.
+  ///
+  /// # Arguments
+  /// * `filter_name` - The filter namespace (e.g., "envoy.filters.http.dynamic_module").
+  /// * `key` - The key within the filter namespace (e.g., "handshake_state").
+  ///
+  /// # Returns
+  /// The number value if it exists and is number-typed, None otherwise.
+  pub fn get_dynamic_metadata_number(&self, filter_name: &str, key: &str) -> Option<f64> {
+    let filter_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: filter_name.as_ptr() as *const _,
+      length: filter_name.len(),
+    };
+    let key_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let mut result: f64 = 0.0;
+    if unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_number(
+        self.envoy_ptr,
+        filter_buf,
+        key_buf,
+        &mut result,
+      )
+    } {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  /// Get a bool value from dynamic metadata.
+  ///
+  /// # Arguments
+  /// * `filter_name` - The filter namespace (e.g., "envoy.filters.http.dynamic_module").
+  /// * `key` - The key within the filter namespace (e.g., "tls_enabled").
+  ///
+  /// # Returns
+  /// The bool value if it exists and is bool-typed, None otherwise.
+  pub fn get_dynamic_metadata_bool(&self, filter_name: &str, key: &str) -> Option<bool> {
+    let filter_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: filter_name.as_ptr() as *const _,
+      length: filter_name.len(),
+    };
+    let key_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let mut result: bool = false;
+    if unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_bool(
+        self.envoy_ptr,
+        filter_buf,
+        key_buf,
+        &mut result,
+      )
+    } {
+      Some(result)
     } else {
       None
     }
