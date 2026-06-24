@@ -236,7 +236,7 @@ public:
 private:
   Handler& handler_;
   const bool track_paths_;
-  // Runtime
+  // Runtime depth guard.
   const int max_depth_;
 
   wuffs_json__decoder::unique_ptr decoder_;
