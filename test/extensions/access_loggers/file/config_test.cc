@@ -64,7 +64,7 @@ public:
     TestUtility::loadFromYaml(yaml, fal_config);
 
     envoy::config::accesslog::v3::AccessLog config;
-    config.mutable_typed_config()->PackFrom(fal_config);
+    std::ignore = config.mutable_typed_config()->PackFrom(fal_config);
 
     auto file = std::make_shared<AccessLog::MockAccessLogFile>();
     Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, fal_config.path()};
@@ -205,7 +205,7 @@ TEST_F(FileAccessLogTest, LogFormatJsonWithCustomCommands) {
   {
     // No custom command parsers and the formatter should fail.
     envoy::config::accesslog::v3::AccessLog config;
-    config.mutable_typed_config()->PackFrom(fal_config);
+    std::ignore = config.mutable_typed_config()->PackFrom(fal_config);
     config.set_name("file");
 
     EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context_),

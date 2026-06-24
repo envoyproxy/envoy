@@ -4,6 +4,7 @@
 # are allowed for any otherwise correctly spelled word.
 
 Allshard
+FCS
 FLUSHALL
 NUMPAT
 PUBSUB
@@ -63,6 +64,8 @@ BPF
 Bdecoded
 Bencoded
 CIO
+CBC
+cbc
 cbegin
 cend
 constness
@@ -82,6 +85,10 @@ Reserializer
 SION
 TRA
 Websockets
+webtransport
+WEBTRANSPORT
+signalling
+signalled
 abc
 abcd
 abd
@@ -124,6 +131,7 @@ Mensah
 NAK
 OWS
 Preconnecting
+CONNECT
 RCVBUF
 RTCP
 RTLD
@@ -511,6 +519,7 @@ SS
 SSD
 SSE
 SSL
+SSRF
 STDSTRING
 STL
 STRLEN
@@ -712,6 +721,7 @@ ci
 ciphersuite
 ciphersuites
 ciphertext
+ciphertexts
 circllhist
 clientcert
 cloneable
@@ -758,6 +768,7 @@ ctad
 ctor
 ctrl
 customizations
+cutover
 darwin
 datacenter
 datadog
@@ -1574,6 +1585,7 @@ unittest
 unix
 unref
 unreferenced
+dereferenced
 unzigzag
 upcasts
 upsert

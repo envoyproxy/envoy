@@ -314,6 +314,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:session_idle_list_lib",
         "@quiche//:quic_server_http_spdy_session_lib",
         "@abseil-cpp//absl/types:optional",
@@ -357,6 +358,7 @@ envoy_cc_library(
         "@quiche//:quic_core_error_codes_lib",
     ]) + envoy_select_enable_http_datagrams([
         ":http_datagram_handler",
+        ":web_transport_session_bridge_lib",
     ]),
 )
 
@@ -754,5 +756,18 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "@quiche//:quic_core_http_spdy_session_lib",
         "@quiche//:quic_core_types_lib",
+    ]),
+)
+
+envoy_cc_library(
+    name = "web_transport_session_bridge_lib",
+    srcs = envoy_select_enable_http3(["web_transport_session_bridge.cc"]),
+    hdrs = envoy_select_enable_http3(["web_transport_session_bridge.h"]),
+    deps = envoy_select_enable_http3([
+        "//envoy/http:codec_interface",
+        "//source/common/common:logger_lib",
+        "@quiche//:quiche_common_buffer_allocator_lib",
+        "@quiche//:quiche_common_capsule_lib",
+        "@quiche//:quiche_web_transport_web_transport_lib",
     ]),
 )

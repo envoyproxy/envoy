@@ -127,7 +127,7 @@ private:
         addr_proto.mutable_socket_address()->set_address(proxy_info_hostname);
         addr_proto.mutable_socket_address()->set_port_value(1234);
         Protobuf::Any anypb;
-        anypb.PackFrom(addr_proto);
+        std::ignore = anypb.PackFrom(addr_proto);
         metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, anypb));
         EXPECT_CALL(*host, metadata()).Times(AnyNumber()).WillRepeatedly(Return(metadata));
 

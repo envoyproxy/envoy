@@ -73,7 +73,7 @@ public:
       }
 
       envoy::service::discovery::v3::Resource resource;
-      resource.mutable_resource()->PackFrom(cla);
+      std::ignore = resource.mutable_resource()->PackFrom(cla);
       resource.set_name(cla.cluster_name());
       resource.set_version(RESOURCE_VERSION);
       resources.emplace_back(std::move(resource));
@@ -124,7 +124,7 @@ protected:
   resourceWithTtl(std::chrono::milliseconds ttl,
                   const envoy::config::endpoint::v3::ClusterLoadAssignment& cla) {
     envoy::service::discovery::v3::Resource resource;
-    resource.mutable_resource()->PackFrom(cla);
+    std::ignore = resource.mutable_resource()->PackFrom(cla);
     resource.mutable_ttl()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(ttl.count()));
     resource.set_name(cla.cluster_name());
     return resource;
@@ -144,7 +144,7 @@ protected:
     response.set_nonce(nonce);
     response.set_type_url(Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>());
     for (const auto& resource_name : resource_names) {
-      response.add_resources()->PackFrom(resource(resource_name));
+      std::ignore = response.add_resources()->PackFrom(resource(resource_name));
     }
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(An<const std::vector<DecodedResourcePtr>&>(), version_info));
@@ -159,7 +159,7 @@ protected:
     response.set_version_info(version_info);
     response.set_nonce(nonce);
     response.set_type_url(Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>());
-    response.add_resources()->PackFrom(resource);
+    std::ignore = response.add_resources()->PackFrom(resource);
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(An<const std::vector<DecodedResourcePtr>&>(), version_info));
     return state_->handleResponse(response);
@@ -456,7 +456,7 @@ TEST_F(SotwSubscriptionStateTest, TypeUrlMismatch) {
   response.set_version_info("version1");
   response.set_nonce("nonce1");
   response.set_type_url("badtypeurl");
-  response.add_resources()->PackFrom(resource("resource"));
+  std::ignore = response.add_resources()->PackFrom(resource("resource"));
   EXPECT_CALL(callbacks_,
               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _))
       .WillOnce(Invoke([](Envoy::Config::ConfigUpdateFailureReason, const EnvoyException* e) {

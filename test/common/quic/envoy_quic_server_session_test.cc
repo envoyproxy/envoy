@@ -24,6 +24,7 @@
 #include "test/test_common/global.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -1254,6 +1255,32 @@ TEST_F(EnvoyQuicServerSessionTest, Http3OptionsTest) {
 
   installReadFilter();
 }
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+// WebTransport is opt-in: even with extended CONNECT enabled, the server advertises no WebTransport
+// versions (and so will not negotiate WebTransport) unless
+// envoy.reloadable_features.quic_support_web_transport is enabled.
+TEST_F(EnvoyQuicServerSessionTest, WebTransportNegotiationGatedByRuntimeFlag) {
+  envoy::config::core::v3::Http3ProtocolOptions http3_options;
+  http3_options.set_allow_extended_connect(true);
+  envoy_quic_session_.setHttp3Options(http3_options);
+
+  // Disabled by default, even though extended CONNECT is enabled.
+  EXPECT_FALSE(envoy_quic_session_.WillNegotiateWebTransport());
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_support_web_transport", "true"}});
+  EXPECT_TRUE(envoy_quic_session_.WillNegotiateWebTransport());
+
+  // WebTransport still requires extended CONNECT, even with the runtime flag enabled.
+  envoy::config::core::v3::Http3ProtocolOptions no_extended_connect;
+  no_extended_connect.set_allow_extended_connect(false);
+  envoy_quic_session_.setHttp3Options(no_extended_connect);
+  EXPECT_FALSE(envoy_quic_session_.WillNegotiateWebTransport());
+
+  installReadFilter();
+}
+#endif
 
 TEST_F(EnvoyQuicServerSessionTest, SetSocketOption) {
   installReadFilter();

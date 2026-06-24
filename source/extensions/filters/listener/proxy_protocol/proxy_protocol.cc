@@ -656,7 +656,7 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
         } else {
           (*tlvs_metadata.mutable_typed_metadata())[key_value_pair->key()] = tlv_value;
           Protobuf::Any typed_metadata;
-          typed_metadata.PackFrom(tlvs_metadata);
+          std::ignore = typed_metadata.PackFrom(tlvs_metadata);
           cb_->setDynamicTypedMetadata(metadata_key, typed_metadata);
         }
         // Always populate untyped metadata for backwards compatibility.

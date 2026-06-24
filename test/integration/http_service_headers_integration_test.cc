@@ -67,9 +67,9 @@ public:
           auto* formatter = http->add_formatters();
           formatter->set_name("envoy.formatter.file_content");
           envoy::extensions::formatter::file_content::v3::FileContent file_content_config;
-          formatter->mutable_typed_config()->PackFrom(file_content_config);
+          std::ignore = formatter->mutable_typed_config()->PackFrom(file_content_config);
 
-          access_log->mutable_typed_config()->PackFrom(config);
+          std::ignore = access_log->mutable_typed_config()->PackFrom(config);
         });
 
     HttpIntegrationTest::initialize();

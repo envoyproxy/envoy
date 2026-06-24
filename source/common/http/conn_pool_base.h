@@ -74,6 +74,9 @@ public:
     drainConnectionsImpl(drain_behavior);
   }
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
+  const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() override {
+    return Envoy::ConnectionPool::ConnPoolImplBase::socketOptions();
+  }
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
                                          Http::ConnectionPool::Callbacks& callbacks,
                                          const Instance::StreamOptions& options) override;

@@ -1527,7 +1527,7 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, ProcessAcceptedConnectionReportsConn
   auto* reporter_cfg = upstream_config_.mutable_reporter_config();
   reporter_cfg->set_name(Bootstrap::ReverseConnection::MOCK_REPORTER);
   Protobuf::StringValue reporter_payload;
-  reporter_cfg->mutable_typed_config()->PackFrom(reporter_payload);
+  std::ignore = reporter_cfg->mutable_typed_config()->PackFrom(reporter_payload);
 
   NiceMock<Bootstrap::ReverseConnection::MockReporterFactory> reporter_factory;
   Registry::InjectFactory<Bootstrap::ReverseConnection::ReverseTunnelReporterFactory>
@@ -1581,7 +1581,7 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest,
   auto* reporter_cfg = upstream_config_.mutable_reporter_config();
   reporter_cfg->set_name(Bootstrap::ReverseConnection::MOCK_REPORTER);
   Protobuf::StringValue reporter_payload;
-  reporter_cfg->mutable_typed_config()->PackFrom(reporter_payload);
+  std::ignore = reporter_cfg->mutable_typed_config()->PackFrom(reporter_payload);
 
   NiceMock<Bootstrap::ReverseConnection::MockReporterFactory> reporter_factory;
   Registry::InjectFactory<Bootstrap::ReverseConnection::ReverseTunnelReporterFactory>
@@ -1637,7 +1637,7 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest,
   auto* reporter_cfg = upstream_config_.mutable_reporter_config();
   reporter_cfg->set_name(Bootstrap::ReverseConnection::MOCK_REPORTER);
   Protobuf::StringValue reporter_payload;
-  reporter_cfg->mutable_typed_config()->PackFrom(reporter_payload);
+  std::ignore = reporter_cfg->mutable_typed_config()->PackFrom(reporter_payload);
 
   NiceMock<Bootstrap::ReverseConnection::MockReporterFactory> reporter_factory;
   Registry::InjectFactory<Bootstrap::ReverseConnection::ReverseTunnelReporterFactory>
@@ -1692,7 +1692,7 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest,
   auto* reporter_cfg = upstream_config_.mutable_reporter_config();
   reporter_cfg->set_name(Bootstrap::ReverseConnection::MOCK_REPORTER);
   Protobuf::StringValue reporter_payload;
-  reporter_cfg->mutable_typed_config()->PackFrom(reporter_payload);
+  std::ignore = reporter_cfg->mutable_typed_config()->PackFrom(reporter_payload);
 
   NiceMock<Bootstrap::ReverseConnection::MockReporterFactory> reporter_factory;
   Registry::InjectFactory<Bootstrap::ReverseConnection::ReverseTunnelReporterFactory>

@@ -192,7 +192,7 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeHeaderFormatters) {
   hdr->mutable_header()->set_value("Bearer %COMMAND_EXTENSION()%");
   auto* formatter = custom_config.mutable_http_handshake()->add_formatters();
   formatter->set_name("envoy.formatter.TestFormatter");
-  formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue());
+  std::ignore = formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue());
 
   auto custom_extension =
       std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
@@ -210,7 +210,7 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeUnknownFormatterThrows) {
   auto custom_config = config_;
   auto* formatter = custom_config.mutable_http_handshake()->add_formatters();
   formatter->set_name("envoy.formatter.does_not_exist");
-  formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue());
+  std::ignore = formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue());
 
   EXPECT_THROW_WITH_REGEX(
       std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config), EnvoyException,

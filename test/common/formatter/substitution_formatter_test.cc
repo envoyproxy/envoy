@@ -3286,11 +3286,17 @@ TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {
       Http::Protocol::Http2, time_system, nullptr, StreamInfo::FilterState::LifeSpan::FilterChain};
   stream_info_no_requested_name.setRequestHeaders(request_header);
 
+  Http::TestRequestHeaderMapImpl empty_request_header;
+  StreamInfo::StreamInfoImpl stream_info_no_requested_name_no_headers{
+      Http::Protocol::Http2, time_system, nullptr, StreamInfo::FilterState::LifeSpan::FilterChain};
+  stream_info_no_requested_name_no_headers.setRequestHeaders(empty_request_header);
+
   {
     auto providers = *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME%"));
     EXPECT_EQ(providers.size(), 1);
     EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
     EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name_no_headers));
   }
 
   {
@@ -3299,6 +3305,7 @@ TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {
     EXPECT_EQ(providers.size(), 1);
     EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
     EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name_no_headers));
   }
 
   {
@@ -3307,6 +3314,7 @@ TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {
     EXPECT_EQ(providers.size(), 1);
     EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
     EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name_no_headers));
   }
 
   {
@@ -3315,6 +3323,7 @@ TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {
     EXPECT_EQ(providers.size(), 1);
     EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
     EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name_no_headers));
   }
 
   {
@@ -3323,6 +3332,16 @@ TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {
     EXPECT_EQ(providers.size(), 1);
     EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
     EXPECT_EQ("fake-authority", providers[0]->format({}, stream_info_no_requested_name));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name_no_headers));
+  }
+
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(SNI_FIRST:ORIG)%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
+    EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name_no_headers));
   }
 
   {
@@ -3331,6 +3350,16 @@ TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {
     EXPECT_EQ(providers.size(), 1);
     EXPECT_EQ("fake-authority", providers[0]->format({}, stream_info));
     EXPECT_EQ("fake-authority", providers[0]->format({}, stream_info_no_requested_name));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name_no_headers));
+  }
+
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(HOST_FIRST:ORIG)%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info));
+    EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name_no_headers));
   }
 
   {
@@ -3339,6 +3368,7 @@ TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {
     EXPECT_EQ(providers.size(), 1);
     EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info));
     EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name_no_headers));
   }
 }
 
@@ -3827,112 +3857,131 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
   {
-    FilterStateFormatter formatter("key", absl::optional<size_t>(), false);
+    auto formatter =
+        FilterStateFormatter::createForTest("key", absl::optional<size_t>(), false).value();
 
-    EXPECT_EQ("\"test_value\"", formatter.format(stream_info));
-    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::stringValue("test_value")));
+    EXPECT_EQ("\"test_value\"", formatter->format(stream_info));
+    EXPECT_THAT(formatter->formatValue(stream_info), ProtoEq(ValueUtil::stringValue("test_value")));
   }
   {
-    FilterStateFormatter formatter("key-struct", absl::optional<size_t>(), false);
+    auto formatter =
+        FilterStateFormatter::createForTest("key-struct", absl::optional<size_t>(), false).value();
 
-    EXPECT_EQ("{\"inner_key\":\"inner_value\"}", formatter.format(stream_info));
+    EXPECT_EQ("{\"inner_key\":\"inner_value\"}", formatter->format(stream_info));
 
     Protobuf::Value expected;
     (*expected.mutable_struct_value()->mutable_fields())["inner_key"] =
         ValueUtil::stringValue("inner_value");
 
-    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(expected));
+    EXPECT_THAT(formatter->formatValue(stream_info), ProtoEq(expected));
   }
 
   // not found case
   {
-    FilterStateFormatter formatter("key-not-found", absl::optional<size_t>(), false);
+    auto formatter =
+        FilterStateFormatter::createForTest("key-not-found", absl::optional<size_t>(), false)
+            .value();
 
-    EXPECT_EQ(absl::nullopt, formatter.format(stream_info));
-    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(absl::nullopt, formatter->format(stream_info));
+    EXPECT_THAT(formatter->formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
 
   // no serialization case
   {
-    FilterStateFormatter formatter("key-no-serialization", absl::optional<size_t>(), false);
+    auto formatter =
+        FilterStateFormatter::createForTest("key-no-serialization", absl::optional<size_t>(), false)
+            .value();
 
-    EXPECT_EQ(absl::nullopt, formatter.format(stream_info));
-    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(absl::nullopt, formatter->format(stream_info));
+    EXPECT_THAT(formatter->formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
 
   // serialization error case
   {
-    FilterStateFormatter formatter("key-serialization-error", absl::optional<size_t>(), false);
+    auto formatter = FilterStateFormatter::createForTest("key-serialization-error",
+                                                         absl::optional<size_t>(), false)
+                         .value();
 
-    EXPECT_EQ(absl::nullopt, formatter.format(stream_info));
-    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(absl::nullopt, formatter->format(stream_info));
+    EXPECT_THAT(formatter->formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
 
   // size limit
   {
-    FilterStateFormatter formatter("key", absl::optional<size_t>(5), false);
+    auto formatter =
+        FilterStateFormatter::createForTest("key", absl::optional<size_t>(5), false).value();
 
-    EXPECT_EQ("\"test", formatter.format(stream_info));
+    EXPECT_EQ("\"test", formatter->format(stream_info));
 
     // N.B. Does not truncate.
-    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::stringValue("test_value")));
+    EXPECT_THAT(formatter->formatValue(stream_info), ProtoEq(ValueUtil::stringValue("test_value")));
   }
 
   // serializeAsString case
   {
-    FilterStateFormatter formatter("test_key", absl::optional<size_t>(), true);
+    auto formatter =
+        FilterStateFormatter::createForTest("test_key", absl::optional<size_t>(), true).value();
 
-    EXPECT_EQ("test_value By PLAIN", formatter.format(stream_info));
+    EXPECT_EQ("test_value By PLAIN", formatter->format(stream_info));
   }
 
   // size limit for serializeAsString
   {
-    FilterStateFormatter formatter("test_key", absl::optional<size_t>(10), true);
+    auto formatter =
+        FilterStateFormatter::createForTest("test_key", absl::optional<size_t>(10), true).value();
 
-    EXPECT_EQ("test_value", formatter.format(stream_info));
+    EXPECT_EQ("test_value", formatter->format(stream_info));
   }
 
   // no serialization case for serializeAsString
   {
-    FilterStateFormatter formatter("key-no-serialization", absl::optional<size_t>(), true);
+    auto formatter =
+        FilterStateFormatter::createForTest("key-no-serialization", absl::optional<size_t>(), true)
+            .value();
 
-    EXPECT_EQ(absl::nullopt, formatter.format(stream_info));
-    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(absl::nullopt, formatter->format(stream_info));
+    EXPECT_THAT(formatter->formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   // FIELD test cases
   {
-    FilterStateFormatter formatter("test_key", absl::optional<size_t>(), false, false,
-                                   "test_field");
+    auto formatter = FilterStateFormatter::createForTest("test_key", absl::optional<size_t>(),
+                                                         false, false, "test_field")
+                         .value();
 
-    EXPECT_EQ("test_value", formatter.format(stream_info));
-    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::stringValue("test_value")));
+    EXPECT_EQ("test_value", formatter->format(stream_info));
+    EXPECT_THAT(formatter->formatValue(stream_info), ProtoEq(ValueUtil::stringValue("test_value")));
   }
   {
-    FilterStateFormatter formatter("test_key", absl::optional<size_t>(), false, false, "test_num");
+    auto formatter = FilterStateFormatter::createForTest("test_key", absl::optional<size_t>(),
+                                                         false, false, "test_num")
+                         .value();
 
-    EXPECT_EQ("137", formatter.format(stream_info));
-    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::stringValue("137")));
+    EXPECT_EQ("137", formatter->format(stream_info));
+    EXPECT_THAT(formatter->formatValue(stream_info), ProtoEq(ValueUtil::stringValue("137")));
   }
   {
-    FilterStateFormatter formatter("test_wrong_key", absl::optional<size_t>(), false, false,
-                                   "test_field");
+    auto formatter = FilterStateFormatter::createForTest("test_wrong_key", absl::optional<size_t>(),
+                                                         false, false, "test_field")
+                         .value();
 
-    EXPECT_EQ(absl::nullopt, formatter.format(stream_info));
-    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(absl::nullopt, formatter->format(stream_info));
+    EXPECT_THAT(formatter->formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   {
-    FilterStateFormatter formatter("test_key", absl::optional<size_t>(), false, false,
-                                   "test_wrong_field");
+    auto formatter = FilterStateFormatter::createForTest("test_key", absl::optional<size_t>(),
+                                                         false, false, "test_wrong_field")
+                         .value();
 
-    EXPECT_EQ(absl::nullopt, formatter.format(stream_info));
-    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(absl::nullopt, formatter->format(stream_info));
+    EXPECT_THAT(formatter->formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   {
-    FilterStateFormatter formatter("test_key", absl::optional<size_t>(5), false, false,
-                                   "test_field");
+    auto formatter = FilterStateFormatter::createForTest("test_key", absl::optional<size_t>(5),
+                                                         false, false, "test_field")
+                         .value();
 
-    EXPECT_EQ("test_", formatter.format(stream_info));
-    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::stringValue("test_")));
+    EXPECT_EQ("test_", formatter->format(stream_info));
+    EXPECT_THAT(formatter->formatValue(stream_info), ProtoEq(ValueUtil::stringValue("test_")));
   }
 }
 

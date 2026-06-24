@@ -174,7 +174,7 @@ TEST_P(ProtocolIntegrationTest, LogicalDns) {
     typed_dns_resolver_config->set_name("envoy.network.dns_resolver.getaddrinfo");
     envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
         getaddrinfo_config;
-    typed_dns_resolver_config->mutable_typed_config()->PackFrom(getaddrinfo_config);
+    std::ignore = typed_dns_resolver_config->mutable_typed_config()->PackFrom(getaddrinfo_config);
   });
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -207,7 +207,7 @@ TEST_P(ProtocolIntegrationTest, StrictDns) {
     typed_dns_resolver_config->set_name("envoy.network.dns_resolver.getaddrinfo");
     envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
         getaddrinfo_config;
-    typed_dns_resolver_config->mutable_typed_config()->PackFrom(getaddrinfo_config);
+    std::ignore = typed_dns_resolver_config->mutable_typed_config()->PackFrom(getaddrinfo_config);
   });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -412,7 +412,7 @@ TEST_P(ProtocolIntegrationTest, DEPRECATED_FEATURE_TEST(RouterOnlyTracing)) {
               hcm) -> void {
         envoy::extensions::filters::http::router::v3::Router router_config;
         router_config.set_start_child_span(true);
-        hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
+        std::ignore = hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
       });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1457,7 +1457,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
   auto* retry_priority_config = retry_policy->mutable_retry_priority();
   retry_priority_config->set_name(factory.name());
   test::mocks::upstream::TestRetryPriorityConfig config;
-  retry_priority_config->mutable_typed_config()->PackFrom(config);
+  std::ignore = retry_priority_config->mutable_typed_config()->PackFrom(config);
   config_helper_.addVirtualHost(host);
   // We want to work with a cluster with two hosts.
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -1531,7 +1531,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
   auto* host_predicate = retry_policy->add_retry_host_predicate();
   host_predicate->set_name(predicate_factory.name());
   ::test::integration::TestHostPredicate config;
-  host_predicate->mutable_typed_config()->PackFrom(config);
+  std::ignore = host_predicate->mutable_typed_config()->PackFrom(config);
   config_helper_.addVirtualHost(host);
 
   // We want to work with a cluster with two hosts.

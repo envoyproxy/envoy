@@ -347,6 +347,7 @@ envoy_cc_library(
         "//envoy/common:exception_lib",
         "//envoy/common:matchers_interface",
         "//envoy/common:pure_lib",
+        "//source/common/matcher:address_matcher_lib",
         "//source/common/network:cidr_range_lib",
         "@abseil-cpp//absl/status:statusor",
     ],
