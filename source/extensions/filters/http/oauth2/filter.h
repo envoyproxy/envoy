@@ -94,7 +94,8 @@ private:
   COUNTER(oauth_success)                                                                           \
   COUNTER(oauth_refreshtoken_success)                                                              \
   COUNTER(oauth_refreshtoken_failure)                                                              \
-  COUNTER(oauth_allow_failed_passthrough)
+  COUNTER(oauth_allow_failed_passthrough)                                                          \
+  COUNTER(oauth_legacy_cbc_decrypt)
 
 /**
  * Wrapper struct filter stats. @see stats_macros.h
@@ -367,6 +368,7 @@ public:
   // Http::PassThroughFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override;
+  void onDestroy() override;
 
   // FilterCallbacks
   void onGetAccessTokenSuccess(const std::string& access_code, const std::string& id_token,
@@ -457,6 +459,40 @@ private:
   void sendUnauthorizedResponse(const std::string& details);
   void sendSecretsNotReadyResponse(const std::string& details);
 };
+
+struct DecryptResult {
+  std::string plaintext;
+  absl::optional<std::string> error;
+  // Whether the decrypted token was encrypted with GCM (true) or CBC (false).
+  bool is_gcm = false;
+};
+
+/**
+ * Decrypt an OAuth2 cookie ciphertext.
+ *
+ * Cookies carrying the ``gcm.`` algorithm marker are decrypted with AES-256-GCM. Cookies
+ * without the marker are treated as legacy AES-256-CBC ciphertexts. The CBC fallback is only
+ * attempted when the runtime flag ``envoy.reloadable_features.oauth2_legacy_cbc_decrypt_compat``
+ * is true (the default during the migration window), and emits an info-level log on success so
+ * operators can observe legacy usage. Once the flag is set to false the CBC fallback is bypassed
+ * and legacy cookies are rejected; this is the post-migration state that fully closes
+ * CVE-2026-47775. Both the flag and the CBC fallback are scheduled for removal.
+ */
+DecryptResult decrypt(absl::string_view encrypted, absl::string_view secret);
+
+/**
+ * Encrypt an OAuth2 cookie plaintext.
+ *
+ * Dispatches on the runtime flag ``envoy.reloadable_features.oauth2_use_gcm_encryption``:
+ * when true the ciphertext is produced with AES-256-GCM and carries a ``gcm.`` marker, and
+ * when false (the default during the migration window) the ciphertext is produced with the
+ * legacy AES-256-CBC format with no marker. The default exists so that newly upgraded
+ * instances stay wire-compatible with older instances during a rolling upgrade; operators
+ * must flip this flag to true cluster-wide to be protected against CVE-2026-47775. The flag
+ * and the CBC encrypt path are scheduled for removal.
+ */
+std::string encrypt(absl::string_view plaintext, absl::string_view secret,
+                    Random::RandomGenerator& random);
 
 } // namespace Oauth2
 } // namespace HttpFilters

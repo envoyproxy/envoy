@@ -116,6 +116,9 @@ public:
     return conn_pool_->newConnection(callbacks);
   }
   Upstream::HostDescriptionConstSharedPtr host() const override { return conn_pool_->host(); }
+  const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() override {
+    return conn_pool_->socketOptions();
+  }
 
   MOCK_METHOD(void, onConnReleasedForTest, ());
   MOCK_METHOD(void, onConnDestroyedForTest, ());

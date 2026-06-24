@@ -345,7 +345,7 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
     cla.set_cluster_name(name);
     auto res = response.add_resources();
     res->set_name(name);
-    res->mutable_resource()->PackFrom(cla);
+    std::ignore = res->mutable_resource()->PackFrom(cla);
     res->set_version(version);
   };
   add_response_resource("x", "2000", *response);
@@ -414,7 +414,7 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
     res->set_name(name);
     res->set_version(version);
     load_assignment.set_cluster_name(name);
-    res->mutable_resource()->PackFrom(load_assignment);
+    std::ignore = res->mutable_resource()->PackFrom(load_assignment);
     return response;
   };
 
@@ -500,7 +500,7 @@ TEST_P(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
     response->set_system_version_info("1");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
-    response->add_resources()->mutable_resource()->PackFrom(load_assignment);
+    std::ignore = response->add_resources()->mutable_resource()->PackFrom(load_assignment);
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
         .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
                                             const Protobuf::RepeatedPtrField<std::string>&,
@@ -537,7 +537,7 @@ TEST_P(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
   vhost.add_domains("domain1.test");
   vhost.add_domains("domain2.test");
 
-  response->add_resources()->mutable_resource()->PackFrom(vhost);
+  std::ignore = response->add_resources()->mutable_resource()->PackFrom(vhost);
   response->mutable_resources()->at(0).set_name("prefix/vhost_1");
   response->mutable_resources()->at(0).add_aliases("prefix/domain1.test");
   response->mutable_resources()->at(0).add_aliases("prefix/domain2.test");
@@ -601,7 +601,7 @@ TEST_P(NewGrpcMuxImplTest, XdsTpGlobCollection) {
   auto* resource = response->add_resources();
   resource->set_name("xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar/"
                      "a?foo=bar&some=thing&thing=some");
-  resource->mutable_resource()->PackFrom(load_assignment);
+  std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
   EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
       .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
                                           const Protobuf::RepeatedPtrField<std::string>&,
@@ -645,18 +645,18 @@ TEST_P(NewGrpcMuxImplTest, XdsTpSingleton) {
     auto* resource = response->add_resources();
     resource->set_name(
         "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar/baz?some=thing&thing=some");
-    resource->mutable_resource()->PackFrom(load_assignment);
+    std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
   }
   {
     auto* resource = response->add_resources();
     resource->set_name("opaque_resource_name");
-    resource->mutable_resource()->PackFrom(load_assignment);
+    std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
   }
   {
     auto* resource = response->add_resources();
     resource->set_name("xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar/"
                        "blah?some=thing&thing=some");
-    resource->mutable_resource()->PackFrom(load_assignment);
+    std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
   }
   EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
       .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
@@ -735,7 +735,7 @@ TEST_P(NewGrpcMuxImplTest, CacheEdsResource) {
     res->set_name("x");
     res->set_version("1");
     load_assignment.set_cluster_name("x");
-    res->mutable_resource()->PackFrom(load_assignment);
+    std::ignore = res->mutable_resource()->PackFrom(load_assignment);
 
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
         .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
@@ -780,7 +780,7 @@ TEST_P(NewGrpcMuxImplTest, UpdateCacheEdsResource) {
     res->set_name("x");
     res->set_version("1");
     load_assignment.set_cluster_name("x");
-    res->mutable_resource()->PackFrom(load_assignment);
+    std::ignore = res->mutable_resource()->PackFrom(load_assignment);
 
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
         .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
@@ -834,7 +834,7 @@ TEST_P(NewGrpcMuxImplTest, AddRemoveSubscriptions) {
       res->set_name("x");
       res->set_version("1");
       load_assignment.set_cluster_name("x");
-      res->mutable_resource()->PackFrom(load_assignment);
+      std::ignore = res->mutable_resource()->PackFrom(load_assignment);
 
       EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
           .WillOnce(Invoke([&load_assignment](
@@ -871,7 +871,7 @@ TEST_P(NewGrpcMuxImplTest, AddRemoveSubscriptions) {
       res->set_name("y");
       res->set_version("2");
       load_assignment.set_cluster_name("y");
-      res->mutable_resource()->PackFrom(load_assignment);
+      std::ignore = res->mutable_resource()->PackFrom(load_assignment);
 
       EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "2"))
           .WillOnce(Invoke([&load_assignment](
@@ -956,7 +956,7 @@ TEST_P(NewGrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
     load_assignment.set_cluster_name("x");
     auto* resource = response->add_resources();
     resource->set_name("x");
-    resource->mutable_resource()->PackFrom(load_assignment);
+    std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
     resource->set_version("x1");
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
         .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
@@ -1003,7 +1003,7 @@ TEST_P(NewGrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
     load_assignment.set_cluster_name("y");
     auto* resource = response->add_resources();
     resource->set_name("y");
-    resource->mutable_resource()->PackFrom(load_assignment);
+    std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
     resource->set_version("y1");
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "2"))
         .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,

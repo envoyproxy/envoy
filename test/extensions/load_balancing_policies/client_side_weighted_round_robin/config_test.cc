@@ -24,7 +24,7 @@ TEST(ClientSideWeightedRoundRobinConfigTest, ValidateFail) {
   config.set_name("envoy.load_balancing_policies.client_side_weighted_round_robin");
   envoy::extensions::load_balancing_policies::client_side_weighted_round_robin::v3::
       ClientSideWeightedRoundRobin config_msg;
-  config.mutable_typed_config()->PackFrom(config_msg);
+  std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
   EXPECT_EQ("envoy.load_balancing_policies.client_side_weighted_round_robin", factory.name());

@@ -317,9 +317,10 @@ protected:
     router_filter->set_name("envoy.router");
     ::envoy::extensions::filters::http::router::v3::Router router_config;
     static_cast<T*>(this)->configureCustomRouterFilter(router_config);
-    router_filter->mutable_typed_config()->PackFrom(router_config);
+    std::ignore = router_filter->mutable_typed_config()->PackFrom(router_config);
 
-    listener.mutable_api_listener()->mutable_api_listener()->PackFrom(api_listener_config);
+    std::ignore =
+        listener.mutable_api_listener()->mutable_api_listener()->PackFrom(api_listener_config);
 
     return listener;
   }
@@ -405,7 +406,7 @@ private:
           envoy::config::bootstrap::v3::ApiListenerManager::STANDALONE_WORKER_THREAD);
     }
     auto* listener_manager = bootstrap.mutable_listener_manager();
-    listener_manager->mutable_typed_config()->PackFrom(api);
+    std::ignore = listener_manager->mutable_typed_config()->PackFrom(api);
     listener_manager->set_name("envoy.listener_manager_impl.api");
   }
 

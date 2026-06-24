@@ -139,7 +139,7 @@ typed_config:
       envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
           config;
       envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-      typed_dns_resolver_config.mutable_typed_config()->PackFrom(config);
+      std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(config);
       typed_dns_resolver_config.set_name(std::string("getAddrInfo"));
       bootstrap.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
     });
@@ -210,12 +210,14 @@ typed_config:
           TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
       if (upstreamProtocol() != Http::CodecType::HTTP3) {
         cluster_.mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
-        cluster_.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+        std::ignore =
+            cluster_.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
       } else {
         envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport quic_context;
         quic_context.mutable_upstream_tls_context()->CopyFrom(tls_context);
         cluster_.mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
-        cluster_.mutable_transport_socket()->mutable_typed_config()->PackFrom(quic_context);
+        std::ignore =
+            cluster_.mutable_transport_socket()->mutable_typed_config()->PackFrom(quic_context);
       }
     }
 

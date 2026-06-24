@@ -112,3 +112,5 @@ areas:
     title: dns
   proxy_protocol:
     title: proxy_protocol
+  zstd:
+    title: zstd

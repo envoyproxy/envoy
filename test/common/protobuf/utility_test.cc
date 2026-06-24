@@ -180,7 +180,7 @@ TEST_F(ProtobufUtilityTest, MessageUtilHash) {
   (*s3.mutable_fields())["cdb"].set_string_value("ij");
 
   Protobuf::Any a1;
-  a1.PackFrom(s);
+  std::ignore = a1.PackFrom(s);
   // The two base64 encoded Struct to test map is identical to the struct above, this tests whether
   // a map is deterministically serialized and hashed.
   Protobuf::Any a2 = a1;
@@ -188,8 +188,8 @@ TEST_F(ProtobufUtilityTest, MessageUtilHash) {
   Protobuf::Any a3 = a1;
   a3.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
   Protobuf::Any a4, a5;
-  a4.PackFrom(s2);
-  a5.PackFrom(s3);
+  std::ignore = a4.PackFrom(s2);
+  std::ignore = a5.PackFrom(s3);
 
   EXPECT_EQ(MessageUtil::hash(a1), MessageUtil::hash(a2));
   EXPECT_EQ(MessageUtil::hash(a2), MessageUtil::hash(a3));
@@ -273,7 +273,7 @@ TEST_F(ProtobufUtilityTest, ValidateUnknownFieldsNestedAny) {
   auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
   auto* cluster_type = cluster->mutable_cluster_type();
   cluster_type->set_name("outer");
-  cluster_type->mutable_typed_config()->PackFrom(outer);
+  std::ignore = cluster_type->mutable_typed_config()->PackFrom(outer);
 
   EXPECT_THROW_WITH_MESSAGE(
       TestUtility::validate(bootstrap, /*recurse_into_any*/ true), EnvoyException,
@@ -299,7 +299,7 @@ TEST_F(ProtobufUtilityTest, JsonConvertAnyUnknownMessageType) {
 
 TEST_F(ProtobufUtilityTest, JsonConvertKnownGoodMessage) {
   Protobuf::Any source_any;
-  source_any.PackFrom(envoy::config::bootstrap::v3::Bootstrap::default_instance());
+  std::ignore = source_any.PackFrom(envoy::config::bootstrap::v3::Bootstrap::default_instance());
   EXPECT_THAT(MessageUtil::getJsonStringFromMessageOrError(source_any, true),
               testing::HasSubstr("@type"));
 }
@@ -1420,20 +1420,20 @@ TEST_F(ProtobufUtilityTest, AnyBytes) {
     Protobuf::StringValue source;
     source.set_value("abc");
     Protobuf::Any source_any;
-    source_any.PackFrom(source);
+    std::ignore = source_any.PackFrom(source);
     EXPECT_EQ(*MessageUtil::anyToBytes(source_any), "abc");
   }
   {
     Protobuf::BytesValue source;
     source.set_value("\x01\x02\x03");
     Protobuf::Any source_any;
-    source_any.PackFrom(source);
+    std::ignore = source_any.PackFrom(source);
     EXPECT_EQ(*MessageUtil::anyToBytes(source_any), "\x01\x02\x03");
   }
   {
     envoy::config::cluster::v3::Filter filter;
     Protobuf::Any source_any;
-    source_any.PackFrom(filter);
+    std::ignore = source_any.PackFrom(filter);
     EXPECT_EQ(*MessageUtil::anyToBytes(source_any), source_any.value());
   }
 }
@@ -1443,21 +1443,21 @@ TEST_F(ProtobufUtilityTest, KnownAnyToBytes) {
     Protobuf::StringValue source;
     source.set_value("abc");
     Protobuf::Any source_any;
-    source_any.PackFrom(source);
+    std::ignore = source_any.PackFrom(source);
     EXPECT_EQ(*MessageUtil::knownAnyToBytes(source_any), "abc");
   }
   {
     Protobuf::BytesValue source;
     source.set_value("\x01\x02\x03");
     Protobuf::Any source_any;
-    source_any.PackFrom(source);
+    std::ignore = source_any.PackFrom(source);
     EXPECT_EQ(*MessageUtil::knownAnyToBytes(source_any), "\x01\x02\x03");
   }
   {
     Protobuf::Struct source;
     (*source.mutable_fields())["key"].set_string_value("value");
     Protobuf::Any source_any;
-    source_any.PackFrom(source);
+    std::ignore = source_any.PackFrom(source);
     auto result = MessageUtil::knownAnyToBytes(source_any);
     ASSERT_TRUE(result.ok());
     EXPECT_EQ(*result, R"({"key":"value"})");
@@ -1465,7 +1465,7 @@ TEST_F(ProtobufUtilityTest, KnownAnyToBytes) {
   {
     envoy::config::cluster::v3::Filter filter;
     Protobuf::Any source_any;
-    source_any.PackFrom(filter);
+    std::ignore = source_any.PackFrom(filter);
     EXPECT_EQ(*MessageUtil::knownAnyToBytes(source_any), source_any.value());
   }
 }
@@ -1475,7 +1475,7 @@ TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
   Protobuf::Duration source_duration;
   source_duration.set_seconds(42);
   Protobuf::Any source_any;
-  source_any.PackFrom(source_duration);
+  std::ignore = source_any.PackFrom(source_duration);
   EXPECT_THROW_WITH_REGEX(
       TestUtility::anyConvert<Protobuf::Timestamp>(source_any), EnvoyException,
       R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
@@ -1485,7 +1485,7 @@ TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
 TEST_F(ProtobufUtilityTest, AnyConvertAndValidateFailedValidation) {
   envoy::config::cluster::v3::Filter filter;
   Protobuf::Any source_any;
-  source_any.PackFrom(filter);
+  std::ignore = source_any.PackFrom(filter);
   EXPECT_THROW(MessageUtil::anyConvertAndValidate<envoy::config::cluster::v3::Filter>(
                    source_any, ProtobufMessage::getStrictValidationVisitor()),
                ProtoValidationException);
@@ -1495,7 +1495,7 @@ TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
   Protobuf::Duration source_duration;
   source_duration.set_seconds(42);
   Protobuf::Any source_any;
-  source_any.PackFrom(source_duration);
+  std::ignore = source_any.PackFrom(source_duration);
   Protobuf::Timestamp dst;
   EXPECT_THAT(
       MessageUtil::unpackTo(source_any, dst).message(),
@@ -1508,7 +1508,7 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
     API_NO_BOOST(envoy::api::v2::Cluster) source;
     source.set_drain_connections_on_host_removal(true);
     Protobuf::Any source_any;
-    source_any.PackFrom(source);
+    std::ignore = source_any.PackFrom(source);
     API_NO_BOOST(envoy::api::v2::Cluster) dst;
     ASSERT_TRUE(MessageUtil::unpackTo(source_any, dst).ok());
     EXPECT_TRUE(dst.drain_connections_on_host_removal());
@@ -1517,7 +1517,7 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) source;
     source.set_ignore_health_on_host_removal(true);
     Protobuf::Any source_any;
-    source_any.PackFrom(source);
+    std::ignore = source_any.PackFrom(source);
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
     ASSERT_TRUE(MessageUtil::unpackTo(source_any, dst).ok());
     EXPECT_TRUE(dst.ignore_health_on_host_removal());
@@ -1529,7 +1529,7 @@ TEST_F(ProtobufUtilityTest, UnpackToNoThrowRightType) {
   Protobuf::Duration src_duration;
   src_duration.set_seconds(42);
   Protobuf::Any source_any;
-  source_any.PackFrom(src_duration);
+  std::ignore = source_any.PackFrom(src_duration);
   Protobuf::Duration dst_duration;
   EXPECT_OK(MessageUtil::unpackTo(source_any, dst_duration));
   // Source and destination are expected to be equal.
@@ -1541,7 +1541,7 @@ TEST_F(ProtobufUtilityTest, UnpackToNoThrowWrongType) {
   Protobuf::Duration source_duration;
   source_duration.set_seconds(42);
   Protobuf::Any source_any;
-  source_any.PackFrom(source_duration);
+  std::ignore = source_any.PackFrom(source_duration);
   Protobuf::Timestamp dst;
   auto status = MessageUtil::unpackTo(source_any, dst);
   EXPECT_TRUE(absl::IsInternal(status));
@@ -1618,7 +1618,8 @@ TEST_F(ProtobufUtilityTest, JsonConvertFail) {
   Protobuf::Struct dest_struct;
   std::string expected_duration_text = R"pb(seconds: -281474976710656)pb";
   Protobuf::Duration expected_duration_proto;
-  Protobuf::TextFormat::ParseFromString(expected_duration_text, &expected_duration_proto);
+  std::ignore =
+      Protobuf::TextFormat::ParseFromString(expected_duration_text, &expected_duration_proto);
   EXPECT_THROW(TestUtility::jsonConvert(source_duration, dest_struct), EnvoyException);
 }
 
