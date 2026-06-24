@@ -31,7 +31,7 @@ public:
   class LookupRequest {
   public:
     virtual ~LookupRequest() = default;
-    virtual void cancel() = 0;
+    virtual void cancel() PURE;
   };
 
   using LookupCallback = std::function<void(Filters::Common::ExtAuthz::ResponsePtr&&)>;
@@ -48,13 +48,13 @@ public:
    *         Invalidated when `cb` or `LookupRequest::cancel` is called.
    */
   virtual LookupRequest* lookup(Http::StreamDecoderFilterCallbacks& decoder_callbacks,
-                                const RequestAttributes& attributes, LookupCallback&& cb) = 0;
+                                const RequestAttributes& attributes, LookupCallback&& cb) PURE;
 
   /**
    * Inserts a response into the cache.
    * @param response The Response received from the authz service.
    */
-  virtual void insert(const Filters::Common::ExtAuthz::Response& response) = 0;
+  virtual void insert(const Filters::Common::ExtAuthz::Response& response) PURE;
 };
 
 using AuthCacheSessionPtr = std::unique_ptr<AuthCacheSession>;
@@ -66,7 +66,7 @@ public:
   /**
    * Creates a new cache session for a stream filter.
    */
-  virtual AuthCacheSessionPtr createSession() = 0;
+  virtual AuthCacheSessionPtr createSession() PURE;
 };
 
 using AuthCachePtr = std::unique_ptr<AuthCache>;
@@ -76,7 +76,7 @@ public:
   ~AuthCacheFactory() override = default;
 
   virtual AuthCachePtr createAuthCache(const Protobuf::Message& config,
-                                       Server::Configuration::ServerFactoryContext& context) = 0;
+                                       Server::Configuration::ServerFactoryContext& context) PURE;
   std::string category() const override { return "envoy.filters.http.ext_authz.cache"; }
 };
 
