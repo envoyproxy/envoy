@@ -1,7 +1,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "source/common/network/cpu_affinity.h"
+#include "source/common/common/cpu_affinity.h"
 
 #include "gtest/gtest.h"
 
@@ -19,7 +19,7 @@
 #endif
 
 namespace Envoy {
-namespace Network {
+namespace Thread {
 namespace {
 
 #if defined(__linux__)
@@ -61,5 +61,5 @@ TEST(CpuAffinityTest, AffinitySetEmptyOnQueryFailure) {
 #endif
 
 } // namespace
-} // namespace Network
+} // namespace Thread
 } // namespace Envoy

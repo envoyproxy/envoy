@@ -16,9 +16,9 @@
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/common/cpu_affinity.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
-#include "source/common/network/cpu_affinity.h"
 #include "source/common/network/filter_matcher.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
@@ -1035,6 +1035,26 @@ bool ListenerManagerImpl::removeListenerInternal(const std::string& name,
   return true;
 }
 
+std::vector<uint32_t> ListenerManagerImpl::assignWorkerCpus() {
+  // Pin each worker thread to a CPU when worker CPU affinity is enabled so each worker keeps its
+  // cache and `NUMA` locality.
+  if (!server_.bootstrap().enable_worker_cpu_affinity()) {
+    return {};
+  }
+  const std::vector<uint32_t> worker_cpus = Thread::workerCpuAssignment(workers_.size());
+  // The gauge counts workers assigned a CPU. Each assigned CPU is in the process mask so the
+  // per-worker pin normally succeeds, and a rare set failure is logged by `setThreadAffinity()`.
+  stats_.workers_pinned_.set(worker_cpus.size());
+  if (worker_cpus.empty()) {
+    ENVOY_LOG(warn, "worker CPU affinity is enabled but no worker could be pinned for {} workers",
+              workers_.size());
+  } else {
+    ENVOY_LOG(info, "worker CPU affinity is enabled, pinning {} workers to CPUs {}",
+              worker_cpus.size(), absl::StrJoin(worker_cpus, ","));
+  }
+  return worker_cpus;
+}
+
 absl::Status ListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog,
                                                std::function<void()> callback) {
   ENVOY_LOG(info, "all dependencies initialized. starting workers");
@@ -1076,22 +1096,7 @@ absl::Status ListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog,
                           });
     }
   }
-  // Pin each worker thread to a CPU when worker CPU affinity is enabled so each worker keeps its
-  // cache and `NUMA` locality.
-  std::vector<uint32_t> worker_cpus;
-  if (server_.bootstrap().enable_worker_cpu_affinity()) {
-    worker_cpus = Network::workerCpuAssignment(workers_.size());
-    // The gauge counts workers assigned a CPU. Each assigned CPU is in the process mask so the
-    // per-worker pin normally succeeds, and a rare set failure is logged by setThreadAffinity.
-    stats_.workers_pinned_.set(worker_cpus.size());
-    if (worker_cpus.empty()) {
-      ENVOY_LOG(warn, "worker CPU affinity is enabled but no worker could be pinned for {} workers",
-                workers_.size());
-    } else {
-      ENVOY_LOG(info, "worker CPU affinity is enabled, pinning {} workers to CPUs {}",
-                worker_cpus.size(), absl::StrJoin(worker_cpus, ","));
-    }
-  }
+  const std::vector<uint32_t> worker_cpus = assignWorkerCpus();
   for (const auto& worker : workers_) {
     ENVOY_LOG(debug, "starting worker {}", i);
     absl::optional<uint32_t> cpu_id;

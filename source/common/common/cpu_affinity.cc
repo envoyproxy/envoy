@@ -1,4 +1,4 @@
-#include "source/common/network/cpu_affinity.h"
+#include "source/common/common/cpu_affinity.h"
 
 #if defined(__linux__)
 #include <sched.h>
@@ -8,7 +8,7 @@
 #endif
 
 namespace Envoy {
-namespace Network {
+namespace Thread {
 
 std::vector<uint32_t> cpuAffinitySet() {
 #if defined(__linux__)
@@ -41,5 +41,5 @@ std::vector<uint32_t> workerCpuAssignment(uint32_t worker_count) {
   return cpus;
 }
 
-} // namespace Network
+} // namespace Thread
 } // namespace Envoy

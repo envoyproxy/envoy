@@ -8,6 +8,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/common/cpu_affinity.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/socket_option_factory.h"
@@ -181,6 +182,11 @@ TEST_P(IntegrationTest, WorkerCpuAffinity) {
     bootstrap.set_enable_worker_cpu_affinity(true);
   });
   initialize();
+
+  // Worker pinning happens during startup, so the gauge reflects the per-worker CPU assignment
+  // derived from the same process affinity mask observed here.
+  const uint64_t expected_pinned_workers = Thread::workerCpuAssignment(concurrency_).size();
+  test_server_->waitForGauge("listener_manager.workers_pinned", Eq(expected_pinned_workers));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);

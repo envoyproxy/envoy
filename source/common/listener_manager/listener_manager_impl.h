@@ -359,6 +359,13 @@ private:
   absl::Status setupSocketFactoryForListener(ListenerImpl& new_listener,
                                              const ListenerImpl& existing_listener);
 
+  /**
+   * Compute the per-worker CPU assignment used to pin worker threads, mapping worker i to entry i.
+   * Records the `workers_pinned` gauge and logs the outcome. Returns an empty vector when worker CPU
+   * affinity is disabled or no assignment is possible, in which case no worker is pinned.
+   */
+  std::vector<uint32_t> assignWorkerCpus();
+
   ApiListenerPtr api_listener_;
   // Active listeners are listeners that are currently accepting new connections on the workers.
   ListenerList active_listeners_;

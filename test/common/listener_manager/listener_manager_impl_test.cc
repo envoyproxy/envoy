@@ -20,10 +20,10 @@
 #ifdef __linux__
 #include "source/common/api/os_sys_calls_impl_linux.h"
 #endif
+#include "source/common/common/cpu_affinity.h"
 #include "source/common/config/metadata.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/network/cpu_affinity.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/network/utility.h"
@@ -8804,29 +8804,26 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, EmptyConnectionBalanceConfig) {
 #endif
 }
 
+// Worker CPU affinity uses the Linux process affinity mask, so these tests are Linux-only.
+#ifdef __linux__
 TEST_P(ListenerManagerImplTest, WorkerCpuAffinityPinsWorkerThreads) {
-// Worker CPU affinity uses the Linux process affinity mask and is a no-op on other platforms.
-#if defined(__linux__)
   server_.bootstrap_.set_enable_worker_cpu_affinity(true);
   // Worker 0 is pinned to the first CPU of the process affinity mask.
-  const std::vector<uint32_t> expected = Network::workerCpuAssignment(1);
+  const std::vector<uint32_t> expected = Thread::workerCpuAssignment(1);
   ASSERT_FALSE(expected.empty());
   EXPECT_CALL(*worker_, start(_, _, absl::optional<uint32_t>(expected[0])));
   ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
   EXPECT_EQ(1, server_.stats_store_
                    .gauge("listener_manager.workers_pinned", Stats::Gauge::ImportMode::NeverImport)
                    .value());
-#endif
 }
 
 TEST_P(ListenerManagerImplTest, WorkerCpuAffinityDoesNotPinWhenNoCpusAvailable) {
-// Worker CPU affinity uses the Linux process affinity mask and is a no-op on other platforms.
-#if defined(__linux__)
   server_.bootstrap_.set_enable_worker_cpu_affinity(true);
   NiceMock<Api::MockLinuxOsSysCalls> linux_os_sys_calls;
   TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls{&linux_os_sys_calls};
   EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
-      .WillRepeatedly(Return(Api::SysCallIntResult{-1, EINVAL}));
+      .WillOnce(Return(Api::SysCallIntResult{-1, EINVAL}));
   // With no available CPUs the worker keeps its inherited affinity and still starts.
   EXPECT_CALL(*worker_, start(_, _, absl::optional<uint32_t>(absl::nullopt)));
   EXPECT_LOG_CONTAINS(
@@ -8835,8 +8832,8 @@ TEST_P(ListenerManagerImplTest, WorkerCpuAffinityDoesNotPinWhenNoCpusAvailable) 
   EXPECT_EQ(0, server_.stats_store_
                    .gauge("listener_manager.workers_pinned", Stats::Gauge::ImportMode::NeverImport)
                    .value());
-#endif
 }
+#endif
 
 TEST_P(ListenerManagerImplTest, WorkerCpuAffinityDisabledByDefault) {
   // With the bootstrap field unset no worker is pinned and the gauge stays zero.

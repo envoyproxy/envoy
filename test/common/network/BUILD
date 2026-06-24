@@ -93,18 +93,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "cpu_affinity_test",
-    srcs = ["cpu_affinity_test.cc"],
-    rbe_pool = "6gig",
-    deps = [
-        "//source/common/api:os_sys_calls_lib",
-        "//source/common/network:cpu_affinity_lib",
-        "//test/mocks/api:api_mocks",
-        "//test/test_common:threadsafe_singleton_injector_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "connection_impl_test",
     srcs = ["connection_impl_test.cc"],
     rbe_pool = "6gig",
