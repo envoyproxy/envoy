@@ -456,7 +456,19 @@ TEST_P(HttpInspectorTest, BinaryWithEmbeddedNul) {
 }
 
 TEST_P(HttpInspectorTest, HighBitBinaryPayload) {
-  const absl::string_view header("\xff\xfe\xfd\xfc", 4);
+  const char data[] = {static_cast<char>(0xff), static_cast<char>(0xfe),
+                       static_cast<char>(0xfd), static_cast<char>(0xfc)};
+  const absl::string_view header(data, sizeof(data));
+  testHttpInspectNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, ShortRequestLineFollowedByHeaderWithNonTokenChars) {
+  const absl::string_view header = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
+  testHttpInspectFound(header, Http::Utility::AlpnNames::get().Http11);
+}
+
+TEST_P(HttpInspectorTest, LeadingCrlfStillRejectedByExistingGuard) {
+  const absl::string_view header = "\r\nGET / HTTP/1.1\r\n";
   testHttpInspectNotFound(header);
 }
 
