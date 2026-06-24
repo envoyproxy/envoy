@@ -361,8 +361,8 @@ private:
 
   /**
    * Compute the per-worker CPU assignment used to pin worker threads, mapping worker i to entry i.
-   * Records the `workers_pinned` gauge and logs the outcome. Returns an empty vector when worker CPU
-   * affinity is disabled or no assignment is possible, in which case no worker is pinned.
+   * Records the `workers_pinned` gauge and logs the outcome. Returns an empty vector when worker
+   * CPU affinity is disabled or no assignment is possible, in which case no worker is pinned.
    */
   std::vector<uint32_t> assignWorkerCpus();
 
