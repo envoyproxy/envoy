@@ -219,7 +219,7 @@ public:
           *ts->mutable_typed_config());
       quic_transport_socket_config.mutable_enable_early_data()->set_value(early_data_enabled);
       quic_transport_socket_config.mutable_enable_resumption()->set_value(resumption_enabled);
-      ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+      std::ignore = ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
     });
   }
 
@@ -372,7 +372,7 @@ public:
     tls_context->mutable_common_tls_context()->add_alpn_protocols(client_alpn_);
 
     envoy::config::core::v3::TransportSocket message;
-    message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
+    std::ignore = message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
     auto& config_factory = Config::Utility::getAndCheckFactory<
         Server::Configuration::UpstreamTransportSocketConfigFactory>(message);
     transport_socket_factory_.reset(static_cast<QuicClientTransportSocketFactory*>(

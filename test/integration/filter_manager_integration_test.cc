@@ -558,8 +558,8 @@ TEST_P(FilterChainAccessLogTest, FilterChainName) {
     access_log_config.set_path(log_file);
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%RESPONSE_FLAGS% %FILTER_CHAIN_NAME%");
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
   enableHalfClose(true);
   initialize();
@@ -716,7 +716,7 @@ TEST_F(NetworkFilterAccessLogIntegrationTest, AccessLogHandlerCalled) {
         bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
     auto* filter = filter_chain->add_filters();
     filter->set_name("envoy.test.access_log_handler_filter");
-    filter->mutable_typed_config()->PackFrom(Envoy::Protobuf::Struct());
+    std::ignore = filter->mutable_typed_config()->PackFrom(Envoy::Protobuf::Struct());
     // Move to front
     for (int i = filter_chain->filters_size() - 1; i > 0; --i) {
       filter_chain->mutable_filters()->SwapElements(i, i - 1);

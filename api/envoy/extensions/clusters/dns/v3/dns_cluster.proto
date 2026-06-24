@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for DNS discovery clusters.
 // [#extension: envoy.clusters.dns]
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message DnsCluster {
   message RefreshRate {
     // Specifies the base interval between refreshes. This parameter is required and must be greater
@@ -89,4 +89,12 @@ message DnsCluster {
   // semantics. Otherwise, each address is considered to be a separate endpoint, which maps to
   // :ref:`strict DNS discovery <arch_overview_service_discovery_types_strict_dns>` semantics.
   bool all_addresses_in_single_endpoint = 9;
+
+  // When :ref:`respect_dns_ttl <envoy_v3_api_field_extensions.clusters.dns.v3.DnsCluster.respect_dns_ttl>`
+  // is enabled, this field specifies a minimum value for the TTL-derived DNS refresh rate.
+  // DNS records with TTLs shorter than this value will be refreshed at this rate instead. If not
+  // set, the TTL from the DNS response is used directly with no minimum floor.
+  // The value must be at least 1 second.
+  google.protobuf.Duration dns_min_refresh_rate = 10
+      [(validate.rules).duration = {gte {seconds: 1}}];
 }

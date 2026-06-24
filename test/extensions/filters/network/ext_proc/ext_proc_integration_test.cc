@@ -56,7 +56,7 @@ public:
 
             // Serialize to an Any
             Protobuf::Any typed_value;
-            typed_value.PackFrom(string_proto);
+            std::ignore = typed_value.PackFrom(string_proto);
 
             // Use the appropriate way to add typed metadata
             callbacks_->connection().streamInfo().setDynamicTypedMetadata(namespace_name,
@@ -161,12 +161,12 @@ public:
             for (auto& filter : *filters) {
               if (filter.name() == "envoy.network_ext_proc.ext_proc_filter") {
                 envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
-                filter.mutable_typed_config()->UnpackTo(&config);
+                std::ignore = filter.mutable_typed_config()->UnpackTo(&config);
 
                 // Apply the provided modifier function
                 config_modifier(config);
 
-                filter.mutable_typed_config()->PackFrom(config);
+                std::ignore = filter.mutable_typed_config()->PackFrom(config);
                 break;
               }
             }
@@ -225,7 +225,7 @@ public:
         if (filter.name() == "test.metadata_setter") {
           Protobuf::Struct existing_config;
           if (filter.has_typed_config()) {
-            filter.typed_config().UnpackTo(&existing_config);
+            std::ignore = filter.typed_config().UnpackTo(&existing_config);
           }
 
           // Set untyped metadata
@@ -265,7 +265,7 @@ public:
                 .set_string_value(typed_value.value());
           }
 
-          filter.mutable_typed_config()->PackFrom(existing_config);
+          std::ignore = filter.mutable_typed_config()->PackFrom(existing_config);
           break;
         }
       }

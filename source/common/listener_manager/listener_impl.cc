@@ -1051,7 +1051,7 @@ bool ListenerImpl::createQuicListenerFilterChain(Network::QuicListenerFilterMana
 }
 
 void ListenerImpl::dumpListenerConfig(Protobuf::Any& dump) const {
-  dump.PackFrom(config_maybe_partial_filter_chains_);
+  std::ignore = dump.PackFrom(config_maybe_partial_filter_chains_);
 }
 
 void ListenerImpl::debugLog(const std::string& message) {

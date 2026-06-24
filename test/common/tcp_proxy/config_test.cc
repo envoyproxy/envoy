@@ -781,7 +781,7 @@ TEST(ConfigTest, AccessLogConfig) {
     file_access_log.set_path("some_path");
     file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "the format specifier");
-    log->mutable_typed_config()->PackFrom(file_access_log);
+    std::ignore = log->mutable_typed_config()->PackFrom(file_access_log);
   }
 
   log = config.mutable_access_log()->Add();
@@ -789,7 +789,7 @@ TEST(ConfigTest, AccessLogConfig) {
   {
     envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("another path");
-    log->mutable_typed_config()->PackFrom(file_access_log);
+    std::ignore = log->mutable_typed_config()->PackFrom(file_access_log);
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;

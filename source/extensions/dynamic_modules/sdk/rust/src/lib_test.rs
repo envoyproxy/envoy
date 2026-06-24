@@ -4170,6 +4170,56 @@ fn test_catch_unwind_http_scheduled_after_poison_is_skipped() {
   );
 }
 
+// Regression test for CatchUnwind re-entrancy. Envoy can synchronously re-enter the same wrapper
+// while an outer callback is still on the stack (e.g. a callback that completes a response with
+// end-of-stream). Here on_scheduled re-derives `&mut CatchUnwind` from the raw wrapper pointer (as
+// every FFI entry point does) and calls a status-returning callback. The take()-based poisoning
+// misread this as a poisoned filter and panicked/failed closed; borrowing in place lets the
+// re-entrant callback run.
+#[test]
+fn test_catch_unwind_http_reentrant_status_callback_is_not_poisoned() {
+  thread_local! {
+    static WRAPPER_PTR: std::cell::Cell<*mut std::ffi::c_void> =
+      const { std::cell::Cell::new(std::ptr::null_mut()) };
+    static RESPONSE_HEADERS_RAN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+  }
+  struct ReentrantFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ReentrantFilter {
+    fn on_scheduled(&mut self, envoy_filter: &mut EHF, _event_id: u64) {
+      let ptr = WRAPPER_PTR.with(|p| p.get()) as *mut CatchUnwind<ReentrantFilter>;
+      // SAFETY: mirrors the FFI entry points re-deriving &mut from the raw filter ptr while an
+      // outer callback (this on_scheduled) is still on the stack.
+      let wrapper = unsafe { &mut *ptr };
+      HttpFilter::on_response_headers(wrapper, envoy_filter, false);
+    }
+    fn on_response_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+      RESPONSE_HEADERS_RAN.with(|c| c.set(true));
+      abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+    }
+  }
+
+  RESET_STREAM_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+  RESPONSE_HEADERS_RAN.with(|c| c.set(false));
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(ReentrantFilter);
+  WRAPPER_PTR
+    .with(|p| p.set(&mut wrapper as *mut CatchUnwind<ReentrantFilter> as *mut std::ffi::c_void));
+
+  HttpFilter::on_scheduled(&mut wrapper, &mut envoy_filter, 1);
+
+  // The re-entrant status-returning callback ran instead of being misread as poisoned.
+  assert!(RESPONSE_HEADERS_RAN.with(std::cell::Cell::get));
+  // No false fail-closed: the legitimate re-entrancy did not trip the panic guard.
+  assert!(!RESET_STREAM_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
 // =============================================================================
 // Cluster Extension FFI stubs for testing.
 // =============================================================================

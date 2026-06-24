@@ -105,7 +105,10 @@ CoalesceFormatter::createFormatterForCommand(absl::string_view command, absl::st
                                              absl::optional<size_t> max_length) {
   // Try built-in command parsers to create the formatter.
   for (const auto& parser : BuiltInCommandParserFactoryHelper::commandParsers()) {
-    auto formatter = parser->parse(command, param, max_length);
+    absl::StatusOr<FormatterProviderPtr> formatter_result =
+        parser->parse(command, param, max_length);
+    RETURN_IF_ERROR(formatter_result.status());
+    FormatterProviderPtr formatter = std::move(formatter_result).value();
     if (formatter != nullptr) {
       return formatter;
     }

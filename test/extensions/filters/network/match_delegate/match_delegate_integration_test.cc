@@ -222,7 +222,7 @@ public:
       auto* typed_config = filter->mutable_typed_config();
       StringValue string_value;
       string_value.set_value(value);
-      typed_config->PackFrom(string_value);
+      std::ignore = typed_config->PackFrom(string_value);
     });
 
     initialize();

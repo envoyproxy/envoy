@@ -14,9 +14,13 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/oauth2/filter.h"
 #include "source/extensions/filters/http/oauth2/oauth.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -76,11 +80,48 @@ createFilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Con
     return absl::InvalidArgumentError("invalid HMAC secret configuration");
   }
 
-  if (proto_config.preserve_authorization_header() && proto_config.forward_bearer_token()) {
+  // Reject headers that must not be set by configuration (pseudo-headers such as ":path" and the
+  // "Host" header) for the forwarded ID token.
+  if (proto_config.has_forward_id_token() &&
+      !Http::HeaderUtility::isModifiableHeader(proto_config.forward_id_token().header())) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "invalid forward_id_token configuration: header '",
+        proto_config.forward_id_token().header(),
+        "' can not be used to forward the ID token; pseudo-headers and the Host header are not "
+        "allowed"));
+  }
+
+  // The forward_id_token header is owned by Envoy. Reject configs whose pass_through_matcher keys
+  // on it: otherwise a client could control the pass-through decision (and thus bypass OAuth
+  // entirely) simply by sending that header.
+  if (proto_config.has_forward_id_token()) {
+    const Http::LowerCaseString id_token_header(proto_config.forward_id_token().header());
+    for (const auto& matcher : proto_config.pass_through_matcher()) {
+      if (Http::LowerCaseString(matcher.name()) == id_token_header) {
+        return absl::InvalidArgumentError(
+            absl::StrCat("invalid forward_id_token configuration: pass_through_matcher can not "
+                         "match on the forwarded ID token header '",
+                         proto_config.forward_id_token().header(), "'"));
+      }
+    }
+  }
+
+  // The Authorization header has at most one owner. It is written by forward_bearer_token (the
+  // access token) and by forward_id_token when its target header is "Authorization" (the ID
+  // token); preserve_authorization_header instead keeps the client-supplied value. None of these
+  // can be combined, since they would otherwise fight over the same header.
+  const bool forward_id_token_on_authorization_header =
+      proto_config.has_forward_id_token() &&
+      Http::LowerCaseString(proto_config.forward_id_token().header()) ==
+          Http::CustomHeaders::get().Authorization;
+  if (static_cast<int>(proto_config.forward_bearer_token()) +
+          static_cast<int>(forward_id_token_on_authorization_header) +
+          static_cast<int>(proto_config.preserve_authorization_header()) >
+      1) {
     return absl::InvalidArgumentError(
-        "invalid combination of forward_bearer_token and preserve_authorization_header "
-        "configuration. If forward_bearer_token is set to true, then "
-        "preserve_authorization_header must be false");
+        "invalid OAuth2 configuration: at most one of forward_bearer_token, "
+        "preserve_authorization_header, or forward_id_token (when forwarding the ID token on the "
+        "Authorization header) may be set, as they all use the Authorization header");
   }
 
   auto secret_reader = std::make_shared<SDSSecretReader>(

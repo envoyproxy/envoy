@@ -188,8 +188,8 @@ response: {{}}
 
 class TestCommandParser : public Formatter::CommandParser {
 public:
-  Formatter::FormatterProviderPtr parse(absl::string_view command, absl::string_view,
-                                        absl::optional<size_t>) const override {
+  absl::StatusOr<Formatter::FormatterProviderPtr>
+  parse(absl::string_view command, absl::string_view, absl::optional<size_t>) const override {
     if (command == "TEST_CUSTOM_CMD") {
       class TestProvider : public Formatter::FormatterProvider {
       public:
@@ -216,7 +216,7 @@ public:
     auto any = std::make_unique<Protobuf::Any>();
     Protobuf::Duration value;
     value.set_seconds(10);
-    any->PackFrom(value);
+    std::ignore = any->PackFrom(value);
     return any;
   }
 };

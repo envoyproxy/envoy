@@ -506,6 +506,7 @@ public:
    * to all worker threads and run concurrently.
    */
   using DrainConnectionsHostPredicate = std::function<bool(const Host&)>;
+  using DrainConnectionsPoolPredicate = std::function<bool(ConnectionPool::Instance&)>;
 
   /**
    * Drain all connection pool connections owned by this cluster.
@@ -523,6 +524,14 @@ public:
    */
   virtual void drainConnections(DrainConnectionsHostPredicate predicate,
                                 ConnectionPool::DrainBehavior drain_behavior) PURE;
+
+  /**
+   * Drain all connection pool connections matching the pool predicate owned by
+   * all clusters.
+   * @param predicate supplies the drain connections pool predicate.
+   */
+  virtual void drainOrCloseConnPools(DrainConnectionsPoolPredicate predicate,
+                                     ConnectionPool::DrainBehavior drain_behavior) PURE;
 
   /**
    * Check if the cluster is active and statically configured, and if not, return an error

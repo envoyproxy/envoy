@@ -232,6 +232,16 @@ std::pair<uint32_t, bool> RetryStateImpl::parseRetryGrpcOn(absl::string_view ret
   return {ret, all_fields_valid};
 }
 
+std::vector<std::string> RetryStateImpl::getUnknownRetryOnTokens(absl::string_view config) {
+  std::vector<std::string> unknown;
+  for (const auto& token : StringUtil::splitToken(config, ",", false, true)) {
+    if (!parseRetryOn(token).second && !parseRetryGrpcOn(token).second) {
+      unknown.emplace_back(token);
+    }
+  }
+  return unknown;
+}
+
 absl::optional<std::chrono::milliseconds>
 RetryStateImpl::parseResetInterval(const Http::ResponseHeaderMap& response_headers) const {
   for (const auto& reset_header : reset_headers_) {

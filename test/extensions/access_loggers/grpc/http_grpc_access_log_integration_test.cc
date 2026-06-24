@@ -58,7 +58,7 @@ public:
           common_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
           setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                          fake_upstreams_.back()->localAddress());
-          access_log->mutable_typed_config()->PackFrom(config);
+          std::ignore = access_log->mutable_typed_config()->PackFrom(config);
         });
 
     HttpIntegrationTest::initialize();

@@ -158,7 +158,7 @@ vhds:
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
   auto* resource = resources.Add();
   resource->set_name("foo/example.com");
-  resource->mutable_resource()->PackFrom(vhost);
+  std::ignore = resource->mutable_resource()->PackFrom(vhost);
 
   auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(resources, "name");
@@ -246,7 +246,7 @@ vhds:
 
   auto* res1 = resources.Add();
   res1->set_name("foo/example1.com");
-  res1->mutable_resource()->PackFrom(vhost1);
+  std::ignore = res1->mutable_resource()->PackFrom(vhost1);
 
   envoy::config::route::v3::VirtualHost vhost2;
   vhost2.set_name("vhost2");
@@ -256,7 +256,7 @@ vhds:
 
   auto* res2 = resources.Add();
   res2->set_name("foo/example2.com");
-  res2->mutable_resource()->PackFrom(vhost2);
+  std::ignore = res2->mutable_resource()->PackFrom(vhost2);
 
   server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   auto decoded_resources =

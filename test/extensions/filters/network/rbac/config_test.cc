@@ -106,7 +106,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, ValidMatcherProto) 
   xds::type::matcher::v3::Matcher matcher;
   auto matcher_action = matcher.mutable_on_no_match()->mutable_action();
   matcher_action->set_name("action");
-  matcher_action->mutable_typed_config()->PackFrom(action);
+  std::ignore = matcher_action->mutable_typed_config()->PackFrom(action);
   envoy::extensions::filters::network::rbac::v3::RBAC config;
   config.set_stat_prefix("stats");
   *config.mutable_matcher() = matcher;
