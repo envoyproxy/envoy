@@ -536,6 +536,32 @@ TEST(Context, ConnectionFallbackAttributes) {
   }
 }
 
+TEST(Context, ConnectionPeerCertificateNotValidated) {
+  // Presented but not validated (e.g. ACCEPT_UNTRUSTED): mtls=true, peer_certificate_valid=false.
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  info.downstream_connection_info_provider_->setSslConnection(ssl_info);
+  EXPECT_CALL(*ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*ssl_info, peerCertificateValidated()).WillRepeatedly(Return(false));
+
+  Protobuf::Arena arena;
+  ConnectionWrapper connection(arena, info);
+
+  {
+    auto value = connection[CelValue::CreateStringView(MTLS)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsBool());
+    EXPECT_TRUE(value.value().BoolOrDie());
+  }
+
+  {
+    auto value = connection[CelValue::CreateStringView(PeerCertificateValid)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsBool());
+    EXPECT_FALSE(value.value().BoolOrDie());
+  }
+}
+
 TEST(Context, ConnectionAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info(
@@ -585,6 +611,7 @@ TEST(Context, ConnectionAttributes) {
 
   EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   EXPECT_CALL(*upstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*downstream_ssl_info, peerCertificateValidated()).WillRepeatedly(Return(true));
   EXPECT_CALL(*upstream_host, address()).WillRepeatedly(Return(upstream_address));
   EXPECT_CALL(*upstream_host, locality()).WillRepeatedly(ReturnRef(upstream_locality));
 
@@ -716,6 +743,13 @@ TEST(Context, ConnectionAttributes) {
 
   {
     auto value = connection[CelValue::CreateStringView(MTLS)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsBool());
+    EXPECT_TRUE(value.value().BoolOrDie());
+  }
+
+  {
+    auto value = connection[CelValue::CreateStringView(PeerCertificateValid)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsBool());
     EXPECT_TRUE(value.value().BoolOrDie());
