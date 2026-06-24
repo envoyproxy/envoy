@@ -183,6 +183,58 @@ TEST_F(SipDecoderTest, DecodeINVITE) {
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
 
+// Regression test for a stack buffer overflow (out-of-bounds write primitive)
+// and reliable remote DoS in Decoder::reassemble(). A Content-Length header
+// whose value was longer than the fixed parse buffer used to be copied into
+// that buffer verbatim via Buffer::copyOut(), which memcpys based on the source
+// length only -- smashing the stack with attacker-controlled bytes. The decoder
+// must now reject the oversized/out-of-range value without crashing and without
+// dispatching the message. Under ASAN this test aborts on the unfixed code.
+TEST_F(SipDecoderTest, DecodeOverlongContentLengthDoesNotOverflow) {
+  initializeFilter(yaml);
+
+  const std::string SIP_OVERLONG_CONTENT_LENGTH =
+      "ACK sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0\x0d\x0a"
+      "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
+      "Via: SIP/2.0/TCP 11.0.0.10:15060;branch=z9hG4bK-3193-1-0\x0d\x0a"
+      "To: <sip:User.0000@tas01.defult.svc.cluster.local>\x0d\x0a"
+      "From: <sip:User.0001@tas01.defult.svc.cluster.local>;tag=1\x0d\x0a"
+      "CSeq: 2 ACK\x0d\x0a"
+      "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>;tag=1\x0d\x0a"
+      "Max-Forwards: 70\x0d\x0a"
+      "Content-Length:  999999999999999999999999999999\x0d\x0a"
+      "\x0d\x0a";
+  buffer_.add(SIP_OVERLONG_CONTENT_LENGTH);
+
+  // Must not crash (previously a stack-smashing write) and must not dispatch the
+  // malformed message downstream.
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(0U, store_.counter("test.request").value());
+}
+
+// A negative Content-Length must likewise be rejected. std::atoi() previously
+// returned -1, which silently became a huge size_t and corrupted the
+// full-message-length computation. absl::SimpleAtoi() rejects it instead.
+TEST_F(SipDecoderTest, DecodeNegativeContentLengthIsRejected) {
+  initializeFilter(yaml);
+
+  const std::string SIP_NEGATIVE_CONTENT_LENGTH =
+      "ACK sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0\x0d\x0a"
+      "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
+      "Via: SIP/2.0/TCP 11.0.0.10:15060;branch=z9hG4bK-3193-1-0\x0d\x0a"
+      "To: <sip:User.0000@tas01.defult.svc.cluster.local>\x0d\x0a"
+      "From: <sip:User.0001@tas01.defult.svc.cluster.local>;tag=1\x0d\x0a"
+      "CSeq: 2 ACK\x0d\x0a"
+      "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>;tag=1\x0d\x0a"
+      "Max-Forwards: 70\x0d\x0a"
+      "Content-Length:  -1\x0d\x0a"
+      "\x0d\x0a";
+  buffer_.add(SIP_NEGATIVE_CONTENT_LENGTH);
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(0U, store_.counter("test.request").value());
+}
+
 TEST_F(SipDecoderTest, DecodeRegister) {
   initializeFilter(yaml);
 
