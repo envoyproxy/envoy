@@ -356,6 +356,8 @@ envoy_cc_fuzz_test(
         "//test/mocks/server:hot_restart_mocks",
         "//test/mocks/server:options_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:file_system_for_test_lib",
+        "//test/test_common:thread_factory_for_test_lib",
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
@@ -416,6 +418,7 @@ envoy_cc_test(
         "//test/mocks/server:options_mocks",
         "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:file_system_for_test_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",

@@ -621,7 +621,7 @@ public:
 
           auto* filter_chain = listener->add_filter_chains();
           auto* filter = filter_chain->add_filters();
-          filter->mutable_typed_config()->PackFrom(proxy_config);
+          std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
           filter->set_name("envoy.filters.network.tcp_proxy");
 
           RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
@@ -886,7 +886,9 @@ public:
   Http2DeferredProcessingIntegrationTest() : registered_tee_factory_(tee_filter_factory_) {
     config_helper_.prependFilter(R"EOF(
       name: stream-tee-filter
-    )EOF");
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.StreamTeeFilterConfig
+      )EOF");
   }
 
 protected:

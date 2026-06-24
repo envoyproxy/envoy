@@ -11,6 +11,7 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/http/common.h"
+#include "test/extensions/filters/http/ext_proc/ext_proc_test_filters.pb.h"
 #include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/filters/common.h"
@@ -155,6 +156,12 @@ protected:
       absl::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb);
   void processAndRespondImmediately(FakeUpstream& grpc_upstream, bool first_message,
                                     absl::optional<std::function<void(ImmediateResponse&)>> cb);
+  // Packing two ProcessingResponses into one gRPC message.
+  // If @param immediate_response is true, the 1st ProcessingResponse is an immediate_response.
+  // Otherwise, the 1st ProcessingResponse is an empty request_trailers response.
+  // The 2nd ProcessingResponse is an empty response_trailers response.
+  void packTwoResponsesInOneMessage(FakeUpstream& grpc_upstream, bool immediate_response,
+                                    absl::optional<std::function<void(ImmediateResponse&)>> cb);
 
   // ext_proc server sends back a response to tell Envoy to stop the
   // original timer and start a new timer.
@@ -204,7 +211,10 @@ protected:
   void initializeLogConfig(std::string& access_log_path);
   void prependExtProcCompositeFilter(const Protobuf::Message& match_input);
 
-  std::unique_ptr<SimpleFilterConfig<DynamicMetadataToHeadersFilter>> simple_filter_config_;
+  std::unique_ptr<UniqueSimpleFilterConfig<
+      DynamicMetadataToHeadersFilter,
+      test::extensions::filters::http::ext_proc::DynamicMetadataToHeadersFilterConfig>>
+      simple_filter_config_;
   std::unique_ptr<
       Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory>>
       registration_;

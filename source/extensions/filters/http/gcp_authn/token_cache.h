@@ -28,7 +28,8 @@ public:
   TokenCacheImpl() = delete;
 
   absl::optional<std::string>
-  lookUp(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience);
+  lookUp(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+         const absl::optional<std::string>& fingerprint);
   void insert(std::unique_ptr<GcpToken> token);
 
   uint64_t capacity() { return lru_cache_.maxSize(); }

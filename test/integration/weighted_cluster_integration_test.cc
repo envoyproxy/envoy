@@ -39,9 +39,17 @@ public:
     });
 
     // Add the custom filter.
-    config_helper_.addFilter("name: repick-cluster-filter");
+    config_helper_.addFilter(R"EOF(
+      name: repick-cluster-filter
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.RepickClusterFilterConfig
+    )EOF");
     if (test_header_mutation) {
-      config_helper_.addFilter("name: envoy.filters.http.header_mutation");
+      config_helper_.addFilter(R"EOF(
+        name: envoy.filters.http.header_mutation
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.header_mutation.v3.HeaderMutation
+      )EOF");
     }
 
     // Modify route with weighted cluster configuration.
@@ -78,8 +86,9 @@ public:
                       value: "cluster-0"
             )EOF";
             TestUtility::loadFromYaml(header_mutation_config, header_mutation);
-            (*cluster->mutable_typed_per_filter_config())["envoy.filters.http.header_mutation"]
-                .PackFrom(header_mutation);
+            std::ignore =
+                (*cluster->mutable_typed_per_filter_config())["envoy.filters.http.header_mutation"]
+                    .PackFrom(header_mutation);
           }
 
           // Add a cluster with `cluster_header` specified.

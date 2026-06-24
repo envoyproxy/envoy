@@ -151,7 +151,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 28]
+// [#next-free-field: 31]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -304,6 +304,51 @@ message OAuth2Config {
   // Note: If a request matches pass_through_matcher, it bypasses OAuth validation and this matcher won't be evaluated.
   // This matcher takes precedence over deny_redirect_matcher.
   repeated config.route.v3.HeaderMatcher allow_failed_matcher = 27;
+
+  // Optional base URI (scheme + host, e.g. ``https://app.example.com``) used to build the
+  // original request URI that is encoded into the OAuth2 ``state`` parameter.
+  // This URI will be used later to redirect users on a successful OAuth.
+  //
+  // This is useful when Envoy sits behind a gateway or load balancer that terminates the
+  // user-facing hostname: In that case, the post-authentication redirect derived from ``state`` would
+  // send the user to an internal host they didn't request.
+  //
+  // Supports request header formatting tokens.
+  //
+  // Example:
+  //
+  //    original_request_uri: "%REQ(x-forwarded-proto?:scheme)%://%REQ(x-forwarded-host?:authority)%"
+  //
+  // If not set, defaults to ``<:scheme>://<:authority>`` of the incoming request.
+  string original_request_uri = 28;
+
+  // Optional list of domains that are allowed as
+  // 1. redirect_uri: which is what the IdP calls after OAuth
+  // 2. original_request_uri: the one extracted from the state of an OAuth callback (where should the request go after OAuth)
+  //
+  // This mitigates:
+  // - injecting a malicious x-forwarded-host or any header that is used to template the redirect urls
+  // - open redirect attacks where an attacker crafts a ``state`` value pointing to an untrusted host.
+  //
+  // Each entry is matched against the host (with any port stripped) extracted from the
+  // formatted ``redirect_uri``, the formatted ``original_request_uri``, and the URL decoded from
+  // the ``state`` parameter on callback. Matching is case-insensitive and supports two forms:
+  //
+  // * Exact match, e.g. ``example.com`` matches only ``example.com``.
+  // * Wildcard subdomain match using a leading ``*.``, e.g. ``*.example.com`` matches
+  //   ``foo.example.com`` and ``bar.baz.example.com`` but not ``example.com`` itself.
+  //
+  // IPv6 literals must be configured without surrounding brackets (e.g. ``::1``, not ``[::1]``).
+  //
+  // If this list is empty (the default), all hosts are allowed and no validation is performed.
+  repeated string allowed_redirect_domains = 29;
+
+  // If set to true, the expiration time for the ID token cookie will always be derived from the
+  // ``expires_in`` field of the access token response rather than from the ``exp`` claim in the
+  // ID token JWT. This is useful when the access token response advertises a longer lifetime than
+  // the ID token and you want the ID token cookie to remain valid for that full duration.
+  // Default is false (use the ID token's own ``exp`` claim when available).
+  bool use_access_token_expiry_for_id_token_cookie = 30;
 }
 
 // Per-route OAuth2 config.

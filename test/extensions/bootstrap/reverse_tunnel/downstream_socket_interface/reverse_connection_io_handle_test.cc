@@ -20,6 +20,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"

@@ -51,6 +51,7 @@ constexpr absl::string_view VERSION_FIELD = "version";
 constexpr absl::string_view DEFAULT_SERVER_VERSION = "1.0.0";
 
 constexpr absl::string_view IS_MCP_REQUEST = "is_mcp_request";
+constexpr absl::string_view IS_EXCEEDING_LIMIT = "is_exceeding_limit";
 
 // HTTP header names
 constexpr absl::string_view MCP_SESSION_ID_HEADER = "mcp-session-id";
@@ -87,6 +88,9 @@ constexpr absl::string_view SAMPLING_CREATE_MESSAGE = "sampling/createMessage";
 
 // Utility
 constexpr absl::string_view PING = "ping";
+
+// Synthetic method for JSON-RPC responses (no "method" field).
+constexpr absl::string_view JSONRPC_RESPONSE = "__jsonrpc_response";
 
 // Notification prefix
 constexpr absl::string_view NOTIFICATION_PREFIX = "notifications/";

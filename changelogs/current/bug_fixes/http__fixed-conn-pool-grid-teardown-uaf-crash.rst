@@ -1,0 +1,1 @@
+Fixed a use-after-free and virtual method call crash in the connectivity grid during teardown when connection attempts are still active. This fix can be temporarily disabled by setting runtime feature ``envoy.reloadable_features.conn_pool_grid_early_return_on_teardown`` to ``false``.

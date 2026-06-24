@@ -38,6 +38,7 @@ public:
   void onAboveWriteBufferHighWatermark() override;
 
   // UpstreamCallbacks
+  void onHostSelected(const Upstream::HostDescriptionConstSharedPtr&) override {}
   void onUpstreamConnectionEstablished() override;
 
   // Http::StreamFilterBase
@@ -77,6 +78,12 @@ public:
     }
     const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
       return filter_.callbacks_->upstreamCallbacks()->upstreamStreamOptions();
+    }
+    // Reaches the downstream stream's WebTransport session (via the upstream filter callbacks,
+    // which delegate to the router's downstream StreamDecoderFilterCallbacks) so the upstream codec
+    // can bridge it to the upstream session.
+    OptRef<Http::WebTransportSession> downstreamWebTransportSession() override {
+      return filter_.callbacks_->upstreamCallbacks()->downstreamWebTransportSession();
     }
 
   private:

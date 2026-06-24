@@ -697,6 +697,82 @@ TEST(EdfLbCoalesceEnabledTest, CoalescedPathExercised) {
   EXPECT_NE(nullptr, result.host);
 }
 
+TEST_P(LeastRequestLoadBalancerTest, PendingIgnoredByDefault) {
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                              makeTestHost(info_, "tcp://127.0.0.1:81")};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {});
+
+  hostSet().healthy_hosts_[0]->stats().rq_active_.set(1);
+  hostSet().healthy_hosts_[0]->stats().rq_pending_active_.set(100);
+  hostSet().healthy_hosts_[1]->stats().rq_active_.set(2);
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(1));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr).host);
+}
+
+TEST_P(LeastRequestLoadBalancerTest, PendingCountedFullScan) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.least_request_lb_count_pending_requests", "true"}});
+
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
+  lr_lb_config.set_selection_method(
+      envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::FULL_SCAN);
+  LeastRequestLoadBalancer lb{priority_set_, nullptr, stats_,       runtime_,
+                              random_,       50,      lr_lb_config, simTime()};
+
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                              makeTestHost(info_, "tcp://127.0.0.1:81")};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {});
+
+  hostSet().healthy_hosts_[0]->stats().rq_active_.set(0);
+  hostSet().healthy_hosts_[0]->stats().rq_pending_active_.set(5);
+  hostSet().healthy_hosts_[1]->stats().rq_active_.set(2);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb.chooseHost(nullptr).host);
+}
+
+TEST_P(LeastRequestLoadBalancerTest, PendingCountedNChoices) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.least_request_lb_count_pending_requests", "true"}});
+
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                              makeTestHost(info_, "tcp://127.0.0.1:81")};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {});
+
+  hostSet().healthy_hosts_[0]->stats().rq_active_.set(0);
+  hostSet().healthy_hosts_[0]->stats().rq_pending_active_.set(5);
+  hostSet().healthy_hosts_[1]->stats().rq_active_.set(2);
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(1));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr).host);
+}
+
+TEST_P(LeastRequestLoadBalancerTest, PendingCountedWeighted) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.least_request_lb_count_pending_requests", "true"}});
+
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {});
+
+  hostSet().healthy_hosts_[1]->stats().rq_pending_active_.set(3);
+
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
+
+  // Effective weights: host[0] = 1 / (0+1) = 1.0, host[1] = 2 / (3+1) = 0.5.
+  // host[0] dominates the EDF schedule 2:1.
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr).host);
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

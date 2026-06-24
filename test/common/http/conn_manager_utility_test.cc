@@ -2490,6 +2490,25 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceOnBrokenUuid) {
   EXPECT_EQ(Tracing::Reason::NotTraceable, request_id_extension_->getTraceReason(request_headers));
 }
 
+// Signed request IDs are malformed and must not participate in trace sampling.
+TEST_F(ConnectionManagerUtilityTest, NoTraceOnSignedRequestId) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-request-id", "-1aaaaaa-6f55-44ba-ad80-413f09f48a28"}};
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("tracing.random_sampling", An<const envoy::type::v3::FractionalPercent&>(), _))
+      .Times(0);
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
+      .Times(0);
+  EXPECT_CALL(*request_id_extension_, setTraceReason(_, _)).Times(0);
+
+  callMutateRequestHeaders(request_headers, Protocol::Http2);
+  EXPECT_EQ(Tracing::Reason::NotTraceable, request_id_extension_->getTraceReason(request_headers));
+}
+
 TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
   Http::TestRequestHeaderMapImpl request_headers{{}};
   Http::TestResponseHeaderMapImpl response_headers{{"keep-alive", "timeout=60"},

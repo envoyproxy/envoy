@@ -2,7 +2,7 @@
 
 import sys
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 # Mock envoy_engine before any imports that might use it
 mock_envoy_engine = MagicMock()
@@ -21,11 +21,32 @@ class TestEnvoyTransportFactory(unittest.TestCase):
         EnvoyTransportFactory._engine = None
         mock_envoy_engine.reset_mock()
 
+    def _setup_mock_builder(self, mock_builder, mock_engine, auto_fire_callback=True):
+        """Helper to configure a mock builder.
+
+        By default, it simulates the real engine by immediately invoking the
+        registered 'on_engine_running' callback when build() is called.
+        """
+        running_callback = None
+
+        def set_on_engine_running(callback):
+            nonlocal running_callback
+            running_callback = callback
+            return mock_builder
+
+        def build():
+            if auto_fire_callback and running_callback:
+                running_callback()
+            return mock_engine
+
+        mock_builder.set_on_engine_running.side_effect = set_on_engine_running
+        mock_builder.build.side_effect = build
+
     def test_get_shared_engine_singleton(self):
         # Setup mocks
         mock_engine = MagicMock()
         mock_builder = MagicMock()
-        mock_builder.build.return_value = mock_engine
+        self._setup_mock_builder(mock_builder, mock_engine)
 
         # Call factory multiple times
         engine1 = EnvoyTransportFactory.get_shared_engine(mock_builder)
@@ -42,7 +63,7 @@ class TestEnvoyTransportFactory(unittest.TestCase):
         # Setup mocks
         mock_engine = MagicMock()
         mock_builder = MagicMock()
-        mock_builder.build.return_value = mock_engine
+        self._setup_mock_builder(mock_builder, mock_engine)
 
         # Get transports
         async_transport = EnvoyTransportFactory.get_async_transport(mock_builder)
@@ -60,7 +81,7 @@ class TestEnvoyTransportFactory(unittest.TestCase):
         mock_builder_instance = MagicMock()
         mock_envoy_engine.EngineBuilder.return_value = mock_builder_instance
         mock_engine = MagicMock()
-        mock_builder_instance.build.return_value = mock_engine
+        self._setup_mock_builder(mock_builder_instance, mock_engine)
 
         # Call without explicit builder
         engine = EnvoyTransportFactory.get_shared_engine()
@@ -68,6 +89,25 @@ class TestEnvoyTransportFactory(unittest.TestCase):
         # Verify default builder was used
         mock_envoy_engine.EngineBuilder.assert_called_once()
         self.assertEqual(engine, mock_engine)
+
+    def test_get_shared_engine_timeout(self):
+        # Setup mocks
+        mock_engine = MagicMock()
+        mock_builder = MagicMock()
+        # Disable auto-fire of callback
+        self._setup_mock_builder(mock_builder, mock_engine, auto_fire_callback=False)
+
+        # Patch threading.Event.wait to return False immediately, simulating a timeout
+        with patch("threading.Event.wait", return_value=False):
+            with self.assertRaises(RuntimeError) as context:
+                EnvoyTransportFactory.get_shared_engine(mock_builder)
+
+            self.assertIn(
+                "Envoy Mobile engine failed to start within 10 seconds", str(context.exception)
+            )
+
+        mock_builder.set_on_engine_running.assert_called_once()
+        mock_builder.build.assert_called_once()
 
 
 if __name__ == "__main__":

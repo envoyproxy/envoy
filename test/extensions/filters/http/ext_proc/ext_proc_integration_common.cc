@@ -57,7 +57,7 @@ void ExtProcIntegrationTest::addDownstreamExtProcFilter(
   setGrpcService(*proto_config.mutable_grpc_service(), cluster_name, grpc_upstream->localAddress());
   envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
   ext_proc_filter.set_name(ext_proc_filter_name);
-  ext_proc_filter.mutable_typed_config()->PackFrom(proto_config);
+  std::ignore = ext_proc_filter.mutable_typed_config()->PackFrom(proto_config);
   config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
 }
 
@@ -116,7 +116,7 @@ void ExtProcIntegrationTest::initializeConfig(
         envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter
             ext_proc_filter;
         ext_proc_filter.set_name(ext_proc_filter_name);
-        ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
+        std::ignore = ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
         config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
       } break;
       case ConfigOptions::FilterSetup::kCompositeMatchOnRequestHeaders: {
@@ -151,30 +151,33 @@ void ExtProcIntegrationTest::initializeConfig(
       typed_md->set_allow_overwrite(true);
       envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_to_stuff;
       typed_md_to_stuff.set_metadata_namespace("typed_value from set_metadata");
-      typed_md->mutable_typed_value()->PackFrom(typed_md_to_stuff);
+      std::ignore = typed_md->mutable_typed_value()->PackFrom(typed_md_to_stuff);
 
-      set_metadata_filter.mutable_typed_config()->PackFrom(set_metadata_config);
+      std::ignore = set_metadata_filter.mutable_typed_config()->PackFrom(set_metadata_config);
       config_helper_.prependFilter(
           MessageUtil::getJsonStringFromMessageOrError(set_metadata_filter));
 
       // Add filter that dumps streamInfo into headers so we can check our receiving
       // namespaces
-      config_helper_.prependFilter(fmt::format(R"EOF(
-name: stream-info-to-headers-filter
-    )EOF"));
+      config_helper_.prependFilter(R"EOF(
+        name: stream-info-to-headers-filter
+        typed_config:
+          "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+      )EOF");
     }
 
     // Add dynamic_metadata_to_headers filter to inject dynamic metadata used for testing
     if (config_option.add_response_processor) {
-      simple_filter_config_ =
-          std::make_unique<SimpleFilterConfig<DynamicMetadataToHeadersFilter>>();
+      simple_filter_config_ = std::make_unique<UniqueSimpleFilterConfig<
+          DynamicMetadataToHeadersFilter,
+          test::extensions::filters::http::ext_proc::DynamicMetadataToHeadersFilterConfig>>();
       registration_ = std::make_unique<
           Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory>>(
           *simple_filter_config_);
       config_helper_.prependFilter(R"EOF(
         name: dynamic-metadata-to-headers-filter
         typed_config:
-          "@type": type.googleapis.com/google.protobuf.Struct
+          "@type": type.googleapis.com/test.extensions.filters.http.ext_proc.DynamicMetadataToHeadersFilterConfig
     )EOF");
     }
 
@@ -195,7 +198,7 @@ name: stream-info-to-headers-filter
 
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;
       logging_filter.set_name("logging-test-filter");
-      logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
+      std::ignore = logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
 
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(logging_filter));
     }
@@ -211,7 +214,8 @@ name: stream-info-to-headers-filter
             *processing_response_factory_);
     Protobuf::Struct config;
     proto_config_.mutable_on_processing_response()->set_name("test-on-processing-response");
-    proto_config_.mutable_on_processing_response()->mutable_typed_config()->PackFrom(config);
+    std::ignore =
+        proto_config_.mutable_on_processing_response()->mutable_typed_config()->PackFrom(config);
   }
 
   if (config_option.http1_codec) {
@@ -565,6 +569,34 @@ void ExtProcIntegrationTest::processAndRespondImmediately(
   processor_stream_->sendGrpcMessage(response);
 }
 
+void ExtProcIntegrationTest::packTwoResponsesInOneMessage(
+    FakeUpstream& grpc_upstream, bool immediate_response,
+    absl::optional<std::function<void(ImmediateResponse&)>> cb) {
+  ProcessingRequest request;
+  ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+  processor_stream_->startGrpcStream();
+
+  ProcessingResponse response1;
+  if (immediate_response) {
+    auto* immediate = response1.mutable_immediate_response();
+    if (cb) {
+      (*cb)(*immediate);
+    }
+  } else {
+    response1.mutable_request_trailers();
+  }
+  auto serialized_response1 = Grpc::Common::serializeToGrpcFrame(response1);
+  Buffer::OwnedImpl combined_buffer;
+  combined_buffer.add(*serialized_response1);
+  ProcessingResponse response2;
+  response2.mutable_response_trailers();
+  auto serialized_response2 = Grpc::Common::serializeToGrpcFrame(response2);
+  combined_buffer.add(*serialized_response2);
+  processor_stream_->encodeData(combined_buffer, false);
+}
+
 // ext_proc server sends back a response to tell Envoy to stop the
 // original timer and start a new timer.
 void ExtProcIntegrationTest::serverSendNewTimeout(const uint64_t timeout_ms) {
@@ -727,7 +759,7 @@ void ExtProcIntegrationTest::testSendDyanmicMetadata() {
         EXPECT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Metadata",
                   fwd_typed_metadata.type_url());
         envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_from_req;
-        fwd_typed_metadata.UnpackTo(&typed_md_from_req);
+        std::ignore = fwd_typed_metadata.UnpackTo(&typed_md_from_req);
         EXPECT_EQ("typed_value from set_metadata", typed_md_from_req.metadata_namespace());
 
         // Spoof the response to contain receiving metadata.
@@ -976,23 +1008,23 @@ void ExtProcIntegrationTest::prependExtProcCompositeFilter(const Protobuf::Messa
   auto* extension_config = extension_with_matcher.mutable_extension_config();
   extension_config->set_name("composite");
   envoy::extensions::filters::http::composite::v3::Composite composite_config;
-  extension_config->mutable_typed_config()->PackFrom(composite_config);
+  std::ignore = extension_config->mutable_typed_config()->PackFrom(composite_config);
 
   auto* matcher_tree = extension_with_matcher.mutable_xds_matcher()->mutable_matcher_tree();
   auto* input = matcher_tree->mutable_input();
   input->set_name("match-input");
-  input->mutable_typed_config()->PackFrom(match_input);
+  std::ignore = input->mutable_typed_config()->PackFrom(match_input);
 
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction execute_filter_action;
   auto* typed_config = execute_filter_action.mutable_typed_config();
   typed_config->set_name("envoy.filters.http.ext_proc");
-  typed_config->mutable_typed_config()->PackFrom(proto_config_);
+  std::ignore = typed_config->mutable_typed_config()->PackFrom(proto_config_);
 
   auto& on_match = (*matcher_tree->mutable_exact_match_map()->mutable_map())["match"];
   on_match.mutable_action()->set_name("composite-action");
-  on_match.mutable_action()->mutable_typed_config()->PackFrom(execute_filter_action);
+  std::ignore = on_match.mutable_action()->mutable_typed_config()->PackFrom(execute_filter_action);
 
-  composite_filter.mutable_typed_config()->PackFrom(extension_with_matcher);
+  std::ignore = composite_filter.mutable_typed_config()->PackFrom(extension_with_matcher);
   config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(composite_filter),
                                true);
 }
@@ -1071,7 +1103,7 @@ void ExtProcIntegrationTest::initializeLogConfig(std::string& access_log_path) {
     (*json_format->mutable_fields())["field_non_existent"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:non_existent_field)%");
 
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
   });
 }
 

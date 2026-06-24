@@ -163,10 +163,15 @@ On the upstream side all http2 statistics are rooted at ``cluster.<name>.http2.`
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
+   ``cookie_count``, Histogram, Number of individial ``cookie`` headers. Enabled by setting the ``envoy.reloadable_features.http2_record_histograms`` to ``true``.
+   ``cookie_size``, Histogram, Byte size of the re-assebled ``cookie`` header. Enabled by setting the ``envoy.reloadable_features.http2_record_histograms`` to ``true``.
+   ``cookies_total_bytes_too_large``, Counter, Total number of streams reset due to the re-assembled ``cookie`` header exceeding the ``envoy.reloadable_features.http2_max_cookies_size_in_kb`` runtime value.
    ``dropped_headers_with_underscores``, Counter, Total number of dropped headers with names containing underscores. This action is configured by setting the :ref:`headers_with_underscores_action config setting <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.headers_with_underscores_action>`.
    ``goaway_sent``, Counter, Total number ``GOAWAY`` frames that have been submitted to the codec to send.
    ``header_overflow``, Counter, Total number of connections reset due to the headers being larger than the :ref:`configured value <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.max_request_headers_kb>`.
    ``headers_cb_no_stream``, Counter, Total number of errors where a header callback is called without an associated stream. This tracks an unexpected occurrence due to an as yet undiagnosed bug
+   ``header_count``, Histogram, Number of headers including individual ``cookie`` headers. Enabled by setting the ``envoy.reloadable_features.http2_record_histograms`` to ``true``.
+   ``header_list_size``, Histogram, Byte size of all headers including ``cookie`` headers. Enabled by setting the ``envoy.reloadable_features.http2_record_histograms`` to ``true``.
    ``inbound_empty_frames_flood``, Counter, Total number of connections terminated for exceeding the limit on consecutive inbound frames with an empty payload and no end stream flag. The limit is configured by setting the :ref:`max_consecutive_inbound_frames_with_empty_payload config setting <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_consecutive_inbound_frames_with_empty_payload>`.
    ``inbound_priority_frames_flood``, Counter, Total number of connections terminated for exceeding the limit on inbound frames of type PRIORITY. The limit is configured by setting the :ref:`max_inbound_priority_frames_per_stream config setting <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_inbound_priority_frames_per_stream>`.
    ``inbound_window_update_frames_flood``, Counter, Total number of connections terminated for exceeding the limit on inbound frames of type WINDOW_UPDATE. The limit is configured by setting the :ref:`max_inbound_window_updateframes_per_data_frame_sent config setting <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_inbound_window_update_frames_per_data_frame_sent>`.

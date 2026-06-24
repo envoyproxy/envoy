@@ -17,6 +17,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -42,11 +43,11 @@ protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
     ASSERT_TRUE(
         // with --config=docker-msan
-        sizeof(stream_info) == 720 ||
+        sizeof(stream_info) == 752 ||
         // with --config=docker-clang
-        sizeof(stream_info) == 744 ||
+        sizeof(stream_info) == 776 ||
         // with --config=docker-clang-libc++
-        sizeof(stream_info) == 696)
+        sizeof(stream_info) == 728)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -120,6 +121,33 @@ TEST_F(StreamInfoImplTest, TimingTest) {
   EXPECT_FALSE(info.requestComplete());
   info.onRequestComplete();
   dur = checkDuration(dur, info.requestComplete());
+}
+
+// downstreamConnectionBegin is empty until set.
+TEST(DownstreamTimingTest, ConnectionBeginSet) {
+  DownstreamTiming timing;
+  EXPECT_FALSE(timing.downstreamConnectionBegin().has_value());
+
+  const MonotonicTime begin(std::chrono::milliseconds(5));
+  timing.setDownstreamConnectionBegin(begin);
+  ASSERT_TRUE(timing.downstreamConnectionBegin().has_value());
+  EXPECT_EQ(begin, timing.downstreamConnectionBegin().value());
+}
+
+// onDownstreamConnectionEnd records only the first close so the duration is not inflated.
+TEST(DownstreamTimingTest, ConnectionEndRecordsFirstClose) {
+  Event::SimulatedTimeSystem time_system;
+  DownstreamTiming timing;
+  EXPECT_FALSE(timing.downstreamConnectionEnd().has_value());
+
+  timing.onDownstreamConnectionEnd(time_system);
+  ASSERT_TRUE(timing.downstreamConnectionEnd().has_value());
+  const MonotonicTime first_close = timing.downstreamConnectionEnd().value();
+
+  // A later close event does not overwrite the recorded connection end time.
+  time_system.advanceTimeWait(std::chrono::milliseconds(5));
+  timing.onDownstreamConnectionEnd(time_system);
+  EXPECT_EQ(first_close, timing.downstreamConnectionEnd().value());
 }
 
 TEST_F(StreamInfoImplTest, BytesTest) {

@@ -44,14 +44,20 @@ areas:
     title: access_log
   attributes:
     title: attributes
+  basic_auth:
+    title: basic_auth
   build:
     title: build
+  circuit_breaker:
+    title: circuit_breaker
   composite:
     title: composite
   dns_resolver:
     title: dns_resolver
   dynamic_modules:
     title: dynamic_modules
+  gcp_authn:
+    title: gcp_authn
   golang:
     title: golang
   http:
@@ -66,6 +72,8 @@ areas:
     title: load_report
   logging:
     title: logging
+  mcp_router:
+    title: mcp_router
   mysql_proxy:
     title: mysql_proxy
   network_ext_proc:
@@ -84,6 +92,8 @@ areas:
     title: router
   set_metadata_filter:
     title: set_metadata_filter
+  sockets:
+    title: sockets
   spiffe_validator:
     title: spiffe_validator
   stat_sinks:
@@ -100,3 +110,7 @@ areas:
     title: wasm
   dns:
     title: dns
+  proxy_protocol:
+    title: proxy_protocol
+  zstd:
+    title: zstd

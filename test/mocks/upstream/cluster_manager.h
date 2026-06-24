@@ -90,6 +90,9 @@ public:
   MOCK_METHOD(void, drainConnections,
               (DrainConnectionsHostPredicate predicate,
                ConnectionPool::DrainBehavior drain_behavior));
+  MOCK_METHOD(void, drainOrCloseConnPools,
+              (DrainConnectionsPoolPredicate predicate,
+               ConnectionPool::DrainBehavior drain_behavior));
   MOCK_METHOD(absl::Status, checkActiveStaticCluster, (const std::string& cluster));
   MOCK_METHOD(absl::StatusOr<OdCdsApiHandlePtr>, allocateOdCdsApi,
               (OdCdsCreationFunction creation_function,

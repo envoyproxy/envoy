@@ -28,6 +28,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
@@ -197,6 +198,12 @@ public:
                     }
                   }));
         }
+        // After the first successful write the upstream socket's ephemeral local address becomes
+        // available and is captured for access logging. Allow the lookup in any flow.
+        EXPECT_CALL(*socket_->io_handle_, localAddress())
+            .Times(testing::AnyNumber())
+            .WillRepeatedly(
+                Return(Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:12345")));
       }
     }
 
@@ -404,7 +411,7 @@ use_original_src_ip: true
       session_file_access_log.set_path("unused");
       session_file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
           session_access_log_format);
-      session_access_log->mutable_typed_config()->PackFrom(session_file_access_log);
+      std::ignore = session_access_log->mutable_typed_config()->PackFrom(session_file_access_log);
     }
 
     if (!proxy_access_log_format.empty()) {
@@ -415,7 +422,7 @@ use_original_src_ip: true
       proxy_file_access_log.set_path("unused");
       proxy_file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
           proxy_access_log_format);
-      proxy_access_log->mutable_typed_config()->PackFrom(proxy_file_access_log);
+      std::ignore = proxy_access_log->mutable_typed_config()->PackFrom(proxy_file_access_log);
     }
     return config;
   }
@@ -585,6 +592,38 @@ upstream_socket_config:
 
   EXPECT_TRUE(std::regex_match(output_[0], std::regex(session_access_log_regex)));
   EXPECT_TRUE(std::regex_match(output_[1], std::regex(session_access_log_regex)));
+}
+
+// The non-tunneling UDP proxy session records the upstream remote and local addresses so they are
+// available to access loggers, matching TCP proxy behavior.
+TEST_F(UdpProxyFilterTest, UpstreamAddressAccessLog) {
+  InSequence s;
+
+  const std::string session_access_log_format =
+      "%UPSTREAM_REMOTE_ADDRESS% %UPSTREAM_LOCAL_ADDRESS%";
+
+  setup(accessLogConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+  )EOF",
+                        session_access_log_format, ""),
+        true, false);
+
+  expectSessionCreate(upstream_address_);
+  // The local ephemeral address is only bound after the first successful send to the upstream;
+  // expectWriteToUpstream stubs it to 127.0.0.1:12345.
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+
+  filter_.reset();
+  ASSERT_EQ(output_.size(), 1);
+  EXPECT_EQ(output_[0], "20.0.0.1:443 127.0.0.1:12345");
 }
 
 // Route with source IP.
@@ -2586,6 +2625,8 @@ TEST_F(TunnelingConnectionPoolImplTest, PoolFailure) {
   pool_->onPoolFailure(Http::ConnectionPool::PoolFailureReason::Timeout, "reason", upstream_host_);
   EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHost()->hostname(), upstream_host_name);
   EXPECT_EQ(stream_info_.upstreamInfo()->upstreamTransportFailureReason(), "reason");
+  ASSERT_EQ(stream_info_.upstreamInfo()->upstreamHostsAttempted().size(), 1);
+  EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHostsAttempted()[0], upstream_host_);
 }
 
 TEST_F(TunnelingConnectionPoolImplTest, PoolReady) {
@@ -2598,6 +2639,8 @@ TEST_F(TunnelingConnectionPoolImplTest, PoolReady) {
   EXPECT_CALL(stream_callbacks_, resetIdleTimer());
   pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
   EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHost()->hostname(), upstream_host_name);
+  ASSERT_EQ(stream_info_.upstreamInfo()->upstreamHostsAttempted().size(), 1);
+  EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHostsAttempted()[0], upstream_host_);
 }
 
 TEST_F(TunnelingConnectionPoolImplTest, OnStreamFailure) {

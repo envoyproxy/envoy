@@ -19,6 +19,7 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/matcher/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/load_balancer_context.h"
@@ -57,7 +58,7 @@ void verifyCaresDnsConfigAndUnpack(
   EXPECT_EQ(
       typed_dns_resolver_config.typed_config().type_url(),
       "type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig");
-  typed_dns_resolver_config.typed_config().UnpackTo(&cares);
+  std::ignore = typed_dns_resolver_config.typed_config().UnpackTo(&cares);
 }
 
 class AlpnSocketFactory : public Network::RawBufferSocketFactory {
@@ -864,7 +865,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecified) {
                                              resolvers);
   cares.add_resolvers()->MergeFrom(resolvers);
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
@@ -909,7 +910,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedMultipleResolvers) {
   Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.5", 81),
                                              resolvers);
   cares.add_resolvers()->MergeFrom(resolvers);
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
@@ -952,7 +953,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedOveridingDeprecatedReso
                                              resolvers);
   cares.add_resolvers()->MergeFrom(resolvers);
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
@@ -1842,6 +1843,66 @@ TEST_F(ClusterManagerImplTest, HttpPoolDataForwardsCallsToConnectionPool) {
 
   EXPECT_CALL(*pool_mock, drainConnections(ConnectionPool::DrainBehavior::DrainAndDelete));
   opt_cp.value().drainConnections(ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
+TEST_F(ClusterManagerImplTest, DrainConnectionsByPredicate) {
+  createWithBasicStaticCluster();
+  NiceMock<MockLoadBalancerContext> context;
+
+  auto* http_pool_mock = new Http::ConnectionPool::MockInstance();
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(http_pool_mock));
+  EXPECT_CALL(*http_pool_mock, addIdleCallback(_));
+
+  auto opt_http_cp =
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->httpConnPool(
+              cluster_manager_->getThreadLocalCluster("cluster_1")->chooseHost(nullptr).host,
+              ResourcePriority::Default, Http::Protocol::Http11, &context);
+  ASSERT_TRUE(opt_http_cp.has_value());
+
+  auto* tcp_pool_mock = new Tcp::ConnectionPool::MockInstance();
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(tcp_pool_mock));
+  EXPECT_CALL(*tcp_pool_mock, addIdleCallback(_));
+
+  auto opt_tcp_cp =
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->tcpConnPool(
+              cluster_manager_->getThreadLocalCluster("cluster_1")->chooseHost(nullptr).host,
+              ResourcePriority::Default, &context);
+  auto mock_option = std::make_shared<Network::MockSocketOption>();
+  auto given_option = std::make_shared<Network::MockSocketOption>();
+  auto pool_options = std::make_shared<Network::ConnectionSocket::Options>();
+  pool_options->push_back(mock_option);
+
+  http_pool_mock->socket_options_ = pool_options;
+  tcp_pool_mock->socket_options_ = pool_options;
+  EXPECT_CALL(*http_pool_mock, socketOptions())
+      .WillRepeatedly(ReturnRef(http_pool_mock->socket_options_));
+  EXPECT_CALL(*tcp_pool_mock, socketOptions())
+      .WillRepeatedly(ReturnRef(tcp_pool_mock->socket_options_));
+
+  // First verify predicate matching given_option (not in pool) does not drain
+  cluster_manager_->drainOrCloseConnPools(
+      [given_option](ConnectionPool::Instance& pool) {
+        return pool.socketOptions() != nullptr &&
+               std::find(pool.socketOptions()->begin(), pool.socketOptions()->end(),
+                         given_option) != pool.socketOptions()->end();
+      },
+      ConnectionPool::DrainBehavior::DrainExistingConnections);
+
+  // Next verify predicate matching mock_option (in pool) drains both pools
+  EXPECT_CALL(*http_pool_mock,
+              drainConnections(ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*tcp_pool_mock,
+              drainConnections(ConnectionPool::DrainBehavior::DrainExistingConnections));
+
+  cluster_manager_->drainOrCloseConnPools(
+      [mock_option](ConnectionPool::Instance& pool) {
+        return pool.socketOptions() != nullptr &&
+               std::find(pool.socketOptions()->begin(), pool.socketOptions()->end(), mock_option) !=
+                   pool.socketOptions()->end();
+      },
+      ConnectionPool::DrainBehavior::DrainExistingConnections);
 }
 
 class TestUpstreamNetworkFilter : public Network::WriteFilter {

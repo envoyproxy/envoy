@@ -12,6 +12,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
 #include "test/integration/utility.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
@@ -90,9 +91,11 @@ typed_config:
         disable_dns_refresh_on_failure, max_pending_requests, key_value_config_,
         typed_dns_resolver_config,
         allow_dynamic_host_from_filter_state ? "allow_dynamic_host_from_filter_state: true" : "");
-    const std::string stream_info_filter_config_str = fmt::format(R"EOF(
-name: stream-info-to-headers-filter
-)EOF");
+    const std::string stream_info_filter_config_str = R"EOF(
+      name: stream-info-to-headers-filter
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+    )EOF";
 
     if (prepend_custom_filter_config_yaml.has_value()) {
       // Prepend DFP filter.
@@ -125,16 +128,18 @@ name: stream-info-to-headers-filter
       config_helper_.prependFilter(stream_info_filter_config_str);
     }
 
-    config_helper_.prependFilter(fmt::format(R"EOF(
-name: stream-info-to-headers-filter
-)EOF"));
+    config_helper_.prependFilter(R"EOF(
+      name: stream-info-to-headers-filter
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+    )EOF");
 
     // Add default DNS resolver as getAddrInfo in the bootstrap.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
           config;
       envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-      typed_dns_resolver_config.mutable_typed_config()->PackFrom(config);
+      std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(config);
       typed_dns_resolver_config.set_name(std::string("getAddrInfo"));
       bootstrap.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
     });
@@ -205,12 +210,14 @@ name: stream-info-to-headers-filter
           TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
       if (upstreamProtocol() != Http::CodecType::HTTP3) {
         cluster_.mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
-        cluster_.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+        std::ignore =
+            cluster_.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
       } else {
         envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport quic_context;
         quic_context.mutable_upstream_tls_context()->CopyFrom(tls_context);
         cluster_.mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
-        cluster_.mutable_transport_socket()->mutable_typed_config()->PackFrom(quic_context);
+        std::ignore =
+            cluster_.mutable_transport_socket()->mutable_typed_config()->PackFrom(quic_context);
       }
     }
 
@@ -321,9 +328,11 @@ typed_config:
   void requestWithBodyTest() {
     int64_t original_usec = dispatcher_->timeSource().monotonicTime().time_since_epoch().count();
 
-    config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+    config_helper_.prependFilter(R"EOF(
+      name: stream-info-to-headers-filter
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+    )EOF");
 
     initializeWithArgs(1024, 1024, "");
     codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -509,9 +518,11 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithTrace) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
 
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
@@ -535,9 +546,11 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithoutTrace) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
 
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
@@ -558,9 +571,11 @@ TEST_P(ProxyFilterIntegrationTest, DisableResolveTimeout) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
 
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
@@ -579,9 +594,11 @@ TEST_P(ProxyFilterIntegrationTest, DisableRefreshOnFailureContainsFailedHost) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
 
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
@@ -618,9 +635,11 @@ TEST_P(ProxyFilterIntegrationTest, DisableRefreshOnFailureContainsSuccessfulHost
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
 
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
@@ -672,9 +691,11 @@ TEST_P(ProxyFilterIntegrationTest, ParallelRequests) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
 
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
@@ -697,9 +718,11 @@ TEST_P(ProxyFilterIntegrationTest, ParallelRequestsWithFakeResolver) {
 
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   upstream_tls_ = false;
   autonomous_upstream_ = true;
@@ -1643,7 +1666,11 @@ TEST_P(ProxyFilterIntegrationTest, DoubleResolution) {
   upstream_tls_ = false;
   autonomous_upstream_ = true;
   // Add DFP filter even if async DNS resolution is enabled.
-  config_helper_.prependFilter("{ name: modify-host-filter }");
+  config_helper_.prependFilter(R"EOF(
+    name: modify-host-filter
+    typed_config:
+      "@type": type.googleapis.com/test.extensions.filters.http.dynamic_forward_proxy.ModifyHostFilterConfig
+  )EOF");
   initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, false, 5, false, false,
                      absl::nullopt, true);
 

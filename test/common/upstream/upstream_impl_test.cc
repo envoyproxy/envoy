@@ -89,8 +89,6 @@ protected:
   createStrictDnsCluster(const envoy::config::cluster::v3::Cluster& cluster_config,
                          ClusterFactoryContext& factory_context,
                          std::shared_ptr<Network::DnsResolver> dns_resolver) {
-    envoy::extensions::clusters::dns::v3::DnsCluster dns_cluster{};
-
     ClusterFactoryContextImpl::LazyCreateDnsResolver resolver_fn = [&]() { return dns_resolver; };
     auto status_or_cluster =
         ClusterFactoryImplBase::create(cluster_config, factory_context.serverFactoryContext(),
@@ -1931,6 +1929,16 @@ TEST_F(HostImplTest, HostnameCanaryAndLocality) {
   EXPECT_EQ("hello", host->locality().zone());
   EXPECT_EQ("world", host->locality().sub_zone());
   EXPECT_EQ(1, host->priority());
+}
+
+TEST_F(HostImplTest, EmptyLocalityZoneStatName) {
+  MockClusterMockPrioritySet cluster;
+  std::unique_ptr<HostImpl> host = *HostImpl::create(
+      cluster.info_, "", *Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), nullptr, nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(),
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::config::core::v3::UNKNOWN);
+  EXPECT_TRUE(host->localityZoneStatName().empty());
 }
 
 TEST_F(HostImplTest, CreateConnection) {
@@ -4073,7 +4081,7 @@ TEST_F(StaticClusterImplTest, CustomUpstreamLocalAddressSelector) {
   Protobuf::Empty empty;
   auto address_selector_config =
       server_context_.cluster_manager_.mutableBindConfig().mutable_local_address_selector();
-  address_selector_config->mutable_typed_config()->PackFrom(empty);
+  std::ignore = address_selector_config->mutable_typed_config()->PackFrom(empty);
   address_selector_config->set_name("test.upstream.local.address.selector");
   server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
       "1.2.3.5");
@@ -4454,7 +4462,8 @@ public:
 
   class RetryBudgetTestClusterInfo : public ClusterInfoImpl {
   public:
-    static std::pair<absl::optional<double>, absl::optional<uint32_t>> getRetryBudgetParams(
+    static std::tuple<absl::optional<double>, absl::optional<uint64_t>, absl::optional<uint32_t>>
+    getRetryBudgetParams(
         const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds) {
       return ClusterInfoImpl::getRetryBudgetParams(thresholds);
     }
@@ -4614,37 +4623,53 @@ TEST_P(ParametrizedClusterInfoImplTest, RetryBudgetDefaultPopulation) {
       - priority: DEFAULT
         retry_budget:
           min_retry_concurrency: 123
+      # 5 - Budget interval set, expect budget default.
+      - priority: DEFAULT
+        retry_budget:
+          budget_interval: 0.2s
   )EOF";
 
   makeCluster(yaml);
   absl::optional<double> budget_percent;
+  absl::optional<uint64_t> budget_interval;
   absl::optional<uint32_t> min_retry_concurrency;
   auto threshold = cluster_config_.circuit_breakers().thresholds();
 
-  std::tie(budget_percent, min_retry_concurrency) =
+  std::tie(budget_percent, budget_interval, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[0]);
   EXPECT_EQ(budget_percent, absl::nullopt);
+  EXPECT_EQ(budget_interval, absl::nullopt);
   EXPECT_EQ(min_retry_concurrency, absl::nullopt);
 
-  std::tie(budget_percent, min_retry_concurrency) =
+  std::tie(budget_percent, budget_interval, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[1]);
   EXPECT_EQ(budget_percent, 20.0);
+  EXPECT_EQ(budget_interval, 0UL);
   EXPECT_EQ(min_retry_concurrency, 3UL);
 
-  std::tie(budget_percent, min_retry_concurrency) =
+  std::tie(budget_percent, budget_interval, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[2]);
   EXPECT_EQ(budget_percent, 20.0);
+  EXPECT_EQ(budget_interval, 0UL);
   EXPECT_EQ(min_retry_concurrency, 3UL);
 
-  std::tie(budget_percent, min_retry_concurrency) =
+  std::tie(budget_percent, budget_interval, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[3]);
   EXPECT_EQ(budget_percent, 42.0);
+  EXPECT_EQ(budget_interval, 0UL);
   EXPECT_EQ(min_retry_concurrency, 3UL);
 
-  std::tie(budget_percent, min_retry_concurrency) =
+  std::tie(budget_percent, budget_interval, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[4]);
   EXPECT_EQ(budget_percent, 20.0);
+  EXPECT_EQ(budget_interval, 0UL);
   EXPECT_EQ(min_retry_concurrency, 123UL);
+
+  std::tie(budget_percent, budget_interval, min_retry_concurrency) =
+      RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[5]);
+  EXPECT_EQ(budget_percent, 20.0);
+  EXPECT_EQ(budget_interval, 200UL);
+  EXPECT_EQ(min_retry_concurrency, 3UL);
 }
 
 TEST_P(ParametrizedClusterInfoImplTest, LoadStatsConflictWithPerEndpointStats) {
@@ -5503,7 +5528,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
   TestFilterConfigFactoryBase factoryBase(
       []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::Struct>(); },
       [&](const Protobuf::Message& msg) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
-        const auto& msg_struct = dynamic_cast<const Protobuf::Struct&>(msg);
+        const auto& msg_struct = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(msg);
         EXPECT_TRUE(msg_struct.fields().find("option") != msg_struct.fields().end());
 
         return protocol_options;

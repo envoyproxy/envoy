@@ -690,7 +690,7 @@ private:
 
     uint8_t* const end_of_varint =
         Protobuf::io::CodedOutputStream::WriteVarint64ToArray(length, reservation_start);
-    message.SerializeWithCachedSizesToArray(end_of_varint);
+    std::ignore = message.SerializeWithCachedSizesToArray(end_of_varint);
 
     ASSERT(end_of_varint >= reservation_start);
     const size_t varint_size = end_of_varint - reservation_start;

@@ -15,6 +15,7 @@ envoy_cc_library(
     hdrs = ["gcp_authn_filter.h"],
     deps = [
         "token_cache",
+        ":crypto_utils",
         ":gcp_authn_client_impl",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
@@ -42,9 +43,11 @@ envoy_cc_library(
     hdrs = ["gcp_authn_client_impl.h"],
     deps = [
         ":gcp_authn_client_interface",
+        "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
+        "//source/common/json:json_loader_lib",
         "//source/common/jwt:jwt_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@abseil-cpp//absl/status:statusor",

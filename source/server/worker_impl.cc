@@ -151,6 +151,18 @@ void WorkerImpl::stopListener(Network::ListenerConfig& listener,
   });
 }
 
+void WorkerImpl::onFilterChainDrain(uint64_t listener_tag,
+                                    const std::list<const Network::FilterChain*>& filter_chains) {
+  dispatcher_->post([this, listener_tag, &filter_chains]() -> void {
+    handler_->onFilterChainDrain(listener_tag, filter_chains);
+  });
+}
+
+void WorkerImpl::onListenerDrain(Network::ListenerConfig& listener) {
+  const uint64_t listener_tag = listener.listenerTag();
+  dispatcher_->post([this, listener_tag]() -> void { handler_->onListenerDrain(listener_tag); });
+}
+
 void WorkerImpl::threadRoutine(OptRef<GuardDog> guard_dog, const std::function<void()>& cb) {
   ENVOY_LOG(debug, "worker entering dispatch loop");
   // The watch dog must be created after the dispatcher starts running and has post events flushed,

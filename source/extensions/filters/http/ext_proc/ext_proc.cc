@@ -1381,9 +1381,13 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   }
 
   // If there is no external processing configured in the encoding path,
+  // and no more external processing is needed in the decoding path,
   // closing the gRPC stream if it is still open.
-  if (encoding_state_.noExternalProcess()) {
-    closeStreamMaybeGraceful();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ext_proc_stream_close_optimization")) {
+    if (encoding_state_.noExternalProcess() && decoding_state_.noMoreExternalProcess()) {
+      closeStreamMaybeGraceful();
+    }
   }
 
   return status;
@@ -1737,30 +1741,35 @@ void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& respons
   }
 
   bool last_response = false;
+  bool last_response_for_direction = false;
   switch (response.response_case()) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
-    if (encoding_state_.noExternalProcess()) {
-      last_response = decoding_state_.isLastResponseAfterHeaderResp();
-    }
+    last_response_for_direction = decoding_state_.isLastResponseAfterHeaderResp();
+    decoding_state_.setLastResponseForDirection(last_response_for_direction);
+    last_response = last_response_for_direction && encoding_state_.noMoreExternalProcess();
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
-    if (encoding_state_.noExternalProcess()) {
-      last_response = decoding_state_.isLastResponseAfterBodyResp(eos_seen_in_body);
-    }
+    last_response_for_direction = decoding_state_.isLastResponseAfterBodyResp(eos_seen_in_body);
+    decoding_state_.setLastResponseForDirection(last_response_for_direction);
+    last_response = last_response_for_direction && encoding_state_.noMoreExternalProcess();
     break;
   case ProcessingResponse::ResponseCase::kRequestTrailers:
-    if (encoding_state_.noExternalProcess()) {
-      last_response = true;
-    }
+    decoding_state_.setLastResponseForDirection(true);
+    last_response = encoding_state_.noMoreExternalProcess();
     break;
   case ProcessingResponse::ResponseCase::kResponseHeaders:
-    last_response = encoding_state_.isLastResponseAfterHeaderResp();
+    last_response_for_direction = encoding_state_.isLastResponseAfterHeaderResp();
+    encoding_state_.setLastResponseForDirection(last_response_for_direction);
+    last_response = last_response_for_direction && decoding_state_.noMoreExternalProcess();
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
-    last_response = encoding_state_.isLastResponseAfterBodyResp(eos_seen_in_body);
+    last_response_for_direction = encoding_state_.isLastResponseAfterBodyResp(eos_seen_in_body);
+    encoding_state_.setLastResponseForDirection(last_response_for_direction);
+    last_response = last_response_for_direction && decoding_state_.noMoreExternalProcess();
     break;
   case ProcessingResponse::ResponseCase::kResponseTrailers:
-    last_response = true;
+    encoding_state_.setLastResponseForDirection(true);
+    last_response = decoding_state_.noMoreExternalProcess();
     break;
   case ProcessingResponse::ResponseCase::kStreamedImmediateResponse:
     // Streamed immediate response handling closes the stream automatically

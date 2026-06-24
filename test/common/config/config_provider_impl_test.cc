@@ -79,8 +79,8 @@ public:
   // Envoy::Config::SubscriptionCallbacks
   absl::Status onConfigUpdate(const std::vector<DecodedResourceRef>& resources,
                               const std::string& version_info) override {
-    const auto& config =
-        dynamic_cast<const test::common::config::DummyConfig&>(resources[0].get().resource());
+    const auto& config = Envoy::Protobuf::DynamicCastMessage<test::common::config::DummyConfig>(
+        resources[0].get().resource());
     if (checkAndApplyConfigUpdate(config, "dummy_config", version_info)) {
       config_proto_ = config;
     }
@@ -199,7 +199,8 @@ public:
     // Currently, the dummy config provider only supports a single static config. We can extend this
     // to support multiple static configs if needed.
     ASSERT(configs.size() == 1);
-    auto config = dynamic_cast<const test::common::config::DummyConfig&>(*configs[0]);
+    auto config =
+        Envoy::Protobuf::DynamicCastMessage<test::common::config::DummyConfig>(*configs[0]);
     return std::make_unique<StaticDummyConfigProvider>(config, factory_context, *this);
   }
 };
@@ -546,7 +547,8 @@ public:
     // implementations.
     for (const auto& resource : resources) {
       const auto& dummy_config =
-          dynamic_cast<const test::common::config::DummyConfig&>(resource.get().resource());
+          Envoy::Protobuf::DynamicCastMessage<test::common::config::DummyConfig>(
+              resource.get().resource());
       proto_map_[version_info] = dummy_config;
       // Propagate the new config proto to all worker threads.
       applyConfigUpdate([&dummy_config](ConfigProvider::ConfigConstSharedPtr prev_config)

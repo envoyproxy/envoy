@@ -260,7 +260,7 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
   switch (format) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::tap::v3::OutputSink::PROTO_BINARY:
-    trace->SerializeToOstream(&output_file_);
+    std::ignore = trace->SerializeToOstream(&output_file_);
     break;
   case envoy::config::tap::v3::OutputSink::PROTO_BINARY_LENGTH_DELIMITED: {
     Protobuf::io::OstreamOutputStream stream(&output_file_);
