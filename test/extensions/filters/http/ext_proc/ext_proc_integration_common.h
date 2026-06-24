@@ -89,10 +89,9 @@ public:
       const auto& typed_md =
           decoder_callbacks_->streamInfo().dynamicMetadata().typed_filter_metadata();
       for (const auto& md_entry : typed_md) {
-        std::string key_prefix = md_entry.first;
         envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_val;
         if (md_entry.second.UnpackTo(&typed_md_val)) {
-          headers.addCopy(Http::LowerCaseString(key_prefix), typed_md_val.metadata_namespace());
+          headers.addCopy(Http::LowerCaseString(md_entry.first), typed_md_val.metadata_namespace());
         }
       }
     }
