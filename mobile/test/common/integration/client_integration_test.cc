@@ -309,7 +309,7 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
   dns_resolver_config.set_name("envoy.test.mock_dns_resolver");
   envoy::test::mock_dns_resolver::v3::MockDnsResolverConfig config;
   config.add_non_existent_domains("doesnotexist");
-  dns_resolver_config.mutable_typed_config()->PackFrom(config);
+  std::ignore = dns_resolver_config.mutable_typed_config()->PackFrom(config);
   builder_.setDnsResolver(dns_resolver_config);
 
   builder_.setDisableDnsRefreshOnFailure(true);
@@ -1055,7 +1055,7 @@ TEST_P(ClientIntegrationTest, InvalidDomain) {
   dns_resolver_config.set_name("envoy.test.mock_dns_resolver");
   envoy::test::mock_dns_resolver::v3::MockDnsResolverConfig config;
   config.add_non_existent_domains("www.doesnotexist.com");
-  dns_resolver_config.mutable_typed_config()->PackFrom(config);
+  std::ignore = dns_resolver_config.mutable_typed_config()->PackFrom(config);
   builder_.setDnsResolver(dns_resolver_config);
 
   initialize();
@@ -1111,7 +1111,7 @@ TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
   dns_resolver_config.set_name("envoy.test.mock_dns_resolver");
   envoy::test::mock_dns_resolver::v3::MockDnsResolverConfig config;
   config.add_non_existent_domains("www.doesnotexist.com");
-  dns_resolver_config.mutable_typed_config()->PackFrom(config);
+  std::ignore = dns_resolver_config.mutable_typed_config()->PackFrom(config);
   builder_.setDnsResolver(dns_resolver_config);
 
   initialize();

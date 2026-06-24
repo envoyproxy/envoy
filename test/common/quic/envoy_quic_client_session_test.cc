@@ -253,6 +253,18 @@ INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionTests, EnvoyQuicClientSessionTest
 
 TEST_P(EnvoyQuicClientSessionTest, ShutdownNoOp) { http_connection_->shutdownNotice(); }
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+// WebTransport is opt-in: the client advertises no WebTransport versions (and so will not negotiate
+// WebTransport) unless envoy.reloadable_features.quic_support_web_transport is enabled.
+TEST_P(EnvoyQuicClientSessionTest, WebTransportNegotiationGatedByRuntimeFlag) {
+  EXPECT_FALSE(envoy_quic_session_->WillNegotiateWebTransport());
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_support_web_transport", "true"}});
+  EXPECT_TRUE(envoy_quic_session_->WillNegotiateWebTransport());
+}
+#endif
+
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionTest, EnvoyQuicClientSessionTest,
                          testing::Combine(testing::ValuesIn(quic::CurrentSupportedHttp3Versions()),
                                           testing::Bool()));

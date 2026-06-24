@@ -35,7 +35,7 @@ public:
           absl::StrCat("No factory for type ", config_.typed_config().type_url()));
     }
     ProtobufTypes::MessagePtr config = factory()->createEmptyConfigProto();
-    config_.typed_config().UnpackTo(config.get());
+    std::ignore = config_.typed_config().UnpackTo(config.get());
     return factory()->createFilterFactoryFromProto(*config, "statprefix", mock_factory_context_);
   }
 
@@ -45,7 +45,7 @@ public:
           absl::StrCat("No factory for type ", config_.typed_config().type_url()));
     }
     ProtobufTypes::MessagePtr config = factory()->createEmptyConfigProto();
-    config_.typed_config().UnpackTo(config.get());
+    std::ignore = config_.typed_config().UnpackTo(config.get());
     return factory()->createRouteSpecificFilterConfig(
         *config, mock_factory_context_.server_factory_context_, validation_visitor_);
   }

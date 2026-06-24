@@ -491,6 +491,50 @@ TEST_P(LogicalDnsImplementationsTest, TtlAsDnsRefreshRate) {
                 TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
 }
 
+TEST_P(LogicalDnsImplementationsTest, TtlAsDnsRefreshRateWithMinRefreshRate) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
+  // dns_min_refresh_rate: 10s, dns_refresh_rate: 4s, respect_dns_ttl: true
+  // TTL < min → use min; TTL > min → use TTL
+  const std::string yaml = R"EOF(
+  name: name
+  connect_timeout: 0.25s
+  cluster_type:
+    name: envoy.cluster.dns
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+      dns_refresh_rate: 4s
+      respect_dns_ttl: true
+      dns_min_refresh_rate: 10s
+      dns_lookup_family: V4_ONLY
+  lb_policy: ROUND_ROBIN
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                     address: foo.bar.com
+                     port_value: 443
+  )EOF";
+
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  setupFromV3Yaml(yaml);
+
+  // TTL (5s) < dns_min_refresh_rate (10s) → refresh rate floored to 10s
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
+                TestUtility::makeDnsResponse({"127.0.0.1"}, std::chrono::seconds(5)));
+
+  // TTL (30s) > dns_min_refresh_rate (10s) → refresh rate uses TTL (30s)
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(30000), _));
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
+                TestUtility::makeDnsResponse({"127.0.0.1"}, std::chrono::seconds(30)));
+}
+
 TEST_P(LogicalDnsImplementationsTest, BadConfig) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});

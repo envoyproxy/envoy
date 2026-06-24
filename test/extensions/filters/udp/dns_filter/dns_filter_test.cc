@@ -187,6 +187,11 @@ server_config:
           - "2001:8a:c1::2801:0006"
           - "2001:8a:c1::2801:0007"
           - "2001:8a:c1::2801:0008"
+    - name: www.supercalifragilisticexpialidocious.thisismydomainforafivehundredandtwelvebytetest.a01234567890123456789012345678901234567890123456789.b01234567890123456789012345678901234567890123456789.c01234567890123456789012345678901234567890123456789.d01234567.com
+      endpoint:
+        address_list:
+          address:
+          - "2001:8a:c1::2801:0009"
 )EOF";
 
   const std::string forward_query_on_config = R"EOF(
@@ -539,6 +544,41 @@ TEST_F(DnsFilterTest, InvalidQueryNameTooLongTest) {
 
   EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, response_ctx_->answers_.size());
+}
+
+TEST_F(DnsFilterTest, QueryNameOf255Octets) {
+  InSequence s;
+
+  setup(forward_query_off_config);
+  std::string domain(
+      "www.supercalifragilisticexpialidocious.thisismydomainforafivehundredandtwelvebytetest."
+      "a01234567890123456789012345678901234567890123456789."
+      "b01234567890123456789012345678901234567890123456789."
+      "c01234567890123456789012345678901234567890123456789.d01234567.com");
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_AAAA, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+
+  sendQueryFromClient("10.0.0.1:1000", query);
+  EXPECT_LT(udp_response_.buffer_->length(), Utils::MAX_UDP_DNS_SIZE);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+
+  // The UDP filter limits response size to 512 bytes. Since the query is included in the
+  // response, and the query name is 255 octets, the filter cannot return any answers,
+  // since together with the answer name, they would exceed the 512 byte limit.
+  // In this case the test response parser sets the response code to NAME_ERROR.
+  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_ctx_->getQueryResponseCode());
+  EXPECT_EQ(0, response_ctx_->answers_.size());
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().aaaa_record_queries_.value());
+
+  EXPECT_EQ(1, config_->stats().local_aaaa_record_answers_.value());
+  EXPECT_EQ(0, config_->stats().downstream_rx_invalid_queries_.value());
+  EXPECT_TRUE(config_->stats().downstream_rx_bytes_.used());
+  EXPECT_TRUE(config_->stats().downstream_tx_bytes_.used());
 }
 
 TEST_F(DnsFilterTest, InvalidLabelNameTooLongTest) {

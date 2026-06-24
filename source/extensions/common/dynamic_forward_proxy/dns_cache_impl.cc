@@ -29,14 +29,23 @@ absl::StatusOr<std::shared_ptr<DnsCacheImpl>> DnsCacheImpl::createDnsCacheImpl(
                         context.serverFactoryContext());
   RETURN_IF_NOT_OK_REF(resolver_or_error.status());
 
-  return std::shared_ptr<DnsCacheImpl>(
-      new DnsCacheImpl(context, config, std::move(*resolver_or_error)));
+  Envoy::Matcher::AddressMatcherPtr resolved_address_filter;
+  if (config.has_resolved_address_filter()) {
+    auto matcher_or_error =
+        Envoy::Matcher::AddressMatcher::create(config.resolved_address_filter());
+    RETURN_IF_NOT_OK_REF(matcher_or_error.status());
+    resolved_address_filter = std::move(*matcher_or_error);
+  }
+
+  return std::shared_ptr<DnsCacheImpl>(new DnsCacheImpl(
+      context, config, std::move(*resolver_or_error), std::move(resolved_address_filter)));
 }
 
 DnsCacheImpl::DnsCacheImpl(
     Server::Configuration::GenericFactoryContext& context,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
-    Network::DnsResolverSharedPtr&& resolver)
+    Network::DnsResolverSharedPtr&& resolver,
+    Envoy::Matcher::AddressMatcherPtr resolved_address_filter)
     : main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       config_(config), random_generator_(context.serverFactoryContext().api().randomGenerator()),
       dns_lookup_family_(DnsUtils::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
@@ -51,7 +60,8 @@ DnsCacheImpl::DnsCacheImpl(
       file_system_(context.serverFactoryContext().api().fileSystem()),
       validation_visitor_(context.messageValidationVisitor()),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
-      max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
+      max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)),
+      resolved_address_filter_(std::move(resolved_address_filter)) {
   tls_slot_.set([&](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(*this); });
 
   loadCacheEntries(config);
@@ -434,6 +444,28 @@ void DnsCacheImpl::finishResolve(const std::string& host,
       }
     }
   }
+
+  // Filter out addresses matching resolved_address_filter.
+  if (resolved_address_filter_ != nullptr && !response.empty()) {
+    const size_t original_size = response.size();
+    response.remove_if([this](const Network::DnsResponse& dns_resp) {
+      const auto& address = dns_resp.addrInfo().address_;
+      if (address == nullptr || address->ip() == nullptr) {
+        return false;
+      }
+      return resolved_address_filter_->match(*address);
+    });
+    const size_t denied_count = original_size - response.size();
+    if (denied_count > 0) {
+      stats_.dns_address_filter_out_.add(denied_count);
+      ENVOY_LOG(debug, "denied {} address(es) for host '{}' matching resolved_address_filter",
+                denied_count, host);
+      if (response.empty()) {
+        details = "address_denied";
+      }
+    }
+  }
+
   ENVOY_LOG_EVENT(debug, "dns_cache_finish_resolve",
                   "main thread resolve complete for host '{}': {}", host,
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {

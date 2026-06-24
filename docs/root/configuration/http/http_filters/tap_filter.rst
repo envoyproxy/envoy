@@ -304,6 +304,36 @@ might look like this:
 
 Etc.
 
+Sampling
+--------
+
+Configure :ref:`tap_enabled
+<envoy_v3_api_field_config.tap.v3.TapConfig.tap_enabled>` to sample a
+fraction of requests at the tap filter:
+
+.. code-block:: yaml
+
+  tap_enabled:
+    default_value:
+      numerator: 1
+      denominator: TEN_THOUSAND
+    runtime_key: tap.sampling.my_route
+
+When sampling is configured, only the configured fraction of requests
+proceeds to match-predicate evaluation. The remainder is short-circuited
+before any match state is allocated. Sampled-out requests increment the
+``rq_sampled_out`` filter stat. Sampling applies to whichever tap
+configuration is active, whether installed statically or through the
+``/tap`` admin endpoint.
+
+The configured sampling rate is recorded on
+:ref:`configured_sample_rate
+<envoy_v3_api_field_data.tap.v3.TraceWrapper.configured_sample_rate>` of the
+first emitted ``TraceWrapper`` segment of each tap trace. When a
+runtime override of ``runtime_key`` is active, the effective rate may
+differ from the recorded value. The :ref:`tap transport socket
+<operations_traffic_tapping>` supports the same per-connection sampling.
+
 Statistics
 ----------
 
@@ -315,4 +345,5 @@ comes from the owning HTTP connection manager.
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
+  rq_sampled_out, Counter, Total requests short-circuited by ``tap_enabled`` sampling before match evaluation
   rq_tapped, Counter, Total requests that matched and were tapped
