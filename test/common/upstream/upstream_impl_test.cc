@@ -1663,6 +1663,62 @@ TEST_P(StrictDnsClusterImplParamTest, TtlAsDnsRefreshRateNoJitter) {
                          TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
 }
 
+TEST_P(StrictDnsClusterImplParamTest, TtlAsDnsRefreshRateWithMinRefreshRate) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
+  ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
+
+  // dns_min_refresh_rate: 10s, dns_refresh_rate: 4s, respect_dns_ttl: true
+  // TTL < min → use min; TTL > min → use TTL
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    cluster_type:
+      name: envoy.cluster.dns
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+        dns_refresh_rate: 4s
+        respect_dns_ttl: true
+        dns_min_refresh_rate: 10s
+        all_addresses_in_single_endpoint: false
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: localhost1
+                    port_value: 11001
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, [dns_resolver = this->dns_resolver_]() { return dns_resolver; }, nullptr,
+      false);
+
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
+
+  MockPriorityUpdateCallback priority_update_cb;
+  auto priority_update_handle =
+      cluster->prioritySet().addPriorityUpdateCb(priority_update_cb.AsStdFunction());
+
+  cluster->initialize([] { return absl::OkStatus(); });
+
+  // TTL (5s) < dns_min_refresh_rate (10s) → refresh rate floored to 10s
+  EXPECT_CALL(priority_update_cb, Call).WillOnce(Return(absl::OkStatus()));
+  EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
+                         TestUtility::makeDnsResponse({"192.168.1.1"}, std::chrono::seconds(5)));
+
+  // TTL (30s) > dns_min_refresh_rate (10s) → refresh rate uses TTL (30s); same IP, no rebuild
+  EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(30000), _));
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
+                         TestUtility::makeDnsResponse({"192.168.1.1"}, std::chrono::seconds(30)));
+}
+
 TEST_P(StrictDnsClusterImplParamTest, NegativeDnsJitter) {
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
