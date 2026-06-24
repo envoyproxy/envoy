@@ -104,8 +104,5 @@ message SubClustersConfig {
   // lookup family, and resolver selection.
   //
   // When not set, sub clusters inherit DNS settings from the parent cluster configuration.
-  //
-  // Note: ``all_addresses_in_single_endpoint`` in the provided config will be ignored; sub
-  // clusters always use strict-DNS semantics (each resolved address is a separate endpoint).
   dns.v3.DnsCluster dns_cluster_config = 5;
 }

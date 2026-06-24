@@ -187,12 +187,9 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
   config.set_lb_policy(sub_cluster_lb_policy_);
 
   if (sub_cluster_dns_config_.has_value()) {
-    // Use the DnsCluster extension for full DNS configuration. all_addresses_in_single_endpoint
-    // is forced to false to preserve strict-DNS semantics (each IP is a separate endpoint).
-    auto dns_config = sub_cluster_dns_config_.value();
-    dns_config.set_all_addresses_in_single_endpoint(false);
+    // Use the DnsCluster extension for full DNS configuration.
     config.mutable_cluster_type()->set_name("envoy.cluster.dns");
-    config.mutable_cluster_type()->mutable_typed_config()->PackFrom(dns_config);
+    config.mutable_cluster_type()->mutable_typed_config()->PackFrom(sub_cluster_dns_config_.value());
   } else {
     config.set_type(
         envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_STRICT_DNS);

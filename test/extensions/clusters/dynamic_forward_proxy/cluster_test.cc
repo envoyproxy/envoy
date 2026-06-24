@@ -298,13 +298,13 @@ cluster_type:
             sub_config->cluster_discovery_type_case());
   EXPECT_EQ("envoy.cluster.dns", sub_config->cluster_type().name());
 
-  // DNS settings should be propagated, but all_addresses_in_single_endpoint is forced to false
-  // to preserve strict-DNS semantics (each resolved address is a separate endpoint).
+  // DNS settings from the provided config are propagated unchanged, including
+  // all_addresses_in_single_endpoint.
   envoy::extensions::clusters::dns::v3::DnsCluster dns_config;
   ASSERT_TRUE(sub_config->cluster_type().typed_config().UnpackTo(&dns_config));
   EXPECT_EQ(envoy::extensions::clusters::common::dns::v3::V4_ONLY, dns_config.dns_lookup_family());
   EXPECT_EQ(30, dns_config.dns_refresh_rate().seconds());
-  EXPECT_FALSE(dns_config.all_addresses_in_single_endpoint());
+  EXPECT_TRUE(dns_config.all_addresses_in_single_endpoint());
 }
 
 // Without dns_cluster_config, sub clusters use legacy STRICT_DNS and inherit parent DNS settings.
