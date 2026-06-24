@@ -6791,7 +6791,7 @@ TEST(HealthCheckEventLoggerImplTest, OneEventLogger) {
   auto event_log = health_check_config.mutable_event_logger()->Add();
   envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink config;
   config.set_event_log_path("foo");
-  event_log->mutable_typed_config()->PackFrom(config);
+  std::ignore = event_log->mutable_typed_config()->PackFrom(config);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
   StringViewSaver file_log_data;

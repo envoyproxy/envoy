@@ -1309,7 +1309,7 @@ TEST_F(TestUpstreamSocketManager, MarkSocketDeadCallsReportDisconnection) {
   auto* reporter_cfg = config_with_reporter.mutable_reporter_config();
   reporter_cfg->set_name(MOCK_REPORTER);
   Protobuf::StringValue noop_config;
-  reporter_cfg->mutable_typed_config()->PackFrom(noop_config);
+  std::ignore = reporter_cfg->mutable_typed_config()->PackFrom(noop_config);
 
   NiceMock<MockReporterFactory> reporter_factory;
   Registry::InjectFactory<ReverseTunnelReporterFactory> reporter_injector(reporter_factory);

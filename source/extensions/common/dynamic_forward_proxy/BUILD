@@ -49,6 +49,7 @@ envoy_cc_library(
         "//source/common/common:dns_utils_lib",
         "//source/common/common:key_value_store_lib",
         "//source/common/config:utility_lib",
+        "//source/common/matcher:address_matcher_lib",
         "//source/common/network:utility_lib",
         "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/server:generic_factory_context_lib",

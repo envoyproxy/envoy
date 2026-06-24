@@ -45,7 +45,7 @@ resources:
           sds->set_name("quic_lb");
           sds->mutable_sds_config()->mutable_path_config_source()->set_path(
               TestEnvironment::substitute("{{ test_tmpdir }}/quic_lb.yaml"));
-          connection_id_config->mutable_typed_config()->PackFrom(config);
+          std::ignore = connection_id_config->mutable_typed_config()->PackFrom(config);
           connection_id_config->set_name("envoy.quic.connection_id_generator.quic_lb");
         });
   }

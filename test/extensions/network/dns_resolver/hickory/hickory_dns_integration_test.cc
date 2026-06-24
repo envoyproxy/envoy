@@ -25,7 +25,7 @@ TEST_P(HickoryDnsIntegrationTest, LogicalDnsWithHickoryResolver) {
     auto* typed_dns_resolver_config = cluster.mutable_typed_dns_resolver_config();
     typed_dns_resolver_config->set_name("envoy.network.dns_resolver.hickory");
     envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig hickory_config;
-    typed_dns_resolver_config->mutable_typed_config()->PackFrom(hickory_config);
+    std::ignore = typed_dns_resolver_config->mutable_typed_config()->PackFrom(hickory_config);
   });
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -51,7 +51,7 @@ TEST_P(HickoryDnsIntegrationTest, StrictDnsWithHickoryResolver) {
     auto* typed_dns_resolver_config = cluster.mutable_typed_dns_resolver_config();
     typed_dns_resolver_config->set_name("envoy.network.dns_resolver.hickory");
     envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig hickory_config;
-    typed_dns_resolver_config->mutable_typed_config()->PackFrom(hickory_config);
+    std::ignore = typed_dns_resolver_config->mutable_typed_config()->PackFrom(hickory_config);
   });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

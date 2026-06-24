@@ -88,22 +88,23 @@ baseProxyConfig(Network::Address::IpVersion version, bool http, int port) {
       resolver_config;
   dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
       "envoy.network.dns_resolver.getaddrinfo");
-  dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
-      resolver_config);
+  std::ignore =
+      dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+          resolver_config);
 
   auto* dfp_filter = hcm.add_http_filters();
   dfp_filter->set_name("envoy.filters.http.dynamic_forward_proxy");
-  dfp_filter->mutable_typed_config()->PackFrom(dfp_config);
+  std::ignore = dfp_filter->mutable_typed_config()->PackFrom(dfp_config);
 
   auto* router_filter = hcm.add_http_filters();
   envoy::extensions::filters::http::router::v3::Router router_config;
   router_filter->set_name("envoy.router");
-  router_filter->mutable_typed_config()->PackFrom(router_config);
+  std::ignore = router_filter->mutable_typed_config()->PackFrom(router_config);
 
   envoy::config::listener::v3::FilterChain* filter_chain = listener->add_filter_chains();
   auto* filter = filter_chain->add_filters();
   filter->set_name("envoy.filters.network.http_connection_manager");
-  filter->mutable_typed_config()->PackFrom(hcm);
+  std::ignore = filter->mutable_typed_config()->PackFrom(hcm);
 
   // Base cluster config (DFP cluster config)
   auto* base_cluster = static_resources->add_clusters();
@@ -114,7 +115,7 @@ baseProxyConfig(Network::Address::IpVersion version, bool http, int port) {
   envoy::config::cluster::v3::Cluster::CustomClusterType base_cluster_type;
   base_cluster_config.mutable_dns_cache_config()->CopyFrom(*dns_cache_config);
   base_cluster_type.set_name("envoy.clusters.dynamic_forward_proxy");
-  base_cluster_type.mutable_typed_config()->PackFrom(base_cluster_config);
+  std::ignore = base_cluster_type.mutable_typed_config()->PackFrom(base_cluster_config);
   base_cluster->mutable_cluster_type()->CopyFrom(base_cluster_type);
 
   return bootstrap;

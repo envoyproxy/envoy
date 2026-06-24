@@ -66,7 +66,7 @@ const Http::HeaderEntry* ReqWithoutQuery::findHeader(OptRef<const Http::HeaderMa
   return header.empty() ? nullptr : header[0];
 }
 
-::Envoy::Formatter::FormatterProviderPtr
+absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
 ReqWithoutQueryCommandParser::parse(absl::string_view command, absl::string_view subcommand,
                                     absl::optional<size_t> max_length) const {
   if (command == "REQ_WITHOUT_QUERY") {

@@ -1043,7 +1043,7 @@ void testUtilV2(const TestUtilOptionsV2& options) {
   const envoy::config::core::v3::TransportSocket& transport_socket =
       filter_chain.transport_socket();
   ASSERT(transport_socket.has_typed_config());
-  transport_socket.typed_config().UnpackTo(&tls_context);
+  std::ignore = transport_socket.typed_config().UnpackTo(&tls_context);
 
   auto server_cfg = *ServerContextConfigImpl::create(tls_context, transport_socket_factory_context,
                                                      server_names, false);
@@ -1249,7 +1249,8 @@ void testUtilV2(const TestUtilOptionsV2& options) {
 void updateFilterChain(
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& tls_context,
     envoy::config::listener::v3::FilterChain& filter_chain) {
-  filter_chain.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+  std::ignore =
+      filter_chain.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
 struct OptionalServerConfig {

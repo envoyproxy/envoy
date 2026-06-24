@@ -1085,7 +1085,7 @@ TEST_F(RoleBasedAccessControlFilterTest, MatcherRouteLocalOverride) {
   xds::type::matcher::v3::Matcher matcher;
   auto matcher_on_no_match_action = matcher.mutable_on_no_match()->mutable_action();
   matcher_on_no_match_action->set_name("action");
-  matcher_on_no_match_action->mutable_typed_config()->PackFrom(action);
+  std::ignore = matcher_on_no_match_action->mutable_typed_config()->PackFrom(action);
   *route_config.mutable_rbac()->mutable_matcher() = matcher;
   ActionValidationVisitor validation_visitor;
   NiceMock<Filters::Common::RBAC::MockMatcherEngine> engine{route_config.rbac().matcher(), context_,
@@ -1253,7 +1253,7 @@ public:
 
       *matcher_ext_config->mutable_name() = "envoy.rbac.matchers.upstream.upstream_ip_port";
 
-      matcher_ext_config->mutable_typed_config()->PackFrom(matcher);
+      std::ignore = matcher_ext_config->mutable_typed_config()->PackFrom(matcher);
     }
 
     policy.add_principals()->set_any(true);

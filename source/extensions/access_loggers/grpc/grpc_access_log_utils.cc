@@ -371,7 +371,7 @@ bool extractFilterStateData(const StreamInfo::FilterState& filter_state, const s
       if (dynamic_cast<Protobuf::Any*>(serialized_proto.get()) != nullptr) {
         any.Swap(dynamic_cast<Protobuf::Any*>(serialized_proto.get()));
       } else {
-        any.PackFrom(*serialized_proto);
+        std::ignore = any.PackFrom(*serialized_proto);
       }
     }
     return true;

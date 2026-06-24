@@ -74,7 +74,7 @@ protected:
   void addStatsdFakeClusterConfig(envoy::config::metrics::v3::StatsSink& sink) {
     envoy::config::metrics::v3::StatsdSink statsd_sink;
     statsd_sink.set_tcp_cluster_name("fake_cluster");
-    sink.mutable_typed_config()->PackFrom(statsd_sink);
+    std::ignore = sink.mutable_typed_config()->PackFrom(statsd_sink);
   }
 
   Api::ApiPtr api_;
@@ -623,7 +623,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
   xds::type::v3::TypedStruct typed_struct;
   auto untyped_struct = typed_struct.mutable_value();
   (*untyped_struct->mutable_fields())["foo"].set_string_value("bar");
-  sink.mutable_typed_config()->PackFrom(typed_struct);
+  std::ignore = sink.mutable_typed_config()->PackFrom(typed_struct);
 
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(

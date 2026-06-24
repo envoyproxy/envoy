@@ -176,7 +176,7 @@ public:
     response.set_version_info(version);
     response.set_type_url(Config::TestTypeUrl::get().Listener);
     for (const auto& listener_config : listener_configs) {
-      response.add_resources()->PackFrom(listener_config);
+      std::ignore = response.add_resources()->PackFrom(listener_config);
     }
     ASSERT(lds_upstream_info_.stream_by_resource_name_[listener_name_] != nullptr);
     lds_upstream_info_.stream_by_resource_name_[listener_name_]->sendGrpcMessage(response);
@@ -199,7 +199,7 @@ public:
     response.set_type_url(Config::TestTypeUrl::get().RouteConfiguration);
     const auto route_configuration =
         TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(route_config);
-    response.add_resources()->PackFrom(route_configuration);
+    std::ignore = response.add_resources()->PackFrom(route_configuration);
     ASSERT(rds_upstream_info_.stream_by_resource_name_[route_configuration.name()] != nullptr);
     rds_upstream_info_.stream_by_resource_name_[route_configuration.name()]->sendGrpcMessage(
         response);
@@ -1235,7 +1235,7 @@ public:
     response.set_version_info(version);
     response.set_type_url(Config::TestTypeUrl::get().Listener);
     for (const auto& listener_config : listener_configs) {
-      response.add_resources()->PackFrom(listener_config);
+      std::ignore = response.add_resources()->PackFrom(listener_config);
     }
     ASSERT_NE(nullptr, lds_stream_);
     lds_stream_->sendGrpcMessage(response);
@@ -1863,7 +1863,7 @@ public:
           // link time.
           auto& filter = *src_listener_config.add_listener_filters();
           filter.set_name("envoy.filters.listener.original_dst");
-          filter.mutable_typed_config()->PackFrom(Protobuf::Struct());
+          std::ignore = filter.mutable_typed_config()->PackFrom(Protobuf::Struct());
           auto& virtual_listener_config = *bootstrap.mutable_static_resources()->add_listeners();
           virtual_listener_config = src_listener_config;
           virtual_listener_config.mutable_use_original_dst()->set_value(false);

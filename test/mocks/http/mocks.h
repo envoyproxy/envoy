@@ -233,6 +233,7 @@ public:
   MOCK_METHOD(void, requestRouteConfigUpdate, (Http::RouteConfigUpdatedCallbackSharedPtr));
   MOCK_METHOD(void, clearRouteCache, ());
   MOCK_METHOD(void, refreshRouteCluster, ());
+  MOCK_METHOD(void, recreateClusterInfo, ());
 
   std::shared_ptr<Router::MockRoute> route_;
 };

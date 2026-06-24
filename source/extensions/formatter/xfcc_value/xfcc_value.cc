@@ -215,7 +215,7 @@ private:
   Http::LowerCaseString key_;
 };
 
-Envoy::Formatter::FormatterProviderPtr
+absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
 XfccValueFormatterCommandParser::parse(absl::string_view command, absl::string_view subcommand,
                                        absl::optional<size_t>) const {
   // Implementation for parsing the XFCC_VALUE() command.

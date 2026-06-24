@@ -336,12 +336,12 @@ std::string MobileEngineBuilder::nativeNameToConfig(absl::string_view name) {
   envoymobile::extensions::filters::http::platform_bridge::PlatformBridge proto_config;
   proto_config.set_platform_filter_name(name);
   std::string ret;
-  proto_config.SerializeToString(&ret);
+  std::ignore = proto_config.SerializeToString(&ret);
   Protobuf::Any any_config;
   any_config.set_type_url(
       "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge");
   any_config.set_value(ret);
-  any_config.SerializeToString(&ret);
+  std::ignore = any_config.SerializeToString(&ret);
   return ret;
 #endif
 }
@@ -474,7 +474,7 @@ absl::Status MobileEngineBuilder::configureRouteConfig(
     auto* early_data = route_to->mutable_early_data_policy();
     early_data->set_name("envoy.route.early_data_policy.default");
     ::envoy::extensions::early_data::v3::DefaultEarlyDataPolicy config;
-    early_data->mutable_typed_config()->PackFrom(config);
+    std::ignore = early_data->mutable_typed_config()->PackFrom(config);
   }
   return absl::OkStatus();
 }
@@ -488,8 +488,8 @@ absl::Status MobileEngineBuilder::configureHttpFilters(
     native_filter->set_name(filter->name_);
     if (!filter->textproto_typed_config_.empty()) {
 #if ENVOY_ENABLE_FULL_PROTOS
-      Protobuf::TextFormat::ParseFromString((*filter).textproto_typed_config_,
-                                            native_filter->mutable_typed_config());
+      std::ignore = Protobuf::TextFormat::ParseFromString((*filter).textproto_typed_config_,
+                                                          native_filter->mutable_typed_config());
       RELEASE_ASSERT(!native_filter->typed_config().DebugString().empty(),
                      "Failed to parse: " + (*filter).textproto_typed_config_);
 #else
@@ -506,7 +506,7 @@ absl::Status MobileEngineBuilder::configureHttpFilters(
     envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig cache_config;
     auto* cache_filter = add_filter();
     cache_filter->set_name("alternate_protocols_cache");
-    cache_filter->mutable_typed_config()->PackFrom(cache_config);
+    std::ignore = cache_filter->mutable_typed_config()->PackFrom(cache_config);
   }
 
   if (gzip_decompression_filter_) {
@@ -514,8 +514,9 @@ absl::Status MobileEngineBuilder::configureHttpFilters(
     gzip_config.mutable_window_bits()->set_value(15);
     envoy::extensions::filters::http::decompressor::v3::Decompressor decompressor_config;
     decompressor_config.mutable_decompressor_library()->set_name("gzip");
-    decompressor_config.mutable_decompressor_library()->mutable_typed_config()->PackFrom(
-        gzip_config);
+    std::ignore =
+        decompressor_config.mutable_decompressor_library()->mutable_typed_config()->PackFrom(
+            gzip_config);
     auto* common_request =
         decompressor_config.mutable_request_direction_config()->mutable_common_config();
     common_request->mutable_enabled()->mutable_default_value();
@@ -525,14 +526,15 @@ absl::Status MobileEngineBuilder::configureHttpFilters(
         ->set_ignore_no_transform_header(true);
     auto* gzip_filter = add_filter();
     gzip_filter->set_name("envoy.filters.http.decompressor");
-    gzip_filter->mutable_typed_config()->PackFrom(decompressor_config);
+    std::ignore = gzip_filter->mutable_typed_config()->PackFrom(decompressor_config);
   }
   if (brotli_decompression_filter_) {
     envoy::extensions::compression::brotli::decompressor::v3::Brotli brotli_config;
     envoy::extensions::filters::http::decompressor::v3::Decompressor decompressor_config;
     decompressor_config.mutable_decompressor_library()->set_name("text_optimized");
-    decompressor_config.mutable_decompressor_library()->mutable_typed_config()->PackFrom(
-        brotli_config);
+    std::ignore =
+        decompressor_config.mutable_decompressor_library()->mutable_typed_config()->PackFrom(
+            brotli_config);
     auto* common_request =
         decompressor_config.mutable_request_direction_config()->mutable_common_config();
     common_request->mutable_enabled()->mutable_default_value();
@@ -542,13 +544,13 @@ absl::Status MobileEngineBuilder::configureHttpFilters(
         ->set_ignore_no_transform_header(true);
     auto* brotli_filter = add_filter();
     brotli_filter->set_name("envoy.filters.http.decompressor");
-    brotli_filter->mutable_typed_config()->PackFrom(decompressor_config);
+    std::ignore = brotli_filter->mutable_typed_config()->PackFrom(decompressor_config);
   }
   if (socket_tagging_filter_) {
     envoymobile::extensions::filters::http::socket_tag::SocketTag tag_config;
     auto* tag_filter = add_filter();
     tag_filter->set_name("envoy.filters.http.socket_tag");
-    tag_filter->mutable_typed_config()->PackFrom(tag_config);
+    std::ignore = tag_filter->mutable_typed_config()->PackFrom(tag_config);
   }
 
   envoymobile::extensions::filters::http::network_configuration::NetworkConfiguration
@@ -557,18 +559,18 @@ absl::Status MobileEngineBuilder::configureHttpFilters(
   network_config.set_enable_interface_binding(enable_interface_binding_);
   auto* network_filter = add_filter();
   network_filter->set_name("envoy.filters.http.network_configuration");
-  network_filter->mutable_typed_config()->PackFrom(network_config);
+  std::ignore = network_filter->mutable_typed_config()->PackFrom(network_config);
 
   envoymobile::extensions::filters::http::local_error::LocalError local_config;
   auto* local_filter = add_filter();
   local_filter->set_name("envoy.filters.http.local_error");
-  local_filter->mutable_typed_config()->PackFrom(local_config);
+  std::ignore = local_filter->mutable_typed_config()->PackFrom(local_config);
 
   envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig dfp_config;
   configureDnsCache(dfp_config.mutable_dns_cache_config());
   auto* dfp_filter = add_filter();
   dfp_filter->set_name("envoy.filters.http.dynamic_forward_proxy");
-  dfp_filter->mutable_typed_config()->PackFrom(dfp_config);
+  std::ignore = dfp_filter->mutable_typed_config()->PackFrom(dfp_config);
   return absl::OkStatus();
 }
 
@@ -592,10 +594,10 @@ void MobileEngineBuilder::configureDnsCache(
     kv_config.set_max_entries(100);
     dns_cache_config->mutable_key_value_config()->mutable_config()->set_name(
         "envoy.key_value.platform");
-    dns_cache_config->mutable_key_value_config()
-        ->mutable_config()
-        ->mutable_typed_config()
-        ->PackFrom(kv_config);
+    std::ignore = dns_cache_config->mutable_key_value_config()
+                      ->mutable_config()
+                      ->mutable_typed_config()
+                      ->PackFrom(kv_config);
   }
 
   if (dns_resolver_config_.has_value()) {
@@ -605,8 +607,9 @@ void MobileEngineBuilder::configureDnsCache(
     envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig resolver_config;
     dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
         "envoy.network.dns_resolver.apple");
-    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
-        resolver_config);
+    std::ignore =
+        dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+            resolver_config);
 #else
     envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
         resolver_config;
@@ -616,8 +619,9 @@ void MobileEngineBuilder::configureDnsCache(
     resolver_config.mutable_num_resolver_threads()->set_value(getaddrinfo_num_threads_);
     dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
         "envoy.network.dns_resolver.getaddrinfo");
-    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
-        resolver_config);
+    std::ignore =
+        dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+            resolver_config);
 #endif
   }
 
@@ -653,7 +657,8 @@ absl::Status MobileEngineBuilder::configureStaticClusters(
     }
     validation->mutable_custom_validator_config()->set_name(
         "envoy_mobile.cert_validator.platform_bridge_cert_validator");
-    validation->mutable_custom_validator_config()->mutable_typed_config()->PackFrom(validator);
+    std::ignore =
+        validation->mutable_custom_validator_config()->mutable_typed_config()->PackFrom(validator);
   } else {
     std::string certs;
 #ifdef ENVOY_MOBILE_XDS
@@ -677,7 +682,8 @@ absl::Status MobileEngineBuilder::configureStaticClusters(
   envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
       ssl_proxy_socket;
   ssl_proxy_socket.mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
-  ssl_proxy_socket.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_socket);
+  std::ignore =
+      ssl_proxy_socket.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_socket);
 
   envoy::extensions::upstreams::http::v3::HttpProtocolOptions h2_protocol_options;
   h2_protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
@@ -687,7 +693,7 @@ absl::Status MobileEngineBuilder::configureStaticClusters(
   envoy::config::cluster::v3::Cluster::CustomClusterType base_cluster_type;
   configureDnsCache(base_cluster_config.mutable_dns_cache_config());
   base_cluster_type.set_name("envoy.clusters.dynamic_forward_proxy");
-  base_cluster_type.mutable_typed_config()->PackFrom(base_cluster_config);
+  std::ignore = base_cluster_type.mutable_typed_config()->PackFrom(base_cluster_config);
 
   auto* upstream_opts = base_cluster->mutable_upstream_connection_options();
   upstream_opts->set_set_local_interface_name_on_upstream_connections(true);
@@ -734,24 +740,26 @@ absl::Status MobileEngineBuilder::configureStaticClusters(
   auto* h1_options = alpn_options.mutable_auto_config()->mutable_http_protocol_options();
   auto* formatter = h1_options->mutable_header_key_format()->mutable_stateful_formatter();
   formatter->set_name("preserve_case");
-  formatter->mutable_typed_config()->PackFrom(preserve_case_config);
+  std::ignore = formatter->mutable_typed_config()->PackFrom(preserve_case_config);
 
   // Base cluster
   base_cluster->set_name("base");
   base_cluster->mutable_connect_timeout()->set_seconds(connect_timeout_seconds_);
   base_cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
-  (*base_cluster->mutable_typed_extension_protocol_options())
-      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-          .PackFrom(alpn_options);
+  std::ignore = (*base_cluster->mutable_typed_extension_protocol_options())
+                    ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                        .PackFrom(alpn_options);
   base_cluster->mutable_cluster_type()->CopyFrom(base_cluster_type);
   base_cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.http_11_proxy");
-  base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(ssl_proxy_socket);
+  std::ignore =
+      base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(ssl_proxy_socket);
 
   // Base clear-text cluster set up
   envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
   envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
       cleartext_proxy_socket;
-  cleartext_proxy_socket.mutable_transport_socket()->mutable_typed_config()->PackFrom(raw_buffer);
+  std::ignore = cleartext_proxy_socket.mutable_transport_socket()->mutable_typed_config()->PackFrom(
+      raw_buffer);
   cleartext_proxy_socket.mutable_transport_socket()->set_name("envoy.transport_sockets.raw_buffer");
   envoy::extensions::upstreams::http::v3::HttpProtocolOptions h1_protocol_options;
   h1_protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
@@ -766,17 +774,19 @@ absl::Status MobileEngineBuilder::configureStaticClusters(
   base_clear->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
   base_clear->mutable_cluster_type()->CopyFrom(base_cluster_type);
   base_clear->mutable_transport_socket()->set_name("envoy.transport_sockets.http_11_proxy");
-  base_clear->mutable_transport_socket()->mutable_typed_config()->PackFrom(cleartext_proxy_socket);
+  std::ignore = base_clear->mutable_transport_socket()->mutable_typed_config()->PackFrom(
+      cleartext_proxy_socket);
   base_clear->mutable_upstream_connection_options()->CopyFrom(
       *base_cluster->mutable_upstream_connection_options());
   base_clear->mutable_circuit_breakers()->CopyFrom(*base_cluster->mutable_circuit_breakers());
-  (*base_clear->mutable_typed_extension_protocol_options())
-      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-          .PackFrom(h1_protocol_options);
+  std::ignore = (*base_clear->mutable_typed_extension_protocol_options())
+                    ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                        .PackFrom(h1_protocol_options);
 
   // Edit and re-pack
   tls_socket.mutable_common_tls_context()->add_alpn_protocols("h2");
-  ssl_proxy_socket.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_socket);
+  std::ignore =
+      ssl_proxy_socket.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_socket);
 
   // Edit base cluster to be an HTTP/3 cluster.
   if (enable_http3_) {
@@ -785,7 +795,8 @@ absl::Status MobileEngineBuilder::configureStaticClusters(
     h3_inner_socket.mutable_upstream_tls_context()->CopyFrom(tls_socket);
     envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
         h3_proxy_socket;
-    h3_proxy_socket.mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_inner_socket);
+    std::ignore = h3_proxy_socket.mutable_transport_socket()->mutable_typed_config()->PackFrom(
+        h3_inner_socket);
     h3_proxy_socket.mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
 
     auto* quic_protocol_options = alpn_options.mutable_auto_config()
@@ -841,8 +852,9 @@ absl::Status MobileEngineBuilder::configureStaticClusters(
     if (use_quic_platform_packet_writer_ || enable_quic_connection_migration_) {
       envoy_mobile::extensions::quic_packet_writer::platform::QuicPlatformPacketWriterConfig
           writer_config;
-      quic_protocol_options->mutable_client_packet_writer()->mutable_typed_config()->PackFrom(
-          writer_config);
+      std::ignore =
+          quic_protocol_options->mutable_client_packet_writer()->mutable_typed_config()->PackFrom(
+              writer_config);
       quic_protocol_options->mutable_client_packet_writer()->set_name(
           "envoy.quic.packet_writer.platform");
     }
@@ -862,10 +874,11 @@ absl::Status MobileEngineBuilder::configureStaticClusters(
           ->add_canonical_suffixes(suffix);
     }
 
-    base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
-    (*base_cluster->mutable_typed_extension_protocol_options())
-        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-            .PackFrom(alpn_options);
+    std::ignore =
+        base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
+    std::ignore = (*base_cluster->mutable_typed_extension_protocol_options())
+                      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                          .PackFrom(alpn_options);
 
     // Set the upstream connections UDP socket receive buffer size. The operating system defaults
     // are usually too small for QUIC.

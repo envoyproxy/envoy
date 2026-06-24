@@ -731,7 +731,7 @@ TEST(UtilityTest, AnyWrongType) {
   Protobuf::Duration source_duration;
   source_duration.set_seconds(42);
   Protobuf::Any typed_config;
-  typed_config.PackFrom(source_duration);
+  std::ignore = typed_config.PackFrom(source_duration);
   Protobuf::Timestamp out;
   EXPECT_THAT(
       Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(),
@@ -745,7 +745,7 @@ TEST(UtilityTest, TranslateAnyWrongToFactoryConfig) {
   Protobuf::Duration source_duration;
   source_duration.set_seconds(42);
   Protobuf::Any typed_config;
-  typed_config.PackFrom(source_duration);
+  std::ignore = typed_config.PackFrom(source_duration);
 
   MockTypedFactory factory;
   EXPECT_CALL(factory, createEmptyConfigProto()).WillOnce(Invoke([]() -> ProtobufTypes::MessagePtr {
@@ -763,7 +763,7 @@ TEST(UtilityTest, TranslateAnyToFactoryConfig) {
   Protobuf::Duration source_duration;
   source_duration.set_seconds(42);
   Protobuf::Any typed_config;
-  typed_config.PackFrom(source_duration);
+  std::ignore = typed_config.PackFrom(source_duration);
 
   MockTypedFactory factory;
   EXPECT_CALL(factory, createEmptyConfigProto()).WillOnce(Invoke([]() -> ProtobufTypes::MessagePtr {
@@ -783,7 +783,7 @@ public:
     (*typed_struct.mutable_type_url()) =
         absl::StrCat("type.googleapis.com/", inner.GetDescriptor()->full_name());
     MessageUtil::jsonConvert(inner, *typed_struct.mutable_value());
-    typed_config.PackFrom(typed_struct);
+    std::ignore = typed_config.PackFrom(typed_struct);
   }
 };
 
@@ -893,7 +893,7 @@ TEST(UtilityTest, AnyToClusterV2) {
     drain_connections_on_host_removal: true
   )EOF";
   TestUtility::loadFromYaml(cluster_config_yaml, cluster);
-  typed_config.PackFrom(cluster);
+  std::ignore = typed_config.PackFrom(cluster);
 
   API_NO_BOOST(envoy::api::v2::Cluster) out;
   EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
@@ -911,7 +911,7 @@ TEST(UtilityTest, AnyToClusterV3) {
     ignore_health_on_host_removal: true
   )EOF";
   TestUtility::loadFromYaml(cluster_config_yaml, cluster);
-  typed_config.PackFrom(cluster);
+  std::ignore = typed_config.PackFrom(cluster);
 
   API_NO_BOOST(envoy::config::cluster::v3::Cluster) out;
   EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
@@ -924,7 +924,7 @@ TEST(UtilityTest, AnyToClusterV3) {
 TEST(UtilityTest, EmptyToEmptyConfig) {
   Protobuf::Any typed_config;
   Protobuf::Empty empty_config;
-  typed_config.PackFrom(empty_config);
+  std::ignore = typed_config.PackFrom(empty_config);
 
   envoy::extensions::filters::http::cors::v3::Cors out;
   EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,

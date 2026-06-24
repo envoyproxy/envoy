@@ -104,7 +104,7 @@ DynamicModuleFormatterProvider::formatValue(const ::Envoy::Formatter::Context& c
 DynamicModuleCommandParser::DynamicModuleCommandParser(DynamicModuleFormatterConfigSharedPtr config)
     : config_(std::move(config)) {}
 
-::Envoy::Formatter::FormatterProviderPtr
+absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
 DynamicModuleCommandParser::parse(absl::string_view command, absl::string_view command_arg,
                                   absl::optional<size_t> max_length) const {
   envoy_dynamic_module_type_envoy_buffer command_buf = {.ptr = command.data(),

@@ -38,6 +38,8 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
       local_info_(context.serverFactoryContext().localInfo()), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(dns_cluster, dns_refresh_rate, 5000))),
+      dns_min_refresh_rate_ms_(std::chrono::milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(dns_cluster, dns_min_refresh_rate, 0))),
       dns_jitter_ms_(PROTOBUF_GET_MS_OR_DEFAULT(dns_cluster, dns_jitter, 0)),
       respect_dns_ttl_(dns_cluster.respect_dns_ttl()),
       dns_lookup_family_(
@@ -200,7 +202,8 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
           if (!response.empty() && parent_.respect_dns_ttl_ &&
               ttl_refresh_rate != std::chrono::seconds(0)) {
-            final_refresh_rate = ttl_refresh_rate;
+            final_refresh_rate = std::max(std::chrono::milliseconds(ttl_refresh_rate),
+                                          parent_.dns_min_refresh_rate_ms_);
             ASSERT(ttl_refresh_rate != std::chrono::seconds::max() &&
                    final_refresh_rate.count() > 0);
           }

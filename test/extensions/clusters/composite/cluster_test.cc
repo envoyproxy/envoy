@@ -582,7 +582,7 @@ TEST_F(CompositeClusterTest, FactoryCreateMethod) {
   envoy::extensions::clusters::composite::v3::ClusterConfig typed_config;
   auto* entry = typed_config.add_clusters();
   entry->set_name("factory_cluster_1");
-  cluster_type->mutable_typed_config()->PackFrom(typed_config);
+  std::ignore = cluster_type->mutable_typed_config()->PackFrom(typed_config);
 
   auto result = factory.create(cluster_config, factory_context);
   EXPECT_TRUE(result.ok());
