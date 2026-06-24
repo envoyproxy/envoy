@@ -164,6 +164,10 @@ public:
     provider_->setCredentialsToAllThreads(std::move(creds));
   }
   void invalidateStats() { provider_->stats_.reset(); }
+  size_t getSubscribersCount() {
+    Thread::LockGuard lock(provider_->mu_);
+    return provider_->credentials_subscribers_.size();
+  }
 
   std::shared_ptr<MetadataCredentialsProviderBase> provider_;
 };
