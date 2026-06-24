@@ -60,6 +60,7 @@ envoy_extension_cc_test(
     ],
     extension_names = [
         "envoy.filters.http.geoip",
+        "envoy.geoip_providers.maxmind",
     ],
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],

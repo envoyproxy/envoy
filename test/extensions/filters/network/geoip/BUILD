@@ -55,7 +55,12 @@ envoy_extension_cc_test(
     data = [
         "//test/extensions/geoip_providers/maxmind/test_data:geolocation_databases",
     ],
-    extension_names = ["envoy.filters.network.geoip"],
+    extension_names = [
+        "envoy.filters.network.geoip",
+        "envoy.filters.network.set_filter_state",
+        "envoy.filters.network.tcp_proxy",
+        "envoy.geoip_providers.maxmind",
+    ],
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/router:string_accessor_lib",
