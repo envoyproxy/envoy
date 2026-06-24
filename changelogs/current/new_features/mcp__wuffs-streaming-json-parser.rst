@@ -1,0 +1,1 @@
+Added a Wuffs-backed streaming SAX-style JSON parser (``WuffsJsonCursor``) for the MCP HTTP filter, replacing the previous DOM-based parser with a zero-copy, chunk-boundary-safe implementation that fires synchronous callbacks without buffering the full request body.

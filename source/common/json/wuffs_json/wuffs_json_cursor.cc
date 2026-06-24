@@ -56,14 +56,8 @@ void appendCodePoint(std::string& out, uint32_t code_point) {
 
 } // namespace
 
-WuffsJsonCursor::WuffsJsonCursor(Handler& handler, bool track_paths, int max_depth)
-    : handler_(handler), track_paths_(track_paths),
-      // Cap max_depth_ at kMaxTrackedDepth-1: the per-depth arrays (is_dict_,
-      // expecting_key_, key_stack_, etc.) are fixed-size with kMaxTrackedDepth
-      // slots.
-      // TODO(tyxia): remove this cap once the fixed arrays are replaced with
-      // std::vector sized to max_depth_+1 at construction time.
-      max_depth_(std::min(max_depth, kMaxTrackedDepth - 1)) {
+WuffsJsonCursor::WuffsJsonCursor(Handler& handler, bool track_paths)
+    : handler_(handler), track_paths_(track_paths) {
   decoder_ = wuffs_json__decoder::alloc();
   token_buf_ =
       wuffs_base__slice_token__writer(wuffs_base__make_slice_token(token_data_, kTokenBufLen));
@@ -220,9 +214,9 @@ absl::Status WuffsJsonCursor::handleStructureToken(uint64_t token_detail, size_t
   const bool to_dict = (token_detail & WUFFS_BASE__TOKEN__VBD__STRUCTURE__TO_DICT) != 0;
   if (is_push) {
     ++depth_;
-    if (depth_ > max_depth_) {
+    if (depth_ > kMaxTrackedDepth - 1) {
       return absl::InvalidArgumentError(
-          absl::StrCat("wuffs json: nesting depth exceeds ", max_depth_));
+          absl::StrCat("wuffs json: nesting depth exceeds ", kMaxTrackedDepth - 1));
     }
     if (depth_ < kMaxTrackedDepth) {
       seen_keys_[depth_].clear();

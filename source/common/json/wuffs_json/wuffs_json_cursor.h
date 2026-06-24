@@ -205,15 +205,7 @@ public:
     virtual void onContainerClose(int depth, size_t token_end) = 0;
   };
 
-  // max_depth: maximum nesting depth allowed before feed() returns
-  // InvalidArgumentError. Default (kMaxTrackedDepth-1 = 8) covers all known
-  // OpenAI/Anthropic schema paths. Values below the default tighten the DoS
-  // bound for schemas known to be shallow. Values above the default are silently
-  // clamped to kMaxTrackedDepth-1: the per-depth tracking arrays are fixed-size,
-  // so accepting deeper JSON without losing key/dup/path tracking accuracy
-  // requires replacing them with std::vector — see TODO below.
-  explicit WuffsJsonCursor(Handler& handler, bool track_paths = false,
-                           int max_depth = kMaxTrackedDepth - 1);
+  explicit WuffsJsonCursor(Handler& handler, bool track_paths = false);
 
   // Feed one body chunk. Set closed=true on the final chunk (signals EOF to Wuffs).
   // Returns non-OK on malformed JSON or internal allocation failure.
@@ -236,8 +228,6 @@ public:
 private:
   Handler& handler_;
   const bool track_paths_;
-  // Runtime depth guard.
-  const int max_depth_;
 
   wuffs_json__decoder::unique_ptr decoder_;
   static constexpr size_t kTokenBufLen = 256;
@@ -254,10 +244,9 @@ private:
   //   messages[i].content[j].content[k].text              (depth 7)
   // plus one buffer level for schemas with one extra level of nesting.
   //
-  // Nesting beyond kMaxTrackedDepth-1 is rejected by default (see max_depth
-  // constructor argument). Key/dup/path tracking accuracy is bounded by
-  // kMaxTrackedDepth-1 regardless of max_depth, because the per-depth arrays
-  // below are stack-allocated at compile time.
+  // Nesting beyond kMaxTrackedDepth-1 is rejected with InvalidArgumentError.
+  // Key/dup/path tracking accuracy is bounded by kMaxTrackedDepth-1 because
+  // the per-depth arrays below are stack-allocated at compile time.
   //
   // TODO(tyxia): replace the fixed arrays with std::vector<T> to support
   // dynamic depth so that max_depth_ can exceed kMaxTrackedDepth-1 without
@@ -265,8 +254,9 @@ private:
   // cost of per-push heap allocation; evaluate against the request-path perf
   // budget before doing so.
   static constexpr int kMaxTrackedDepth = 9;
-  // 256 bytes covers all known OpenAI/Anthropic/Google JSON schema field names
-  // with generous headroom; acts as a DoS safeguard against unbounded key lengths.
+  // Cap key length at 256 bytes: well above any legitimate schema field name
+  // (longest observed ~25B, e.g. "input_audio_transcription") while bounding
+  // per-key allocation and guarding against DoS via unbounded key lengths.
   static constexpr size_t kMaxKeyBytes = 256;
   int depth_{0};
   bool is_dict_[kMaxTrackedDepth]{};
@@ -307,8 +297,8 @@ private:
   // by matching buildPatternPath(depth) / buildPatternPath(depth-1) at onContainerOpen against
   // specs and records element byte ranges.
   //
-  // Implements the three-tier body-size logic (full capture semantic-only / reject). Implement a
-  // utility to parse ExtractFieldSpec path strings
+  // Implements the three-tier body-size logic (full capture semantic-only / reject).
+  // Implement a utility to parse ExtractFieldSpec path strings
   // ("messages[].content[].text") into a normalized form directly comparable with
   // buildPatternPath() output. At filter init, derive the max_depth constructor argument from the
   // deepest ExtractFieldSpec path rather than the static default, tightening the DoS bound to

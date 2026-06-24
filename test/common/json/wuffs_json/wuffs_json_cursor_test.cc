@@ -567,34 +567,10 @@ TEST(WuffsJsonCursorTest, MaxDepthAccepted) {
   EXPECT_TRUE(parse(R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}})", h).ok());
 }
 
-// 9 levels of nesting must be rejected by default (fail-closed).
-TEST(WuffsJsonCursorTest, ExceedDefaultMaxDepthRejected) {
+// 9 levels of nesting must be rejected (fail-closed).
+TEST(WuffsJsonCursorTest, ExceedMaxDepthRejected) {
   CapturingHandler h;
   EXPECT_FALSE(parse(R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}}})", h).ok());
-}
-
-// max_depth values above kMaxTrackedDepth-1 (= 8) are silently clamped because
-// the per-depth tracking arrays are fixed-size. Depth-8 is still accepted;
-// depth-9 is rejected even with max_depth=12.
-TEST(WuffsJsonCursorTest, MaxDepthAboveCeilingClampedToEight) {
-  // Depth-8 accepted — max_depth=12 clamps to 8, same as default.
-  {
-    CapturingHandler h;
-    WuffsJsonCursor cursor(h, /*track_paths=*/false, /*max_depth=*/12);
-    EXPECT_TRUE(cursor
-                    .feed(R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}})",
-                          /*closed=*/true)
-                    .ok());
-  }
-  // Depth-9 rejected even with max_depth=12 — effective limit is 8.
-  {
-    CapturingHandler h;
-    WuffsJsonCursor cursor(h, /*track_paths=*/false, /*max_depth=*/12);
-    EXPECT_FALSE(cursor
-                     .feed(R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}}})",
-                           /*closed=*/true)
-                     .ok());
-  }
 }
 
 // Path-tracking tests
