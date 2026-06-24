@@ -1073,11 +1073,14 @@ void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
 }
 bool ServerConnectionImpl::initializeReadFilters() {
   bool initialized = ConnectionImpl::initializeReadFilters();
-  if (initialized) {
+  if (initialized && state() == State::Open) {
     // Server connection starts as connected, and we must explicitly signal to
     // the downstream transport socket that the underlying socket is connected.
     // We delay this step until after the filters are initialized and can
     // receive the connection events.
+    // A filter may close the connection during onNewConnection() (e.g. circuit
+    // breaker overflow), in which case the state is no longer Open and we must
+    // skip signaling onConnected to the transport socket.
     onConnected();
   }
   return initialized;
@@ -1124,7 +1127,7 @@ ClientConnectionImpl::ClientConnectionImpl(
   if (transport_options) {
     for (const auto& object : transport_options->downstreamSharedFilterStateObjects()) {
       // This does not throw as all objects are distinctly named and the stream info is empty.
-      stream_info_.filterState()->setData(object.name_, object.data_, object.state_type_,
+      stream_info_.filterState()->setData(object.name_, object.data_,
                                           StreamInfo::FilterState::LifeSpan::Connection,
                                           object.stream_sharing_);
     }

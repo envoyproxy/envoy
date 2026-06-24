@@ -1285,7 +1285,7 @@ TEST_F(RouterRetryStateImplTest, BudgetAvailableRetries) {
   // budget. As configured, there are no allowed retries via max_retries CB.
   cluster_.resetResourceManagerWithRetryBudget(
       0 /* cx */, 0 /* rq_pending */, 0 /* rq */, 0 /* rq_retry */, 0 /* conn_pool */,
-      20.0 /* budget_percent */, 3 /* min_retry_concurrency */);
+      20.0 /* budget_percent */, 100 /* budget_interval */, 3 /* min_retry_concurrency */);
 
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
 
@@ -1304,7 +1304,7 @@ TEST_F(RouterRetryStateImplTest, BudgetNoAvailableRetries) {
   // CB.
   cluster_.resetResourceManagerWithRetryBudget(
       0 /* cx */, 0 /* rq_pending */, 20 /* rq */, 5 /* rq_retry */, 0 /* conn_pool */,
-      0 /* budget_percent */, 0 /* min_retry_concurrency */);
+      0 /* budget_percent */, 100 /* budget_interval */, 0 /* min_retry_concurrency */);
 
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
 
@@ -1320,7 +1320,7 @@ TEST_F(RouterRetryStateImplTest, BudgetVerifyMinimumConcurrency) {
   // Expect no available retries from resource manager.
   cluster_.resetResourceManagerWithRetryBudget(
       0 /* cx */, 0 /* rq_pending */, 0 /* rq */, 0 /* rq_retry */, 0 /* conn_pool */,
-      20.0 /* budget_percent */, 3 /* min_retry_concurrency */);
+      20.0 /* budget_percent */, 100 /* budget_interval */, 3 /* min_retry_concurrency */);
 
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"},
                                                  {"x-envoy-max-retries", "42"}};
@@ -1443,6 +1443,35 @@ TEST_F(RouterRetryStateImplTest, ParseRetryGrpcOn) {
   result = RetryStateImpl::parseRetryGrpcOn(config);
   EXPECT_EQ(result.first, 96);
   EXPECT_FALSE(result.second);
+}
+
+TEST_F(RouterRetryStateImplTest, GetUnknownRetryOnTokens) {
+  // All valid HTTP tokens: no unknowns.
+  EXPECT_TRUE(RetryStateImpl::getUnknownRetryOnTokens("5xx,gateway-error,connect-failure").empty());
+
+  // All valid gRPC tokens: no unknowns.
+  EXPECT_TRUE(RetryStateImpl::getUnknownRetryOnTokens("cancelled,deadline-exceeded").empty());
+
+  // Mixed valid HTTP and gRPC tokens: no unknowns.
+  EXPECT_TRUE(RetryStateImpl::getUnknownRetryOnTokens("5xx,cancelled").empty());
+
+  // One unknown token among valid ones.
+  auto unknown = RetryStateImpl::getUnknownRetryOnTokens("5xx,typo,connect-failure");
+  EXPECT_EQ(unknown.size(), 1);
+  EXPECT_EQ(unknown[0], "typo");
+
+  // Multiple unknown tokens.
+  unknown = RetryStateImpl::getUnknownRetryOnTokens("bad1,5xx,bad2");
+  EXPECT_EQ(unknown.size(), 2);
+  EXPECT_EQ(unknown[0], "bad1");
+  EXPECT_EQ(unknown[1], "bad2");
+
+  // All unknown tokens.
+  unknown = RetryStateImpl::getUnknownRetryOnTokens("foo,bar");
+  EXPECT_EQ(unknown.size(), 2);
+
+  // Empty config: no unknowns.
+  EXPECT_TRUE(RetryStateImpl::getUnknownRetryOnTokens("").empty());
 }
 
 TEST_F(RouterRetryStateImplTest, RemoveAllRetryHeaders) {

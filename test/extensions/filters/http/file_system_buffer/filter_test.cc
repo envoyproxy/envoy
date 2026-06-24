@@ -7,6 +7,7 @@
 #include "test/extensions/common/async_files/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/logging.h"
 
 #include "gtest/gtest.h"
 

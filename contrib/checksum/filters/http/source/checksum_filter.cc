@@ -2,6 +2,8 @@
 
 #include <openssl/mem.h>
 
+#include <optional>
+
 #include "source/common/common/assert.h"
 #include "source/common/common/hex.h"
 
@@ -34,7 +36,7 @@ OptRef<const Sha256Checksum> ChecksumFilterConfig::expectedChecksum(absl::string
       return m.second;
     }
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 ChecksumFilter::ChecksumFilter(ChecksumFilterConfigSharedPtr config) : config_(config) {}
@@ -44,7 +46,7 @@ Http::FilterHeadersStatus ChecksumFilter::decodeHeaders(Http::RequestHeaderMap& 
   expected_checksum_ = config_->expectedChecksum(headers.Path()->value().getStringView());
   if (!expected_checksum_.has_value() && config_->rejectUnmatched()) {
     decoder_callbacks_->sendLocalReply(Http::Code::Forbidden, "No checksum for path", nullptr,
-                                       absl::nullopt, "no_checksum_for_path");
+                                       std::nullopt, "no_checksum_for_path");
     return Http::FilterHeadersStatus::StopIteration;
   }
   return Http::FilterHeadersStatus::Continue;
@@ -55,7 +57,7 @@ Http::FilterHeadersStatus ChecksumFilter::encodeHeaders(Http::ResponseHeaderMap&
   if (end_stream && expected_checksum_.has_value()) {
     encoder_callbacks_->sendLocalReply(Http::Code::Forbidden,
                                        "Expected checksum has value but response has no body",
-                                       nullptr, absl::nullopt, "checksum_but_no_body");
+                                       nullptr, std::nullopt, "checksum_but_no_body");
     return Http::FilterHeadersStatus::StopIteration;
   }
   SHA256_Init(&sha_);
@@ -71,7 +73,7 @@ Http::FilterDataStatus ChecksumFilter::encodeData(Buffer::Instance& data, bool e
   }
   if (end_stream && !checksumMatched()) {
     encoder_callbacks_->sendLocalReply(Http::Code::Forbidden, "Mismatched checksum", nullptr,
-                                       absl::nullopt, "mismatched_checksum");
+                                       std::nullopt, "mismatched_checksum");
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
   return Http::FilterDataStatus::Continue;
@@ -82,7 +84,7 @@ Http::FilterTrailersStatus ChecksumFilter::encodeTrailers(Http::ResponseTrailerM
     return Http::FilterTrailersStatus::Continue;
   }
   encoder_callbacks_->sendLocalReply(Http::Code::Forbidden, "Mismatched checksum", nullptr,
-                                     absl::nullopt, "mismatched_checksum");
+                                     std::nullopt, "mismatched_checksum");
   return Http::FilterTrailersStatus::StopIteration;
 }
 

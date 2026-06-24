@@ -1,12 +1,22 @@
 #pragma once
 
 #include <cstdint>
+#include <ctime>
+#include <memory>
 #include <string>
 
+#include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/network/address.h"
+#include "envoy/network/listener.h"
+#include "envoy/network/socket.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
+
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {

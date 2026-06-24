@@ -2,7 +2,10 @@
 
 // This file provides host-side implementations for the cluster dynamic module ABI callbacks.
 
+#include <cstring>
+
 #include "source/common/common/assert.h"
+#include "source/common/common/safe_memcpy.h"
 #include "source/common/common/thread.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/router/string_accessor_impl.h"
@@ -32,6 +35,30 @@ getConfig(envoy_dynamic_module_type_cluster_config_envoy_ptr config_envoy_ptr) {
 Envoy::Upstream::LoadBalancerContext*
 getContext(envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr) {
   return static_cast<Envoy::Upstream::LoadBalancerContext*>(context_envoy_ptr);
+}
+
+// Helper that maps a host_stat enum to its counter/gauge accessor on HostStats.
+uint64_t readHostStat(const Envoy::Upstream::HostStats& host_stats,
+                      envoy_dynamic_module_type_host_stat stat) {
+  switch (stat) {
+  case envoy_dynamic_module_type_host_stat_CxConnectFail:
+    return host_stats.cx_connect_fail_.value();
+  case envoy_dynamic_module_type_host_stat_CxTotal:
+    return host_stats.cx_total_.value();
+  case envoy_dynamic_module_type_host_stat_RqError:
+    return host_stats.rq_error_.value();
+  case envoy_dynamic_module_type_host_stat_RqSuccess:
+    return host_stats.rq_success_.value();
+  case envoy_dynamic_module_type_host_stat_RqTimeout:
+    return host_stats.rq_timeout_.value();
+  case envoy_dynamic_module_type_host_stat_RqTotal:
+    return host_stats.rq_total_.value();
+  case envoy_dynamic_module_type_host_stat_CxActive:
+    return host_stats.cx_active_.value();
+  case envoy_dynamic_module_type_host_stat_RqActive:
+    return host_stats.rq_active_.value();
+  }
+  return 0;
 }
 
 // Helper to look up a metadata value by filter name and key for a host in the cluster priority set.
@@ -182,6 +209,14 @@ envoy_dynamic_module_type_cluster_host_envoy_ptr
 envoy_dynamic_module_callback_cluster_find_host_by_address(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
     envoy_dynamic_module_type_module_buffer address) {
+  // This reads the main thread cross-priority host map, so it is main-thread-only. An
+  // `ASSERT_IS_MAIN_OR_TEST_THREAD` would be compiled out under NDEBUG, so guard explicitly and
+  // fail closed.
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_find_host_by_address must be called on the "
+                 "main thread");
+    return nullptr;
+  }
   auto* cluster = getCluster(cluster_envoy_ptr);
   std::string address_str(address.ptr, address.length);
   auto host = cluster->findHostByAddress(address_str);
@@ -477,26 +512,7 @@ uint64_t envoy_dynamic_module_callback_cluster_lb_get_host_stat(
   if (index >= hosts.size()) {
     return 0;
   }
-  const auto& host_stats = hosts[index]->stats();
-  switch (stat) {
-  case envoy_dynamic_module_type_host_stat_CxConnectFail:
-    return host_stats.cx_connect_fail_.value();
-  case envoy_dynamic_module_type_host_stat_CxTotal:
-    return host_stats.cx_total_.value();
-  case envoy_dynamic_module_type_host_stat_RqError:
-    return host_stats.rq_error_.value();
-  case envoy_dynamic_module_type_host_stat_RqSuccess:
-    return host_stats.rq_success_.value();
-  case envoy_dynamic_module_type_host_stat_RqTimeout:
-    return host_stats.rq_timeout_.value();
-  case envoy_dynamic_module_type_host_stat_RqTotal:
-    return host_stats.rq_total_.value();
-  case envoy_dynamic_module_type_host_stat_CxActive:
-    return host_stats.cx_active_.value();
-  case envoy_dynamic_module_type_host_stat_RqActive:
-    return host_stats.rq_active_.value();
-  }
-  return 0;
+  return readHostStat(hosts[index]->stats(), stat);
 }
 
 bool envoy_dynamic_module_callback_cluster_lb_get_host_locality(
@@ -896,6 +912,17 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
   return true;
 }
 
+uint64_t envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr host_envoy_ptr,
+    envoy_dynamic_module_type_host_stat stat) {
+  if (context_envoy_ptr == nullptr || host_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto* host = static_cast<const Envoy::Upstream::Host*>(host_envoy_ptr);
+  return readHostStat(host->stats(), stat);
+}
+
 envoy_dynamic_module_type_cluster_scheduler_module_ptr
 envoy_dynamic_module_callback_cluster_scheduler_new(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr) {
@@ -916,6 +943,43 @@ void envoy_dynamic_module_callback_cluster_scheduler_commit(
       static_cast<Envoy::Extensions::Clusters::DynamicModules::DynamicModuleClusterScheduler*>(
           scheduler_module_ptr);
   scheduler->commit(event_id);
+}
+
+void envoy_dynamic_module_callback_cluster_run_on_all_workers(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint64_t event_id) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_run_on_all_workers must be called on the "
+                 "main thread");
+    return;
+  }
+  getCluster(cluster_envoy_ptr)->runOnAllWorkers(event_id);
+}
+
+void envoy_dynamic_module_callback_cluster_worker_slot_set(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data_module_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_worker_slot_set must be called on the "
+                 "main thread");
+    return;
+  }
+  getCluster(cluster_envoy_ptr)->workerSlotSet(data_module_ptr);
+}
+
+envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr
+envoy_dynamic_module_callback_cluster_worker_slot_get(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr) {
+  // Callable from any thread with a TLS registration; the registered-thread guard lives inside
+  // DynamicModuleCluster::workerSlotGet().
+  return getCluster(cluster_envoy_ptr)->workerSlotGet();
+}
+
+void envoy_dynamic_module_callback_cluster_get_name(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  const auto& name = getCluster(cluster_envoy_ptr)->clusterName();
+  result->ptr = name.data();
+  result->length = name.size();
 }
 
 // =============================================================================
@@ -1289,6 +1353,60 @@ bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(
   const auto& address_str = (*hosts)[index]->address()->asStringView();
   result->ptr = address_str.data();
   result->length = address_str.size();
+  return true;
+}
+
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_lb_get_member_update_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added) {
+  if (lb_envoy_ptr == nullptr) {
+    return nullptr;
+  }
+  const auto* hosts =
+      is_added ? getLb(lb_envoy_ptr)->hostsAdded() : getLb(lb_envoy_ptr)->hostsRemoved();
+  if (hosts == nullptr || index >= hosts->size()) {
+    return nullptr;
+  }
+  return const_cast<Envoy::Upstream::Host*>((*hosts)[index].get());
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added,
+    envoy_dynamic_module_type_packed_address* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  const auto* hosts =
+      is_added ? getLb(lb_envoy_ptr)->hostsAdded() : getLb(lb_envoy_ptr)->hostsRemoved();
+  if (hosts == nullptr || index >= hosts->size()) {
+    return false;
+  }
+  // Null for a pipe (non-IP) address; the packed representation only covers IP addresses.
+  const auto* ip = (*hosts)[index]->address()->ip();
+  if (ip == nullptr) {
+    return false;
+  }
+  std::memset(result->address_bytes, 0, sizeof(result->address_bytes));
+  // Both accessors return the address in network byte order, read straight from the sockaddr; see
+  // Ipv4/Ipv6Instance in source/common/network/address_impl.{h,cc}.
+  switch (ip->version()) {
+  case Envoy::Network::Address::IpVersion::v4: {
+    result->family = 4;
+    const uint32_t v4 = ip->ipv4()->address();
+    Envoy::safeMemcpyUnsafeDst(result->address_bytes, &v4);
+    break;
+  }
+  case Envoy::Network::Address::IpVersion::v6: {
+    result->family = 6;
+    const absl::uint128 v6 = ip->ipv6()->address();
+    Envoy::safeMemcpyUnsafeDst(result->address_bytes, &v6);
+    break;
+  }
+  default:
+    IS_ENVOY_BUG("unexpected IP version in cluster LB packed address getter");
+    return false;
+  }
+  result->port = static_cast<uint16_t>(ip->port());
   return true;
 }
 

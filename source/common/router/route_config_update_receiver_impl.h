@@ -62,11 +62,11 @@ public:
     return base_.parsedConfiguration();
   }
   SystemTime lastUpdated() const override { return base_.lastUpdated(); }
-  const std::set<std::string>& resourceIdsInLastVhdsUpdate() override {
+  const std::set<std::string>& resourceIdsInLastVhdsUpdate() const override {
     return resource_ids_in_last_update_;
   }
   const envoy::config::route::v3::RouteConfiguration& protobufConfigurationCast() const override {
-    ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(
+    ASSERT(Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::RouteConfiguration>(
         &RouteConfigUpdateReceiverImpl::protobufConfiguration()));
     return static_cast<const envoy::config::route::v3::RouteConfiguration&>(
         RouteConfigUpdateReceiverImpl::protobufConfiguration());

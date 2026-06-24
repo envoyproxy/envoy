@@ -209,6 +209,8 @@ envoy.clusters.original_dst:
   - envoy.clusters
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+  type_urls:
+  - envoy.extensions.clusters.original_dst.v3.OriginalDstCluster
 envoy.clusters.eds:
   categories:
   - envoy.clusters
@@ -339,6 +341,13 @@ envoy.filters.http.bandwidth_limit:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.bandwidth_limit.v3.BandwidthLimit
+envoy.filters.http.bandwidth_share:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.http.bandwidth_share.v3.BandwidthShare
 envoy.filters.http.basic_auth:
   categories:
   - envoy.filters.http
@@ -497,6 +506,14 @@ envoy.filters.http.fault:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.fault.v3.HTTPFault
+envoy.filters.http.filter_chain:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.filter_chain.v3.FilterChainConfig
+  - envoy.extensions.filters.http.filter_chain.v3.FilterChainConfigPerRoute
 envoy.filters.http.file_server:
   categories:
   - envoy.filters.http
@@ -643,6 +660,7 @@ envoy.filters.http.mcp_json_rest_bridge:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+  - envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridgePerRoute
 envoy.filters.http.mcp_router:
   categories:
   - envoy.filters.http
@@ -1073,6 +1091,13 @@ envoy.formatter.cel:
   status: alpha
   type_urls:
   - envoy.extensions.formatter.cel.v3.Cel
+envoy.formatter.dynamic_modules:
+  categories:
+  - envoy.formatter
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.formatter.dynamic_modules.v3.DynamicModuleFormatter
 envoy.formatter.file_content:
   categories:
   - envoy.formatter
@@ -1463,6 +1488,13 @@ envoy.stat_sinks.dog_statsd:
   status: stable
   type_urls:
   - envoy.config.metrics.v3.DogStatsdSink
+envoy.stat_sinks.dynamic_modules:
+  categories:
+  - envoy.stats_sinks
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.stat_sinks.dynamic_modules.v3.DynamicModuleStatsSink
 envoy.stat_sinks.graphite_statsd:
   categories:
   - envoy.stats_sinks
@@ -1630,6 +1662,14 @@ envoy.transport_sockets.quic:
   type_urls:
   - envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
   - envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
+envoy.transport_sockets.dynamic_modules:
+  categories:
+  - envoy.transport_sockets.downstream
+  - envoy.transport_sockets.upstream
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.transport_sockets.dynamic_modules.v3.DynamicModuleTransportSocket
 envoy.transport_sockets.raw_buffer:
   categories:
   - envoy.transport_sockets.downstream
@@ -2072,6 +2112,13 @@ envoy.load_balancing_policies.least_request:
   status: stable
   type_urls:
   - envoy.extensions.load_balancing_policies.least_request.v3.LeastRequest
+envoy.load_balancing_policies.load_aware_locality:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality
 envoy.load_balancing_policies.random:
   categories:
   - envoy.load_balancing_policies

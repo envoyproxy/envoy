@@ -50,7 +50,7 @@ protected:
 
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
       ext_proc_filter.set_name("envoy.filters.http.ext_proc");
-      ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
+      std::ignore = ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
     });
 
@@ -76,9 +76,9 @@ protected:
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
   }
 
-  bool IsEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
+  bool isEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
 
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_;
   FakeStreamPtr processor_stream_;
   FakeHttpConnectionPtr processor_connection_;
   std::vector<FakeUpstream*> grpc_upstreams_;
@@ -132,7 +132,7 @@ TEST_P(ExtProcStatusOnErrorIntegrationTest, GrpcStreamErrorDefaultStatus) {
 
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
     ext_proc_filter.set_name("envoy.filters.http.ext_proc");
-    ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
+    std::ignore = ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
   });
 

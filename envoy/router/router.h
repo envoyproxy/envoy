@@ -96,7 +96,8 @@ public:
    * @return std::string the redirect URL if this DirectResponseEntry is a redirect,
    *         or an empty string otherwise.
    */
-  virtual std::string newUri(const Http::RequestHeaderMap& headers) const PURE;
+  virtual std::string newUri(const Http::RequestHeaderMap& headers,
+                             const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
    * Format the response body for direct responses. Users should pass
@@ -1551,6 +1552,8 @@ public:
   virtual bool valid() const PURE;
 };
 
+using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;
+
 /**
  * An API for the interactions the upstream stream needs to have with the downstream stream
  * and/or router components
@@ -1678,8 +1681,6 @@ public:
    */
   virtual const StreamInfo::BytesMeterSharedPtr& bytesMeter() PURE;
 };
-
-using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;
 
 /*
  * A factory for creating generic connection pools.

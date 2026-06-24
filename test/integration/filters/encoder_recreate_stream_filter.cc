@@ -12,6 +12,7 @@
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "gtest/gtest.h"
 
@@ -32,7 +33,7 @@ public:
 
     decoder_callbacks_->streamInfo().filterState()->setData(
         "test_key", std::make_unique<Router::StringAccessorImpl>("test_value"),
-        StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
+        StreamInfo::FilterState::LifeSpan::Request);
 
     if (decoder_callbacks_->recreateStream(nullptr)) {
       return ::Envoy::Http::FilterHeadersStatus::StopIteration;
@@ -48,8 +49,10 @@ public:
 
 // perform static registration
 constexpr char EncoderRecreateStreamFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<EncoderRecreateStreamFilter>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<EncoderRecreateStreamFilter,
+                             test::integration::filters::EncoderRecreateStreamFilterConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 
 } // namespace Envoy

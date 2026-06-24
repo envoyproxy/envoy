@@ -10,6 +10,9 @@
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/test_runtime.h"
+#ifdef ENVOY_ENABLE_QUIC
+#include "test/extensions/quic/proof_source/pending_proof_source.pb.h"
+#endif
 
 #include "absl/strings/str_cat.h"
 
@@ -24,14 +27,15 @@ using testing::HasSubstr;
 class OverloadIntegrationTest : public BaseOverloadIntegrationTest,
                                 public HttpProtocolIntegrationTest {
 protected:
-  void initializeOverloadManager(const envoy::config::overload::v3::OverloadAction& overload_action,
-                                 absl::optional<bool> appendLocalOverloadHeader = absl::nullopt) {
+  void
+  initializeOverloadManager(const envoy::config::overload::v3::OverloadAction& overload_action,
+                            absl::optional<bool> append_local_overload_header = absl::nullopt) {
     setupOverloadManagerConfig(overload_action);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
     });
 
-    if (appendLocalOverloadHeader.has_value() && appendLocalOverloadHeader.value()) {
+    if (append_local_overload_header.has_value() && append_local_overload_header.value()) {
       config_helper_.addConfigModifier(
           [=](envoy::extensions::filters::network::http_connection_manager::v3::
                   HttpConnectionManager& cm) -> void { cm.set_append_local_overload(true); });
@@ -384,7 +388,7 @@ protected:
             scaling_threshold: 0.5
             saturation_threshold: 0.9
     )EOF");
-    overload_action.mutable_typed_config()->PackFrom(config);
+    std::ignore = overload_action.mutable_typed_config()->PackFrom(config);
     setupOverloadManagerConfig(overload_action);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
@@ -405,7 +409,7 @@ protected:
             scaling_threshold: 0.5
             saturation_threshold: 0.9
     )EOF");
-    overload_action.mutable_typed_config()->PackFrom(config);
+    std::ignore = overload_action.mutable_typed_config()->PackFrom(config);
     OverloadIntegrationTest::initializeOverloadManager(overload_action);
   }
 };
@@ -621,6 +625,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHa
   }
   TestScopedRuntime scoped_runtime;
 
+#ifdef ENVOY_ENABLE_QUIC
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* proof_source_config = bootstrap.mutable_static_resources()
                                     ->mutable_listeners(0)
@@ -628,8 +633,13 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHa
                                     ->mutable_quic_options()
                                     ->mutable_proof_source_config();
     proof_source_config->set_name("envoy.quic.proof_source.pending_signing");
-    proof_source_config->mutable_typed_config();
+    test::extensions::quic::proof_source::PendingProofSourceConfig config;
+    std::ignore = proof_source_config->mutable_typed_config()->PackFrom(config);
   });
+#else
+  FAIL() << "This test is not expected to run with quic disabled.";
+#endif
+
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::ScaleTimersOverloadActionConfig>(R"EOF(
       timer_scale_factors:
@@ -686,6 +696,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseMaxDurationHttpConnectionsD
             ProtobufUtil::TimeUtil::SecondsToDuration(20));
       });
 
+#ifdef ENVOY_ENABLE_QUIC
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* proof_source_config = bootstrap.mutable_static_resources()
                                     ->mutable_listeners(0)
@@ -693,8 +704,13 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseMaxDurationHttpConnectionsD
                                     ->mutable_quic_options()
                                     ->mutable_proof_source_config();
     proof_source_config->set_name("envoy.quic.proof_source.pending_signing");
-    proof_source_config->mutable_typed_config();
+    test::extensions::quic::proof_source::PendingProofSourceConfig config;
+    std::ignore = proof_source_config->mutable_typed_config()->PackFrom(config);
   });
+#else
+  FAIL() << "This test is not expected to run with quic disabled.";
+#endif
+
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::ScaleTimersOverloadActionConfig>(R"EOF(
       timer_scale_factors:

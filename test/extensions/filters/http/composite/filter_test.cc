@@ -672,7 +672,6 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingAction) {
 
   filter_state->setData(MatchedActionsFilterStateKey,
                         std::make_shared<MatchedActionInfo>("rootFilterName", "oldActionName"),
-                        StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
 
   Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
@@ -703,7 +702,6 @@ TEST_F(FilterTest, MatchingActionShouldNotCollitionWithOtherRootFilter) {
 
   filter_state->setData(MatchedActionsFilterStateKey,
                         std::make_shared<MatchedActionInfo>("otherRootFilterName", "anyActionName"),
-                        StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
 
   Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
@@ -1745,7 +1743,7 @@ TEST(ConfigTest, CompileNamedFilterChainsFailsOnFactoryError) {
   auto* typed = chain.add_typed_config();
   typed->set_name("envoy.filters.http.test.fail_factory");
   Protobuf::Struct struct_config;
-  typed->mutable_typed_config()->PackFrom(struct_config);
+  std::ignore = typed->mutable_typed_config()->PackFrom(struct_config);
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   CompositeFilterFactory factory;

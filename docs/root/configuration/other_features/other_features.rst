@@ -5,7 +5,6 @@ Other features
   :maxdepth: 2
 
   bootstrap_extensions/dynamic_modules
-  dlb
   hyperscan
   internal_listener
   rate_limit

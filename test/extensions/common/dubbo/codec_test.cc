@@ -4,6 +4,7 @@
 #include "source/extensions/common/dubbo/message.h"
 
 #include "test/extensions/common/dubbo/mocks.h"
+#include "test/test_common/enum_test_utils.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -328,7 +329,7 @@ TEST(DubboCodecTest, DecodeDataTest) {
     MessageMetadata metadata;
     auto context = std::make_unique<Context>();
 
-    context->setMessageType(static_cast<MessageType>(6));
+    context->setMessageType(uncheckedEnumCastForTest<MessageType>(6));
     context->setRequestId(1);
     context->setBodySize(buffer.length());
     context->setResponseStatus(ResponseStatus::Ok);
@@ -603,7 +604,7 @@ TEST(DubboCodecTest, EncodeTest) {
     MessageMetadata metadata;
 
     auto context = std::make_unique<Context>();
-    context->setMessageType(static_cast<MessageType>(6));
+    context->setMessageType(uncheckedEnumCastForTest<MessageType>(6));
     context->setResponseStatus(ResponseStatus::Ok);
     context->setRequestId(12345);
 
@@ -621,7 +622,7 @@ TEST(DubboCodecTest, EncodeHeaderForTestTest) {
     Buffer::OwnedImpl buffer;
 
     auto context = std::make_unique<Context>();
-    context->setMessageType(static_cast<MessageType>(6));
+    context->setMessageType(uncheckedEnumCastForTest<MessageType>(6));
     context->setResponseStatus(ResponseStatus::Ok);
     context->setRequestId(12345);
 

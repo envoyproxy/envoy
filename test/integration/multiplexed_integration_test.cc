@@ -22,6 +22,7 @@
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
@@ -123,9 +124,11 @@ TEST_P(MultiplexedIntegrationTest, Http3StreamInfoDownstreamHandshakeTiming) {
     return;
   }
 
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -331,6 +334,8 @@ TEST_P(MultiplexedIntegrationTest, Http2DownstreamKeepalive) {
 
 static std::string response_metadata_filter = R"EOF(
 name: response-metadata-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.ResponseMetadataFilterConfig
 )EOF";
 
 class MetadataIntegrationTest : public HttpProtocolIntegrationTest {
@@ -844,6 +849,8 @@ TEST_P(MetadataIntegrationTest, RequestMetadataThenTrailers) {
 
 static std::string request_metadata_filter = R"EOF(
 name: request-metadata-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.RequestMetadataFilterConfig
 )EOF";
 
 TEST_P(MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
@@ -1023,6 +1030,8 @@ void MetadataIntegrationTest::testRequestMetadataWithStopAllFilter() {
 
 static std::string metadata_stop_all_filter = R"EOF(
 name: metadata-stop-all-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.MetadataStopAllFilterConfig
 )EOF";
 
 TEST_P(MetadataIntegrationTest, RequestMetadataWithStopAllFilterBeforeMetadataFilter) {
@@ -1038,6 +1047,8 @@ TEST_P(MetadataIntegrationTest, RequestMetadataWithStopAllFilterAfterMetadataFil
 TEST_P(MetadataIntegrationTest, TestAddEncodedMetadata) {
   config_helper_.prependFilter(R"EOF(
 name: encode-headers-return-stop-all-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.EncodeHeadersReturnStopAllFilterConfig
 )EOF");
 
   initialize();
@@ -1143,7 +1154,11 @@ TEST_P(MultiplexedIntegrationTest, BadFrame) {
 
 // Test GoAway from L7 decoder filters with StopIteration.
 TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilter) {
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
@@ -1159,7 +1174,11 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilter) {
 
 // Test GoAway from L7 decoder filters with Continue.
 TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilterContinue) {
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
@@ -1179,7 +1198,11 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterStopIterat
   FakeHttpConnectionPtr fake_upstream_connection;
   Http::RequestEncoder* encoder;
   FakeStreamPtr upstream_request;
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -1211,7 +1234,11 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterContinue) 
   FakeHttpConnectionPtr fake_upstream_connection;
   Http::RequestEncoder* encoder;
   FakeStreamPtr upstream_request;
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -1240,7 +1267,11 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterContinue) 
 
 // Test sending GoAway during SendLocalReply from L7 encoder filters.
 TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredInLocalReplyEncoderFilter) {
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -1901,6 +1932,8 @@ TEST_P(MultiplexedIntegrationTest, EmptyTrailers) {
 TEST_P(MultiplexedIntegrationTest, TestEncode1xxHeaders) {
   static std::string encode1xx_local_reply_config = R"EOF(
   name: encode1xx-local-reply-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.Encode1xxLocalReplyFilterConfig
   )EOF";
   config_helper_.prependFilter(encode1xx_local_reply_config);
   config_helper_.addConfigModifier(
@@ -1930,9 +1963,13 @@ TEST_P(MultiplexedIntegrationTest, TestEncode1xxHeaders) {
 TEST_P(MultiplexedIntegrationTest, TestEncode1xxHeadersWithLocalReplyDuringData) {
   std::string local_reply_during_decode_config = R"EOF(
   name: local-reply-during-decode
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringDecodeConfig
   )EOF";
   std::string add_response_metadata_config = R"EOF(
   name: response-metadata-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.ResponseMetadataFilterConfig
   )EOF";
   config_helper_.prependFilter(local_reply_during_decode_config);
   config_helper_.prependFilter(add_response_metadata_config);
@@ -2798,6 +2835,8 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithMetadata) {
 
   config_helper_.prependFilter(R"EOF(
   name: metadata-control-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.MetadataControlFilterConfig
   )EOF");
 
   const int kRequestsSentPerIOCycle = 20;
@@ -2852,7 +2891,11 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsDecodeHeadersEndsRequest) {
   // The local-reply-during-decode will call sendLocalReply, completing them
   // when processing headers. This will cause the ConnectionManagerImpl::ActiveRequest
   // object to be removed from the streams_ list during the onDeferredRequestProcessing call.
-  config_helper_.addFilter("{ name: local-reply-during-decode }");
+  config_helper_.addFilter(R"EOF(
+    name: local-reply-during-decode
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringDecodeConfig
+  )EOF");
   // Process more than 1 deferred request at a time to validate the removal of elements from
   // the list does not break reverse iteration.
   config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "3");
@@ -2936,7 +2979,11 @@ void Http2FrameIntegrationTest::sendRequestsAndResponses(uint32_t num_requests) 
 
 // Validate that GOAWAY is triggered by a L7 filter.
 TEST_P(Http2FrameIntegrationTest, SendGoAwayTriggerredByDecodingFilter) {
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   beginSession();
   uint32_t num_requests = 10;
   std::string buffer;
@@ -2957,7 +3004,11 @@ TEST_P(Http2FrameIntegrationTest, SendGoAwayTriggerredByDecodingFilter) {
 
 // GOAWAY is not triggered by a L7 filter.
 TEST_P(Http2FrameIntegrationTest, SendGoAwayNotTriggerredByDecodingFilter) {
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   beginSession();
   std::string buffer;
   auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(1), "a", "/",
@@ -2979,7 +3030,11 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailersWithFilterChainPau
   const int kRequestsSentPerIOCycle = 20;
   // Add filter that stops iteration in the decodeHeaders and resumes in
   // decodeData to verify that downstream end_stream is handled correctly by the filter manager.
-  config_helper_.addFilter("name: stop-in-headers-continue-in-body-filter");
+  config_helper_.addFilter(R"EOF(
+    name: stop-in-headers-continue-in-body-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StopInHeadersContinueInBodyFilterConfig
+  )EOF");
   config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
   sendRequestsAndResponses(kRequestsSentPerIOCycle);
 }
@@ -2995,7 +3050,11 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailersNoPauseInFilterCha
 TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailersDecodeHeadersEndsRequest) {
   const int kRequestsSentPerIOCycle = 20;
   autonomous_upstream_ = true;
-  config_helper_.addFilter("{ name: local-reply-during-decode }");
+  config_helper_.addFilter(R"EOF(
+    name: local-reply-during-decode
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringDecodeConfig
+  )EOF");
   config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "6");
   beginSession();
 
@@ -3595,7 +3654,7 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogation) {
       // is not complete yet, it will finally result in resetting of the downstream stream.
       upstream_request_->encodeResetStream(Http::StreamResetReason::ProtocolError);
       ASSERT_TRUE(response->waitForReset());
-      EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+      EXPECT_EQ(Http::StreamResetReason::RemoteResetNoError, response->resetReason());
 
       cleanupUpstreamAndDownstream();
     });
@@ -3626,7 +3685,7 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogation) {
       // is not complete yet, it will finally result in resetting of the stream.
       upstream_request_->encodeResetStream(Http::StreamResetReason::LocalReset);
       ASSERT_TRUE(response->waitForReset());
-      EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+      EXPECT_EQ(Http::StreamResetReason::RemoteResetNoError, response->resetReason());
 
       cleanupUpstreamAndDownstream();
     });
@@ -3696,7 +3755,7 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogationToD
       // is not complete yet, it will finally result in resetting of the stream.
       upstream_request_->encodeResetStream(Http::StreamResetReason::LocalReset);
       ASSERT_TRUE(response->waitForReset());
-      EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+      EXPECT_EQ(Http::StreamResetReason::RemoteResetNoError, response->resetReason());
 
       cleanupUpstreamAndDownstream();
     });
@@ -3708,8 +3767,8 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogationLeg
 
   std::vector<Http::StreamResetReason> reasons = {Http::StreamResetReason::ProtocolError,
                                                   Http::StreamResetReason::LocalReset};
-  std::vector<Http::StreamResetReason> result_reasons = {Http::StreamResetReason::RemoteReset,
-                                                         Http::StreamResetReason::RemoteReset};
+  std::vector<Http::StreamResetReason> result_reasons = {
+      Http::StreamResetReason::RemoteResetNoError, Http::StreamResetReason::RemoteResetNoError};
 
   // There are four streams created in total, client stream, Envoy server stream,
   // Envoy client stream and upstream server stream.
@@ -3739,6 +3798,479 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogationLeg
 
     cleanupUpstreamAndDownstream();
   }
+}
+
+// RFC 9113 Section 8.1: When the upstream sends a complete gRPC response (HEADERS + DATA +
+// trailers with END_STREAM) followed by RST_STREAM(NO_ERROR), and the response body is large
+// enough to trigger chunked decoding in the upstream H2 codec (body > connection buffer limit),
+// the trailers get buffered. The RST_STREAM(NO_ERROR) is then processed before the buffered
+// trailers are delivered, causing the RST_STREAM to reach the router as RemoteReset instead of
+// being silently consumed by the preemptive reset in onUpstreamComplete.
+// This test verifies that the complete response (including trailers) is forwarded to the client.
+TEST_P(Http2FrameIntegrationTest, UpstreamRstStreamNoErrorWithBufferedTrailers) {
+  config_helper_.setBufferLimits(1024, 1024);
+  beginSession();
+
+  const uint32_t stream_idx = 1;
+  sendFrame(Http2Frame::makePostRequest(stream_idx, "host", "/"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(Http2Frame::makeEmptySettingsFrame())));
+
+  // HEADERS (200, EndHeaders, no EndStream)
+  const auto response_headers = Http2Frame::makeHeadersFrameWithStatus(
+      "200", stream_idx, Http2Frame::HeadersFlags::EndHeaders);
+
+  // DATA: >1024 bytes to trigger chunked decoding (defer_processing_segment_size_ = buffer limit).
+  // This causes body_buffered_ = true after the first chunk is decoded, which in turn causes
+  // trailers to be buffered via maybeDeferDecodeTrailers().
+  const std::string large_body(2000, 'a');
+  const auto response_data =
+      Http2Frame::makeDataFrame(stream_idx, large_body, Http2Frame::DataFlags::None);
+
+  // Trailers: HEADERS with EndStream | EndHeaders containing "grpc-status: 0".
+  std::string hpack_trailers;
+  hpack_trailers.push_back(0x00);
+  hpack_trailers.push_back(0x0b);
+  hpack_trailers.append("grpc-status");
+  hpack_trailers.push_back(0x01);
+  hpack_trailers.push_back('0');
+  const auto trailers =
+      Http2Frame::makeRawFrame(Http2Frame::Type::Headers,
+                               static_cast<uint8_t>(Http2Frame::HeadersFlags::EndStream) |
+                                   static_cast<uint8_t>(Http2Frame::HeadersFlags::EndHeaders),
+                               stream_idx, hpack_trailers);
+
+  // RST_STREAM (NO_ERROR)
+  const auto rst_stream =
+      Http2Frame::makeResetStreamFrame(stream_idx, Http2Frame::ErrorCode::NoError);
+
+  // Send all frames in a single write so they're processed in the same dispatch.
+  // The codec will: decode headers (immediate), chunk data (buffer remainder),
+  // buffer trailers (body_buffered_), then process RST_STREAM.
+  ASSERT_TRUE(fake_upstream_connection->write(
+      absl::StrCat(std::string(response_headers), std::string(response_data), std::string(trailers),
+                   std::string(rst_stream))));
+
+  auto readNextResponseFrame = [this]() -> Http2Frame {
+    while (true) {
+      auto frame = readFrame();
+      if (frame.type() != Http2Frame::Type::WindowUpdate &&
+          frame.type() != Http2Frame::Type::Settings && frame.type() != Http2Frame::Type::Ping) {
+        return frame;
+      }
+    }
+  };
+
+  // Response HEADERS — should be 200 OK, not a 503 local error reply.
+  auto headers_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, headers_frame.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, headers_frame.responseStatus())
+      << "Expected 200 OK from upstream, not a local error reply";
+
+  // Response DATA — may be split across multiple frames due to buffer limits.
+  Http2Frame next_frame;
+  do {
+    next_frame = readNextResponseFrame();
+  } while (next_frame.type() == Http2Frame::Type::Data && !next_frame.endStream());
+
+  // Response trailers (HEADERS with END_STREAM) — the complete response must be forwarded.
+  // If the bug triggers, we'll get RST_STREAM here instead of trailers.
+  auto trailers_frame = next_frame;
+  if (trailers_frame.type() == Http2Frame::Type::RstStream) {
+    ASSERT_GE(trailers_frame.size(), Http2Frame::HeaderSize + 4);
+    const uint8_t* p = trailers_frame.data() + Http2Frame::HeaderSize;
+    const uint32_t error_code = (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
+    EXPECT_EQ(Http2Frame::Type::Headers, trailers_frame.type())
+        << "Expected trailers (HEADERS with END_STREAM) but got RST_STREAM with error code "
+        << error_code
+        << ". The RST_STREAM(NO_ERROR) from upstream was likely processed before the buffered "
+           "trailers were delivered, causing the response to be truncated.";
+  } else {
+    EXPECT_EQ(Http2Frame::Type::Headers, trailers_frame.type())
+        << "Expected trailers (HEADERS with END_STREAM) but got frame type "
+        << static_cast<int>(trailers_frame.type());
+    EXPECT_TRUE(trailers_frame.endStream());
+  }
+
+  tcp_client_->close();
+}
+
+// Verify old behavior when the runtime guard is disabled: RST_STREAM(NO_ERROR) after a complete
+// response with buffered trailers causes the response to be truncated (trailers discarded) and
+// an error RST_STREAM sent downstream instead.
+TEST_P(Http2FrameIntegrationTest, UpstreamRstStreamNoErrorWithBufferedTrailersLegacy) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.http_preserve_rst_no_error",
+                                    "false");
+  config_helper_.setBufferLimits(1024, 1024);
+  beginSession();
+
+  const uint32_t stream_idx = 1;
+  sendFrame(Http2Frame::makePostRequest(stream_idx, "host", "/"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(Http2Frame::makeEmptySettingsFrame())));
+
+  const auto response_headers = Http2Frame::makeHeadersFrameWithStatus(
+      "200", stream_idx, Http2Frame::HeadersFlags::EndHeaders);
+
+  const std::string large_body(2000, 'a');
+  const auto response_data =
+      Http2Frame::makeDataFrame(stream_idx, large_body, Http2Frame::DataFlags::None);
+
+  std::string hpack_trailers;
+  hpack_trailers.push_back(0x00);
+  hpack_trailers.push_back(0x0b);
+  hpack_trailers.append("grpc-status");
+  hpack_trailers.push_back(0x01);
+  hpack_trailers.push_back('0');
+  const auto trailers =
+      Http2Frame::makeRawFrame(Http2Frame::Type::Headers,
+                               static_cast<uint8_t>(Http2Frame::HeadersFlags::EndStream) |
+                                   static_cast<uint8_t>(Http2Frame::HeadersFlags::EndHeaders),
+                               stream_idx, hpack_trailers);
+
+  const auto rst_stream =
+      Http2Frame::makeResetStreamFrame(stream_idx, Http2Frame::ErrorCode::NoError);
+
+  ASSERT_TRUE(fake_upstream_connection->write(
+      absl::StrCat(std::string(response_headers), std::string(response_data), std::string(trailers),
+                   std::string(rst_stream))));
+
+  auto readNextResponseFrame = [this]() -> Http2Frame {
+    while (true) {
+      auto frame = readFrame();
+      if (frame.type() != Http2Frame::Type::WindowUpdate &&
+          frame.type() != Http2Frame::Type::Settings && frame.type() != Http2Frame::Type::Ping) {
+        return frame;
+      }
+    }
+  };
+
+  auto headers_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, headers_frame.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, headers_frame.responseStatus());
+
+  // Consume DATA frames, then expect RST_STREAM (old buggy behavior: trailers discarded).
+  auto next_frame = readNextResponseFrame();
+  while (next_frame.type() == Http2Frame::Type::Data) {
+    next_frame = readNextResponseFrame();
+  }
+  EXPECT_EQ(Http2Frame::Type::RstStream, next_frame.type())
+      << "With runtime guard disabled, expected RST_STREAM (old behavior) but got frame type "
+      << static_cast<int>(next_frame.type());
+  ASSERT_GE(next_frame.size(), Http2Frame::HeaderSize + 4);
+  const uint8_t* p = next_frame.data() + Http2Frame::HeaderSize;
+  const uint32_t error_code = (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
+  EXPECT_NE(0u, error_code) << "With runtime guard disabled, RST_STREAM error code should not be "
+                               "NO_ERROR (old behavior sends an error reset)";
+
+  tcp_client_->close();
+}
+
+// Verify that RST_STREAM with an actual error code (not NO_ERROR) still correctly resets the stream
+// even when trailers are buffered.
+TEST_P(Http2FrameIntegrationTest, UpstreamRstStreamWithErrorAndBufferedTrailers) {
+  config_helper_.setBufferLimits(1024, 1024);
+  beginSession();
+
+  const uint32_t stream_idx = 1;
+  sendFrame(Http2Frame::makePostRequest(stream_idx, "host", "/"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(Http2Frame::makeEmptySettingsFrame())));
+
+  const auto response_headers = Http2Frame::makeHeadersFrameWithStatus(
+      "200", stream_idx, Http2Frame::HeadersFlags::EndHeaders);
+
+  const std::string large_body(2000, 'a');
+  const auto response_data =
+      Http2Frame::makeDataFrame(stream_idx, large_body, Http2Frame::DataFlags::None);
+
+  std::string hpack_trailers;
+  hpack_trailers.push_back(0x00);
+  hpack_trailers.push_back(0x0b);
+  hpack_trailers.append("grpc-status");
+  hpack_trailers.push_back(0x01);
+  hpack_trailers.push_back('0');
+  const auto trailers =
+      Http2Frame::makeRawFrame(Http2Frame::Type::Headers,
+                               static_cast<uint8_t>(Http2Frame::HeadersFlags::EndStream) |
+                                   static_cast<uint8_t>(Http2Frame::HeadersFlags::EndHeaders),
+                               stream_idx, hpack_trailers);
+
+  // RST_STREAM with INTERNAL_ERROR (not NO_ERROR)
+  const auto rst_stream =
+      Http2Frame::makeResetStreamFrame(stream_idx, Http2Frame::ErrorCode::InternalError);
+
+  ASSERT_TRUE(fake_upstream_connection->write(
+      absl::StrCat(std::string(response_headers), std::string(response_data), std::string(trailers),
+                   std::string(rst_stream))));
+
+  auto readNextResponseFrame = [this]() -> Http2Frame {
+    while (true) {
+      auto frame = readFrame();
+      if (frame.type() != Http2Frame::Type::WindowUpdate &&
+          frame.type() != Http2Frame::Type::Settings && frame.type() != Http2Frame::Type::Ping) {
+        return frame;
+      }
+    }
+  };
+
+  auto headers_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, headers_frame.type());
+
+  // With an actual error, the stream should be reset — we expect RST_STREAM downstream,
+  // not the complete response with trailers. Consume any DATA frames first.
+  auto next_frame = readNextResponseFrame();
+  while (next_frame.type() == Http2Frame::Type::Data) {
+    next_frame = readNextResponseFrame();
+  }
+  EXPECT_EQ(Http2Frame::Type::RstStream, next_frame.type())
+      << "Expected RST_STREAM for error reset but got frame type "
+      << static_cast<int>(next_frame.type());
+  ASSERT_GE(next_frame.size(), Http2Frame::HeaderSize + 4);
+  const uint8_t* p = next_frame.data() + Http2Frame::HeaderSize;
+  const uint32_t error_code = (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
+  EXPECT_NE(0u, error_code) << "RST_STREAM error code should not be NO_ERROR for an error reset";
+
+  tcp_client_->close();
+}
+
+// RFC 9113 Section 8.1: A server MAY send RST_STREAM(NO_ERROR) after sending a complete response
+// to request that the client stop sending the request body. The client MUST NOT discard the
+// response as a result of receiving such a RST_STREAM, and the proxy MUST NOT translate a
+// RST_STREAM(NO_ERROR) into an error.
+//
+// Verify that when the upstream sends a complete response (with END_STREAM on DATA) followed by
+// RST_STREAM(NO_ERROR) before the client has sent END_STREAM, Envoy forwards the response and
+// sends RST_STREAM(NO_ERROR) downstream (not an error code). Uses raw H2 frames on both sides
+// to ensure compliance without depending on Envoy codec interpretation for the upstream and
+// downstream.
+TEST_P(Http2FrameIntegrationTest, UpstreamCompleteResponseFollowedByRstStreamNoError) {
+  beginSession();
+
+  const uint32_t stream_idx = 1;
+  sendFrame(Http2Frame::makePostRequest(stream_idx, "host", "/"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(Http2Frame::makeEmptySettingsFrame())));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+
+  const auto response_headers = Http2Frame::makeHeadersFrameWithStatus(
+      "200", stream_idx, Http2Frame::HeadersFlags::EndHeaders);
+  const auto response_data =
+      Http2Frame::makeDataFrame(stream_idx, "hello", Http2Frame::DataFlags::EndStream);
+  const auto rst_stream =
+      Http2Frame::makeResetStreamFrame(stream_idx, Http2Frame::ErrorCode::NoError);
+
+  ASSERT_TRUE(fake_upstream_connection->write(absl::StrCat(
+      std::string(response_headers), std::string(response_data), std::string(rst_stream))));
+
+  auto readNextResponseFrame = [this]() -> Http2Frame {
+    while (true) {
+      auto frame = readFrame();
+      if (frame.type() != Http2Frame::Type::WindowUpdate &&
+          frame.type() != Http2Frame::Type::Settings && frame.type() != Http2Frame::Type::Ping) {
+        return frame;
+      }
+    }
+  };
+
+  auto headers_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, headers_frame.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, headers_frame.responseStatus())
+      << "Expected 200 OK from upstream, not a local error reply";
+
+  auto data_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Data, data_frame.type());
+  EXPECT_TRUE(data_frame.endStream());
+
+  auto rst_frame = readNextResponseFrame();
+  ASSERT_EQ(Http2Frame::Type::RstStream, rst_frame.type());
+  ASSERT_GE(rst_frame.size(), Http2Frame::HeaderSize + 4);
+  const uint8_t* p = rst_frame.data() + Http2Frame::HeaderSize;
+  const uint32_t error_code = (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
+  EXPECT_EQ(0u, error_code) << "RST_STREAM error code must be NO_ERROR (0) per RFC 9113 "
+                               "Section 8.1, but got "
+                            << error_code;
+
+  tcp_client_->close();
+}
+
+// Same scenario as above, but with allow_multiplexed_upstream_half_close enabled and using
+// gRPC-style trailers (HEADERS with END_STREAM) instead of DATA with END_STREAM.
+// This exercises the path where the upstream stream stays open after the response is complete
+// (onUpstreamComplete returns early), so the server's RST_STREAM(NO_ERROR) reaches the router
+// as a RemoteReset via onUpstreamReset. The downstream RST_STREAM must still be NO_ERROR.
+TEST_P(Http2FrameIntegrationTest, UpstreamTrailersAndRstStreamNoErrorWithHalfClose) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
+  beginSession();
+
+  const uint32_t stream_idx = 1;
+  sendFrame(Http2Frame::makePostRequest(stream_idx, "host", "/"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(Http2Frame::makeEmptySettingsFrame())));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+
+  // HEADERS (200, EndHeaders, no EndStream)
+  const auto response_headers = Http2Frame::makeHeadersFrameWithStatus(
+      "200", stream_idx, Http2Frame::HeadersFlags::EndHeaders);
+
+  // DATA ("hello", no EndStream)
+  const auto response_data =
+      Http2Frame::makeDataFrame(stream_idx, "hello", Http2Frame::DataFlags::None);
+
+  // Trailers: a HEADERS frame with EndStream | EndHeaders, containing "grpc-status: 0".
+  // HPACK literal header without indexing, new name:
+  //   0x00 | name_len(0x0b) | "grpc-status" | value_len(0x01) | "0"
+  std::string hpack_trailers;
+  hpack_trailers.push_back(0x00);
+  hpack_trailers.push_back(0x0b);
+  hpack_trailers.append("grpc-status");
+  hpack_trailers.push_back(0x01);
+  hpack_trailers.push_back('0');
+  const auto trailers =
+      Http2Frame::makeRawFrame(Http2Frame::Type::Headers,
+                               static_cast<uint8_t>(Http2Frame::HeadersFlags::EndStream) |
+                                   static_cast<uint8_t>(Http2Frame::HeadersFlags::EndHeaders),
+                               stream_idx, hpack_trailers);
+
+  // RST_STREAM (NO_ERROR)
+  const auto rst_stream =
+      Http2Frame::makeResetStreamFrame(stream_idx, Http2Frame::ErrorCode::NoError);
+
+  // Send response + RST_STREAM in a single write.
+  ASSERT_TRUE(fake_upstream_connection->write(
+      absl::StrCat(std::string(response_headers), std::string(response_data), std::string(trailers),
+                   std::string(rst_stream))));
+
+  auto readNextResponseFrame = [this]() -> Http2Frame {
+    while (true) {
+      auto frame = readFrame();
+      if (frame.type() != Http2Frame::Type::WindowUpdate &&
+          frame.type() != Http2Frame::Type::Settings && frame.type() != Http2Frame::Type::Ping) {
+        return frame;
+      }
+    }
+  };
+
+  // Response HEADERS (200 OK).
+  auto headers_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, headers_frame.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, headers_frame.responseStatus())
+      << "Expected 200 OK from upstream, not a local error reply";
+
+  // Response DATA.
+  auto data_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Data, data_frame.type());
+
+  // Response trailers (HEADERS with END_STREAM).
+  auto trailers_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, trailers_frame.type());
+  EXPECT_TRUE(trailers_frame.endStream());
+
+  // RST_STREAM must be NO_ERROR per RFC 9113 Section 8.1.
+  auto rst_frame = readNextResponseFrame();
+  ASSERT_EQ(Http2Frame::Type::RstStream, rst_frame.type());
+  ASSERT_GE(rst_frame.size(), Http2Frame::HeaderSize + 4);
+  const uint8_t* p = rst_frame.data() + Http2Frame::HeaderSize;
+  const uint32_t error_code = (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
+  EXPECT_EQ(0u, error_code) << "RST_STREAM error code must be NO_ERROR (0) per RFC 9113 "
+                               "Section 8.1, but got "
+                            << error_code;
+
+  tcp_client_->close();
+}
+
+// Same as UpstreamTrailersAndRstStreamNoErrorWithHalfClose, but the RST_STREAM is sent in a
+// separate write from the response, simulating separate TCP packets. This tests the case where
+// the RST_STREAM(NO_ERROR) arrives in a different event loop iteration from the response.
+TEST_P(Http2FrameIntegrationTest, UpstreamTrailersAndSeparateRstStreamNoError) {
+  beginSession();
+
+  const uint32_t stream_idx = 1;
+  sendFrame(Http2Frame::makePostRequest(stream_idx, "host", "/"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(Http2Frame::makeEmptySettingsFrame())));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+
+  // HEADERS (200, EndHeaders, no EndStream)
+  const auto response_headers = Http2Frame::makeHeadersFrameWithStatus(
+      "200", stream_idx, Http2Frame::HeadersFlags::EndHeaders);
+
+  // DATA ("hello", no EndStream)
+  const auto response_data =
+      Http2Frame::makeDataFrame(stream_idx, "hello", Http2Frame::DataFlags::None);
+
+  // Trailers with EndStream | EndHeaders containing "grpc-status: 0".
+  std::string hpack_trailers;
+  hpack_trailers.push_back(0x00);
+  hpack_trailers.push_back(0x0b);
+  hpack_trailers.append("grpc-status");
+  hpack_trailers.push_back(0x01);
+  hpack_trailers.push_back('0');
+  const auto trailers =
+      Http2Frame::makeRawFrame(Http2Frame::Type::Headers,
+                               static_cast<uint8_t>(Http2Frame::HeadersFlags::EndStream) |
+                                   static_cast<uint8_t>(Http2Frame::HeadersFlags::EndHeaders),
+                               stream_idx, hpack_trailers);
+
+  // Send the response (headers + data + trailers) first.
+  ASSERT_TRUE(fake_upstream_connection->write(absl::StrCat(
+      std::string(response_headers), std::string(response_data), std::string(trailers))));
+
+  auto readNextResponseFrame = [this]() -> Http2Frame {
+    while (true) {
+      auto frame = readFrame();
+      if (frame.type() != Http2Frame::Type::WindowUpdate &&
+          frame.type() != Http2Frame::Type::Settings && frame.type() != Http2Frame::Type::Ping) {
+        return frame;
+      }
+    }
+  };
+
+  // Read the response frames first — this implicitly waits for them to be forwarded.
+  // Response HEADERS (200 OK).
+  auto headers_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, headers_frame.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, headers_frame.responseStatus())
+      << "Expected 200 OK from upstream, not a local error reply";
+
+  // Response DATA.
+  auto data_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Data, data_frame.type());
+
+  // Response trailers (HEADERS with END_STREAM).
+  auto trailers_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, trailers_frame.type());
+  EXPECT_TRUE(trailers_frame.endStream());
+
+  // Now send RST_STREAM(NO_ERROR) in a separate write, after the response is confirmed forwarded.
+  const auto rst_stream =
+      Http2Frame::makeResetStreamFrame(stream_idx, Http2Frame::ErrorCode::NoError);
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(rst_stream)));
+
+  // RST_STREAM must be NO_ERROR.
+  auto rst_frame = readNextResponseFrame();
+  ASSERT_EQ(Http2Frame::Type::RstStream, rst_frame.type());
+  ASSERT_GE(rst_frame.size(), Http2Frame::HeaderSize + 4);
+  const uint8_t* p = rst_frame.data() + Http2Frame::HeaderSize;
+  const uint32_t error_code = (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
+  EXPECT_EQ(0u, error_code) << "RST_STREAM error code must be NO_ERROR (0) per RFC 9113 "
+                               "Section 8.1, but got "
+                            << error_code;
+
+  tcp_client_->close();
 }
 
 } // namespace Envoy

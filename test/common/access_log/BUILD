@@ -54,5 +54,6 @@ envoy_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
+        "//test/test_common:thread_factory_for_test_lib",
     ],
 )

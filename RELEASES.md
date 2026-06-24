@@ -132,7 +132,7 @@ deadline of 3 weeks.
 * Begin marshalling the ongoing PR flow in this repo. Ask maintainers to hold off merging any
   particularly risky PRs until after the release is tagged. This is because we aim for main to be
   at release candidate quality at all times.
-* Do a final check of the [release notes](changelogs/current.yaml):
+* Do a final check of the release note fragments in [changelogs/current](changelogs/current):
   * Make any needed corrections (grammar, punctuation, formatting, etc.).
   * Check to see if any security/stable version release notes are duplicated in
     the major version release notes. These should not be duplicated.

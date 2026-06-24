@@ -44,19 +44,23 @@ constexpr absl::string_view LocalReplyFilterStateKey =
     "envoy.filters.network.http_connection_manager.local_reply_owner";
 class LocalReplyOwnerObject : public StreamInfo::FilterState::Object {
 public:
-  LocalReplyOwnerObject(const std::string& filter_config_name)
+  // The filter_config_name is expected to outlive the LocalReplyOwnerObject, as it typically
+  // comes from the filter configuration.
+  LocalReplyOwnerObject(absl::string_view filter_config_name)
       : filter_config_name_(filter_config_name) {}
 
   ProtobufTypes::MessagePtr serializeAsProto() const override {
     auto message = std::make_unique<Protobuf::StringValue>();
-    message->set_value(filter_config_name_);
+    message->set_value(std::string(filter_config_name_));
     return message;
   }
 
-  absl::optional<std::string> serializeAsString() const override { return filter_config_name_; }
+  absl::optional<std::string> serializeAsString() const override {
+    return std::string(filter_config_name_);
+  }
 
 private:
-  const std::string filter_config_name_;
+  const absl::string_view filter_config_name_;
 };
 
 // TODO(wbpcode): Rather than allocating every filter with an unique pointer, we could
@@ -270,6 +274,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void handleMetadataAfterHeadersCallback() override;
 
   // Http::StreamDecoderFilterCallbacks
+  OptRef<WebTransportSession> webTransportSession() override;
   void addDecodedData(Buffer::Instance& data, bool streaming) override;
   void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
   RequestTrailerMap& addDecodedTrailers() override;
@@ -387,6 +392,13 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
 class FilterManagerCallbacks {
 public:
   virtual ~FilterManagerCallbacks() = default;
+
+  /**
+   * @return the WebTransport session of the codec stream this filter manager is bound to, if any.
+   * The downstream HTTP connection manager returns the downstream codec stream's session; the
+   * default empty OptRef applies elsewhere.
+   */
+  virtual OptRef<WebTransportSession> webTransportSession() { return {}; }
 
   /**
    * Called when the provided headers have been encoded by all the filters in the chain.
@@ -698,6 +710,12 @@ public:
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
     ASSERT(state_.filter_call_state_ == 0);
+  }
+
+  // Returns the WebTransport session of the codec stream this filter manager is bound to, if any.
+  // Delegates to the FilterManagerCallbacks (e.g. the HTTP connection manager's ActiveStream).
+  OptRef<WebTransportSession> webTransportSession() {
+    return filter_manager_callbacks_.webTransportSession();
   }
 
   // ScopeTrackedObject

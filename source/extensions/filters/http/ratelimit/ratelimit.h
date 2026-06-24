@@ -79,16 +79,19 @@ public:
                                        ? absl::optional<Envoy::Runtime::FractionalPercent>(
                                              Envoy::Runtime::FractionalPercent(
                                                  config.failure_mode_deny_percent(), runtime_))
-                                       : absl::nullopt) {
+                                       : absl::nullopt),
+        metadata_namespace_(config.metadata_namespace().empty() ? "envoy.filters.http.ratelimit"
+                                                                : config.metadata_namespace()) {
     absl::StatusOr<Router::HeaderParserPtr> response_headers_parser_or_ =
         Envoy::Router::HeaderParser::configure(config.response_headers_to_add());
     SET_AND_RETURN_IF_NOT_OK(response_headers_parser_or_.status(), creation_status);
     response_headers_parser_ = std::move(response_headers_parser_or_.value());
     rate_limit_config_ = std::make_unique<Filters::Common::RateLimit::RateLimitConfig>(
-        config.rate_limits(), context, creation_status);
+        config.rate_limits(), context, creation_status, /*no_limit=*/false);
   }
 
   const std::string& domain() const { return domain_; }
+  const std::string& metadataNamespace() const { return metadata_namespace_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
   Runtime::Loader& runtime() { return runtime_; }
@@ -172,6 +175,7 @@ private:
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
   const absl::optional<Envoy::Runtime::FractionalPercent> failure_mode_deny_percent_;
   std::unique_ptr<RateLimitConfig> rate_limit_config_;
+  const std::string metadata_namespace_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -185,7 +189,7 @@ public:
       : local_info_(context.localInfo()), vh_rate_limits_(config.vh_rate_limits()),
         domain_(config.domain()) {
     rate_limit_config_ = std::make_unique<Filters::Common::RateLimit::RateLimitConfig>(
-        config.rate_limits(), context, creation_status);
+        config.rate_limits(), context, creation_status, /*no_limit=*/false);
   }
 
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions

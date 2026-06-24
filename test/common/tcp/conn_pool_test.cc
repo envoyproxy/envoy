@@ -72,7 +72,7 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
   StrictMock<ConnectionPool::MockUpstreamCallbacks> callbacks_;
   testing::MockFunction<void()> mock_pool_failure_cb_;
   testing::MockFunction<void()> mock_pool_ready_cb_;
-  ConnectionPool::ConnectionDataPtr conn_data_{};
+  ConnectionPool::ConnectionDataPtr conn_data_;
   absl::optional<ConnectionPool::PoolFailureReason> reason_;
   std::string failure_reason_string_;
   Upstream::HostDescriptionConstSharedPtr host_;
@@ -116,6 +116,9 @@ public:
     return conn_pool_->newConnection(callbacks);
   }
   Upstream::HostDescriptionConstSharedPtr host() const override { return conn_pool_->host(); }
+  const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() override {
+    return conn_pool_->socketOptions();
+  }
 
   MOCK_METHOD(void, onConnReleasedForTest, ());
   MOCK_METHOD(void, onConnDestroyedForTest, ());

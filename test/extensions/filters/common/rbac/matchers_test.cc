@@ -527,7 +527,7 @@ TEST(MtlsAuthenticatedMatcher, ValidateConfig) {
   envoy::extensions::rbac::principals::mtls_authenticated::v3::Config
       mtls_authenticated; // Leave empty which is invalid.
   envoy::config::rbac::v3::Principal principal;
-  principal.mutable_custom()->mutable_typed_config()->PackFrom(mtls_authenticated);
+  std::ignore = principal.mutable_custom()->mutable_typed_config()->PackFrom(mtls_authenticated);
   EXPECT_THROW_WITH_MESSAGE(
       { Matcher::create(principal, factory_context); }, EnvoyException,
       "envoy.rbac.principals.mtls_authenticated did not have any configured "
@@ -545,13 +545,13 @@ TEST(MtlsAuthenticatedMatcher, NoSSL) {
   envoy::extensions::rbac::principals::mtls_authenticated::v3::Config mtls_authenticated;
   mtls_authenticated.set_any_validated_client_certificate(true);
   envoy::config::rbac::v3::Principal principal;
-  principal.mutable_custom()->mutable_typed_config()->PackFrom(mtls_authenticated);
+  std::ignore = principal.mutable_custom()->mutable_typed_config()->PackFrom(mtls_authenticated);
   checkMatcher(*Matcher::create(principal, factory_context), false, conn);
 
   auto* matcher = mtls_authenticated.mutable_san_matcher();
   matcher->set_san_type(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI);
   matcher->mutable_matcher()->MergeFrom(TestUtility::createRegexMatcher(".*"));
-  principal.mutable_custom()->mutable_typed_config()->PackFrom(mtls_authenticated);
+  std::ignore = principal.mutable_custom()->mutable_typed_config()->PackFrom(mtls_authenticated);
   checkMatcher(*Matcher::create(principal, factory_context), false, conn);
 }
 
@@ -808,8 +808,7 @@ TEST(FilterStateMatcher, FilterStateMatcher) {
   matcher.mutable_string_match()->set_prefix("test");
 
   checkMatcher(FilterStateMatcher(matcher, context), false, conn, header, info);
-  filter_state.setData("test.key", std::make_shared<TestObject>(),
-                       StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state.setData("test.key", std::make_shared<TestObject>());
   checkMatcher(FilterStateMatcher(matcher, context), true, conn, header, info);
 }
 
@@ -1194,8 +1193,7 @@ TEST(PrincipalMatcher, UrlPathAndFilterState) {
 
   NiceMock<StreamInfo::MockStreamInfo> info;
   StreamInfo::FilterStateImpl filter_state_impl(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state_impl.setData("test.key", std::make_shared<TestObject>(),
-                            StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state_impl.setData("test.key", std::make_shared<TestObject>());
   EXPECT_CALL(Const(info), filterState()).WillRepeatedly(ReturnRef(filter_state_impl));
 
   auto matcher_filter_state = Matcher::create(principal_filter_state, factory_context);

@@ -362,12 +362,17 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return {nullptr};
   }
 
+  auto cluster = cluster_.lock();
+  if (!cluster) {
+    return {nullptr};
+  }
+
   // For host lookup, we need to make sure to match the host of any DNS cache
   // insert. Two code points currently do DNS cache insert: the http DFP filter,
   // which inserts for HTTP traffic, and sets port based on the cluster's
   // security level, and the SNI DFP network filter which sets port based on
   // stream metadata, or configuration (which is then added as stream metadata).
-  const bool is_secure = cluster_.info()
+  const bool is_secure = cluster->info()
                              ->transportSocketMatcher()
                              .resolve(nullptr, nullptr)
                              .factory_.implementsSecureTransport();
@@ -426,8 +431,8 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   std::string hostname =
       Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(raw_host, port);
 
-  if (cluster_.enableSubCluster()) {
-    return cluster_.chooseHost(hostname, context);
+  if (cluster->enableSubCluster()) {
+    return cluster->chooseHost(hostname, context);
   }
   Upstream::HostConstSharedPtr host = findHostByName(hostname);
   bool force_refresh =
@@ -440,7 +445,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   }
 
   // If the host is not found, the DFP cluster can now do asynchronous lookup.
-  Upstream::ResourceAutoIncDecPtr handle = cluster_.dns_cache_->canCreateDnsRequest();
+  Upstream::ResourceAutoIncDecPtr handle = cluster->dns_cache_->canCreateDnsRequest();
 
   // Return an immediate failure if there's too many requests already.
   if (!handle) {
@@ -449,10 +454,10 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 
   // Attempt to load the host from cache. Generally this will result in async
   // resolution so create a DFPHostSelectionHandle to handle this.
-  std::unique_ptr<DFPHostSelectionHandle> cancelable =
-      std::make_unique<DFPHostSelectionHandle>(context, cluster_, hostname);
+  std::unique_ptr<DFPHostSelectionHandle> cancelable = std::make_unique<DFPHostSelectionHandle>(
+      context, cluster_, hostname, pending_host_selection_handles_);
   bool is_proxying = isProxying(context->requestStreamInfo());
-  auto result = cluster_.dns_cache_->loadDnsCacheEntryWithForceRefresh(raw_host, port, is_proxying,
+  auto result = cluster->dns_cache_->loadDnsCacheEntryWithForceRefresh(raw_host, port, is_proxying,
                                                                        force_refresh, *cancelable);
   switch (result.status_) {
   case Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::InCache:
@@ -463,6 +468,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     // resolution is canceled by the stream.
     cancelable->setHandle(std::move(result.handle_));
     cancelable->setAutoDec(std::move(handle));
+    pending_host_selection_handles_.insert(cancelable.get());
     return Upstream::HostSelectionResponse{nullptr, std::move(cancelable)};
   case Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Overflow:
     // In the case of overflow, return immediate failure.
@@ -473,7 +479,10 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 }
 
 Upstream::HostConstSharedPtr Cluster::LoadBalancer::findHostByName(const std::string& host) const {
-  return cluster_.findHostByName(host);
+  if (auto cluster = cluster_.lock()) {
+    return cluster->findHostByName(host);
+  }
+  return nullptr;
 }
 
 Upstream::HostConstSharedPtr Cluster::findHostByName(const std::string& host) const {
@@ -491,6 +500,17 @@ Upstream::HostConstSharedPtr Cluster::findHostByName(const std::string& host) co
       host_it->second.shared_host_info_->touch();
       return host_it->second.logical_host_;
     }
+  }
+}
+
+Cluster::LoadBalancer::~LoadBalancer() {
+  // Clean up pending host selection handles to avoid calling back into a destroyed load
+  // balancer. Notify each pending callback that host selection was aborted because the load
+  // balancer was destroyed.
+  while (!pending_host_selection_handles_.empty()) {
+    auto handle = *pending_host_selection_handles_.begin();
+    handle->cancel();
+    handle->context_->onAsyncHostSelection(nullptr, "load_balancer_destroyed");
   }
 }
 
@@ -524,10 +544,13 @@ Cluster::LoadBalancer::selectExistingConnection(Upstream::LoadBalancerContext* /
 
 OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
 Cluster::LoadBalancer::lifetimeCallbacks() {
-  if (!cluster_.allowCoalescedConnections()) {
-    return {};
+  if (auto cluster = cluster_.lock()) {
+    if (!cluster->allowCoalescedConnections()) {
+      return {};
+    }
+    return makeOptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>(*this);
   }
-  return makeOptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>(*this);
+  return {};
 }
 
 void Cluster::LoadBalancer::onConnectionOpen(Envoy::Http::ConnectionPool::Instance& pool,
@@ -610,7 +633,7 @@ ClusterFactory::createClusterWithConfig(
         "unsupported lb_policy 'CLUSTER_PROVIDED' in sub_cluster_config");
   }
 
-  auto lb = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*new_cluster);
+  auto lb = std::make_unique<Cluster::ThreadAwareLoadBalancer>(new_cluster);
   return std::make_pair(new_cluster, std::move(lb));
 }
 

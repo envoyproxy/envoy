@@ -1016,7 +1016,6 @@ TEST_P(ClientTest, SaveLatestStreamIntelPopulatesScone) {
   scone_state->scone_max_kbps = 100;
   scone_state->timestamp_ms = 12345;
   stream_info_.filter_state_->setData(Quic::SconeStateKey, scone_state,
-                                      StreamInfo::FilterState::StateType::Mutable,
                                       StreamInfo::FilterState::LifeSpan::Connection);
 
   auto stream_ptr = getDirectStream(stream_);
@@ -1038,7 +1037,6 @@ TEST_P(ClientTest, SaveLatestStreamIntelPersistsScone) {
   scone_state->scone_max_kbps = 100;
   scone_state->timestamp_ms = 12345;
   stream_info_.filter_state_->setData(Quic::SconeStateKey, scone_state,
-                                      StreamInfo::FilterState::StateType::Mutable,
                                       StreamInfo::FilterState::LifeSpan::Connection);
 
   auto stream_ptr = getDirectStream(stream_);
@@ -1073,7 +1071,6 @@ TEST_P(ClientTest, SaveLatestStreamIntelWithZeroSconeValue) {
   scone_state->scone_max_kbps = 0;
   scone_state->timestamp_ms = 12345;
   stream_info_.filter_state_->setData(Quic::SconeStateKey, scone_state,
-                                      StreamInfo::FilterState::StateType::Mutable,
                                       StreamInfo::FilterState::LifeSpan::Connection);
 
   auto stream_ptr = getDirectStream(stream_);

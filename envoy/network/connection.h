@@ -61,6 +61,17 @@ public:
    * watermark to under its low watermark.
    */
   virtual void onBelowWriteBufferLowWatermark() PURE;
+
+  /**
+   * Called when the connection has been notified that it is being drained (for example
+   * because the filter chain or listener that owns it is being drained). Callbacks may
+   * use this signal to begin a graceful shutdown of any state layered on top of the
+   * connection (e.g. send an HTTP/2 GOAWAY or close-after-current-request).
+   *
+   * The connection remains usable after this call; it is not closed by onDrain() itself.
+   * The default implementation is a no-op.
+   */
+  virtual void onDrain() {}
 };
 
 /**
@@ -165,6 +176,14 @@ public:
    * @return true if half-close semantics are enabled, false otherwise.
    */
   virtual bool isHalfCloseEnabled() const PURE;
+
+  /**
+   * Notify the connection that it is being drained. This will fire onDrain() on every
+   * registered ConnectionCallbacks. Drain is a notification only: the connection is
+   * not closed and remains usable. Callbacks may react by initiating a graceful
+   * shutdown of any higher-level state (e.g. HTTP/2 GOAWAY).
+   */
+  virtual void onDrain() PURE;
 
   /**
    * Close the connection.

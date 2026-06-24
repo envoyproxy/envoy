@@ -104,7 +104,7 @@ constexpr char FilterConfigName[] = "ext_authz_filter";
 
 template <class T> class HttpFilterTestBase : public T {
 public:
-  HttpFilterTestBase() {}
+  HttpFilterTestBase() = default;
 
   void initialize(std::string&& yaml) {
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
@@ -245,7 +245,7 @@ public:
     initialize(getFilterConfig(std::get<0>(GetParam()), std::get<1>(GetParam())));
   }
 
-  static std::string ParamsToString(const testing::TestParamInfo<std::tuple<bool, bool>>& info) {
+  static std::string paramsToString(const testing::TestParamInfo<std::tuple<bool, bool>>& info) {
     return absl::StrCat(std::get<0>(info.param) ? "FailOpen" : "FailClosed", "_",
                         std::get<1>(info.param) ? "HttpClient" : "GrpcClient");
   }
@@ -253,7 +253,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(ParameterizedFilterConfig, HttpFilterTestParam,
                          testing::Combine(testing::Bool(), testing::Bool()),
-                         HttpFilterTestParam::ParamsToString);
+                         HttpFilterTestParam::paramsToString);
 
 class ExtAuthzLoggingInfoTest
     : public testing::TestWithParam<
@@ -289,7 +289,7 @@ public:
     }
   }
 
-  static std::string ParamsToString(
+  static std::string paramsToString(
       const testing::TestParamInfo<std::tuple<std::string, absl::optional<uint64_t>>>& info) {
     return absl::StrCat(std::get<1>(info.param).has_value() ? "" : "no_", std::get<0>(info.param),
                         std::get<1>(info.param).has_value()
@@ -305,12 +305,12 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Combine(testing::Values("latency_us", "bytesSent", "bytesReceived"),
                      testing::Values(absl::optional<uint64_t>{}, absl::optional<uint64_t>{0},
                                      absl::optional<uint64_t>{1})),
-    ExtAuthzLoggingInfoTest::ParamsToString);
+    ExtAuthzLoggingInfoTest::paramsToString);
 
 INSTANTIATE_TEST_SUITE_P(ExtAuthzLoggingInfoTestInvalid, ExtAuthzLoggingInfoTest,
                          testing::Values(std::make_tuple("wrong_property_name",
                                                          absl::optional<uint64_t>{})),
-                         ExtAuthzLoggingInfoTest::ParamsToString);
+                         ExtAuthzLoggingInfoTest::paramsToString);
 
 class EmitFilterStateTest
     : public HttpFilterTestBase<testing::TestWithParam<
@@ -357,7 +357,7 @@ public:
   }
 
   static std::string
-  ParamsToString(const testing::TestParamInfo<std::tuple<bool, bool, bool>>& info) {
+  paramsToString(const testing::TestParamInfo<std::tuple<bool, bool, bool>>& info) {
     return absl::StrCat(std::get<0>(info.param) ? "HttpClient" : "GrpcClient", "_",
                         std::get<1>(info.param) ? "EmitStats" : "DoNotEmitStats", "_",
                         std::get<2>(info.param) ? "EmitFilterMetadata" : "DoNotEmitFilterMetadata");
@@ -437,7 +437,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(EmitFilterStateTestParams, EmitFilterStateTest,
                          testing::Combine(testing::Bool(), testing::Bool(), testing::Bool()),
-                         EmitFilterStateTest::ParamsToString);
+                         EmitFilterStateTest::paramsToString);
 
 class InvalidMutationTest : public HttpFilterTestBase<testing::Test> {
 public:
@@ -493,6 +493,7 @@ public:
   const std::string invalid_value_;
 
   static std::string getInvalidValue() {
+    // NOLINTNEXTLINE(modernize-return-braced-init-list)
     return std::string(reinterpret_cast<const char*>(invalid_value_bytes_));
   }
 };
@@ -2337,7 +2338,6 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestHeaders) {
   absl::string_view header_value = reinterpret_cast<const char*>(non_utf_8_bytes);
   request_headers_.addCopy(Http::LowerCaseString{header_key}, header_value);
 
-  envoy::service::auth::v3::CheckRequest check_request;
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest& check_request,
@@ -3193,18 +3193,17 @@ TEST_F(HttpFilterTest, MetadataContext) {
             check_request.attributes().metadata_context().filter_metadata().count("hiphop.drums"));
 
   helloworld::HelloRequest hello;
-  check_request.attributes()
-      .metadata_context()
-      .typed_filter_metadata()
-      .at("blues.piano")
-      .UnpackTo(&hello);
+  std::ignore = check_request.attributes()
+                    .metadata_context()
+                    .typed_filter_metadata()
+                    .at("blues.piano")
+                    .UnpackTo(&hello);
   EXPECT_EQ("jack dupree", hello.name());
-
-  check_request.attributes()
-      .metadata_context()
-      .typed_filter_metadata()
-      .at("jazz.sax")
-      .UnpackTo(&hello);
+  std::ignore = check_request.attributes()
+                    .metadata_context()
+                    .typed_filter_metadata()
+                    .at("jazz.sax")
+                    .UnpackTo(&hello);
   EXPECT_EQ("shorter wayne", hello.name());
 
   EXPECT_EQ(
@@ -3325,18 +3324,17 @@ TEST_F(HttpFilterTest, ConnectionMetadataContext) {
                    "typed.connection.data"));
 
   helloworld::HelloRequest hello;
-  check_request.attributes()
-      .metadata_context()
-      .typed_filter_metadata()
-      .at("typed.connection.data")
-      .UnpackTo(&hello);
+  std::ignore = check_request.attributes()
+                    .metadata_context()
+                    .typed_filter_metadata()
+                    .at("typed.connection.data")
+                    .UnpackTo(&hello);
   EXPECT_EQ("connection_typed", hello.name());
-
-  check_request.attributes()
-      .metadata_context()
-      .typed_filter_metadata()
-      .at("untyped.and.typed.connection.data")
-      .UnpackTo(&hello);
+  std::ignore = check_request.attributes()
+                    .metadata_context()
+                    .typed_filter_metadata()
+                    .at("untyped.and.typed.connection.data")
+                    .UnpackTo(&hello);
   EXPECT_EQ("connection_typed", hello.name());
 
   EXPECT_EQ(0, check_request.attributes().metadata_context().typed_filter_metadata().count(
@@ -4957,6 +4955,70 @@ TEST_P(HttpFilterTestParam, OnDestroyCancelsDefaultClient) {
   filter_->onDestroy();
 }
 
+// Verify that the default client is NOT destroyed when a per-route client override
+// is active.
+TEST_P(HttpFilterTestParam, OnDestroyPreservesDefaultClientWithPerRouteOverride) {
+  if (std::get<1>(GetParam())) {
+    return;
+  }
+
+  prepareCheck();
+
+  // Create per-route configuration with gRPC service override.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  per_route_config.mutable_check_settings()
+      ->mutable_grpc_service()
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("per_route_ext_authz_cluster");
+
+  std::unique_ptr<FilterConfigPerRoute> per_route_filter_config =
+      std::make_unique<FilterConfigPerRoute>(per_route_config);
+
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(per_route_filter_config.get()));
+
+  Router::RouteSpecificFilterConfigs per_route_configs;
+  per_route_configs.push_back(per_route_filter_config.get());
+  ON_CALL(decoder_filter_callbacks_, perFilterConfigs()).WillByDefault(Return(per_route_configs));
+
+  // Create a new filter with an explicitly tracked default client.
+  auto default_client = std::make_unique<Filters::Common::ExtAuthz::MockClient>();
+  auto* default_client_ptr = default_client.get();
+
+  // we'll verify after decodeHeaders() to prove the client is still alive.
+  EXPECT_CALL(*default_client_ptr, streamInfo()).WillRepeatedly(Return(nullptr));
+
+  auto test_filter = std::make_unique<Filter>(config_, std::move(default_client), factory_context_);
+  test_filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+  test_filter->setEncoderFilterCallbacks(encoder_filter_callbacks_);
+
+  // Mock successful gRPC async client manager access.
+  auto mock_grpc_client_manager = std::make_shared<Grpc::MockAsyncClientManager>();
+  ON_CALL(factory_context_, clusterManager()).WillByDefault(ReturnRef(cm_));
+  ON_CALL(cm_, grpcAsyncClientManager()).WillByDefault(ReturnRef(*mock_grpc_client_manager));
+
+  auto mock_raw_grpc_client = std::make_shared<Grpc::MockAsyncClient>();
+  auto mock_async_request = std::make_unique<Grpc::MockAsyncRequest>();
+  auto* mock_async_request_ptr = mock_async_request.get();
+
+  EXPECT_CALL(*mock_grpc_client_manager, getOrCreateRawAsyncClientWithHashKey(_, _, true))
+      .WillOnce(Return(absl::StatusOr<Grpc::RawAsyncClientSharedPtr>(mock_raw_grpc_client)));
+
+  EXPECT_CALL(*mock_raw_grpc_client, sendRaw(_, _, _, _, _, _))
+      .WillOnce(Return(mock_async_request_ptr));
+
+  // The default client's check should NOT be called.
+  EXPECT_CALL(*default_client_ptr, check(_, _, _, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            test_filter->decodeHeaders(request_headers_, false));
+
+  EXPECT_EQ(nullptr, default_client_ptr->streamInfo());
+
+  EXPECT_CALL(*default_client_ptr, cancel()).Times(0);
+  EXPECT_CALL(*mock_async_request_ptr, cancel());
+  test_filter->onDestroy();
+}
+
 // Regression test for https://github.com/envoyproxy/envoy/pull/8436.
 // Test that ext_authz filter is not in noop mode when cluster is not specified per route
 // (this could be the case when route is configured with redirect or direct response action).
@@ -5302,8 +5364,7 @@ TEST_P(EmitFilterStateTest, PreexistingFilterStateDifferentTypeMutable) {
       FilterConfigName,
       // This will not cast to ExtAuthzLoggingInfo, so when the filter tries to
       // getMutableData<ExtAuthzLoggingInfo>(...), it will return nullptr.
-      std::make_shared<TestObject>(), Envoy::StreamInfo::FilterState::StateType::Mutable,
-      Envoy::StreamInfo::FilterState::LifeSpan::Request);
+      std::make_shared<TestObject>(), Envoy::StreamInfo::FilterState::LifeSpan::Request);
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
@@ -5323,7 +5384,6 @@ TEST_P(EmitFilterStateTest, PreexistingFilterStateSameTypeMutable) {
       // This will not cast to ExtAuthzLoggingInfo, so when the filter tries to
       // getMutableData<ExtAuthzLoggingInfo>(...), it will return nullptr.
       std::make_shared<ExtAuthzLoggingInfo>(absl::nullopt),
-      Envoy::StreamInfo::FilterState::StateType::Mutable,
       Envoy::StreamInfo::FilterState::LifeSpan::Request);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -5764,7 +5824,7 @@ TEST_P(HttpFilterTestParam, PerRouteConfigurationIntegrationTest) {
         check_response.mutable_ok_response();
 
         std::string serialized_response;
-        check_response.SerializeToString(&serialized_response);
+        std::ignore = check_response.SerializeToString(&serialized_response);
         auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
 
         callbacks.onSuccessRaw(std::move(response), parent_span);
@@ -5840,7 +5900,7 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcClientCreationAndUsage) {
 
         // Serialize the response to a buffer.
         std::string serialized_response;
-        check_response.SerializeToString(&serialized_response);
+        std::ignore = check_response.SerializeToString(&serialized_response);
         auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
 
         callbacks.onSuccessRaw(std::move(response), parent_span);
@@ -6148,7 +6208,7 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcClientTimeoutConfiguration) {
             check_response.mutable_ok_response();
 
             std::string serialized_response;
-            check_response.SerializeToString(&serialized_response);
+            std::ignore = check_response.SerializeToString(&serialized_response);
             auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
 
             callbacks.onSuccessRaw(std::move(response), parent_span);
@@ -6165,7 +6225,7 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcClientTimeoutConfiguration) {
             check_response.mutable_ok_response();
 
             std::string serialized_response;
-            check_response.SerializeToString(&serialized_response);
+            std::ignore = check_response.SerializeToString(&serialized_response);
             auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
 
             callbacks.onSuccessRaw(std::move(response), parent_span);
@@ -6657,9 +6717,8 @@ TEST_F(HttpFilterTest, ShadowModeDeniedSetsFilterStateAndContinues) {
   // Exercise serializeAsProto (populates all non-empty branches) and serializeAsString.
   auto serialized = shadow->serializeAsProto();
   ASSERT_NE(serialized, nullptr);
-  const auto& proto =
-      dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ShadowDecision&>(
-          *serialized);
+  const auto& proto = Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::filters::http::ext_authz::v3::ShadowDecision>(*serialized);
   EXPECT_EQ(proto.check_result(),
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::DENIED);
   EXPECT_EQ(proto.status_code(), 401);
@@ -6820,9 +6879,8 @@ TEST_F(HttpFilterTest, ShadowModeOkSetsFilterState) {
   // Exercise serializeAsProto on the OK branch.
   auto serialized = shadow->serializeAsProto();
   ASSERT_NE(serialized, nullptr);
-  const auto& proto =
-      dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ShadowDecision&>(
-          *serialized);
+  const auto& proto = Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::filters::http::ext_authz::v3::ShadowDecision>(*serialized);
   EXPECT_EQ(proto.check_result(),
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::OK);
   EXPECT_EQ(proto.status_code(), 200);

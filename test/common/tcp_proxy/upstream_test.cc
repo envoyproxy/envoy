@@ -13,6 +13,7 @@
 #include "test/mocks/router/router_filter_interface.h"
 #include "test/mocks/router/upstream_request.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/test_common/environment.h"
@@ -214,6 +215,41 @@ TEST_P(HttpUpstreamTest, UpstreamResetWithGuardDisabled) {
   EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::Normal);
 }
 
+TEST_P(HttpUpstreamTest, UpstreamRemoteResetAfterStreamCompleteProducesLocalClose) {
+  this->setupUpstream();
+  testing::Mock::VerifyAndClearExpectations(&this->encoder_);
+  EXPECT_CALL(this->encoder_, getStream()).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, encodeHeaders(_, false)).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, http1StreamEncoderOptions()).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, enableTcpTunneling()).Times(AnyNumber());
+
+  // Simulate stream already completed normally via half-close path.
+  EXPECT_CALL(this->callbacks_, onEvent(_)).Times(AnyNumber());
+  this->upstream_->doneReading();
+
+  // Remote reset after completion should NOT produce RST.
+  EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
+  EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  this->upstream_->onResetStream(Http::StreamResetReason::RemoteReset, "");
+  EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::Normal);
+}
+
+TEST_P(HttpUpstreamTest, UpstreamRemoteResetBeforeStreamCompleteProducesRemoteClose) {
+  this->setupUpstream();
+  testing::Mock::VerifyAndClearExpectations(&this->encoder_);
+  EXPECT_CALL(this->encoder_, getStream()).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, encodeHeaders(_, false)).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, http1StreamEncoderOptions()).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, enableTcpTunneling()).Times(AnyNumber());
+
+  // Stream has NOT completed - doneReading() is intentionally not called.
+  // Remote reset before completion SHOULD propagate as RemoteReset downstream.
+  EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
+  EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
+  this->upstream_->onResetStream(Http::StreamResetReason::RemoteReset, "");
+  EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::RemoteReset);
+}
+
 TEST_P(HttpUpstreamTest, UpstreamWatermarks) {
   this->setupUpstream();
   EXPECT_CALL(this->callbacks_, onAboveWriteBufferHighWatermark());
@@ -259,6 +295,55 @@ TEST_P(HttpUpstreamTest, OnFailureCalledOnInvalidResponse) {
   EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_)).Times(0);
   Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "404"}}};
   this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+}
+
+TEST_P(HttpUpstreamTest, TunnelResponseStatusCapturedOnInvalidResponse) {
+  this->setupUpstream();
+  auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
+  auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
+  this->upstream_->setConnPoolCallbacks(std::move(conn_pool_callbacks));
+  auto mock_upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  ON_CALL(this->downstream_stream_info_, upstreamInfo()).WillByDefault(Return(mock_upstream_info));
+  EXPECT_CALL(*mock_upstream_info,
+              setUpstreamTransportFailureReason(absl::string_view("tunnel_response:403")));
+  EXPECT_CALL(*conn_pool_callbacks_raw, onFailure());
+  EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_)).Times(0);
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "403"}}};
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+  EXPECT_EQ(this->upstream_->tunnelResponseStatus(), 403);
+}
+
+TEST_P(HttpUpstreamTest, TunnelResponseStatusCaptured401) {
+  this->setupUpstream();
+  auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
+  auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
+  this->upstream_->setConnPoolCallbacks(std::move(conn_pool_callbacks));
+  EXPECT_CALL(*conn_pool_callbacks_raw, onFailure());
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "401"}}};
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+  EXPECT_EQ(this->upstream_->tunnelResponseStatus(), 401);
+}
+
+TEST_P(HttpUpstreamTest, TunnelResponseStatusCaptured500) {
+  this->setupUpstream();
+  auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
+  auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
+  this->upstream_->setConnPoolCallbacks(std::move(conn_pool_callbacks));
+  EXPECT_CALL(*conn_pool_callbacks_raw, onFailure());
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "500"}}};
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+  EXPECT_EQ(this->upstream_->tunnelResponseStatus(), 500);
+}
+
+TEST_P(HttpUpstreamTest, TunnelResponseStatusNotSetOnValidResponse) {
+  this->setupUpstream();
+  auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
+  auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
+  this->upstream_->setConnPoolCallbacks(std::move(conn_pool_callbacks));
+  EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_));
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+  EXPECT_EQ(this->upstream_->tunnelResponseStatus(), 0);
 }
 
 TEST_P(HttpUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
@@ -390,7 +475,7 @@ TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoderUsePostWithCustomPath) {
 TEST_P(HttpUpstreamRequestEncoderTest, RequestIdGeneratedWhenEnabled) {
   envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension reqid_ext;
   envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_cfg;
-  reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
+  std::ignore = reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
   *this->tcp_proxy_.mutable_tunneling_config()->mutable_request_id_extension() = reqid_ext;
   this->setupUpstream();
 
@@ -417,7 +502,7 @@ MATCHER(HasNonEmptyTunnelRequestId, "Struct has non-empty tunnel_request_id") {
 TEST_P(HttpUpstreamRequestEncoderTest, RequestIdStoredInDynamicMetadataWhenEnabled) {
   envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension reqid_ext;
   envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_cfg;
-  reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
+  std::ignore = reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
   *this->tcp_proxy_.mutable_tunneling_config()->mutable_request_id_extension() = reqid_ext;
   this->setupUpstream();
   EXPECT_CALL(this->downstream_stream_info_,
@@ -429,7 +514,7 @@ TEST_P(HttpUpstreamRequestEncoderTest, RequestIdStoredInDynamicMetadataWhenEnabl
 TEST_P(HttpUpstreamRequestEncoderTest, RequestIdHeaderOverrideAndMetadataKeyOverride) {
   envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension reqid_ext;
   envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_cfg;
-  reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
+  std::ignore = reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
   auto* tunneling = this->tcp_proxy_.mutable_tunneling_config();
   *tunneling->mutable_request_id_extension() = reqid_ext;
   tunneling->set_request_id_header("x-rid");
@@ -587,7 +672,7 @@ TEST(TunnelingConfigHelperImplTest, FormatterExtensionRendersInHeader) {
   tunneling->set_hostname("host.example.com:443");
   auto* formatter = tunneling->add_formatters();
   formatter->set_name("envoy.formatter.TestFormatter");
-  formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue());
+  std::ignore = formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue());
   auto* header = tunneling->add_headers_to_add();
   header->mutable_header()->set_key("x-custom");
   header->mutable_header()->set_value("%COMMAND_EXTENSION()%");
@@ -742,7 +827,7 @@ TEST_F(CombinedUpstreamTest, WriteUpstream) {
 TEST_F(CombinedUpstreamTest, CombinedUpstreamGeneratesRequestIdWhenEnabled) {
   envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension reqid_ext;
   envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_cfg;
-  reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
+  std::ignore = reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
   *this->tcp_proxy_.mutable_tunneling_config()->mutable_request_id_extension() = reqid_ext;
   this->setup();
   auto* headers = this->upstream_->downstreamHeaders();
@@ -822,6 +907,33 @@ TEST_F(CombinedUpstreamTest, OnFailureCalledOnInvalidResponse) {
   EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_)).Times(0);
   Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "404"}}};
   this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+}
+
+TEST_F(CombinedUpstreamTest, TunnelResponseStatusCapturedOnInvalidResponse) {
+  this->setup();
+  auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
+  auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
+  this->upstream_->setConnPoolCallbacks(std::move(conn_pool_callbacks));
+  auto mock_upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  ON_CALL(this->downstream_stream_info_, upstreamInfo()).WillByDefault(Return(mock_upstream_info));
+  EXPECT_CALL(*mock_upstream_info,
+              setUpstreamTransportFailureReason(absl::string_view("tunnel_response:403")));
+  EXPECT_CALL(*conn_pool_callbacks_raw, onFailure());
+  EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_)).Times(0);
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "403"}}};
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+  EXPECT_EQ(this->upstream_->tunnelResponseStatus(), 403);
+}
+
+TEST_F(CombinedUpstreamTest, TunnelResponseStatusNotSetOnValidResponse) {
+  this->setup();
+  auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
+  auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
+  this->upstream_->setConnPoolCallbacks(std::move(conn_pool_callbacks));
+  EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_));
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+  EXPECT_EQ(this->upstream_->tunnelResponseStatus(), 0);
 }
 
 TEST_F(CombinedUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {

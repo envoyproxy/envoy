@@ -548,7 +548,12 @@ TEST_P(IntegrationTest, RouterRetryOnResetBeforeRequestBeforeHeaders) {
     ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                      protocol_options);
   });
-  config_helper_.prependFilter("{ name: buffer-continue-filter }", false);
+  config_helper_.prependFilter(R"EOF(
+    name: buffer-continue-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.BufferContinueFilterConfig
+  )EOF",
+                               false);
   testRouterRetryOnResetBeforeRequestBeforeHeaders();
 }
 
@@ -1822,7 +1827,11 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
              hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
   // This test will trigger an early 413 Payload Too Large response due to buffer limits being
   // exceeded. The following filter is needed since the router filter will never trigger a 413.
-  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
+  config_helper_.prependFilter(R"EOF(
+    name: encoder-decoder-buffer-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
+  )EOF");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -1854,7 +1863,11 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
 // Test configuration of the delayed close timeout on downstream HTTP/1.1 connections. A value of 0
 // disables delayed close processing.
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
-  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
+  config_helper_.prependFilter(R"EOF(
+    name: encoder-decoder-buffer-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
+  )EOF");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1887,7 +1900,11 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
 
 // Test that if the route cache is cleared, it doesn't cause problems.
 TEST_P(IntegrationTest, TestClearingRouteCacheFilter) {
-  config_helper_.prependFilter("{ name: clear-route-cache }");
+  config_helper_.prependFilter(R"EOF(
+    name: clear-route-cache
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.ClearRouteCacheFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
@@ -1924,7 +1941,11 @@ TEST_P(IntegrationTest, NoConnectionPoolsFree) {
 }
 
 TEST_P(IntegrationTest, ProcessObjectHealthy) {
-  config_helper_.prependFilter("{ name: process-context-filter }");
+  config_helper_.prependFilter(R"EOF(
+    name: process-context-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.ProcessContextFilterConfig
+  )EOF");
 
   ProcessObjectForFilter healthy_object(true);
   process_object_ = healthy_object;
@@ -1944,7 +1965,11 @@ TEST_P(IntegrationTest, ProcessObjectHealthy) {
 }
 
 TEST_P(IntegrationTest, ProcessObjectUnealthy) {
-  config_helper_.prependFilter("{ name: process-context-filter }");
+  config_helper_.prependFilter(R"EOF(
+    name: process-context-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.ProcessContextFilterConfig
+  )EOF");
 
   ProcessObjectForFilter unhealthy_object(false);
   process_object_ = unhealthy_object;

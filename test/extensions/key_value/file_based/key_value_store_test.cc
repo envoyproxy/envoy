@@ -7,6 +7,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/file_system_for_test.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
@@ -35,7 +36,7 @@ protected:
   }
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::string filename_;
-  std::unique_ptr<FileBasedKeyValueStore> store_{};
+  std::unique_ptr<FileBasedKeyValueStore> store_;
   std::chrono::seconds flush_interval_{5};
   Event::MockTimer* ttl_timer_ = nullptr;
   Event::MockTimer* flush_timer_ = nullptr;

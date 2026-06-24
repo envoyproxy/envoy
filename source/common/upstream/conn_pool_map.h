@@ -69,6 +69,13 @@ public:
    */
   void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior);
 
+  /**
+   * See `Envoy::ConnectionPool::Instance::drainConnections()`.
+   * Drains only the pools that match the predicate.
+   */
+  void drainConnectionsIf(Envoy::ConnectionPool::DrainConnectionsPoolPredicate predicate,
+                          Envoy::ConnectionPool::DrainBehavior drain_behavior);
+
 private:
   /**
    * Frees the first idle pool in `active_pools_`.

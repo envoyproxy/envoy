@@ -12,6 +12,7 @@
 #include "source/common/quic/quic_transport_socket_factory.h"
 #include "source/common/quic/scone_state.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "quiche/quic/core/http/quic_spdy_client_session.h"
 
 namespace Envoy {
@@ -78,9 +79,32 @@ public:
   void StartDraining() override;
 
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override { return http_datagram_support_; }
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  quic::WebTransportHttp3VersionSet LocallySupportedWebTransportVersions() const override;
+#endif
   std::vector<std::string> GetAlpnsToOffer() const override;
   void OnConfigNegotiated() override;
   void OnSconePacket(quic::QuicBandwidth bandwidth) override;
+
+  // quic::QuicSpdySession
+  // Overridden to flush WebTransport CONNECT requests that were deferred until the peer's HTTP/3
+  // SETTINGS arrived. See registerStreamWaitingForSettings().
+  bool OnSettingsFrame(const quic::SettingsFrame& frame) override;
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // Registers/unregisters a client stream that buffered a WebTransport CONNECT request in
+  // encodeHeaders() because the peer's HTTP/3 SETTINGS had not yet been received. QUICHE creates
+  // the upstream WebTransport session synchronously inside WriteHeaders, but only if WebTransport
+  // is already negotiated (which is known only after SETTINGS). When the SETTINGS frame arrives,
+  // OnSettingsFrame() flushes every registered stream. Streams are tracked by ID rather than
+  // pointer: a stream that is destroyed without unregistering simply fails the GetActiveStream()
+  // lookup at flush time, so there is no dangling reference. Only WebTransport CONNECT streams ever
+  // wait here; all other requests are written immediately and the connection becomes ready right
+  // after the handshake.
+  void registerStreamWaitingForSettings(quic::QuicStreamId stream_id);
+  void unregisterStreamWaitingForSettings(quic::QuicStreamId stream_id);
+#endif
 
   // quic::QuicSpdyClientSessionBase
   bool ShouldKeepConnectionAlive() const override;
@@ -141,6 +165,12 @@ protected:
 
 private:
   uint64_t streamsAvailable();
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // IDs of client streams that buffered a WebTransport CONNECT request awaiting the peer's HTTP/3
+  // SETTINGS. Flushed and cleared in OnSettingsFrame(). See registerStreamWaitingForSettings().
+  absl::flat_hash_set<quic::QuicStreamId> streams_waiting_for_settings_;
+#endif
 
   // These callbacks are owned by network filters and quic session should outlive
   // them.

@@ -23,7 +23,7 @@ protected:
 };
 
 TEST_F(CacheFilterFactoryTest, Basic) {
-  config_.mutable_typed_config()->PackFrom(
+  std::ignore = config_.mutable_typed_config()->PackFrom(
       envoy::extensions::http::cache_v2::simple_http_cache::v3::SimpleHttpCacheV2Config());
   Http::FilterFactoryCb cb =
       factory_.createFilterFactoryFromProto(config_, "stats", context_).value();
@@ -52,7 +52,7 @@ TEST_F(CacheFilterFactoryTest, NoTypedConfig) {
 }
 
 TEST_F(CacheFilterFactoryTest, UnregisteredTypedConfig) {
-  config_.mutable_typed_config()->PackFrom(
+  std::ignore = config_.mutable_typed_config()->PackFrom(
       envoy::extensions::filters::http::cache_v2::v3::CacheV2Config());
   EXPECT_THROW(
       factory_.createFilterFactoryFromProto(config_, "stats", context_).status().IgnoreError(),
@@ -61,9 +61,7 @@ TEST_F(CacheFilterFactoryTest, UnregisteredTypedConfig) {
 
 class FailToCreateCacheFactory : public HttpCacheFactory {
 public:
-  std::string name() const override {
-    return std::string("envoy.extensions.http.cache_v2.fake_fail");
-  }
+  std::string name() const override { return {"envoy.extensions.http.cache_v2.fake_fail"}; }
   // Arbitrarily use "Key" as the proto type of the config because it's convenient,
   // and we have to register it as *some* type of proto message.
   ProtobufTypes::MessagePtr createEmptyConfigProto() override { return std::make_unique<Key>(); }
@@ -77,7 +75,7 @@ public:
 static Registry::RegisterFactory<FailToCreateCacheFactory, HttpCacheFactory> register_;
 
 TEST_F(CacheFilterFactoryTest, FactoryFailsToCreateCache) {
-  config_.mutable_typed_config()->PackFrom(Key());
+  std::ignore = config_.mutable_typed_config()->PackFrom(Key());
   EXPECT_THROW(
       factory_.createFilterFactoryFromProto(config_, "stats", context_).status().IgnoreError(),
       EnvoyException);

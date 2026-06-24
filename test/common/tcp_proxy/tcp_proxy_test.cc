@@ -101,7 +101,6 @@ public:
     filter_callbacks_.connection().streamInfo().filterState()->setData(
         TcpProxy::ReceiveBeforeConnectKey,
         std::make_unique<StreamInfo::BoolAccessorImpl>(receive_before_connect),
-        StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
 
     // Create and initialize filter.
@@ -175,7 +174,6 @@ public:
         filter_callbacks_.connection_.streamInfo().filterState()->setData(
             Network::UpstreamSocketOptionsFilterState::key(),
             std::make_unique<Network::UpstreamSocketOptionsFilterState>(),
-            StreamInfo::FilterState::StateType::Mutable,
             StreamInfo::FilterState::LifeSpan::Connection);
         filter_callbacks_.connection_.streamInfo()
             .filterState()
@@ -188,7 +186,6 @@ public:
       filter_callbacks_.connection().streamInfo().filterState()->setData(
           TcpProxy::ReceiveBeforeConnectKey,
           std::make_unique<StreamInfo::BoolAccessorImpl>(receive_before_connect),
-          StreamInfo::FilterState::StateType::ReadOnly,
           StreamInfo::FilterState::LifeSpan::Connection);
 
       filter_ = std::make_unique<Filter>(config_,
@@ -339,7 +336,7 @@ TEST_P(TcpProxyTest, ExplicitFactory) {
                    .cluster_.info_;
   info->upstream_config_ = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   envoy::extensions::upstreams::tcp::generic::v3::GenericConnectionPoolProto generic_config;
-  info->upstream_config_->mutable_typed_config()->PackFrom(generic_config);
+  std::ignore = info->upstream_config_->mutable_typed_config()->PackFrom(generic_config);
   setup(1);
 
   raiseEventUpstreamConnected(0);
@@ -363,7 +360,7 @@ TEST_P(TcpProxyTest, BadFactory) {
   info->upstream_config_ = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   // The HTTP Generic connection pool is not a valid type for TCP upstreams.
   envoy::extensions::upstreams::http::generic::v3::GenericConnectionPoolProto generic_config;
-  info->upstream_config_->mutable_typed_config()->PackFrom(generic_config);
+  std::ignore = info->upstream_config_->mutable_typed_config()->PackFrom(generic_config);
 
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
 
@@ -1487,7 +1484,7 @@ TEST_P(TcpProxyTest, IdleTimeoutWithFilterStateOverride) {
   filter_callbacks_.connection_.streamInfo().filterState()->setData(
       TcpProxy::PerConnectionIdleTimeoutMs,
       std::make_unique<StreamInfo::UInt64AccessorImpl>(idle_timeout_override),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(idle_timeout_override), _));
@@ -1665,6 +1662,47 @@ TEST_P(TcpProxyTest, AccessLogUpstreamLocalAddress) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
   EXPECT_EQ(access_log_data_, "2.2.2.2:50000");
+}
+
+// Test that the COMMON_DURATION downstream and upstream connection time points are populated for
+// TCP connections, with the upstream connect timing plumbed back from the upstream connection.
+TEST_P(TcpProxyTest, AccessLogCommonDuration) {
+  // Put the downstream connection begin on the test clock so the DS_CX_* time points render
+  // deterministically.
+  filter_callbacks_.connection_.stream_info_.start_time_monotonic_ =
+      timeSystem().monotonicTime() - std::chrono::microseconds(10);
+
+  setup(1, accessLogConfig("%COMMON_DURATION(DS_CX_BEG:US_CX_BEG:us)% "
+                           "%COMMON_DURATION(US_CX_BEG:US_CX_END:us)% "
+                           "%COMMON_DURATION(DS_CX_BEG:DS_CX_END:us)%"));
+
+  // Record the real connect timing on the upstream connection so it is plumbed back to the
+  // downstream stream info, mirroring how the HTTP router records upstream connect timing.
+  auto& upstream_timing =
+      upstream_connections_.at(0)->stream_info_.upstreamInfo()->upstreamTiming();
+  upstream_timing.onUpstreamConnectStart(timeSystem());
+  timeSystem().advanceTimeWait(std::chrono::microseconds(40));
+  upstream_timing.onUpstreamConnectComplete(timeSystem());
+  raiseEventUpstreamConnected(0);
+
+  timeSystem().advanceTimeWait(std::chrono::microseconds(60));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+
+  EXPECT_EQ(access_log_data_, "10 40 110");
+}
+
+// Test that when the upstream connection is never established the US_CX time points stay unset and
+// render as "-", so a failed pool attempt is not logged as a real connect.
+TEST_P(TcpProxyTest, AccessLogCommonDurationUpstreamConnectFailure) {
+  setup(1, accessLogConfig("%COMMON_DURATION(DS_CX_BEG:US_CX_BEG:us)% "
+                           "%COMMON_DURATION(US_CX_BEG:US_CX_END:us)%"));
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
+
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "- -");
 }
 
 // Test that access log fields %DOWNSTREAM_PEER_URI_SAN% is correctly logged.
@@ -1972,7 +2010,7 @@ TEST_P(TcpProxyTest, ShareFilterState) {
 
   upstream_connections_.at(0)->streamInfo().filterState()->setData(
       "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
   raiseEventUpstreamConnected(0);
   EXPECT_EQ("filter_state_cluster",
             filter_callbacks_.connection_.streamInfo()
@@ -2327,8 +2365,6 @@ TEST_P(TcpProxyTest, OdcdsClusterMissingCauseConnectionClose) {
 
 // Test that upstream transport failure message is reflected in access logs.
 TEST_P(TcpProxyTest, UpstreamConnectFailureStreamInfoAccessLog) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
-
   setup(1, accessLogConfig("%UPSTREAM_TRANSPORT_FAILURE_REASON%"));
 
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure,
@@ -2563,7 +2599,7 @@ TEST_P(TcpProxyTest, SetDynamicTLVWithFilterState) {
   // Set filter state on the connection streamInfo.
   filter_callbacks_.connection_.stream_info_.filter_state_->setData(
       "test.key", std::make_unique<Router::StringAccessorImpl>("filter_state_value"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   setup(1, config);
   raiseEventUpstreamConnected(0);
@@ -2613,8 +2649,8 @@ TEST_P(TcpProxyTest, SetDynamicTLVWithStartTime) {
   const std::string timestamp_value(tlvs[0].value.begin(), tlvs[0].value.end());
   EXPECT_FALSE(timestamp_value.empty());
   // Should contain date-like characters.
-  EXPECT_TRUE(timestamp_value.find("-") != std::string::npos ||
-              timestamp_value.find(":") != std::string::npos);
+  EXPECT_TRUE(timestamp_value.find('-') != std::string::npos ||
+              timestamp_value.find(':') != std::string::npos);
 }
 
 // Test buffer overflow behavior - should only readDisable, not re-trigger connection.
@@ -3009,7 +3045,6 @@ public:
     filter_callbacks_.connection().streamInfo().filterState()->setData(
         TcpProxy::ReceiveBeforeConnectKey,
         std::make_unique<StreamInfo::BoolAccessorImpl>(receive_before_connect),
-        StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
 
     // Create and initialize filter.
@@ -3098,7 +3133,7 @@ TEST_P(TcpProxyTlsHandshakeTest,
   filter_callbacks_.connection_.stream_info_.filter_state_->setData(
       Envoy::TcpProxy::PerConnectionCluster::key(),
       std::make_shared<Envoy::TcpProxy::PerConnectionCluster>("state_fake_cluster"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   // Set up connection pool expectations for when TLS handshake completes.
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
@@ -3402,7 +3437,7 @@ TEST_P(TcpProxyTest, DelayRouteSelectionAllowsFilterStateChanges) {
   filter_callbacks_.connection_.stream_info_.filter_state_->setData(
       Envoy::TcpProxy::PerConnectionCluster::key(),
       std::make_shared<Envoy::TcpProxy::PerConnectionCluster>("state_fake_cluster"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
               tcpConnPool(_, _, _))
@@ -3528,7 +3563,7 @@ TEST_P(TcpProxyTest, MergeWithDownstreamTlvsWithDownstreamState) {
           Network::ProxyProtocolDataWithVersion{
               {downstream_src_addr, downstream_dst_addr, downstream_tlvs},
               Network::ProxyProtocolVersion::V2}),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   setup(1, config);
   raiseEventUpstreamConnected(0);
@@ -3583,7 +3618,7 @@ TEST_P(TcpProxyTest, MergeWithDownstreamTlvsPrecedence) {
           Network::ProxyProtocolDataWithVersion{
               {downstream_src_addr, downstream_dst_addr, downstream_tlvs},
               Network::ProxyProtocolVersion::V2}),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   setup(1, config);
   raiseEventUpstreamConnected(0);
@@ -3629,7 +3664,7 @@ TEST_P(TcpProxyTest, NoMergeWithDownstreamTlvsWhenDisabled) {
           Network::ProxyProtocolDataWithVersion{
               {downstream_src_addr, downstream_dst_addr, downstream_tlvs},
               Network::ProxyProtocolVersion::V2}),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   setup(1, config);
   raiseEventUpstreamConnected(0);
@@ -3678,7 +3713,7 @@ TEST_P(TcpProxyTest, MergeWithDownstreamTlvsWithDynamicTlv) {
           Network::ProxyProtocolDataWithVersion{
               {downstream_src_addr, downstream_dst_addr, downstream_tlvs},
               Network::ProxyProtocolVersion::V2}),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   setup(1, config);
   raiseEventUpstreamConnected(0);
@@ -3730,7 +3765,7 @@ TEST_P(TcpProxyTest, AppendToDownstreamTlvsPreservesDuplicates) {
           Network::ProxyProtocolDataWithVersion{
               {downstream_src_addr, downstream_dst_addr, downstream_tlvs},
               Network::ProxyProtocolVersion::V2}),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   setup(1, config);
   raiseEventUpstreamConnected(0);

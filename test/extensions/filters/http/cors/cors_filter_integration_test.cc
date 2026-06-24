@@ -127,7 +127,12 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().ip_version) {}
 
   void initialize() override {
-    config_helper_.prependFilter("name: envoy.filters.http.cors");
+
+    config_helper_.prependFilter(R"EOF(
+name: envoy.filters.http.cors
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
+)EOF");
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void {

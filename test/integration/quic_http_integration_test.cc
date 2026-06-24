@@ -7,6 +7,8 @@
 #include <initializer_list>
 #include <memory>
 
+#include "test/test_common/logging.h"
+
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 
 namespace Envoy {
@@ -43,7 +45,7 @@ INSTANTIATE_TEST_SUITE_P(QuicHttpMultiAddressesIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-static std::string SPATestParamsToString(
+static std::string spaTestParamsToString(
     const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool, bool>>& params) {
   return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)), "_",
                       std::get<1>(params.param) ? "all_clients_impl" : "quiche_client_impl", "_",
@@ -54,7 +56,7 @@ INSTANTIATE_TEST_SUITE_P(
     QuicHttpIntegrationSPATests, QuicHttpIntegrationSPATest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::Values(true, false), testing::Values(true, false)),
-    SPATestParamsToString);
+    spaTestParamsToString);
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
   useAccessLog("%DOWNSTREAM_TLS_VERSION% %DOWNSTREAM_TLS_CIPHER% %DOWNSTREAM_TLS_SESSION_ID%");
@@ -102,6 +104,10 @@ TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
 }
 
 TEST_P(QuicHttpIntegrationTest, CertCompressionEnabled) {
+  // Brotli certificate compression is opt-in, so enable the runtime guard explicitly to exercise
+  // the brotli compression path.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
   initialize();
 
   EXPECT_LOG_CONTAINS_ALL_OF(
@@ -196,7 +202,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
 TEST_P(QuicHttpIntegrationTest, EarlyDataDisabled) {
   // Make sure all connections use the same PersistentQuicInfoImpl.
   concurrency_ = 1;
-  configureEarlyData(false);
+  configureTlsOptions(/*early_data_enabled=*/false, /*resumption_enabled=*/true);
   initialize();
   // Start the first connection.
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -370,7 +376,7 @@ public:
   }
 };
 
-static std::string PortMigrationTestParamsToString(
+static std::string portMigrationTestParamsToString(
     const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
   return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)), "_",
                       std::get<1>(params.param) ? "migration_by_quiche" : "migration_in_house");
@@ -380,7 +386,7 @@ INSTANTIATE_TEST_SUITE_P(
     QuicHttpIntegrationPortMigrationTest, QuicHttpIntegrationPortMigrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::Values(true, false)),
-    PortMigrationTestParamsToString);
+    portMigrationTestParamsToString);
 
 TEST_P(QuicHttpIntegrationPortMigrationTest, PortMigrationOnPathDegrading) {
   setConcurrency(2);
@@ -1228,7 +1234,7 @@ TEST_P(QuicHttpIntegrationTest, ConfigureAlpnProtocols) {
         quic_transport_socket_config.mutable_downstream_tls_context()->mutable_common_tls_context();
     common_tls_context->add_alpn_protocols("h3");
     common_tls_context->add_alpn_protocols("h3-special");
-    ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+    std::ignore = ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
   });
   initialize();
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
@@ -1292,7 +1298,7 @@ public:
           ->mutable_routes(0)
           ->mutable_route()
           ->set_cluster("cluster_1");
-      config_blob->PackFrom(hcm_config);
+      std::ignore = config_blob->PackFrom(hcm_config);
       bootstrap.mutable_static_resources()->mutable_clusters()->Add()->MergeFrom(
           *bootstrap.mutable_static_resources()->mutable_clusters(0));
       bootstrap.mutable_static_resources()->mutable_clusters(1)->set_name("cluster_1");
@@ -1436,7 +1442,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
 }
 
 TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
-  configureEarlyData(true);
+  configureTlsOptions(/*early_data_enabled=*/true, /*resumption_enabled=*/true);
   inplaceInitialize(/*add_default_filter_chain=*/false);
 
   auto codec_client_0 = makeRawHttp3Connection(
@@ -1447,7 +1453,8 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
 
   // Modify 1st transport socket factory to disable early data.
   ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
-  configureEarlyData(false, &new_config_helper);
+  configureTlsOptions(/*early_data_enabled=*/false, /*resumption_enabled=*/false,
+                      &new_config_helper);
 
   new_config_helper.setLds("1");
   test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
@@ -1464,6 +1471,37 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
   EnvoyQuicClientSession* quic_session =
       static_cast<EnvoyQuicClientSession*>(codec_client_2->connection());
   EXPECT_FALSE(quic_session->EarlyDataAccepted());
+  codec_client_2->close();
+}
+
+TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableResumption) {
+  configureTlsOptions(/*early_data_enabled=*/true, /*resumption_enabled=*/true);
+  inplaceInitialize(/*add_default_filter_chain=*/false);
+
+  auto codec_client_0 = makeRawHttp3Connection(
+      makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"), absl::nullopt,
+      /*wait_for_1rtt_key*/ true);
+  makeRequestAndWaitForResponse(*codec_client_0);
+  codec_client_0->close();
+
+  // Modify 1st transport socket factory to disable resumption.
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
+  configureTlsOptions(/*early_data_enabled=*/false, /*resumption_enabled=*/false,
+                      &new_config_helper);
+
+  new_config_helper.setLds("1");
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Ge(1));
+
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
+
+  auto codec_client_2 = makeRawHttp3Connection(
+      makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"), absl::nullopt,
+      /*wait_for_1rtt_key*/ true);
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_2->connection());
+  EXPECT_FALSE(quic_session->IsResumption());
+  makeRequestAndWaitForResponse(*codec_client_2);
   codec_client_2->close();
 }
 
@@ -1520,7 +1558,8 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddress) {
             server_preferred_address;
         server_preferred_address.set_ipv4_address("127.0.0.2");
         server_preferred_address.set_ipv6_address("::2");
-        preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
+        std::ignore =
+            preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
 
         // Configure a test listener filter which is incompatible with any server preferred
         // addresses but with any matcher, which effectively disables the filter.
@@ -1531,7 +1570,7 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddress) {
         configuration.set_added_value("foo");
         configuration.set_allow_server_migration(false);
         configuration.set_allow_client_migration(false);
-        listener_filter->mutable_typed_config()->PackFrom(configuration);
+        std::ignore = listener_filter->mutable_typed_config()->PackFrom(configuration);
         listener_filter->mutable_filter_disabled()->set_any_match(true);
       });
 
@@ -1603,7 +1642,8 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
         server_preferred_address.mutable_ipv6_config()->mutable_address()->set_port_value(12345);
         server_preferred_address.mutable_ipv6_config()->mutable_dnat_address()->set_address("::2");
         server_preferred_address.mutable_ipv6_config()->mutable_dnat_address()->set_port_value(0);
-        preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
+        std::ignore =
+            preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
 
         // Configure a test listener filter which is incompatible with any server preferred
         // addresses but with any matcher, which effectively disables the filter.
@@ -1614,7 +1654,7 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
         configuration.set_added_value("foo");
         configuration.set_allow_server_migration(false);
         configuration.set_allow_client_migration(false);
-        listener_filter->mutable_typed_config()->PackFrom(configuration);
+        std::ignore = listener_filter->mutable_typed_config()->PackFrom(configuration);
         listener_filter->mutable_filter_disabled()->set_any_match(true);
       });
 
@@ -1694,7 +1734,8 @@ TEST_P(QuicHttpIntegrationSPATest, PreferredAddressRuntimeFlag) {
             server_preferred_address;
         server_preferred_address.set_ipv4_address("127.0.0.2");
         server_preferred_address.set_ipv6_address("::2");
-        preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
+        std::ignore =
+            preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
 
         // Configure a test listener filter which is incompatible with any server preferred
         // addresses but with any matcher, which effectively disables the filter.
@@ -1705,7 +1746,7 @@ TEST_P(QuicHttpIntegrationSPATest, PreferredAddressRuntimeFlag) {
         configuration.set_added_value("foo");
         configuration.set_allow_server_migration(false);
         configuration.set_allow_client_migration(false);
-        listener_filter->mutable_typed_config()->PackFrom(configuration);
+        std::ignore = listener_filter->mutable_typed_config()->PackFrom(configuration);
         listener_filter->mutable_filter_disabled()->set_any_match(true);
       });
 
@@ -1757,7 +1798,8 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDualStack) {
     envoy::extensions::quic::server_preferred_address::v3::FixedServerPreferredAddressConfig
         server_preferred_address;
     server_preferred_address.set_ipv4_address("127.0.0.2");
-    preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
+    std::ignore =
+        preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
   });
 
   initialize();
@@ -1815,7 +1857,8 @@ TEST_P(QuicHttpIntegrationTest, PreferredAddressDroppedByIncompatibleListenerFil
             server_preferred_address;
         server_preferred_address.set_ipv4_address("127.0.0.2");
         server_preferred_address.set_ipv6_address("::2");
-        preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
+        std::ignore =
+            preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
 
         // Configure a test listener filter which is incompatible with any server preferred
         // addresses.
@@ -1826,7 +1869,7 @@ TEST_P(QuicHttpIntegrationTest, PreferredAddressDroppedByIncompatibleListenerFil
         configuration.set_added_value("foo");
         configuration.set_allow_server_migration(false);
         configuration.set_allow_client_migration(false);
-        listener_filter->mutable_typed_config()->PackFrom(configuration);
+        std::ignore = listener_filter->mutable_typed_config()->PackFrom(configuration);
       });
 
   initialize();
@@ -1948,7 +1991,7 @@ TEST_P(QuicHttpIntegrationTest, ConnectionDebugVisitor) {
                                     ->mutable_connection_debug_visitor_config();
     debug_visitor_config->set_name("envoy.quic.connection_debug_visitor.basic");
     envoy::extensions::quic::connection_debug_visitor::v3::BasicConfig config;
-    debug_visitor_config->mutable_typed_config()->PackFrom(config);
+    std::ignore = debug_visitor_config->mutable_typed_config()->PackFrom(config);
   });
 
   initialize();
@@ -2021,7 +2064,7 @@ TEST_P(QuicHttpIntegrationTest, QuicListenerFilterReceivesFirstPacketWithCmsg) {
     configuration.set_added_value("foo");
     configuration.set_allow_server_migration(false);
     configuration.set_allow_client_migration(false);
-    listener_filter->mutable_typed_config()->PackFrom(configuration);
+    std::ignore = listener_filter->mutable_typed_config()->PackFrom(configuration);
   });
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -2059,7 +2102,7 @@ TEST_P(QuicHttpIntegrationTest, SessionTicketResumptionWithStaticKeys) {
                      ->mutable_session_ticket_keys();
     // Session ticket keys must be exactly 80 bytes.
     keys->add_keys()->set_inline_bytes(std::string(80, '\x01'));
-    ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+    std::ignore = ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
   });
 
   initialize();
@@ -2109,6 +2152,81 @@ TEST_P(QuicHttpIntegrationTest, NoSessionTicketResumptionWithoutKeys) {
   EnvoyQuicClientSession* quic_session =
       static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
   EXPECT_FALSE(quic_session->IsResumption());
+  codec_client_->close();
+}
+
+TEST_P(QuicHttpIntegrationTest, InconsistentContentLengthHeadersOnlyEnabled) {
+  useAccessLog("%RESPONSE_CODE% %RESPONSE_CODE_DETAILS% %RESPONSE_FLAGS%");
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+
+  // Adjust stream idle timeout to 1 second to timeout faster during request hanging.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_stream_idle_timeout()->set_seconds(1); });
+
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.quic_validate_headers_only_content_length", "true");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},
+      {":path", "/test/long/url"},
+      {":authority", "sni.lyft.com"},
+      {":scheme", "http"},
+      {"content-length", "10"} // Inconsistent content-length
+  };
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // We expect the request to be reset downstream.
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_FALSE(response->complete());
+
+  // Verify access log contains 0 response code, http3.inconsistent_content_length, and DPE flag
+  std::string log = waitForAccessLog(access_log_name_, 0);
+  EXPECT_THAT(log, testing::HasSubstr("0 http3.inconsistent_content_length DPE"));
+}
+
+TEST_P(QuicHttpIntegrationTest, InconsistentContentLengthHeadersOnlyDisabled) {
+  useAccessLog("%RESPONSE_CODE% %RESPONSE_CODE_DETAILS% %RESPONSE_FLAGS%");
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+
+  // Adjust stream idle timeout to 1 second to timeout faster during request hanging.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_stream_idle_timeout()->set_seconds(1); });
+
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.quic_validate_headers_only_content_length", "false");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},
+      {":path", "/test/long/url"},
+      {":authority", "sni.lyft.com"},
+      {":scheme", "http"},
+      {"content-length", "10"} // Inconsistent content-length
+  };
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // Since the flag is disabled, Envoy forwards the request to the H1 backend.
+  // The autonomous upstream will receive it, but will hang waiting for the body.
+  // Envoy's stream idle timeout should trigger after 1s and return 504 Gateway Timeout.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("504", response->headers().getStatusValue());
+
+  // Verify access log contains 504 response code, stream_idle_timeout, and SI flag (entry index 0)
+  std::string log = waitForAccessLog(access_log_name_, 0);
+  EXPECT_THAT(log, testing::HasSubstr("504 stream_idle_timeout SI"));
+
   codec_client_->close();
 }
 

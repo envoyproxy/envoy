@@ -31,11 +31,17 @@ TEST(UtilityTest, TestSha256DigestGrowingBuffer) {
   auto digest = UtilitySingleton::get().getSha256Digest(buffer);
   EXPECT_EQ("76571770bb46bdf51e1aba95b23c681fda27f6ae56a8a90898a4cb7556e19dcb",
             Hex::encode(digest));
-  buffer.add("slice 2");
+
+  buffer.appendSliceForTest("slice 2");
+  ASSERT_EQ(2, buffer.getRawSlices().size());
+
   digest = UtilitySingleton::get().getSha256Digest(buffer);
   EXPECT_EQ("290b462b0fe5edcf6b8532de3ca70da8ab77937212042bb959192ec6c9f95b9a",
             Hex::encode(digest));
-  buffer.add("slice 3");
+
+  buffer.appendSliceForTest("slice 3");
+  ASSERT_EQ(3, buffer.getRawSlices().size());
+
   digest = UtilitySingleton::get().getSha256Digest(buffer);
   EXPECT_EQ("29606bbf02fdc40007cdf799de36d931e3587dafc086937efd6599a4ea9397aa",
             Hex::encode(digest));

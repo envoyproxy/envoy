@@ -55,7 +55,6 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
           if (!has_options) {
             filter_state.setData(Network::UpstreamSocketOptionsFilterState::key(),
                                  std::make_unique<Network::UpstreamSocketOptionsFilterState>(),
-                                 StreamInfo::FilterState::StateType::Mutable,
                                  StreamInfo::FilterState::LifeSpan::Connection);
           }
           filter_state

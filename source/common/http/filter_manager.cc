@@ -381,7 +381,6 @@ void ActiveStreamFilterBase::sendLocalReply(
     streamInfo().filterState()->setData(
         LocalReplyFilterStateKey,
         std::make_shared<LocalReplyOwnerObject>(filter_context_.config_name),
-        StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 
@@ -488,6 +487,10 @@ void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance&
   }
   parent_.decodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
+}
+
+OptRef<WebTransportSession> ActiveStreamDecoderFilter::webTransportSession() {
+  return parent_.webTransportSession();
 }
 
 void ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
