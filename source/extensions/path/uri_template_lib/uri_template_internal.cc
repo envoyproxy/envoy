@@ -288,8 +288,8 @@ absl::StatusOr<ParsedResult<Variable>> parseMixedVariableLiteral(absl::string_vi
     return var_result.status();
   }
 
-  Variable mixed_var(var_result->parsed_value_.name_, std::move(var_result->parsed_value_.match_), prefix,
-                     suffix);
+  Variable mixed_var(var_result->parsed_value_.name_, std::move(var_result->parsed_value_.match_),
+                     prefix, suffix);
   return ParsedResult<Variable>(mixed_var, unparsed_pattern);
 }
 
