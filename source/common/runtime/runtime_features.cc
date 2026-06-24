@@ -152,8 +152,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 FALSE_RUNTIME_GUARD(envoy_restart_features_upstream_http_filters_with_tcp_proxy);
 // TODO(danzh) false deprecate it once QUICHE has its own enable/disable flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
-// TODO(panting): Flip to true once direct packet writer rollout is stable.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_use_direct_packet_writer);
 // TODO(doogie): Flip to true once QUIC session ticket support is stable.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_session_ticket_support);
 // TODO(#10646) change to true when UHV is sufficiently tested

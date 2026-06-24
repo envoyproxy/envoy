@@ -631,7 +631,6 @@ envoy_cc_library(
     hdrs = envoy_select_enable_http3(["envoy_quic_packet_writer.h"]),
     deps = envoy_select_enable_http3([
         ":envoy_quic_utils_lib",
-        ":quic_packet_writer_interface",
         "//envoy/network:udp_packet_writer_handler_interface",
         "@quiche//:quic_core_packet_writer_lib",
         "@quiche//:quic_platform",

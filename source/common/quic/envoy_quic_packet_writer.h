@@ -2,7 +2,7 @@
 
 #include "envoy/network/udp_packet_writer_handler.h"
 
-#include "source/common/quic/quic_packet_writer_interface.h"
+#include "quiche/quic/core/quic_packet_writer.h"
 
 namespace Envoy {
 namespace Quic {
