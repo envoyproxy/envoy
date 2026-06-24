@@ -159,6 +159,15 @@ public:
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
   bool preserveAuthorizationHeader() const { return preserve_authorization_header_; }
+  // Whether the OIDC ID token should be forwarded upstream.
+  bool forwardIdToken() const { return !forward_id_token_header_.get().empty(); }
+  // The upstream header that carries the forwarded ID token (empty when forwarding is disabled).
+  const Http::LowerCaseString& forwardIdTokenHeader() const { return forward_id_token_header_; }
+  // Whether the ID token is forwarded on the ``Authorization`` header (using the ``Bearer ``
+  // prefix) rather than a custom header carrying the raw token value.
+  bool forwardIdTokenOnAuthorizationHeader() const {
+    return forward_id_token_header_ == Http::CustomHeaders::get().Authorization;
+  }
   const std::vector<Http::HeaderUtility::HeaderDataPtr>& passThroughMatchers() const {
     return pass_through_header_matchers_;
   }
@@ -279,6 +288,9 @@ private:
   const bool disable_refresh_token_set_cookie_ : 1;
   const bool disable_token_encryption_ : 1;
   const bool use_access_token_expiry_for_id_token_cookie_ : 1;
+  // The upstream header used to forward the OIDC ID token. Empty when ID token forwarding is
+  // disabled.
+  const Http::LowerCaseString forward_id_token_header_;
   Router::RetryPolicyConstSharedPtr retry_policy_;
   const CookieSettings bearer_token_cookie_settings_;
   const CookieSettings hmac_cookie_settings_;
@@ -306,6 +318,7 @@ class CookieValidator {
 public:
   virtual ~CookieValidator() = default;
   virtual const std::string& token() const PURE;
+  virtual const std::string& idToken() const PURE;
   virtual const std::string& refreshToken() const PURE;
   virtual void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) PURE;
   virtual bool isValid() const PURE;
@@ -319,6 +332,7 @@ public:
       : time_source_(time_source), cookie_names_(cookie_names), cookie_domain_(cookie_domain) {}
 
   const std::string& token() const override { return access_token_; }
+  const std::string& idToken() const override { return id_token_; }
   const std::string& refreshToken() const override { return refresh_token_; }
 
   void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) override;
@@ -390,6 +404,11 @@ public:
 
   void finishGetAccessTokenFlow();
   void finishRefreshAccessTokenFlow();
+
+  // Forwards the OIDC ID token upstream on the configured header, if ID token forwarding is
+  // enabled and the token is non-empty. When the configured header is ``Authorization`` the token
+  // is forwarded with the ``Bearer `` prefix; otherwise the raw token value is set on the header.
+  void forwardIdToken(Http::RequestHeaderMap& headers, const std::string& id_token) const;
   void updateTokens(const std::string& access_token, const std::string& id_token,
                     const std::string& refresh_token, std::chrono::seconds expires_in);
 
