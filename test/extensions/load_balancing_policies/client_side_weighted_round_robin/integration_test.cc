@@ -220,7 +220,7 @@ public:
   using ClientSideWeightedRoundRobinProto = envoy::extensions::load_balancing_policies::
       client_side_weighted_round_robin::v3::ClientSideWeightedRoundRobin;
 
-  // customize_policy, when set, mutates the typed CSWRR config after the base
+  // customize_policy, when set, mutates the typed policy config after the base
   // config is applied (e.g. to set oob_reporting_config). Runs inside the config
   // modifier, after fake upstreams exist, so it can reference their ports.
   void initializeConfig(
