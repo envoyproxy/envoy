@@ -3554,6 +3554,22 @@ TEST_P(TcpProxyTest, DownstreamReadDisableDurationStat) {
   EXPECT_EQ(350U, config_->stats().downstream_flow_control_combined_reading_delay_micros_.value());
 }
 
+TEST_P(TcpProxyTest, DownstreamReadDisableDurationStatOnDestroy) {
+  setup(0, false, true);
+
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true))
+      .WillOnce(Return(Network::Connection::ReadDisableStatus::TransitionedToReadDisabled));
+  filter_->readDisableDownstream(true);
+  EXPECT_EQ(1U, config_->stats().downstream_flow_control_paused_reading_total_.value());
+  EXPECT_EQ(0U, config_->stats().downstream_flow_control_combined_reading_delay_micros_.value());
+
+  timeSystem().advanceTimeWait(std::chrono::microseconds(125));
+  filter_.reset();
+
+  EXPECT_EQ(0U, config_->stats().downstream_flow_control_resumed_reading_total_.value());
+  EXPECT_EQ(125U, config_->stats().downstream_flow_control_combined_reading_delay_micros_.value());
+}
+
 TEST_P(TcpProxyTest, UpstreamReadDisableDurationStat) {
   setup(1);
   raiseEventUpstreamConnected(0);

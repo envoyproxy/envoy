@@ -196,6 +196,10 @@ void UpstreamRequest::cleanUp() {
   }
   cleaned_up_ = true;
 
+  upstream_read_pause_tracker_.onDestruction(
+      parent_.callbacks()->dispatcher().timeSource(),
+      parent_.cluster()->trafficStats()->upstream_flow_control_combined_reading_delay_micros_);
+
   filter_manager_->destroyFilters();
 
   if (span_ != nullptr) {

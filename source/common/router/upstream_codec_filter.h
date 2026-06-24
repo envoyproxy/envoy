@@ -43,7 +43,7 @@ public:
   void onUpstreamConnectionEstablished() override;
 
   // Http::StreamFilterBase
-  void onDestroy() override { callbacks_->removeDownstreamWatermarkCallbacks(*this); }
+  void onDestroy() override;
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,

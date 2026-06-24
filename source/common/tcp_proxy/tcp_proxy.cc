@@ -347,6 +347,20 @@ Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager
 }
 
 Filter::~Filter() {
+  if (read_callbacks_ != nullptr) {
+    downstream_read_pause_tracker_.onDestruction(
+        read_callbacks_->connection().dispatcher().timeSource(),
+        config_->stats().downstream_flow_control_combined_reading_delay_micros_);
+    if (read_callbacks_->upstreamHost() != nullptr) {
+      upstream_read_pause_tracker_.onDestruction(
+          read_callbacks_->connection().dispatcher().timeSource(),
+          read_callbacks_->upstreamHost()
+              ->cluster()
+              .trafficStats()
+              ->upstream_flow_control_combined_reading_delay_micros_);
+    }
+  }
+
   // Disable access log flush timer if it is enabled.
   disableAccessLogFlushTimer();
 

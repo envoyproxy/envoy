@@ -155,6 +155,7 @@ private:
                               public RouteCache {
     ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit,
                  Buffer::BufferMemoryAccountSharedPtr account);
+    ~ActiveStream() override;
 
     // Event::DeferredDeletable
     void deleteIsPending() override {

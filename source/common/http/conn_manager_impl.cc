@@ -1019,6 +1019,12 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   }
 }
 
+ConnectionManagerImpl::ActiveStream::~ActiveStream() {
+  downstream_read_pause_tracker_.onDestruction(
+      connection_manager_.timeSource(),
+      connection_manager_.stats_.named_.downstream_flow_control_combined_reading_delay_micros_);
+}
+
 void ConnectionManagerImpl::ActiveStream::log(AccessLog::AccessLogType type) {
   const Formatter::Context log_context{
       request_headers_.get(), response_headers_.get(), response_trailers_.get(), {}, type,

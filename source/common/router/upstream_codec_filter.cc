@@ -27,6 +27,15 @@
 namespace Envoy {
 namespace Router {
 
+void UpstreamCodecFilter::onDestroy() {
+  upstream_read_pause_tracker_.onDestruction(
+      callbacks_->dispatcher().timeSource(),
+      callbacks_->clusterInfo()
+          ->trafficStats()
+          ->upstream_flow_control_combined_reading_delay_micros_);
+  callbacks_->removeDownstreamWatermarkCallbacks(*this);
+}
+
 void UpstreamCodecFilter::onBelowWriteBufferLowWatermark() {
   upstream_read_pause_tracker_.onResumed(
       callbacks_->dispatcher().timeSource(),
