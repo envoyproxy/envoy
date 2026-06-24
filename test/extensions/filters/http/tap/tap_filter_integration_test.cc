@@ -3,6 +3,7 @@
 
 #include "test/extensions/common/tap/common.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"

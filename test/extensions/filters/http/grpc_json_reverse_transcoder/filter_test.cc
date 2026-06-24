@@ -71,7 +71,7 @@ protected:
 
   std::string makeProtoDescriptor(std::function<void(Protobuf::FileDescriptorSet&)> process) {
     Protobuf::FileDescriptorSet descriptor_set;
-    descriptor_set.ParseFromString(
+    std::ignore = descriptor_set.ParseFromString(
         api_->fileSystem()
             .fileReadToEnd(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"))
             .value());
@@ -81,7 +81,7 @@ protected:
     TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
     std::string path = TestEnvironment::temporaryPath("envoy_test/proto.descriptor");
     std::ofstream file(path, std::ios::binary);
-    descriptor_set.SerializeToOstream(&file);
+    std::ignore = descriptor_set.SerializeToOstream(&file);
 
     return path;
   }
@@ -600,7 +600,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, OKResponse) {
   std::ignore = decoder.decode(buffer, frames);
 
   bookstore::Book book;
-  book.ParseFromString(frames[0].data_->toString());
+  std::ignore = book.ParseFromString(frames[0].data_->toString());
 
   EXPECT_TRUE(MessageDifferencer::Equals(expected_book, book));
   EXPECT_EQ(trailers.getGrpcStatusValue(), "0"); // OK
@@ -635,7 +635,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, OKResponseForResourceCreation) {
   std::ignore = decoder.decode(buffer, frames);
 
   bookstore::Book book;
-  book.ParseFromString(frames[0].data_->toString());
+  std::ignore = book.ParseFromString(frames[0].data_->toString());
 
   EXPECT_TRUE(MessageDifferencer::Equals(expected_book, book));
   EXPECT_EQ(trailers.getGrpcStatusValue(), "0"); // OK
@@ -662,7 +662,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, OKResponseWithTrailer) {
         std::ignore = decoder.decode(data, frames);
 
         bookstore::Book book;
-        book.ParseFromString(frames[0].data_->toString());
+        std::ignore = book.ParseFromString(frames[0].data_->toString());
 
         EXPECT_TRUE(MessageDifferencer::Equals(expected_book, book));
       }));
@@ -708,7 +708,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, OKHttpBodyResponse) {
   std::ignore = decoder.decode(buffer, frames);
 
   google::api::HttpBody body;
-  body.ParseFromString(frames[0].data_->toString());
+  std::ignore = body.ParseFromString(frames[0].data_->toString());
 
   EXPECT_TRUE(MessageDifferencer::Equals(expected_body, body));
   EXPECT_EQ(trailers.getGrpcStatusValue(), "0");
@@ -758,7 +758,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, OKHttpBodyResponseWithTrailer) {
         std::ignore = decoder.decode(data, frames);
 
         google::api::HttpBody body;
-        body.ParseFromString(frames[0].data_->toString());
+        std::ignore = body.ParseFromString(frames[0].data_->toString());
 
         EXPECT_TRUE(MessageDifferencer::Equals(expected_body, body));
       }));

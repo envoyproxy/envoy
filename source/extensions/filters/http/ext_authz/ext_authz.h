@@ -569,6 +569,10 @@ private:
   Filters::Common::ExtAuthz::ClientPtr client_;
   AuthCacheSessionPtr cache_session_;
   AuthCacheSession::LookupRequest* active_lookup_{nullptr};
+  // Per-route client that overrides the default client when specified by route configuration.
+  Filters::Common::ExtAuthz::ClientPtr per_route_client_;
+  // Raw pointer to the client currently serving an in-flight authorization request.
+  Filters::Common::ExtAuthz::Client* active_client_{nullptr};
   // Server context for creating per-route clients.
   Server::Configuration::ServerFactoryContext* server_context_{nullptr};
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};

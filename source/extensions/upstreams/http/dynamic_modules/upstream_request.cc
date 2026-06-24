@@ -171,12 +171,12 @@ void HttpTcpBridge::encodeData(Buffer::Instance& data, bool end_stream) {
   }
   downstream_complete_ = end_stream;
 
-  // Move into a local buffer so the module reads from a stable copy. The module is expected
-  // to forward the data via send_upstream_data, which writes to the connection and drains
+  // Move into the owned request buffer so the module reads from a stable copy whose lifetime is
+  // tied to this object. Draining first scopes the buffer to the current call. The module is
+  // expected to forward the data via send_upstream_data, which writes to the connection and drains
   // naturally.
-  Buffer::OwnedImpl local_buffer;
-  local_buffer.move(data);
-  request_buffer_ = &local_buffer;
+  request_buffer_.drain(request_buffer_.length());
+  request_buffer_.move(data);
 
   // The module callback may trigger decodeData with end_stream=true (e.g., via sendResponse),
   // which can cause the router to destroy this object. Do not access any member variables after
@@ -211,15 +211,14 @@ void HttpTcpBridge::onUpstreamData(Buffer::Instance& data, bool end_stream) {
     return;
   }
 
-  // Move data into a local buffer before calling the module. The module callback may trigger
-  // downstream processing that re-enables upstream reads, causing a re-entrant onUpstreamData
-  // call. Moving the data first ensures the connection's read buffer is empty, preventing the
-  // same data from being delivered twice.
-  Buffer::OwnedImpl local_buffer;
-  local_buffer.move(data);
-
-  response_buffer_ = &local_buffer;
-  bytes_meter_->addWireBytesReceived(local_buffer.length());
+  // Move data into the owned response buffer before calling the module. The module callback may
+  // trigger downstream processing that re-enables upstream reads, causing a re-entrant
+  // onUpstreamData call. Moving the data first ensures the connection's read buffer is empty,
+  // preventing the same data from being delivered twice. The owned buffer is tied to this object so
+  // the pointer never outlives its storage. Draining first scopes the buffer to the current call.
+  response_buffer_.drain(response_buffer_.length());
+  response_buffer_.move(data);
+  bytes_meter_->addWireBytesReceived(response_buffer_.length());
 
   // The module callback may trigger decodeData with end_stream=true, which can cause the router
   // to call resetStream() and ultimately destroy this object. Do not access any member variables

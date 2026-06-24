@@ -148,7 +148,7 @@ ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config
                            ->Mutable(0)
                            ->mutable_typed_per_filter_config();
 
-        (*config)["buffer"].PackFrom(buffer_per_route);
+        std::ignore = (*config)["buffer"].PackFrom(buffer_per_route);
       };
 }
 

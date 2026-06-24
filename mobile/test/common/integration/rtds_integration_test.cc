@@ -38,7 +38,7 @@ public:
     xds_builder.addRuntimeDiscoveryService("some_rtds_resource", /*timeout_in_seconds=*/1)
         .setSslRootCerts(getUpstreamCert());
     builder_.setXds(std::move(xds_builder));
-    builder_.setLogLevel(Logger::Logger::trace);
+    builder_.setLogLevel(Logger::Logger::info);
     builder_.enforceTrustChainVerification(false);
     XdsIntegrationTest::createEnvoy();
   }

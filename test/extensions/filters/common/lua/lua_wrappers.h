@@ -31,7 +31,7 @@ public:
     state_ = std::make_unique<ThreadLocalState>(code, tls_);
     state_->registerType<T>();
     coroutine_ = state_->createCoroutine();
-    lua_pushcclosure(coroutine_->luaState(), luaTestPrint, 1);
+    lua_pushcclosure(coroutine_->luaState(), luaTestPrint, 0);
     lua_setglobal(coroutine_->luaState(), "testPrint");
     testing::Mock::AllowLeak(&printer_);
   }

@@ -73,7 +73,7 @@ protected:
 
     auto* reporter_config = custom_config.mutable_reporter_config();
     reporter_config->set_name(MOCK_REPORTER);
-    reporter_config->mutable_typed_config()->PackFrom(Protobuf::StringValue{});
+    std::ignore = reporter_config->mutable_typed_config()->PackFrom(Protobuf::StringValue{});
 
     return custom_config;
   }
@@ -617,14 +617,14 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateConnectionReporting) {
         auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
 
         EXPECT_CALL(*reporter, reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
-                                                     testing::Eq(tenant_id)));
+                                                     testing::Eq(tenant_id), testing::_));
 
         return reporter;
       }));
 
   extension_ =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
-  extension_->reportConnection(node_id, cluster_id, tenant_id);
+  extension_->reportConnection(node_id, cluster_id, tenant_id, 0);
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateDisconnectionReporting) {

@@ -22,6 +22,8 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 #include "source/server/generic_factory_context.h"
 
+#include "absl/strings/numbers.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -509,7 +511,20 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
   }
   encoder_.encodeHeaders(*resp_headers, true);
 
-  parent_.processAcceptedConnection(node_id, cluster_id, tenant_id);
+  // Extract DP-side tunnel initiation timestamp if present. Defaults to 0 (absent).
+  int64_t initiation_time_ms = 0;
+  const auto initiation_time_vals =
+      headers_->get(Bootstrap::ReverseConnection::reverseTunnelInitiationTimeHeader());
+  if (!initiation_time_vals.empty()) {
+    if (!absl::SimpleAtoi(initiation_time_vals[0]->value().getStringView(), &initiation_time_ms)) {
+      ENVOY_CONN_LOG(warn, "reverse_tunnel: failed to parse initiation-time header value '{}'",
+                     parent_.read_callbacks_->connection(),
+                     initiation_time_vals[0]->value().getStringView());
+      initiation_time_ms = 0;
+    }
+  }
+
+  parent_.processAcceptedConnection(node_id, cluster_id, tenant_id, initiation_time_ms);
   parent_.stats_.accepted_.inc();
 
   // Close the listener-side connection so tunnel bytes go to the duped fd, not back into
@@ -523,7 +538,8 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
 
 void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
                                                     absl::string_view cluster_id,
-                                                    absl::string_view tenant_id) {
+                                                    absl::string_view tenant_id,
+                                                    int64_t initiation_time_ms) {
   ENVOY_CONN_LOG(debug,
                  "reverse_tunnel: connection accepted for node '{}' in cluster '{}' (tenant: '{}')",
                  read_callbacks_->connection(), node_id, cluster_id, tenant_id);
@@ -593,7 +609,7 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
 
   // Report the connection to the extension -> reporter.
   if (auto extension = socket_manager->getUpstreamExtension()) {
-    extension->reportConnection(socket_node_id, socket_cluster_id, tenant_id);
+    extension->reportConnection(socket_node_id, socket_cluster_id, tenant_id, initiation_time_ms);
   }
 }
 

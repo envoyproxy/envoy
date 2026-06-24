@@ -325,7 +325,9 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
         [this](auto&... params) -> bool { return this->compareVirtualHost(params...); },
         [this](auto&... params) -> bool { return this->compareRewritePath(params...); },
         [this](auto&... params) -> bool { return this->compareRewriteHost(params...); },
-        [this](auto&... params) -> bool { return this->compareRedirectPath(params...); },
+        [this, &stream_info](auto&... params) -> bool {
+          return this->compareRedirectPath(params..., stream_info);
+        },
         [this](auto&... params) -> bool { return this->compareRedirectCode(params...); },
         [this](auto&... params) -> bool { return this->compareRequestHeaderFields(params...); },
         [this](auto&... params) -> bool { return this->compareResponseHeaderFields(params...); },
@@ -480,7 +482,8 @@ bool RouterCheckTool::compareRewriteHost(
 
 bool RouterCheckTool::compareRedirectPath(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected,
-    envoy::RouterCheckToolSchema::ValidationFailure& failure) {
+    envoy::RouterCheckToolSchema::ValidationFailure& failure,
+    const StreamInfo::StreamInfo& stream_info) {
   if (!expected.has_path_redirect()) {
     return true;
   }
@@ -488,7 +491,8 @@ bool RouterCheckTool::compareRedirectPath(
       tool_config.route_ != nullptr && tool_config.route_->directResponseEntry() != nullptr;
   std::string actual = "";
   if (has_direct_response_entry) {
-    actual = tool_config.route_->directResponseEntry()->newUri(*tool_config.request_headers_);
+    actual = tool_config.route_->directResponseEntry()->newUri(*tool_config.request_headers_,
+                                                               stream_info);
   }
   const bool matches = compareResults(actual, expected.path_redirect().value(), "path_redirect");
   if (!matches) {

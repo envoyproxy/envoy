@@ -60,7 +60,8 @@ public:
       composite_config.add_clusters()->set_name("cluster_1");
       composite_config.add_clusters()->set_name("cluster_2");
 
-      composite_cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(composite_config);
+      std::ignore = composite_cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(
+          composite_config);
     });
 
     // Configure the route to use our composite cluster.

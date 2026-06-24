@@ -395,7 +395,7 @@ void MessageUtil::recursivePgvCheck(const Protobuf::Message& message) {
 
 void MessageUtil::packFrom(Protobuf::Any& any_message, const Protobuf::Message& message) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
-  any_message.PackFrom(message);
+  std::ignore = any_message.PackFrom(message);
 #else
   any_message.set_type_url(message.GetTypeName());
   any_message.set_value(message.SerializeAsString());
@@ -531,7 +531,7 @@ bool redactAny(Protobuf::Message* message, bool ancestor_is_sensitive) {
                 const Protobuf::FieldDescriptor* field_descriptor) {
         Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(*message);
         // To unpack an `Any`, parse the serialized proto.
-        typed_message->ParseFromString(
+        std::ignore = typed_message->ParseFromString(
             reflection->GetString(*reflectable_message, field_descriptor));
       },
       [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,

@@ -1,0 +1,1 @@
+Added ``onHostSelected()`` pre-connection callback to the ``UpstreamCallbacks`` interface. Upstream HTTP filters can now inspect the selected host before the upstream connection is initiated and reject the request via ``sendLocalReply()`` (for example, to enforce SSRF protection by matching the resolved host address against CIDR deny lists).

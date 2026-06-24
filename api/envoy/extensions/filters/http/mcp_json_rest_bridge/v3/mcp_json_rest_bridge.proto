@@ -90,7 +90,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //   - Body: {"data": "updated value"}
 //     (Only the "payload" field from arguments is used as the body. Other arguments not in the
 //     path, like 'resource_id', become query parameters.)
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message McpJsonRestBridge {
   // Where to store parsed MCP request attributes.
   enum RequestStorageMode {
@@ -136,6 +136,16 @@ message McpJsonRestBridge {
   // using the filter's config name (i.e. the ``name`` field of this filter's entry
   // in the ``http_filters`` list) as the metadata namespace.
   RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
+
+  // If set, extract OpenTelemetry (OTel) trace context from MCP requests and propagate it to
+  // request headers. The keys ``traceparent``, ``tracestate``, and ``baggage``
+  // will be extracted from ``_meta``.
+  // Ref: `Request Meta SEP <https://modelcontextprotocol.io/seps/414-request-meta>`_
+  TraceContextExtractionOptions trace_context_extraction = 6;
+}
+
+// Options for trace context extraction.
+message TraceContextExtractionOptions {
 }
 
 // Configuration for the server metadata.
@@ -167,12 +177,12 @@ message ServerInfo {
   google.protobuf.StringValue fallback_protocol_version = 3;
 }
 
-// [#not-implemented-hide:]
 // Configuration for sending locally-generated responses to tools/list requests.
 message ToolsListLocal {
 }
 
 // Configuration for the MCP tool capability of the server.
+// [#next-free-field: 6]
 message ServerToolConfig {
   // List of MCP tools configurations.
   repeated ToolConfig tools = 1;
@@ -193,14 +203,16 @@ message ServerToolConfig {
     // https://modelcontextprotocol.io/specification/2025-11-25/schema#listtoolsresult
     HttpRule tool_list_http_rule = 3;
 
-    // [#not-implemented-hide:]
     // If provided: The extension sends a local response, according to each tool's
     // ToolsListSpecificConfig.
     ToolsListLocal tool_list_local = 4;
   }
+
+  // [#not-implemented-hide:]
+  // Default server info for tools without specific ones.
+  McpServerInfo default_server_info = 5;
 }
 
-// [#not-implemented-hide:]
 // Configuration for a tool's entry in tools/list responses.
 message ToolsListSpecificConfig {
   // Optional, human-readable name of the tool for display purposes.
@@ -216,6 +228,15 @@ message ToolsListSpecificConfig {
   string input_schema = 3;
 }
 
+message McpServerInfo {
+  // The path to the endpoint hosting this tool.
+  string path = 1;
+
+  // The host hosting this tool.
+  string host = 2;
+}
+
+// [#next-free-field: 6]
 message ToolConfig {
   // Unique identifier of the tool. Used both for tools/list and tools/call transcoding.
   string name = 1 [(validate.rules).string = {min_len: 1}];
@@ -223,7 +244,6 @@ message ToolConfig {
   // The HTTP configuration rules that apply to the normal backend.
   HttpRule http_rule = 2;
 
-  // [#not-implemented-hide:]
   // Config for this tool's entry in a local tools/list response. Used when tool_list_local is set
   // in the ServerToolConfig.
   ToolsListSpecificConfig tool_list_config = 3;
@@ -242,6 +262,10 @@ message ToolConfig {
   //
   // Disabled by default.
   bool text_content_streaming_enabled = 4;
+
+  // [#not-implemented-hide:]
+  // Path and host of the MCP server that hosts this tool.
+  repeated McpServerInfo server_info = 5;
 }
 
 // Defines the schema of the JSON-RPC to REST mapping. It specifies how the "arguments"
@@ -295,5 +319,5 @@ message HttpRule {
 
 // Per-route override configuration for the MCP JSON REST Bridge filter.
 message McpJsonRestBridgePerRoute {
-  ServerToolConfig tool_config = 1;
+  repeated ServerToolConfig tool_config = 1;
 }

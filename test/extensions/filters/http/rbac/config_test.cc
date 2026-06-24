@@ -43,7 +43,7 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidMatcherProto) {
   xds::type::matcher::v3::Matcher matcher;
   auto matcher_action = matcher.mutable_on_no_match()->mutable_action();
   matcher_action->set_name("action");
-  matcher_action->mutable_typed_config()->PackFrom(action);
+  std::ignore = matcher_action->mutable_typed_config()->PackFrom(action);
   envoy::extensions::filters::http::rbac::v3::RBAC config;
   *config.mutable_matcher() = matcher;
 
@@ -57,14 +57,17 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidMatcherProto) {
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyProto) {
   RoleBasedAccessControlFilterConfigFactory factory;
-  EXPECT_NE(nullptr, dynamic_cast<envoy::extensions::filters::http::rbac::v3::RBAC*>(
-                         factory.createEmptyConfigProto().get()));
+  EXPECT_NE(nullptr,
+            Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::rbac::v3::RBAC>(
+                factory.createEmptyConfigProto().get()));
 }
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyRouteProto) {
   RoleBasedAccessControlFilterConfigFactory factory;
-  EXPECT_NE(nullptr, dynamic_cast<envoy::extensions::filters::http::rbac::v3::RBACPerRoute*>(
-                         factory.createEmptyRouteConfigProto().get()));
+  EXPECT_NE(
+      nullptr,
+      Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::rbac::v3::RBACPerRoute>(
+          factory.createEmptyRouteConfigProto().get()));
 }
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, InvalidMatcherProto) {

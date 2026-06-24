@@ -83,7 +83,7 @@ public:
                                                    preserve_case::v3::PreserveCaseFormatterConfig>(
               fmt::format("formatter_type_on_envoy_headers: {}",
                           static_cast<int>(GetParam().formatter_type_on_envoy_headers)));
-          typed_extension_config->mutable_typed_config()->PackFrom(config);
+          std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(config);
         });
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -97,7 +97,7 @@ public:
                                                preserve_case::v3::PreserveCaseFormatterConfig>(
           fmt::format("formatter_type_on_envoy_headers: {}",
                       static_cast<int>(GetParam().formatter_type_on_envoy_headers)));
-      typed_extension_config->mutable_typed_config()->PackFrom(config);
+      std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(config);
       ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                        protocol_options);
     });
