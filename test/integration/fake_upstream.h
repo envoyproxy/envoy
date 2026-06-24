@@ -118,6 +118,12 @@ public:
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() {
     return encoder_.http1StreamEncoderOptions();
   }
+  // Exposes the underlying WebTransport session of this stream, if any (HTTP/3 only). Lets tests
+  // drive a negotiated WebTransport session on the upstream side: install a visitor, open streams,
+  // send/receive data and datagrams. Empty OptRef for non-WebTransport streams.
+  OptRef<Http::WebTransportSession> webTransportSession() {
+    return encoder_.getStream().webTransportSession();
+  }
   void
   sendLocalReply(Http::Code code, absl::string_view body,
                  const std::function<void(Http::ResponseHeaderMap& headers)>& /*modify_headers*/,

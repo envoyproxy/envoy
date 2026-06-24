@@ -85,6 +85,10 @@ Reserializer
 SION
 TRA
 Websockets
+webtransport
+WEBTRANSPORT
+signalling
+signalled
 abc
 abcd
 abd
@@ -127,6 +131,7 @@ Mensah
 NAK
 OWS
 Preconnecting
+CONNECT
 RCVBUF
 RTCP
 RTLD
@@ -1580,6 +1585,7 @@ unittest
 unix
 unref
 unreferenced
+dereferenced
 unzigzag
 upcasts
 upsert
