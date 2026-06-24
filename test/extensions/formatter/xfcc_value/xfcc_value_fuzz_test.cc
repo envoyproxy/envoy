@@ -16,7 +16,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
 
   // We just want to make sure that the parser doesn't crash with any input.
   XfccValueFormatterCommandParser parser;
-  auto formatter = parser.parse("XFCC_VALUE", "uri", absl::nullopt);
+  auto formatter = parser.parse("XFCC_VALUE", "uri", absl::nullopt).value();
 
   Http::TestRequestHeaderMapImpl request_headers{};
   request_headers.setForwardedClientCert(sv);

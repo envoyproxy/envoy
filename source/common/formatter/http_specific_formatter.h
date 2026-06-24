@@ -249,8 +249,9 @@ public:
   BuiltInHttpCommandParser() = default;
 
   // CommandParser
-  FormatterProviderPtr parse(absl::string_view command, absl::string_view subcommand,
-                             absl::optional<size_t> max_length) const override;
+  absl::StatusOr<FormatterProviderPtr> parse(absl::string_view command,
+                                             absl::string_view subcommand,
+                                             absl::optional<size_t> max_length) const override;
 
 private:
   using FormatterProviderCreateFunc =
