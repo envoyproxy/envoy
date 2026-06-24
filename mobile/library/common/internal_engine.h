@@ -193,6 +193,7 @@ public:
    * Dumps Envoy stats into string. Returns an empty string when an error occurred.
    */
   std::string dumpStats();
+  void drainConnectionsBySocketTag(uint32_t tag);
 
   /**
    * Get cluster manager from the Engine.

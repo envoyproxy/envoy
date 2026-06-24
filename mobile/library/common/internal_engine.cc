@@ -14,6 +14,7 @@
 #include "library/common/mobile_process_wide.h"
 #include "library/common/network/network_types.h"
 #include "library/common/network/proxy_api.h"
+#include "library/common/network/socket_tag_socket_option_impl.h"
 #include "library/common/stats/utility.h"
 #include "library/common/types/c_types.h"
 #include "source/common/api/os_sys_calls_impl.h"
@@ -638,6 +639,36 @@ std::string InternalEngine::dumpStats() {
     return stats;
   }
   return stats;
+}
+
+void InternalEngine::drainConnectionsBySocketTag(uint32_t tag) {
+  if (!main_thread_->joinable() || terminated_) {
+    return;
+  }
+  std::vector<uint8_t> target_hash;
+  uid_t uid = 0;
+  Network::SocketTagSocketOptionImpl::generateHashKey(uid, tag, target_hash);
+
+  main_dispatcher_->post([this, target_hash]() {
+    auto& cluster_manager = getClusterManager();
+    cluster_manager.drainOrCloseConnPools(
+        [target_hash](ConnectionPool::Instance& pool) {
+          const auto& options = pool.socketOptions();
+          if (!options)
+            return false;
+          for (const auto& option : *options) {
+            std::vector<uint8_t> option_hash;
+            option->hashKey(option_hash);
+            if (option_hash == target_hash) {
+              ASSERT(dynamic_cast<const Network::SocketTagSocketOptionImpl*>(option.get()) !=
+                     nullptr);
+              return true;
+            }
+          }
+          return false;
+        },
+        ConnectionPool::DrainBehavior::DrainAndDelete);
+  });
 }
 
 Upstream::ClusterManager& InternalEngine::getClusterManager() {

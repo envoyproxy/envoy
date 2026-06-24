@@ -168,6 +168,8 @@ PYBIND11_MODULE(envoy_engine, m) {
       .def("terminate", &Envoy::Platform::Engine::terminate,
            py::call_guard<py::gil_scoped_release>())
       .def("dump_stats", &Envoy::Platform::Engine::dumpStats,
+           py::call_guard<py::gil_scoped_release>())
+      .def("drain_connections_by_socket_tag", &Envoy::Platform::Engine::drainConnectionsBySocketTag,
            py::call_guard<py::gil_scoped_release>());
 
   // -- EngineBuilder --

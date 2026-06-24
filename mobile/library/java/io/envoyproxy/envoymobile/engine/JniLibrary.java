@@ -202,6 +202,13 @@ public class JniLibrary {
   protected static native String dumpStats(long engine);
 
   /**
+   * Drains connections matching the given socket tag.
+   * @param engine, handle to the engine.
+   * @param tag,    socket tag.
+   */
+  protected static native void drainConnectionsBySocketTag(long engine, int tag);
+
+  /**
    * Register a platform-provided key-value store implementation.
    *
    * @param name,    unique name identifying this key-value store.
