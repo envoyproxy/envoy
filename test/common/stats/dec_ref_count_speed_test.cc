@@ -11,7 +11,6 @@
 // iteration with ref_count_=1, so each timed dec frees its counter.
 
 #include <limits>
-#include <optional>
 #include <vector>
 
 #include "source/common/common/assert.h"
@@ -19,6 +18,7 @@
 #include "source/common/stats/symbol_table.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/types/optional.h"
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
@@ -62,16 +62,12 @@ void bmDecRefCountFastPathSingleThread(benchmark::State& state) {
 }
 BENCHMARK(bmDecRefCountFastPathSingleThread);
 
-std::optional<DecRefCountFixture> multi_thread_fixture;
-void multiThreadInitSameStat(const benchmark::State&) {
-  multi_thread_fixture.emplace(1);
-}
+absl::optional<DecRefCountFixture> multi_thread_fixture;
+void multiThreadInitSameStat(const benchmark::State&) { multi_thread_fixture.emplace(1); }
 void multiThreadInitDistinctStat(const benchmark::State& state) {
   multi_thread_fixture.emplace(state.threads());
 }
-void multiThreadDestroy(const benchmark::State&) {
-  multi_thread_fixture.reset();
-}
+void multiThreadDestroy(const benchmark::State&) { multi_thread_fixture.reset(); }
 
 // Multiple threads, same stat, ref_count_ > 1
 void bmDecRefCountFastPathMultiThreadSameStat(benchmark::State& state) {
