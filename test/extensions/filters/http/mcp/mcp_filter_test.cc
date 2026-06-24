@@ -160,6 +160,34 @@ TEST_F(McpFilterTest, RejectNoMcpMode) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
+// Test REJECT_NO_MCP mode - reject non-MCP traffic and populate FilterState
+TEST_F(McpFilterTest, RejectNoMcpModePopulatesFilterState) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.set_request_storage_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"accept", "text/html"}};
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Http::Code::BadRequest, "Only MCP traffic is allowed", _, _, "REJECT_NO_MCP"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  const auto* filter_state_obj =
+      decoder_callbacks_.stream_info_.filterState()->getDataReadOnly<McpFilterStateObject>(
+          std::string(McpFilterStateObject::FilterStateKey));
+  ASSERT_NE(filter_state_obj, nullptr);
+  EXPECT_FALSE(filter_state_obj->isMcpRequest());
+  EXPECT_FALSE(filter_state_obj->isExceedingLimit());
+  EXPECT_EQ(filter_state_obj->status(), Filters::Common::Mcp::Status::NoMcp);
+  EXPECT_EQ(filter_state_obj->method(), absl::nullopt);
+}
+
 // Test REJECT_NO_MCP mode - allow valid SSE
 TEST_F(McpFilterTest, RejectModeAllowsValidSse) {
   setupRejectMode();
@@ -455,11 +483,13 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitContinues) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
-// Test request body exceeding limit when there is not enough data.
+// Test request body exceeding limit when there is not enough data
 TEST_F(McpFilterTest, RequestBodyExceedingLimitRejectWhenNotEnoughData) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.mutable_max_request_body_size()->set_value(20); // Very small limit
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.set_request_storage_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE);
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -492,6 +522,45 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitRejectWhenNotEnoughData) {
       });
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+
+  // Verify FilterState
+  const auto* filter_state_obj =
+      decoder_callbacks_.stream_info_.filterState()->getDataReadOnly<McpFilterStateObject>(
+          std::string(McpFilterStateObject::FilterStateKey));
+  ASSERT_NE(filter_state_obj, nullptr);
+  EXPECT_FALSE(filter_state_obj->isMcpRequest());
+  EXPECT_TRUE(filter_state_obj->isExceedingLimit());
+  EXPECT_EQ(filter_state_obj->status(), Filters::Common::Mcp::Status::BodyTooLarge);
+}
+
+// Test that REJECT_NO_MCP mode populates FilterState even for non-MCP requests
+TEST_F(McpFilterTest, RejectModeNonJsonRpcPopulatesFilterState) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.set_request_storage_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({"foo": "bar"})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+
+  const auto* filter_state_obj =
+      decoder_callbacks_.stream_info_.filterState()->getDataReadOnly<McpFilterStateObject>(
+          std::string(McpFilterStateObject::FilterStateKey));
+  ASSERT_NE(filter_state_obj, nullptr);
+  EXPECT_FALSE(filter_state_obj->isMcpRequest());
+  EXPECT_EQ(filter_state_obj->status(), Filters::Common::Mcp::Status::NotJsonRpc);
 }
 
 // Test that truncated JSON with end_stream is rejected even in PASS_THROUGH mode.

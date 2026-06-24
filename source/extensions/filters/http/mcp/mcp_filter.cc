@@ -355,6 +355,17 @@ void McpFilter::sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp
   status_ = status;
   is_mcp_request_ = false;
 
+  if (config_->shouldStoreToFilterState()) {
+    std::string method = parser_ ? parser_->getMethod() : "";
+    Protobuf::Struct metadata = parser_ ? parser_->metadata() : Protobuf::Struct();
+    auto filter_state_obj = std::make_shared<FilterStateObject>(method, metadata, is_mcp_request_,
+                                                                is_exceeding_limit_, status_);
+    decoder_callbacks_->streamInfo().filterState()->setData(
+        std::string(FilterStateObject::FilterStateKey), std::move(filter_state_obj),
+        StreamInfo::FilterState::LifeSpan::Request,
+        StreamInfo::StreamSharingMayImpactPooling::None);
+  }
+
   if (config_->shouldStoreToDynamicMetadata()) {
     Protobuf::Struct metadata = parser_ ? parser_->metadata() : Protobuf::Struct();
     setDynamicMetadataStatus(std::move(metadata));
