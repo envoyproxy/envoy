@@ -2224,7 +2224,7 @@ TEST_P(ClientIntegrationTest, DrainConnectionsBySocketTag) {
   // 1. First request to establish a connection with socket tag 12345
   ConditionalInitializer terminal1;
   std::string status1;
-  send_request_with_tag(12345, terminal1, status1);
+  auto s1 = send_request_with_tag(12345, terminal1, status1);
 
   FakeHttpConnectionPtr fake_upstream_connection1;
   FakeStreamPtr fake_stream1;
@@ -2241,7 +2241,7 @@ TEST_P(ClientIntegrationTest, DrainConnectionsBySocketTag) {
   // 2. Second request to the same host with a different socket tag 67890
   ConditionalInitializer terminal2;
   std::string status2;
-  send_request_with_tag(67890, terminal2, status2);
+  auto s2 = send_request_with_tag(67890, terminal2, status2);
 
   FakeHttpConnectionPtr fake_upstream_connection2;
   FakeStreamPtr fake_stream2;
@@ -2265,7 +2265,7 @@ TEST_P(ClientIntegrationTest, DrainConnectionsBySocketTag) {
   // 4. Third request to the same host with the second socket tag 67890
   ConditionalInitializer terminal3;
   std::string status3;
-  send_request_with_tag(67890, terminal3, status3);
+  auto s3 = send_request_with_tag(67890, terminal3, status3);
 
   FakeStreamPtr fake_stream3;
   ASSERT_TRUE(
@@ -2276,6 +2276,10 @@ TEST_P(ClientIntegrationTest, DrainConnectionsBySocketTag) {
   terminal3.waitReady();
 
   ASSERT_EQ(status3, "200");
+  if (fake_upstream_connection2 != nullptr) {
+    ASSERT_TRUE(fake_upstream_connection2->close());
+    ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
+  }
 }
 } // namespace
 } // namespace Envoy

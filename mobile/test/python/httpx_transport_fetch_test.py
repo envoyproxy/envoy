@@ -61,7 +61,9 @@ class HttpxTransportFetchTest(unittest.TestCase):
 
         # Close the transport (this triggers drain_connections_by_socket_tag)
         client.close()
-        mock_engine.drain_connections_by_socket_tag.assert_called_once_with(transport._transport_tag)
+        mock_engine.drain_connections_by_socket_tag.assert_called_once_with(
+            transport._transport_tag
+        )
 
         engine.terminate()
 
@@ -78,7 +80,9 @@ class HttpxTransportFetchTest(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
 
             await client.aclose()
-            mock_engine.drain_connections_by_socket_tag.assert_called_once_with(transport._transport_tag)
+            mock_engine.drain_connections_by_socket_tag.assert_called_once_with(
+                transport._transport_tag
+            )
 
         asyncio.run(run_request())
         engine.terminate()

@@ -37,7 +37,7 @@ extension EngineImpl: Engine {
   }
 
   func drainConnectionsBySocketTag(_ tag: UInt32) {
-    self.engine.drainConnectionsBySocketTag(tag)
+    self.engine.drainConnections(bySocketTag: tag)
   }
 
   func terminate() {
