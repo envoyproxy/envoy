@@ -65,6 +65,74 @@ and/or an `accredited CMVP laboratory <https://csrc.nist.gov/projects/testing-la
 Please note that the FIPS-compliant build is based on an older version of BoringSSL than
 the non-FIPS build, and it doesn't support the most recent QUIC APIs.
 
+.. _arch_overview_ssl_pqc:
+
+Post-Quantum Cryptography (PQC)
+-------------------------------
+
+Envoy's BoringSSL backend supports post-quantum key exchange via **X25519MLKEM768**, a hybrid
+key exchange that combines the classical X25519 elliptic-curve Diffie-Hellman with the ML-KEM
+768 (formerly CRYSTALS-Kyber) post-quantum key encapsulation mechanism. This provides
+protection against "harvest now, decrypt later" attacks by quantum computers while maintaining
+compatibility with existing infrastructure through the hybrid construction.
+
+X25519MLKEM768 is **not** included in the default ECDH curves. To opt in, explicitly set the
+``ecdh_curves`` field in the
+:ref:`TlsParameters <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsParameters>`:
+
+.. code-block:: yaml
+
+   transport_socket:
+     name: envoy.transport_sockets.tls
+     typed_config:
+       "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+       common_tls_context:
+         tls_params:
+           ecdh_curves:
+           - X25519MLKEM768
+           - X25519
+           - P-256
+
+Placing ``X25519MLKEM768`` first gives it the highest priority. Peers that do not support
+ML-KEM will gracefully fall back to X25519 or P-256 via standard TLS group negotiation.
+
+The same configuration pattern applies to upstream (client) connections using
+:ref:`UpstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`.
+
+.. note::
+
+   X25519MLKEM768 is only available in non-FIPS builds of BoringSSL. FIPS builds do not
+   support ML-KEM.
+
+ClientHello size considerations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+X25519MLKEM768 adds approximately 1.1 KB to the TLS ClientHello due to the ML-KEM public
+key material. For TCP/TLS this is generally not a problem, as analysis by BoringSSL
+maintainers has shown that the larger ClientHello does not cause issues with standard TLS
+infrastructure.
+
+For **QUIC**, however, the larger ClientHello can push initial server flights beyond the
+`3x amplification limit <https://www.rfc-editor.org/rfc/rfc9000.html#section-8.1>`_
+enforced before address validation completes. This may cause handshake failures or force an
+extra round trip, negating QUIC's 1-RTT advantage. Use X25519MLKEM768 over QUIC only if
+your deployment can tolerate this (e.g., because Retry tokens or NEW_TOKEN frames are
+already in use).
+
+Regulatory context
+^^^^^^^^^^^^^^^^^^
+
+Several regulatory bodies recommend or require migration to post-quantum cryptography:
+
+* **ANSSI** (France) recommends a hybrid post-quantum migration by 2027.
+* **US Executive Order 14028** and the subsequent **National Security Memorandum on
+  Promoting United States Leadership in Quantum Computing While Mitigating Risks to
+  Vulnerable Cryptographic Systems** (NSM-10) direct federal agencies to inventory
+  cryptographic systems and begin transitioning to post-quantum algorithms.
+
+Enabling X25519MLKEM768 via explicit ``ecdh_curves`` configuration allows operators to begin
+this transition today without waiting for a default change.
+
 .. _arch_overview_ssl_enabling_verification:
 
 Enabling certificate verification
