@@ -4,11 +4,15 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.h"
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.validate.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
 
 #include "source/common/common/fmt.h"
 #include "source/common/common/macros.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/well_known_names.h"
 
+#include "test/common/config/dummy_config.pb.h"
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/ads_integration.h"
 #include "test/integration/ads_xdstp_config_sources_integration.h"
@@ -23,6 +27,49 @@
 
 namespace Envoy {
 namespace {
+
+class OdcdsTestFilter : public Http::PassThroughFilter {
+public:
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+    if (decoder_callbacks_->clusterInfo().has_value()) {
+      cluster_name_ = decoder_callbacks_->clusterInfo()->name();
+    } else {
+      cluster_name_ = "none";
+    }
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override {
+    headers.setCopy(Http::LowerCaseString("fetched-cluster-name"), cluster_name_);
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+private:
+  std::string cluster_name_;
+};
+
+class OdcdsTestFilterConfig : public Server::Configuration::NamedHttpFilterConfigFactory {
+public:
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+                               Server::Configuration::FactoryContext&) override {
+    return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamFilter(std::make_shared<OdcdsTestFilter>());
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<test::common::config::DummyConfig>();
+  }
+
+  std::set<std::string> configTypes() override { return {"test.common.config.DummyConfig"}; }
+
+  std::string name() const override { return "odcds-test-filter"; }
+};
+
+static Registry::RegisterFactory<OdcdsTestFilterConfig,
+                                 Server::Configuration::NamedHttpFilterConfigFactory>
+    register_odcds_test_filter_;
 
 class OdCdsIntegrationHelper {
 public:
@@ -342,6 +389,60 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
   ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", {}, {});
+
+  cleanUpXdsConnection();
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryFetchesClusterInfo) {
+  addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
+                        OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500),
+                    "integration", {});
+  // Add a filter after on demand filter to check the cluster info.
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    auto* filters = hcm.mutable_http_filters();
+    RELEASE_ASSERT(filters->size() == 2, "");
+
+    auto* new_filter = filters->Add();
+    *new_filter = filters->Get(1);
+
+    auto* test_filter = filters->Mutable(1);
+    test_filter->set_name("odcds-test-filter");
+
+    test::common::config::DummyConfig test_filter_config;
+    test_filter->mutable_typed_config()->PackFrom(test_filter_config);
+  });
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"Pick-This-Cluster", "new_cluster"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  createXdsConnection();
+  auto result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  odcds_stream_->startGrpcStream();
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {},
+                                           odcds_stream_.get()));
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TestTypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {}, {},
+                                           odcds_stream_.get()));
+
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  auto fetched_cluster = response->headers().get(Http::LowerCaseString("fetched-cluster-name"));
+  ASSERT_FALSE(fetched_cluster.empty());
+  EXPECT_EQ(fetched_cluster[0]->value().getStringView(), "new_cluster");
+
   verifyResponse(std::move(response), "200", {}, {});
 
   cleanUpXdsConnection();

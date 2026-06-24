@@ -407,6 +407,14 @@ public:
   virtual void refreshRouteCluster() PURE;
 
   /**
+   * Re-initialize the cached cluster info using the currently selected target cluster
+   * name from the matched route, without invoking cluster re-selection in specifiers.
+   * Useful to pull newly fetched cluster metadata (like from on-demand discovery) into
+   * the active stream.
+   */
+  virtual void recreateClusterInfo() PURE;
+
+  /**
    * Schedules a request for a RouteConfiguration update from the management server.
    * @param route_config_updated_cb callback to be called when the configuration update has been
    * propagated to the worker thread.
