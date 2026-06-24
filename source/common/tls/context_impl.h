@@ -116,6 +116,7 @@ public:
       const CertValidator::ExtraValidationContext& validation_context,
       const std::string& host_name);
 
+  absl::Status setCompliancePolicy(enum ssl_compliance_policy_t policy);
   static void keylogCallback(const SSL* ssl, const char* line);
 
 protected:
