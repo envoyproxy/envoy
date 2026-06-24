@@ -99,8 +99,8 @@ public:
     // Checks if ref_count_snapshot is 1. If it is 1, then a decrement would free memory, and we
     // would need to acquire the allocator mutex.
     //
-    // If ref_count_snapshot is > 1, then we there are some important cases where thread
-    // interuptions can might change what happens:
+    // If ref_count_snapshot is > 1, then there are some important cases where thread
+    // interruptions might change what happens:
     //
     // First case: ref_count_ is unchanged (ref_count_ == ref_count_snapshot)
     // Zero or more threads touch ref_count_ before compare_exchange_weak is called.
@@ -122,9 +122,8 @@ public:
         return false;
       }
     }
-    // If ref_count_ is 0, then our allocator is inconsistent with the number of references that
-    // exist (there has to be at least 1 reference at this point because how else are we able to
-    // access ref_count_).
+    // Another thread may call incRefCount at this point. The lock path still does the right thing
+    // because the stat is not freed if ref_count_ is not 0.
     Thread::LockGuard lock(alloc_.mutex_);
     if (--ref_count_ == 0) {
       alloc_.sync().syncPoint(Allocator::DecrementToZeroSyncPoint);
