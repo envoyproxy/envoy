@@ -34,11 +34,11 @@ enum class Operator { PathGlob, TextGlob };
  */
 struct Variable {
   Variable(absl::string_view name, std::vector<absl::variant<Operator, Literal>> match)
-      : name_(name), match_(match), prefix_(""), suffix_("") {}
+      : name_(name), match_(std::move(match)), prefix_(""), suffix_("") {}
 
   Variable(absl::string_view name, std::vector<absl::variant<Operator, Literal>> match,
            absl::string_view prefix, absl::string_view suffix)
-      : name_(name), match_(match), prefix_(prefix), suffix_(suffix) {}
+      : name_(name), match_(std::move(match)), prefix_(prefix), suffix_(suffix) {}
 
   std::string debugString() const;
 
