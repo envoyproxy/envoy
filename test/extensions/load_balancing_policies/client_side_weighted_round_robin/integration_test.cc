@@ -3,11 +3,13 @@
 #include <functional>
 
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/load_balancing_policies/client_side_weighted_round_robin/v3/client_side_weighted_round_robin.pb.h"
 
 #include "source/common/common/base64.h"
 #include "source/common/grpc/common.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
 
 #include "test/integration/http_integration.h"
@@ -215,17 +217,21 @@ public:
 
   void TearDown() override { cleanupOobStreams(); }
 
-  // extra_oob_yaml, when set, returns yaml appended to the policy typed_config
-  // (e.g. an oob_reporting_config block). Evaluated inside the config modifier,
-  // after fake upstreams exist, so it can reference their ports.
-  void initializeConfig(std::function<std::string()> extra_oob_yaml = nullptr) {
-    config_helper_.addConfigModifier(
-        [extra_oob_yaml](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
-          ASSERT(cluster_0->name() == "cluster_0");
-          auto* endpoint = cluster_0->mutable_load_assignment()->mutable_endpoints()->Mutable(0);
+  using ClientSideWeightedRoundRobinProto = envoy::extensions::load_balancing_policies::
+      client_side_weighted_round_robin::v3::ClientSideWeightedRoundRobin;
 
-          constexpr absl::string_view endpoints_yaml = R"EOF(
+  // customize_policy, when set, mutates the typed CSWRR config after the base
+  // config is applied (e.g. to set oob_reporting_config). Runs inside the config
+  // modifier, after fake upstreams exist, so it can reference their ports.
+  void initializeConfig(
+      std::function<void(ClientSideWeightedRoundRobinProto&)> customize_policy = nullptr) {
+    config_helper_.addConfigModifier([customize_policy](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
+      ASSERT(cluster_0->name() == "cluster_0");
+      auto* endpoint = cluster_0->mutable_load_assignment()->mutable_endpoints()->Mutable(0);
+
+      constexpr absl::string_view endpoints_yaml = R"EOF(
           lb_endpoints:
           - endpoint:
               address:
@@ -238,12 +244,12 @@ public:
                   address: {}
                   port_value: 0
           )EOF";
-          const std::string local_address = Network::Test::getLoopbackAddressString(GetParam());
-          TestUtility::loadFromYaml(fmt::format(endpoints_yaml, local_address, local_address),
-                                    *endpoint);
+      const std::string local_address = Network::Test::getLoopbackAddressString(GetParam());
+      TestUtility::loadFromYaml(fmt::format(endpoints_yaml, local_address, local_address),
+                                *endpoint);
 
-          auto* policy = cluster_0->mutable_load_balancing_policy();
-          std::string policy_yaml = R"EOF(
+      auto* policy = cluster_0->mutable_load_balancing_policy();
+      std::string policy_yaml = R"EOF(
           policies:
           - typed_extension_config:
               name: envoy.load_balancing_policies.client_side_weighted_round_robin
@@ -258,11 +264,15 @@ public:
                       seconds: 180
                   weight_update_period:
                       seconds: 1)EOF";
-          if (extra_oob_yaml != nullptr) {
-            absl::StrAppend(&policy_yaml, extra_oob_yaml());
-          }
-          TestUtility::loadFromYaml(policy_yaml, *policy);
-        });
+      TestUtility::loadFromYaml(policy_yaml, *policy);
+      if (customize_policy != nullptr) {
+        auto* typed_config =
+            policy->mutable_policies(0)->mutable_typed_extension_config()->mutable_typed_config();
+        auto cswrr = MessageUtil::anyConvert<ClientSideWeightedRoundRobinProto>(*typed_config);
+        customize_policy(cswrr);
+        typed_config->PackFrom(cswrr);
+      }
+    });
     HttpIntegrationTest::initialize();
   }
 
@@ -338,10 +348,8 @@ TEST_P(ClientSideWeightedRoundRobinOobIntegrationTest, OobReportsApplyWeights) {
 
 // oob_reporting_config.authority overrides :authority on every OOB stream.
 TEST_P(ClientSideWeightedRoundRobinOobIntegrationTest, OobAuthorityOverride) {
-  initializeConfig([] {
-    return R"EOF(
-                  oob_reporting_config:
-                      authority: orca.example.com)EOF";
+  initializeConfig([](ClientSideWeightedRoundRobinProto& cswrr) {
+    cswrr.mutable_oob_reporting_config()->set_authority("orca.example.com");
   });
   respondToOobStreams(/*host0_qps=*/100.0, /*host1_qps=*/1000.0);
 
@@ -358,11 +366,9 @@ TEST_P(ClientSideWeightedRoundRobinOobIntegrationTest, OobPortOverrideDialsAlter
   setUpstreamCount(3);
   // Upstream 2 is the OOB target only; no cluster endpoint consumes its port.
   config_helper_.skipPortUsageValidation();
-  initializeConfig([this] {
-    return fmt::format(R"EOF(
-                  oob_reporting_config:
-                      port_value: {})EOF",
-                       fake_upstreams_[2]->localAddress()->ip()->port());
+  initializeConfig([this](ClientSideWeightedRoundRobinProto& cswrr) {
+    cswrr.mutable_oob_reporting_config()->set_port_value(
+        fake_upstreams_[2]->localAddress()->ip()->port());
   });
   // Both hosts resolve to loopback, so with the port override both OOB
   // streams land on upstream 2 as separate connections.
