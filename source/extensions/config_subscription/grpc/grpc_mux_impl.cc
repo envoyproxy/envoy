@@ -597,6 +597,9 @@ void GrpcMuxImpl::onEstablishmentFailure(bool) {
 }
 
 void GrpcMuxImpl::queueDiscoveryRequest(absl::string_view queue_item) {
+  if (shutdown_) {
+    return;
+  }
   if (!grpc_stream_->grpcStreamAvailable()) {
     ENVOY_LOG(debug, "No stream available to queueDiscoveryRequest for {}", queue_item);
     return; // Drop this request; the reconnect will enqueue a new one.
