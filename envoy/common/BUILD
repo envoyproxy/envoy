@@ -31,6 +31,8 @@ envoy_basic_cc_library(
     ],
     deps = [
         "//source/common/common:assert_lib",
+        "@abseil-cpp//absl/status:status",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
 
@@ -46,8 +48,8 @@ envoy_cc_library(
     name = "conn_pool_interface",
     hdrs = ["conn_pool.h"],
     deps = [
-        "//envoy/event:deferred_deletable",
-        "//envoy/upstream:upstream_interface",
+        ":pure_lib",
+        "//envoy/upstream:host_description_interface",
     ],
 )
 
@@ -105,14 +107,23 @@ envoy_cc_library(
     name = "key_value_store_interface",
     hdrs = ["key_value_store.h"],
     deps = [
+        ":pure_lib",
+        "//envoy/config:typed_config_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/filesystem:filesystem_interface",
         "//envoy/protobuf:message_validator_interface",
-        "//envoy/registry",
+        "//source/common/protobuf",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
 envoy_cc_library(
     name = "interval_set_interface",
     hdrs = ["interval_set.h"],
+    deps = [
+        ":pure_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -123,16 +134,24 @@ envoy_cc_library(
 envoy_cc_library(
     name = "backoff_strategy_interface",
     hdrs = ["backoff_strategy.h"],
+    deps = [
+        ":pure_lib",
+    ],
 )
 
 envoy_cc_library(
     name = "execution_context",
     hdrs = ["execution_context.h"],
     deps = [
+        ":optref_lib",
         ":pure_lib",
         ":scope_tracker_interface",
+        "//envoy/stream_info:filter_state_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/common:macros",
+        "//source/common/common:non_copyable",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -149,6 +168,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "hashable_interface",
     hdrs = ["hashable.h"],
+    deps = [
+        ":pure_lib",
+        "@abseil-cpp//absl/types:optional",
+    ],
 )
 
 envoy_cc_library(

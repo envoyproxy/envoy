@@ -2,8 +2,10 @@
 
 #include <stdexcept>
 #include <string>
+#include <utility>
 
-#include "source/common/common/assert.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 
 namespace Envoy {
 
@@ -14,6 +16,9 @@ namespace Envoy {
 // for example error handling PRs.
 // TODO(alyssawilk) finish up error handling and remove this.
 #ifdef ENVOY_DISABLE_EXCEPTIONS
+// Needed for PANIC for mobile builds only.
+#include "source/common/common/assert.h"
+
 #define throwEnvoyExceptionOrPanic(x) PANIC(x)
 #define throwExceptionOrPanic(x, y) PANIC(y)
 #else

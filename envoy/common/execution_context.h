@@ -1,14 +1,18 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 
 #include "envoy/common/pure.h"
 #include "envoy/common/scope_tracker.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/cleanup.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/non_copyable.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 

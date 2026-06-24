@@ -3,8 +3,7 @@
 #include <functional>
 
 #include "envoy/common/pure.h"
-#include "envoy/event/deferred_deletable.h"
-#include "envoy/upstream/upstream.h"
+#include "envoy/upstream/host_description.h"
 
 namespace Envoy {
 namespace ConnectionPool {
