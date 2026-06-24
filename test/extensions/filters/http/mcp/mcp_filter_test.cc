@@ -145,16 +145,16 @@ TEST_F(McpFilterTest, RejectNoMcpMode) {
 
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"accept", "text/html"}};
 
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::BadRequest, "Only MCP traffic is allowed", _, _,
-                             "mcp_filter_reject_no_mcp"));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Http::Code::BadRequest, "Only MCP traffic is allowed", _, _, "REJECT_NO_MCP"));
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
         EXPECT_THAT(
             metadata.fields(),
-            AllOf(Contains(Pair("status", Property(&Protobuf::Value::string_value,
-                                                   "mcp_filter_reject_no_mcp"))),
-                  Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, false)))));
+            AllOf(
+                Contains(Pair("status", Property(&Protobuf::Value::string_value, "REJECT_NO_MCP"))),
+                Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, false)))));
       });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
@@ -186,13 +186,12 @@ TEST_F(McpFilterTest, RejectModeRejectsNonJsonRpc) {
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
                              "request must be a valid JSON-RPC 2.0 message for MCP", _, _,
-                             "mcp_filter_not_jsonrpc"));
+                             "NOT_JSONRPC"));
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
         EXPECT_THAT(
             metadata.fields(),
-            AllOf(Contains(Pair("status", Property(&Protobuf::Value::string_value,
-                                                   "mcp_filter_not_jsonrpc"))),
+            AllOf(Contains(Pair("status", Property(&Protobuf::Value::string_value, "NOT_JSONRPC"))),
                   Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, false)))));
       });
 
@@ -281,14 +280,13 @@ TEST_F(McpFilterTest, PartialNoJsonData) {
 
   Buffer::OwnedImpl buffer("partial data");
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "not a valid JSON", _, _,
-                                                 "mcp_filter_not_jsonrpc"));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest, "not a valid JSON", _, _, "NOT_JSONRPC"));
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
         EXPECT_THAT(
             metadata.fields(),
-            AllOf(Contains(Pair("status", Property(&Protobuf::Value::string_value,
-                                                   "mcp_filter_not_jsonrpc"))),
+            AllOf(Contains(Pair("status", Property(&Protobuf::Value::string_value, "NOT_JSONRPC"))),
                   Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, false)))));
       });
 
@@ -312,13 +310,12 @@ TEST_F(McpFilterTest, IncompleteJsonParseError) {
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
                              "reached end_stream or configured body size, don't get enough data.",
-                             _, _, "mcp_filter_parse_error"));
+                             _, _, "PARSE_ERROR"));
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
         EXPECT_THAT(
             metadata.fields(),
-            AllOf(Contains(Pair("status", Property(&Protobuf::Value::string_value,
-                                                   "mcp_filter_parse_error"))),
+            AllOf(Contains(Pair("status", Property(&Protobuf::Value::string_value, "PARSE_ERROR"))),
                   Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, false)))));
       });
 
@@ -482,13 +479,13 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitRejectWhenNotEnoughData) {
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
                              "reached end_stream or configured body size, don't get enough data.",
-                             _, _, "mcp_filter_body_too_large"));
+                             _, _, "BODY_TOO_LARGE"));
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
         EXPECT_THAT(
             metadata.fields(),
-            AllOf(Contains(Pair("status", Property(&Protobuf::Value::string_value,
-                                                   "mcp_filter_body_too_large"))),
+            AllOf(Contains(
+                      Pair("status", Property(&Protobuf::Value::string_value, "BODY_TOO_LARGE"))),
                   Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, false))),
                   Contains(
                       Pair("is_exceeding_limit", Property(&Protobuf::Value::bool_value, true)))));
@@ -643,13 +640,13 @@ TEST_F(McpFilterTest, DuplicateKeyRejectionEnabledConfig) {
   // Expect request to be rejected with BadRequest due to duplicate keys
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest, "duplicate JSON keys detected", _, _,
-                             "mcp_filter_duplicate_keys"));
+                             "DUPLICATE_KEYS"));
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
         EXPECT_THAT(
             metadata.fields(),
-            AllOf(Contains(Pair("status", Property(&Protobuf::Value::string_value,
-                                                   "mcp_filter_duplicate_keys"))),
+            AllOf(Contains(
+                      Pair("status", Property(&Protobuf::Value::string_value, "DUPLICATE_KEYS"))),
                   Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, false)))));
       });
 

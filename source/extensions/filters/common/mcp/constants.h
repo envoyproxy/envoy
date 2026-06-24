@@ -56,11 +56,11 @@ constexpr absl::string_view STATUS = "status";
 
 namespace StatusValues {
 constexpr absl::string_view OK = "OK";
-constexpr absl::string_view PARSE_ERROR = "mcp_filter_parse_error";
-constexpr absl::string_view NO_MCP = "mcp_filter_reject_no_mcp";
-constexpr absl::string_view NOT_JSONRPC = "mcp_filter_not_jsonrpc";
-constexpr absl::string_view DUPLICATE_KEYS = "mcp_filter_duplicate_keys";
-constexpr absl::string_view BODY_TOO_LARGE = "mcp_filter_body_too_large";
+constexpr absl::string_view PARSE_ERROR = "PARSE_ERROR";
+constexpr absl::string_view NO_MCP = "REJECT_NO_MCP";
+constexpr absl::string_view NOT_JSONRPC = "NOT_JSONRPC";
+constexpr absl::string_view DUPLICATE_KEYS = "DUPLICATE_KEYS";
+constexpr absl::string_view BODY_TOO_LARGE = "BODY_TOO_LARGE";
 } // namespace StatusValues
 
 // HTTP header names
