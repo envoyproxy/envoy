@@ -170,8 +170,7 @@ bool isValidVariableName(absl::string_view variable) {
 }
 
 absl::StatusOr<ParsedResult<Literal>> parseLiteral(absl::string_view pattern) {
-  absl::string_view literal =
-      std::vector<absl::string_view>(absl::StrSplit(pattern, absl::MaxSplits('/', 1)))[0];
+  absl::string_view literal = pattern.substr(0, pattern.find('/'));
   absl::string_view unparsed_pattern = pattern.substr(literal.size());
   if (!isValidLiteral(literal)) {
     return absl::InvalidArgumentError(fmt::format("Invalid literal: \"{}\"", literal));
@@ -289,7 +288,7 @@ absl::StatusOr<ParsedResult<Variable>> parseMixedVariableLiteral(absl::string_vi
     return var_result.status();
   }
 
-  Variable mixed_var(var_result->parsed_value_.name_, var_result->parsed_value_.match_, prefix,
+  Variable mixed_var(var_result->parsed_value_.name_, std::move(var_result->parsed_value_.match_), prefix,
                      suffix);
   return ParsedResult<Variable>(mixed_var, unparsed_pattern);
 }
@@ -387,8 +386,7 @@ absl::StatusOr<ParsedPathPattern> parsePathPatternSyntax(absl::string_view path)
       }
       segment = *std::move(status);
     } else {
-      absl::string_view segment_until_slash =
-          std::vector<absl::string_view>(absl::StrSplit(path, absl::MaxSplits('/', 1)))[0];
+      absl::string_view segment_until_slash = path.substr(0, path.find('/'));
 
       // Detect mixed variable/literal segments (e.g., "v{version}" or "{id}.json").
       if (mixed_vars_enabled && segment_until_slash.find('{') != absl::string_view::npos &&
