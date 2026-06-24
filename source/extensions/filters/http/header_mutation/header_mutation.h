@@ -108,9 +108,6 @@ class PerRouteHeaderMutation : public Router::RouteSpecificFilterConfig {
 public:
   PerRouteHeaderMutation(const PerRouteProtoConfig& config,
                          Server::Configuration::ServerFactoryContext& context,
-                         absl::Status& creation_status);
-  PerRouteHeaderMutation(const PerRouteProtoConfig& config,
-                         Server::Configuration::ServerFactoryContext& context,
                          ProtobufMessage::ValidationVisitor& validation_visitor,
                          absl::Status& creation_status);
 

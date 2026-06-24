@@ -154,12 +154,6 @@ void Mutations::mutateRequestTrailers(Http::RequestTrailerMap& trailers,
   request_trailers_mutations_->evaluateHeaders(trailers, context, stream_info);
 }
 
-PerRouteHeaderMutation::PerRouteHeaderMutation(const PerRouteProtoConfig& config,
-                                               Server::Configuration::ServerFactoryContext& context,
-                                               absl::Status& creation_status)
-    : PerRouteHeaderMutation(config, context, ProtobufMessage::getNullValidationVisitor(),
-                             creation_status) {}
-
 PerRouteHeaderMutation::PerRouteHeaderMutation(
     const PerRouteProtoConfig& config, Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor, absl::Status& creation_status)

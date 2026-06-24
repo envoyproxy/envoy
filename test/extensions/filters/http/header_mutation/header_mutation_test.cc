@@ -72,8 +72,8 @@ TEST(HeaderMutationFilterTest, RequestMutationTest) {
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
 
   absl::Status creation_status = absl::OkStatus();
-  PerRouteHeaderMutationSharedPtr config =
-      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, context, creation_status);
+  PerRouteHeaderMutationSharedPtr config = std::make_shared<PerRouteHeaderMutation>(
+      per_route_proto_config, context, context.messageValidationVisitor(), creation_status);
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
@@ -348,8 +348,8 @@ TEST(HeaderMutationFilterTest, ResponseMutationTest) {
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
 
   absl::Status creation_status = absl::OkStatus();
-  PerRouteHeaderMutationSharedPtr config =
-      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, context, creation_status);
+  PerRouteHeaderMutationSharedPtr config = std::make_shared<PerRouteHeaderMutation>(
+      per_route_proto_config, context, context.messageValidationVisitor(), creation_status);
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
@@ -526,8 +526,8 @@ TEST(HeaderMutationFilterTest, ResponseTrailerMutationTest) {
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
 
   absl::Status creation_status = absl::OkStatus();
-  PerRouteHeaderMutationSharedPtr config =
-      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, context, creation_status);
+  PerRouteHeaderMutationSharedPtr config = std::make_shared<PerRouteHeaderMutation>(
+      per_route_proto_config, context, context.messageValidationVisitor(), creation_status);
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
@@ -706,8 +706,8 @@ TEST(HeaderMutationFilterTest, HybridMutationTest) {
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
 
   absl::Status creation_status = absl::OkStatus();
-  PerRouteHeaderMutationSharedPtr config =
-      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, context, creation_status);
+  PerRouteHeaderMutationSharedPtr config = std::make_shared<PerRouteHeaderMutation>(
+      per_route_proto_config, context, context.messageValidationVisitor(), creation_status);
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
@@ -838,8 +838,8 @@ TEST(HeaderMutationFilterTest, QueryParameterMutationTest) {
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
 
   absl::Status creation_status = absl::OkStatus();
-  PerRouteHeaderMutationSharedPtr config =
-      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, context, creation_status);
+  PerRouteHeaderMutationSharedPtr config = std::make_shared<PerRouteHeaderMutation>(
+      per_route_proto_config, context, context.messageValidationVisitor(), creation_status);
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
@@ -952,8 +952,8 @@ TEST(HeaderMutationFilterTest, RequestTrailerMutationTest) {
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
 
   absl::Status creation_status = absl::OkStatus();
-  PerRouteHeaderMutationSharedPtr config =
-      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, context, creation_status);
+  PerRouteHeaderMutationSharedPtr config = std::make_shared<PerRouteHeaderMutation>(
+      per_route_proto_config, context, context.messageValidationVisitor(), creation_status);
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
