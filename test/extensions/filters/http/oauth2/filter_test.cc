@@ -22,6 +22,7 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/match.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -103,6 +104,8 @@ public:
   void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
                                     const Http::ResponseHeaderMap*) override {}
 
+  MOCK_METHOD(void, cancel, (), (override));
+
   MOCK_METHOD(void, asyncGetAccessToken,
               (const std::string&, const std::string&, const std::string&, const std::string&,
                const std::string&, Envoy::Extensions::HttpFilters::Oauth2::AuthType));
@@ -114,7 +117,7 @@ public:
   MOCK_METHOD(OAuthState, getState, (), (const, override));
 };
 
-class OAuth2Test : public testing::TestWithParam<int> {
+class OAuth2Test : public testing::Test {
 public:
   OAuth2Test(bool run_init = true) : request_(&cm_.thread_local_cluster_.async_client_) {
     factory_context_.server_factory_context_.cluster_manager_.initializeClusters(
@@ -708,6 +711,24 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
+}
+
+TEST_F(OAuth2Test, OnDestroyCancelsOAuthClient) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Options},
+      {Http::Headers::get().Cookie.get(), "OauthHMAC=some_oauth_hmac_value"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=some_oauth_expires_value"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=some_refresh_token_value"},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=some_oauth_nonce_value"},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=some_code_verifier_value"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  EXPECT_CALL(*oauth_client_, cancel());
+  filter_->onDestroy();
 }
 
 // Verifies that the CSRF token cookie expiration (Max-Age) uses the custom
@@ -3921,7 +3942,9 @@ TEST_F(OAuth2Test, CookieValidatorInTransition) {
       {Http::Headers::get().Cookie.get(), "BearerToken=" + TEST_ENCRYPTED_ACCESS_TOKEN},
       {Http::Headers::get().Cookie.get(), "IdToken=" + TEST_ENCRYPTED_ID_TOKEN},
       {Http::Headers::get().Cookie.get(), "RefreshToken=" + TEST_ENCRYPTED_REFRESH_TOKEN},
-      {Http::Headers::get().Cookie.get(), "OauthHMAC=eK7Kw2VqlnZJiz93KTnZqUar3ajNAe+ubmosGFkyL4I="},
+      {Http::Headers::get().Cookie.get(),
+       "OauthHMAC="
+       "NzhhZWNhYzM2NTZhOTY3NjQ5OGIzZjc3MjkzOWQ5YTk0NmFiZGRhOGNkMDFlZmFlNmU2YTJjMTg1OTMyMmY4Mg=="},
   };
   cookie_validator->setParams(request_headers_hexbase64, "mock-secret");
 
@@ -6072,6 +6095,162 @@ TEST_F(OAuth2Test, GarbagePlaintextCookieDoesNotCrash) {
   // dropped instead of preserved.
   ASSERT_TRUE(cookies.contains("RefreshToken"));
   EXPECT_EQ(cookies.at("RefreshToken"), garbage_ciphertext);
+}
+
+// Legacy AES-256-CBC ciphertext for the plaintext "access_code". Used by the rolling-upgrade tests
+// below to exercise the CBC fallback path with a stable, known-CBC fixture (the production
+// encrypt() may produce either GCM or CBC depending on the runtime flag, so we can't rely on
+// encryptTokenForTest() to generate a CBC ciphertext deterministically).
+static const std::string TEST_LEGACY_CBC_ENCRYPTED_ACCESS_TOKEN =
+    "Fc1bBwAAAAAVzVsHAAAAAHDCo6XWwdgw5IYsxjfymIQ";
+static const std::string TEST_LEGACY_CBC_PLAINTEXT = "access_code";
+
+// AES-256-GCM ciphertext for the plaintext "access_code" with a 12-byte zero IV. The IV is fixed to
+// keep this fixture stable; the production encrypt() uses a random IV. Used as a known-GCM fixture
+// so the positive GCM path can be exercised without depending on the runtime flag dispatch in
+// encryptTokenForTest().
+static const std::string TEST_KNOWN_GCM_ENCRYPTED_ACCESS_TOKEN =
+    "gcm.AAAAAAAAAAAAAAAAXKvqQaYSMR-WpXHLNyAmsF4A95dUO3Xxogek";
+
+/**
+ * Test fixture parameterized on whether envoy.reloadable_features.oauth2_use_gcm_encryption is
+ * enabled. Each TEST_P below runs twice: once with the flag at the default (false, ``encrypt()``
+ * emits AES-256-CBC) and once with the flag turned on (true, ``encrypt()`` emits AES-256-GCM
+ * with the ``gcm.`` marker). The behaviors asserted here must hold in both cipher modes.
+ */
+class OAuth2CipherModeTest : public OAuth2Test, public ::testing::WithParamInterface<bool> {
+public:
+  void SetUp() override {
+    if (useGcm()) {
+      scoped_runtime_.mergeValues(
+          {{"envoy.reloadable_features.oauth2_use_gcm_encryption", "true"}});
+    }
+  }
+  bool useGcm() const { return GetParam(); }
+
+private:
+  TestScopedRuntime scoped_runtime_;
+};
+
+INSTANTIATE_TEST_SUITE_P(BothCiphers, OAuth2CipherModeTest, ::testing::Bool(),
+                         [](const ::testing::TestParamInfo<bool>& info) {
+                           return info.param ? "GcmEncryption" : "CbcEncryption";
+                         });
+
+/**
+ * In both cipher modes, a legacy AES-256-CBC ciphertext must be accepted via the CBC fallback,
+ * since envoy.reloadable_features.oauth2_legacy_cbc_decrypt_compat defaults to true during the
+ * migration window. Turning on GCM encryption must not break decryption of cookies issued by
+ * older instances that are still emitting CBC.
+ */
+TEST_P(OAuth2CipherModeTest, LegacyCbcCookieIsAccepted) {
+  primeActiveConfigForTest();
+  EXPECT_EQ(0, config_->stats().oauth_legacy_cbc_decrypt_.value());
+  EXPECT_EQ(decryptTokenForTest(TEST_LEGACY_CBC_ENCRYPTED_ACCESS_TOKEN), TEST_LEGACY_CBC_PLAINTEXT);
+  // Successful CBC fallback must tick oauth_legacy_cbc_decrypt so operators can observe
+  // legacy cookie traffic and know when it's safe to flip oauth2_legacy_cbc_decrypt_compat off.
+  EXPECT_EQ(1, config_->stats().oauth_legacy_cbc_decrypt_.value());
+}
+
+/**
+ * In both cipher modes, a valid "gcm."-prefixed ciphertext must decrypt to its original
+ * plaintext via the unconditional GCM path, and the CBC fallback log must NOT fire.
+ * This guards the post-CVE-2026-47775 happy path against
+ * any future flag-coupled regression in decrypt().
+ */
+TEST_P(OAuth2CipherModeTest, KnownGcmCookieIsAccepted) {
+  primeActiveConfigForTest();
+  EXPECT_EQ(decryptTokenForTest(TEST_KNOWN_GCM_ENCRYPTED_ACCESS_TOKEN), TEST_LEGACY_CBC_PLAINTEXT);
+  // GCM path must never increment the legacy CBC counter.
+  EXPECT_EQ(0, config_->stats().oauth_legacy_cbc_decrypt_.value());
+}
+
+/**
+ * In both cipher modes, encrypt()'s output must round-trip back through decrypt() to the
+ * original plaintext, and the wire format must match the mode: no marker when use_gcm=false
+ * (legacy CBC), "gcm." marker when use_gcm=true. The CBC fallback log must not fire on the
+ * GCM round trip.
+ */
+TEST_P(OAuth2CipherModeTest, EncryptThenDecryptRoundTrips) {
+  primeActiveConfigForTest();
+  const std::string plaintext = "some_access_token_value";
+  const std::string ciphertext = encryptTokenForTest(plaintext);
+  EXPECT_EQ(absl::StartsWith(ciphertext, "gcm."), useGcm())
+      << "encrypt() wire format does not match oauth2_use_gcm_encryption=" << useGcm();
+  if (useGcm()) {
+    EXPECT_EQ(decryptTokenForTest(ciphertext), plaintext);
+    EXPECT_EQ(0, config_->stats().oauth_legacy_cbc_decrypt_.value());
+  } else {
+    EXPECT_EQ(decryptTokenForTest(ciphertext), plaintext);
+    EXPECT_EQ(1, config_->stats().oauth_legacy_cbc_decrypt_.value());
+  }
+}
+
+/**
+ * In both cipher modes, attacker garbage (not valid GCM nor valid CBC) must fail cleanly:
+ * decryptToken returns the original input and no crash. Flipping use_gcm must not open a door
+ * for attacker-chosen plaintext on totally invalid input.
+ */
+TEST_P(OAuth2CipherModeTest, GarbageCiphertextFailsCleanly) {
+  primeActiveConfigForTest();
+  // Length > 12 + 16 so the GCM-side size check doesn't short-circuit; also > 16 so the CBC-side
+  // size check doesn't either. Neither GCM tag nor CBC padding will validate, so both paths must
+  // reject.
+  const std::string garbage = "j5Vhtnz_uyhDVTrSri3GzLoroprQYVoXsp61kIq_JC4-extra-bytes";
+  EXPECT_LOG_CONTAINS("error", "failed to decrypt token",
+                      { EXPECT_EQ(decryptTokenForTest(garbage), garbage); });
+}
+
+/**
+ * In both cipher modes, a "gcm."-prefixed ciphertext whose decoded payload is too short to
+ * hold IV (12) + tag (16) must fail at the size check inside decrypt() before reaching
+ * EVP_DecryptFinal_ex. decryptToken returns the original input and logs an error. The cipher
+ * mode parameter is irrelevant for this path (decrypt() dispatches on the marker, not the
+ * flag) but we run under both to guard against future flag-coupled bugs.
+ */
+TEST_P(OAuth2CipherModeTest, GcmPrefixedGarbageBelowSizeBoundFailsCleanly) {
+  primeActiveConfigForTest();
+  // 28-char base64url body decodes to 21 bytes, which is <= the 12 + 16 = 28 minimum the size
+  // check enforces. Must be rejected without touching the EVP code path.
+  const std::string garbage = "gcm.AAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+  EXPECT_LOG_CONTAINS("error", "failed to decrypt token",
+                      { EXPECT_EQ(decryptTokenForTest(garbage), garbage); });
+}
+
+/**
+ * In both cipher modes, a "gcm."-prefixed ciphertext that passes the size check but whose
+ * auth tag does not match must fail at EVP_DecryptFinal_ex. decryptToken returns the original
+ * input and logs an error. This is the critical security path: flipping use_gcm must never let
+ * an unauthenticated GCM ciphertext through.
+ */
+TEST_P(OAuth2CipherModeTest, GcmPrefixedGarbageAboveSizeBoundFailsCleanly) {
+  primeActiveConfigForTest();
+  // 48-char base64url body decodes to 36 bytes (> 28), so the size check passes and the tag
+  // check is what must reject. All-zero bytes will not match the tag.
+  const std::string garbage = "gcm.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+  EXPECT_LOG_CONTAINS("error", "failed to decrypt token",
+                      { EXPECT_EQ(decryptTokenForTest(garbage), garbage); });
+}
+
+/**
+ * Post-migration state (use_gcm=true, compat=false): only GCM-marked cookies decrypt; legacy
+ * CBC cookies are rejected. This is the configuration operators land on after their cookie TTL
+ * has elapsed and is what fully closes CVE-2026-47775. Not parameterized — this scenario is
+ * specific to the compat-off side of the matrix.
+ */
+TEST_F(OAuth2Test, PostMigrationConfigRejectsCbcCiphertext) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.oauth2_use_gcm_encryption", "true"},
+       {"envoy.reloadable_features.oauth2_legacy_cbc_decrypt_compat", "false"}});
+  primeActiveConfigForTest();
+  EXPECT_LOG_CONTAINS("error", "failed to decrypt token", {
+    EXPECT_EQ(decryptTokenForTest(TEST_LEGACY_CBC_ENCRYPTED_ACCESS_TOKEN),
+              TEST_LEGACY_CBC_ENCRYPTED_ACCESS_TOKEN);
+  });
+  // Rejection path (no marker + compat off) must not tick the legacy CBC counter: nothing was
+  // decrypted, just refused.
+  EXPECT_EQ(0, config_->stats().oauth_legacy_cbc_decrypt_.value());
 }
 
 } // namespace Oauth2

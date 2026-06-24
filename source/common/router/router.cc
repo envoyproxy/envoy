@@ -2331,7 +2331,11 @@ bool Filter::convertRequestHeadersForInternalRedirect(
       downstream_headers.getMethodValue() != Http::Headers::get().MethodValues.Head) {
     downstream_headers.setMethod(Http::Headers::get().MethodValues.Get);
     downstream_headers.remove(Http::Headers::get().ContentLength);
-    callbacks_->modifyDecodingBuffer([](Buffer::Instance& data) { data.drain(data.length()); });
+    // Requests without any body never allocate a decoding buffer, so we only drain when one exists.
+    // For example, a POST request with end_stream on headers will not allocate a decoding buffer.
+    if (callbacks_->decodingBuffer()) {
+      callbacks_->modifyDecodingBuffer([](Buffer::Instance& data) { data.drain(data.length()); });
+    }
   }
 
   num_internal_redirect->increment();

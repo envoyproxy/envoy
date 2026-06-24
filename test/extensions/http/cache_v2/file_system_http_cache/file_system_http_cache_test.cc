@@ -90,7 +90,7 @@ public:
 
   envoy::extensions::filters::http::cache_v2::v3::CacheV2Config cacheConfig(ConfigProto cfg) {
     envoy::extensions::filters::http::cache_v2::v3::CacheV2Config cache_config;
-    cache_config.mutable_typed_config()->PackFrom(cfg);
+    std::ignore = cache_config.mutable_typed_config()->PackFrom(cfg);
     return cache_config;
   }
 

@@ -113,7 +113,7 @@ TEST(ConfigTest, TunnelingConfigWithFormatters) {
 
   auto* formatter = tunneling->add_formatters();
   formatter->set_name("envoy.formatter.TestFormatter");
-  formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue());
+  std::ignore = formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue());
 
   EXPECT_TRUE(factory.createFilterFactoryFromProto(config, context).ok());
 }
@@ -132,7 +132,7 @@ TEST(ConfigTest, TunnelingConfigWithUnknownFormatter) {
 
   auto* formatter = tunneling->add_formatters();
   formatter->set_name("envoy.formatter.does_not_exist");
-  formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue());
+  std::ignore = formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue());
 
   EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProto(config, context).IgnoreError(),
                           EnvoyException, "envoy.formatter.does_not_exist");

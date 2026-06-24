@@ -33,7 +33,7 @@ const xds::type::matcher::v3::Matcher& blankTenantSelector() {
     action->set_name("empty_tenant");
     Protobuf::StringValue str;
     str.set_value("");
-    action->mutable_typed_config()->PackFrom(str);
+    std::ignore = action->mutable_typed_config()->PackFrom(str);
     return matcher;
   }());
 }

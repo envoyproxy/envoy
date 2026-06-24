@@ -171,7 +171,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithStringValueConfig) {
   // Set up a StringValue config.
   Protobuf::StringValue string_value;
   string_value.set_value("test_config_value");
-  config.mutable_lb_policy_config()->PackFrom(string_value);
+  std::ignore = config.mutable_lb_policy_config()->PackFrom(string_value);
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -187,7 +187,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithBytesValueConfig) {
   // Set up a BytesValue config.
   Protobuf::BytesValue bytes_value;
   bytes_value.set_value("binary_config_data");
-  config.mutable_lb_policy_config()->PackFrom(bytes_value);
+  std::ignore = config.mutable_lb_policy_config()->PackFrom(bytes_value);
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -203,7 +203,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithStructConfig) {
   // Set up a Struct config.
   Protobuf::Struct struct_value;
   (*struct_value.mutable_fields())["key"].set_string_value("value");
-  config.mutable_lb_policy_config()->PackFrom(struct_value);
+  std::ignore = config.mutable_lb_policy_config()->PackFrom(struct_value);
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);

@@ -44,11 +44,11 @@ public:
     envoy::config::core::v3::TransportSocket raw_transport_socket;
     raw_transport_socket.set_name("envoy.transport_sockets.raw_buffer");
     envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer_config;
-    raw_transport_socket.mutable_typed_config()->PackFrom(raw_buffer_config);
+    std::ignore = raw_transport_socket.mutable_typed_config()->PackFrom(raw_buffer_config);
     envoy::extensions::transport_sockets::tap::v3::Tap tap_config =
         createTapConfig(raw_transport_socket);
     tap_config.mutable_transport_socket()->MergeFrom(raw_transport_socket);
-    transport_socket->mutable_typed_config()->PackFrom(tap_config);
+    std::ignore = transport_socket->mutable_typed_config()->PackFrom(tap_config);
   }
 
   void setupDownstreamTap(envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -63,7 +63,7 @@ public:
     envoy::extensions::transport_sockets::tap::v3::Tap tap_config =
         createTapConfig(ssl_transport_socket);
     tap_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
-    transport_socket->mutable_typed_config()->PackFrom(tap_config);
+    std::ignore = transport_socket->mutable_typed_config()->PackFrom(tap_config);
   }
 
   envoy::extensions::transport_sockets::tap::v3::Tap

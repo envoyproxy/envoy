@@ -54,7 +54,7 @@ public:
       config.mutable_buffer_size_kb()->set_value(buffer_size_);
     }
     auto* bootstrap_extension = bootstrap.add_bootstrap_extensions();
-    bootstrap_extension->mutable_typed_config()->PackFrom(config);
+    std::ignore = bootstrap_extension->mutable_typed_config()->PackFrom(config);
     bootstrap_extension->set_name("envoy.bootstrap.internal_listener");
   }
   void initialize() override {

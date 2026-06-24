@@ -97,6 +97,11 @@ public:
   void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
   void dumpState(std::ostream& os, int indent_level) const override;
+  // Reaches the downstream stream's WebTransport session via the router's downstream
+  // StreamDecoderFilterCallbacks. Note: in the usual filter-chain path the codec sees
+  // UpstreamCodecFilter::CodecBridge rather than this decoder; this override covers direct uses of
+  // UpstreamRequest as the decoder.
+  OptRef<Http::WebTransportSession> downstreamWebTransportSession() override;
 
   // UpstreamToDownstream (Http::StreamCallbacks)
   void onResetStream(Http::StreamResetReason reason,
@@ -357,6 +362,7 @@ public:
 
   // Http::UpstreamStreamFilterCallbacks
   StreamInfo::StreamInfo& upstreamStreamInfo() override { return upstream_request_.streamInfo(); }
+  OptRef<Http::WebTransportSession> downstreamWebTransportSession() override;
   OptRef<GenericUpstream> upstream() override {
     return makeOptRefFromPtr(upstream_request_.upstream_.get());
   }

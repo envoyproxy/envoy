@@ -127,7 +127,7 @@ absl::StatusOr<Envoy::Http::HeaderValidatorFactoryPtr> createHeaderValidatorFact
     uhv_config.mutable_http1_protocol_options()->set_allow_chunked_length(
         getHttpOptions(options).allow_chunked_length());
     legacy_header_validator_config.set_name("default_envoy_uhv_from_legacy_settings");
-    legacy_header_validator_config.mutable_typed_config()->PackFrom(uhv_config);
+    std::ignore = legacy_header_validator_config.mutable_typed_config()->PackFrom(uhv_config);
   }
 
   const ::envoy::config::core::v3::TypedExtensionConfig& header_validator_config =

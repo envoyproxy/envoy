@@ -45,7 +45,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
     envoy::Cookie cookie;
     cookie.set_address("1.2.3.4:80");
     // The expiration field is not set in the cookie because TTL is 0 in the config.
-    cookie.SerializeToString(&cookie_content);
+    std::ignore = cookie.SerializeToString(&cookie_content);
 
     Envoy::Http::TestResponseHeaderMapImpl response_headers;
     // Check the format of the cookie sent back to client.
@@ -74,7 +74,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
     envoy::Cookie cookie;
     cookie.set_address("1.2.3.4:80");
     cookie.set_expires(1005);
-    cookie.SerializeToString(&cookie_content);
+    std::ignore = cookie.SerializeToString(&cookie_content);
     Envoy::Http::TestRequestHeaderMapImpl request_headers = {
         {":path", "/path"},
         {"cookie", "override_host=" +
@@ -93,7 +93,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
     // Update session state because the current request is routed to a new upstream host.
     cookie.set_address("2.3.4.5:80");
     cookie.set_expires(1005);
-    cookie.SerializeToString(&cookie_content);
+    std::ignore = cookie.SerializeToString(&cookie_content);
     EXPECT_EQ(response_headers.get_("set-cookie"),
               Envoy::Http::Utility::makeSetCookieValue(
                   "override_host",
@@ -129,7 +129,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateProtoCookie) {
   envoy::Cookie cookie;
   cookie.set_address("2.3.4.5:80");
   cookie.set_expires(1005);
-  cookie.SerializeToString(&cookie_content);
+  std::ignore = cookie.SerializeToString(&cookie_content);
   // PROTO format - expired cookie
   time_simulator.setSystemTime(std::chrono::seconds(1006));
   Envoy::Http::TestRequestHeaderMapImpl request_headers = {
@@ -141,7 +141,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateProtoCookie) {
 
   // PROTO format - no "expired field"
   cookie.clear_expires();
-  cookie.SerializeToString(&cookie_content);
+  std::ignore = cookie.SerializeToString(&cookie_content);
   request_headers = {{":path", "/path"},
                      {"cookie", "override_host=" + Envoy::Base64::encode(cookie_content.c_str(),
                                                                          cookie_content.length())}};

@@ -589,7 +589,7 @@ TEST_P(WasmCommonTest, VmCache) {
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
   Protobuf::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
-  vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
+  std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
   std::string code;
   if (std::get<0>(GetParam()) != "null") {
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -716,7 +716,7 @@ TEST_P(WasmCommonTest, RemoteCode) {
     vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
     Protobuf::BytesValue vm_configuration_bytes;
     vm_configuration_bytes.set_value(vm_configuration);
-    vm_config->mutable_configuration()->PackFrom(vm_configuration_bytes);
+    std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_bytes);
     std::string sha256 = Extensions::Common::Wasm::sha256(code);
     std::string sha256Hex =
         Hex::encode(reinterpret_cast<const uint8_t*>(&*sha256.begin()), sha256.size());
@@ -819,7 +819,7 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
   Protobuf::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
-  vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
+  std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
   std::string sha256 = Extensions::Common::Wasm::sha256(code);
   std::string sha256Hex =
       Hex::encode(reinterpret_cast<const uint8_t*>(&*sha256.begin()), sha256.size());

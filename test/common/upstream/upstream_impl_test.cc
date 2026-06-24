@@ -4081,7 +4081,7 @@ TEST_F(StaticClusterImplTest, CustomUpstreamLocalAddressSelector) {
   Protobuf::Empty empty;
   auto address_selector_config =
       server_context_.cluster_manager_.mutableBindConfig().mutable_local_address_selector();
-  address_selector_config->mutable_typed_config()->PackFrom(empty);
+  std::ignore = address_selector_config->mutable_typed_config()->PackFrom(empty);
   address_selector_config->set_name("test.upstream.local.address.selector");
   server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
       "1.2.3.5");

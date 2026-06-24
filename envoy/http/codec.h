@@ -21,8 +21,35 @@
 
 #include "source/common/http/status.h"
 
+namespace webtransport {
+class Session;
+class SessionVisitor;
+} // namespace webtransport
+
 namespace Envoy {
 namespace Http {
+
+// TODO(wbpcode): The webtransport::Session should be used ideally. However, the
+// webtransport::Session does not provide the SetVisitor method which is necessary for bridging the
+// downstream and upstream session.
+class WebTransportSession {
+public:
+  virtual ~WebTransportSession() = default;
+
+  /**
+   * Set a visitor for this WebTransport session. The visitor will be notified of session-level
+   * events such as incoming streams and datagrams. This is only used for negotiated WebTransport
+   * sessions, and should not be set for non-WebTransport sessions.
+   *
+   * @param visitor supplies the visitor to set.
+   */
+  virtual void setWebTransportVisitor(std::unique_ptr<webtransport::SessionVisitor> visitor) PURE;
+
+  /**
+   * @return a pointer to the webtransport::Session.
+   */
+  virtual webtransport::Session* rawWebTransportSession() PURE;
+};
 
 enum class CodecType { HTTP1, HTTP2, HTTP3 };
 
@@ -331,6 +358,16 @@ public:
    * the handle.
    */
   virtual ResponseDecoderHandlePtr createResponseDecoderHandle() PURE;
+
+  /**
+   * @return the WebTransport session of the *downstream* stream paired with this decoder, if any.
+   *
+   * Only decoders on the router's upstream path (which are paired 1:1 with a downstream stream)
+   * implement this; they reach the downstream StreamDecoderFilterCallbacks and return its
+   * webTransportSession(). It lets the upstream codec obtain the downstream WebTransport session so
+   * it can bridge the two directly. All other response decoders inherit the default empty OptRef.
+   */
+  virtual OptRef<WebTransportSession> downstreamWebTransportSession() { return {}; }
 };
 
 /**
@@ -473,6 +510,13 @@ public:
    * HTTP/3 streams return the HTTP/3 stream ID or nullopt if not available.
    */
   virtual absl::optional<uint32_t> codecStreamId() const PURE;
+
+  /**
+   * @return the WebTransport session this stream carries, if it is a negotiated WebTransport
+   * CONNECT stream. Only HTTP/3 codec streams that have created a WebTransportHttp3 session return
+   * a value; all other streams inherit the default empty OptRef.
+   */
+  virtual OptRef<WebTransportSession> webTransportSession() { return {}; }
 };
 
 /**
