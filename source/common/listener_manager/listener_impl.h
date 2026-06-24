@@ -342,7 +342,7 @@ public:
   // FilterChainUpdateCallbacks
   absl::Status
   onFilterChainUpdate(const std::vector<Network::DrainableFilterChainSharedPtr>& added_or_updated,
-                      const std::vector<std::string>& removed) override;
+                      const std::vector<Network::DrainableFilterChainSharedPtr>& draining) override;
 
   void ensureSocketOptions(Network::Socket::OptionsSharedPtr& options) {
     if (options == nullptr) {

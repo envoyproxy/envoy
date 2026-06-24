@@ -30,10 +30,11 @@ public:
 
   /**
    * Called when filter chains are added, updated or removed.
+   * Updates expect the client to start draining the replaced chains.
    */
   virtual absl::Status
   onFilterChainUpdate(const std::vector<Network::DrainableFilterChainSharedPtr>& added_or_updated,
-                      const std::vector<std::string>& removed) PURE;
+                      const std::vector<Network::DrainableFilterChainSharedPtr>& draining) PURE;
 };
 
 class FcdsSharedFilterChainManager;
@@ -55,7 +56,7 @@ public:
   /**
    * Start the FCDS subscription.
    */
-  virtual absl::Status start() PURE;
+  virtual void start() PURE;
 
   /**
    * @return the last received version info from FCDS.
@@ -70,22 +71,24 @@ using FcdsApiPtr = std::unique_ptr<FcdsApi>;
  */
 class FcdsApiImpl : public FcdsApi, Logger::Loggable<Logger::Id::upstream> {
 public:
-  FcdsApiImpl(const envoy::config::listener::v3::Listener::FcdsConfig& fcds_config,
-              const std::string& filter_chain_name, FcdsSharedFilterChainManager& shared_manager,
-              Upstream::ClusterManager& cm, Stats::Scope& scope,
-              ProtobufMessage::ValidationVisitor& validation_visitor);
+  FcdsApiImpl(const envoy::config::core::v3::ConfigSource& fcds_config,
+                         const std::string& filter_chain_name,
+                         FcdsSharedFilterChainManager& shared_manager, 
+                         Upstream::ClusterManager& cm,
+                         Stats::Scope& scope,
+                         ProtobufMessage::ValidationVisitor& validation_visitor,
+                         absl::Status& creation_status);
 
   ~FcdsApiImpl() override = default;
 
   // FcdsApi
-  absl::Status start() override;
+  void start() override;
   std::string versionInfo() const override { return system_version_info_; }
 
   // Client Management
   absl::Status subscribeClient(FilterChainUpdateCallbacks& callbacks,
                                Init::TargetImpl& init_target);
   void unsubscribeClient(FilterChainUpdateCallbacks& callbacks);
-
   bool hasClients() const { return !clients_.empty(); }
 
   Network::DrainableFilterChainSharedPtr filterChain() const { return filter_chain_; }
@@ -106,17 +109,17 @@ private:
     bool init_target_ready_{false};
   };
 
-  const envoy::config::listener::v3::Listener::FcdsConfig fcds_config_;
+  const envoy::config::core::v3::ConfigSource fcds_config_;
   const std::string filter_chain_name_;
   FcdsSharedFilterChainManager& shared_manager_;
-  Upstream::ClusterManager& cm_;
-  std::vector<Client> clients_;
   Config::SubscriptionPtr subscription_;
+
+  std::vector<Client> clients_;
   std::string system_version_info_;
   Stats::ScopeSharedPtr scope_;
   const Config::ResourceTypeHelper<envoy::config::listener::v3::FilterChain> resource_type_helper_;
   Network::DrainableFilterChainSharedPtr filter_chain_;
-  bool subscription_started_{false};
+  bool started_{false};
 };
 
 } // namespace Server

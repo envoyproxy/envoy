@@ -175,13 +175,16 @@ struct ListenerManagerStats {
  */
 class DrainingFilterChainsManager {
 public:
-  DrainingFilterChainsManager(ListenerImplPtr&& draining_listener, uint64_t listener_tag,
+  DrainingFilterChainsManager(ListenerImplPtr&& draining_listener,
+                              uint64_t workers_pending_removal);
+  DrainingFilterChainsManager(std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains,
+                              uint64_t listener_tag,
                               uint64_t workers_pending_removal);
   uint64_t getDrainingListenerTag() const { return listener_tag_; }
   const std::list<const Network::FilterChain*>& getDrainingFilterChains() const {
     return draining_filter_chains_;
   }
-  ListenerImpl& getDrainingListener() const { return *draining_listener_; }
+  OptRef<ListenerImpl> getDrainingListener() const { return makeOptRefFromPtr(draining_listener_.get()); }
   uint64_t decWorkersPendingRemoval() { return --workers_pending_removal_; }
 
   // Schedule listener destroy.
@@ -194,21 +197,20 @@ public:
     drain_timer_->enableTimer(drain_time);
   }
 
+  // Used by the in-place LDS update.
   void addFilterChainToDrain(const Network::FilterChain& filter_chain) {
     draining_filter_chains_.push_back(&filter_chain);
-  }
-
-  void addSharedFilterChainToKeepAlive(Network::DrainableFilterChainSharedPtr filter_chain) {
-    draining_filter_chain_shared_ptrs_.push_back(filter_chain);
   }
 
   uint32_t numDrainingFilterChains() const { return draining_filter_chains_.size(); }
 
 private:
   ListenerImplPtr draining_listener_;
-  uint64_t listener_tag_;
-  std::vector<Network::DrainableFilterChainSharedPtr> draining_filter_chain_shared_ptrs_;
+  const uint64_t listener_tag_;
   std::list<const Network::FilterChain*> draining_filter_chains_;
+
+  // Used by the FCDS to extend the lifetime, assumes draining_listener_ to be nullptr.
+  const std::vector<Network::DrainableFilterChainSharedPtr> draining_filter_chain_shared_ptrs_;
 
   uint64_t workers_pending_removal_;
   Event::TimerPtr drain_timer_;
@@ -226,11 +228,10 @@ public:
 
   void onListenerWarmed(ListenerImpl& listener);
   void inPlaceFilterChainUpdate(ListenerImpl& listener);
-  absl::Status registerWarmingListener(ListenerImplPtr&& new_listener, ListenerImpl& origin);
+  void drainGroup(std::list<DrainingFilterChainsManager>::iterator draining_group);
   void
   drainFilterChains(ListenerImpl& listener,
                     std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains);
-  void updateListenerOnWorkers(ListenerImpl& listener);
 
   // Server::ListenerManager
   absl::StatusOr<bool> addOrUpdateListener(const envoy::config::listener::v3::Listener& config,

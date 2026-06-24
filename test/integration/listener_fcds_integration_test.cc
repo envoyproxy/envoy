@@ -275,7 +275,7 @@ TEST_P(ListenerFcdsIntegrationTest, BasicFcdsInPlaceUpdate) {
   sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 404)}, "2");
 
   // Wait for Envoy's local stats to increment indicating FCDS update has completed
-  test_server_->waitForCounter("listener_manager.fcds.dynamic_filter_chain_1.update_success",
+  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success",
                                Eq(2));
   // Wait for the new config to take effect. Since there's no listener reconstruction,
   // we just make a new connection.
@@ -323,7 +323,7 @@ TEST_P(ListenerFcdsIntegrationTest, TwoListenersSharedFilterChain) {
   sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 404)}, "2");
 
   // Wait for Envoy's local stats to increment indicating FCDS update has completed
-  test_server_->waitForCounter("listener_manager.fcds.dynamic_filter_chain_1.update_success",
+  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success",
                                Eq(2));
 
   // Verify both listeners serve HTTP 404 correctly.
@@ -383,7 +383,7 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsFilterChainRemovalAndDraining) {
   sendFcdsResponse({}, {"dynamic_filter_chain_1"}, "2");
 
   // Wait for Envoy's local stats to increment indicating FCDS update has completed.
-  test_server_->waitForCounter("listener_manager.fcds.dynamic_filter_chain_1.update_success",
+  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success",
                                Eq(2));
 
   // Check that the filter chain is now in draining state!

@@ -258,7 +258,8 @@ inline constexpr char FcdsSharedFilterChainManagerName[] =
 
 class FcdsSharedFilterChainManager : public Singleton::Instance,
                                      public std::enable_shared_from_this<FcdsSharedFilterChainManager>,
-                                     public FilterChainFactoryContextCreator {
+                                     public FilterChainFactoryContextCreator,
+                                     public Logger::Loggable<Logger::Id::config> {
 public:
   FcdsSharedFilterChainManager(Server::Configuration::ServerFactoryContext& server_context,
                                ListenerComponentFactory& listener_component_factory);
@@ -269,6 +270,14 @@ public:
 
   virtual Network::DrainableFilterChainSharedPtr
   findSharedFilterChain(const std::string& name) const;
+
+  virtual void removeSharedFilterChain(const std::string& name);
+
+  const Network::FilterChain* findThreadLocalFilterChain(const std::string& name) const;
+
+  struct ThreadLocalState : public ThreadLocal::ThreadLocalObject {
+    absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr> filter_chains_;
+  };
 
   // Subscribes a listener callback for a filter chain name.
   virtual absl::StatusOr<FcdsSubscriptionHandlePtr>
@@ -288,7 +297,9 @@ public:
 private:
   Server::Configuration::ServerFactoryContext& server_context_;
   ListenerComponentFactory& listener_component_factory_;
+  ThreadLocal::TypedSlotPtr<ThreadLocalState> tls_slot_;
   Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_;
+  Stats::ScopeSharedPtr scope_;
 
   absl::flat_hash_map<std::string, FcdsApiImpl*> name_to_subscription_;
 
@@ -347,10 +358,6 @@ public:
       const envoy::config::listener::v3::FilterChain* default_filter_chain,
       FilterChainFactoryBuilder& filter_chain_factory_builder,
       FilterChainFactoryContextCreator& context_creator);
-
-  absl::Status
-  updateFilterChains(const std::vector<Network::DrainableFilterChainSharedPtr>& added_or_updated,
-                     const std::vector<std::string>& removed);
 
   static bool isWildcardServerName(const std::string& name);
 

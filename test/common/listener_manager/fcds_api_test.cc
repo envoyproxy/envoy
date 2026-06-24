@@ -37,7 +37,7 @@ class MockFilterChainUpdateCallbacks : public FilterChainUpdateCallbacks {
 public:
   MOCK_METHOD(absl::Status, onFilterChainUpdate,
               (const std::vector<Network::DrainableFilterChainSharedPtr>& added_or_updated,
-               const std::vector<std::string>& removed),
+               const std::vector<Network::DrainableFilterChainSharedPtr>& draining),
               (override));
 };
 
@@ -128,7 +128,7 @@ TEST_F(FcdsApiTest, OnConfigUpdateDecodesAndPropagates) {
   // Verify that config update correctly decodes the resources and calls callbacks with compiled
   // object
   EXPECT_CALL(callbacks_, onFilterChainUpdate(testing::ElementsAre(mock_filter_chain),
-                                              testing::ElementsAre("chain-2")))
+                                              testing::IsEmpty()))
       .WillOnce(Return(absl::Status(absl::OkStatus())));
   EXPECT_CALL(init_watcher_, ready());
 

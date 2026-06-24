@@ -1470,25 +1470,14 @@ ListenerImpl::getFilterChainNamesFromMatcher(const xds::type::matcher::v3::Match
 
 absl::Status ListenerImpl::onFilterChainUpdate(
     const std::vector<Network::DrainableFilterChainSharedPtr>& added_or_updated,
-    const std::vector<std::string>& removed) {
+    const std::vector<Network::DrainableFilterChainSharedPtr>& draining) {
+  UNREFERENCED_PARAMETER(added_or_updated);
+  ENVOY_LOG(debug, "FCDS updating filter chains: added/updated: {}, draining: {}",
+            added_or_updated.size(), draining.size());
 
-  ENVOY_LOG(info, "FCDS updating filter chains in-place: added/updated: {}, removed: {}",
-            added_or_updated.size(), removed.size());
-
-  // 1. Update filter chains directly in our manager
-  RETURN_IF_NOT_OK(filter_chain_manager_->updateFilterChains(added_or_updated, removed));
-
-  // 2. Push the updated config to all workers in-place
   if (parent_.isWorkerStarted()) {
-    parent_.updateListenerOnWorkers(*this);
-
-    // 3. Drain the removed or modified filter chains in-place
-    auto draining_chains = filter_chain_manager_->takeDrainingFilterChains();
+    std::vector<Network::DrainableFilterChainSharedPtr> draining_chains = draining;
     parent_.drainFilterChains(*this, std::move(draining_chains));
-  } else {
-    // If workers are not started, no connections can exist on the old filter chains.
-    // Discard them immediately to prevent accumulation during warming.
-    filter_chain_manager_->takeDrainingFilterChains();
   }
 
   return absl::OkStatus();

@@ -11,30 +11,32 @@
 namespace Envoy {
 namespace Server {
 
-FcdsApiImpl::FcdsApiImpl(const envoy::config::listener::v3::Listener::FcdsConfig& fcds_config,
+FcdsApiImpl::FcdsApiImpl(const envoy::config::core::v3::ConfigSource& fcds_config,
                          const std::string& filter_chain_name,
-                         FcdsSharedFilterChainManager& shared_manager, Upstream::ClusterManager& cm,
+                         FcdsSharedFilterChainManager& shared_manager, 
+                         Upstream::ClusterManager& cm,
                          Stats::Scope& scope,
-                         ProtobufMessage::ValidationVisitor& validation_visitor)
+                         ProtobufMessage::ValidationVisitor& validation_visitor,
+                         absl::Status& creation_status)
     : fcds_config_(fcds_config), filter_chain_name_(filter_chain_name),
-      shared_manager_(shared_manager), cm_(cm),
-      scope_(scope.createScope(fmt::format("listener_manager.fcds.{}.", filter_chain_name))),
-      resource_type_helper_(validation_visitor, "name") {}
+      shared_manager_(shared_manager), 
+      scope_(scope.createScope(absl::StrCat(filter_chain_name, "."))),
+      resource_type_helper_(validation_visitor, "name") {
+  const auto resource_name = resource_type_helper_.getResourceName();
+  auto subscription_or_error = cm.subscriptionFactory().subscriptionFromConfigSource(
+      fcds_config_, Grpc::Common::typeUrl(resource_name),
+      *scope_, *this, resource_type_helper_.resourceDecoder(), {});
+  SET_AND_RETURN_IF_NOT_OK(subscription_or_error.status(), creation_status);
+  subscription_ = std::move(subscription_or_error).value();
+}
 
-absl::Status FcdsApiImpl::start() {
-  ENVOY_LOG(debug, "FcdsApiImpl::start: starting dynamic subscription for resource: {}",
-            filter_chain_name_);
-  if (!subscription_) {
-    const auto resource_name = resource_type_helper_.getResourceName();
-    auto subscription_or_error = cm_.subscriptionFactory().subscriptionFromConfigSource(
-        fcds_config_.config_source(), Grpc::Common::typeUrl(resource_name),
-        *scope_, *this, resource_type_helper_.resourceDecoder(), {});
-    RETURN_IF_NOT_OK(subscription_or_error.status());
-    subscription_ = std::move(subscription_or_error.value());
+void FcdsApiImpl::start() {
+  if (!started_) {
+    ENVOY_LOG(debug, "FcdsApiImpl::start: starting dynamic subscription for resource: {}",
+              filter_chain_name_);
+    started_ = true;
+    subscription_->start({filter_chain_name_});
   }
-  subscription_started_ = true;
-  subscription_->start({filter_chain_name_});
-  return absl::OkStatus();
 }
 
 absl::Status FcdsApiImpl::subscribeClient(FilterChainUpdateCallbacks& callbacks,
@@ -42,8 +44,8 @@ absl::Status FcdsApiImpl::subscribeClient(FilterChainUpdateCallbacks& callbacks,
   ENVOY_LOG(debug, "FcdsApiImpl::subscribeClient: subscribing client for: {}", filter_chain_name_);
   clients_.push_back({&callbacks, &init_target, false});
 
-  if (!subscription_started_) {
-    RETURN_IF_NOT_OK(start());
+  if (!started_) {
+    start();
   }
 
   // Check if compiled and cached in the subscription
@@ -74,6 +76,16 @@ FcdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added
   ENVOY_LOG(info, "fcds: config update received for name {}: added/updated: {}, removed: {}",
             filter_chain_name_, added_resources.size(), removed_resources.size());
 
+  bool this_removed = false;
+  for (const auto& name : removed_resources) {
+    if (name == filter_chain_name_) {
+      this_removed = true;
+      break;
+    }
+  }
+
+  std::vector<Network::DrainableFilterChainSharedPtr> draining;
+
   // 1. Compile the added/updated filter chain
   Network::DrainableFilterChainSharedPtr compiled_filter_chain = nullptr;
   for (const auto& resource : added_resources) {
@@ -87,9 +99,14 @@ FcdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added
     compiled_filter_chain = result.value();
   }
 
+  if (filter_chain_ != nullptr && (compiled_filter_chain != nullptr || this_removed)) {
+    draining.push_back(filter_chain_);
+  }
+
   if (compiled_filter_chain != nullptr) {
     filter_chain_ = compiled_filter_chain;
-  } else if (!removed_resources.empty()) {
+  } else if (this_removed) {
+    shared_manager_.removeSharedFilterChain(filter_chain_name_);
     filter_chain_ = nullptr;
   }
 
@@ -98,14 +115,9 @@ FcdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added
     added_or_updated.push_back(filter_chain_);
   }
 
-  std::vector<std::string> removed;
-  for (const auto& removed_resource : removed_resources) {
-    removed.push_back(removed_resource);
-  }
-
   // 2. Notify each client with the runtime filter chain objects
   for (auto& client : clients_) {
-    RETURN_IF_NOT_OK(client.callbacks_->onFilterChainUpdate(added_or_updated, removed));
+    RETURN_IF_NOT_OK(client.callbacks_->onFilterChainUpdate(added_or_updated, draining));
 
     // 3. Mark client ready if cached
     if (!client.init_target_ready_ && filter_chain_ != nullptr) {
@@ -120,18 +132,14 @@ FcdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added
 
 absl::Status FcdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                          const std::string& version_info) {
-  Protobuf::RepeatedPtrField<std::string> removed_resources;
-  bool found = false;
   for (const auto& resource : resources) {
     if (resource.get().name() == filter_chain_name_) {
-      found = true;
-      break;
+      return onConfigUpdate({resource}, {}, version_info);
     }
   }
-  if (!found) {
-    removed_resources.Add(std::string(filter_chain_name_));
-  }
-  return onConfigUpdate(resources, removed_resources, version_info);
+  Protobuf::RepeatedPtrField<std::string> removed;
+  removed.Add(std::string(filter_chain_name_));
+  return onConfigUpdate({}, removed, version_info);
 }
 
 void FcdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
