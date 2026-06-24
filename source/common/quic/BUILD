@@ -501,6 +501,7 @@ envoy_cc_library(
         ":envoy_quic_proof_source_lib",
         ":envoy_quic_server_preferred_address_config_factory_interface",
         ":envoy_quic_utils_lib",
+        ":quic_packet_writer_interface",
         "//envoy/network:listener_interface",
         "//source/common/network:listener_lib",
         "//source/common/protobuf:utility_lib",
