@@ -27,6 +27,7 @@
 
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -725,6 +726,7 @@ void FakeUpstream::initializeServer() {
   }
 
   dispatcher_->post([this]() -> void {
+    EXPECT_OK(listener_.udp_listener_config_.listenerFactory().doFinalPreWorkerInit());
     EXPECT_TRUE(socket_factories_[0]->doFinalPreWorkerInit().ok());
     handler_->addListener(absl::nullopt, listener_, runtime_, random_);
     server_initialized_.setReady();
