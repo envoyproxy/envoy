@@ -631,20 +631,26 @@ envoy_cc_library(
     hdrs = envoy_select_enable_http3(["envoy_quic_packet_writer.h"]),
     deps = envoy_select_enable_http3([
         ":envoy_quic_utils_lib",
+        ":quic_packet_writer_interface",
+        "//envoy/network:udp_packet_writer_handler_interface",
         "@quiche//:quic_core_packet_writer_lib",
         "@quiche//:quic_platform",
     ]),
 )
 
 envoy_cc_library(
-    name = "envoy_quic_packet_writer_factory_factory_interface",
-    hdrs = ["envoy_quic_packet_writer_factory_factory.h"],
-    deps = [
-        ":envoy_quic_packet_writer_lib",
+    name = "quic_packet_writer_interface",
+    hdrs = envoy_select_enable_http3(["quic_packet_writer_interface.h"]),
+    deps = envoy_select_enable_http3([
+        "//envoy/network:io_handle_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/event:dispatcher_interface",
         "//envoy/config:typed_config_interface",
         "//envoy/server:factory_context_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
+        "@quiche//:quic_core_packet_writer_lib",
+        "@quiche//:quic_platform",
+    ]),
 )
 
 envoy_cc_library(

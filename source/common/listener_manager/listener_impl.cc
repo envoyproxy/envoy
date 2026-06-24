@@ -41,7 +41,7 @@
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/active_quic_listener.h"
 #include "source/common/quic/envoy_quic_packet_writer.h"
-#include "source/common/quic/envoy_quic_packet_writer_factory_factory.h"
+#include "source/common/quic/quic_packet_writer_interface.h"
 #include "source/common/quic/udp_gso_batch_writer.h"
 #endif
 
@@ -717,15 +717,15 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
         config.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
         validation_visitor_, *listener_factory_context_);
 
-    if (config.udp_listener_config().has_udp_packet_packet_writer_config() &&
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_use_direct_packet_writer")) {
+    if (config.udp_listener_config().has_udp_packet_packet_writer_config()) {
       auto* quic_factory_factory =
           Config::Utility::getFactory<Quic::QuicPacketWriterFactoryFactory>(
               config.udp_listener_config().udp_packet_packet_writer_config());
       if (quic_factory_factory != nullptr) {
-        udp_listener_config_->writer_factory_ = quic_factory_factory->createQuicPacketWriterFactory(
-            config.udp_listener_config().udp_packet_packet_writer_config(),
-            *listener_factory_context_);
+        udp_listener_config_->quic_writer_factory_ =
+            quic_factory_factory->createQuicPacketWriterFactory(
+                config.udp_listener_config().udp_packet_packet_writer_config(),
+                *listener_factory_context_);
       }
     }
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT

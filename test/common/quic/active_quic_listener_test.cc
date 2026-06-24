@@ -18,6 +18,7 @@
 #include "source/common/quic/envoy_quic_clock.h"
 #include "source/common/quic/envoy_quic_packet_writer.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_packet_writer_interface.h"
 #include "source/common/quic/udp_gso_batch_writer.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
@@ -170,7 +171,7 @@ protected:
     ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _, _, _))
         .WillByDefault(
             Invoke([&](Network::IoHandle& io_handle, Stats::Scope& scope, Envoy::Event::Dispatcher&,
-                       absl::AnyInvocable<void()&&>) -> Network::UdpPacketWriterPtr {
+                       absl::AnyInvocable<void() &&>) -> Network::UdpPacketWriterPtr {
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
               return std::make_unique<Quic::UdpGsoBatchWriter>(io_handle, scope);
 #else
@@ -791,26 +792,30 @@ public:
 } // namespace
 
 TEST_P(ActiveQuicListenerTest, DirectQuicPacketWriterCreation) {
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_use_direct_packet_writer", true);
   MockQuicPacketWriterFactory quic_packet_writer_factory;
 
-  // Override the packetWriterFactory mock to return our QUIC factory.
-  EXPECT_CALL(udp_listener_config_, packetWriterFactory())
-      .WillRepeatedly(ReturnRef(quic_packet_writer_factory));
+  // Override the quicPacketWriterFactory mock to return our QUIC factory.
+  EXPECT_CALL(udp_listener_config_, quicPacketWriterFactory())
+      .WillRepeatedly(Return(&quic_packet_writer_factory));
 
   // Expect createQuicPacketWriter to be called, and return our dummy writer.
+  FakeQuicPacketWriter* raw_writer = nullptr;
   EXPECT_CALL(quic_packet_writer_factory, createQuicPacketWriter(_, _, _, _))
-      .WillOnce(Invoke([](Network::IoHandle&, Stats::Scope&, Envoy::Event::Dispatcher&,
-                          absl::AnyInvocable<void()&&>) -> QuicPacketWriterPtr {
-        return std::make_unique<FakeQuicPacketWriter>();
+      .WillOnce(Invoke([&raw_writer](Network::IoHandle&, Stats::Scope&, Envoy::Event::Dispatcher&,
+                                     absl::AnyInvocable<void() &&>) -> QuicPacketWriterPtr {
+        auto writer = std::make_unique<FakeQuicPacketWriter>();
+        raw_writer = writer.get();
+        return writer;
       }));
 
   // Initialize the listener. This will trigger createQuicPacketWriter.
   initialize();
 
-  // Verify that the dispatcher was initialized with a writer (it shouldn't be
-  // null).
+  // Verify that the dispatcher was initialized with a writer (it shouldn't be null).
   EXPECT_NE(quic_dispatcher_, nullptr);
+
+  // Verify that the listener keeps a member pointing to the created writer.
+  EXPECT_EQ(quic_listener_->quicPacketWriter(), raw_writer);
 }
 
 } // namespace Quic

@@ -22,6 +22,7 @@
 #include "source/common/init/target_impl.h"
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/common/listener_manager/listener_info_impl.h"
+#include "source/common/quic/quic_packet_writer_interface.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/server/factory_context_impl.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -370,6 +371,9 @@ private:
     // Network::UdpListenerConfig
     Network::ActiveUdpListenerFactory& listenerFactory() override { return *listener_factory_; }
     Network::UdpPacketWriterFactory& packetWriterFactory() override { return *writer_factory_; }
+    Envoy::Quic::QuicPacketWriterFactory* quicPacketWriterFactory() override {
+      return quic_writer_factory_.get();
+    }
     Network::UdpListenerWorkerRouter&
     listenerWorkerRouter(const Network::Address::Instance& address) override {
       auto iter = listener_worker_routers_.find(address.asString());
@@ -381,6 +385,7 @@ private:
     const envoy::config::listener::v3::UdpListenerConfig config_;
     Network::ActiveUdpListenerFactoryPtr listener_factory_;
     Network::UdpPacketWriterFactoryPtr writer_factory_;
+    Quic::QuicPacketWriterFactoryPtr quic_writer_factory_;
     absl::flat_hash_map<std::string, Network::UdpListenerWorkerRouterPtr> listener_worker_routers_;
   };
 

@@ -18,6 +18,10 @@
 
 #include "quiche/quic/load_balancer/load_balancer_encoder.h"
 
+namespace quic {
+class QuicPacketWriter;
+} // namespace quic
+
 namespace Envoy {
 namespace Quic {
 
@@ -58,6 +62,7 @@ public:
     // No-op. Quic can't do anything upon listener error.
   }
   Network::UdpPacketWriter& udpPacketWriter() override { return *udp_packet_writer_; }
+  quic::QuicPacketWriter* quicPacketWriter() { return quic_packet_writer_; }
   void onDataWorker(Network::UdpRecvData&& data) override;
   uint32_t destination(const Network::UdpRecvData& data) const override;
   size_t numPacketsExpectedPerEventLoop() const override;
@@ -94,6 +99,7 @@ private:
   const bool kernel_worker_routing_;
   absl::optional<Runtime::FeatureFlag> enabled_;
   Network::UdpPacketWriter* udp_packet_writer_;
+  quic::QuicPacketWriter* quic_packet_writer_{nullptr};
 
   // The number of runs of the event loop in which at least one CHLO was buffered.
   // TODO(ggreenway): Consider making this a published stat, or some variation of this information.
