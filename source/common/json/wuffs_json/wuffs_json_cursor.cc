@@ -116,6 +116,10 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
   std::string pending_storage;
   absl::string_view effective_chunk = chunk;
   if (!pending_bytes_.empty()) {
+    // TODO(tyxia): copy only the minimal suffix of `chunk` needed to complete
+    // the token (scan for the first JSON terminator byte) rather than the
+    // entire chunk. Pending bytes are at most a few bytes, so the copy is
+    // cheap in practice, but stitching only the suffix would be cleaner.
     pending_storage = std::move(pending_bytes_);
     pending_storage.append(chunk.data(), chunk.size());
     effective_chunk = pending_storage;
@@ -227,16 +231,13 @@ absl::Status WuffsJsonCursor::handleStructureToken(uint64_t token_detail, size_t
       }
     }
     if (track_paths_ && depth_ <= kMaxTrackedDepth) {
-      push_key_[depth_] = (depth_ > 1 && depth_ - 1 < kMaxTrackedDepth && is_dict_[depth_ - 1])
-                              ? key_stack_[depth_ - 1]
-                              : "";
+      push_key_[depth_] = (depth_ > 1 && is_dict_[depth_ - 1]) ? key_stack_[depth_ - 1] : "";
     }
     // key for onContainerOpen is the parent dict key that triggered this container.
     // Empty when the parent is an array or at root (depth 1).
-    const absl::string_view parent_key =
-        (depth_ > 1 && depth_ - 1 < kMaxTrackedDepth && is_dict_[depth_ - 1])
-            ? absl::string_view(key_stack_[depth_ - 1])
-            : absl::string_view();
+    const absl::string_view parent_key = (depth_ > 1 && is_dict_[depth_ - 1])
+                                             ? absl::string_view(key_stack_[depth_ - 1])
+                                             : absl::string_view();
     handler_.onContainerOpen(parent_key, to_dict, depth_, token_start);
   } else {
     const int pop_depth = depth_;
@@ -290,6 +291,9 @@ absl::Status WuffsJsonCursor::handleStringToken(absl::string_view raw, uint64_t 
   in_string_chain_ = continued;
   if (!in_string_chain_) {
     if (string_is_key_) {
+      // TODO(tyxia): duplicate-key rejection is unconditional. There are 3 popular options
+      // here: reject / last-wins / frist-wins
+      // Addiing a configuration option here to enable different options.
       if (depth_ < kMaxTrackedDepth && !seen_keys_[depth_].insert(key_buffer_).second) {
         return absl::InvalidArgumentError(
             absl::StrCat("wuffs json: duplicate key \"", key_buffer_, "\""));
@@ -340,7 +344,9 @@ absl::Status WuffsJsonCursor::handleUnicodeCodePointToken(uint64_t token_detail)
     }
     appendCodePoint(key_buffer_, code_point);
   } else if (string_chunk_active_) {
-    // Encode to a stack buffer; the string_view is valid for this call only.
+    // TODO(tyxia): each UNICODE_CODE_POINT token triggers a separate onStringChunk
+    // call with 1-4 bytes. Consider buffering consecutive code points and flushing
+    // them as a single call on the next STRING/COPY token or chain end.
     uint8_t buf[4];
     encodeCodePoint(buf, code_point);
     const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
