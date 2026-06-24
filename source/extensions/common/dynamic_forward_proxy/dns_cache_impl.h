@@ -68,11 +68,11 @@ public:
                                     LoadDnsCacheEntryCallbacks& callbacks) override;
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
   void iterateHostMap(IterateHostMapCb cb) override;
-  absl::optional<const DnsHostInfoSharedPtr> getHost(absl::string_view host_name) override;
+  std::optional<const DnsHostInfoSharedPtr> getHost(absl::string_view host_name) override;
   Upstream::ResourceAutoIncDecPtr canCreateDnsRequest() override;
   void forceRefreshHosts() override;
-  void setIpVersionToRemove(absl::optional<Network::Address::IpVersion> ip_version) override;
-  absl::optional<Network::Address::IpVersion> getIpVersionToRemove() override;
+  void setIpVersionToRemove(std::optional<Network::Address::IpVersion> ip_version) override;
+  std::optional<Network::Address::IpVersion> getIpVersionToRemove() override;
   void stop() override;
 
 private:
@@ -189,7 +189,7 @@ private:
 
   void finishResolve(const std::string& host, Network::DnsResolver::ResolutionStatus status,
                      absl::string_view details, std::list<Network::DnsResponse>&& response,
-                     absl::optional<MonotonicTime> resolution_time = {},
+                     std::optional<MonotonicTime> resolution_time = {},
                      bool is_proxy_lookup = false, bool is_timeout = false);
   absl::Status runAddUpdateCallbacks(const std::string& host,
                                      const DnsHostInfoSharedPtr& host_info);
@@ -210,8 +210,8 @@ private:
   void loadCacheEntries(
       const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
   PrimaryHostInfo* createHost(const std::string& host, uint16_t default_port);
-  absl::optional<Network::DnsResponse> parseValue(absl::string_view value,
-                                                  absl::optional<MonotonicTime>& resolution_time);
+  std::optional<Network::DnsResponse> parseValue(absl::string_view value,
+                                                 std::optional<MonotonicTime>& resolution_time);
 
   Event::Dispatcher& main_thread_dispatcher_;
   const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config_;
@@ -235,8 +235,8 @@ private:
   const std::chrono::milliseconds host_ttl_;
   const uint32_t max_hosts_;
   absl::Mutex ip_version_to_remove_lock_;
-  absl::optional<Network::Address::IpVersion>
-      ip_version_to_remove_ ABSL_GUARDED_BY(ip_version_to_remove_lock_) = absl::nullopt;
+  std::optional<Network::Address::IpVersion>
+      ip_version_to_remove_ ABSL_GUARDED_BY(ip_version_to_remove_lock_) = std::nullopt;
   bool enable_dfp_dns_trace_;
   const Envoy::Matcher::AddressMatcherPtr resolved_address_filter_;
 };

@@ -225,7 +225,7 @@ TEST_F(ClusterTest, CreateSubClusterConfig) {
   const std::string cluster_name = "fake_cluster_name";
   const std::string host = "localhost";
   const int port = 80;
-  std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>> sub_cluster_pair =
+  std::pair<bool, std::optional<envoy::config::cluster::v3::Cluster>> sub_cluster_pair =
       cluster_->createSubClusterConfig(cluster_name, host, port);
   EXPECT_EQ(true, sub_cluster_pair.first);
   EXPECT_EQ(true, sub_cluster_pair.second.has_value());
@@ -435,7 +435,7 @@ TEST_F(ClusterTest, LoadBalancer_CleansUpPendingAsyncHostSelectionOnDestroy) {
                                               LoadDnsCacheEntryCallbacks&) {
         return Extensions::Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult{
             Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Loading,
-            dns_cache_handle, absl::nullopt};
+            dns_cache_handle, std::nullopt};
       }));
   EXPECT_CALL(lb_context_, onAsyncHostSelection(_, _))
       .WillOnce([](Upstream::HostConstSharedPtr&& host, std::string&& details) {
@@ -497,7 +497,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoConnections) {
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   EXPECT_FALSE(selection.has_value());
@@ -528,7 +528,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnection) {
   std::vector<std::string> dns_sans = {"www.example.org", "mail.example.org"};
   EXPECT_CALL(*ssl_info, dnsSansPeerCertificate()).WillOnce(Return(dns_sans));
 
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_TRUE(selection.has_value());
@@ -561,7 +561,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnectionHttp3) {
   std::vector<std::string> dns_sans = {"www.example.org", "mail.example.org"};
   EXPECT_CALL(*ssl_info, dnsSansPeerCertificate()).WillOnce(Return(dns_sans));
 
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_TRUE(selection.has_value());
@@ -595,7 +595,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoMatchingConnectionAfterDraining) {
   // Drain the connection then no verify that no connection is subsequently selected.
   lifetime_callbacks->onConnectionDraining(pool, hash_key, connection);
 
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
@@ -624,7 +624,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolInvalidAlpn) {
   EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
   lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
 
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
@@ -654,7 +654,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolSanMismatch) {
   std::vector<std::string> dns_sans = {"www.example.org"};
   EXPECT_CALL(*ssl_info, dnsSansPeerCertificate()).WillOnce(Return(dns_sans));
 
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
@@ -683,7 +683,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolHashMismatch) {
   lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
 
   hash_key[0]++;
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
@@ -713,7 +713,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolIpMismatch) {
   std::vector<std::string> dns_sans = {"www.example.org", "mail.example.org"};
   EXPECT_CALL(*ssl_info, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
 
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
@@ -747,7 +747,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolEmptyHostname) {
   Upstream::MockHost empty_host;
   EXPECT_CALL(empty_host, hostname()).WillRepeatedly(testing::ReturnRef(empty_hostname));
 
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, empty_host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
@@ -775,7 +775,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoSSSL) {
   EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
   lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
 
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_FALSE(selection.has_value());

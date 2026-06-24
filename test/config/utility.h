@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -27,8 +28,6 @@
 #include "source/common/protobuf/utility.h"
 
 #include "test/integration/server_stats.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 
@@ -117,7 +116,7 @@ public:
       return *this;
     }
 
-    ServerSslOptions& setVerifyDepth(absl::optional<uint32_t> depth) {
+    ServerSslOptions& setVerifyDepth(std::optional<uint32_t> depth) {
       max_verify_depth_ = depth;
       return *this;
     }
@@ -169,7 +168,7 @@ public:
     std::string tls_cert_selector_yaml_{""};
     bool client_with_intermediate_cert_{false};
     bool trust_root_only_{false};
-    absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
+    std::optional<uint32_t> max_verify_depth_{std::nullopt};
   };
 
   // Sets up config with the provided bootstrap.
@@ -441,7 +440,7 @@ public:
   // Configure Envoy to do TLS to upstream.
   void configureUpstreamTls(
       bool use_alpn = false, bool http3 = false,
-      absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+      std::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
           alternate_protocol_cache_config = {},
       std::function<void(envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext&)>
           configure_tls_context = nullptr);
@@ -464,8 +463,8 @@ public:
   // CONNECT requests.
   static void setConnectConfig(HttpConnectionManager& hcm, bool terminate_connect, bool allow_post,
                                bool http3 = false,
-                               absl::optional<envoy::config::core::v3::ProxyProtocolConfig::Version>
-                                   proxy_protocol_version = absl::nullopt);
+                               std::optional<envoy::config::core::v3::ProxyProtocolConfig::Version>
+                                   proxy_protocol_version = std::nullopt);
   // Given an HCM with the default config, set the matcher to be a connect matcher and enable
   // CONNECT-UDP requests.
   static void setConnectUdpConfig(HttpConnectionManager& hcm, bool terminate_connect,

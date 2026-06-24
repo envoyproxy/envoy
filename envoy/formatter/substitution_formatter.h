@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -15,7 +16,6 @@
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Formatter {
@@ -51,11 +51,11 @@ public:
    * Format the value with the given context and stream info.
    * @param context supplies the formatter context.
    * @param stream_info supplies the stream info.
-   * @return absl::optional<std::string> optional string containing a single value extracted from
+   * @return std::optional<std::string> optional string containing a single value extracted from
    *         the given context and stream info.
    */
-  virtual absl::optional<std::string> format(const Context& context,
-                                             const StreamInfo::StreamInfo& stream_info) const PURE;
+  virtual std::optional<std::string> format(const Context& context,
+                                            const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
    * Format the value with the given context and stream info.
@@ -87,7 +87,7 @@ public:
    */
   virtual absl::StatusOr<FormatterProviderPtr> parse(absl::string_view command,
                                                      absl::string_view command_arg,
-                                                     absl::optional<size_t> max_length) const PURE;
+                                                     std::optional<size_t> max_length) const PURE;
 };
 
 using CommandParserPtr = std::unique_ptr<CommandParser>;

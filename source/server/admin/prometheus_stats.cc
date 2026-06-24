@@ -265,7 +265,7 @@ class ProtobufFormat : public PrometheusStatsFormatter::OutputFormat {
 public:
   static constexpr uint32_t kDefaultMaxNativeHistogramBuckets = 20;
 
-  ProtobufFormat(absl::optional<uint32_t> native_histogram_max_buckets)
+  ProtobufFormat(std::optional<uint32_t> native_histogram_max_buckets)
       : native_histogram_max_buckets_(
             native_histogram_max_buckets.value_or(kDefaultMaxNativeHistogramBuckets)) {}
 
@@ -624,7 +624,7 @@ private:
     constexpr int8_t kSchemaDefault = 4;
 
     for (int8_t schema = kSchemaDefault; schema >= kSchemaMin; --schema) {
-      absl::optional<std::set<int32_t>> indices = nativeHistogramBucketIndicesFromHistogramBuckets(
+      std::optional<std::set<int32_t>> indices = nativeHistogramBucketIndicesFromHistogramBuckets(
           detailed_buckets, schema, zero_threshold, max_buckets);
       // If it doesn't have a value, that means it exceeded `max_buckets`.
       if (indices.has_value()) {
@@ -641,9 +641,9 @@ private:
   // cover any part of the range of any of the buckets.
   //
   // If max_buckets is provided and the limit would be exceeded, returns nullopt.
-  static absl::optional<std::set<int32_t>> nativeHistogramBucketIndicesFromHistogramBuckets(
+  static std::optional<std::set<int32_t>> nativeHistogramBucketIndicesFromHistogramBuckets(
       const std::vector<Stats::ParentHistogram::Bucket>& buckets, int8_t schema,
-      double zero_threshold, absl::optional<uint32_t> max_buckets = absl::nullopt) {
+      double zero_threshold, std::optional<uint32_t> max_buckets = std::nullopt) {
     std::set<int32_t> indices;
 
     const double log_base = std::log(std::pow(2.0, std::pow(2.0, static_cast<double>(-schema))));
@@ -672,7 +672,7 @@ private:
 
         // Early termination if we've exceeded the limit
         if (max_buckets.has_value() && indices.size() > *max_buckets) {
-          return absl::nullopt;
+          return std::nullopt;
         }
       }
     }
@@ -771,7 +771,7 @@ uint64_t outputStatType(Buffer::Instance& response, const StatsParams& params,
   auto result = groups.size();
   for (auto& group_name : sorted_stat_names) {
     auto& group = groups[group_name];
-    const absl::optional<std::string> prefixed_tag_extracted_name =
+    const std::optional<std::string> prefixed_tag_extracted_name =
         PrometheusStatsFormatter::metricName(global_symbol_table.toString(group_name),
                                              custom_namespaces);
     if (!prefixed_tag_extracted_name.has_value()) {
@@ -837,7 +837,7 @@ uint64_t outputPrimitiveStatType(Buffer::Instance& response, const StatsParams& 
   auto result = groups.size();
   for (auto& group_name : sorted_group_names) {
     auto& group = groups[group_name];
-    const absl::optional<std::string> prefixed_tag_extracted_name =
+    const std::optional<std::string> prefixed_tag_extracted_name =
         PrometheusStatsFormatter::metricName(std::move(group_name), custom_namespaces);
     if (!prefixed_tag_extracted_name.has_value()) {
       --result;
@@ -936,10 +936,10 @@ absl::Status PrometheusStatsFormatter::validateParams(const StatsParams& params,
   return result;
 }
 
-absl::optional<std::string>
+std::optional<std::string>
 PrometheusStatsFormatter::metricName(std::string&& extracted_name,
                                      const Stats::CustomStatNamespaces& custom_namespaces) {
-  const absl::optional<absl::string_view> custom_namespace_stripped =
+  const std::optional<absl::string_view> custom_namespace_stripped =
       custom_namespaces.stripRegisteredPrefix(extracted_name);
   if (custom_namespace_stripped.has_value()) {
     // This case the name has a custom namespace, and it is a custom metric.
@@ -951,7 +951,7 @@ PrometheusStatsFormatter::metricName(std::string&& extracted_name,
     // thanks to sanitizeName above, so the only thing we have to do is check
     // if it does not start with digits.
     if (sanitized_name.empty() || absl::ascii_isdigit(sanitized_name.front())) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     return sanitized_name;
   }

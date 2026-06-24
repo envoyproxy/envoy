@@ -242,7 +242,7 @@ std::vector<std::string> RetryStateImpl::getUnknownRetryOnTokens(absl::string_vi
   return unknown;
 }
 
-absl::optional<std::chrono::milliseconds>
+std::optional<std::chrono::milliseconds>
 RetryStateImpl::parseResetInterval(const Http::ResponseHeaderMap& response_headers) const {
   for (const auto& reset_header : reset_headers_) {
     const auto& interval = reset_header->parseInterval(time_source_, response_headers);
@@ -251,7 +251,7 @@ RetryStateImpl::parseResetInterval(const Http::ResponseHeaderMap& response_heade
     }
   }
 
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 void RetryStateImpl::resetRetry() {
@@ -407,7 +407,7 @@ RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_he
       (RetryPolicy::RETRY_ON_GRPC_CANCELLED | RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED |
        RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED | RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE |
        RetryPolicy::RETRY_ON_GRPC_INTERNAL)) {
-    absl::optional<Grpc::Status::GrpcStatus> status = Grpc::Common::getGrpcStatus(response_headers);
+    std::optional<Grpc::Status::GrpcStatus> status = Grpc::Common::getGrpcStatus(response_headers);
     if (status) {
       if ((status.value() == Grpc::Status::Canceled &&
            (retry_on_ & RetryPolicy::RETRY_ON_GRPC_CANCELLED)) ||

@@ -1,13 +1,12 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "envoy/common/time.h"
 #include "envoy/rds/config.h"
 
 #include "source/common/protobuf/protobuf.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Rds {
@@ -41,7 +40,7 @@ public:
    * if the provider has not yet performed an initial configuration load, no information will be
    * returned.
    */
-  virtual const absl::optional<ConfigInfo>& configInfo() const PURE;
+  virtual const std::optional<ConfigInfo>& configInfo() const PURE;
 
   /**
    * @return the last time this RouteConfigProvider was updated. Used for config dumps.

@@ -172,7 +172,7 @@ static std::string dateNowPlus60s() {
   return formatter.fromTime(t);
 }
 
-Http::ResponseHeaderMapPtr cacheableResponseHeaders(absl::optional<uint64_t> content_length = 0) {
+Http::ResponseHeaderMapPtr cacheableResponseHeaders(std::optional<uint64_t> content_length = 0) {
   auto h = std::make_unique<Http::TestResponseHeaderMapImpl>();
   h->setStatus("200");
   h->addCopy(":scheme", "http");
@@ -186,7 +186,7 @@ Http::ResponseHeaderMapPtr cacheableResponseHeaders(absl::optional<uint64_t> con
 }
 
 Http::ResponseHeaderMapPtr
-cacheableResponseHeadersByExpire(absl::optional<uint64_t> content_length = 0) {
+cacheableResponseHeadersByExpire(std::optional<uint64_t> content_length = 0) {
   auto h = std::make_unique<Http::TestResponseHeaderMapImpl>();
   h->setStatus("200");
   h->addCopy(":scheme", "http");

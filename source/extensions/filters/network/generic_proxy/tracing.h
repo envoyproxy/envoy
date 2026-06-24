@@ -22,7 +22,7 @@ public:
   absl::string_view path() const override;
   absl::string_view method() const override;
   void forEach(IterateCallback callback) const override;
-  absl::optional<absl::string_view> get(absl::string_view key) const override;
+  std::optional<absl::string_view> get(absl::string_view key) const override;
   void set(absl::string_view key, absl::string_view val) override;
   void remove(absl::string_view key) override;
 

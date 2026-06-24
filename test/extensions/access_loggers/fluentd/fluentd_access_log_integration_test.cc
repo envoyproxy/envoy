@@ -32,11 +32,11 @@ public:
 
   void init(const std::string cluster_name = default_cluster_name,
             bool flush_access_log_on_connected = false,
-            absl::optional<uint32_t> buffer_size_bytes = absl::nullopt,
-            absl::optional<uint32_t> max_connect_attempts = 1,
-            absl::optional<uint64_t> base_backoff_interval = absl::nullopt,
-            absl::optional<uint64_t> max_backoff_interval = absl::nullopt,
-            absl::optional<std::string> formatter_type = absl::nullopt) {
+            std::optional<uint32_t> buffer_size_bytes = std::nullopt,
+            std::optional<uint32_t> max_connect_attempts = 1,
+            std::optional<uint64_t> base_backoff_interval = std::nullopt,
+            std::optional<uint64_t> max_backoff_interval = std::nullopt,
+            std::optional<std::string> formatter_type = std::nullopt) {
     setUpstreamCount(2);
     config_helper_.renameListener("tcp_proxy");
     config_helper_.addConfigModifier(

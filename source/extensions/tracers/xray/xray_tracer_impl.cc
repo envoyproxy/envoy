@@ -78,7 +78,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   // TODO(suniltheta) - how do we factor this into the logic above
   UNREFERENCED_PARAMETER(tracing_decision);
   const auto header = xRayTraceHeader().get(trace_context);
-  absl::optional<bool> should_trace;
+  std::optional<bool> should_trace;
   XRayHeader xray_header;
   if (header.has_value()) {
     // This is an implicitly untrusted header, so only the first value is used.
@@ -107,8 +107,8 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   auto* tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer_.get();
   if (should_trace.value()) {
     return tracer->startSpan(config, operation_name, stream_info.startTime(),
-                             header.has_value() ? absl::optional<XRayHeader>(xray_header)
-                                                : absl::nullopt,
+                             header.has_value() ? std::optional<XRayHeader>(xray_header)
+                                                : std::nullopt,
                              xForwardedForHeader().get(trace_context));
   }
 
@@ -116,8 +116,8 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   // This is important to communicate that information to upstream services (see injectContext()).
   // Otherwise, the upstream service can decide to sample the request regardless and we end up with
   // more samples than we asked for.
-  return tracer->createNonSampledSpan(header.has_value() ? absl::optional<XRayHeader>(xray_header)
-                                                         : absl::nullopt);
+  return tracer->createNonSampledSpan(header.has_value() ? std::optional<XRayHeader>(xray_header)
+                                                         : std::nullopt);
 }
 
 } // namespace XRay

@@ -58,7 +58,6 @@ envoy_cc_library(
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/override_host/v3:pkg_cc_proto",
     ],

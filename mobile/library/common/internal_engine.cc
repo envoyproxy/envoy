@@ -90,8 +90,8 @@ static std::atomic<envoy_stream_t> current_stream_handle_{0};
 InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                std::unique_ptr<EnvoyLogger> logger,
                                std::unique_ptr<EnvoyEventTracker> event_tracker,
-                               absl::optional<int> thread_priority,
-                               absl::optional<size_t> high_watermark,
+                               std::optional<int> thread_priority,
+                               std::optional<size_t> high_watermark,
                                Thread::PosixThreadFactoryPtr thread_factory, bool enable_logger,
                                bool use_worker_thread)
     : thread_factory_(std::move(thread_factory)), callbacks_(std::move(callbacks)),
@@ -108,8 +108,8 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
 InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                std::unique_ptr<EnvoyLogger> logger,
                                std::unique_ptr<EnvoyEventTracker> event_tracker,
-                               absl::optional<int> thread_priority,
-                               absl::optional<size_t> high_watermark, bool enable_logger,
+                               std::optional<int> thread_priority,
+                               std::optional<size_t> high_watermark, bool enable_logger,
                                bool use_worker_thread)
     : InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
                      thread_priority, high_watermark, Thread::PosixThreadFactory::create(),
@@ -539,7 +539,7 @@ void InternalEngine::resetHttpPropertiesAndDrainHosts(bool has_ipv6_connectivity
     if (!has_ipv6_connectivity) {
       connectivity_manager_->dnsCache()->setIpVersionToRemove({Network::Address::IpVersion::v6});
     } else {
-      connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
+      connectivity_manager_->dnsCache()->setIpVersionToRemove(std::nullopt);
     }
   }
   Http::HttpServerPropertiesCacheManager& cache_manager =

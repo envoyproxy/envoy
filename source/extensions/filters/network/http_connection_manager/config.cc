@@ -395,9 +395,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_connection_duration)),
       max_connection_duration_jitter_percentage_(
           config.common_http_protocol_options().has_max_connection_duration_jitter()
-              ? absl::optional<double>(
+              ? std::optional<double>(
                     config.common_http_protocol_options().max_connection_duration_jitter().value())
-              : absl::nullopt),
+              : std::nullopt),
       http1_safe_max_connection_duration_(config.http1_safe_max_connection_duration()),
       max_stream_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_stream_duration)),
@@ -411,8 +411,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
       drain_timeout_jitter_percentage_(
           config.has_drain_timeout_jitter()
-              ? absl::optional<double>(config.drain_timeout_jitter().value())
-              : absl::nullopt),
+              ? std::optional<double>(config.drain_timeout_jitter().value())
+              : std::nullopt),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
       preserve_external_request_id_(config.preserve_external_request_id()),
       always_set_request_id_in_response_(config.always_set_request_id_in_response()),
@@ -488,7 +488,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
-    idle_timeout_ = absl::nullopt;
+    idle_timeout_ = std::nullopt;
   }
 
   if (config.common_http_protocol_options().has_max_response_headers_kb()) {
@@ -772,10 +772,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 }
 
-absl::optional<std::chrono::milliseconds>
+std::optional<std::chrono::milliseconds>
 HttpConnectionManagerConfig::maxConnectionDuration() const {
   if (!max_connection_duration_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   std::chrono::milliseconds duration = max_connection_duration_.value();
   // Apply jitter: extend the base duration by a random amount up to

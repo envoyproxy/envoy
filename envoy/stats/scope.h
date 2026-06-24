@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
@@ -10,8 +11,6 @@
 #include "envoy/stats/tag.h"
 
 #include "source/common/stats/symbol_table.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Stats {
@@ -24,22 +23,22 @@ class Scope;
 class Store;
 class TextReadout;
 
-using CounterOptConstRef = absl::optional<std::reference_wrapper<const Counter>>;
-using GaugeOptConstRef = absl::optional<std::reference_wrapper<const Gauge>>;
-using HistogramOptConstRef = absl::optional<std::reference_wrapper<const Histogram>>;
-using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextReadout>>;
+using CounterOptConstRef = std::optional<std::reference_wrapper<const Counter>>;
+using GaugeOptConstRef = std::optional<std::reference_wrapper<const Gauge>>;
+using HistogramOptConstRef = std::optional<std::reference_wrapper<const Histogram>>;
+using TextReadoutOptConstRef = std::optional<std::reference_wrapper<const TextReadout>>;
 using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
 
 // Settings for limiting the number of counters, gauges and histograms allowed
 // in a scope. This currently only supports thread local stats.
 struct ScopeStatsLimitSettings {
-  // Max number of counters allowed in this scope. absl::nullopt means no limit.
-  absl::optional<uint32_t> max_counters = absl::nullopt;
-  // Max number of gauges allowed in this scope. absl::nullopt means no limit.
-  absl::optional<uint32_t> max_gauges = absl::nullopt;
-  // Max number of histograms allowed in this scope. absl::nullopt means no limit.
-  absl::optional<uint32_t> max_histograms = absl::nullopt;
+  // Max number of counters allowed in this scope. std::nullopt means no limit.
+  std::optional<uint32_t> max_counters = std::nullopt;
+  // Max number of gauges allowed in this scope. std::nullopt means no limit.
+  std::optional<uint32_t> max_gauges = std::nullopt;
+  // Max number of histograms allowed in this scope. std::nullopt means no limit.
+  std::optional<uint32_t> max_histograms = std::nullopt;
 };
 
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
@@ -175,7 +174,7 @@ public:
    * @return a counter within the scope's namespace.
    */
   virtual Counter& counterFromTaggedName(StatName base_name,
-                                         absl::optional<StatNameTagSpan> name_tags,
+                                         std::optional<StatNameTagSpan> name_tags,
                                          StatName tagged_name) PURE;
 
   /**
@@ -191,7 +190,7 @@ public:
    * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.
    */
-  virtual Gauge& gaugeFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+  virtual Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
                                      StatName tagged_name, Gauge::ImportMode import_mode) PURE;
 
   /**
@@ -208,7 +207,7 @@ public:
    * @return a histogram within the scope's namespace with a particular value type.
    */
   virtual Histogram& histogramFromTaggedName(StatName base_name,
-                                             absl::optional<StatNameTagSpan> name_tags,
+                                             std::optional<StatNameTagSpan> name_tags,
                                              StatName tagged_name, Histogram::Unit unit) PURE;
 
   /**
@@ -224,7 +223,7 @@ public:
    * @return a text readout within the scope's namespace.
    */
   virtual TextReadout& textReadoutFromTaggedName(StatName base_name,
-                                                 absl::optional<StatNameTagSpan> name_tags,
+                                                 std::optional<StatNameTagSpan> name_tags,
                                                  StatName tagged_name) PURE;
 
   /**
@@ -233,7 +232,7 @@ public:
    * @return a counter within the scope's namespace.
    */
   Counter& counterFromStatName(const StatName& name) {
-    return counterFromStatNameWithTags(name, absl::nullopt);
+    return counterFromStatNameWithTags(name, std::nullopt);
   }
   /**
    * Creates a Counter from the stat name and tags. If tags are not provided, tag extraction
@@ -260,7 +259,7 @@ public:
    * @return a gauge within the scope's namespace.
    */
   Gauge& gaugeFromStatName(const StatName& name, Gauge::ImportMode import_mode) {
-    return gaugeFromStatNameWithTags(name, absl::nullopt, import_mode);
+    return gaugeFromStatNameWithTags(name, std::nullopt, import_mode);
   }
 
   /**
@@ -291,7 +290,7 @@ public:
    * @return a histogram within the scope's namespace with a particular value type.
    */
   Histogram& histogramFromStatName(const StatName& name, Histogram::Unit unit) {
-    return histogramFromStatNameWithTags(name, absl::nullopt, unit);
+    return histogramFromStatNameWithTags(name, std::nullopt, unit);
   }
 
   /**
@@ -321,7 +320,7 @@ public:
    * @return a text readout within the scope's namespace.
    */
   TextReadout& textReadoutFromStatName(const StatName& name) {
-    return textReadoutFromStatNameWithTags(name, absl::nullopt);
+    return textReadoutFromStatNameWithTags(name, std::nullopt);
   }
 
   /**
@@ -427,11 +426,11 @@ public:
   // *FromStatNameWithTags convenience methods into the span representation taken by the new
   // *FromStatName virtual methods. The returned span aliases the caller-owned vector and must only
   // be used for the duration of the (synchronous) call.
-  static absl::optional<StatNameTagSpan> toTagSpan(StatNameTagVectorOptConstRef tags) {
+  static std::optional<StatNameTagSpan> toTagSpan(StatNameTagVectorOptConstRef tags) {
     if (tags.has_value()) {
       return StatNameTagSpan(tags->get());
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 };
 

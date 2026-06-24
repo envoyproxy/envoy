@@ -26,7 +26,7 @@ Http::FilterHeadersStatus TestReadFilter::decodeHeaders(Http::RequestHeaderMap& 
 
     // trigger the error and stop iteration to other filters
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "test_read filter threw: ", nullptr,
-                                       absl::nullopt, "");
+                                       std::nullopt, "");
     return Http::FilterHeadersStatus::StopIteration;
   }
 

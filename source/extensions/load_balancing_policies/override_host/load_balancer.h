@@ -24,7 +24,6 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -58,8 +57,8 @@ class OverrideHostLbConfig : public Upstream::LoadBalancerConfig {
 public:
   struct OverrideSource {
     static OverrideSource make(const OverrideHost::OverrideHostSource& config);
-    absl::optional<Http::LowerCaseString> header_name;
-    absl::optional<Config::MetadataKey> metadata_key;
+    std::optional<Http::LowerCaseString> header_name;
+    std::optional<Config::MetadataKey> metadata_key;
   };
 
   static absl::StatusOr<std::unique_ptr<OverrideHostLbConfig>> make(const OverrideHost& config,
@@ -70,11 +69,11 @@ public:
                                     RandomGenerator& random, TimeSource& time_source) const;
 
   const std::vector<OverrideSource>& overrideHostSources() const { return override_host_sources_; }
-  const absl::optional<Config::MetadataKey>& selectedHostKey() const { return selected_host_key_; }
+  const std::optional<Config::MetadataKey>& selectedHostKey() const { return selected_host_key_; }
 
 private:
   OverrideHostLbConfig(std::vector<OverrideSource>&& override_host_sources,
-                       absl::optional<Config::MetadataKey>&& selected_host_key,
+                       std::optional<Config::MetadataKey>&& selected_host_key,
                        TypedLoadBalancerFactory* fallback_load_balancer_factory,
                        LoadBalancerConfigPtr&& fallback_load_balancer_config);
 
@@ -90,7 +89,7 @@ private:
   const FallbackLbConfig fallback_picker_lb_config_;
 
   const std::vector<OverrideSource> override_host_sources_;
-  const absl::optional<Config::MetadataKey> selected_host_key_;
+  const std::optional<Config::MetadataKey> selected_host_key_;
 };
 
 // Load balancer for the dynamic forwarding, supporting external endpoint
@@ -140,7 +139,7 @@ private:
       return {};
     }
 
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(LoadBalancerContext*, const Host&, std::vector<uint8_t>&) override {
       // This functionality is not supported by dynamic forwarding LB.
       return std::nullopt;
@@ -161,13 +160,13 @@ private:
 
     // Return a list of endpoints selected by the LbTrafficExtension.
     // nullopt if the metadata is not present.
-    absl::optional<absl::string_view>
+    std::optional<absl::string_view>
     getSelectedHostsFromMetadata(const ::envoy::config::core::v3::Metadata& metadata,
                                  const Config::MetadataKey& metadata_key);
 
     // Return a list of endpoints selected by the LbTrafficExtension, specified.
     // in the header. nullopt if the header is not present.
-    absl::optional<absl::string_view>
+    std::optional<absl::string_view>
     getSelectedHostsFromHeader(const Http::RequestHeaderMap* header_map,
                                const Http::LowerCaseString& header_name);
 

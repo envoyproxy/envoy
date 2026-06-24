@@ -26,7 +26,7 @@ public:
   static uint32_t xffNumTrustedHops(const GeoipFilter& filter) {
     return filter.config_->xffNumTrustedHops();
   }
-  static const absl::optional<Http::LowerCaseString>& ipAddressHeader(const GeoipFilter& filter) {
+  static const std::optional<Http::LowerCaseString>& ipAddressHeader(const GeoipFilter& filter) {
     return filter.config_->ipAddressHeader();
   }
 };

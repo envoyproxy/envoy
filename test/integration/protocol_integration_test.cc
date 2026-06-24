@@ -3434,7 +3434,7 @@ TEST_P(ProtocolIntegrationTest, Http1SafeConnDurationTimeout) {
       });
   initialize();
 
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
 
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
   waitForNextUpstreamRequest();

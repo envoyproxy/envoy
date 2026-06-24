@@ -120,7 +120,7 @@ public:
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
-  absl::optional<std::string> getClientCertFingerprint(Upstream::ThreadLocalCluster* cluster) {
+  std::optional<std::string> getClientCertFingerprint(Upstream::ThreadLocalCluster* cluster) {
     return filter_->getClientCertFingerprint(cluster);
   }
 
@@ -480,7 +480,7 @@ TEST_F(GcpAuthnFilterTest, CacheMissAndInsert) {
   // Verify by performing a lookup in the cache and asserting it is found!
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.set_url("test");
-  auto cached_val = cache.lookUp(audience, absl::nullopt);
+  auto cached_val = cache.lookUp(audience, std::nullopt);
   EXPECT_TRUE(cached_val.has_value());
   EXPECT_EQ(cached_val.value(), std::string(GoodTokenStr));
 }
@@ -634,7 +634,7 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithoutFingerprintFails) {
 
 TEST_F(GcpAuthnFilterTest, GetClientCertFingerprintWithNullClusterReturnsNullopt) {
   setupFilterAndCallback();
-  EXPECT_EQ(getClientCertFingerprint(nullptr), absl::nullopt);
+  EXPECT_EQ(getClientCertFingerprint(nullptr), std::nullopt);
 }
 
 TEST_F(GcpAuthnFilterTest, BoundJwtWithEmptyTlsCertificatesFails) {

@@ -14,7 +14,7 @@ public:
   void initialize() override {
     upstream_tls_ = true;
     config_helper_.configureUpstreamTls(
-        true /* use alpn */, false /* http3 */, absl::nullopt,
+        true /* use alpn */, false /* http3 */, std::nullopt,
         [this](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& ctx) {
           ctx.set_auto_host_sni(auto_host_sni_);
           ctx.set_auto_sni_san_validation(auto_sni_san_validation_);

@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/common/platform.h"
@@ -63,7 +64,6 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "openssl/crypto.h"
@@ -90,7 +90,7 @@ namespace Tls {
 class SslSocketPeer {
 public:
   static void drainErrorQueue(SslSocket& socket) { socket.drainErrorQueue(); }
-  static const absl::optional<Api::IoError::IoErrorCode>& detectedIoError(const SslSocket& socket) {
+  static const std::optional<Api::IoError::IoErrorCode>& detectedIoError(const SslSocket& socket) {
     return socket.detected_io_error_;
   }
   static absl::string_view failureReason(const SslSocket& socket) { return socket.failure_reason_; }
@@ -785,7 +785,7 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->pemEncodedPeerCertificate());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->subjectPeerCertificate());
-        EXPECT_EQ(absl::nullopt, server_connection->ssl()->parsedSubjectPeerCertificate());
+        EXPECT_EQ(std::nullopt, server_connection->ssl()->parsedSubjectPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->dnsSansPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->ipSansPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->emailSansPeerCertificate());
@@ -1168,7 +1168,7 @@ void testUtilV2(const TestUtilOptionsV2& options) {
         EXPECT_EQ(options.expectedTlsGroup(), group_name);
       }
 
-      absl::optional<std::string> server_ssl_requested_server_name;
+      std::optional<std::string> server_ssl_requested_server_name;
       const SslHandshakerImpl* server_ssl_socket =
           dynamic_cast<const SslHandshakerImpl*>(server_connection->ssl().get());
       SSL* server_ssl = server_ssl_socket->ssl();
@@ -1254,9 +1254,9 @@ void updateFilterChain(
 }
 
 struct OptionalServerConfig {
-  absl::optional<std::string> cert_hash;
-  absl::optional<std::string> trusted_ca;
-  absl::optional<bool> allow_expired_cert;
+  std::optional<std::string> cert_hash;
+  std::optional<std::string> trusted_ca;
+  std::optional<bool> allow_expired_cert;
 };
 
 void configureServerAndExpiredClientCertificate(

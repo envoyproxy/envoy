@@ -3,12 +3,12 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "absl/types/variant.h"
 
 namespace Envoy {
@@ -105,7 +105,7 @@ struct ParsedMessage {
 struct ParseResult {
   // The parsed message, if a complete message was found.
   // nullopt if the buffer doesn't contain a complete message yet.
-  absl::optional<ParsedMessage> message;
+  std::optional<ParsedMessage> message;
 
   // Number of bytes consumed from the buffer.
   // 0 if incomplete (need more data).

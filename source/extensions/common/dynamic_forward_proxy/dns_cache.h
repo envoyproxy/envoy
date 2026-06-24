@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/common/pure.h"
@@ -17,7 +18,6 @@
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -221,7 +221,7 @@ public:
   struct LoadDnsCacheEntryResult {
     LoadDnsCacheEntryStatus status_;
     LoadDnsCacheEntryHandlePtr handle_;
-    absl::optional<DnsHostInfoSharedPtr> host_info_;
+    std::optional<DnsHostInfoSharedPtr> host_info_;
   };
 
   /**
@@ -267,9 +267,9 @@ public:
    * Retrieve the DNS host info of a given host currently stored in the cache.
    * @param host_name supplies the host name.
    * @return the DNS host info associated with the given host name if the host's address is cached,
-   * otherwise `absl::nullopt`.
+   * otherwise `std::nullopt`.
    */
-  virtual absl::optional<const DnsHostInfoSharedPtr> getHost(absl::string_view host_name) PURE;
+  virtual std::optional<const DnsHostInfoSharedPtr> getHost(absl::string_view host_name) PURE;
 
   /**
    * Check if a DNS request is allowed given resource limits.
@@ -289,12 +289,12 @@ public:
    * specific IP version, we can save time not having to try to connect to both IPv4 and IPv6
    * addresses.
    */
-  virtual void setIpVersionToRemove(absl::optional<Network::Address::IpVersion> ip_version) PURE;
+  virtual void setIpVersionToRemove(std::optional<Network::Address::IpVersion> ip_version) PURE;
 
   /**
    * Gets the `IpVersion` addresses to be removed from the DNS response.
    */
-  virtual absl::optional<Network::Address::IpVersion> getIpVersionToRemove() PURE;
+  virtual std::optional<Network::Address::IpVersion> getIpVersionToRemove() PURE;
 
   /**
    * Stops the DNS cache background tasks by canceling the pending queries and stopping the timeout

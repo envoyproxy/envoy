@@ -14,7 +14,7 @@ using ::testing::Invoke;
 MockWorker::MockWorker() {
   ON_CALL(*this, addListener(_, _, _, _, _))
       .WillByDefault(
-          Invoke([this](absl::optional<uint64_t> overridden_listener,
+          Invoke([this](std::optional<uint64_t> overridden_listener,
                         Network::ListenerConfig& config, AddListenerCompletion completion,
                         Runtime::Loader&, Random::RandomGenerator&) -> void {
             UNREFERENCED_PARAMETER(overridden_listener);
@@ -48,7 +48,7 @@ MockWorker::MockWorker() {
 
   ON_CALL(*this, start(_, _, _))
       .WillByDefault(Invoke([](OptRef<GuardDog>, const std::function<void()>& cb,
-                               absl::optional<uint32_t>) -> void { cb(); }));
+                               std::optional<uint32_t>) -> void { cb(); }));
 }
 
 MockWorker::~MockWorker() = default;

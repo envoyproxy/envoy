@@ -28,7 +28,7 @@ enum class DriverMode {
 
 struct PayloadOptions {
   PayloadOptions(TransportType transport, ProtocolType protocol, DriverMode mode,
-                 absl::optional<std::string> service_name, std::string method_name,
+                 std::optional<std::string> service_name, std::string method_name,
                  std::vector<std::string> method_args = {},
                  std::vector<std::pair<std::string, std::string>> headers = {})
       : transport_(transport), protocol_(protocol), mode_(mode), service_name_(service_name),
@@ -41,7 +41,7 @@ struct PayloadOptions {
   const TransportType transport_;
   const ProtocolType protocol_;
   const DriverMode mode_;
-  const absl::optional<std::string> service_name_;
+  const std::optional<std::string> service_name_;
   const std::string method_name_;
   const std::vector<std::string> method_args_;
   const std::vector<std::pair<std::string, std::string>> headers_;

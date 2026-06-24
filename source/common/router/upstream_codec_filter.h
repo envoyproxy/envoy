@@ -96,7 +96,7 @@ public:
   CodecBridge bridge_;
   OptRef<Http::RequestHeaderMap> latched_headers_;
   absl::Status deferred_reset_status_;
-  absl::optional<bool> latched_end_stream_;
+  std::optional<bool> latched_end_stream_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   bool calling_encode_headers_ = false;
 

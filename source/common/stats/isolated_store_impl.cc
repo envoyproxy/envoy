@@ -19,7 +19,7 @@ IsolatedStoreImpl::IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table
   symbol_table_storage_ = std::move(symbol_table);
 }
 
-static StatNameTagSpan tagSpanFromOpt(absl::optional<StatNameTagSpan> tags) {
+static StatNameTagSpan tagSpanFromOpt(std::optional<StatNameTagSpan> tags) {
   return tags ? tags.value() : StatNameTagSpan{};
 }
 

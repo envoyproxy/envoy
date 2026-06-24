@@ -70,7 +70,7 @@ TEST(Context, RequestAttributes) {
   // "2018-04-03T23:06:09.123Z".
   const SystemTime start_time(std::chrono::milliseconds(1522796769123));
   EXPECT_CALL(info, startTime()).WillRepeatedly(Return(start_time));
-  absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
+  std::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
   EXPECT_CALL(info, requestComplete()).WillRepeatedly(Return(dur));
   EXPECT_CALL(info, protocol()).WillRepeatedly(Return(Http::Protocol::Http2));
 
@@ -345,7 +345,7 @@ TEST(Context, ResponseAttributes) {
   EXPECT_CALL(time_system, monotonicTime)
       .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(25000000))));
 
-  const absl::optional<std::string> code_details = "unauthorized";
+  const std::optional<std::string> code_details = "unauthorized";
   EXPECT_CALL(info, responseCodeDetails()).WillRepeatedly(ReturnRef(code_details));
 
   {
@@ -575,7 +575,7 @@ TEST(Context, ConnectionAttributes) {
   info.upstreamInfo()->setUpstreamTransportFailureReason(upstream_transport_failure_reason);
   EXPECT_CALL(info, connectionID()).WillRepeatedly(Return(123));
   info.downstream_connection_info_provider_->setConnectionID(123);
-  const absl::optional<std::string> connection_termination_details = "unauthorized";
+  const std::optional<std::string> connection_termination_details = "unauthorized";
   EXPECT_CALL(info, connectionTerminationDetails())
       .WillRepeatedly(ReturnRef(connection_termination_details));
   const std::string downstream_transport_failure_reason = "TlsError";

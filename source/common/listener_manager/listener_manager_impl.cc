@@ -337,7 +337,7 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
       return absl::InvalidArgumentError("failed to create socket using custom interface");
     }
     return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options,
-                                                      absl::nullopt, bind_type != BindType::NoBind);
+                                                      std::nullopt, bind_type != BindType::NoBind);
   }
 
   // Continue with standard socket creation for addresses using the default interface.
@@ -839,7 +839,7 @@ bool ListenerManagerImpl::doFinalPreWorkerListenerInit(ListenerImpl& listener) {
 }
 
 void ListenerManagerImpl::addListenerToWorker(Worker& worker,
-                                              absl::optional<uint64_t> overridden_listener,
+                                              std::optional<uint64_t> overridden_listener,
                                               ListenerImpl& listener,
                                               ListenerCompletionCallback completion_callback) {
   if (overridden_listener.has_value()) {
@@ -871,7 +871,7 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
     return;
   }
   for (const auto& worker : workers_) {
-    addListenerToWorker(*worker, absl::nullopt, listener, nullptr);
+    addListenerToWorker(*worker, std::nullopt, listener, nullptr);
   }
 
   auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
@@ -1087,7 +1087,7 @@ absl::Status ListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog,
       continue;
     }
     for (const auto& worker : workers_) {
-      addListenerToWorker(*worker, absl::nullopt, *listener,
+      addListenerToWorker(*worker, std::nullopt, *listener,
                           [this, listeners_pending_init, callback]() {
                             if (--(*listeners_pending_init) == 0) {
                               stats_.workers_started_.set(1);
@@ -1099,7 +1099,7 @@ absl::Status ListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog,
   const std::vector<uint32_t> worker_cpus = assignWorkerCpus();
   for (const auto& worker : workers_) {
     ENVOY_LOG(debug, "starting worker {}", i);
-    absl::optional<uint32_t> cpu_id;
+    std::optional<uint32_t> cpu_id;
     if (i < worker_cpus.size()) {
       cpu_id = worker_cpus[i];
     }
@@ -1301,7 +1301,7 @@ void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
 }
 
 ApiListenerOptRef ListenerManagerImpl::apiListener() {
-  return api_listener_ ? ApiListenerOptRef(std::ref(*api_listener_)) : absl::nullopt;
+  return api_listener_ ? ApiListenerOptRef(std::ref(*api_listener_)) : std::nullopt;
 }
 
 ListenerUpdateCallbacksHandlePtr

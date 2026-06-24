@@ -278,7 +278,7 @@ void ExtProcIntegrationTest::protocolConfigEncoding(ProcessingRequest& request) 
 }
 
 IntegrationStreamDecoderPtr ExtProcIntegrationTest::sendDownstreamRequest(
-    absl::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers) {
+    std::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers) {
   auto conn = makeClientConnection(lookupPort("http"));
   codec_client_ = makeHttpConnection(std::move(conn));
   Http::TestRequestHeaderMapImpl headers;
@@ -291,7 +291,7 @@ IntegrationStreamDecoderPtr ExtProcIntegrationTest::sendDownstreamRequest(
 
 IntegrationStreamDecoderPtr ExtProcIntegrationTest::sendDownstreamRequestWithBody(
     absl::string_view body,
-    absl::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers,
+    std::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers,
     bool add_content_length) {
   auto conn = makeClientConnection(lookupPort("http"));
   codec_client_ = makeHttpConnection(std::move(conn));
@@ -389,7 +389,7 @@ void ExtProcIntegrationTest::waitForFirstMessage(FakeUpstream& grpc_upstream,
 
 void ExtProcIntegrationTest::processGenericMessage(
     FakeUpstream& grpc_upstream, bool first_message,
-    absl::optional<std::function<bool(const ProcessingRequest&, ProcessingResponse&)>> cb) {
+    std::optional<std::function<bool(const ProcessingRequest&, ProcessingResponse&)>> cb) {
   ProcessingRequest request;
   if (first_message) {
     ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -408,7 +408,7 @@ void ExtProcIntegrationTest::processGenericMessage(
 
 void ExtProcIntegrationTest::processRequestHeadersMessage(
     FakeUpstream& grpc_upstream, bool first_message,
-    absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
+    std::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
   ProcessingRequest request;
   if (first_message) {
     ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -430,7 +430,7 @@ void ExtProcIntegrationTest::processRequestHeadersMessage(
 
 void ExtProcIntegrationTest::processRequestTrailersMessage(
     FakeUpstream& grpc_upstream, bool first_message,
-    absl::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb) {
+    std::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb) {
   ProcessingRequest request;
   if (first_message) {
     ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -451,7 +451,7 @@ void ExtProcIntegrationTest::processRequestTrailersMessage(
 
 void ExtProcIntegrationTest::processResponseHeadersMessage(
     FakeUpstream& grpc_upstream, bool first_message,
-    absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
+    std::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
   ProcessingRequest request;
   if (first_message) {
     ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -474,7 +474,7 @@ void ExtProcIntegrationTest::processResponseHeadersMessage(
 
 void ExtProcIntegrationTest::processRequestBodyMessage(
     FakeUpstream& grpc_upstream, bool first_message,
-    absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb,
+    std::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb,
     bool check_downstream_flow_control) {
   ProcessingRequest request;
   if (first_message) {
@@ -507,7 +507,7 @@ void ExtProcIntegrationTest::processRequestBodyMessage(
 
 void ExtProcIntegrationTest::processResponseBodyMessage(
     FakeUpstream& grpc_upstream, bool first_message,
-    absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb) {
+    std::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb) {
   ProcessingRequest request;
   if (first_message) {
     ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -530,7 +530,7 @@ void ExtProcIntegrationTest::processResponseBodyMessage(
 
 void ExtProcIntegrationTest::processResponseTrailersMessage(
     FakeUpstream& grpc_upstream, bool first_message,
-    absl::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb) {
+    std::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb) {
   ProcessingRequest request;
   if (first_message) {
     ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -551,7 +551,7 @@ void ExtProcIntegrationTest::processResponseTrailersMessage(
 
 void ExtProcIntegrationTest::processAndRespondImmediately(
     FakeUpstream& grpc_upstream, bool first_message,
-    absl::optional<std::function<void(ImmediateResponse&)>> cb) {
+    std::optional<std::function<void(ImmediateResponse&)>> cb) {
   ProcessingRequest request;
   if (first_message) {
     ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -571,7 +571,7 @@ void ExtProcIntegrationTest::processAndRespondImmediately(
 
 void ExtProcIntegrationTest::packTwoResponsesInOneMessage(
     FakeUpstream& grpc_upstream, bool immediate_response,
-    absl::optional<std::function<void(ImmediateResponse&)>> cb) {
+    std::optional<std::function<void(ImmediateResponse&)>> cb) {
   ProcessingRequest request;
   ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
   ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
@@ -622,7 +622,7 @@ void ExtProcIntegrationTest::newTimeoutWrongConfigTest(const uint64_t timeout_ms
   }
   initializeConfig();
   HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
+  auto response = sendDownstreamRequest(std::nullopt);
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
                                [&](const HttpHeaders&, HeadersResponse&) {
@@ -652,7 +652,7 @@ void ExtProcIntegrationTest::testWithHeaderMutation(ConfigOptions config_option)
   initializeConfig(config_option);
   HttpIntegrationTest::initialize();
 
-  auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
+  auto response = sendDownstreamRequestWithBody("Replace this!", std::nullopt);
   processRequestHeadersMessage(
       *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
         auto* content_length =
@@ -685,9 +685,8 @@ void ExtProcIntegrationTest::testWithoutHeaderMutation(ConfigOptions config_opti
   initializeConfig(config_option);
   HttpIntegrationTest::initialize();
 
-  auto response =
-      sendDownstreamRequestWithBody("test!", absl::nullopt, /*add_content_length=*/true);
-  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  auto response = sendDownstreamRequestWithBody("test!", std::nullopt, /*add_content_length=*/true);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
   processRequestBodyMessage(
       *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
         EXPECT_TRUE(body.end_of_stream());
@@ -712,7 +711,7 @@ void ExtProcIntegrationTest::addMutationRemoveHeaders(
 
 void ExtProcIntegrationTest::testGetAndFailStream() {
   HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
+  auto response = sendDownstreamRequest(std::nullopt);
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
@@ -723,7 +722,7 @@ void ExtProcIntegrationTest::testGetAndFailStream() {
 
 void ExtProcIntegrationTest::testGetAndCloseStream() {
   HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
+  auto response = sendDownstreamRequest(std::nullopt);
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
@@ -783,7 +782,7 @@ void ExtProcIntegrationTest::testSidestreamPushbackDownstream(uint32_t body_size
   HttpIntegrationTest::initialize();
 
   std::string body_str = std::string(body_size, 'a');
-  auto response = sendDownstreamRequestWithBody(body_str, absl::nullopt);
+  auto response = sendDownstreamRequestWithBody(body_str, std::nullopt);
 
   bool end_stream = false;
   int count = 0;

@@ -2700,11 +2700,11 @@ public:
 
   void set(Http::RequestHeaderMap&, bool, bool) override {}
   void setInResponse(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&) override {}
-  absl::optional<absl::string_view> get(const Http::RequestHeaderMap&) const override {
-    return absl::nullopt;
+  std::optional<absl::string_view> get(const Http::RequestHeaderMap&) const override {
+    return std::nullopt;
   }
-  absl::optional<uint64_t> getInteger(const Http::RequestHeaderMap&) const override {
-    return absl::nullopt;
+  std::optional<uint64_t> getInteger(const Http::RequestHeaderMap&) const override {
+    return std::nullopt;
   }
   Tracing::Reason getTraceReason(const Http::RequestHeaderMap&) override {
     return Tracing::Reason::Sampling;

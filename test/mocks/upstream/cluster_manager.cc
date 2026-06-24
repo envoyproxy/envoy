@@ -73,7 +73,7 @@ void MockClusterManager::initializeClusters(const std::vector<std::string>& acti
         if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
           return *it->second;
         }
-        return absl::nullopt;
+        return std::nullopt;
       }));
   ON_CALL(*this, getActiveOrWarmingCluster(_))
       .WillByDefault(Invoke([this](const std::string& cluster_name) -> OptRef<const Cluster> {
@@ -83,7 +83,7 @@ void MockClusterManager::initializeClusters(const std::vector<std::string>& acti
         if (const auto& it = warming_clusters_.find(cluster_name); it != warming_clusters_.end()) {
           return *it->second;
         }
-        return absl::nullopt;
+        return std::nullopt;
       }));
   ON_CALL(*this, hasCluster(_))
       .WillByDefault(Invoke([this](const std::string& cluster_name) -> bool {

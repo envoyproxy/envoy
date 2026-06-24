@@ -308,7 +308,7 @@ RouteConstSharedPtr Config::getRouteFromEntries(Network::Connection& connection)
                                           random_generator_.random(), false);
 }
 
-const absl::optional<std::chrono::milliseconds>
+const std::optional<std::chrono::milliseconds>
 Config::calculateMaxDownstreamConnectionDurationWithJitter() {
   const auto& max_downstream_connection_duration = maxDownstreamConnectionDuration();
   if (!max_downstream_connection_duration) {
@@ -1568,7 +1568,7 @@ void UpstreamDrainManager::add(const Config::SharedConfigSharedPtr& config,
                                Tcp::ConnectionPool::ConnectionDataPtr&& upstream_conn_data,
                                const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
                                Event::TimerPtr&& idle_timer,
-                               absl::optional<std::chrono::milliseconds> idle_timeout,
+                               std::optional<std::chrono::milliseconds> idle_timeout,
                                const Upstream::HostDescriptionConstSharedPtr& upstream_host) {
   DrainerPtr drainer(new Drainer(*this, config, callbacks, std::move(upstream_conn_data),
                                  std::move(idle_timer), idle_timeout, upstream_host));
@@ -1589,7 +1589,7 @@ void UpstreamDrainManager::remove(Drainer& drainer, Event::Dispatcher& dispatche
 Drainer::Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedPtr& config,
                  const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
                  Tcp::ConnectionPool::ConnectionDataPtr&& conn_data, Event::TimerPtr&& idle_timer,
-                 absl::optional<std::chrono::milliseconds> idle_timeout,
+                 std::optional<std::chrono::milliseconds> idle_timeout,
                  const Upstream::HostDescriptionConstSharedPtr& upstream_host)
     : parent_(parent), callbacks_(callbacks), upstream_conn_data_(std::move(conn_data)),
       idle_timer_(std::move(idle_timer)), idle_timeout_(idle_timeout),

@@ -32,7 +32,7 @@ public:
                                      const envoy::config::core::v3::GrpcMethodList& method_list)
       : stat_name_pool_(symbol_table), map_(populate(method_list)) {}
 
-  absl::optional<Grpc::Context::RequestStatNames>
+  std::optional<Grpc::Context::RequestStatNames>
   lookup(const Grpc::Common::RequestNames& request_names) const {
     auto it = map_.find(request_names);
     if (it != map_.end()) {
@@ -112,7 +112,7 @@ struct Config {
   const bool enable_upstream_stats_;
   const bool replace_dots_in_grpc_service_name_;
   const bool stats_for_all_methods_;
-  absl::optional<GrpcServiceMethodToRequestNamesMap> allowlist_;
+  std::optional<GrpcServiceMethodToRequestNamesMap> allowlist_;
 };
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 
@@ -146,7 +146,7 @@ public:
           // Resolve the service and method to a string_view, then get
           // the Context::RequestStatNames out of the pre-allocated list that
           // can be produced with the allowlist being present.
-          absl::optional<Grpc::Common::RequestNames> request_names =
+          std::optional<Grpc::Common::RequestNames> request_names =
               Grpc::Common::resolveServiceAndMethod(headers.Path());
 
           if (request_names) {
@@ -309,7 +309,7 @@ private:
   Grpc::FrameInspector request_counter_;
   ResponseFrameCounter response_counter_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
-  absl::optional<Grpc::Context::RequestStatNames> request_names_;
+  std::optional<Grpc::Context::RequestStatNames> request_names_;
 };
 
 } // namespace

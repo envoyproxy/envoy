@@ -85,7 +85,7 @@ NewGrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientSharedPtr&& async_cli
         },
         /*failover_stream_creator=*/
         failover_async_client
-            ? absl::make_optional(
+            ? std::make_optional(
                   [&failover_async_client, &service_method, &dispatcher = dispatcher_, &scope,
                    &rate_limit_settings](
                       GrpcStreamCallbacks<envoy::service::discovery::v3::DeltaDiscoveryResponse>*
@@ -109,7 +109,7 @@ NewGrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientSharedPtr&& async_cli
                                    envoy::service::discovery::v3::DeltaDiscoveryResponse>::
                             ConnectedStateValue::SecondEntry);
                   })
-            : absl::nullopt,
+            : std::nullopt,
         /*grpc_mux_callbacks=*/*this,
         /*dispatch=*/dispatcher_);
   }
@@ -357,7 +357,7 @@ void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
 NewGrpcMuxImpl::SubscriptionsMap::iterator
 NewGrpcMuxImpl::addSubscription(const std::string& type_url, const bool use_namespace_matching) {
   // Resource cache is only used for EDS resources.
-  EdsResourcesCacheOptRef resources_cache{absl::nullopt};
+  EdsResourcesCacheOptRef resources_cache{std::nullopt};
   if (eds_resources_cache_ &&
       (type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>())) {
     resources_cache = makeOptRefFromPtr(eds_resources_cache_.get());
@@ -380,7 +380,7 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
 
   while (true) {
     // Do any of our subscriptions even want to send a request?
-    absl::optional<std::string> maybe_request_type = whoWantsToSendDiscoveryRequest();
+    std::optional<std::string> maybe_request_type = whoWantsToSendDiscoveryRequest();
     if (!maybe_request_type.has_value()) {
       break;
     }
@@ -442,7 +442,7 @@ bool NewGrpcMuxImpl::canSendDiscoveryRequest(const std::string& type_url) {
 // First, prioritizes ACKs over non-ACK subscription interest updates.
 // Then, prioritizes non-ACK updates in the order the various types
 // of subscriptions were activated.
-absl::optional<std::string> NewGrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
+std::optional<std::string> NewGrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
   // All ACKs are sent before plain updates. trySendDiscoveryRequests() relies on this. So, choose
   // type_url from pausable_ack_queue_ if possible, before looking at pending updates.
   if (!pausable_ack_queue_.empty()) {
@@ -457,7 +457,7 @@ absl::optional<std::string> NewGrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
       return sub->first;
     }
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 // A factory class for creating NewGrpcMuxImpl so it does not have to be
@@ -490,7 +490,7 @@ public:
         /*rate_limit_settings_=*/rate_limit_settings_or_error.value(),
         /*scope_=*/scope,
         /*config_validators_=*/std::move(config_validators),
-        /*xds_resources_delegate_=*/absl::nullopt,
+        /*xds_resources_delegate_=*/std::nullopt,
         /*xds_config_tracker_=*/xds_config_tracker,
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",

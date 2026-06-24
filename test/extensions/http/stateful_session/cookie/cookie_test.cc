@@ -38,7 +38,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
     // No valid address in the request headers.
     Envoy::Http::TestRequestHeaderMapImpl request_headers;
     auto session_state = factory.create(request_headers);
-    EXPECT_EQ(absl::nullopt, session_state->upstreamAddress());
+    EXPECT_EQ(std::nullopt, session_state->upstreamAddress());
 
     // No valid address then update it by set-cookie.
     std::string cookie_content;
@@ -137,7 +137,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateProtoCookie) {
       {"cookie",
        "override_host=" + Envoy::Base64::encode(cookie_content.c_str(), cookie_content.length())}};
   auto session_state = factory.create(request_headers);
-  EXPECT_EQ(absl::nullopt, session_state->upstreamAddress());
+  EXPECT_EQ(std::nullopt, session_state->upstreamAddress());
 
   // PROTO format - no "expired field"
   cookie.clear_expires();

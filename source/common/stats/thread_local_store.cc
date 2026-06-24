@@ -471,7 +471,7 @@ ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
 class StatNameTagHelper {
 public:
   StatNameTagHelper(ThreadLocalStoreImpl& tls, StatName name,
-                    absl::optional<StatNameTagSpan> stat_name_tags)
+                    std::optional<StatNameTagSpan> stat_name_tags)
       : pool_(tls.symbolTable()) {
     if (stat_name_tags.has_value()) {
       stat_name_tags_.assign(stat_name_tags->begin(), stat_name_tags->end());
@@ -534,7 +534,7 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
 
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
-    StatName full_stat_name, StatName name_no_tags, absl::optional<StatNameTagSpan> stat_name_tags,
+    StatName full_stat_name, StatName name_no_tags, std::optional<StatNameTagSpan> stat_name_tags,
     StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
     StatsMatcher::FastResult fast_reject_result, StatNameStorageSet& central_rejected_stats,
     MakeStatFn<StatType> make_stat, StatRefMap<StatType>* tls_cache,
@@ -605,13 +605,13 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromTaggedName(
-    StatName base_name, absl::optional<StatNameTagSpan> stat_name_tags, StatName tagged_name) {
+    StatName base_name, std::optional<StatNameTagSpan> stat_name_tags, StatName tagged_name) {
   if (!tagged_name.empty()) {
     // If a non-empty tagged_name (with tag values) is provided, it means the latest tag-aware API
     // is being used. The legacy scope implementation does not retain scope-level tag metadata, so
     // it uses tagged_name as both the tag-extracted name and the flat name and drops the tags.
     base_name = tagged_name;
-    stat_name_tags = absl::nullopt;
+    stat_name_tags = std::nullopt;
   }
 
   if (scopeRejectsAll()) {
@@ -668,14 +668,14 @@ void ThreadLocalStoreImpl::deliverHistogramToSinks(const Histogram& histogram, u
 }
 
 Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromTaggedName(
-    StatName base_name, absl::optional<StatNameTagSpan> stat_name_tags, StatName tagged_name,
+    StatName base_name, std::optional<StatNameTagSpan> stat_name_tags, StatName tagged_name,
     Gauge::ImportMode import_mode) {
   if (!tagged_name.empty()) {
     // If a non-empty tagged_name (with tag values) is provided, it means the latest tag-aware API
     // is being used. The legacy scope implementation does not retain scope-level tag metadata, so
     // it uses tagged_name as both the tag-extracted name and the flat name and drops the tags.
     base_name = tagged_name;
-    stat_name_tags = absl::nullopt;
+    stat_name_tags = std::nullopt;
   }
 
   // If a gauge is "hidden" it should not be rejected as these are used for deferred stats.
@@ -728,14 +728,14 @@ ThreadLocalStoreImpl::ScopeImpl::getOrCreateGaugeBase(const TagUtility::TagStatN
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromTaggedName(
-    StatName base_name, absl::optional<StatNameTagSpan> stat_name_tags, StatName tagged_name,
+    StatName base_name, std::optional<StatNameTagSpan> stat_name_tags, StatName tagged_name,
     Histogram::Unit unit) {
   if (!tagged_name.empty()) {
     // If a non-empty tagged_name (with tag values) is provided, it means the latest tag-aware API
     // is being used. The legacy scope implementation does not retain scope-level tag metadata, so
     // it uses tagged_name as both the tag-extracted name and the flat name and drops the tags.
     base_name = tagged_name;
-    stat_name_tags = absl::nullopt;
+    stat_name_tags = std::nullopt;
   }
 
   if (scopeRejectsAll()) {
@@ -829,13 +829,13 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::getOrCreateHistogramBase(
 }
 
 TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromTaggedName(
-    StatName base_name, absl::optional<StatNameTagSpan> stat_name_tags, StatName tagged_name) {
+    StatName base_name, std::optional<StatNameTagSpan> stat_name_tags, StatName tagged_name) {
   if (!tagged_name.empty()) {
     // If a non-empty tagged_name (with tag values) is provided, it means the latest tag-aware API
     // is being used. The legacy scope implementation does not retain scope-level tag metadata, so
     // it uses tagged_name as both the tag-extracted name and the flat name and drops the tags.
     base_name = tagged_name;
-    stat_name_tags = absl::nullopt;
+    stat_name_tags = std::nullopt;
   }
 
   if (scopeRejectsAll()) {
@@ -898,7 +898,7 @@ HistogramOptConstRef ThreadLocalStoreImpl::ScopeImpl::findHistogramLockHeld(Stat
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
   auto iter = central_cache_->histograms_.find(name);
   if (iter == central_cache_->histograms_.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   RefcountPtr<Histogram> histogram_ref(iter->second);
@@ -969,7 +969,7 @@ ScopeSharedPtr ThreadLocalStoreImpl::TagScopeImpl::scopeFromTaggedName(
 }
 
 Counter& ThreadLocalStoreImpl::TagScopeImpl::counterFromTaggedName(
-    StatName base_name, absl::optional<StatNameTagSpan> name_tags, StatName tagged_name) {
+    StatName base_name, std::optional<StatNameTagSpan> name_tags, StatName tagged_name) {
   if (scopeRejectsAll()) {
     return parent_.null_counter_;
   }
@@ -980,7 +980,7 @@ Counter& ThreadLocalStoreImpl::TagScopeImpl::counterFromTaggedName(
 }
 
 Gauge& ThreadLocalStoreImpl::TagScopeImpl::gaugeFromTaggedName(
-    StatName base_name, absl::optional<StatNameTagSpan> name_tags, StatName tagged_name,
+    StatName base_name, std::optional<StatNameTagSpan> name_tags, StatName tagged_name,
     Gauge::ImportMode import_mode) {
   // If a gauge is "hidden" it should not be rejected as these are used for deferred stats.
   if (scopeRejectsAll() && import_mode != Gauge::ImportMode::HiddenAccumulate) {
@@ -993,7 +993,7 @@ Gauge& ThreadLocalStoreImpl::TagScopeImpl::gaugeFromTaggedName(
 }
 
 Histogram& ThreadLocalStoreImpl::TagScopeImpl::histogramFromTaggedName(
-    StatName base_name, absl::optional<StatNameTagSpan> name_tags, StatName tagged_name,
+    StatName base_name, std::optional<StatNameTagSpan> name_tags, StatName tagged_name,
     Histogram::Unit unit) {
   if (scopeRejectsAll()) {
     return parent_.null_histogram_;
@@ -1005,7 +1005,7 @@ Histogram& ThreadLocalStoreImpl::TagScopeImpl::histogramFromTaggedName(
 }
 
 TextReadout& ThreadLocalStoreImpl::TagScopeImpl::textReadoutFromTaggedName(
-    StatName base_name, absl::optional<StatNameTagSpan> name_tags, StatName tagged_name) {
+    StatName base_name, std::optional<StatNameTagSpan> name_tags, StatName tagged_name) {
   if (scopeRejectsAll()) {
     return parent_.null_text_readout_;
   }
@@ -1030,7 +1030,7 @@ Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint6
     }
   }
 
-  StatNameTagHelper tag_helper(*this, parent.statName(), absl::nullopt);
+  StatNameTagHelper tag_helper(*this, parent.statName(), std::nullopt);
 
   TlsHistogramSharedPtr hist_tls_ptr(
       new ThreadLocalHistogramImpl(parent.statName(), parent.unit(), tag_helper.tagExtractedName(),
@@ -1049,7 +1049,7 @@ ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name, Histogram::Uni
                                                    StatName tag_extracted_name,
                                                    StatNameTagSpan stat_name_tags,
                                                    SymbolTable& symbol_table,
-                                                   absl::optional<uint32_t> bins)
+                                                   std::optional<uint32_t> bins)
     : HistogramImplHelper(name, tag_extracted_name, stat_name_tags, symbol_table), unit_(unit),
       used_(false), created_thread_id_(std::this_thread::get_id()), symbol_table_(symbol_table) {
   histograms_[0] = bins ? hist_alloc_nbins(bins.value()) : hist_alloc();
@@ -1079,7 +1079,7 @@ ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit,
                                          StatName tag_extracted_name,
                                          StatNameTagSpan stat_name_tags,
                                          ConstSupportedBuckets& supported_buckets,
-                                         absl::optional<uint32_t> bins, uint64_t id)
+                                         std::optional<uint32_t> bins, uint64_t id)
     : MetricImpl(name, tag_extracted_name, stat_name_tags, thread_local_store.symbolTable()),
       unit_(unit), bins_(bins), thread_local_store_(thread_local_store),
       interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),

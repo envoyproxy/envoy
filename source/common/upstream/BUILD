@@ -594,7 +594,6 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/upstream:upstream_interface",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -613,7 +612,6 @@ envoy_cc_library(
         "//envoy/registry",
         "//envoy/upstream:upstream_interface",
         "//source/common/network:resolver_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/upstream/local_address_selector/v3:pkg_cc_proto",
     ],
     # Ensure this factory in the source is always linked in.

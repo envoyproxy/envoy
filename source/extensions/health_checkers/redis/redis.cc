@@ -17,10 +17,10 @@ RedisHealthChecker::RedisHealthChecker(
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
     Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
     Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
-    const absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
+    const std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
         aws_iam_config,
-    const absl::optional<Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::
-                             AwsIamAuthenticatorSharedPtr>
+    const std::optional<Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::
+                            AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, api.randomGenerator(),
                             std::move(event_logger)),

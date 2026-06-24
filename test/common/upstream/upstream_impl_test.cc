@@ -2168,7 +2168,7 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "name", std::vector<std::string>(), std::vector<std::string>(),
-          std::vector<std::string>(), absl::nullopt, nullptr, std::move(proxy_info));
+          std::vector<std::string>(), std::nullopt, nullptr, std::move(proxy_info));
   Network::ConnectionSocket::OptionsSharedPtr options;
   Network::MockTransportSocketFactory socket_factory;
 
@@ -2248,7 +2248,7 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
 
   // pass in empty happy_eyeballs_config
   // a default config will be created
-  EXPECT_CALL(*(cluster.info_), happyEyeballsConfig()).WillRepeatedly(Return(absl::nullopt));
+  EXPECT_CALL(*(cluster.info_), happyEyeballsConfig()).WillRepeatedly(Return(std::nullopt));
 
   envoy::config::core::v3::Metadata metadata;
   Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
@@ -2986,7 +2986,7 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
   // Set a single host as having failed and fire outlier detector callbacks. This should result
   // in only a single healthy host.
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->outlierDetector().putResult(
-      Outlier::Result::ExtOriginRequestFailed, absl::optional<uint64_t>(503));
+      Outlier::Result::ExtOriginRequestFailed, std::optional<uint64_t>(503));
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
       Host::HealthFlag::FAILED_OUTLIER_CHECK);
   detector->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
@@ -4248,7 +4248,7 @@ public:
           updateHostsParams(hosts_, hosts_per_locality_,
                             std::make_shared<const HealthyHostVector>(*hosts_),
                             hosts_per_locality_),
-          {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
+          {}, hosts_added, hosts_removed, std::nullopt, std::nullopt);
     }
 
     // Remove the host from P1.
@@ -4261,7 +4261,7 @@ public:
           updateHostsParams(empty_hosts, HostsPerLocalityImpl::empty(),
                             std::make_shared<const HealthyHostVector>(*empty_hosts),
                             HostsPerLocalityImpl::empty()),
-          {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
+          {}, hosts_added, hosts_removed, std::nullopt, std::nullopt);
     }
   }
 
@@ -4321,7 +4321,7 @@ TEST(PrioritySet, Extend) {
         1,
         updateHostsParams(hosts, hosts_per_locality,
                           std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-        {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt, fake_cross_priority_host_map);
+        {}, hosts_added, hosts_removed, std::nullopt, std::nullopt, fake_cross_priority_host_map);
   }
   EXPECT_EQ(1, priority_changes);
   EXPECT_EQ(1, membership_changes);
@@ -4373,7 +4373,7 @@ public:
         updateHostsParams(hosts_p0, hosts_per_locality_p0,
                           std::make_shared<const HealthyHostVector>(*hosts_p0),
                           hosts_per_locality_p0),
-        {}, *hosts_p0, {}, absl::nullopt, absl::nullopt);
+        {}, *hosts_p0, {}, std::nullopt, std::nullopt);
 
     HostVectorSharedPtr hosts_p1 = std::make_shared<HostVector>();
     for (int i = 0; i < 50; i++) {
@@ -4385,7 +4385,7 @@ public:
         updateHostsParams(hosts_p1, hosts_per_locality_p1,
                           std::make_shared<const HealthyHostVector>(*hosts_p1),
                           hosts_per_locality_p1),
-        {}, *hosts_p1, {}, absl::nullopt, absl::nullopt);
+        {}, *hosts_p1, {}, std::nullopt, std::nullopt);
   }
 
   std::shared_ptr<MockClusterInfo> info_;
@@ -4463,7 +4463,7 @@ TEST(PrioritySet, MainPrioritySetTest) {
                              updateHostsParams(hosts, hosts_per_locality,
                                                std::make_shared<const HealthyHostVector>(*hosts),
                                                hosts_per_locality),
-                             {}, hosts_added, hosts_removed, absl::nullopt);
+                             {}, hosts_added, hosts_removed, std::nullopt);
   }
 
   // Only mutable host map can be updated directly. Read only host map will not be updated before
@@ -4484,7 +4484,7 @@ TEST(PrioritySet, MainPrioritySetTest) {
                              updateHostsParams(hosts, hosts_per_locality,
                                                std::make_shared<const HealthyHostVector>(*hosts),
                                                hosts_per_locality),
-                             {}, hosts_added, hosts_removed, absl::nullopt);
+                             {}, hosts_added, hosts_removed, std::nullopt);
   }
 
   // New mutable host map will be created and all update will be applied to new mutable host map.
@@ -4518,7 +4518,7 @@ public:
 
   class RetryBudgetTestClusterInfo : public ClusterInfoImpl {
   public:
-    static std::tuple<absl::optional<double>, absl::optional<uint64_t>, absl::optional<uint32_t>>
+    static std::tuple<std::optional<double>, std::optional<uint64_t>, std::optional<uint32_t>>
     getRetryBudgetParams(
         const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds) {
       return ClusterInfoImpl::getRetryBudgetParams(thresholds);
@@ -4686,16 +4686,16 @@ TEST_P(ParametrizedClusterInfoImplTest, RetryBudgetDefaultPopulation) {
   )EOF";
 
   makeCluster(yaml);
-  absl::optional<double> budget_percent;
-  absl::optional<uint64_t> budget_interval;
-  absl::optional<uint32_t> min_retry_concurrency;
+  std::optional<double> budget_percent;
+  std::optional<uint64_t> budget_interval;
+  std::optional<uint32_t> min_retry_concurrency;
   auto threshold = cluster_config_.circuit_breakers().thresholds();
 
   std::tie(budget_percent, budget_interval, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[0]);
-  EXPECT_EQ(budget_percent, absl::nullopt);
-  EXPECT_EQ(budget_interval, absl::nullopt);
-  EXPECT_EQ(min_retry_concurrency, absl::nullopt);
+  EXPECT_EQ(budget_percent, std::nullopt);
+  EXPECT_EQ(budget_interval, std::nullopt);
+  EXPECT_EQ(min_retry_concurrency, std::nullopt);
 
   std::tie(budget_percent, budget_interval, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[1]);
@@ -5149,7 +5149,7 @@ TEST_P(ParametrizedClusterInfoImplTest, MaxConnectionDurationTest) {
   )EOF";
 
   auto cluster1 = makeCluster(fmt::format(yaml_base, "cluster1"));
-  EXPECT_EQ(absl::nullopt, cluster1->info()->maxConnectionDuration());
+  EXPECT_EQ(std::nullopt, cluster1->info()->maxConnectionDuration());
 
   auto cluster2 = makeCluster(fmt::format(yaml_base, "cluster2") +
                               fmt::format(yaml_set_max_connection_duration, "9s"));
@@ -5157,7 +5157,7 @@ TEST_P(ParametrizedClusterInfoImplTest, MaxConnectionDurationTest) {
 
   auto cluster3 = makeCluster(fmt::format(yaml_base, "cluster3") +
                               fmt::format(yaml_set_max_connection_duration, "0s"));
-  EXPECT_EQ(absl::nullopt, cluster3->info()->maxConnectionDuration());
+  EXPECT_EQ(std::nullopt, cluster3->info()->maxConnectionDuration());
 }
 
 TEST_P(ParametrizedClusterInfoImplTest, Timeouts) {
@@ -5274,7 +5274,7 @@ TEST_P(ParametrizedClusterInfoImplTest, TcpPoolIdleTimeout) {
 
   auto cluster3 = makeCluster(fmt::format(yaml_base, "cluster3") +
                               fmt::format(yaml_set_tcp_pool_idle_timeout, "0s"));
-  EXPECT_EQ(absl::nullopt, cluster3->info()->tcpPoolIdleTimeout());
+  EXPECT_EQ(std::nullopt, cluster3->info()->tcpPoolIdleTimeout());
 }
 
 TEST_P(ParametrizedClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {
@@ -5706,7 +5706,7 @@ TEST_F(ClusterInfoImplTest, UpstreamHttp2Protocol) {
 
   auto cluster = makeCluster(yaml);
 
-  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol(absl::nullopt)[0]);
+  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol(std::nullopt)[0]);
   EXPECT_EQ(Http::Protocol::Http2,
             cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
   EXPECT_EQ(Http::Protocol::Http2,
@@ -5725,7 +5725,7 @@ TEST_F(ClusterInfoImplTest, UpstreamHttp11Protocol) {
 
   auto cluster = makeCluster(yaml);
 
-  EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol(absl::nullopt)[0]);
+  EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol(std::nullopt)[0]);
   EXPECT_EQ(Http::Protocol::Http11,
             cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
   EXPECT_EQ(Http::Protocol::Http11,
@@ -6358,7 +6358,7 @@ TEST_F(ClusterInfoImplTest, MaxResponseHeadersRuntimeOverride) {
       .WillRepeatedly(Return(456));
 
   auto cluster = makeCluster(yaml);
-  EXPECT_EQ(absl::make_optional(uint16_t(123)), cluster->info()->maxResponseHeadersKb());
+  EXPECT_EQ(std::make_optional(uint16_t(123)), cluster->info()->maxResponseHeadersKb());
   EXPECT_EQ(456, cluster->info()->maxResponseHeadersCount());
 }
 
@@ -6387,7 +6387,7 @@ TEST_F(ClusterInfoImplTest, MaxResponseHeadersRuntimeOverrideIgnored) {
       .WillRepeatedly(Return(456));
 
   auto cluster = makeCluster(yaml);
-  EXPECT_EQ(absl::make_optional(uint16_t(1)), cluster->info()->maxResponseHeadersKb());
+  EXPECT_EQ(std::make_optional(uint16_t(1)), cluster->info()->maxResponseHeadersKb());
   EXPECT_EQ(2, cluster->info()->maxResponseHeadersCount());
 }
 
@@ -6682,8 +6682,8 @@ TEST_F(PriorityStateManagerTest, LocalityClusterUpdate) {
 
   // Update the cluster's priority set with the added hosts
   priority_state_manager.updateClusterPrioritySet(
-      0, std::move(priority_state_manager.priorityState()[0].first), hosts_added, absl::nullopt,
-      absl::nullopt);
+      0, std::move(priority_state_manager.priorityState()[0].first), hosts_added, std::nullopt,
+      std::nullopt);
 
   // Check that the P=0 host set has the added hosts, and the expected HostsPerLocality state
   const HostVector& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
