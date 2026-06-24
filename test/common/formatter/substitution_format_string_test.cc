@@ -7,16 +7,19 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Return;
-
 namespace Envoy {
 namespace Formatter {
+
+using ::Envoy::StatusHelpers::IsOkAndHolds;
+using ::testing::NotNull;
+using ::testing::Return;
 
 class SubstitutionFormatStringUtilsTest : public ::testing::Test {
 public:
@@ -254,8 +257,8 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestParseFormattersWithSingleExtension
 
   absl::optional<size_t> max_length = {};
   ASSERT_TRUE(commands[0] != nullptr);
-  auto provider = commands[0]->parse("COMMAND_EXTENSION", "", max_length);
-  ASSERT_TRUE(provider != nullptr);
+  auto status_or_provider = commands[0]->parse("COMMAND_EXTENSION", "", max_length);
+  ASSERT_THAT(status_or_provider, IsOkAndHolds(NotNull()));
 }
 
 TEST_F(SubstitutionFormatStringUtilsTest, TestParseFormattersWithMultipleExtensions) {
@@ -293,11 +296,12 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestParseFormattersWithMultipleExtensi
 
   absl::optional<size_t> max_length = {};
   ASSERT_TRUE(commands[0] != nullptr);
-  auto test_command_provider = commands[0]->parse("COMMAND_EXTENSION", "", max_length);
-  ASSERT_TRUE(test_command_provider != nullptr);
+  auto test_command_provider_or_status = commands[0]->parse("COMMAND_EXTENSION", "", max_length);
+  ASSERT_THAT(test_command_provider_or_status, IsOkAndHolds(NotNull()));
   ASSERT_TRUE(commands[1] != nullptr);
-  auto additional_command_provider = commands[1]->parse("ADDITIONAL_EXTENSION", "", max_length);
-  ASSERT_TRUE(additional_command_provider != nullptr);
+  auto additional_command_provider_or_status =
+      commands[1]->parse("ADDITIONAL_EXTENSION", "", max_length);
+  ASSERT_THAT(additional_command_provider_or_status, IsOkAndHolds(NotNull()));
 }
 
 } // namespace Formatter

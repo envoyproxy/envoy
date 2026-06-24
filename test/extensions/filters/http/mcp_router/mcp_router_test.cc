@@ -536,10 +536,9 @@ TEST_F(McpRouterFilterTest, UsingClusterConfigForListOfServers) {
   auto* backend = cluster_config.add_servers();
   backend->set_name("backend");
   backend->mutable_mcp_cluster()->set_cluster("backend_cluster");
-
-  (*decoder_callbacks_.cluster_info_->metadata_
-        .mutable_typed_filter_metadata())["envoy.clusters.mcp_multicluster"]
-      .PackFrom(cluster_config);
+  std::ignore = (*decoder_callbacks_.cluster_info_->metadata_
+                      .mutable_typed_filter_metadata())["envoy.clusters.mcp_multicluster"]
+                    .PackFrom(cluster_config);
 
   Http::TestRequestHeaderMapImpl headers{
       {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};

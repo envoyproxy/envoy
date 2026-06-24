@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/formatter/substitution_formatter_base.h"
+#include "envoy/formatter/substitution_formatter.h"
 
 #include "source/common/common/statusor.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
@@ -107,9 +107,9 @@ public:
   explicit DynamicModuleCommandParser(DynamicModuleFormatterConfigSharedPtr config);
 
   // Formatter::CommandParser
-  ::Envoy::Formatter::FormatterProviderPtr parse(absl::string_view command,
-                                                 absl::string_view command_arg,
-                                                 absl::optional<size_t> max_length) const override;
+  absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
+  parse(absl::string_view command, absl::string_view command_arg,
+        absl::optional<size_t> max_length) const override;
 
 private:
   const DynamicModuleFormatterConfigSharedPtr config_;

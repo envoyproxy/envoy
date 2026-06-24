@@ -13,6 +13,7 @@ HTTP filters
   api_key_auth_filter
   aws_request_signing_filter
   bandwidth_limit_filter
+  bandwidth_share_filter
   basic_auth_filter
   buffer_filter
   cache_filter

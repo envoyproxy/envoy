@@ -80,7 +80,7 @@ public:
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::UpstreamFactoryContext&) override {
-    auto config = dynamic_cast<const Protobuf::StringValue&>(proto_config);
+    auto config = Envoy::Protobuf::DynamicCastMessage<Protobuf::StringValue>(proto_config);
     return [this, config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addFilter(std::make_shared<PoliteFilter>(test_parent_, config));
     };
@@ -141,7 +141,7 @@ public:
       filter->set_name("envoy.upstream.polite");
       Protobuf::StringValue config;
       config.set_value("surely ");
-      filter->mutable_typed_config()->PackFrom(config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(config);
     });
     ClusterFilterIntegrationTestBase::initialize();
     BaseIntegrationTest::initialize();
@@ -201,7 +201,7 @@ public:
       filter->set_name("envoy.upstream.polite");
       Protobuf::StringValue config;
       config.set_value("");
-      filter->mutable_typed_config()->PackFrom(config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(config);
     });
     ClusterFilterIntegrationTestBase::initialize();
     HttpIntegrationTest::initialize();

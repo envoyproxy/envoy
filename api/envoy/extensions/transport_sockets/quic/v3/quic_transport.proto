@@ -27,6 +27,10 @@ message QuicDownstreamTransport {
   // If false, QUIC will tell TLS to reject any early data and to stop issuing 0-RTT credentials with resumption session tickets. This will prevent clients from sending 0-RTT requests.
   // Default to true.
   google.protobuf.BoolValue enable_early_data = 2;
+
+  // If false, TLS session tickets are not issued and accepted by QUIC.
+  // Default to true.
+  google.protobuf.BoolValue enable_resumption = 3;
 }
 
 // Configuration for Upstream QUIC transport socket. This provides Google's implementation of Google QUIC and IETF QUIC to Envoy.

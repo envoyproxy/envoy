@@ -1161,6 +1161,12 @@ pub trait EnvoyHttpFilter {
   /// Returns true if the operation is successful.
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str);
 
+  /// Set the dynamic metadata value with the given namespace and key to raw bytes.
+  ///
+  /// The bytes are stored as the metadata value as is, so non-UTF-8 values are preserved. Read
+  /// them back with [`Self::get_metadata_string`].
+  fn set_dynamic_metadata_bytes(&mut self, namespace: &str, key: &str, value: &[u8]);
+
   /// Set multiple string-typed dynamic metadata entries under `namespace` in a single call.
   ///
   /// Equivalent to calling [`Self::set_dynamic_metadata_string`] once per entry but resolves the
@@ -1998,6 +2004,14 @@ pub trait EnvoySpan {
   /// reported to the tracing system.
   fn set_sampled(&self, sampled: bool);
 
+  /// Stop using the Envoy local tracing decision for this span.
+  ///
+  /// Combined with [`EnvoySpan::set_sampled`], this keeps a filter's sampling decision when Envoy
+  /// refreshes tracing after a route cache change. With the OpenTelemetry tracer the connection
+  /// manager does not re-derive the decision after a route cache change. Other tracers may not
+  /// support this.
+  fn disable_local_decision(&self);
+
   /// Get a baggage value from this span.
   ///
   /// Baggage data may have been set by this span or any parent spans.
@@ -2073,6 +2087,12 @@ impl EnvoySpan for EnvoySpanImpl {
   fn set_sampled(&self, sampled: bool) {
     unsafe {
       abi::envoy_dynamic_module_callback_http_span_set_sampled(self.raw_ptr, sampled);
+    }
+  }
+
+  fn disable_local_decision(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_disable_local_decision(self.raw_ptr);
     }
   }
 
@@ -2609,6 +2629,17 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         str_to_module_buffer(namespace),
         str_to_module_buffer(key),
         str_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_bytes(&mut self, namespace: &str, key: &str, value: &[u8]) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
       )
     }
   }
@@ -4019,6 +4050,10 @@ pub trait EnvoyHttpFilterScheduler: Send + Sync {
   /// Once this is called, [`HttpFilter::on_scheduled`] will be called with
   /// the same `event_id` on the worker thread where the filter is running IF
   /// by the time the event is committed, the filter is still alive.
+  ///
+  /// This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+  /// module must join or quiesce any thread that may call this before worker shutdown so a
+  /// scheduled event cannot race the worker dispatcher teardown.
   fn commit(&self, event_id: u64);
 }
 

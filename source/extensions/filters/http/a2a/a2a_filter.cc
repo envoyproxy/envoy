@@ -157,7 +157,11 @@ Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_st
       // TODO(tyxia) Support the case that size limit hit before optional fields.
       if (size_limit_hit) {
         config_->stats().body_too_large_.inc();
-        handleParseError("request body is too large.");
+        ENVOY_LOG(debug, "request body is too large.");
+        is_a2a_request_ = false;
+        decoder_callbacks_->sendLocalReply(Http::Code::PayloadTooLarge,
+                                           "request body is too large.", nullptr, absl::nullopt,
+                                           "a2a_filter_body_too_large");
       } else {
         config_->stats().invalid_json_.inc();
         handleParseError("not a valid JSON (incomplete).");

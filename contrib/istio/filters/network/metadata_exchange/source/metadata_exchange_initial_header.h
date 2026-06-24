@@ -5,8 +5,7 @@
 #include "envoy/common/platform.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace NetworkFilters {
+namespace Tcp {
 namespace MetadataExchange {
 
 // Used with MetadataExchangeHeaderProto to be extensible.
@@ -19,6 +18,5 @@ PACKED_STRUCT(struct MetadataExchangeInitialHeader {
 });
 
 } // namespace MetadataExchange
-} // namespace NetworkFilters
-} // namespace Extensions
+} // namespace Tcp
 } // namespace Envoy

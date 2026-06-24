@@ -814,7 +814,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DisableUpstreamEarlyData) {
                                       ->mutable_early_data_policy();
         envoy::extensions::early_data::v3::DefaultEarlyDataPolicy config;
         early_data_policy->set_name("envoy.route.early_data_policy.default");
-        early_data_policy->mutable_typed_config()->PackFrom(config);
+        std::ignore = early_data_policy->mutable_typed_config()->PackFrom(config);
       });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -954,7 +954,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamDisconnectDuringEarlyData) {
   envoy::config::listener::v3::QuicProtocolOptions options;
   auto* crypto_stream_config = options.mutable_crypto_stream_config();
   crypto_stream_config->set_name("envoy.quic.crypto_stream.server.fail_handshake");
-  crypto_stream_config->mutable_typed_config()->PackFrom(Protobuf::Struct());
+  std::ignore = crypto_stream_config->mutable_typed_config()->PackFrom(Protobuf::Struct());
   mergeOptions(options);
 
   initialize();

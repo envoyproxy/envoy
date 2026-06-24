@@ -568,6 +568,15 @@ void UdpProxyFilter::UdpActiveSession::writeUpstream(Network::UdpRecvData& data)
   } else {
     cluster_->cluster_stats_.sess_tx_datagrams_.inc();
     cluster_->cluster_info_->trafficStats()->upstream_cx_tx_bytes_total_.add(tx_buffer_length);
+
+    // The local ephemeral address is only bound after the first successful send, so populate the
+    // upstream local address for access logging once it becomes available.
+    if (udp_session_info_.upstreamInfo()->upstreamLocalAddress() == nullptr) {
+      auto local_address = udp_socket_->ioHandle().localAddress();
+      if (local_address.ok()) {
+        udp_session_info_.upstreamInfo()->setUpstreamLocalAddress(*local_address);
+      }
+    }
   }
 }
 
@@ -629,6 +638,7 @@ bool UdpProxyFilter::UdpActiveSession::createUpstream() {
   // Track attempted hosts for access logging
   udp_session_info_.upstreamInfo()->addUpstreamHostAttempted(host_);
   udp_session_info_.upstreamInfo()->setUpstreamHost(host_);
+  udp_session_info_.upstreamInfo()->setUpstreamRemoteAddress(host_->address());
   cluster_->addSession(host_.get(), this);
   createUdpSocket(host_);
   return true;
@@ -962,6 +972,7 @@ void TunnelingConnectionPoolImpl::onPoolFailure(Http::ConnectionPool::PoolFailur
   upstream_handle_ = nullptr;
   // Writing to downstream_info_ before calling onStreamFailure, as the session could be potentially
   // removed by onStreamFailure, which will cause downstream_info_ to be freed.
+  downstream_info_.upstreamInfo()->addUpstreamHostAttempted(host);
   downstream_info_.upstreamInfo()->setUpstreamHost(host);
   downstream_info_.upstreamInfo()->setUpstreamTransportFailureReason(failure_reason);
   callbacks_->onStreamFailure(reason, failure_reason, *host);
@@ -983,6 +994,7 @@ void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_enco
   bool is_ssl = upstream_host->transportSocketFactory().implementsSecureTransport();
   upstream_->setRequestEncoder(request_encoder, is_ssl);
   upstream_->setTunnelCreationCallbacks(*this);
+  downstream_info_.upstreamInfo()->addUpstreamHostAttempted(upstream_host);
   downstream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
   downstream_info_.setUpstreamBytesMeter(request_encoder.getStream().bytesMeter());
   downstream_info_.upstreamInfo()->setUpstreamConnectionId(upstream_connection_id);

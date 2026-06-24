@@ -121,7 +121,7 @@ public:
     auto* single = entry->mutable_predicate()->mutable_single_predicate();
     single->mutable_input()->set_name("envoy.matching.inputs.cel_data_input");
     xds::type::matcher::v3::HttpAttributesCelMatchInput input_config;
-    single->mutable_input()->mutable_typed_config()->PackFrom(input_config);
+    std::ignore = single->mutable_input()->mutable_typed_config()->PackFrom(input_config);
 
     auto* custom_match = single->mutable_custom_match();
     custom_match->set_name("envoy.matching.matchers.cel_matcher");
@@ -129,11 +129,12 @@ public:
     auto parse_status = google::api::expr::parser::Parse("true");
     RELEASE_ASSERT(parse_status.ok(), "Failed to parse CEL expression");
     *cel_matcher.mutable_expr_match()->mutable_cel_expr_parsed() = *parse_status;
-    custom_match->mutable_typed_config()->PackFrom(cel_matcher);
+    std::ignore = custom_match->mutable_typed_config()->PackFrom(cel_matcher);
 
     // Configure Action (RemoveField).
     envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction remove_action;
-    entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(remove_action);
+    std::ignore = entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
+        remove_action);
     entry->mutable_on_match()->mutable_action()->set_name("remove_field");
 
     *(*rules)[field_path].mutable_matcher() = matcher;

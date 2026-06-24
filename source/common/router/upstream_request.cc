@@ -383,6 +383,10 @@ void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
 
 const Route& UpstreamRequest::route() const { return *parent_.callbacks()->route(); }
 
+OptRef<Http::WebTransportSession> UpstreamRequest::downstreamWebTransportSession() {
+  return parent_.callbacks()->webTransportSession();
+}
+
 OptRef<const Network::Connection> UpstreamRequest::connection() const {
   return parent_.callbacks()->connection();
 }
@@ -840,6 +844,11 @@ const ScopeTrackedObject& UpstreamRequestFilterManagerCallbacks::scope() {
 
 OptRef<const Tracing::Config> UpstreamRequestFilterManagerCallbacks::tracingConfig() const {
   return upstream_request_.parent_.callbacks()->tracingConfig();
+}
+
+OptRef<Http::WebTransportSession>
+UpstreamRequestFilterManagerCallbacks::downstreamWebTransportSession() {
+  return upstream_request_.parent_.callbacks()->webTransportSession();
 }
 
 Tracing::Span& UpstreamRequestFilterManagerCallbacks::activeSpan() {

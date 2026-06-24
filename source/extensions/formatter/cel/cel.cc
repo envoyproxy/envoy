@@ -76,7 +76,7 @@ Protobuf::Value CELFormatter::formatValue(const Envoy::Formatter::Context& conte
   }
 }
 
-::Envoy::Formatter::FormatterProviderPtr
+absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
 CELFormatterCommandParser::parse(absl::string_view command, absl::string_view subcommand,
                                  absl::optional<size_t> max_length) const {
 #if defined(USE_CEL_PARSER)

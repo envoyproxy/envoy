@@ -369,7 +369,7 @@ public:
       envoy::config::bootstrap::v3::Bootstrap& bootstrap,
       std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
           configure_tls_context,
-      bool enable_quic_early_data = true);
+      bool enable_quic_early_data = true, bool enable_quic_resumption = true);
 
   // Add the default SSL configuration.
   void addSslConfig(const ServerSslOptions& options);
@@ -520,7 +520,7 @@ private:
     RELEASE_ASSERT(!finalized_, "");
     auto* filter_config_any = getFilterFromListener(name)->mutable_typed_config();
 
-    filter_config_any->PackFrom(filter);
+    std::ignore = filter_config_any->PackFrom(filter);
   }
 
   // Load the first FilterType struct from the first listener filters into a parsed proto.
@@ -542,7 +542,7 @@ private:
     RELEASE_ASSERT(!finalized_, "");
     auto* filter_config_any = getListenerFilterFromListener(name)->mutable_typed_config();
 
-    filter_config_any->PackFrom(filter);
+    std::ignore = filter_config_any->PackFrom(filter);
   }
 
   // Finds the filter named 'name' from the first filter chain from the first listener.

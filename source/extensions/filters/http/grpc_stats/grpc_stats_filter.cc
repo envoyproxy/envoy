@@ -183,12 +183,16 @@ public:
       uint64_t delta = request_counter_.inspect(data);
       if (delta > 0) {
         maybeWriteFilterState();
-        config_->context_.chargeRequestMessageStat(*cluster_, request_names_, delta);
+        if (doStatTracking()) {
+          config_->context_.chargeRequestMessageStat(*cluster_, request_names_, delta);
+        }
       }
     } else if (connect_unary_ && end_stream) {
       connect_unary_request_body_ = true;
       maybeWriteFilterState();
-      config_->context_.chargeRequestMessageStat(*cluster_, request_names_, 1);
+      if (doStatTracking()) {
+        config_->context_.chargeRequestMessageStat(*cluster_, request_names_, 1);
+      }
     }
     return Http::FilterDataStatus::Continue;
   }
@@ -225,9 +229,11 @@ public:
       uint64_t delta = response_counter_.inspect(data);
       if (delta > 0) {
         maybeWriteFilterState();
-        config_->context_.chargeResponseMessageStat(*cluster_, request_names_, delta);
+        if (doStatTracking()) {
+          config_->context_.chargeResponseMessageStat(*cluster_, request_names_, delta);
+        }
       }
-      if (end_stream) {
+      if (end_stream && doStatTracking()) {
         config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,
                                      response_counter_.connectSuccess());
         maybeChargeUpstreamStat();
@@ -235,8 +241,10 @@ public:
     } else if (connect_unary_ && end_stream) {
       connect_unary_response_body_ = true;
       maybeWriteFilterState();
-      config_->context_.chargeResponseMessageStat(*cluster_, request_names_, 1);
-      maybeChargeUpstreamStat();
+      if (doStatTracking()) {
+        config_->context_.chargeResponseMessageStat(*cluster_, request_names_, 1);
+        maybeChargeUpstreamStat();
+      }
     }
     return Http::FilterDataStatus::Continue;
   }
@@ -273,7 +281,7 @@ public:
   }
 
   void maybeChargeUpstreamStat() {
-    if (!config_->enable_upstream_stats_) {
+    if (!config_->enable_upstream_stats_ || !doStatTracking()) {
       return;
     }
     StreamInfo::TimingUtility timing(decoder_callbacks_->streamInfo());

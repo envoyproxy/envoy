@@ -388,7 +388,7 @@ protected:
             scaling_threshold: 0.5
             saturation_threshold: 0.9
     )EOF");
-    overload_action.mutable_typed_config()->PackFrom(config);
+    std::ignore = overload_action.mutable_typed_config()->PackFrom(config);
     setupOverloadManagerConfig(overload_action);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
@@ -409,7 +409,7 @@ protected:
             scaling_threshold: 0.5
             saturation_threshold: 0.9
     )EOF");
-    overload_action.mutable_typed_config()->PackFrom(config);
+    std::ignore = overload_action.mutable_typed_config()->PackFrom(config);
     OverloadIntegrationTest::initializeOverloadManager(overload_action);
   }
 };
@@ -634,7 +634,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHa
                                     ->mutable_proof_source_config();
     proof_source_config->set_name("envoy.quic.proof_source.pending_signing");
     test::extensions::quic::proof_source::PendingProofSourceConfig config;
-    proof_source_config->mutable_typed_config()->PackFrom(config);
+    std::ignore = proof_source_config->mutable_typed_config()->PackFrom(config);
   });
 #else
   FAIL() << "This test is not expected to run with quic disabled.";
@@ -705,7 +705,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseMaxDurationHttpConnectionsD
                                     ->mutable_proof_source_config();
     proof_source_config->set_name("envoy.quic.proof_source.pending_signing");
     test::extensions::quic::proof_source::PendingProofSourceConfig config;
-    proof_source_config->mutable_typed_config()->PackFrom(config);
+    std::ignore = proof_source_config->mutable_typed_config()->PackFrom(config);
   });
 #else
   FAIL() << "This test is not expected to run with quic disabled.";
