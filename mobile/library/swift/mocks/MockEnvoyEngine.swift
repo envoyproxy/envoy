@@ -39,7 +39,7 @@ extension MockEnvoyEngine: EnvoyEngine {
     return ""
   }
 
-  func drainConnectionsBySocketTag(_ tag: UInt32) {}
+  func drainConnections(bySocketTag tag: UInt32) {}
 
   func terminate() {}
 
