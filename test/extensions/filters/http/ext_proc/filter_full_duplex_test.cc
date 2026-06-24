@@ -117,7 +117,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestNormal) {
   bool encoding_watermarked = false;
   setUpEncodingWatermarking(encoding_watermarked);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  processResponseHeaders(false, absl::nullopt);
+  processResponseHeaders(true, absl::nullopt);
 
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
@@ -210,7 +210,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithTrailer) {
   setUpEncodingWatermarking(encoding_watermarked);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   // Server sending headers response without waiting for body.
-  processResponseHeaders(false, absl::nullopt);
+  processResponseHeaders(true, absl::nullopt);
 
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
@@ -368,7 +368,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithFilterConfigMissing) 
   bool encoding_watermarked = false;
   setUpEncodingWatermarking(encoding_watermarked);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  processResponseHeaders(false, absl::nullopt);
+  processResponseHeaders(true, absl::nullopt);
 
   for (int i = 0; i < 4; i++) {
     // 4 request chunks are sent to the ext_proc server.
@@ -417,7 +417,7 @@ TEST_F(HttpFilterTest, FullDuplexFailCloseWithDataOutbound) {
   bool encoding_watermarked = false;
   setUpEncodingWatermarking(encoding_watermarked);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  processResponseHeaders(false, absl::nullopt);
+  processResponseHeaders(true, absl::nullopt);
 
   Buffer::OwnedImpl resp_chunk;
   TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
@@ -487,7 +487,7 @@ TEST_F(HttpFilterTest, FullDuplexFailCloseWithDataInbound) {
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, absl::nullopt);
+  processRequestHeaders(true, absl::nullopt);
   Buffer::OwnedImpl req_data("foo");
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, false));
 
