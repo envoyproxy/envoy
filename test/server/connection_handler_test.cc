@@ -126,6 +126,7 @@ public:
         return *iter->second;
       }
       const envoy::config::listener::v3::UdpListenerConfig& config() override { return config_; }
+      Envoy::Quic::QuicPacketWriterFactory* quicPacketWriterFactory() override { return nullptr; }
 
       const envoy::config::listener::v3::UdpListenerConfig config_;
       std::unique_ptr<Network::ActiveUdpListenerFactory> listener_factory_;
