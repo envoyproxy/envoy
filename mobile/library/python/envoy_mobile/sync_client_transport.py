@@ -197,3 +197,6 @@ class EnvoyClientTransport(httpx.BaseTransport):
             headers=handler.headers,
             stream=SyncEnvoyStream(stream, handler.data_queue, handler.stream_complete),
         )
+
+    def close(self) -> None:
+        self._engine.drain_connections_by_socket_tag(self._transport_tag)

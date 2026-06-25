@@ -37,7 +37,9 @@ public:
   MOCK_METHOD(uint64_t, numConnections, (), (const));
   MOCK_METHOD(void, removeListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
-  MOCK_METHOD(void, start, (OptRef<GuardDog> guard_dog, const std::function<void()>& cb));
+  MOCK_METHOD(void, start,
+              (OptRef<GuardDog> guard_dog, const std::function<void()>& cb,
+               absl::optional<uint32_t> cpu_id));
   MOCK_METHOD(void, initializeStats, (Stats::Scope & scope));
   MOCK_METHOD(void, stop, ());
   MOCK_METHOD(void, stopListener,

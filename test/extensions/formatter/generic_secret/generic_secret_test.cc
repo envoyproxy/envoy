@@ -136,7 +136,7 @@ TEST_F(GenericSecretFormatterTest, FormatValueReturnsStringValue) {
   GenericSecretFormatterFactory factory;
   auto parser = factory.createCommandParserFromProto(proto_config, context_);
 
-  auto provider = parser->parse("SECRET", "my-token", absl::nullopt);
+  auto provider = parser->parse("SECRET", "my-token", absl::nullopt).value();
   ASSERT_NE(nullptr, provider);
 
   auto value = provider->formatValue(formatter_context_, stream_info_);
@@ -153,7 +153,7 @@ TEST_F(GenericSecretFormatterTest, ParseIgnoresOtherCommands) {
   GenericSecretFormatterFactory factory;
   auto parser = factory.createCommandParserFromProto(proto_config, context_);
 
-  auto provider = parser->parse("NOT_SECRET", "my-token", absl::nullopt);
+  auto provider = parser->parse("NOT_SECRET", "my-token", absl::nullopt).value();
   EXPECT_EQ(nullptr, provider);
 }
 

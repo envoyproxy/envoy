@@ -682,6 +682,9 @@ FilterConfig::FilterConfig(
       disable_token_encryption_(proto_config.disable_token_encryption()),
       use_access_token_expiry_for_id_token_cookie_(
           proto_config.use_access_token_expiry_for_id_token_cookie()),
+      forward_id_token_header_(proto_config.has_forward_id_token()
+                                   ? Http::LowerCaseString(proto_config.forward_id_token().header())
+                                   : Http::LowerCaseString("")),
       bearer_token_cookie_settings_(
           (proto_config.has_cookie_configs() &&
            proto_config.cookie_configs().has_bearer_token_cookie_config())
@@ -870,6 +873,13 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // If no config is set, OAuth2 is disabled for this request.
   if (config_ == nullptr) {
     return Http::FilterHeadersStatus::Continue;
+  }
+
+  // Strip the configured forward_id_token header before any upstream-bound path (including the
+  // pass-through bypass below) so a client can never spoof it; Envoy re-sets it from a validated
+  // cookie later. The Authorization-header case is handled by the sanitization further down.
+  if (config_->forwardIdToken() && !config_->forwardIdTokenOnAuthorizationHeader()) {
+    headers.remove(config_->forwardIdTokenHeader());
   }
 
   // Skip Filter and continue chain if a Passthrough header is matching.
@@ -1078,6 +1088,9 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
     if (config_->forwardBearerToken() && !validator_->token().empty()) {
       setBearerToken(headers, validator_->token());
     }
+    if (config_->forwardIdToken() && !validator_->idToken().empty()) {
+      forwardIdToken(headers, validator_->idToken());
+    }
     ENVOY_STREAM_LOG(debug, "skipping oauth flow due to valid hmac cookie", *decoder_callbacks_);
     return true;
   }
@@ -1119,6 +1132,17 @@ void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& hea
       !encrypted_refresh_token.empty()) {
     std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
     headers.setReferenceKey(Http::Headers::get().Cookie, new_cookies);
+  }
+}
+
+void OAuth2Filter::forwardIdToken(Http::RequestHeaderMap& headers,
+                                  const std::string& id_token) const {
+  if (config_->forwardIdTokenOnAuthorizationHeader()) {
+    // Forward on the Authorization header using the standard Bearer scheme.
+    setBearerToken(headers, id_token);
+  } else {
+    // Forward the raw token value on the configured custom header.
+    headers.setCopy(config_->forwardIdTokenHeader(), id_token);
   }
 }
 
@@ -1552,6 +1576,9 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   request_headers_->setReferenceKey(Http::Headers::get().Cookie, new_cookies);
   if (config_->forwardBearerToken() && !access_token_.empty()) {
     setBearerToken(*request_headers_, access_token_);
+  }
+  if (config_->forwardIdToken() && !id_token_.empty()) {
+    forwardIdToken(*request_headers_, id_token_);
   }
 
   was_refresh_token_flow_ = true;

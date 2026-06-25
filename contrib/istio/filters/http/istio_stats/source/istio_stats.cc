@@ -488,7 +488,7 @@ struct Config : public Logger::Loggable<Logger::Id::filter> {
     reporter_ = Reporter::ClientSidecar;
     switch (proto_config.reporter()) {
     case stats::Reporter::UNSPECIFIED:
-      switch (factory_context.listenerInfo().direction()) {
+      switch (factory_context.direction()) {
       case envoy::config::core::v3::TrafficDirection::INBOUND:
         reporter_ = Reporter::ServerSidecar;
         break;

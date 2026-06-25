@@ -21,7 +21,10 @@ envoy_extension_cc_test(
         # https://github.com/open-telemetry/opentelemetry-cpp/blob/v1.14.0/api/BUILD#L32
         "-DHAVE_ABSEIL",
     ],
-    extension_names = ["envoy.tracers.opentelemetry"],
+    extension_names = [
+        "envoy.tracers.opentelemetry",
+        "envoy.tracers.opentelemetry.samplers.always_on",
+    ],
     rbe_pool = "6gig",
     deps = [
         "//envoy/common:time_interface",
@@ -33,6 +36,7 @@ envoy_extension_cc_test(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
+        "//source/extensions/tracers/opentelemetry/samplers/always_on:config",
         "//test/mocks:common_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:tracer_factory_context_mocks",

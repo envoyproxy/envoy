@@ -2609,8 +2609,9 @@ public:
   BuiltInStreamInfoCommandParser() = default;
 
   // CommandParser
-  FormatterProviderPtr parse(absl::string_view command, absl::string_view sub_command,
-                             absl::optional<size_t> max_length) const override {
+  absl::StatusOr<FormatterProviderPtr> parse(absl::string_view command,
+                                             absl::string_view sub_command,
+                                             absl::optional<size_t> max_length) const override {
 
     auto it = getKnownStreamInfoFormatterProviders().find(command);
 

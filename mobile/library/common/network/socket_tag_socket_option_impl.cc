@@ -31,9 +31,14 @@ bool SocketTagSocketOptionImpl::setOption(
   return true;
 }
 
+void SocketTagSocketOptionImpl::generateHashKey(uid_t uid, uint32_t traffic_stats_tag,
+                                                std::vector<uint8_t>& hash_key) {
+  pushScalarToByteVector(uid, hash_key);
+  pushScalarToByteVector(traffic_stats_tag, hash_key);
+}
+
 void SocketTagSocketOptionImpl::hashKey(std::vector<uint8_t>& hash_key) const {
-  pushScalarToByteVector(uid_, hash_key);
-  pushScalarToByteVector(traffic_stats_tag_, hash_key);
+  generateHashKey(uid_, traffic_stats_tag_, hash_key);
 }
 
 absl::optional<Socket::Option::Details> SocketTagSocketOptionImpl::getOptionDetails(

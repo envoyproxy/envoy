@@ -106,6 +106,11 @@ public:
    */
   virtual bool autoSniSanMatch() const PURE;
 
+  /**
+   * @return whether to suppress sending CA certificate names to clients during handshake.
+   */
+  virtual bool suppressClientCaList() const PURE;
+
   // SECURITY NOTE
   //
   // When adding or changing this interface, it is likely that a change is needed to

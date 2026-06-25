@@ -9,6 +9,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/cleanup.h"
+#include "source/common/matcher/address_matcher.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_resource_manager.h"
 #include "source/server/generic_factory_context.h"
@@ -25,6 +26,7 @@ namespace DynamicForwardProxy {
  */
 #define ALL_DNS_CACHE_STATS(COUNTER, GAUGE)                                                        \
   COUNTER(cache_load)                                                                              \
+  COUNTER(dns_address_filter_out)                                                                  \
   COUNTER(dns_query_attempt)                                                                       \
   COUNTER(dns_query_failure)                                                                       \
   COUNTER(dns_query_success)                                                                       \
@@ -76,7 +78,8 @@ public:
 private:
   DnsCacheImpl(Server::Configuration::GenericFactoryContext& context,
                const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
-               Network::DnsResolverSharedPtr&& resolver);
+               Network::DnsResolverSharedPtr&& resolver,
+               Envoy::Matcher::AddressMatcherPtr resolved_address_filter);
   struct LoadDnsCacheEntryHandleImpl
       : public LoadDnsCacheEntryHandle,
         RaiiMapOfListElement<std::string, LoadDnsCacheEntryHandleImpl*> {
@@ -235,6 +238,7 @@ private:
   absl::optional<Network::Address::IpVersion>
       ip_version_to_remove_ ABSL_GUARDED_BY(ip_version_to_remove_lock_) = absl::nullopt;
   bool enable_dfp_dns_trace_;
+  const Envoy::Matcher::AddressMatcherPtr resolved_address_filter_;
 };
 
 } // namespace DynamicForwardProxy

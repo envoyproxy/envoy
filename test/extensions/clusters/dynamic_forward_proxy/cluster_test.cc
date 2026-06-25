@@ -1,4 +1,6 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/common/dns/v3/dns.pb.h"
+#include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
@@ -263,6 +265,74 @@ TEST_F(ClusterTest, ClusterDestroyedInMainThread) {
   // Destroy the cluster, LB will return nullptr without accessing the cluster.
   cluster_.reset();
   EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1:0")).host);
+}
+
+// dns_cluster_config in sub_clusters_config causes sub clusters to use the DnsCluster extension.
+TEST_F(ClusterTest, CreateSubClusterConfigWithDnsClusterConfig) {
+  const std::string yaml_config = R"EOF(
+name: name
+connect_timeout: 0.25s
+cluster_type:
+  name: dynamic_forward_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+    sub_clusters_config:
+      max_sub_clusters: 1024
+      dns_cluster_config:
+        dns_lookup_family: V4_ONLY
+        dns_refresh_rate: 30s
+        all_addresses_in_single_endpoint: true
+        dns_failure_refresh_rate:
+          base_interval: 5s
+          max_interval: 10s
+)EOF";
+  initialize(yaml_config, false);
+
+  const std::string cluster_name = "test_cluster";
+  auto [ok, sub_config] = cluster_->createSubClusterConfig(cluster_name, "example.com", 443);
+
+  EXPECT_TRUE(ok);
+  ASSERT_TRUE(sub_config.has_value());
+  // Sub cluster should use the DnsCluster extension, not legacy STRICT_DNS.
+  EXPECT_EQ(envoy::config::cluster::v3::Cluster::kClusterType,
+            sub_config->cluster_discovery_type_case());
+  EXPECT_EQ("envoy.cluster.dns", sub_config->cluster_type().name());
+
+  // DNS settings from the provided config are propagated unchanged, including
+  // all_addresses_in_single_endpoint.
+  envoy::extensions::clusters::dns::v3::DnsCluster dns_config;
+  ASSERT_TRUE(sub_config->cluster_type().typed_config().UnpackTo(&dns_config));
+  EXPECT_EQ(envoy::extensions::clusters::common::dns::v3::V4_ONLY, dns_config.dns_lookup_family());
+  EXPECT_EQ(30, dns_config.dns_refresh_rate().seconds());
+  EXPECT_TRUE(dns_config.all_addresses_in_single_endpoint());
+}
+
+// Without dns_cluster_config, sub clusters use legacy STRICT_DNS and inherit parent DNS settings.
+TEST_F(ClusterTest, CreateSubClusterConfigWithoutDnsClusterConfig) {
+  const std::string yaml_config = R"EOF(
+name: name
+connect_timeout: 0.25s
+dns_lookup_family: V6_ONLY
+dns_refresh_rate: 45s
+cluster_type:
+  name: dynamic_forward_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+    sub_clusters_config:
+      max_sub_clusters: 1024
+)EOF";
+  initialize(yaml_config, false);
+
+  const std::string cluster_name = "inherit_cluster";
+  auto [ok, sub_config] = cluster_->createSubClusterConfig(cluster_name, "example.com", 80);
+
+  EXPECT_TRUE(ok);
+  ASSERT_TRUE(sub_config.has_value());
+  // No dns_cluster_config: legacy STRICT_DNS type, DNS settings inherited from parent.
+  EXPECT_EQ(envoy::config::cluster::v3::Cluster::kType, sub_config->cluster_discovery_type_case());
+  EXPECT_EQ(envoy::config::cluster::v3::Cluster::STRICT_DNS, sub_config->type());
+  EXPECT_EQ(envoy::config::cluster::v3::Cluster::V6_ONLY, sub_config->dns_lookup_family());
+  EXPECT_EQ(45, sub_config->dns_refresh_rate().seconds());
 }
 
 // Basic flow of the cluster including adding hosts and removing them.

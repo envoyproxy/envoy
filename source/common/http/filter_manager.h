@@ -274,6 +274,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void handleMetadataAfterHeadersCallback() override;
 
   // Http::StreamDecoderFilterCallbacks
+  OptRef<WebTransportSession> webTransportSession() override;
   void addDecodedData(Buffer::Instance& data, bool streaming) override;
   void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
   RequestTrailerMap& addDecodedTrailers() override;
@@ -391,6 +392,13 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
 class FilterManagerCallbacks {
 public:
   virtual ~FilterManagerCallbacks() = default;
+
+  /**
+   * @return the WebTransport session of the codec stream this filter manager is bound to, if any.
+   * The downstream HTTP connection manager returns the downstream codec stream's session; the
+   * default empty OptRef applies elsewhere.
+   */
+  virtual OptRef<WebTransportSession> webTransportSession() { return {}; }
 
   /**
    * Called when the provided headers have been encoded by all the filters in the chain.
@@ -702,6 +710,12 @@ public:
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
     ASSERT(state_.filter_call_state_ == 0);
+  }
+
+  // Returns the WebTransport session of the codec stream this filter manager is bound to, if any.
+  // Delegates to the FilterManagerCallbacks (e.g. the HTTP connection manager's ActiveStream).
+  OptRef<WebTransportSession> webTransportSession() {
+    return filter_manager_callbacks_.webTransportSession();
   }
 
   // ScopeTrackedObject

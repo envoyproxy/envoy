@@ -64,10 +64,12 @@ public:
   Network::DrainDecision& drainDecision() override;
   Init::Manager& initManager() override;
   Stats::Scope& scope() override;
-  const Network::ListenerInfo& listenerInfo() const override;
+  Stats::Scope& prefixedScope() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
   Configuration::ServerFactoryContext& serverFactoryContext() override;
-  Stats::Scope& listenerScope() override;
+  envoy::config::core::v3::TrafficDirection direction() const override;
+  bool isQuic() const override;
+  bool shouldBypassOverloadManager() const override;
 
   void startDraining() override { is_draining_.store(true); }
 
@@ -75,8 +77,7 @@ private:
   Configuration::FactoryContext& parent_context_;
   // The scope that has empty prefix.
   Stats::ScopeSharedPtr scope_;
-  // filter_chain_scope_ has the same prefix as listener owners scope.
-  Stats::ScopeSharedPtr filter_chain_scope_;
+  Stats::ScopeSharedPtr prefixed_scope_;
   Init::Manager& init_manager_;
   std::atomic<bool> is_draining_{false};
 };
@@ -401,6 +402,30 @@ private:
 namespace FilterChain {
 DECLARE_FACTORY(FilterChainNameActionFactory);
 }
+
+class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
+public:
+  ListenerFilterChainFactoryBuilder(
+      bool is_quic, ProtobufMessage::ValidationVisitor& validator,
+      ListenerComponentFactory& listener_component_factory,
+      Server::Configuration::TransportSocketFactoryContext& factory_context);
+
+  absl::StatusOr<Network::DrainableFilterChainSharedPtr>
+  buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
+                   FilterChainFactoryContextCreator& context_creator,
+                   bool added_via_api) const override;
+
+private:
+  absl::StatusOr<Network::DrainableFilterChainSharedPtr> buildFilterChainInternal(
+      const envoy::config::listener::v3::FilterChain& filter_chain,
+      Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context,
+      bool added_via_api) const;
+
+  const bool is_quic_;
+  ProtobufMessage::ValidationVisitor& validator_;
+  ListenerComponentFactory& listener_component_factory_;
+  Configuration::TransportSocketFactoryContext& factory_context_;
+};
 
 } // namespace Server
 } // namespace Envoy

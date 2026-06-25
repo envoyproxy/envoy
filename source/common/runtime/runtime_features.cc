@@ -123,6 +123,7 @@ RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_skip_pending_overflow_count_on_active_rq);
 RUNTIME_GUARD(envoy_reloadable_features_ssl_socket_report_connection_reset);
 RUNTIME_GUARD(envoy_reloadable_features_strict_stats_matcher_unpacked);
+RUNTIME_GUARD(envoy_reloadable_features_tap_honor_tap_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_odcds_over_ads_fix);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_trace_refresh_after_route_refresh);
@@ -187,6 +188,10 @@ FALSE_RUNTIME_GUARD(envoy_restart_features_xds_failover_support);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_cache_set_ip_version_to_remove);
 // TODO(fredyw): evaluate and either make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_no_tcp_delay);
+// WebTransport over HTTP/3 is opt-in while it stabilizes. When disabled (the default), the QUIC
+// client and server sessions advertise no WebTransport versions, so WebTransport is never
+// negotiated (SupportsWebTransport() stays false).
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_support_web_transport);
 // TODO(danzh) re-enable it when the issue of preferring TCP over v6 rather than QUIC over v4 is
 // fixed.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http3_happy_eyeballs);

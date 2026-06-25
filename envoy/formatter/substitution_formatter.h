@@ -13,6 +13,7 @@
 
 #include "source/common/protobuf/protobuf.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
@@ -81,10 +82,12 @@ public:
    * @param max_length length to which the output produced by FormatterProvider
    *                   should be truncated to (optional).
    *
-   * @return FormattterProviderPtr substitution provider for the parsed command.
+   * @return absl::StatusOr<FormatterProviderPtr> substitution provider for the parsed command or an
+   * error status.
    */
-  virtual FormatterProviderPtr parse(absl::string_view command, absl::string_view command_arg,
-                                     absl::optional<size_t> max_length) const PURE;
+  virtual absl::StatusOr<FormatterProviderPtr> parse(absl::string_view command,
+                                                     absl::string_view command_arg,
+                                                     absl::optional<size_t> max_length) const PURE;
 };
 
 using CommandParserPtr = std::unique_ptr<CommandParser>;

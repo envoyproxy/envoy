@@ -369,7 +369,7 @@ message SubjectAltNameMatcher {
   string oid = 3;
 }
 
-// [#next-free-field: 18]
+// [#next-free-field: 19]
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.CertificateValidationContext";
@@ -594,4 +594,28 @@ message CertificateValidationContext {
   // in OpenSSL 1.1.x and newer versions of BoringSSL in that the trust anchor is included.
   // Trusted issues are specified by setting :ref:`trusted_ca <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`
   google.protobuf.UInt32Value max_verify_depth = 16 [(validate.rules).uint32 = {lte: 100}];
+
+  // If true, the server does not include the trusted-CA distinguished names in the
+  // TLS ``CertificateRequest`` message. CAs from :ref:`trusted_ca
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`
+  // are still used to validate presented client certificates; only the wire
+  // advertisement changes.
+  //
+  // This is useful when the configured CA set is large enough that the
+  // ``CertificateRequest`` would exceed client-side TLS record limits, or when
+  // clients mishandle the CA set in some way.
+  //
+  // .. attention::
+  //
+  //   When enabled, clients that rely on the advertised CA list to select among
+  //   multiple client certificates may now send no certificate or the wrong one;
+  //   validation will then fail with the standard TLS alert.
+  //
+  // This option only affects downstream (server) TLS connections where Envoy sends a
+  // ``CertificateRequest`` to clients. It has no effect on upstream connections.
+  //
+  // Honored by the built-in validator and the SPIFFE validator. Validators that do
+  // not set a client CA list themselves (e.g., the dynamic-modules validator) are
+  // unaffected. Defaults to false.
+  bool suppress_client_ca_list = 18;
 }

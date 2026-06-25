@@ -618,9 +618,9 @@ BuiltInHttpCommandParser::getKnownFormatters() {
          }}}});
 }
 
-FormatterProviderPtr BuiltInHttpCommandParser::parse(absl::string_view command,
-                                                     absl::string_view subcommand,
-                                                     absl::optional<size_t> max_length) const {
+absl::StatusOr<FormatterProviderPtr>
+BuiltInHttpCommandParser::parse(absl::string_view command, absl::string_view subcommand,
+                                absl::optional<size_t> max_length) const {
   const FormatterProviderLookupTbl& providers = getKnownFormatters();
 
   auto it = providers.find(command);
