@@ -1,6 +1,7 @@
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 
 #include "source/common/common/cleanup.h"
 #include "source/common/common/empty_string.h"
@@ -13,6 +14,10 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/server/configuration_impl.h"
+
+#ifdef ENVOY_ENABLE_QUIC
+#include "source/common/quic/quic_server_transport_socket_factory.h"
+#endif
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/match.h"
@@ -848,6 +853,86 @@ Configuration::FilterChainFactoryContextPtr FilterChainManagerImpl::createFilter
   // TODO(lambdai): add stats
   UNREFERENCED_PARAMETER(filter_chain);
   return std::make_unique<PerFilterChainFactoryContextImpl>(parent_context_, init_manager_);
+}
+
+ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
+    bool is_quic, ProtobufMessage::ValidationVisitor& validator,
+    ListenerComponentFactory& listener_component_factory,
+    Server::Configuration::TransportSocketFactoryContext& factory_context)
+    : is_quic_(is_quic), validator_(validator),
+      listener_component_factory_(listener_component_factory), factory_context_(factory_context) {}
+
+absl::StatusOr<Network::DrainableFilterChainSharedPtr>
+ListenerFilterChainFactoryBuilder::buildFilterChain(
+    const envoy::config::listener::v3::FilterChain& filter_chain,
+    FilterChainFactoryContextCreator& context_creator, bool added_via_api) const {
+  return buildFilterChainInternal(
+      filter_chain, context_creator.createFilterChainFactoryContext(&filter_chain), added_via_api);
+}
+
+absl::StatusOr<Network::DrainableFilterChainSharedPtr>
+ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
+    const envoy::config::listener::v3::FilterChain& filter_chain,
+    Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context,
+    bool added_via_api) const {
+  // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
+  // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
+  // We copy by value first then override if necessary.
+  auto transport_socket = filter_chain.transport_socket();
+  if (!filter_chain.has_transport_socket()) {
+    envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
+    transport_socket.mutable_typed_config()->PackFrom(raw_buffer);
+    transport_socket.set_name("envoy.transport_sockets.raw_buffer");
+  }
+
+  auto& config_factory = Config::Utility::getAndCheckFactory<
+      Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket);
+#if defined(ENVOY_ENABLE_QUIC)
+  if (is_quic_ &&
+      dynamic_cast<Quic::QuicServerTransportSocketConfigFactory*>(&config_factory) == nullptr) {
+    return absl::InvalidArgumentError(
+        fmt::format("error building filter chain for quic listener: wrong "
+                    "transport socket config specified for quic transport socket: "
+                    "{}. \nUse QuicDownstreamTransport instead.",
+                    transport_socket.DebugString()));
+  }
+  const std::string hcm_str =
+      "type.googleapis.com/"
+      "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
+  if (is_quic_ &&
+      (filter_chain.filters().empty() ||
+       filter_chain.filters(filter_chain.filters().size() - 1).typed_config().type_url() !=
+           hcm_str)) {
+    return absl::InvalidArgumentError(
+        fmt::format("error building network filter chain for quic listener: requires "
+                    "http_connection_manager filter to be last in the chain."));
+  }
+#else
+  // When QUIC is compiled out it should not be possible to configure either the QUIC transport
+  // socket or the QUIC listener and get to this point.
+  ASSERT(!is_quic);
+#endif
+  ProtobufTypes::MessagePtr message =
+      Config::Utility::translateToFactoryConfig(transport_socket, validator_, config_factory);
+
+  std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
+                                        filter_chain.filter_chain_match().server_names().end());
+
+  auto factory_or_error = config_factory.createTransportSocketFactory(*message, factory_context_,
+                                                                      std::move(server_names));
+  RETURN_IF_NOT_OK(factory_or_error.status());
+  auto factory_list_or_error = listener_component_factory_.createNetworkFilterFactoryList(
+      filter_chain.filters(), *filter_chain_factory_context);
+  RETURN_IF_NOT_OK(factory_list_or_error.status());
+
+  auto filter_chain_res = std::make_shared<FilterChainImpl>(
+      std::move(factory_or_error.value()), std::move(*factory_list_or_error),
+      std::chrono::milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(filter_chain, transport_socket_connect_timeout, 0)),
+      added_via_api, filter_chain);
+
+  filter_chain_res->setFilterChainFactoryContext(std::move(filter_chain_factory_context));
+  return filter_chain_res;
 }
 
 } // namespace Server

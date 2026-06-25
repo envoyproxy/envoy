@@ -403,5 +403,29 @@ namespace FilterChain {
 DECLARE_FACTORY(FilterChainNameActionFactory);
 }
 
+class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
+public:
+  ListenerFilterChainFactoryBuilder(
+      bool is_quic, ProtobufMessage::ValidationVisitor& validator,
+      ListenerComponentFactory& listener_component_factory,
+      Server::Configuration::TransportSocketFactoryContext& factory_context);
+
+  absl::StatusOr<Network::DrainableFilterChainSharedPtr>
+  buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
+                   FilterChainFactoryContextCreator& context_creator,
+                   bool added_via_api) const override;
+
+private:
+  absl::StatusOr<Network::DrainableFilterChainSharedPtr> buildFilterChainInternal(
+      const envoy::config::listener::v3::FilterChain& filter_chain,
+      Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context,
+      bool added_via_api) const;
+
+  const bool is_quic_;
+  ProtobufMessage::ValidationVisitor& validator_;
+  ListenerComponentFactory& listener_component_factory_;
+  Configuration::TransportSocketFactoryContext& factory_context_;
+};
+
 } // namespace Server
 } // namespace Envoy
