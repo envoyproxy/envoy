@@ -59,7 +59,7 @@ enum class BridgeStatus {
   RequestToolNameNotFound,
   RequestUnknownTool,
   RequestToolArgumentsInvalid,
-  RequestInvalidToolArguments,
+  RequestToolTranscodingFailure,
   RequestPassthrough,
   ResponseTooLarge,
   ResponseInvalidUtf8,
@@ -88,8 +88,8 @@ inline constexpr absl::string_view REQUEST_TOOL_NAME_NOT_FOUND = "REQUEST_TOOL_N
 inline constexpr absl::string_view REQUEST_UNKNOWN_TOOL = "REQUEST_UNKNOWN_TOOL";
 inline constexpr absl::string_view REQUEST_TOOL_ARGUMENTS_INVALID =
     "REQUEST_TOOL_ARGUMENTS_INVALID";
-inline constexpr absl::string_view REQUEST_INVALID_TOOL_ARGUMENTS =
-    "REQUEST_INVALID_TOOL_ARGUMENTS";
+inline constexpr absl::string_view REQUEST_TOOL_TRANSCODING_FAILURE =
+    "REQUEST_TOOL_TRANSCODING_FAILURE";
 inline constexpr absl::string_view REQUEST_PASSTHROUGH = "REQUEST_PASSTHROUGH";
 inline constexpr absl::string_view RESPONSE_TOO_LARGE = "RESPONSE_TOO_LARGE";
 inline constexpr absl::string_view RESPONSE_INVALID_UTF8 = "RESPONSE_INVALID_UTF8";

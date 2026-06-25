@@ -207,8 +207,8 @@ absl::string_view bridgeStatusToString(BridgeStatus status) {
     return BridgeStatusValues::REQUEST_UNKNOWN_TOOL;
   case BridgeStatus::RequestToolArgumentsInvalid:
     return BridgeStatusValues::REQUEST_TOOL_ARGUMENTS_INVALID;
-  case BridgeStatus::RequestInvalidToolArguments:
-    return BridgeStatusValues::REQUEST_INVALID_TOOL_ARGUMENTS;
+  case BridgeStatus::RequestToolTranscodingFailure:
+    return BridgeStatusValues::REQUEST_TOOL_TRANSCODING_FAILURE;
   case BridgeStatus::RequestPassthrough:
     return BridgeStatusValues::REQUEST_PASSTHROUGH;
   case BridgeStatus::ResponseTooLarge:
@@ -1096,8 +1096,8 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
   if (!http_request.ok()) {
     ENVOY_STREAM_LOG(error, "Failed to build HTTP request for method: {} with status: {}",
                      *decoder_callbacks_, tool_name, http_request.status());
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestInvalidToolArguments,
-                      generateErrorJsonResponse(-32602, "Invalid tool arguments").dump(), nullptr,
+    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestToolTranscodingFailure,
+                      generateErrorJsonResponse(-32602, "Failed to build HTTP request").dump(), nullptr,
                       McpConstants::Methods::TOOLS_CALL, params);
     return;
   }

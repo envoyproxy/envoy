@@ -789,7 +789,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolParamsNotFoundReturnsError) {
           R"json({"error":{"code":-32602,"message":"Invalid params"},"id":123,"jsonrpc":"2.0"})json"));
 }
 
-TEST_F(McpJsonRestBridgeFilterTest, InvalidToolArgumentsReturnsError) {
+TEST_F(McpJsonRestBridgeFilterTest, ToolTranscodingFailureReturnsError) {
   request_headers_ = {{":path", "/mcp"}, {":method", "POST"}};
 
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
@@ -797,13 +797,13 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidToolArgumentsReturnsError) {
 
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Eq(Http::Code::BadRequest),
-                             StrEq(R"json({"code":-32602,"message":"Invalid tool arguments"})json"),
+                             StrEq(R"json({"code":-32602,"message":"Failed to build HTTP request"})json"),
                              _, _,
-                             StrEq("REQUEST_INVALID_TOOL_ARGUMENTS")));
+                             StrEq("REQUEST_TOOL_TRANSCODING_FAILURE")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "REQUEST_INVALID_TOOL_ARGUMENTS",
+    "status": "REQUEST_TOOL_TRANSCODING_FAILURE",
     "method": "tools/call",
     "params": {
       "name": "create_api_key",
@@ -827,7 +827,7 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidToolArgumentsReturnsError) {
   response_headers_ = {{"content-type", "text/plain"}, {"content-length", "123456"}};
   EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
-  Buffer::OwnedImpl response_body(R"json({"code":-32602,"message":"Invalid tool arguments"})json");
+  Buffer::OwnedImpl response_body(R"json({"code":-32602,"message":"Failed to build HTTP request"})json");
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
@@ -836,7 +836,7 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidToolArgumentsReturnsError) {
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
-          R"json({"error":{"code":-32602,"message":"Invalid tool arguments"},"id":123,"jsonrpc":"2.0"})json"));
+          R"json({"error":{"code":-32602,"message":"Failed to build HTTP request"},"id":123,"jsonrpc":"2.0"})json"));
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolArgumentsMustBeObjectReturnsError) {
