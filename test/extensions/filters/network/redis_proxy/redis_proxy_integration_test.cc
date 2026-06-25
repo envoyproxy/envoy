@@ -2118,7 +2118,7 @@ TEST_P(RedisProxyWithBatchingIntegrationTest, SimpleBatching) {
   initialize();
 
   const std::string& request = makeBulkStringArray({"get", "foo"});
-  const std::string& response = "$3\r\nbar\r\n";
+  const std::string response = "$3\r\nbar\r\n";
 
   std::string proxy_to_server;
   IntegrationTcpClientPtr redis_client_1 = makeTcpConnection(lookupPort("redis_proxy"));
@@ -2426,7 +2426,7 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredCatchAllRequest) {
 
   std::array<FakeRawConnectionPtr, 3> fake_upstream_connection;
   const std::string& request = makeBulkStringArray({"get", "toto"});
-  const std::string& response = "$3\r\nbar\r\n";
+  const std::string response = "$3\r\nbar\r\n";
   // roundtrip to cluster_0 (catch_all route)
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
   ASSERT_TRUE(redis_client->write(request));
@@ -2458,7 +2458,7 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredTransaction) {
   std::string request = makeBulkStringArray({"MULTI"}) +
                         makeBulkStringArray({"set", "foo", "bar"}) +
                         makeBulkStringArray({"get", "foo"}) + makeBulkStringArray({"exec"});
-  const std::string& response = "+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n+OK\r\n$3\r\nbar\r\n";
+  const std::string response = "+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n+OK\r\n$3\r\nbar\r\n";
 
   // roundtrip to cluster_0 (catch_all route)
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
@@ -2488,7 +2488,7 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredWriteOnlyRequest) {
 
   std::array<FakeRawConnectionPtr, 2> fake_upstream_connection;
   const std::string& set_request = makeBulkStringArray({"set", "write_only:toto", "bar"});
-  const std::string& set_response = ":1\r\n";
+  const std::string set_response = ":1\r\n";
 
   // roundtrip to cluster_0 (write_only route)
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
@@ -2515,7 +2515,7 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, ExcludeReadCommands) {
 
   FakeRawConnectionPtr cluster_0_connection;
   const std::string& get_request = makeBulkStringArray({"get", "write_only:toto"});
-  const std::string& get_response = "$3\r\nbar\r\n";
+  const std::string get_response = "$3\r\nbar\r\n";
 
   // roundtrip to cluster_0 (write_only route)
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
@@ -2542,7 +2542,7 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, EnabledViaRuntimeFraction) {
   std::array<FakeRawConnectionPtr, 2> fake_upstream_connection;
   // When random_value is < 50, the percentage:* will be mirrored, random() default is 0
   const std::string& request = makeBulkStringArray({"get", "percentage:toto"});
-  const std::string& response = "$3\r\nbar\r\n";
+  const std::string response = "$3\r\nbar\r\n";
   // roundtrip to cluster_0 (catch_all route)
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
   ASSERT_TRUE(redis_client->write(request));
@@ -2575,7 +2575,7 @@ TEST_P(RedisProxyWithFaultInjectionIntegrationTest, ErrorFault) {
 
 TEST_P(RedisProxyWithFaultInjectionIntegrationTest, DelayFault) {
   const std::string& set_request = makeBulkStringArray({"set", "write_only:toto", "bar"});
-  const std::string& set_response = ":1\r\n";
+  const std::string set_response = ":1\r\n";
   initialize();
   simpleRequestAndResponse(set_request, set_response);
 
@@ -2786,7 +2786,7 @@ TEST_P(RedisProxyWithCommandStatsIntegrationTest, PipelinedTransactionTest) {
   std::string transaction_commands =
       makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"set", "foo", "bar"}) +
       makeBulkStringArray({"get", "foo"}) + makeBulkStringArray({"exec"});
-  const std::string& response = "+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n+OK\r\n$3\r\nbar\r\n";
+  const std::string response = "+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n+OK\r\n$3\r\nbar\r\n";
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
   ASSERT_TRUE(redis_client->write(transaction_commands));
 
@@ -2800,7 +2800,7 @@ TEST_P(RedisProxyWithCommandStatsIntegrationTest, PipelinedTransactionTest) {
   redis_client->close();
 }
 
-// TODO: Add full transaction test.
+// TODO: Add full transaction semantics coverage (DISCARD/WATCH/abort/error paths).
 
 TEST_P(RedisProxyWithExternalAuthIntegrationTest, ErrorsUntilCorrectPasswordSentExternal) {
   initialize();

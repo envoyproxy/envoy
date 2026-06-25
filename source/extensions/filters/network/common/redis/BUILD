@@ -20,7 +20,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "utility_interface",
     hdrs = ["utility.h"],
-    deps = [":codec_interface"],
+    deps = [
+        ":codec_interface",
+        "@abseil-cpp//absl/strings:string_view",
+    ],
 )
 
 envoy_cc_library(
@@ -107,6 +110,7 @@ envoy_cc_library(
     deps = [
         ":codec_lib",
         "//source/common/common:utility_lib",
+        "@abseil-cpp//absl/strings:string_view",
     ],
 )
 

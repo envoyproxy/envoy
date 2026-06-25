@@ -86,6 +86,10 @@ envoy_cc_library(
         "//source/extensions/filters/network/common/redis:supported_commands_lib",
         "//source/extensions/filters/network/common/redis:utility_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:string_view",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 

@@ -7,6 +7,10 @@
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 #include "source/extensions/filters/network/redis_proxy/cluster_response_handler.h"
 
+#include "absl/strings/ascii.h"
+#include "absl/strings/numbers.h"
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

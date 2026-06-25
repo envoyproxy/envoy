@@ -19,6 +19,9 @@
 #include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
 #include "source/extensions/filters/network/redis_proxy/router.h"
 
+#include "absl/container/flat_hash_set.h"
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
