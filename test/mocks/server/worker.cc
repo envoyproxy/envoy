@@ -46,9 +46,9 @@ MockWorker::MockWorker() {
         remove_filter_chains_completion_ = completion;
       }));
 
-  ON_CALL(*this, start(_, _))
-      .WillByDefault(
-          Invoke([](OptRef<GuardDog>, const std::function<void()>& cb) -> void { cb(); }));
+  ON_CALL(*this, start(_, _, _))
+      .WillByDefault(Invoke([](OptRef<GuardDog>, const std::function<void()>& cb,
+                               absl::optional<uint32_t>) -> void { cb(); }));
 }
 
 MockWorker::~MockWorker() = default;

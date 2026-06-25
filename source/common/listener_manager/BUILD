@@ -39,6 +39,7 @@ envoy_cc_library(
         "//source/common/access_log:access_log_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:basic_resource_lib",
+        "//source/common/common:cpu_affinity_lib",
         "//source/common/common:empty_string",
         "//source/common/config:utility_lib",
         "//source/common/http:conn_manager_lib",

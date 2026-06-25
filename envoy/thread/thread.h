@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -65,6 +66,10 @@ struct Options {
   // If no value is set, the thread will be created with the default thread priority for the
   // platform.
   absl::optional<int> priority_{absl::nullopt};
+
+  // An optional CPU index to pin the thread to. When set, the thread sets its affinity to this
+  // single CPU at start. Supported on Linux, ignored on other platforms.
+  absl::optional<uint32_t> cpu_affinity_{absl::nullopt};
 };
 
 using OptionsOptConstRef = const absl::optional<Options>&;

@@ -48,6 +48,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "cpu_affinity_lib",
+    srcs = ["cpu_affinity.cc"],
+    hdrs = ["cpu_affinity.h"],
+    deps = [
+        "//source/common/api:os_sys_calls_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "debug_recursion_checker_lib",
     hdrs = ["debug_recursion_checker.h"],
     deps = [":assert_lib"],

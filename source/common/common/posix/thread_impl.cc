@@ -8,6 +8,7 @@
 #include "absl/strings/str_cat.h"
 
 #if defined(__linux__)
+#include <sched.h>
 #include <sys/resource.h>
 #include <sys/syscall.h>
 #elif defined(__APPLE__)
@@ -62,6 +63,25 @@ void setThreadPriority(const int64_t tid, const int priority) {
 #endif
 }
 
+void setThreadAffinity(const uint32_t cpu) {
+#if defined(__linux__)
+  if (cpu >= CPU_SETSIZE) {
+    ENVOY_LOG_MISC(warn, "thread affinity CPU {} exceeds the supported maximum", cpu);
+    return;
+  }
+  cpu_set_t set;
+  CPU_ZERO(&set);
+  CPU_SET(cpu, &set);
+  const int rc = sched_setaffinity(0, sizeof(set), &set);
+  if (rc != 0) {
+    ENVOY_LOG_MISC(warn, "failed to set thread affinity to CPU {}: {}", cpu,
+                   Envoy::errorDetails(errno));
+  }
+#else
+  UNREFERENCED_PARAMETER(cpu);
+#endif
+}
+
 } // namespace
 
 // See https://www.man7.org/linux/man-pages/man3/pthread_setname_np.3.html.
@@ -70,13 +90,17 @@ void setThreadPriority(const int64_t tid, const int priority) {
 #define PTHREAD_MAX_THREADNAME_LEN_INCLUDING_NULL_BYTE 16
 
 ThreadHandle::ThreadHandle(std::function<void()> thread_routine,
-                           absl::optional<int> thread_priority)
-    : thread_routine_(thread_routine), thread_priority_(thread_priority) {}
+                           absl::optional<int> thread_priority,
+                           absl::optional<uint32_t> thread_cpu_affinity)
+    : thread_routine_(thread_routine), thread_priority_(thread_priority),
+      thread_cpu_affinity_(thread_cpu_affinity) {}
 
 /** Returns the thread routine. */
 std::function<void()>& ThreadHandle::routine() { return thread_routine_; }
 
 absl::optional<int> ThreadHandle::priority() const { return thread_priority_; }
+
+absl::optional<uint32_t> ThreadHandle::cpuAffinity() const { return thread_cpu_affinity_; }
 
 /** Returns the thread handle. */
 pthread_t& ThreadHandle::handle() { return thread_handle_; }
@@ -175,6 +199,9 @@ int PosixThreadFactory::createPthread(ThreadHandle* thread_handle) {
         if (handle->priority()) {
           setThreadPriority(getCurrentThreadId(), *handle->priority());
         }
+        if (handle->cpuAffinity()) {
+          setThreadAffinity(*handle->cpuAffinity());
+        }
         handle->routine()();
         return nullptr;
       },
@@ -184,7 +211,8 @@ int PosixThreadFactory::createPthread(ThreadHandle* thread_handle) {
 PosixThreadPtr PosixThreadFactory::createThread(std::function<void()> thread_routine,
                                                 OptionsOptConstRef options, bool crash_on_failure) {
   auto thread_handle =
-      new ThreadHandle(thread_routine, options ? options->priority_ : absl::nullopt);
+      new ThreadHandle(thread_routine, options ? options->priority_ : absl::nullopt,
+                       options ? options->cpu_affinity_ : absl::nullopt);
   const int rc = createPthread(thread_handle);
   if (rc != 0) {
     delete thread_handle;
