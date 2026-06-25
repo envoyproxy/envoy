@@ -10,7 +10,6 @@
 #include "absl/base/thread_annotations.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
-#include "absl/types/optional.h"
 #include "brotli/decode.h"
 #include "brotli/encode.h"
 #include "openssl/tls1.h"
@@ -68,7 +67,7 @@ int writeToCbb(CBB* out, const std::string& data) {
 }
 
 int compressCached(SSL* ssl, uint16_t alg,
-                   absl::optional<std::string> (*compressor)(const uint8_t*, size_t), CBB* out,
+                   std::optional<std::string> (*compressor)(const uint8_t*, size_t), CBB* out,
                    const uint8_t* in, size_t in_len) {
   ASSERT(ssl != nullptr);
   auto* cache = static_cast<CompressedCertCache*>(
@@ -86,7 +85,7 @@ int compressCached(SSL* ssl, uint16_t alg,
     }
   }
 
-  absl::optional<std::string> compressed = compressor(in, in_len);
+  std::optional<std::string> compressed = compressor(in, in_len);
   if (!compressed.has_value()) {
     return CertCompression::FAILURE;
   }
@@ -96,11 +95,11 @@ int compressCached(SSL* ssl, uint16_t alg,
   return writeToCbb(out, it->second);
 }
 
-absl::optional<std::string> doBrotliCompress(const uint8_t* in, size_t in_len) {
+std::optional<std::string> doBrotliCompress(const uint8_t* in, size_t in_len) {
   size_t encoded_size = BrotliEncoderMaxCompressedSize(in_len);
   if (encoded_size == 0) {
     IS_ENVOY_BUG("BrotliEncoderMaxCompressedSize returned 0");
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   std::string compressed(encoded_size, '\0');
@@ -108,7 +107,7 @@ absl::optional<std::string> doBrotliCompress(const uint8_t* in, size_t in_len) {
                             in_len, in, &encoded_size,
                             reinterpret_cast<uint8_t*>(compressed.data())) != BROTLI_TRUE) {
     IS_ENVOY_BUG("Cert compression failure in BrotliEncoderCompress");
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   compressed.resize(encoded_size);
@@ -188,7 +187,7 @@ private:
   CleanupFunc cleanup_;
 };
 
-absl::optional<std::string> doZlibCompress(const uint8_t* in, size_t in_len) {
+std::optional<std::string> doZlibCompress(const uint8_t* in, size_t in_len) {
   z_stream z = {};
   // The deflateInit macro from zlib.h contains an old-style cast, so we need to suppress the
   // warning for this call.
@@ -198,7 +197,7 @@ absl::optional<std::string> doZlibCompress(const uint8_t* in, size_t in_len) {
 #pragma GCC diagnostic pop
   if (rv != Z_OK) {
     IS_ENVOY_BUG(fmt::format("Cert compression failure in deflateInit: {}", rv));
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   ScopedZStream deleter(z, deflateEnd);
