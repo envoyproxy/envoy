@@ -1,6 +1,7 @@
 #pragma once
 
-#include "absl/types/optional.h"
+#include <optional>
+
 #include "quiche/quic/core/quic_packet_writer.h"
 
 namespace Envoy {
@@ -29,7 +30,7 @@ public:
     return {nullptr, nullptr};
   }
   quic::WriteResult Flush() override { return quic::WriteResult(quic::WRITE_STATUS_OK, 0); }
-  absl::optional<int> MessageTooBigErrorCode() const override { return absl::nullopt; }
+  std::optional<int> MessageTooBigErrorCode() const override { return std::nullopt; }
   bool SupportsEcn() const override { return false; }
 };
 
