@@ -881,7 +881,7 @@ ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
   auto transport_socket = filter_chain.transport_socket();
   if (!filter_chain.has_transport_socket()) {
     envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
-    transport_socket.mutable_typed_config()->PackFrom(raw_buffer);
+    std::ignore = transport_socket.mutable_typed_config()->PackFrom(raw_buffer);
     transport_socket.set_name("envoy.transport_sockets.raw_buffer");
   }
 
@@ -910,7 +910,7 @@ ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
 #else
   // When QUIC is compiled out it should not be possible to configure either the QUIC transport
   // socket or the QUIC listener and get to this point.
-  ASSERT(!is_quic);
+  ASSERT(!is_quic_);
 #endif
   ProtobufTypes::MessagePtr message =
       Config::Utility::translateToFactoryConfig(transport_socket, validator_, config_factory);
@@ -934,6 +934,7 @@ ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
   filter_chain_res->setFilterChainFactoryContext(std::move(filter_chain_factory_context));
   return filter_chain_res;
 }
+
 
 } // namespace Server
 } // namespace Envoy
