@@ -20,7 +20,7 @@ public:
                  Event::TimeSystem& time_system, Filesystem::Instance& file_system,
                  Random::RandomGenerator& random_generator,
                  const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                 const ProcessContextOptRef& process_context = absl::nullopt);
+                 const ProcessContextOptRef& process_context = std::nullopt);
 
   Event::DispatcherPtr allocateDispatcher(const std::string& name) override;
   Event::DispatcherPtr allocateDispatcher(const std::string& name,

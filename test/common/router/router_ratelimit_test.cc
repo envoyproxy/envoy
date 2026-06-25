@@ -773,7 +773,7 @@ actions:
 
   setupTest(yaml);
 
-  EXPECT_CALL(stream_info_, upstreamClusterInfo()).WillRepeatedly(testing::Return(absl::nullopt));
+  EXPECT_CALL(stream_info_, upstreamClusterInfo()).WillRepeatedly(testing::Return(std::nullopt));
 
   rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
 

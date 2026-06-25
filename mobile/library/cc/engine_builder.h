@@ -12,7 +12,7 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/types/optional.h"
+#include <optional>
 #include "library/cc/engine.h"
 #include "library/cc/key_value_store.h"
 #include "library/cc/string_accessor.h"
@@ -212,7 +212,7 @@ private:
   int dns_query_timeout_seconds_ = 120;
   bool disable_dns_refresh_on_failure_{false};
   bool disable_dns_refresh_on_network_change_{false};
-  absl::optional<uint32_t> dns_num_retries_ = 3;
+  std::optional<uint32_t> dns_num_retries_ = 3;
   uint32_t getaddrinfo_num_threads_ = 1;
   int h2_connection_keepalive_idle_interval_milliseconds_ = 100000000;
   int h2_connection_keepalive_timeout_seconds_ = 15;
@@ -228,8 +228,8 @@ private:
   bool platform_certificates_validation_on_ = false;
   bool dns_cache_on_ = false;
   int dns_cache_save_interval_seconds_ = 1;
-  absl::optional<int> network_thread_priority_ = absl::nullopt;
-  absl::optional<size_t> high_watermark_ = absl::nullopt;
+  std::optional<int> network_thread_priority_ = std::nullopt;
+  std::optional<size_t> high_watermark_ = std::nullopt;
 
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 
@@ -258,7 +258,7 @@ private:
 
   std::vector<NativeFilterConfig> native_filter_chain_;
   std::vector<std::pair<std::string /* host */, uint32_t /* port */>> dns_preresolve_hostnames_;
-  absl::optional<envoy::config::core::v3::TypedExtensionConfig> dns_resolver_config_;
+  std::optional<envoy::config::core::v3::TypedExtensionConfig> dns_resolver_config_;
   std::vector<envoy::config::core::v3::SocketOption> socket_options_;
 
   std::vector<std::pair<std::string, bool>> runtime_guards_;
@@ -289,14 +289,14 @@ private:
   int max_time_on_non_default_network_seconds_ = 0;
 
   std::string node_id_;
-  absl::optional<NodeLocality> node_locality_ = absl::nullopt;
-  absl::optional<Protobuf::Struct> node_metadata_ = absl::nullopt;
+  std::optional<NodeLocality> node_locality_ = std::nullopt;
+  std::optional<Protobuf::Struct> node_metadata_ = std::nullopt;
   bool enable_stats_collection_ = true;
   bool use_worker_thread_{false};
   bool enable_network_change_monitor_{false};
 
 #ifdef ENVOY_MOBILE_XDS
-  absl::optional<XdsBuilder> xds_builder_ = absl::nullopt;
+  std::optional<XdsBuilder> xds_builder_ = std::nullopt;
 #endif // ENVOY_MOBILE_XDS
 };
 

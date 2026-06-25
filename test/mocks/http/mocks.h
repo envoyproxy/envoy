@@ -99,7 +99,7 @@ public:
   MOCK_METHOD(Router::RouteConstSharedPtr, routeSharedPtr, (const Router::RouteCallback& cb));
   MOCK_METHOD(void, setRoute, (Router::RouteConstSharedPtr));
   MOCK_METHOD(void, clearRouteCache, ());
-  MOCK_METHOD(absl::optional<Router::ConfigConstSharedPtr>, routeConfig, ());
+  MOCK_METHOD(std::optional<Router::ConfigConstSharedPtr>, routeConfig, ());
   MOCK_METHOD(void, requestRouteConfigUpdate, (Http::RouteConfigUpdatedCallbackSharedPtr));
   MOCK_METHOD(Tracing::Span&, activeSpan, ());
   MOCK_METHOD(void, onResponseDataTooLarge, ());
@@ -197,7 +197,7 @@ public:
   MOCK_METHOD(absl::string_view, filterConfigName, (), (const));
   MOCK_METHOD(void, setFilterConfigName, (absl::string_view name));
   MOCK_METHOD(OptRef<const Router::Route>, route, (), (const));
-  MOCK_METHOD(absl::optional<bool>, filterDisabled, (absl::string_view filter_name), (const));
+  MOCK_METHOD(std::optional<bool>, filterDisabled, (absl::string_view filter_name), (const));
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
   MOCK_METHOD(RequestHeaderMapOptRef, requestHeaders, (), (const));
 };
@@ -264,7 +264,7 @@ public:
   MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfoSharedPtr, ());
   MOCK_METHOD(OptRef<const Router::Route>, route, ());
   MOCK_METHOD(Router::RouteConstSharedPtr, routeSharedPtr, ());
-  MOCK_METHOD(absl::optional<Router::ConfigConstSharedPtr>, routeConfig, ());
+  MOCK_METHOD(std::optional<Router::ConfigConstSharedPtr>, routeConfig, ());
   MOCK_METHOD(uint64_t, streamId, (), (const));
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(Tracing::Span&, activeSpan, ());
@@ -297,7 +297,7 @@ public:
   // NOLINTNEXTLINE(readability-identifier-naming)
   void sendLocalReply_(Code code, absl::string_view body,
                        std::function<void(ResponseHeaderMap& headers)> modify_headers,
-                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                       const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                        absl::string_view details);
 
   void encode1xxHeaders(ResponseHeaderMapPtr&& headers) override { encode1xxHeaders_(*headers); }
@@ -332,7 +332,7 @@ public:
   MOCK_METHOD(void, sendLocalReply,
               (Code code, absl::string_view body,
                std::function<void(ResponseHeaderMap& headers)> modify_headers,
-               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+               const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                absl::string_view details));
   MOCK_METHOD(Buffer::BufferMemoryAccountSharedPtr, account, (), (const));
   MOCK_METHOD(void, setUpstreamOverrideHost, (Upstream::LoadBalancerContext::OverrideHost));
@@ -402,7 +402,7 @@ public:
   MOCK_METHOD(void, sendLocalReply,
               (Code code, absl::string_view body,
                std::function<void(ResponseHeaderMap& headers)> modify_headers,
-               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+               const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                absl::string_view details));
 
   Buffer::InstancePtr buffer_;
@@ -433,7 +433,7 @@ public:
   MOCK_METHOD(void, sendLocalReply,
               (Code code, absl::string_view body,
                const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-               bool is_head_request, const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+               bool is_head_request, const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                absl::string_view details));
 
   Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -590,7 +590,7 @@ public:
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, (), (override));
 
 private:
-  absl::optional<AsyncClient::StreamDestructorCallbacks> destructor_callback_;
+  std::optional<AsyncClient::StreamDestructorCallbacks> destructor_callback_;
 };
 
 class MockAsyncClientOngoingRequest : public virtual AsyncClient::OngoingRequest,
@@ -638,7 +638,7 @@ public:
   MOCK_METHOD(const AccessLog::InstanceSharedPtrVector&, accessLogs, ());
   MOCK_METHOD(bool, flushAccessLogOnNewRequest, ());
   MOCK_METHOD(bool, flushAccessLogOnTunnelSuccessfullyEstablished, (), (const));
-  MOCK_METHOD(const absl::optional<std::chrono::milliseconds>&, accessLogFlushInterval, ());
+  MOCK_METHOD(const std::optional<std::chrono::milliseconds>&, accessLogFlushInterval, ());
   MOCK_METHOD(ServerConnection*, createCodec_,
               (Network::Connection&, const Buffer::Instance&, ServerConnectionCallbacks&,
                Server::OverloadManager&));
@@ -650,13 +650,13 @@ public:
   MOCK_METHOD(bool, alwaysSetRequestIdInResponse, (), (const));
   MOCK_METHOD(uint32_t, maxRequestHeadersKb, (), (const));
   MOCK_METHOD(uint32_t, maxRequestHeadersCount, (), (const));
-  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
+  MOCK_METHOD(std::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
   MOCK_METHOD(bool, isRoutable, (), (const));
-  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxConnectionDuration, (), (const));
+  MOCK_METHOD(std::optional<std::chrono::milliseconds>, maxConnectionDuration, (), (const));
   MOCK_METHOD(bool, http1SafeMaxConnectionDuration, (), (const));
-  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
+  MOCK_METHOD(std::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, streamIdleTimeout, (), (const));
-  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, streamFlushTimeout, (), (const));
+  MOCK_METHOD(std::optional<std::chrono::milliseconds>, streamFlushTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, requestTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, requestHeadersTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, delayedCloseTimeout, (), (const));
@@ -666,7 +666,7 @@ public:
   MOCK_METHOD(const std::string&, serverName, (), (const));
   MOCK_METHOD(HttpConnectionManagerProto::ServerHeaderTransformation, serverHeaderTransformation,
               (), (const));
-  MOCK_METHOD(const absl::optional<std::string>&, schemeToSet, (), (const));
+  MOCK_METHOD(const std::optional<std::string>&, schemeToSet, (), (const));
   MOCK_METHOD(bool, shouldSchemeMatchUpstream, (), (const));
   MOCK_METHOD(ConnectionManagerStats&, stats, ());
   MOCK_METHOD(ConnectionManagerTracingStats&, tracingStats, ());
@@ -686,7 +686,7 @@ public:
   MOCK_METHOD(const Matcher::MatchTreePtr<HttpMatchingData>&, forwardClientCertMatcher, (),
               (const));
   MOCK_METHOD(const Network::Address::Instance&, localAddress, ());
-  MOCK_METHOD(const absl::optional<std::string>&, userAgent, ());
+  MOCK_METHOD(const std::optional<std::string>&, userAgent, ());
   MOCK_METHOD(const Http::TracingConnectionManagerConfig*, tracingConfig, ());
   MOCK_METHOD(Tracing::TracerSharedPtr, tracer, ());
   MOCK_METHOD(ConnectionManagerListenerStats&, listenerStats, ());
@@ -727,7 +727,7 @@ public:
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<AllowInternalAddressConfig>();
   std::vector<Http::EarlyHeaderMutationPtr> early_header_mutation_extensions_;
-  absl::optional<std::string> scheme_;
+  std::optional<std::string> scheme_;
   bool scheme_match_upstream_;
   absl::flat_hash_set<uint32_t> https_destination_ports_;
   absl::flat_hash_set<uint32_t> http_destination_ports_;
@@ -738,9 +738,9 @@ public:
   MockReceivedSettings();
   ~MockReceivedSettings() override = default;
 
-  MOCK_METHOD(const absl::optional<uint32_t>&, maxConcurrentStreams, (), (const));
+  MOCK_METHOD(const std::optional<uint32_t>&, maxConcurrentStreams, (), (const));
 
-  absl::optional<uint32_t> max_concurrent_streams_;
+  std::optional<uint32_t> max_concurrent_streams_;
 };
 
 } // namespace Http

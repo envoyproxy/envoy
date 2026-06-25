@@ -38,14 +38,15 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
       trust_chain_verification_(config.trust_chain_verification()),
       custom_validator_config_(
           config.has_custom_validator_config()
-              ? absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>(
+              ? std::make_optional<envoy::config::core::v3::TypedExtensionConfig>(
                     config.custom_validator_config())
-              : absl::nullopt),
+              : std::nullopt),
       api_(api), only_verify_leaf_cert_crl_(config.only_verify_leaf_cert_crl()),
       max_verify_depth_(config.has_max_verify_depth()
-                            ? absl::optional<uint32_t>(config.max_verify_depth().value())
-                            : absl::nullopt),
-      auto_sni_san_match_(auto_sni_san_match) {}
+                            ? std::optional<uint32_t>(config.max_verify_depth().value())
+                            : std::nullopt),
+      auto_sni_san_match_(auto_sni_san_match),
+      suppress_client_ca_list_(config.suppress_client_ca_list()) {}
 
 absl::StatusOr<std::unique_ptr<CertificateValidationContextConfigImpl>>
 CertificateValidationContextConfigImpl::create(
@@ -70,7 +71,7 @@ CertificateValidationContextConfigImpl::create(
 }
 
 absl::Status CertificateValidationContextConfigImpl::initialize() {
-  if (ca_cert_.empty() && custom_validator_config_ == absl::nullopt) {
+  if (ca_cert_.empty() && custom_validator_config_ == std::nullopt) {
     if (!certificate_revocation_list_.empty()) {
       return absl::InvalidArgumentError(fmt::format("Failed to load CRL from {} without trusted CA",
                                                     certificateRevocationListPath()));

@@ -182,7 +182,7 @@ protected:
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
     logical_host->createConnection(server_context_.dispatcher_, nullptr, nullptr);
     logical_host->outlierDetector().putResult(Outlier::Result::ExtOriginRequestSuccess,
-                                              absl::optional<uint64_t>(200));
+                                              std::optional<uint64_t>(200));
 
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
     resolve_timer_->invokeCallback();
@@ -222,7 +222,7 @@ protected:
     EXPECT_TRUE(TestUtility::protoEqual(envoy::config::core::v3::Metadata::default_instance(),
                                         *data.host_description_->metadata()));
     data.host_description_->outlierDetector().putResult(Outlier::Result::ExtOriginRequestSuccess,
-                                                        absl::optional<uint64_t>(200));
+                                                        std::optional<uint64_t>(200));
     data.host_description_->healthChecker().setUnhealthy(
         HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail);
 

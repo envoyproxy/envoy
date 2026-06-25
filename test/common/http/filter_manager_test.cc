@@ -152,7 +152,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
       .WillRepeatedly(Invoke([&](RequestHeaderMap& headers, bool) -> FilterHeadersStatus {
         headers.setContentType("text/plain");
 
-        filter->callbacks_->sendLocalReply(Code::InternalServerError, "", nullptr, absl::nullopt,
+        filter->callbacks_->sendLocalReply(Code::InternalServerError, "", nullptr, std::nullopt,
                                            "details");
 
         return FilterHeadersStatus::StopIteration;
@@ -218,7 +218,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
   EXPECT_CALL(*encoder_filter, encodeHeaders(_, true))
       .WillRepeatedly(Invoke([&](auto&, bool) -> FilterHeadersStatus {
         encoder_filter->encoder_callbacks_->sendLocalReply(Code::InternalServerError, "", nullptr,
-                                                           absl::nullopt, "details");
+                                                           std::nullopt, "details");
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -373,7 +373,7 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
     EXPECT_CALL(*encoder_filter, encodeHeaders(_, _))
         .WillOnce(Invoke([&](ResponseHeaderMap&, bool) -> FilterHeadersStatus {
           decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body2", nullptr,
-                                                     absl::nullopt, "details2");
+                                                     std::nullopt, "details2");
           return FilterHeadersStatus::StopIteration;
         }));
 
@@ -386,7 +386,7 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
     EXPECT_CALL(dispatcher_, trackedObjectStackIsEmpty()).Times(0);
 
     decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
-                                               absl::nullopt, "details");
+                                               std::nullopt, "details");
   }
 
   // The final details should be details2.
@@ -629,7 +629,7 @@ TEST_F(FilterManagerTest, DecodeMetadataSendsLocalReply) {
 
   EXPECT_CALL(*filter_1, decodeMetadata(_)).WillOnce([&]() {
     filter_1->decoder_callbacks_->sendLocalReply(Code::InternalServerError, "bad_metadata", nullptr,
-                                                 absl::nullopt, "bad_metadata");
+                                                 std::nullopt, "bad_metadata");
     return FilterMetadataStatus::StopIterationForLocalReply;
   });
 
@@ -682,7 +682,7 @@ TEST_F(FilterManagerTest, MetadataContinueAllFollowedByHeadersLocalReply) {
   MetadataMap map2 = {{"c", "d"}};
   EXPECT_CALL(*filter_2, decodeHeaders(_, _)).WillOnce([&]() {
     filter_2->decoder_callbacks_->sendLocalReply(Code::InternalServerError, "bad_headers", nullptr,
-                                                 absl::nullopt, "bad_headers");
+                                                 std::nullopt, "bad_headers");
     return FilterHeadersStatus::StopIteration;
   });
   // filter_2 should never decode metadata.
@@ -721,7 +721,7 @@ TEST_F(FilterManagerTest, EncodeMetadataSendsLocalReply) {
 
   EXPECT_CALL(*filter_2, encodeMetadata(_)).WillOnce([&]() {
     filter_2->encoder_callbacks_->sendLocalReply(Code::InternalServerError, "", nullptr,
-                                                 absl::nullopt, "bad_metadata");
+                                                 std::nullopt, "bad_metadata");
     return FilterMetadataStatus::StopIterationForLocalReply;
   });
   // Headers have already passed through; we will reset the stream.

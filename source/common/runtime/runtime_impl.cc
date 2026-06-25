@@ -150,7 +150,7 @@ Snapshot::ConstStringOptRef SnapshotImpl::get(absl::string_view key) const {
   ASSERT(!isRuntimeFeature(key)); // Make sure runtime guarding is only used for getBoolean
   auto entry = key.empty() ? values_.end() : values_.find(key);
   if (entry == values_.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return entry->second.raw_string_value_;
   }

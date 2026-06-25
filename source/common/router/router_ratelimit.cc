@@ -268,7 +268,7 @@ bool QueryParametersAction::populateDescriptor(RateLimit::DescriptorEntry& descr
   Http::Utility::QueryParamsMulti query_parameters =
       Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
 
-  const absl::optional<std::string> query_param_value =
+  const std::optional<std::string> query_param_value =
       query_parameters.getFirstValue(query_param_name_);
 
   // If query parameter is not present and ``skip_if_absent`` is ``true``, skip this descriptor.

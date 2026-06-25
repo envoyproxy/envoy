@@ -116,3 +116,5 @@ areas:
     title: proxy_protocol
   zstd:
     title: zstd
+  server:
+    title: server

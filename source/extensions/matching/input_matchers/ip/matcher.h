@@ -25,7 +25,7 @@ public:
   Matcher(std::vector<Network::Address::CidrRange> const& ranges, absl::string_view stat_prefix,
           Stats::Scope& stat_scope);
   ::Envoy::Matcher::MatchResult match(const Envoy::Matcher::DataInputGetResult& input) override;
-  absl::optional<const MatcherStats> stats() const { return stats_; }
+  std::optional<const MatcherStats> stats() const { return stats_; }
 
 private:
   const Network::LcTrie::LcTrie<bool> trie_;

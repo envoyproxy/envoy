@@ -101,7 +101,7 @@ AssertionResult RouterTestBase::verifyHostUpstreamStats(uint64_t success, uint64
 }
 
 void RouterTestBase::verifyAttemptCountInRequestBasic(bool set_include_attempt_count_in_request,
-                                                      absl::optional<int> preset_count,
+                                                      std::optional<int> preset_count,
                                                       int expected_count) {
   setIncludeAttemptCountInRequest(set_include_attempt_count_in_request);
 
@@ -130,7 +130,7 @@ void RouterTestBase::verifyAttemptCountInRequestBasic(bool set_include_attempt_c
 }
 
 void RouterTestBase::verifyAttemptCountInResponseBasic(bool set_include_attempt_count_in_response,
-                                                       absl::optional<int> preset_count,
+                                                       std::optional<int> preset_count,
                                                        int expected_count) {
   setIncludeAttemptCountInResponse(set_include_attempt_count_in_response);
 
@@ -150,7 +150,7 @@ void RouterTestBase::verifyAttemptCountInResponseBasic(bool set_include_attempt_
   }
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([expected_count](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ(expected_count, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
@@ -281,7 +281,7 @@ void RouterTestBase::executeMetadataTest(
         validator) {
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
       .WillOnce(Invoke([this, validator](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                                         absl::optional<Http::Protocol>,
+                                         std::optional<Http::Protocol>,
                                          Upstream::LoadBalancerContext* context) {
         auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
         validator(match);

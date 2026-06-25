@@ -8,7 +8,7 @@
 namespace Envoy {
 namespace Server {
 
-class FactoryContextImplBase : virtual public Configuration::FactoryContext {
+class FactoryContextImplBase : virtual public Configuration::ListenerFactoryContext {
 public:
   FactoryContextImplBase(Server::Instance& server,
                          ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -20,7 +20,11 @@ public:
   Stats::Scope& scope() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
   const Network::ListenerInfo& listenerInfo() const override;
+  envoy::config::core::v3::TrafficDirection direction() const override;
+  bool isQuic() const override;
+  bool shouldBypassOverloadManager() const override;
 
+  Stats::Scope& prefixedScope() override;
   Stats::Scope& listenerScope() override;
 
 protected:

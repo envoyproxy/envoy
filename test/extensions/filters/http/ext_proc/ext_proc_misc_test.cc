@@ -91,7 +91,7 @@ protected:
   }
 
   IntegrationStreamDecoderPtr sendDownstreamRequest(
-      absl::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers) {
+      std::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestRequestHeaderMapImpl headers;
@@ -104,7 +104,7 @@ protected:
 
   void processRequestHeadersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
+      std::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
     ProcessingRequest request;
     if (first_message) {
       ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -125,7 +125,7 @@ protected:
 
   void processResponseHeadersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
+      std::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
     ProcessingRequest request;
     if (first_message) {
       ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -144,9 +144,9 @@ protected:
     }
   }
 
-  void processRequestBodyMessage(
-      FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb) {
+  void
+  processRequestBodyMessage(FakeUpstream& grpc_upstream, bool first_message,
+                            std::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb) {
     ProcessingRequest request;
     if (first_message) {
       ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -209,12 +209,12 @@ body_format:
       headers.addCopy(LowerCaseString("connection"), "Upgrade");
     });
 
-    processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+    processRequestHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
 
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
     ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-    processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+    processResponseHeadersMessage(*grpc_upstreams_[0], false, std::nullopt);
     verifyDownstreamResponse(*response, 200);
   }
 
@@ -263,7 +263,7 @@ TEST_P(ExtProcMiscIntegrationTest, SendEmptyLastBodyChunk) {
   const uint32_t init_body_size = 1000;
   std::string init_body(init_body_size, 'a');
   codec_client_->sendData(*request_encoder_, init_body, false);
-  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
 
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(20));
   const uint32_t body_size = 2000;

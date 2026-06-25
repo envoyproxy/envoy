@@ -98,7 +98,7 @@ protected:
   }
 
   Http::RequestEncoder&
-  sendClientRequestHeaders(absl::optional<std::function<void(Http::HeaderMap&)>> cb) {
+  sendClientRequestHeaders(std::optional<std::function<void(Http::HeaderMap&)>> cb) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestRequestHeaderMapImpl headers{{":method", "POST"}};
@@ -121,7 +121,7 @@ protected:
   // "num_chunks" of "chunk_size" bytes each. Return a copy of the complete
   // body that may be used for comparison later.
   Buffer::OwnedImpl sendPostRequest(uint32_t num_chunks, uint32_t chunk_size,
-                                    absl::optional<std::function<void(Http::HeaderMap&)>> cb) {
+                                    std::optional<std::function<void(Http::HeaderMap&)>> cb) {
     auto& encoder = sendClientRequestHeaders(cb);
     Buffer::OwnedImpl post_body;
     for (uint32_t i = 0; i < num_chunks && codec_client_->streamOpen(); i++) {

@@ -26,7 +26,7 @@ public:
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
     UNREFERENCED_PARAMETER(end_stream);
 
-    absl::optional<Upstream::TcpPoolData> pool_data =
+    std::optional<Upstream::TcpPoolData> pool_data =
         cluster_manager_.getThreadLocalCluster("cluster_0")
             ->tcpConnPool(Upstream::ResourcePriority::Default, nullptr);
     ASSERT(pool_data.has_value());

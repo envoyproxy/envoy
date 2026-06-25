@@ -84,11 +84,11 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
           std::move(addrs.begin(), addrs.end(), std::inserter(addr_vec, addr_vec.end()));
         } else {
           // Add a new endpoint config for the new domain
-          endpoint_config.address_list = absl::make_optional<AddressConstPtrVec>(std::move(addrs));
+          endpoint_config.address_list = std::make_optional<AddressConstPtrVec>(std::move(addrs));
           virtual_domains->emplace(std::string(virtual_domain_name), std::move(endpoint_config));
         }
       } else {
-        endpoint_config.address_list = absl::make_optional<AddressConstPtrVec>(std::move(addrs));
+        endpoint_config.address_list = std::make_optional<AddressConstPtrVec>(std::move(addrs));
         addEndpointToSuffix(suffix, virtual_domain_name, endpoint_config);
       }
     }
@@ -135,7 +135,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
 
         DnsEndpointConfig endpoint_config{};
         endpoint_config.service_list =
-            absl::make_optional<DnsSrvRecordPtr>(std::move(service_record_ptr));
+            std::make_optional<DnsSrvRecordPtr>(std::move(service_record_ptr));
 
         auto virtual_domains = dns_lookup_trie_.find(suffix);
         if (virtual_domains != nullptr) {
@@ -148,7 +148,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     const absl::string_view cluster_name = virtual_domain.endpoint().cluster_name();
     if (!cluster_name.empty()) {
       DnsEndpointConfig endpoint_config{};
-      endpoint_config.cluster_name = absl::make_optional<std::string>(cluster_name);
+      endpoint_config.cluster_name = std::make_optional<std::string>(cluster_name);
 
       // See if there's a suffix already configured
       auto virtual_domains = dns_lookup_trie_.find(suffix);

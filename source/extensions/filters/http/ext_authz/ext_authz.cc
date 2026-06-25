@@ -103,30 +103,30 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       validate_mutations_(config.validate_mutations()), scope_(scope),
       decoder_header_mutation_checker_(
           config.has_decoder_header_mutation_rules()
-              ? absl::optional<Filters::Common::MutationRules::Checker>(
+              ? std::optional<Filters::Common::MutationRules::Checker>(
                     Filters::Common::MutationRules::Checker(config.decoder_header_mutation_rules(),
                                                             factory_context.regexEngine()))
-              : absl::nullopt),
+              : std::nullopt),
       enable_dynamic_metadata_ingestion_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enable_dynamic_metadata_ingestion, true)),
       runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
-      filter_metadata_(config.has_filter_metadata() ? absl::optional(config.filter_metadata())
-                                                    : absl::nullopt),
+      filter_metadata_(config.has_filter_metadata() ? std::optional(config.filter_metadata())
+                                                    : std::nullopt),
       emit_filter_state_stats_(config.emit_filter_state_stats()),
       enforce_response_header_limits_(config.enforce_response_header_limits()),
       filter_enabled_(config.has_filter_enabled()
-                          ? absl::optional<Runtime::FractionalPercent>(
+                          ? std::optional<Runtime::FractionalPercent>(
                                 Runtime::FractionalPercent(config.filter_enabled(), runtime_))
-                          : absl::nullopt),
+                          : std::nullopt),
       filter_enabled_metadata_(
           config.has_filter_enabled_metadata()
-              ? absl::optional<Matchers::MetadataMatcher>(
+              ? std::optional<Matchers::MetadataMatcher>(
                     Matchers::MetadataMatcher(config.filter_enabled_metadata(), factory_context))
-              : absl::nullopt),
+              : std::nullopt),
       deny_at_disable_(config.has_deny_at_disable()
-                           ? absl::optional<Runtime::FeatureFlag>(
+                           ? std::optional<Runtime::FeatureFlag>(
                                  Runtime::FeatureFlag(config.deny_at_disable(), runtime_))
-                           : absl::nullopt),
+                           : std::nullopt),
       pool_(scope_.symbolTable()),
       metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
                                    config.metadata_context_namespaces().end()),
@@ -204,9 +204,9 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       // specific configuration. If the more specific configuration has no override, leave both
       // unset so that the main filter configuration is used.
       grpc_service_(more_specific.grpc_service_.has_value() ? more_specific.grpc_service_
-                                                            : absl::nullopt),
+                                                            : std::nullopt),
       http_service_(more_specific.http_service_.has_value() ? more_specific.http_service_
-                                                            : absl::nullopt) {
+                                                            : std::nullopt) {
   // Merge context extensions from more specific configuration, overriding less specific ones.
   for (const auto& extension : more_specific.context_extensions_) {
     context_extensions_[extension.first] = extension.second;
@@ -226,10 +226,10 @@ Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grp
   // A timeout of 0 means infinite (no timeout). Convert to nullopt in that case.
   const uint32_t timeout_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(grpc_service, timeout, kDefaultPerRouteTimeoutMs);
-  const absl::optional<std::chrono::milliseconds> timeout =
+  const std::optional<std::chrono::milliseconds> timeout =
       timeout_ms == 0
-          ? absl::nullopt
-          : absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(timeout_ms));
+          ? std::nullopt
+          : std::optional<std::chrono::milliseconds>(std::chrono::milliseconds(timeout_ms));
 
   // We can skip transport version check for per-route gRPC service here.
   // The transport version is already validated at the main configuration level.
@@ -308,7 +308,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     }
   }
 
-  absl::optional<FilterConfigPerRoute> maybe_merged_per_route_config;
+  std::optional<FilterConfigPerRoute> maybe_merged_per_route_config;
   for (const FilterConfigPerRoute& cfg :
        Http::Utility::getAllPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_)) {
     if (maybe_merged_per_route_config.has_value()) {
@@ -433,7 +433,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
       decoder_callbacks_->sendLocalReply(
-          config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
+          config_->statusOnError(), EMPTY_STRING, nullptr, std::nullopt,
           Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -596,7 +596,7 @@ void Filter::updateEffect(const Effect effect) {
   logging_info_->setReqProcessingEffect(effect);
 }
 
-void Filter::updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& grpc_status) {
+void Filter::updateLoggingInfo(const std::optional<Grpc::Status::GrpcStatus>& grpc_status) {
   if (!config_->emitFilterStateStats()) {
     return;
   }
@@ -933,7 +933,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                              response->response_headers_to_overwrite_if_exists.end()};
     }
 
-    absl::optional<Http::Utility::QueryParamsMulti> modified_query_parameters;
+    std::optional<Http::Utility::QueryParamsMulti> modified_query_parameters;
     if (!response->query_parameters_to_set.empty()) {
       modified_query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(
           request_headers_->Path()->value().getStringView());
@@ -1075,7 +1075,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
             response_headers.addCopy(Http::LowerCaseString(key), value);
           }
         },
-        absl::nullopt, Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied);
+        std::nullopt, Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied);
     break;
   }
 
@@ -1138,7 +1138,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
            this](Http::HeaderMap& response_headers) -> void {
             addErrorResponseHeaders(response_headers, headers_to_set, headers_to_append);
           },
-          absl::nullopt, Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
+          std::nullopt, Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
     }
     break;
   }
@@ -1155,7 +1155,7 @@ void Filter::responseHeaderLimitsReached() {
   encoder_callbacks_->streamInfo().setResponseFlag(
       StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
   encoder_callbacks_->sendLocalReply(
-      status, EMPTY_STRING, nullptr, absl::nullopt,
+      status, EMPTY_STRING, nullptr, std::nullopt,
       Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzInvalid);
 }
 
@@ -1170,7 +1170,7 @@ void Filter::rejectResponse() {
   decoder_callbacks_->streamInfo().setResponseFlag(
       StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
   decoder_callbacks_->sendLocalReply(
-      status, EMPTY_STRING, nullptr, absl::nullopt,
+      status, EMPTY_STRING, nullptr, std::nullopt,
       Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzInvalid);
 }
 
@@ -1318,7 +1318,7 @@ ProtobufTypes::MessagePtr ShadowDecisionObject::serializeAsProto() const {
   return msg;
 }
 
-absl::optional<std::string> ShadowDecisionObject::serializeAsString() const {
+std::optional<std::string> ShadowDecisionObject::serializeAsString() const {
   ShadowDecisionProto msg;
   populateProto(msg);
   return MessageUtil::getJsonStringFromMessageOrError(msg);

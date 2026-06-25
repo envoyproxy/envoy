@@ -913,7 +913,6 @@ envoy_cc_test_library(
         "//source/common/network:address_lib",
         "//source/common/network:default_socket_interface_lib",
         "//test/test_common:network_utility_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ],
 )

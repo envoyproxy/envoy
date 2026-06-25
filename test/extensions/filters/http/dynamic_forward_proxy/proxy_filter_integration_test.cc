@@ -61,7 +61,7 @@ public:
       bool use_sub_cluster = false, double dns_query_timeout = 5,
       bool disable_dns_refresh_on_failure = false,
       bool allow_dynamic_host_from_filter_state = false,
-      const absl::optional<std::string>& prepend_custom_filter_config_yaml = absl::nullopt,
+      const std::optional<std::string>& prepend_custom_filter_config_yaml = std::nullopt,
       bool use_dfp_even_when_cluster_resolves_hosts = false) {
     const std::string filter_use_sub_cluster = R"EOF(
 name: dynamic_forward_proxy
@@ -1672,7 +1672,7 @@ TEST_P(ProxyFilterIntegrationTest, DoubleResolution) {
       "@type": type.googleapis.com/test.extensions.filters.http.dynamic_forward_proxy.ModifyHostFilterConfig
   )EOF");
   initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, false, 5, false, false,
-                     absl::nullopt, true);
+                     std::nullopt, true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 

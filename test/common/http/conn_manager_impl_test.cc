@@ -491,9 +491,9 @@ TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
 
   startRequest(false);
 
-  EXPECT_NE(absl::nullopt, decoder_->streamInfo().getStreamIdProvider());
-  EXPECT_NE(absl::nullopt, decoder_->streamInfo().getStreamIdProvider()->toInteger());
-  EXPECT_NE(absl::nullopt, decoder_->streamInfo().getStreamIdProvider()->toStringView());
+  EXPECT_NE(std::nullopt, decoder_->streamInfo().getStreamIdProvider());
+  EXPECT_NE(std::nullopt, decoder_->streamInfo().getStreamIdProvider()->toInteger());
+  EXPECT_NE(std::nullopt, decoder_->streamInfo().getStreamIdProvider()->toStringView());
   EXPECT_EQ(ssl_connection_, decoder_->streamInfo().downstreamAddressProvider().sslConnection());
   EXPECT_EQ(filter_callbacks_.connection_.id_,
             decoder_->streamInfo().downstreamAddressProvider().connectionID().value());
@@ -506,7 +506,7 @@ TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
                                          Network::ProxyProtocolFilterState::key())
                                      ->value();
 
-  EXPECT_EQ(proxy_proto_data.version_, absl::nullopt);
+  EXPECT_EQ(proxy_proto_data.version_, std::nullopt);
   // Clean up.
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
@@ -3184,7 +3184,7 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
           [&](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
             EXPECT_EQ(AccessLog::AccessLogType::DownstreamPeriodic, log_context.accessLogType());
             EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
-            EXPECT_EQ(stream_info.requestComplete(), absl::nullopt);
+            EXPECT_EQ(stream_info.requestComplete(), std::nullopt);
             EXPECT_THAT(stream_info.getDownstreamBytesMeter()->bytesAtLastDownstreamPeriodicLog(),
                         testing::IsNull());
           }))
@@ -3593,7 +3593,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
     EXPECT_CALL(*timer, disableTimer());
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
         .Times(1)
-        .WillRepeatedly(Return(absl::nullopt));
+        .WillRepeatedly(Return(std::nullopt));
     decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
@@ -3604,10 +3604,10 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
     EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(17), _));
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
         .Times(1)
-        .WillRepeatedly(Return(absl::nullopt));
+        .WillRepeatedly(Return(std::nullopt));
     decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
-    max_stream_duration_ = absl::nullopt;
+    max_stream_duration_ = std::nullopt;
   }
 
   // Add a gRPC header, but not a gRPC timeout and verify the timer is unchanged.
@@ -3616,7 +3616,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
     EXPECT_CALL(*timer, disableTimer());
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
         .Times(1)
-        .WillRepeatedly(Return(absl::nullopt));
+        .WillRepeatedly(Return(std::nullopt));
     decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
@@ -3701,7 +3701,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
                 grpcTimeoutHeaderOffset())
         .Times(AnyNumber())
-        .WillRepeatedly(Return(absl::nullopt));
+        .WillRepeatedly(Return(std::nullopt));
     EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(15), _));
     decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
@@ -3717,7 +3717,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
                 grpcTimeoutHeaderOffset())
         .Times(AnyNumber())
-        .WillRepeatedly(Return(absl::nullopt));
+        .WillRepeatedly(Return(std::nullopt));
     EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(0), _));
     decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
@@ -3863,9 +3863,9 @@ protected:
   const bool global_flush_timeout_set_;
   const bool route_flush_timeout_set_;
   const bool route_idle_timeout_set_;
-  absl::optional<std::chrono::milliseconds> global_flush_timeout_{absl::nullopt};
-  absl::optional<std::chrono::milliseconds> route_flush_timeout_{absl::nullopt};
-  absl::optional<std::chrono::milliseconds> route_idle_timeout_{absl::nullopt};
+  std::optional<std::chrono::milliseconds> global_flush_timeout_{std::nullopt};
+  std::optional<std::chrono::milliseconds> route_flush_timeout_{std::nullopt};
+  std::optional<std::chrono::milliseconds> route_idle_timeout_{std::nullopt};
 };
 
 INSTANTIATE_TEST_SUITE_P(IdleAndFlushTimeoutTestFixture, IdleAndFlushTimeoutTestFixture,
@@ -4964,9 +4964,9 @@ public:
                            /*decode_headers_stop_all=*/false);
     sendRequestHeadersAndData();
   }
-  const ResponseHeaderMap*
-  sendRequestWith(int status, StreamInfo::CoreResponseFlag response_flag, std::string details,
-                  absl::optional<std::string> proxy_status = absl::nullopt) {
+  const ResponseHeaderMap* sendRequestWith(int status, StreamInfo::CoreResponseFlag response_flag,
+                                           std::string details,
+                                           std::optional<std::string> proxy_status = std::nullopt) {
     auto response_headers = new TestResponseHeaderMapImpl{{":status", std::to_string(status)}};
     if (proxy_status.has_value()) {
       response_headers->setProxyStatus(proxy_status.value());

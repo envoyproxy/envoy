@@ -32,7 +32,7 @@ REGISTER_CUSTOM_RESPONSE_FLAG(CF, CustomFlag);
 REGISTER_CUSTOM_RESPONSE_FLAG(CF2, CustomFlag2);
 
 std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
-                                       absl::optional<std::chrono::nanoseconds> timing) {
+                                       std::optional<std::chrono::nanoseconds> timing) {
   EXPECT_TRUE(timing);
   EXPECT_LE(last, timing.value());
   return timing.value();
@@ -412,7 +412,7 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
 TEST_F(StreamInfoImplTest, CodecStreamId) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
                              FilterState::LifeSpan::FilterChain);
-  EXPECT_EQ(absl::nullopt, stream_info.codecStreamId());
+  EXPECT_EQ(std::nullopt, stream_info.codecStreamId());
   stream_info.setCodecStreamId(12345);
   EXPECT_EQ(12345, stream_info.codecStreamId());
 }
@@ -460,7 +460,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   s1.addPacketsRetransmitted(1);
 
   // setFrom
-  s1.setVirtualClusterName(absl::optional<std::string>("bar"));
+  s1.setVirtualClusterName(std::optional<std::string>("bar"));
   s1.setResponseCode(200);
   s1.setResponseCodeDetails("OK");
   s1.setConnectionTerminationDetails("baz");

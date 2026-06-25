@@ -179,7 +179,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
 
   if (!headers_decompressed() || header_list.empty()) {
-    onStreamError(absl::nullopt);
+    onStreamError(std::nullopt);
     return;
   }
 
@@ -211,7 +211,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
       Http::HeaderUtility::checkValidRequestHeaders(*headers) != Http::okStatus() ||
       (headers->Protocol() && !spdy_session()->allow_extended_connect())) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
-    onStreamError(absl::nullopt);
+    onStreamError(std::nullopt);
     return;
   }
 
@@ -224,7 +224,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (Http::HeaderUtility::checkRequiredRequestHeaders(*headers) != Http::okStatus() ||
       (headers->Protocol() && !spdy_session()->allow_extended_connect())) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
-    onStreamError(absl::nullopt);
+    onStreamError(std::nullopt);
     return;
   }
 #endif
@@ -563,14 +563,14 @@ void EnvoyQuicServerStream::OnMetadataComplete(size_t /*frame_len*/,
   }
 }
 
-void EnvoyQuicServerStream::onStreamError(absl::optional<bool> should_close_connection,
+void EnvoyQuicServerStream::onStreamError(std::optional<bool> should_close_connection,
                                           quic::QuicRstStreamErrorCode rst) {
   if (details_.empty()) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
   }
 
   bool close_connection_upon_invalid_header;
-  if (should_close_connection != absl::nullopt) {
+  if (should_close_connection != std::nullopt) {
     close_connection_upon_invalid_header = should_close_connection.value();
   } else {
     close_connection_upon_invalid_header =
@@ -636,7 +636,7 @@ bool EnvoyQuicServerStream::resetIfWebTransport(absl::string_view frame_type) {
 }
 #endif
 
-void EnvoyQuicServerStream::OnInvalidHeaders() { onStreamError(absl::nullopt); }
+void EnvoyQuicServerStream::OnInvalidHeaders() { onStreamError(std::nullopt); }
 
 void EnvoyQuicServerStream::OnSoonToBeDestroyed() {
   quic::QuicSpdyServerStreamBase::OnSoonToBeDestroyed();

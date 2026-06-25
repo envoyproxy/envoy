@@ -857,7 +857,7 @@ void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
 void ConfigHelper::setConnectConfig(
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm,
     bool terminate_connect, bool allow_post, bool http3,
-    absl::optional<envoy::config::core::v3::ProxyProtocolConfig::Version> proxy_protocol_version) {
+    std::optional<envoy::config::core::v3::ProxyProtocolConfig::Version> proxy_protocol_version) {
   auto* route_config = hcm.mutable_route_config();
   ASSERT_EQ(1, route_config->virtual_hosts_size());
   auto* route = route_config->mutable_virtual_hosts(0)->mutable_routes(0);
@@ -928,7 +928,7 @@ void ConfigHelper::applyConfigModifiers() {
 
 void ConfigHelper::configureUpstreamTls(
     bool use_alpn, bool http3,
-    absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+    std::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
         alternate_protocol_cache_config,
     std::function<void(envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext&)>
         configure_tls_context) {

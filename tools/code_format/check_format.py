@@ -688,28 +688,22 @@ class FormatChecker:
             report_error("Don't use std::get_if; use absl::get_if instead")
         if self.token_in_line("std::holds_alternative", line):
             report_error("Don't use std::holds_alternative; use absl::holds_alternative instead")
-        if file_path.startswith("./contrib/") or file_path.startswith("contrib/"):
-            if self.token_in_line("absl::make_optional", line):
-                report_error(
-                    "Don't use absl::make_optional (deprecated), use std::make_optional instead"
-                )
-            if self.token_in_line("absl::nullopt", line):
-                report_error(
-                    "Don't use absl::nullopt (deprecated), use std::nullopt instead")
-            if self.token_in_line("absl::optional", line):
-                report_error(
-                    "Don't use absl::optional (deprecated), use std::optional instead")
-            if "absl/types/optional.h" in line:
-                report_error(
-                    "Don't include absl/types/optional.h (deprecated), use <optional> instead"
-                )
-        else:
-            if self.token_in_line("std::make_optional", line):
-                report_error("Don't use std::make_optional; use absl::make_optional instead")
-            if self.token_in_line("std::optional", line) and not "NOLINT(std::optional)" in line:
-                report_error("Don't use std::optional; use absl::optional instead")
         if self.token_in_line("std::monostate", line):
             report_error("Don't use std::monostate; use absl::monostate instead")
+        absl_optional = "absl::" + "optional"
+        absl_nullopt = "absl::" + "nullopt"
+        absl_make_optional = "absl::" + "make_optional"
+        absl_optional_header = "absl/types/" + "optional.h"
+        if self.token_in_line(absl_optional, line):
+            report_error(f"Don't use {absl_optional} (deprecated); use std::optional instead")
+        if self.token_in_line(absl_nullopt, line):
+            report_error(f"Don't use {absl_nullopt} (deprecated); use std::nullopt instead")
+        if self.token_in_line(absl_make_optional, line):
+            report_error(
+                f"Don't use {absl_make_optional} (deprecated); use std::make_optional instead")
+        if absl_optional_header in line:
+            report_error(
+                f"Don't include {absl_optional_header} (deprecated); use <optional> instead")
         if not self.allow_listed_for_std_string_view(
                 file_path) and not "NOLINT(std::string_view)" in line:
             if self.token_in_line("std::string_view", line) or self.token_in_line("toStdStringView",

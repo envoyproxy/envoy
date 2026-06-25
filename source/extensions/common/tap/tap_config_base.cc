@@ -56,8 +56,8 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
           proto_config.output_config(), max_buffered_tx_bytes, DefaultMaxBufferedBytes)),
       streaming_(proto_config.output_config().streaming()),
       runtime_(context.serverFactoryContext().runtime()),
-      tap_enabled_(proto_config.has_tap_enabled() ? absl::make_optional(proto_config.tap_enabled())
-                                                  : absl::nullopt) {
+      tap_enabled_(proto_config.has_tap_enabled() ? std::make_optional(proto_config.tap_enabled())
+                                                  : std::nullopt) {
 
   using ProtoOutputSink = envoy::config::tap::v3::OutputSink;
   auto& sinks = proto_config.output_config().sinks();
@@ -68,7 +68,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
   sink_type_ = sinks[0].output_sink_type_case();
 
   if (PROTOBUF_GET_OPTIONAL_WRAPPED(proto_config.output_config(), min_streamed_sent_bytes) !=
-      absl::nullopt) {
+      std::nullopt) {
     min_streamed_sent_bytes_ =
         std::max(proto_config.output_config().min_streamed_sent_bytes().value(),
                  DefaultMinStreamedSentBytes);

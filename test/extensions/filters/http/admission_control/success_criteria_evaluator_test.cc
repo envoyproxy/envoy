@@ -23,7 +23,7 @@ public:
   SuccessCriteriaTest() = default;
 
   void makeEvaluator(const std::string& yaml,
-                     absl::optional<std::string> error_status_message = absl::nullopt) {
+                     std::optional<std::string> error_status_message = std::nullopt) {
     AdmissionControlProto::SuccessCriteria proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
 

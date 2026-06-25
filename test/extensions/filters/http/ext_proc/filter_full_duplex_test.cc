@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "envoy/http/filter.h"
 #include "envoy/http/filter_factory.h"
 #include "envoy/http/header_map.h"
@@ -11,7 +13,6 @@
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -109,7 +110,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestNormal) {
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, absl::nullopt);
+  processRequestHeaders(false, std::nullopt);
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
@@ -117,7 +118,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestNormal) {
   bool encoding_watermarked = false;
   setUpEncodingWatermarking(encoding_watermarked);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  processResponseHeaders(true, absl::nullopt);
+  processResponseHeaders(true, std::nullopt);
 
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
@@ -201,7 +202,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithTrailer) {
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, absl::nullopt);
+  processRequestHeaders(false, std::nullopt);
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
@@ -210,7 +211,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithTrailer) {
   setUpEncodingWatermarking(encoding_watermarked);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   // Server sending headers response without waiting for body.
-  processResponseHeaders(true, absl::nullopt);
+  processResponseHeaders(true, std::nullopt);
 
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
@@ -230,7 +231,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithTrailer) {
   processResponseBodyStreamedAfterTrailer(" AAAAA ", want_response_body);
   processResponseBodyStreamedAfterTrailer(" BBBB ", want_response_body);
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
-  processResponseTrailers(absl::nullopt, true);
+  processResponseTrailers(std::nullopt, true);
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
   // The two buffers should match.
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
@@ -265,7 +266,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithHeaderAndTrailer) {
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   EXPECT_TRUE(last_request_.has_protocol_config());
-  processRequestHeaders(false, absl::nullopt);
+  processRequestHeaders(false, std::nullopt);
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
@@ -292,10 +293,10 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithHeaderAndTrailer) {
 
   EXPECT_FALSE(last_request_.has_protocol_config());
   // Server now sends back response.
-  processResponseHeadersAfterTrailer(absl::nullopt);
+  processResponseHeadersAfterTrailer(std::nullopt);
   processResponseBodyStreamedAfterTrailer(" AAAAA ", want_response_body);
   processResponseBodyStreamedAfterTrailer(" BBBB ", want_response_body);
-  processResponseTrailers(absl::nullopt, true);
+  processResponseTrailers(std::nullopt, true);
 
   // The two buffers should match.
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
@@ -326,7 +327,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithHeaderAndTrailerNoBod
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, absl::nullopt);
+  processRequestHeaders(false, std::nullopt);
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
@@ -338,8 +339,8 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithHeaderAndTrailerNoBod
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
 
   // Server now sends back response.
-  processResponseHeadersAfterTrailer(absl::nullopt);
-  processResponseTrailers(absl::nullopt, true);
+  processResponseHeadersAfterTrailer(std::nullopt);
+  processResponseTrailers(std::nullopt, true);
 
   EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
   filter_->onDestroy();
@@ -360,7 +361,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithFilterConfigMissing) 
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, absl::nullopt);
+  processRequestHeaders(false, std::nullopt);
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
@@ -368,7 +369,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithFilterConfigMissing) 
   bool encoding_watermarked = false;
   setUpEncodingWatermarking(encoding_watermarked);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  processResponseHeaders(true, absl::nullopt);
+  processResponseHeaders(true, std::nullopt);
 
   for (int i = 0; i < 4; i++) {
     // 4 request chunks are sent to the ext_proc server.
@@ -409,7 +410,7 @@ TEST_F(HttpFilterTest, FullDuplexFailCloseWithDataOutbound) {
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, absl::nullopt);
+  processRequestHeaders(false, std::nullopt);
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
@@ -417,7 +418,7 @@ TEST_F(HttpFilterTest, FullDuplexFailCloseWithDataOutbound) {
   bool encoding_watermarked = false;
   setUpEncodingWatermarking(encoding_watermarked);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  processResponseHeaders(true, absl::nullopt);
+  processResponseHeaders(true, std::nullopt);
 
   Buffer::OwnedImpl resp_chunk;
   TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
@@ -453,7 +454,7 @@ TEST_F(HttpFilterTest, FullDuplexFailOpenWithoutDataOutbound) {
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, absl::nullopt);
+  processRequestHeaders(false, std::nullopt);
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
@@ -461,7 +462,7 @@ TEST_F(HttpFilterTest, FullDuplexFailOpenWithoutDataOutbound) {
   bool encoding_watermarked = false;
   setUpEncodingWatermarking(encoding_watermarked);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  processResponseHeaders(false, absl::nullopt);
+  processResponseHeaders(false, std::nullopt);
 
   // Fail open with gRPC error messages received.
   stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
@@ -487,7 +488,7 @@ TEST_F(HttpFilterTest, FullDuplexFailCloseWithDataInbound) {
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(true, absl::nullopt);
+  processRequestHeaders(true, std::nullopt);
   Buffer::OwnedImpl req_data("foo");
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, false));
 

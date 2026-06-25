@@ -68,7 +68,6 @@ envoy_quiche_platform_impl_cc_library(
     deps = [
         "@abseil-cpp//absl/base",
         "@abseil-cpp//absl/time",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 

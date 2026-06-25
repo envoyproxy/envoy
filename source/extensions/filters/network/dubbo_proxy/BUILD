@@ -121,7 +121,6 @@ envoy_cc_library(
         ":message_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 

@@ -258,7 +258,7 @@ public:
     EXPECT_CALL(init_watcher_, ready());
     ASSERT_TRUE(
         callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()).ok());
-    EXPECT_NE(absl::nullopt, provider_->config());
+    EXPECT_NE(std::nullopt, provider_->config());
     EXPECT_EQ(1UL, store_.counter(getConfigReloadCounter()).value());
     EXPECT_EQ(0UL, store_.counter(getConfigFailCounter()).value());
 
@@ -452,7 +452,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
   TypeParam config_discovery_test;
   config_discovery_test.setup();
   EXPECT_EQ("foo", config_discovery_test.provider_->name());
-  EXPECT_EQ(absl::nullopt, config_discovery_test.provider_->config());
+  EXPECT_EQ(std::nullopt, config_discovery_test.provider_->config());
 
   // Initial request.
   {
@@ -467,7 +467,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
     ASSERT_TRUE(config_discovery_test.callbacks_
                     ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
                     .ok());
-    EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
+    EXPECT_NE(std::nullopt, config_discovery_test.provider_->config());
     EXPECT_EQ(1UL,
               config_discovery_test.store_.counter(config_discovery_test.getConfigReloadCounter())
                   .value());
@@ -556,7 +556,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, IncrementalWithOutDefault) {
   config_discovery_test.setup();
   config_discovery_test.incrementalTest();
   // Verify the provider config is empty.
-  EXPECT_EQ(absl::nullopt, config_discovery_test.provider_->config());
+  EXPECT_EQ(std::nullopt, config_discovery_test.provider_->config());
 }
 
 // With default config.
@@ -567,7 +567,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, IncrementalWithDefault) {
   config_discovery_test.setup(true, true);
   config_discovery_test.incrementalTest();
   // Verify the provider config is not empty since the default config is there.
-  EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
+  EXPECT_NE(std::nullopt, config_discovery_test.provider_->config());
 }
 
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, ApplyWithoutWarming) {
@@ -575,7 +575,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, ApplyWithoutWarming) {
   TypeParam config_discovery_test;
   config_discovery_test.setup(false);
   EXPECT_EQ("foo", config_discovery_test.provider_->name());
-  EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
+  EXPECT_NE(std::nullopt, config_discovery_test.provider_->config());
   EXPECT_EQ(
       0UL,
       config_discovery_test.store_.counter(config_discovery_test.getConfigReloadCounter()).value());
@@ -590,7 +590,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProviders) {
   config_discovery_test.setup();
   const auto provider2 = config_discovery_test.createProvider("foo", true, false);
   EXPECT_EQ("foo", provider2->name());
-  EXPECT_EQ(absl::nullopt, provider2->config());
+  EXPECT_EQ(std::nullopt, provider2->config());
   const auto response = config_discovery_test.createResponse("1", "foo");
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
@@ -598,8 +598,8 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProviders) {
   ASSERT_TRUE(config_discovery_test.callbacks_
                   ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
                   .ok());
-  EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
-  EXPECT_NE(absl::nullopt, provider2->config());
+  EXPECT_NE(std::nullopt, config_discovery_test.provider_->config());
+  EXPECT_NE(std::nullopt, provider2->config());
   EXPECT_EQ(
       1UL,
       config_discovery_test.store_.counter(config_discovery_test.getConfigReloadCounter()).value());

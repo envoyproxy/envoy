@@ -282,7 +282,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadRpingEchoScenarios) {
 
     // Read should process RPING and return the size (indicating RPING was handled).
     Buffer::OwnedImpl buffer;
-    auto result = handle->read(buffer, absl::nullopt);
+    auto result = handle->read(buffer, std::nullopt);
 
     EXPECT_EQ(result.return_value_, rping_msg.size());
     EXPECT_EQ(result.err_, nullptr);
@@ -324,7 +324,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadRpingEchoScenarios) {
 
     // Read should process RPING and return only app data size.
     Buffer::OwnedImpl buffer;
-    auto result = handle->read(buffer, absl::nullopt);
+    auto result = handle->read(buffer, std::nullopt);
 
     EXPECT_EQ(result.return_value_, app_data.size()); // Only app data size
     EXPECT_EQ(result.err_, nullptr);
@@ -363,7 +363,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadRpingEchoScenarios) {
 
     // Read should return all HTTP data without processing.
     Buffer::OwnedImpl buffer;
-    auto result = handle->read(buffer, absl::nullopt);
+    auto result = handle->read(buffer, std::nullopt);
 
     EXPECT_EQ(result.return_value_, http_data.size());
     EXPECT_EQ(result.err_, nullptr);
@@ -409,7 +409,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadPartialDataAndStateTransitio
 
     // Read should return the partial data as-is.
     Buffer::OwnedImpl buffer;
-    auto result = handle->read(buffer, absl::nullopt);
+    auto result = handle->read(buffer, std::nullopt);
 
     EXPECT_EQ(result.return_value_, 3);
     EXPECT_EQ(result.err_, nullptr);
@@ -442,7 +442,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadPartialDataAndStateTransitio
 
     // Read should return HTTP data and disable echo.
     Buffer::OwnedImpl buffer;
-    auto result = handle->read(buffer, absl::nullopt);
+    auto result = handle->read(buffer, std::nullopt);
 
     EXPECT_EQ(result.return_value_, http_data.size());
     EXPECT_EQ(result.err_, nullptr);
@@ -486,7 +486,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadEchoDisabledAndErrorHandling
     ASSERT_EQ(written, static_cast<ssize_t>(http_data.size()));
 
     Buffer::OwnedImpl buffer1;
-    handle->read(buffer1, absl::nullopt);
+    handle->read(buffer1, std::nullopt);
     EXPECT_EQ(buffer1.toString(), http_data);
 
     // Now send RPING - it should pass through without echo.
@@ -494,7 +494,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadEchoDisabledAndErrorHandling
     ASSERT_EQ(written, static_cast<ssize_t>(rping_msg.size()));
 
     Buffer::OwnedImpl buffer2;
-    auto result = handle->read(buffer2, absl::nullopt);
+    auto result = handle->read(buffer2, std::nullopt);
 
     EXPECT_EQ(result.return_value_, rping_msg.size());
     EXPECT_EQ(result.err_, nullptr);
@@ -531,7 +531,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadEchoDisabledAndErrorHandling
     close(fds[1]);
 
     Buffer::OwnedImpl buffer;
-    auto result = handle->read(buffer, absl::nullopt);
+    auto result = handle->read(buffer, std::nullopt);
 
     EXPECT_EQ(result.return_value_, 0); // EOF
     EXPECT_EQ(result.err_, nullptr);    // No error, just EOF

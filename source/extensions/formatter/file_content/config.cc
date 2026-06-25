@@ -25,11 +25,11 @@ public:
       Config::DataSource::DataSourceProviderSharedPtr<std::string> provider)
       : provider_(std::move(provider)) {}
 
-  absl::optional<std::string> format(const Envoy::Formatter::Context&,
-                                     const StreamInfo::StreamInfo&) const override {
+  std::optional<std::string> format(const Envoy::Formatter::Context&,
+                                    const StreamInfo::StreamInfo&) const override {
     const auto data = provider_->data();
     if (!data) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     return *data;
   }
@@ -61,7 +61,7 @@ public:
 
   absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
   parse(absl::string_view command, absl::string_view subcommand,
-        absl::optional<size_t> max_length) const override {
+        std::optional<size_t> max_length) const override {
     if (command != FileContentCommand) {
       return nullptr;
     }

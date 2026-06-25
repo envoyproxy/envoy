@@ -111,7 +111,7 @@ GrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientSharedPtr&& async_client
         },
         /*failover_stream_creator=*/
         failover_async_client
-            ? absl::make_optional(
+            ? std::make_optional(
                   [&failover_async_client, &service_method, &dispatcher = dispatcher_, &scope,
                    &rate_limit_settings](
                       GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse>*
@@ -134,7 +134,7 @@ GrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientSharedPtr&& async_client
                                    envoy::service::discovery::v3::DiscoveryResponse>::
                             ConnectedStateValue::SecondEntry);
                   })
-            : absl::nullopt,
+            : std::nullopt,
         /*grpc_mux_callbacks=*/*this,
         /*dispatch=*/dispatcher_);
   }
@@ -271,7 +271,7 @@ GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
                                       OpaqueResourceDecoderSharedPtr resource_decoder,
                                       const SubscriptionOptions& options) {
   // Resource cache is only used for EDS resources.
-  EdsResourcesCacheOptRef resources_cache{absl::nullopt};
+  EdsResourcesCacheOptRef resources_cache{std::nullopt};
   if (eds_resources_cache_ &&
       (type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>())) {
     resources_cache = makeOptRefFromPtr(eds_resources_cache_.get());

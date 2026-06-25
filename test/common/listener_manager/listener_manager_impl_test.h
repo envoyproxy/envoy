@@ -391,7 +391,7 @@ protected:
                                                  bool multiple_addresses = false) {
     InSequence s;
 
-    EXPECT_CALL(*worker_, start(_, _));
+    EXPECT_CALL(*worker_, start(_, _, _));
     ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
     auto socket = std::make_shared<testing::NiceMock<Network::MockListenSocket>>();
@@ -440,7 +440,7 @@ protected:
                                                          const std::string& message) {
     InSequence s;
 
-    EXPECT_CALL(*worker_, start(_, _));
+    EXPECT_CALL(*worker_, start(_, _, _));
     ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
     auto socket = std::make_shared<testing::NiceMock<Network::MockListenSocket>>();
