@@ -935,6 +935,5 @@ ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
   return filter_chain_res;
 }
 
-
 } // namespace Server
 } // namespace Envoy
