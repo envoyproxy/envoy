@@ -16,13 +16,24 @@
 #include "absl/strings/strip.h"
 
 namespace Envoy {
+namespace {
+// Sets *diag when the caller passed one.
+void setReason(CgroupDetectionDiagnostic* diag, absl::string_view message, bool is_error = false) {
+  if (diag != nullptr) {
+    diag->message = std::string(message);
+    diag->is_error = is_error;
+  }
+}
+} // namespace
 
 // Implementation of CgroupDetector interface
 std::optional<uint32_t> CgroupDetectorImpl::getCpuLimit(Filesystem::Instance& fs) {
-  const std::optional<uint32_t> limit = CgroupCpuUtil::getCpuLimit(fs);
+  CgroupDetectionDiagnostic diag;
+  const std::optional<uint32_t> limit = CgroupCpuUtil::getCpuLimit(fs, &diag);
   absl::MutexLock lock(&mutex_);
   ran_ = true;
   detected_limit_ = limit;
+  detection_diagnostic_ = std::move(diag);
   return limit;
 }
 
@@ -33,8 +44,12 @@ void CgroupDetectorImpl::logResult() {
   }
   if (detected_limit_.has_value()) {
     ENVOY_LOG_MISC(debug, "cgroup CPU limit detected: {}", *detected_limit_);
-  } else {
+  } else if (detection_diagnostic_.message.empty()) {
     ENVOY_LOG_MISC(debug, "no cgroup CPU limit detected");
+  } else if (detection_diagnostic_.is_error) {
+    ENVOY_LOG_MISC(warn, "no cgroup CPU limit detected: {}", detection_diagnostic_.message);
+  } else {
+    ENVOY_LOG_MISC(debug, "no cgroup CPU limit detected: {}", detection_diagnostic_.message);
   }
   // Consume the result so a later server in the same process (e.g. tests) doesn't re-log it.
   ran_ = false;
@@ -47,11 +62,12 @@ void CgroupDetectorImpl::logResult() {
 // Return values:
 //   Valid uint32_t: Actual CPU limit (number of CPUs, rounded up)
 //   std::nullopt: No limit detected (unlimited CPU usage allowed)
-std::optional<uint32_t> CgroupCpuUtil::getCpuLimit(Filesystem::Instance& fs) {
+std::optional<uint32_t> CgroupCpuUtil::getCpuLimit(Filesystem::Instance& fs,
+                                                   CgroupDetectionDiagnostic* diag) {
   // Step 1: Mount Discovery - call once and reuse
   std::optional<std::string> mount_opt = discoverCgroupMount(fs);
   if (!mount_opt.has_value()) {
-    // No `cgroup` filesystem found
+    setReason(diag, "no cgroup filesystem mounts found");
     return std::nullopt;
   }
   const std::string& mount_point = mount_opt.value();
@@ -59,7 +75,7 @@ std::optional<uint32_t> CgroupCpuUtil::getCpuLimit(Filesystem::Instance& fs) {
   // Steps 2-3: Process Assignment + Path Construction
   std::optional<CgroupInfo> cgroup_info_opt = constructCgroupPath(mount_point, fs);
   if (!cgroup_info_opt.has_value()) {
-    // No valid `cgroup` path found
+    setReason(diag, "no valid cgroup path found");
     return std::nullopt;
   }
   const CgroupInfo& cgroup_info = cgroup_info_opt.value();
@@ -67,15 +83,15 @@ std::optional<uint32_t> CgroupCpuUtil::getCpuLimit(Filesystem::Instance& fs) {
   // Step 4: File Access - append version-specific filenames and validate access
   std::optional<CpuFiles> cpu_files_opt = accessCgroupFiles(cgroup_info, fs);
   if (!cpu_files_opt.has_value()) {
-    // File access failed - fallback to "no `cgroup`"
+    setReason(diag, "cgroup CPU files not accessible");
     return std::nullopt;
   }
   const CpuFiles& cpu_files = cpu_files_opt.value();
 
   // Step 5: Read Actual Limits using cached file paths
-  std::optional<double> cpu_ratio = readActualLimits(cpu_files, fs);
+  std::optional<double> cpu_ratio = readActualLimits(cpu_files, fs, diag);
   if (!cpu_ratio.has_value()) {
-    // No valid limit found or unlimited
+    // readActualLimits set the diagnostic.
     return std::nullopt;
   }
 
@@ -278,27 +294,30 @@ std::optional<CpuFiles> CgroupCpuUtil::accessCgroupFiles(const CgroupInfo& cgrou
 }
 
 // Reads actual CPU limits from cgroup v1 files with quota/period parsing.
-std::optional<double> CgroupCpuUtil::readActualLimitsV1(const CpuFiles& cpu_files) {
+std::optional<double> CgroupCpuUtil::readActualLimitsV1(const CpuFiles& cpu_files,
+                                                        CgroupDetectionDiagnostic* diag) {
   // v1: Use cached quota and period content (no re-reading)
   const std::string quota_str = std::string(absl::StripAsciiWhitespace(cpu_files.quota_content));
   const std::string period_str = std::string(absl::StripAsciiWhitespace(cpu_files.period_content));
 
   int64_t quota, period;
   if (!absl::SimpleAtoi(quota_str, &quota) || !absl::SimpleAtoi(period_str, &period)) {
-    ENVOY_LOG_MISC(warn, "Failed to parse cgroup v1 values: quota='{}' period='{}'", quota_str,
-                   period_str);
+    setReason(diag,
+              absl::StrCat("failed to parse cgroup v1 values: quota='", quota_str, "' period='",
+                           period_str, "'"),
+              /*is_error=*/true);
     return std::nullopt;
   }
 
-  // Handle special case: v1 quota = -1 means no limit
+  // v1 quota = -1 means no limit.
   if (quota == -1) {
-    ENVOY_LOG_MISC(debug, "cgroup v1 unlimited CPU (quota = -1)");
-    return std::nullopt; // Unlimited - return nullopt
+    setReason(diag, "cgroup v1 unlimited CPU (quota = -1)");
+    return std::nullopt;
   }
 
-  // Validate values
   if (period <= 0 || quota <= 0) {
-    ENVOY_LOG_MISC(warn, "Invalid cgroup v1 values: quota={} period={}", quota, period);
+    setReason(diag, absl::StrCat("invalid cgroup v1 values: quota=", quota, " period=", period),
+              /*is_error=*/true);
     return std::nullopt;
   }
 
@@ -309,7 +328,8 @@ std::optional<double> CgroupCpuUtil::readActualLimitsV1(const CpuFiles& cpu_file
 }
 
 // Reads actual CPU limits from cgroup v2 files with "quota period" parsing.
-std::optional<double> CgroupCpuUtil::readActualLimitsV2(const CpuFiles& cpu_files) {
+std::optional<double> CgroupCpuUtil::readActualLimitsV2(const CpuFiles& cpu_files,
+                                                        CgroupDetectionDiagnostic* diag) {
   // v2: Use cached cpu.max content (no re-reading)
   absl::string_view content = absl::StripAsciiWhitespace(cpu_files.quota_content);
 
@@ -317,27 +337,30 @@ std::optional<double> CgroupCpuUtil::readActualLimitsV2(const CpuFiles& cpu_file
   const std::vector<absl::string_view> parts = absl::StrSplit(content, ' ');
 
   if (parts.size() != 2) {
-    ENVOY_LOG_MISC(warn, "Malformed cgroup v2 cpu.max: expected 'quota period', got '{}'", content);
+    setReason(
+        diag,
+        absl::StrCat("malformed cgroup v2 cpu.max: expected 'quota period', got '", content, "'"),
+        /*is_error=*/true);
     return std::nullopt;
   }
 
-  // Handle special case: v2 quota = "max" means no limit
+  // v2 quota = "max" means no limit.
   if (parts[0] == "max") {
-    ENVOY_LOG_MISC(debug, "cgroup v2 unlimited CPU (quota = max)");
-    return std::nullopt; // Unlimited - return nullopt
+    setReason(diag, "cgroup v2 unlimited CPU (quota = max)");
+    return std::nullopt;
   }
 
-  // Parse quota and period values
   uint64_t quota, period;
   if (!absl::SimpleAtoi(parts[0], &quota) || !absl::SimpleAtoi(parts[1], &period)) {
-    ENVOY_LOG_MISC(warn, "Failed to parse cgroup v2 values: quota='{}' period='{}'", parts[0],
-                   parts[1]);
+    setReason(diag,
+              absl::StrCat("failed to parse cgroup v2 values: quota='", parts[0], "' period='",
+                           parts[1], "'"),
+              /*is_error=*/true);
     return std::nullopt;
   }
 
-  // Validate values
   if (period == 0) {
-    ENVOY_LOG_MISC(warn, "Invalid cgroup v2 period: cannot be zero");
+    setReason(diag, "invalid cgroup v2 period: cannot be zero", /*is_error=*/true);
     return std::nullopt;
   }
 
@@ -360,13 +383,14 @@ std::optional<double> CgroupCpuUtil::readActualLimitsV2(const CpuFiles& cpu_file
 //      - v2: quota = "max" means no limit
 //   5. Result: CPU limit as float64 ratio
 std::optional<double> CgroupCpuUtil::readActualLimits(const CpuFiles& cpu_files,
-                                                      Filesystem::Instance& /* fs */) {
+                                                      Filesystem::Instance& /* fs */,
+                                                      CgroupDetectionDiagnostic* diag) {
   if (cpu_files.version == "v1") {
-    return readActualLimitsV1(cpu_files);
+    return readActualLimitsV1(cpu_files, diag);
   } else if (cpu_files.version == "v2") {
-    return readActualLimitsV2(cpu_files);
+    return readActualLimitsV2(cpu_files, diag);
   } else {
-    ENVOY_LOG_MISC(warn, "Unknown cgroup version: {}", cpu_files.version);
+    setReason(diag, absl::StrCat("unknown cgroup version: ", cpu_files.version), /*is_error=*/true);
     return std::nullopt;
   }
 }
@@ -504,7 +528,6 @@ std::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Instan
   }
 
   // No cgroup filesystem found
-  ENVOY_LOG_MISC(debug, "No cgroup filesystem mounts found");
   return std::nullopt;
 }
 
