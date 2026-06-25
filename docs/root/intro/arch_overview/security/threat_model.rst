@@ -61,6 +61,15 @@ and will not be considered security issues. This includes:
 * Debug assertion failures, which are compiled out of Envoy release builds
 * Use of TLS libraries other than BoringSSL
 
+Envoy configurations
+--------------------
+
+Issues that can only be hit by configuring a feature marked as deprecated (via protobuf annotations) are not
+covered by the security policy.
+
+Issues that can only be hit by enabling a :ref:`runtime flag <arch_overview_runtime>` which defaults to
+false are not covered by the security policy.
+
 Data and control plane
 ----------------------
 
