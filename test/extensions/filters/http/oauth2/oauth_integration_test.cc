@@ -471,6 +471,10 @@ typed_config:
 
     waitForOAuth2Response(token_secret, expect_failure);
     if (expect_failure) {
+      response->waitForHeaders();
+      EXPECT_EQ("302", response->headers().getStatusValue());
+      RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
+      cleanup();
       return;
     }
 
