@@ -1,5 +1,11 @@
 #include "contrib/sip_proxy/filters/network/source/decoder.h"
 
+#include <limits>
+
+#include "envoy/common/exception.h"
+
+#include "absl/strings/numbers.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -93,10 +99,14 @@ int Decoder::reassemble(Buffer::Instance& data) {
   Buffer::Instance& remaining_data = data;
 
   int ret = 0;
-  size_t clen = 0;         // Content-Length value
-  size_t full_msg_len = 0; // Length of the entire message
+
+  constexpr size_t kMaxContentLengthDigits = 20;
+  constexpr size_t kMaxContentLengthValueLength = 32;
 
   while (remaining_data.length() != 0) {
+    size_t clen = 0;         // Content-Length value
+    size_t full_msg_len = 0; // Length of the entire message
+
     ssize_t content_pos = remaining_data.search("\n\r\n", strlen("\n\r\n"), 0);
     if (content_pos != -1) {
       // Get the Content-Length header value so that we can find
@@ -112,24 +122,44 @@ int Decoder::reassemble(Buffer::Instance& data) {
       ssize_t content_length_end = remaining_data.search(
           "\r\n", strlen("\r\n"), content_length_start + strlen("Content-Length:"), content_pos);
 
+      if (content_length_end == -1) {
+        throw EnvoyException("invalid Content-Length header");
+      }
+
       // The "\n\r\n" is always included in remaining_data, so could not return -1
       // if (content_length_end == -1) {
       //   break;
       // }
 
-      char len[10]{}; // temporary storage
+      const size_t content_length_value_len =
+          static_cast<size_t>(content_length_end - content_length_start -
+                              static_cast<ssize_t>(strlen("Content-Length:")));
+      if (content_length_value_len == 0 ||
+          content_length_value_len > kMaxContentLengthValueLength) {
+        throw EnvoyException("invalid Content-Length value");
+      }
+
+      std::string len_str(content_length_value_len, '\0');
       remaining_data.copyOut(content_length_start + strlen("Content-Length:"),
-                             content_length_end - content_length_start - strlen("Content-Length:"),
-                             len);
+                             content_length_value_len, len_str.data());
 
-      clen = std::atoi(len);
+      const absl::string_view trimmed_len = StringUtil::trim(len_str);
+      if (trimmed_len.empty() || trimmed_len.size() > kMaxContentLengthDigits) {
+        throw EnvoyException("invalid Content-Length value");
+      }
 
-      // atoi return value >= 0, could not < 0
-      // if (clen < static_cast<size_t>(0)) {
-      //   break;
-      // }
+      uint64_t parsed_len = 0;
+      if (!absl::SimpleAtoi(trimmed_len, &parsed_len)) {
+        throw EnvoyException("invalid Content-Length value");
+      }
 
-      full_msg_len = content_pos + clen;
+      const size_t content_pos_size = static_cast<size_t>(content_pos);
+      if (parsed_len > std::numeric_limits<size_t>::max() - content_pos_size) {
+        throw EnvoyException("Content-Length overflow");
+      }
+
+      clen = static_cast<size_t>(parsed_len);
+      full_msg_len = content_pos_size + clen;
     }
 
     // Check for partial message received.

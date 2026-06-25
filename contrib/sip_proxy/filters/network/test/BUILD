@@ -128,6 +128,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "sip_decoder_regression_test",
+    srcs = ["sip_decoder_regression_test.cc"],
+    deps = [
+        ":mocks",
+        "//contrib/sip_proxy/filters/network/source:decoder_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "router_test",
     srcs = ["router_test.cc"],
     rbe_pool = "6gig",
