@@ -164,7 +164,7 @@ std::optional<Envoy::Protobuf::Any> Filter::discoverPeerMetadata() {
 
   Envoy::Protobuf::Struct data = ::Istio::Common::convertWorkloadMetadataToStruct(*metadata);
   Envoy::Protobuf::Any wrapped;
-  wrapped.PackFrom(data);
+  std::ignore = wrapped.PackFrom(data);
   return wrapped;
 }
 

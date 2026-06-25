@@ -411,7 +411,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryFetchesClusterInfo) {
     test_filter->set_name("odcds-test-filter");
 
     test::common::config::DummyConfig test_filter_config;
-    test_filter->mutable_typed_config()->PackFrom(test_filter_config);
+    std::ignore = test_filter->mutable_typed_config()->PackFrom(test_filter_config);
   });
 
   initialize();
