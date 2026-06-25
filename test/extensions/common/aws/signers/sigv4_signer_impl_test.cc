@@ -104,7 +104,7 @@ public:
   std::shared_ptr<SigV4SignerImpl> signer_;
   Credentials credentials_;
   Credentials token_credentials_;
-  absl::optional<std::string> region_;
+  std::optional<std::string> region_;
   CredentialsProviderChainSharedPtr chain_;
 };
 

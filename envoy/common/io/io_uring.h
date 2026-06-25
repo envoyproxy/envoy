@@ -436,13 +436,13 @@ public:
   /**
    * Return the data get from the read request.
    * @return Only return valid ReadParam when the callback is invoked with
-   * `Event::FileReadyType::Read`, otherwise `absl::nullopt` returned.
+   * `Event::FileReadyType::Read`, otherwise `std::nullopt` returned.
    */
   virtual const OptRef<ReadParam>& getReadParam() const PURE;
   /**
    * Return the data get from the write request.
    * @return Only return valid WriteParam when the callback is invoked with
-   * `Event::FileReadyType::Write`, otherwise `absl::nullopt` returned.
+   * `Event::FileReadyType::Write`, otherwise `std::nullopt` returned.
    */
   virtual const OptRef<WriteParam>& getWriteParam() const PURE;
 
@@ -533,7 +533,7 @@ public:
 
   /**
    * Returns the current thread's IoUringWorker. If the thread have not registered a IoUringWorker,
-   * an absl::nullopt will be returned.
+   * an std::nullopt will be returned.
    */
   virtual OptRef<IoUringWorker> getIoUringWorker() PURE;
 

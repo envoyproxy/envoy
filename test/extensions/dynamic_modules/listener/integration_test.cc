@@ -40,7 +40,7 @@ protected:
           dynamic_module_config;
       dynamic_module_config.mutable_dynamic_module_config()->set_name("listener_integration_test");
       dynamic_module_config.set_filter_name(filter_name);
-      filter->mutable_typed_config()->PackFrom(dynamic_module_config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(dynamic_module_config);
     });
 
     BaseIntegrationTest::initialize();
@@ -90,6 +90,20 @@ TEST_P(DynamicModulesListenerSdkIntegrationTest, HttpCalloutOnAcceptDoesNotCrash
   autonomous_upstream_ = true;
   initializeFilter("http_callout_on_accept");
 
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write("ping"));
+  tcp_client->waitForData("ping");
+  tcp_client->close();
+}
+
+TEST_P(DynamicModulesListenerSdkIntegrationTest, DynamicMetadataBatch) {
+  if (GetParam() != "rust") {
+    GTEST_SKIP() << "the dynamic_metadata filter is only in the rust test module";
+  }
+  initializeFilter("dynamic_metadata");
+
+  // The filter sets batch metadata and reads it back on accept, asserting in the module. A failure
+  // there stops the chain and the echo upstream never returns the payload.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->write("ping"));
   tcp_client->waitForData("ping");

@@ -16,7 +16,7 @@ namespace Eventstream {
 absl::StatusOr<ParseResult> EventstreamParser::parseMessage(absl::string_view buffer) {
   // Need at least the prelude to read total_length and validate prelude CRC
   if (buffer.size() < PRELUDE_SIZE) {
-    return ParseResult{absl::nullopt, 0};
+    return ParseResult{std::nullopt, 0};
   }
 
   const uint8_t* data = reinterpret_cast<const uint8_t*>(buffer.data());
@@ -57,7 +57,7 @@ absl::StatusOr<ParseResult> EventstreamParser::parseMessage(absl::string_view bu
 
   // Check if we have the complete message
   if (buffer.size() < total_length) {
-    return ParseResult{absl::nullopt, 0};
+    return ParseResult{std::nullopt, 0};
   }
 
   // Verify message CRC (covers everything except the last 4 bytes)

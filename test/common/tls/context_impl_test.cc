@@ -262,7 +262,7 @@ TEST_F(SslContextImplTest, TestExpiredCert) {
   Envoy::Ssl::ClientContextSharedPtr context(
       *manager_.createSslClientContext(*store_.rootScope(), *cfg));
   auto cleanup = cleanUpHelper(context);
-  EXPECT_EQ(absl::nullopt, context->daysUntilFirstCertExpires());
+  EXPECT_EQ(std::nullopt, context->daysUntilFirstCertExpires());
 }
 
 // Validate that when the context is updated, the daysUntilFirstCertExpires returns the current
@@ -283,7 +283,7 @@ TEST_F(SslContextImplTest, TestContextUpdate) {
   auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Envoy::Ssl::ClientContextSharedPtr context(
       *manager_.createSslClientContext(*store_.rootScope(), *cfg));
-  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), absl::nullopt);
+  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), std::nullopt);
 
   const std::string expiring_yaml = R"EOF(
   common_tls_context:
@@ -317,8 +317,8 @@ TEST_F(SslContextImplTest, TestContextUpdate) {
   manager_.removeContext(new_context);
   auto cleanup = cleanUpHelper(updated_context);
 
-  EXPECT_EQ(updated_context->daysUntilFirstCertExpires(), absl::nullopt);
-  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), absl::nullopt);
+  EXPECT_EQ(updated_context->daysUntilFirstCertExpires(), std::nullopt);
+  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), std::nullopt);
 }
 
 TEST_F(SslContextImplTest, TestGetCertInformation) {

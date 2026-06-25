@@ -120,7 +120,7 @@ static uint64_t fileSizeFromAttributeData(const WIN32_FILE_ATTRIBUTE_DATA& data)
   return static_cast<uint64_t>(file_size.QuadPart);
 }
 
-static absl::optional<SystemTime> systemTimeFromFileTime(const FILETIME& t) {
+static std::optional<SystemTime> systemTimeFromFileTime(const FILETIME& t) {
   // `FILETIME` is a 64 bit value representing the number of 100-nanosecond
   // intervals since January 1, 1601 (UTC).
   // https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-filetime
@@ -136,7 +136,7 @@ static absl::optional<SystemTime> systemTimeFromFileTime(const FILETIME& t) {
   SystemTime ret = windows_file_time_epoch + std::chrono::microseconds{v / 10};
   if (ret <= SystemTime{}) {
     // If the timestamp is before the unix epoch, return nullopt.
-    return absl::nullopt;
+    return std::nullopt;
   }
   return ret;
 }
@@ -153,7 +153,7 @@ static FileType fileTypeFromAttributeData(const WIN32_FILE_ATTRIBUTE_DATA& data)
 
 static Api::IoCallResult<FileInfo>
 fileInfoFromAttributeData(absl::string_view path, const WIN32_FILE_ATTRIBUTE_DATA& data) {
-  absl::optional<uint64_t> sz;
+  std::optional<uint64_t> sz;
   FileType type = fileTypeFromAttributeData(data);
   if (type == FileType::Regular) {
     sz = fileSizeFromAttributeData(data);

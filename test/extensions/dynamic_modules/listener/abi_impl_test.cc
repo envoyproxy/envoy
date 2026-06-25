@@ -1456,6 +1456,56 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullValue) 
                                                                             key_buf, value_buf);
 }
 
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStringBatch) {
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(callbacks_, setDynamicMetadata(std::string("test_ns"), testing::_))
+      .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())["test_ns"]));
+
+  char ns[] = "test_ns";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
+
+  // A batch sets every entry, and within the batch a later duplicate key wins.
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> entries = {
+      {"k1", 2, "v1", 2},
+      {"k2", 2, "v2", 2},
+      {"k1", 2, "v1b", 3},
+  };
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch(
+      filterPtr(), ns_buf, entries.data(), entries.size());
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
+      filterPtr(), ns_buf, {"k1", 2}, &result));
+  EXPECT_EQ("v1b", std::string(result.ptr, result.length));
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
+      filterPtr(), ns_buf, {"k2", 2}, &result));
+  EXPECT_EQ("v2", std::string(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStringBatchEmpty) {
+  // An empty batch is a no-op and must not set any metadata.
+  EXPECT_CALL(callbacks_, setDynamicMetadata(testing::_, testing::_)).Times(0);
+
+  char ns[] = "test_ns";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch(
+      filterPtr(), ns_buf, nullptr, 0);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStringBatchNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
+
+  char ns[] = "test_ns";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> entries = {{"k1", 2, "v1", 2}};
+  // Should not crash with null callbacks.
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch(
+      static_cast<void*>(filter.get()), ns_buf, entries.data(), entries.size());
+}
+
 // =============================================================================
 // Tests for set_filter_state.
 // =============================================================================

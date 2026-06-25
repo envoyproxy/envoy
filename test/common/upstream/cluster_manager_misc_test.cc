@@ -197,7 +197,7 @@ private:
     OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
       return {};
     }
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext*, const Upstream::Host&,
                              std::vector<uint8_t>&) override {
       return {};
@@ -297,7 +297,7 @@ private:
     OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
       return {};
     }
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext*, const Upstream::Host&,
                              std::vector<uint8_t>&) override {
       return {};
@@ -944,9 +944,9 @@ public:
 
   void TearDown() override { factory_.tls_.shutdownThread(); }
 
-  void expectSetsockoptSoKeepalive(absl::optional<int> keepalive_probes,
-                                   absl::optional<int> keepalive_time,
-                                   absl::optional<int> keepalive_interval) {
+  void expectSetsockoptSoKeepalive(std::optional<int> keepalive_probes,
+                                   std::optional<int> keepalive_time,
+                                   std::optional<int> keepalive_interval) {
     if (!ENVOY_SOCKET_SO_KEEPALIVE.hasValue()) {
       EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
           .WillOnce(
@@ -1214,7 +1214,7 @@ public:
     // Sending non-mergeable updates.
     cluster_->prioritySet().updateHosts(
         0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts,
-        {}, absl::nullopt, 100);
+        {}, std::nullopt, 100);
   }
 
   Cluster* cluster_{};

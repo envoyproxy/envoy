@@ -104,7 +104,7 @@ filter_disabled:
   }
 
   void initializeWithTlsInspector(bool ssl_client, const std::string& log_format,
-                                  absl::optional<bool> listener_filter_disabled = absl::nullopt,
+                                  std::optional<bool> listener_filter_disabled = std::nullopt,
                                   bool enable_ja3_fingerprinting = false,
                                   bool enable_ja4_fingerprinting = false) {
     std::string tls_inspector_config =
@@ -627,7 +627,7 @@ TEST_P(TlsInspectorIntegrationTest, SniCapturedOnFilterChainNotFound) {
   const std::string test_sni = "test.example.com";
   initializeWithTlsInspector(/*ssl_client=*/true,
                              /*log_format=*/"%REQUESTED_SERVER_NAME%|%RESPONSE_CODE_DETAILS%",
-                             /*listener_filter_disabled=*/absl::nullopt);
+                             /*listener_filter_disabled=*/std::nullopt);
 
   // Set up the SSL client with an SNI that won't match any filter chain.
   Network::Address::InstanceConstSharedPtr address =

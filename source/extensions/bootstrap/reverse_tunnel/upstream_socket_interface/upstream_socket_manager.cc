@@ -526,7 +526,7 @@ void UpstreamSocketManager::onPingResponse(Network::IoHandle& io_handle) {
   const auto ping_size =
       ::Envoy::Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::PING_MESSAGE
           .size();
-  Api::IoCallUint64Result result = io_handle.read(buffer, absl::make_optional(ping_size));
+  Api::IoCallUint64Result result = io_handle.read(buffer, std::make_optional(ping_size));
   if (!result.ok()) {
     ENVOY_LOG(debug, "reverse_tunnel: Read error on FD: {}: error - {}", fd,
               result.err_->getErrorDetails());

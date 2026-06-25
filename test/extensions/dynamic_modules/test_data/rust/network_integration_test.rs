@@ -28,6 +28,7 @@ fn new_network_filter_config_fn<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkF
     },
     "half_close" => Some(Box::new(HalfCloseFilterConfig)),
     "buffer_limits" => Some(Box::new(BufferLimitsFilterConfig)),
+    "dynamic_metadata" => Some(Box::new(DynamicMetadataFilterConfig)),
     _ => panic!("unknown filter name: {name}"),
   }
 }
@@ -309,5 +310,69 @@ impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for BufferLimitsFilter {
 
   fn on_below_write_buffer_low_watermark(&mut self, _envoy_filter: &mut ENF) {
     BELOW_LOW_WATERMARK_CALLED.store(true, Ordering::SeqCst);
+  }
+}
+
+// =============================================================================
+// Dynamic Metadata Test Filter
+// =============================================================================
+
+// Sets several string entries under one namespace via the batch setter, then reads them back to
+// prove the batch and the getter round trip through the ABI. An empty batch must not create a
+// namespace.
+struct DynamicMetadataFilterConfig;
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for DynamicMetadataFilterConfig {
+  fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+    Box::new(DynamicMetadataFilter)
+  }
+}
+
+struct DynamicMetadataFilter;
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for DynamicMetadataFilter {
+  fn on_new_connection(
+    &mut self,
+    envoy_filter: &mut ENF,
+  ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+    envoy_filter.set_dynamic_metadata_string_batch(
+      "dynamic_modules.test",
+      &[
+        ("batch_key1", "batch_value1"),
+        ("batch_key2", "batch_value2"),
+      ],
+    );
+    envoy_filter.set_dynamic_metadata_string_batch("dynamic_modules.empty", &[]);
+
+    assert_eq!(
+      envoy_filter
+        .get_dynamic_metadata_string("dynamic_modules.test", "batch_key1")
+        .map(|value| value.as_slice().to_vec()),
+      Some(b"batch_value1".to_vec())
+    );
+    assert_eq!(
+      envoy_filter
+        .get_dynamic_metadata_string("dynamic_modules.test", "batch_key2")
+        .map(|value| value.as_slice().to_vec()),
+      Some(b"batch_value2".to_vec())
+    );
+    assert!(envoy_filter
+      .get_dynamic_metadata_string("dynamic_modules.empty", "batch_key1")
+      .is_none());
+
+    // Set a non-UTF-8 byte value and read it back to prove set_dynamic_metadata_bytes preserves it.
+    envoy_filter.set_dynamic_metadata_bytes(
+      "dynamic_modules.test",
+      "bytes_key",
+      &[0xff, 0x00, 0xfe],
+    );
+    assert_eq!(
+      envoy_filter
+        .get_dynamic_metadata_string("dynamic_modules.test", "bytes_key")
+        .map(|value| value.as_slice().to_vec()),
+      Some(vec![0xff, 0x00, 0xfe])
+    );
+
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
   }
 }

@@ -11,12 +11,12 @@ public:
   TlsContextMatchCriteriaImpl(
       const envoy::config::route::v3::RouteMatch::TlsContextMatchOptions& options);
 
-  const absl::optional<bool>& presented() const override { return presented_; }
-  const absl::optional<bool>& validated() const override { return validated_; }
+  const std::optional<bool>& presented() const override { return presented_; }
+  const std::optional<bool>& validated() const override { return validated_; }
 
 private:
-  absl::optional<bool> presented_;
-  absl::optional<bool> validated_;
+  std::optional<bool> presented_;
+  std::optional<bool> validated_;
 };
 
 } // namespace Router

@@ -95,6 +95,23 @@ public:
     setup(opentelemetry_config);
   }
 
+  void setupValidDriverWithAlwaysOnSampler() {
+    const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    sampler:
+      name: envoy.tracers.opentelemetry.samplers.always_on
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.AlwaysOnSamplerConfig
+    )EOF";
+    envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+    TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+    setup(opentelemetry_config);
+  }
+
 protected:
   const std::string operation_name_{"test"};
   NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> context_;
@@ -1095,13 +1112,73 @@ TEST_F(OpenTelemetryDriverTest, UseLocalDecisionFalse) {
       {":method", "GET"},
       {"traceparent", "00-00000000000000010000000000000002-0000000000000003-01"}};
 
-  // The traceparent header indicates the span is sampled and the Envoy tracing decision is
-  // ignored.
+  // A propagated parent disables local-decision mode, but the request-entry tracing decision
+  // still acts as a final veto.
   Tracing::SpanPtr span =
       driver_->startSpan(mock_tracing_config_, request_headers, stream_info_, operation_name_,
                          {Tracing::Reason::NotTraceable, false});
   // The `useLocalDecision` should be false because there is a traceparent header in the request.
   EXPECT_FALSE(span->useLocalDecision());
+  EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U)).Times(0);
+  EXPECT_CALL(*mock_client_, sendRaw(_, _, _, _, _, _)).Times(0);
+  span->finishSpan();
+  EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+TEST_F(OpenTelemetryDriverTest, RootSpanWithAlwaysOnSamplerStillHonorsEnvoyDecision) {
+  setupValidDriverWithAlwaysOnSampler();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  Tracing::SpanPtr span =
+      driver_->startSpan(mock_tracing_config_, request_headers, stream_info_, operation_name_,
+                         {Tracing::Reason::NotTraceable, false});
+
+  EXPECT_FALSE(span->useLocalDecision());
+  EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U)).Times(0);
+  EXPECT_CALL(*mock_client_, sendRaw(_, _, _, _, _, _)).Times(0);
+  span->finishSpan();
+  EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+TEST_F(OpenTelemetryDriverTest, PropagatedSpanWithAlwaysOnSamplerStillHonorsEnvoyDecision) {
+  setupValidDriverWithAlwaysOnSampler();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"},
+      {":path", "/"},
+      {":method", "GET"},
+      {"traceparent", "00-00000000000000010000000000000002-0000000000000003-01"}};
+
+  Tracing::SpanPtr span =
+      driver_->startSpan(mock_tracing_config_, request_headers, stream_info_, operation_name_,
+                         {Tracing::Reason::NotTraceable, false});
+
+  EXPECT_FALSE(span->useLocalDecision());
+  EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U)).Times(0);
+  EXPECT_CALL(*mock_client_, sendRaw(_, _, _, _, _, _)).Times(0);
+  span->finishSpan();
+  EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+TEST_F(OpenTelemetryDriverTest, AlwaysOnSamplerExportsWhenEnvoyDecisionAllowsTracing) {
+  setupValidDriverWithAlwaysOnSampler();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"},
+      {":path", "/"},
+      {":method", "GET"},
+      {"traceparent", "00-00000000000000010000000000000002-0000000000000003-01"}};
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+
+  EXPECT_FALSE(span->useLocalDecision());
+  EXPECT_TRUE(dynamic_cast<Span*>(span.get())->sampled());
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .Times(1)

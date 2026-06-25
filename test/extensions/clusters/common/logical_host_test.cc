@@ -100,7 +100,7 @@ public:
     auto shared_objects = filter_state->objectsSharedWithUpstreamConnection();
     return std::make_shared<Network::TransportSocketOptionsImpl>(
         "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-        absl::nullopt, std::move(shared_objects));
+        std::nullopt, std::move(shared_objects));
   }
 
   // Helper to compute the per-connection resolution condition as used in LogicalHost.

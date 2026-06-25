@@ -136,7 +136,7 @@ void HotRestartImpl::initialize(Event::Dispatcher& dispatcher, Server::Instance&
   as_child_.initialize(dispatcher);
 }
 
-absl::optional<HotRestart::AdminShutdownResponse> HotRestartImpl::sendParentAdminShutdownRequest() {
+std::optional<HotRestart::AdminShutdownResponse> HotRestartImpl::sendParentAdminShutdownRequest() {
   return as_child_.sendParentAdminShutdownRequest();
 }
 

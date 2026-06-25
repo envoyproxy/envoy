@@ -171,7 +171,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithStringValueConfig) {
   // Set up a StringValue config.
   Protobuf::StringValue string_value;
   string_value.set_value("test_config_value");
-  config.mutable_lb_policy_config()->PackFrom(string_value);
+  std::ignore = config.mutable_lb_policy_config()->PackFrom(string_value);
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -187,7 +187,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithBytesValueConfig) {
   // Set up a BytesValue config.
   Protobuf::BytesValue bytes_value;
   bytes_value.set_value("binary_config_data");
-  config.mutable_lb_policy_config()->PackFrom(bytes_value);
+  std::ignore = config.mutable_lb_policy_config()->PackFrom(bytes_value);
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -203,7 +203,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithStructConfig) {
   // Set up a Struct config.
   Protobuf::Struct struct_value;
   (*struct_value.mutable_fields())["key"].set_string_value("value");
-  config.mutable_lb_policy_config()->PackFrom(struct_value);
+  std::ignore = config.mutable_lb_policy_config()->PackFrom(struct_value);
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -359,7 +359,7 @@ TEST_F(DynamicModulesLoadBalancerTest, ChooseHostWithContext) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"x-test-header", "test-value"}};
   ON_CALL(context, downstreamHeaders()).WillByDefault(Return(&headers));
-  ON_CALL(context, computeHashKey()).WillByDefault(Return(absl::optional<uint64_t>(12345)));
+  ON_CALL(context, computeHashKey()).WillByDefault(Return(std::optional<uint64_t>(12345)));
 
   auto response = lb->chooseHost(&context);
   EXPECT_NE(response.host, nullptr);
@@ -1017,7 +1017,7 @@ TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksSuccessfulCases) {
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"}, {":path", "/"}, {"x-custom-header", "custom-value"}};
   ON_CALL(context, downstreamHeaders()).WillByDefault(Return(&headers));
-  ON_CALL(context, computeHashKey()).WillByDefault(Return(absl::optional<uint64_t>(42)));
+  ON_CALL(context, computeHashKey()).WillByDefault(Return(std::optional<uint64_t>(42)));
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
 
@@ -1072,7 +1072,7 @@ TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksSuccessfulCases) {
 
 TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksNoHashKey) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
-  ON_CALL(context, computeHashKey()).WillByDefault(Return(absl::nullopt));
+  ON_CALL(context, computeHashKey()).WillByDefault(Return(std::nullopt));
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
 
@@ -1657,7 +1657,7 @@ TEST_F(DynamicModulesLoadBalancerTest, CallbacksTestModuleExercisesNewCallbacks)
   NiceMock<Upstream::MockLoadBalancerContext> context;
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"x-test-header", "test-value"}};
   ON_CALL(context, downstreamHeaders()).WillByDefault(Return(&headers));
-  ON_CALL(context, computeHashKey()).WillByDefault(Return(absl::optional<uint64_t>(12345)));
+  ON_CALL(context, computeHashKey()).WillByDefault(Return(std::optional<uint64_t>(12345)));
 
   auto response = lb->chooseHost(&context);
   EXPECT_NE(response.host, nullptr);

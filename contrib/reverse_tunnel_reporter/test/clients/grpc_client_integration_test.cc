@@ -173,7 +173,7 @@ protected:
         Protobuf::util::TimeUtil::MillisecondsToDuration(sendInterval);
     grpc_cfg.set_max_retries(maxRetries);
     grpc_cfg.set_max_buffer_count(1'000'000);
-    client->mutable_typed_config()->PackFrom(grpc_cfg);
+    std::ignore = client->mutable_typed_config()->PackFrom(grpc_cfg);
 
     return cfg;
   }

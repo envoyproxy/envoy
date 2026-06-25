@@ -1,11 +1,11 @@
 #include "source/common/stats/utility.h"
 
 #include <algorithm>
+#include <optional>
 #include <string>
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_replace.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Stats {
@@ -26,8 +26,8 @@ std::string Utility::sanitizeStatsName(absl::string_view name) {
                                    });
 }
 
-absl::optional<StatName> Utility::findTag(const Metric& metric, StatName find_tag_name) {
-  absl::optional<StatName> value;
+std::optional<StatName> Utility::findTag(const Metric& metric, StatName find_tag_name) {
+  std::optional<StatName> value;
   metric.iterateTagStatNames(
       [&value, &find_tag_name](Stats::StatName tag_name, Stats::StatName tag_value) -> bool {
         if (tag_name == find_tag_name) {

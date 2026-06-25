@@ -368,8 +368,8 @@ public:
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
 
   // ZooKeeperProxy::DecoderCallback
-  void onDecodeError(const absl::optional<OpCodes> opcode) override;
-  void onRequestBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) override;
+  void onDecodeError(const std::optional<OpCodes> opcode) override;
+  void onRequestBytes(const std::optional<OpCodes> opcode, const uint64_t bytes) override;
   void onConnect(bool readonly) override;
   void onPing() override;
   void onAuthRequest(const std::string& scheme) override;
@@ -396,7 +396,7 @@ public:
   absl::Status onGetAllChildrenNumberRequest(const absl::StatusOr<std::string>& path,
                                              const OpCodes opcode) override;
   void onCloseRequest() override;
-  void onResponseBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) override;
+  void onResponseBytes(const std::optional<OpCodes> opcode, const uint64_t bytes) override;
   void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly,
                          const std::chrono::milliseconds latency) override;
   void onResponse(OpCodes opcode, int32_t xid, int64_t zxid, int32_t error,

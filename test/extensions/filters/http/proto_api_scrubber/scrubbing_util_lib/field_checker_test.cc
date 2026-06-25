@@ -853,7 +853,7 @@ TEST_F(RequestFieldCheckerTest, MapType) {
   map_entry_type.set_name("test.extensions.filters.http.proto_api_scrubber.ScrubRequest.TagsEntry");
   auto* option = map_entry_type.add_options();
   option->set_name("map_entry");
-  option->mutable_value()->PackFrom(Protobuf::BoolValue()); // Value not strictly checked by logic.
+  std::ignore = option->mutable_value()->PackFrom(Protobuf::BoolValue());
 
   // Test the CheckField call for a map value.
   // Path: ["tags", "some_random_key"]
@@ -1132,7 +1132,7 @@ TEST_F(ResponseFieldCheckerTest, MapType) {
   option->set_name("map_entry");
   Protobuf::BoolValue bool_val;
   bool_val.set_value(true);
-  option->mutable_value()->PackFrom(bool_val);
+  std::ignore = option->mutable_value()->PackFrom(bool_val);
 
   // Test the CheckField call
   // The proto_scrubber library passes:

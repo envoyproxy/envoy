@@ -38,6 +38,5 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/network:address_interface",
-        "@abseil-cpp//absl/types:optional",
     ],
 )

@@ -5,8 +5,10 @@
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "library/common/internal_engine.h"
+#include "library/common/network/socket_tag_socket_option_impl.h"
 #include "library/common/system/system_helper.h"
 #include "library/common/types/c_types.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Platform {
@@ -62,6 +64,10 @@ void Engine::onDefaultNetworkAvailable() { engine_->onDefaultNetworkAvailable();
 
 envoy_status_t Engine::setProxySettings(absl::string_view host, const uint16_t port) {
   return engine_->setProxySettings(host, port);
+}
+
+void Engine::drainConnectionsBySocketTag(uint32_t tag) {
+  engine_->drainConnectionsBySocketTag(tag);
 }
 
 } // namespace Platform

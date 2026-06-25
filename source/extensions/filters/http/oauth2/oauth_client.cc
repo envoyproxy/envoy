@@ -137,6 +137,17 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
   dispatchRequest(std::move(request));
 }
 
+void OAuth2ClientImpl::cancel() {
+  parent_ = nullptr;
+  decoder_callbacks_ = nullptr;
+  Http::AsyncClient::Request* in_flight = in_flight_request_;
+  in_flight_request_ = nullptr;
+  if (in_flight != nullptr) {
+    in_flight->cancel();
+  }
+  state_ = OAuthState::Idle;
+}
+
 void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
   const auto thread_local_cluster = cm_.getThreadLocalCluster(uri_.cluster());
   if (thread_local_cluster != nullptr) {
@@ -186,6 +197,11 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   // token request. Set state_ for the caller to check instead of calling continueDecoding.
   const bool is_request_dispatched = (in_flight_request_ != nullptr);
   in_flight_request_ = nullptr;
+
+  if (parent_ == nullptr) {
+    state_ = OAuthState::Idle;
+    return;
+  }
 
   ASSERT(state_ == OAuthState::PendingAccessToken ||
          state_ == OAuthState::PendingAccessTokenByRefreshToken);
@@ -265,11 +281,17 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
 
 void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
                                  Http::AsyncClient::FailureReason) {
-  ENVOY_STREAM_LOG(debug, "OAuth request failed.", *decoder_callbacks_);
   // If not yet dispatched, onFailure was called synchronously during decodeHeaders rather than in
   // an async token request. Set state_ for the caller to check instead of calling continueDecoding.
   const bool is_request_dispatched = (in_flight_request_ != nullptr);
   in_flight_request_ = nullptr;
+
+  if (parent_ == nullptr) {
+    state_ = OAuthState::Idle;
+    return;
+  }
+
+  ENVOY_STREAM_LOG(debug, "OAuth request failed.", *decoder_callbacks_);
   const OAuthState oldState = state_;
   state_ = OAuthState::Idle;
 

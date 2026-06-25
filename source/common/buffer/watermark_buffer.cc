@@ -169,8 +169,8 @@ WatermarkBufferFactory::createAccount(Http::StreamResetHandler& reset_handler) {
 }
 
 void WatermarkBufferFactory::updateAccountClass(const BufferMemoryAccountSharedPtr& account,
-                                                absl::optional<uint32_t> current_class,
-                                                absl::optional<uint32_t> new_class) {
+                                                std::optional<uint32_t> current_class,
+                                                std::optional<uint32_t> new_class) {
   ASSERT(current_class != new_class, "Expected the current_class and new_class to be different");
 
   if (!current_class.has_value()) {
@@ -193,7 +193,7 @@ void WatermarkBufferFactory::updateAccountClass(const BufferMemoryAccountSharedP
 }
 
 void WatermarkBufferFactory::unregisterAccount(const BufferMemoryAccountSharedPtr& account,
-                                               absl::optional<uint32_t> current_class) {
+                                               std::optional<uint32_t> current_class) {
   if (current_class.has_value()) {
     ASSERT(size_class_account_sets_[current_class.value()].contains(account));
     size_class_account_sets_[current_class.value()].erase(account);
@@ -264,7 +264,7 @@ BufferMemoryAccountImpl::createAccount(WatermarkBufferFactory* factory,
   return account;
 }
 
-absl::optional<uint32_t> BufferMemoryAccountImpl::balanceToClassIndex() {
+std::optional<uint32_t> BufferMemoryAccountImpl::balanceToClassIndex() {
   const uint64_t shifted_balance = buffer_memory_allocated_ >> factory_->bitshift();
 
   if (shifted_balance == 0) {

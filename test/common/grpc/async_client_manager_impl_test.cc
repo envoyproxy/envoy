@@ -205,7 +205,7 @@ public:
     context_.thread_local_.setDispatcher(dispatcher_.get());
   }
 
-  void initialize(absl::optional<Bootstrap::GrpcAsyncClientManagerConfig> config = absl::nullopt) {
+  void initialize(std::optional<Bootstrap::GrpcAsyncClientManagerConfig> config = std::nullopt) {
     ON_CALL(context_, clusterManager()).WillByDefault(testing::ReturnRef(cm_));
     ON_CALL(context_, mainThreadDispatcher()).WillByDefault(testing::ReturnRef(*dispatcher_));
     ON_CALL(context_, timeSource()).WillByDefault(testing::ReturnRef(time_system_));

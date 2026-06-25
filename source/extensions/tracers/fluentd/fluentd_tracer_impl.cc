@@ -172,8 +172,8 @@ FluentdTracerImpl::FluentdTracerImpl(Upstream::ThreadLocalCluster& cluster,
     : FluentdBase(
           cluster, std::move(client), dispatcher, config.tag(),
           config.has_retry_policy() && config.retry_policy().has_num_retries()
-              ? absl::optional<uint32_t>(config.retry_policy().num_retries().value())
-              : absl::nullopt,
+              ? std::optional<uint32_t>(config.retry_policy().num_retries().value())
+              : std::nullopt,
           parent_scope, config.stat_prefix(), std::move(backoff_strategy),
           PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, DefaultBufferFlushIntervalMs),
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, DefaultMaxBufferSize)),

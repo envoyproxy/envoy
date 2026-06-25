@@ -306,7 +306,7 @@ void OrcaOobManager::OobSession::connectAndStream() {
 
   auto headers_message =
       Grpc::Common::prepareHeaders(authority(*dial_address), std::string(kOrcaOobServiceFullName),
-                                   std::string(kStreamCoreMetricsMethod), absl::nullopt);
+                                   std::string(kStreamCoreMetricsMethod), std::nullopt);
   headers_message->headers().setReferenceScheme(secure_transport
                                                     ? Http::Headers::get().SchemeValues.Https
                                                     : Http::Headers::get().SchemeValues.Http);

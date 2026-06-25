@@ -45,7 +45,7 @@ public:
     lb_->orca_weight_manager_->updateWeightsOnHosts(hosts);
   }
 
-  static absl::optional<uint32_t>
+  static std::optional<uint32_t>
   getClientSideWeightIfValidFromHost(const Host& host, const MonotonicTime& min_non_empty_since,
                                      const MonotonicTime& max_last_update_time) {
     return OrcaWeightManager::getWeightIfValidFromHost(host, min_non_empty_since,
@@ -124,7 +124,7 @@ public:
             lb_config_, cluster_info_, priority_set_, runtime_, random_, simTime()),
         std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb>(
             priority_set_, local_priority_set_.get(), stats_, runtime_, random_, common_config_,
-            lb_config_.round_robin_overrides_, simTime(), /*tls_shim=*/absl::nullopt));
+            lb_config_.round_robin_overrides_, simTime(), /*tls_shim=*/std::nullopt));
 
     // Initialize the thread aware load balancer from config.
     ASSERT_EQ(lb_->initialize(), absl::OkStatus());
@@ -137,7 +137,7 @@ public:
         0,
         updateHostsParams(hosts, hosts_per_locality,
                           std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-        {}, empty_host_vector_, empty_host_vector_, random_.random(), absl::nullopt);
+        {}, empty_host_vector_, empty_host_vector_, random_.random(), std::nullopt);
   }
 
   void peekThenPick(std::vector<int> picks) {
