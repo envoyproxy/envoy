@@ -232,7 +232,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = envoy_select_enable_http3([
         ":test_proof_source_lib",
-        ":test_quic_connection_id_generator_factory_lib",
+        ":mock_quic_connection_id_generator_factory_lib",
         ":test_utils_lib",
         "//source/common/http:utility_lib",
         "//source/common/listener_manager:connection_handler_lib",
@@ -306,8 +306,8 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "test_quic_connection_id_generator_factory_lib",
-    hdrs = envoy_select_enable_http3(["test_quic_connection_id_generator_factory.h"]),
+    name = "mock_quic_connection_id_generator_factory_lib",
+    hdrs = envoy_select_enable_http3(["mock_quic_connection_id_generator_factory.h"]),
     deps = envoy_select_enable_http3([
         "//source/common/protobuf:utility_lib",
         "//source/common/quic:envoy_quic_connection_id_generator_factory_interface",

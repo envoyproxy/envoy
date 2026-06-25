@@ -24,8 +24,8 @@
 #include "source/server/configuration_impl.h"
 #include "source/server/process_context_impl.h"
 
+#include "test/common/quic/mock_quic_connection_id_generator_factory.h"
 #include "test/common/quic/test_proof_source.h"
-#include "test/common/quic/test_quic_connection_id_generator_factory.h"
 #include "test/common/quic/test_utils.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/listener_factory_context.h"
