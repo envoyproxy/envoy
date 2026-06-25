@@ -94,7 +94,7 @@ public:
     TestClientCodecCallbacks(IntegrationTest& parent) : parent_(parent) {}
 
     void onDecodingSuccess(ResponseHeaderFramePtr response_frame,
-                           absl::optional<StartTime>) override {
+                           std::optional<StartTime>) override {
       auto& response = responses_[response_frame->frameFlags().streamId()];
       ASSERT(!response.end_stream_);
       response.end_stream_ = response_frame->frameFlags().endStream();
@@ -142,8 +142,7 @@ public:
   struct TestServerCodecCallbacks : public ServerCodecCallbacks {
     TestServerCodecCallbacks(IntegrationTest& parent) : parent_(parent) {}
 
-    void onDecodingSuccess(RequestHeaderFramePtr request_frame,
-                           absl::optional<StartTime>) override {
+    void onDecodingSuccess(RequestHeaderFramePtr request_frame, std::optional<StartTime>) override {
       auto& request = requests_[request_frame->frameFlags().streamId()];
       ASSERT(!request.end_stream_);
       request.end_stream_ = request_frame->frameFlags().endStream();

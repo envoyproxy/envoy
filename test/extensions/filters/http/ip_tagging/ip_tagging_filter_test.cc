@@ -261,7 +261,7 @@ public:
   }
 
   void initializeFilter(const std::string& yaml,
-                        absl::optional<std::string> expected_error = absl::nullopt) {
+                        std::optional<std::string> expected_error = std::nullopt) {
     envoy::extensions::filters::http::ip_tagging::v3::IPTagging config;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
     auto config_or =

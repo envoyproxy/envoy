@@ -558,4 +558,34 @@ type HttpFilterConfigHandle interface {
 	// This should be called only during the plugin configuration phase, and the returned
 	// Scheduler can be used later even outside of the callbacks and at other threads.
 	GetScheduler() Scheduler
+
+	// RecordHistogramValue records the given value to the histogram metric. The order and
+	// size of tagsValues must match the tag keys defined when the metric was created.
+	// Unlike HttpFilterHandle.RecordHistogramValue, this does not require a per-stream filter and
+	// can be called outside of the request lifecycle, for example from a scheduled background task.
+	RecordHistogramValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
+
+	// SetGaugeValue sets the given value on the gauge metric. The order and size of
+	// tagsValues must match the tag keys defined when the metric was created.
+	// Unlike HttpFilterHandle.SetGaugeValue, this does not require a per-stream filter and
+	// can be called outside of the request lifecycle, for example from a scheduled background task.
+	SetGaugeValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
+
+	// IncrementGaugeValue adds the given value to the gauge metric. The order and size of
+	// tagsValues must match the tag keys defined when the metric was created.
+	// Unlike HttpFilterHandle.IncrementGaugeValue, this does not require a per-stream filter and
+	// can be called outside of the request lifecycle, for example from a scheduled background task.
+	IncrementGaugeValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
+
+	// DecrementGaugeValue subtracts the given value from the gauge metric. The order and
+	// size of tagsValues must match the tag keys defined when the metric was created.
+	// Unlike HttpFilterHandle.DecrementGaugeValue, this does not require a per-stream filter and
+	// can be called outside of the request lifecycle, for example from a scheduled background task.
+	DecrementGaugeValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
+
+	// IncrementCounterValue adds the given value to the counter metric. The order and
+	// size of tagsValues must match the tag keys defined when the metric was created.
+	// Unlike HttpFilterHandle.IncrementCounterValue, this does not require a per-stream filter and
+	// can be called outside of the request lifecycle, for example from a scheduled background task.
+	IncrementCounterValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
 }

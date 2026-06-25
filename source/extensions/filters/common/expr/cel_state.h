@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "envoy/stream_info/filter_state.h"
@@ -8,7 +9,6 @@
 #include "source/common/singleton/const_singleton.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
@@ -76,7 +76,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr serializeAsProto() const override;
-  absl::optional<std::string> serializeAsString() const override { return value_; }
+  std::optional<std::string> serializeAsString() const override { return value_; }
 
 private:
   const bool readonly_;

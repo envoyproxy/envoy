@@ -52,6 +52,15 @@ lack of safe defaults. Over time, we will work towards improved safe-by-default 
 due to backwards compatibility and performance concerns, this will require following the breaking
 change deprecation policy.
 
+Build configurations
+--------------------
+
+Issues that do not affect Envoy in published release configurations are not covered by the threat model
+and will not be considered security issues. This includes:
+
+* Debug assertion failures, which are compiled out of Envoy release builds
+* Use of TLS libraries other than BoringSSL
+
 Data and control plane
 ----------------------
 

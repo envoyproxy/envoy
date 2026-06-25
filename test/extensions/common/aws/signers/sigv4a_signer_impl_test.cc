@@ -142,7 +142,7 @@ public:
   Http::RequestMessagePtr message_;
   Credentials credentials_;
   Credentials token_credentials_;
-  absl::optional<std::string> region_;
+  std::optional<std::string> region_;
   CredentialsProviderChainSharedPtr chain_;
   std::shared_ptr<SigV4ASignerImpl> signer_;
 };

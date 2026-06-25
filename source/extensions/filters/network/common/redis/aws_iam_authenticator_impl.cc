@@ -18,7 +18,7 @@ namespace AwsIamAuthenticator {
 AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(Envoy::Extensions::Common::Aws::SignerPtr signer)
     : signer_(std::move(signer)) {}
 
-absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAwsIamAuthenticator(
+std::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAwsIamAuthenticator(
     Server::Configuration::ServerFactoryContext& context,
     envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config) {
 
@@ -38,12 +38,12 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAws
   if (aws_iam_config.region().empty()) {
     auto region_provider =
         std::make_shared<Extensions::Common::Aws::RegionProviderChain>(credential_file_config);
-    absl::optional<std::string> regionOpt;
+    std::optional<std::string> regionOpt;
     regionOpt = region_provider->getRegion();
     if (!regionOpt.has_value()) {
       ENVOY_LOG(error, "AWS region is not set in xDS configuration and failed to retrieve from "
                        "environment variable or AWS profile/config files.");
-      return absl::nullopt;
+      return std::nullopt;
     }
     region = regionOpt.value();
   } else {
@@ -63,7 +63,7 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAws
   if (!credentials_provider_chain.ok()) {
     ENVOY_LOG(error, "Failed to initialize AWS credentials provider chain: {}",
               credentials_provider_chain.status().message());
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   // ElastiCache IAM authentication uses SigV4 query string signing

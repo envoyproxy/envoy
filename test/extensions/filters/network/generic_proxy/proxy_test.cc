@@ -38,7 +38,7 @@ public:
   MockRouteConfigProvider() { ON_CALL(*this, config()).WillByDefault(Return(route_config_)); }
 
   MOCK_METHOD(Rds::ConfigConstSharedPtr, config, (), (const));
-  MOCK_METHOD(const absl::optional<Rds::RouteConfigProvider::ConfigInfo>&, configInfo, (), (const));
+  MOCK_METHOD(const std::optional<Rds::RouteConfigProvider::ConfigInfo>&, configInfo, (), (const));
   MOCK_METHOD(SystemTime, lastUpdated, (), (const));
   MOCK_METHOD(absl::Status, onConfigUpdate, ());
 
@@ -119,7 +119,7 @@ public:
     file_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(format);
     file_log_config.set_path("/fake/log/path");
     envoy::config::accesslog::v3::AccessLog config;
-    config.mutable_typed_config()->PackFrom(file_log_config);
+    std::ignore = config.mutable_typed_config()->PackFrom(file_log_config);
     config.set_name("file");
 
     std::vector<Formatter::CommandParserPtr> command_parsers;

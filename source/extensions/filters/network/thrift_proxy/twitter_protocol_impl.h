@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
@@ -7,8 +8,6 @@
 
 #include "source/common/common/macros.h"
 #include "source/extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -38,7 +37,7 @@ public:
    * @return true if the protocol upgrade was success, false if not, no value if the result is not
    *         yet known
    */
-  absl::optional<bool> upgraded() { return upgraded_; }
+  std::optional<bool> upgraded() { return upgraded_; }
 
   /**
    * @return std::string containing the "improbably-named method" used for Twitter protocol upgrade.
@@ -66,7 +65,7 @@ protected:
 private:
   ThriftObjectPtr header_;
   bool header_complete_{false};
-  absl::optional<bool> upgraded_;
+  std::optional<bool> upgraded_;
 };
 
 } // namespace ThriftProxy

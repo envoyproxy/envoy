@@ -14,6 +14,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
 
 using testing::NiceMock;
@@ -51,6 +52,20 @@ public:
     factory_->initialize();
     quic_info_ = Quic::createPersistentQuicInfoForCluster(dispatcher_, mockHost().cluster_,
                                                           context_.server_context_);
+
+    // Create dummy peer sockets for sending the packets to.
+    //
+    // This is necessary once ClientHello does not fit in a single packet
+    // anymore, as on Linux sending the first packet to an unreachable port
+    // always succeeds, but sending subsequent packets returns ECONNREFUSED.
+    // And that error will ultimately fail the tests.
+    dummy_peer_v4_ = std::make_unique<Network::Test::UdpSyncPeer>(Network::Address::IpVersion::v4);
+    dummy_peer_v6_ = std::make_unique<Network::Test::UdpSyncPeer>(Network::Address::IpVersion::v6);
+
+    test_address_ = dummy_peer_v4_->localAddress();
+    address_list_ = std::make_shared<Upstream::HostDescription::AddressVector>(
+        Upstream::HostDescription::AddressVector{dummy_peer_v4_->localAddress(),
+                                                 dummy_peer_v6_->localAddress()});
   }
 
   void initialize() {
@@ -76,7 +91,7 @@ public:
                          transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
                          makeOptRef<PoolConnectResultCallback>(connect_result_callback_),
                          *quic_info_, {observers_}, overload_manager_, happy_eyeballs_);
-    EXPECT_EQ(3000, Http3ConnPoolImplPeer::getServerId(*pool_).port());
+    EXPECT_EQ(test_address_->ip()->port(), Http3ConnPoolImplPeer::getServerId(*pool_).port());
   }
 
   void createNewStream();
@@ -90,12 +105,8 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Upstream::ClusterConnectivityState state_;
   NiceMock<Server::MockOverloadManager> overload_manager_;
-  Network::Address::InstanceConstSharedPtr test_address_ =
-      *Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
-  std::shared_ptr<Upstream::HostDescription::AddressVector> address_list_{
-      new Upstream::HostDescription::AddressVector{
-          *Network::Utility::resolveUrl("tcp://127.0.0.1:3000"),
-          *Network::Utility::resolveUrl("tcp://[::]:3000")}};
+  Network::Address::InstanceConstSharedPtr test_address_;
+  std::shared_ptr<Upstream::HostDescription::AddressVector> address_list_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
   Ssl::ClientContextSharedPtr ssl_context_{new Ssl::MockClientContext()};
@@ -108,6 +119,8 @@ public:
   std::shared_ptr<Network::MockSocketOption> socket_option_{new Network::MockSocketOption()};
   absl::Status creation_status_;
   bool happy_eyeballs_ = false;
+  std::unique_ptr<Network::Test::UdpSyncPeer> dummy_peer_v4_;
+  std::unique_ptr<Network::Test::UdpSyncPeer> dummy_peer_v6_;
 };
 
 class MockQuicClientTransportSocketFactory : public Quic::QuicClientTransportSocketFactory {

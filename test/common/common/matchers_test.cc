@@ -638,11 +638,11 @@ TEST_F(FilterStateMatcher, MatchAbsentFilterState) {
 
 class TestObject : public StreamInfo::FilterState::Object {
 public:
-  TestObject(absl::optional<std::string> value) : value_(value) {}
-  absl::optional<std::string> serializeAsString() const override { return value_; }
+  TestObject(std::optional<std::string> value) : value_(value) {}
+  std::optional<std::string> serializeAsString() const override { return value_; }
 
 private:
-  absl::optional<std::string> value_;
+  std::optional<std::string> value_;
 };
 
 TEST_F(FilterStateMatcher, MatchFilterStateWithoutString) {
@@ -651,7 +651,7 @@ TEST_F(FilterStateMatcher, MatchFilterStateWithoutString) {
   matcher.set_key(key);
   matcher.mutable_string_match()->set_exact("exact");
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state.setData(key, std::make_shared<TestObject>(absl::nullopt));
+  filter_state.setData(key, std::make_shared<TestObject>(std::nullopt));
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
@@ -665,7 +665,7 @@ TEST_F(FilterStateMatcher, MatchFilterStateDifferentString) {
   matcher.mutable_string_match()->set_exact(value);
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(key,
-                       std::make_shared<TestObject>(absl::make_optional<std::string>("different")));
+                       std::make_shared<TestObject>(std::make_optional<std::string>("different")));
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
@@ -678,7 +678,7 @@ TEST_F(FilterStateMatcher, MatchFilterState) {
   matcher.set_key(key);
   matcher.mutable_string_match()->set_exact(value);
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state.setData(key, std::make_shared<TestObject>(absl::make_optional<std::string>(value)));
+  filter_state.setData(key, std::make_shared<TestObject>(std::make_optional<std::string>(value)));
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());
   EXPECT_TRUE((*filter_state_matcher)->match(filter_state));

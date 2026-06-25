@@ -102,8 +102,8 @@ protected:
   UpdateAck deliverDiscoveryResponse(
       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string& version_info, absl::optional<std::string> nonce = absl::nullopt,
-      bool expect_config_update_call = true, absl::optional<uint64_t> updated_resources = {}) {
+      const std::string& version_info, std::optional<std::string> nonce = std::nullopt,
+      bool expect_config_update_call = true, std::optional<uint64_t> updated_resources = {}) {
     envoy::service::discovery::v3::DeltaDiscoveryResponse message;
     *message.mutable_resources() = added_resources;
     *message.mutable_removed_resources() = removed_resources;
@@ -496,7 +496,7 @@ TEST_P(DeltaSubscriptionStateTestBlank, AmbiguousResourceTTL) {
   time_system.setSystemTime(std::chrono::milliseconds(0));
 
   auto create_resource_with_ttl = [](absl::string_view name, absl::string_view version,
-                                     absl::optional<std::chrono::seconds> ttl_s,
+                                     std::optional<std::chrono::seconds> ttl_s,
                                      bool include_resource) {
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
     auto* resource = added_resources.Add();
@@ -1198,7 +1198,7 @@ TEST_P(DeltaSubscriptionStateTest, CheckUpdatePending) {
 TEST_P(DeltaSubscriptionStateTest, DuplicatedAdd) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> additions =
       populateRepeatedResource({{"name1", "version1A"}, {"name1", "sdfsdfsdfds"}});
-  UpdateAck ack = deliverDiscoveryResponse(additions, {}, "debugversion1", absl::nullopt, false);
+  UpdateAck ack = deliverDiscoveryResponse(additions, {}, "debugversion1", std::nullopt, false);
   EXPECT_EQ("duplicate name name1 found among added/updated resources",
             ack.error_detail_.message());
 }
@@ -1207,7 +1207,7 @@ TEST_P(DeltaSubscriptionStateTest, DuplicatedRemove) {
   Protobuf::RepeatedPtrField<std::string> removals;
   *removals.Add() = "name1";
   *removals.Add() = "name1";
-  UpdateAck ack = deliverDiscoveryResponse({}, removals, "debugversion1", absl::nullopt, false);
+  UpdateAck ack = deliverDiscoveryResponse({}, removals, "debugversion1", std::nullopt, false);
   EXPECT_EQ("duplicate name name1 found in the union of added+removed resources",
             ack.error_detail_.message());
 }
@@ -1218,7 +1218,7 @@ TEST_P(DeltaSubscriptionStateTest, AddedAndRemoved) {
   Protobuf::RepeatedPtrField<std::string> removals;
   *removals.Add() = "name1";
   UpdateAck ack =
-      deliverDiscoveryResponse(additions, removals, "debugversion1", absl::nullopt, false);
+      deliverDiscoveryResponse(additions, removals, "debugversion1", std::nullopt, false);
   EXPECT_EQ("duplicate name name1 found in the union of added+removed resources",
             ack.error_detail_.message());
 }
@@ -1227,7 +1227,7 @@ TEST_P(DeltaSubscriptionStateTest, ResourceTTL) {
   Event::SimulatedTimeSystem time_system;
   time_system.setSystemTime(std::chrono::milliseconds(0));
 
-  auto create_resource_with_ttl = [](absl::optional<std::chrono::seconds> ttl_s,
+  auto create_resource_with_ttl = [](std::optional<std::chrono::seconds> ttl_s,
                                      bool include_resource) {
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
     auto* resource = added_resources.Add();
@@ -1271,7 +1271,7 @@ TEST_P(DeltaSubscriptionStateTest, ResourceTTL) {
 
   // Remove the TTL.
   EXPECT_CALL(*ttl_timer_, disableTimer());
-  deliverDiscoveryResponse(create_resource_with_ttl(absl::nullopt, true), {}, "debug1", "nonce1",
+  deliverDiscoveryResponse(create_resource_with_ttl(std::nullopt, true), {}, "debug1", "nonce1",
                            true, 1);
 
   // Add back the TTL.
@@ -1295,7 +1295,7 @@ TEST_P(DeltaSubscriptionStateTest, HeartbeatResourcesNotProcessed) {
   time_system.setSystemTime(std::chrono::milliseconds(0));
 
   auto create_resource_with_ttl = [](absl::string_view name, absl::string_view version,
-                                     absl::optional<std::chrono::seconds> ttl_s,
+                                     std::optional<std::chrono::seconds> ttl_s,
                                      bool include_resource) {
     envoy::service::discovery::v3::Resource resource;
     resource.set_name(name);

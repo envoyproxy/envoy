@@ -83,7 +83,7 @@ std::unique_ptr<GrpcStreamInterface<RQ, RS>> GrpcMuxImpl<S, F, RQ, RS>::createGr
         },
         /*failover_stream_creator=*/
         failover_async_client
-            ? absl::make_optional(
+            ? std::make_optional(
                   [&failover_async_client, &service_method, &dispatcher = dispatcher_, &scope,
                    &rate_limit_settings](
                       GrpcStreamCallbacks<RS>* callbacks) -> GrpcStreamInterfacePtr<RQ, RS> {
@@ -96,7 +96,7 @@ std::unique_ptr<GrpcStreamInterface<RQ, RS>> GrpcMuxImpl<S, F, RQ, RS>::createGr
                             GrpcMuxFailover<RQ, RS>::DefaultFailoverBackoffMilliseconds),
                         rate_limit_settings, GrpcStream<RQ, RS>::ConnectedStateValue::SecondEntry);
                   })
-            : absl::nullopt,
+            : std::nullopt,
         /*grpc_mux_callbacks=*/*this,
         /*dispatch=*/dispatcher_);
   }
@@ -133,7 +133,7 @@ Config::GrpcMuxWatchPtr GrpcMuxImpl<S, F, RQ, RS>::addWatch(
   auto watch_map = watch_maps_.find(type_url);
   if (watch_map == watch_maps_.end()) {
     // Resource cache is only used for EDS resources.
-    EdsResourcesCacheOptRef resources_cache{absl::nullopt};
+    EdsResourcesCacheOptRef resources_cache{std::nullopt};
     if (eds_resources_cache_ &&
         (type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>())) {
       resources_cache = makeOptRefFromPtr(eds_resources_cache_.get());
@@ -376,7 +376,7 @@ void GrpcMuxImpl<S, F, RQ, RS>::trySendDiscoveryRequests() {
 
   while (true) {
     // Do any of our subscriptions even want to send a request?
-    absl::optional<std::string> request_type_if_any = whoWantsToSendDiscoveryRequest();
+    std::optional<std::string> request_type_if_any = whoWantsToSendDiscoveryRequest();
     if (!request_type_if_any.has_value()) {
       break;
     }
@@ -435,7 +435,7 @@ bool GrpcMuxImpl<S, F, RQ, RS>::canSendDiscoveryRequest(const std::string& type_
 // Then, prioritizes non-ACK updates in the order the various types
 // of subscriptions were activated.
 template <class S, class F, class RQ, class RS>
-absl::optional<std::string> GrpcMuxImpl<S, F, RQ, RS>::whoWantsToSendDiscoveryRequest() {
+std::optional<std::string> GrpcMuxImpl<S, F, RQ, RS>::whoWantsToSendDiscoveryRequest() {
   // All ACKs are sent before plain updates. trySendDiscoveryRequests() relies on this. So, choose
   // type_url from pausable_ack_queue_ if possible, before looking at pending updates.
   if (!pausable_ack_queue_.empty()) {
@@ -449,7 +449,7 @@ absl::optional<std::string> GrpcMuxImpl<S, F, RQ, RS>::whoWantsToSendDiscoveryRe
       return sub_type;
     }
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 template class GrpcMuxImpl<DeltaSubscriptionState, DeltaSubscriptionStateFactory,
@@ -515,7 +515,7 @@ public:
         /*rate_limit_settings_=*/rate_limit_settings_or_error.value(),
         /*scope_=*/scope,
         /*config_validators_=*/std::move(config_validators),
-        /*xds_resources_delegate_=*/absl::nullopt,
+        /*xds_resources_delegate_=*/std::nullopt,
         /*xds_config_tracker_=*/xds_config_tracker,
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",
@@ -554,7 +554,7 @@ public:
         /*rate_limit_settings_=*/rate_limit_settings_or_error.value(),
         /*scope_=*/scope,
         /*config_validators_=*/std::move(config_validators),
-        /*xds_resources_delegate_=*/absl::nullopt,
+        /*xds_resources_delegate_=*/std::nullopt,
         /*xds_config_tracker_=*/xds_config_tracker,
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",

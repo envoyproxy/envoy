@@ -162,9 +162,24 @@ FilterMetadataStatus DynamicModuleHttpFilter::encodeMetadata(MetadataMap&) {
 void DynamicModuleHttpFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+    const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   sent_local_reply_ = true;
   decoder_callbacks_->sendLocalReply(code, body, modify_headers, grpc_status, details);
+}
+
+void DynamicModuleHttpFilter::sendResponseHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
+  sent_local_reply_ = true;
+  decoder_callbacks_->encodeHeaders(std::move(headers), end_stream, "");
+}
+
+void DynamicModuleHttpFilter::sendResponseData(Buffer::Instance& data, bool end_stream) {
+  sent_local_reply_ = true;
+  decoder_callbacks_->encodeData(data, end_stream);
+}
+
+void DynamicModuleHttpFilter::sendResponseTrailers(ResponseTrailerMapPtr&& trailers) {
+  sent_local_reply_ = true;
+  decoder_callbacks_->encodeTrailers(std::move(trailers));
 }
 
 void DynamicModuleHttpFilter::encodeComplete() {};

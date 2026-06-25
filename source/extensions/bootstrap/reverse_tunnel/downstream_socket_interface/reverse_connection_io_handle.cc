@@ -301,7 +301,7 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
 }
 
 Api::IoCallUint64Result ReverseConnectionIOHandle::read(Buffer::Instance& buffer,
-                                                        absl::optional<uint64_t> max_length) {
+                                                        std::optional<uint64_t> max_length) {
   ENVOY_LOG(trace, "Read operation - max_length: {}", max_length.value_or(0));
   auto result = IoSocketHandleImpl::read(buffer, max_length);
   return result;
@@ -1000,7 +1000,7 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
     // Safely log address information without assuming IP is present (internal addresses possible).
     const auto& addr = host->address();
     std::string addr_str = addr ? addr->asString() : std::string("<unknown>");
-    absl::optional<uint16_t> port_opt;
+    std::optional<uint16_t> port_opt;
     if (addr && addr->ip() != nullptr) {
       port_opt = addr->ip()->port();
     }

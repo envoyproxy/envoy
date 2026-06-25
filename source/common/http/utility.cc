@@ -3,6 +3,7 @@
 #include <http_parser.h>
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -33,7 +34,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "quiche/http2/adapter/http2_protocol.h"
 
 namespace Envoy {
@@ -552,13 +552,13 @@ void Utility::QueryParamsMulti::overwrite(absl::string_view key, absl::string_vi
   this->data_[key] = std::vector<std::string>{std::string(value)};
 }
 
-absl::optional<std::string> Utility::QueryParamsMulti::getFirstValue(absl::string_view key) const {
+std::optional<std::string> Utility::QueryParamsMulti::getFirstValue(absl::string_view key) const {
   auto it = this->data_.find(key);
   if (it == this->data_.end()) {
     return std::nullopt;
   }
 
-  return absl::optional<std::string>{it->second.at(0)};
+  return std::optional<std::string>{it->second.at(0)};
 }
 
 absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
@@ -656,11 +656,11 @@ uint64_t Utility::getResponseStatus(const ResponseHeaderMap& headers) {
   return status.value();
 }
 
-absl::optional<uint64_t> Utility::getResponseStatusOrNullopt(const ResponseHeaderMap& headers) {
+std::optional<uint64_t> Utility::getResponseStatusOrNullopt(const ResponseHeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
   if (!header || !absl::SimpleAtoi(headers.getStatusValue(), &response_code)) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return response_code;
 }
@@ -1070,7 +1070,7 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
 }
 
 std::string Utility::buildOriginalUri(const Http::RequestHeaderMap& request_headers,
-                                      const absl::optional<uint32_t> max_path_length) {
+                                      const std::optional<uint32_t> max_path_length) {
   if (!request_headers.Path()) {
     return "";
   }
@@ -1408,7 +1408,7 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   // effort attempt.
   const auto colon_pos = host.rfind(':');
   absl::string_view host_to_resolve = host;
-  absl::optional<uint16_t> port;
+  std::optional<uint16_t> port;
   if (colon_pos != absl::string_view::npos && host_to_resolve.back() != ']') {
     const absl::string_view string_view_host = host;
     host_to_resolve = string_view_host.substr(0, colon_pos);

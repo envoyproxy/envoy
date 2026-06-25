@@ -33,7 +33,7 @@ public:
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactory(const FilterConfig& proto_config, const std::string& stat_prefix,
                       Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
-                      OptRef<Init::Manager> init_manager = absl::nullopt);
+                      OptRef<Init::Manager> init_manager = std::nullopt);
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(const RouteConfigProto&,

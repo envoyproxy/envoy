@@ -11,14 +11,14 @@ namespace Network {
 
 class SourceIpHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  absl::optional<uint64_t> evaluate(const Network::Connection& connection) const override {
+  std::optional<uint64_t> evaluate(const Network::Connection& connection) const override {
     const auto* downstream_addr = connection.connectionInfoProvider().remoteAddress().get();
     if (downstream_addr && downstream_addr->ip()) {
       ASSERT(!downstream_addr->ip()->addressAsString().empty());
       return HashUtil::xxHash64(downstream_addr->ip()->addressAsString());
     }
 
-    return absl::nullopt;
+    return std::nullopt;
   }
 };
 
@@ -26,12 +26,12 @@ class FilterStateHashMethod : public HashPolicyImpl::HashMethod {
 public:
   FilterStateHashMethod(absl::string_view key) : key_(key) {}
 
-  absl::optional<uint64_t> evaluate(const Network::Connection& connection) const override {
+  std::optional<uint64_t> evaluate(const Network::Connection& connection) const override {
     const auto& filter_state = connection.streamInfo().filterState();
     if (auto typed_state = filter_state.getDataReadOnly<Hashable>(key_); typed_state != nullptr) {
       return typed_state->hash();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
 private:
@@ -53,7 +53,7 @@ HashPolicyImpl::HashPolicyImpl(
   }
 }
 
-absl::optional<uint64_t> HashPolicyImpl::generateHash(const Network::Connection& connection) const {
+std::optional<uint64_t> HashPolicyImpl::generateHash(const Network::Connection& connection) const {
   return hash_impl_->evaluate(connection);
 }
 

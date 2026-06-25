@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/common/wasm/wasm.h"
@@ -8,7 +10,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest-param-test.h"
 #include "gtest/gtest.h"
@@ -51,8 +52,7 @@ public:
     plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration_);
     plugin_config.mutable_configuration()->set_value(plugin_configuration_);
     plugin_ = std::make_shared<Extensions::Common::Wasm::Plugin>(
-        plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_,
-        nullptr);
+        plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_);
     auto config = plugin_->wasmConfig();
     config.allowedCapabilities() = allowed_capabilities_;
     config.environmentVariables() = envs_;

@@ -1,12 +1,12 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_lifecycle_info.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,7 +29,7 @@ public:
 
 private:
   Network::ReadFilterCallbacks* read_callbacks_{nullptr};
-  absl::optional<ReverseTunnelLifecycleInfo> lifecycle_;
+  std::optional<ReverseTunnelLifecycleInfo> lifecycle_;
   int fd_{-1};
   bool keepalive_timeout_logged_{false};
 };

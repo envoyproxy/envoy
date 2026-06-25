@@ -4,6 +4,10 @@
 #include "source/common/common/posix/thread_impl.h"
 #endif
 
+#if defined(__linux__)
+#include <sched.h>
+#endif
+
 #include "source/common/common/thread.h"
 #include "source/common/common/thread_synchronizer.h"
 
@@ -67,6 +71,97 @@ TEST_F(ThreadAsyncPtrTest, DeleteOnDestruct) {
   }));
   EXPECT_FALSE(called);
 }
+
+#if defined(__linux__)
+// Verifies that a thread created with a CPU affinity option is pinned to that CPU.
+TEST_F(ThreadAsyncPtrTest, CpuAffinity) {
+  cpu_set_t process_mask;
+  CPU_ZERO(&process_mask);
+  ASSERT_EQ(0, sched_getaffinity(0, sizeof(process_mask), &process_mask));
+  int target_cpu = -1;
+  for (int cpu = 0; cpu < CPU_SETSIZE; cpu++) {
+    if (CPU_ISSET(cpu, &process_mask)) {
+      target_cpu = cpu;
+      break;
+    }
+  }
+  ASSERT_GE(target_cpu, 0);
+
+  absl::Notification done;
+  cpu_set_t observed;
+  CPU_ZERO(&observed);
+  Options options{"affined"};
+  options.cpu_affinity_ = static_cast<uint32_t>(target_cpu);
+  auto thread = thread_factory_.createThread(
+      [&done, &observed]() {
+        sched_getaffinity(0, sizeof(observed), &observed);
+        done.Notify();
+      },
+      options);
+  done.WaitForNotification();
+  thread->join();
+  EXPECT_EQ(1, CPU_COUNT(&observed));
+  EXPECT_TRUE(CPU_ISSET(target_cpu, &observed));
+}
+
+// Verifies that a CPU index beyond the supported maximum is ignored and the thread keeps the
+// inherited affinity.
+TEST_F(ThreadAsyncPtrTest, CpuAffinityExceedsMaximum) {
+  cpu_set_t process_mask;
+  CPU_ZERO(&process_mask);
+  ASSERT_EQ(0, sched_getaffinity(0, sizeof(process_mask), &process_mask));
+
+  absl::Notification done;
+  cpu_set_t observed;
+  CPU_ZERO(&observed);
+  Options options{"affined-max"};
+  options.cpu_affinity_ = CPU_SETSIZE;
+  auto thread = thread_factory_.createThread(
+      [&done, &observed]() {
+        sched_getaffinity(0, sizeof(observed), &observed);
+        done.Notify();
+      },
+      options);
+  done.WaitForNotification();
+  thread->join();
+  EXPECT_TRUE(CPU_EQUAL(&process_mask, &observed));
+}
+
+// Verifies that a failed `sched_setaffinity` leaves the thread with the inherited affinity.
+TEST_F(ThreadAsyncPtrTest, CpuAffinitySetFailure) {
+  cpu_set_t process_mask;
+  CPU_ZERO(&process_mask);
+  ASSERT_EQ(0, sched_getaffinity(0, sizeof(process_mask), &process_mask));
+
+  // Pick the highest CPU index outside the process mask so `sched_setaffinity` fails
+  // deterministically rather than relying on a fixed index that a large host might have online.
+  int unavailable_cpu = -1;
+  for (int cpu = CPU_SETSIZE - 1; cpu >= 0; cpu--) {
+    if (!CPU_ISSET(cpu, &process_mask)) {
+      unavailable_cpu = cpu;
+      break;
+    }
+  }
+  if (unavailable_cpu < 0) {
+    GTEST_SKIP() << "every CPU is in the process mask";
+  }
+
+  absl::Notification done;
+  cpu_set_t observed;
+  CPU_ZERO(&observed);
+  Options options{"affined-bad"};
+  options.cpu_affinity_ = static_cast<uint32_t>(unavailable_cpu);
+  auto thread = thread_factory_.createThread(
+      [&done, &observed]() {
+        sched_getaffinity(0, sizeof(observed), &observed);
+        done.Notify();
+      },
+      options);
+  done.WaitForNotification();
+  thread->join();
+  EXPECT_TRUE(CPU_EQUAL(&process_mask, &observed));
+}
+#endif
 
 // Same test as AtomicPtrDeleteOnDestruct, except the allocator callbacks return
 // pointers to locals, rather than allocating the strings on the heap.
@@ -257,7 +352,7 @@ TEST(PosixThreadTest, PThreadId) {
   ThreadId thread_id;
   auto thread =
       thread_factory->createThread([&]() { thread_id = thread_factory->currentPthreadId(); },
-                                   /* options= */ absl::nullopt, /* crash_on_failure= */ false);
+                                   /* options= */ std::nullopt, /* crash_on_failure= */ false);
   auto threadId = thread->pthreadId();
   thread->join();
 
@@ -267,7 +362,7 @@ TEST(PosixThreadTest, PThreadId) {
 
 TEST(PosixThreadTest, Joinable) {
   auto thread_factory = PosixThreadFactory::create();
-  auto thread = thread_factory->createThread([&]() {}, /* options= */ absl::nullopt,
+  auto thread = thread_factory->createThread([&]() {}, /* options= */ std::nullopt,
                                              /* crash_on_failure= */ true);
 
   EXPECT_TRUE(thread->joinable());
@@ -308,7 +403,7 @@ protected:
 
 TEST(PosixThreadTest, FailCreate) {
   PosixThreadFactoryFailCreate thread_factory;
-  EXPECT_ENVOY_BUG(thread_factory.createThread([&]() {}, /* options= */ absl::nullopt,
+  EXPECT_ENVOY_BUG(thread_factory.createThread([&]() {}, /* options= */ std::nullopt,
                                                /* crash_on_failure= */ false),
                    "Unable to create a thread with return code: 1");
 }

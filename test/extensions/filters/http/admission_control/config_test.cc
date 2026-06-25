@@ -149,8 +149,6 @@ success_criteria:
 // Verify the config defaults when not specified.
 TEST_F(AdmissionControlConfigTest, BasicTestMinimumConfigured) {
   // Empty config. No fields are required.
-  AdmissionControlProto proto;
-
   const std::string yaml = R"EOF(
 success_criteria:
   http_criteria:

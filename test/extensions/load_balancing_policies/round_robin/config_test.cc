@@ -23,7 +23,7 @@ TEST(RoundRobinConfigTest, ValidateFail) {
   envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("envoy.load_balancing_policies.round_robin");
   envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin config_msg;
-  config.mutable_typed_config()->PackFrom(config_msg);
+  std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
   EXPECT_EQ("envoy.load_balancing_policies.round_robin", factory.name());

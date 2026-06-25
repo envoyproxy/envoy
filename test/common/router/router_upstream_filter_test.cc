@@ -127,7 +127,7 @@ public:
 
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_
                     .host_->outlier_detector_,
-                putResult(_, absl::optional<uint64_t>(200)));
+                putResult(_, std::optional<uint64_t>(200)));
     // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     response_decoder->decodeHeaders(std::move(response_headers), true);
     return headers;
@@ -154,12 +154,12 @@ TEST_F(RouterUpstreamFilterTest, UpstreamFilter) {
   HttpFilter add_header_filter;
   add_header_filter.set_name("add-header-filter");
   test::integration::filters::AddHeaderEmptyFilterConfig add_header_config;
-  add_header_filter.mutable_typed_config()->PackFrom(add_header_config);
+  std::ignore = add_header_filter.mutable_typed_config()->PackFrom(add_header_config);
 
   HttpFilter codec_filter;
   codec_filter.set_name("envoy.filters.http.upstream_codec");
   envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec upstream_codec_config;
-  codec_filter.mutable_typed_config()->PackFrom(upstream_codec_config);
+  std::ignore = codec_filter.mutable_typed_config()->PackFrom(upstream_codec_config);
 
   init({add_header_filter, codec_filter});
   auto headers = run();

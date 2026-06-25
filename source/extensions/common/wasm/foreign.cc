@@ -124,7 +124,7 @@ RegisterForeignFunction registerVerifySignatureForeignFunction(
 
         auto size = verification_result.ByteSizeLong();
         auto result = alloc_result(size);
-        verification_result.SerializeToArray(result, static_cast<int>(size));
+        std::ignore = verification_result.SerializeToArray(result, static_cast<int>(size));
         return WasmResult::Ok;
       }
       return WasmResult::BadArgument;
@@ -161,7 +161,7 @@ RegisterForeignFunction registerSignForeignFunction(
 
         auto size = signing_result.ByteSizeLong();
         auto result = alloc_result(size);
-        signing_result.SerializeToArray(result, static_cast<int>(size));
+        std::ignore = signing_result.SerializeToArray(result, static_cast<int>(size));
         return WasmResult::Ok;
       }
       return WasmResult::BadArgument;

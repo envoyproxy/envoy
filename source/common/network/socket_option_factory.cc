@@ -17,7 +17,7 @@ SocketOptionFactory::buildTcpKeepaliveOptions(Network::TcpKeepaliveConfig keepal
   if (isTcpKeepaliveConfigDisabled(keepalive_config)) {
     return options;
   }
-  absl::optional<Network::Socket::Type> tcp_only = {Network::Socket::Type::Stream};
+  std::optional<Network::Socket::Type> tcp_only = {Network::Socket::Type::Stream};
   options->push_back(std::make_shared<Network::SocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_SO_KEEPALIVE, 1,
       tcp_only));
@@ -103,7 +103,7 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
       continue;
     }
 
-    absl::optional<Network::Socket::Type> socket_type = absl::nullopt;
+    std::optional<Network::Socket::Type> socket_type = std::nullopt;
     if (socket_option.has_type() && socket_option.type().has_stream()) {
       if (socket_option.type().has_datagram()) {
         ENVOY_LOG(
@@ -114,7 +114,7 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
     } else if (socket_option.has_type() && socket_option.type().has_datagram()) {
       socket_type = Network::Socket::Type::Datagram;
     }
-    absl::optional<Network::Address::IpVersion> socket_ip_version = absl::nullopt;
+    std::optional<Network::Address::IpVersion> socket_ip_version = std::nullopt;
     switch (socket_option.ip_version()) {
     case envoy::config::core::v3::SocketOption::SOCKET_IP_VERSION_UNSPECIFIED:
       break;

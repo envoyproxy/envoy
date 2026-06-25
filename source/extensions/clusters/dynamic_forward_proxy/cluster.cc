@@ -82,7 +82,11 @@ Cluster::Cluster(
       sub_cluster_ttl_(
           PROTOBUF_GET_MS_OR_DEFAULT(config.sub_clusters_config(), sub_cluster_ttl, 300000)),
       sub_cluster_lb_policy_(config.sub_clusters_config().lb_policy()),
-      enable_sub_cluster_(config.has_sub_clusters_config()) {
+      enable_sub_cluster_(config.has_sub_clusters_config()),
+      sub_cluster_dns_config_(
+          config.has_sub_clusters_config() && config.sub_clusters_config().has_dns_cluster_config()
+              ? std::make_optional(config.sub_clusters_config().dns_cluster_config())
+              : std::nullopt) {
 
   if (enable_sub_cluster_) {
     idle_timer_ = main_thread_dispatcher_.createTimer([this]() { checkIdleSubCluster(); });
@@ -155,7 +159,7 @@ void Cluster::checkIdleSubCluster() {
   idle_timer_->enableTimer(sub_cluster_ttl_);
 }
 
-std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>
+std::pair<bool, std::optional<envoy::config::cluster::v3::Cluster>>
 Cluster::createSubClusterConfig(const std::string& cluster_name, const std::string& host,
                                 const int port) {
   {
@@ -163,12 +167,12 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
     const auto cluster_it = cluster_map_.find(cluster_name);
     if (cluster_it != cluster_map_.end()) {
       cluster_it->second->touch();
-      return std::make_pair(true, absl::nullopt);
+      return std::make_pair(true, std::nullopt);
     }
     if (cluster_map_.size() >= max_sub_clusters_) {
       ENVOY_LOG(debug, "cluster='{}' create failed due to max sub cluster limitation",
                 cluster_name);
-      return std::make_pair(false, absl::nullopt);
+      return std::make_pair(false, std::nullopt);
     }
     cluster_map_.emplace(cluster_name, std::make_shared<ClusterInfo>(cluster_name, *this));
   }
@@ -176,12 +180,21 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
   // Inherit configuration from the parent DFP cluster.
   envoy::config::cluster::v3::Cluster config = orig_cluster_config_;
 
-  // Overwrite the type.
+  // Overwrite the name and lb policy. Clear the inherited DFP cluster type so each branch below
+  // establishes a fresh discovery type instead of carrying the parent's DFP ClusterConfig.
   config.set_name(cluster_name);
   config.clear_cluster_type();
   config.set_lb_policy(sub_cluster_lb_policy_);
-  config.set_type(
-      envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_STRICT_DNS);
+
+  if (sub_cluster_dns_config_.has_value()) {
+    // Use the DnsCluster extension for full DNS configuration.
+    config.mutable_cluster_type()->set_name("envoy.cluster.dns");
+    config.mutable_cluster_type()->mutable_typed_config()->PackFrom(
+        sub_cluster_dns_config_.value());
+  } else {
+    config.set_type(
+        envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_STRICT_DNS);
+  }
 
   // Set endpoint.
   auto load_assignments = config.mutable_load_assignment();
@@ -196,7 +209,7 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
   socket_address->set_address(host);
   socket_address->set_port_value(port);
 
-  return std::make_pair(true, absl::make_optional(config));
+  return std::make_pair(true, std::make_optional(config));
 }
 
 Upstream::HostSelectionResponse Cluster::chooseHost(absl::string_view host,
@@ -340,7 +353,7 @@ void Cluster::updatePriorityState(const Upstream::HostVector& hosts_added,
   }
   priority_state_manager.updateClusterPrioritySet(
       0, std::move(priority_state_manager.priorityState()[0].first), hosts_added, hosts_removed,
-      absl::nullopt, absl::nullopt, absl::nullopt);
+      std::nullopt, std::nullopt, std::nullopt);
 }
 
 void Cluster::onDnsHostRemove(const std::string& host) {
@@ -514,19 +527,19 @@ Cluster::LoadBalancer::~LoadBalancer() {
   }
 }
 
-absl::optional<Upstream::SelectedPoolAndConnection>
+std::optional<Upstream::SelectedPoolAndConnection>
 Cluster::LoadBalancer::selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                                                 const Upstream::Host& host,
                                                 std::vector<uint8_t>& hash_key) {
   const std::string& hostname = host.hostname();
   if (hostname.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   LookupKey key = {hash_key, *host.address()};
   auto it = connection_info_map_.find(key);
   if (it == connection_info_map_.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   for (auto& info : it->second) {
@@ -539,7 +552,7 @@ Cluster::LoadBalancer::selectExistingConnection(Upstream::LoadBalancerContext* /
     }
   }
 
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>

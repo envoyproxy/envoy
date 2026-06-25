@@ -37,7 +37,7 @@ struct CertValidatorCallContext {
   // callbacks to reach the connection stream info.
   Network::TransportSocketCallbacks* callbacks = nullptr;
   // Error details set by the module via the set_error_details callback.
-  absl::optional<std::string> error_details;
+  std::optional<std::string> error_details;
 };
 
 /**
@@ -112,7 +112,7 @@ public:
   void updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md, uint8_t hash_buffer[EVP_MAX_MD_SIZE],
                                 unsigned hash_length) override;
 
-  absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
+  std::optional<uint32_t> daysUntilFirstCertExpires() const override;
   std::string getCaFileName() const override;
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
 

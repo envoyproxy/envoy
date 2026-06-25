@@ -186,6 +186,14 @@ message PrivateKeyJwtConfig {
   google.protobuf.Duration assertion_lifetime = 2 [(validate.rules).duration = {gte {seconds: 1}}];
 }
 
+// Defines how an OAuth token is forwarded upstream.
+message OAuth2TokenForwarding {
+  // The upstream request header that will carry the token.
+  // Pseudo-headers (names starting with ``:``) and the ``Host`` header are not allowed.
+  string header = 1
+      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+}
+
 // OAuth config
 //
 // [#next-free-field: 32]
@@ -249,6 +257,19 @@ message OAuth2Config {
 
   // Forward the OAuth token as a Bearer to upstream web service.
   bool forward_bearer_token = 7;
+
+  // Forward the OIDC ID token to the upstream.
+  //
+  // If the configured header is ``Authorization``, Envoy forwards the ID token using the
+  // ``Bearer`` prefix. For any other header, Envoy forwards the raw token value.
+  // If not specified, the ID token will not be forwarded.
+  //
+  // This can not be configured with :ref:`forward_bearer_token
+  // <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.forward_bearer_token>`
+  // or :ref:`preserve_authorization_header
+  // <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.preserve_authorization_header>`
+  // when the header is ``Authorization``.
+  OAuth2TokenForwarding forward_id_token = 31;
 
   // If set to true, preserve the existing authorization header.
   // By default the client strips the existing authorization header before forwarding upstream.
@@ -396,7 +417,7 @@ message OAuth2Config {
   // Configuration for ``PRIVATE_KEY_JWT`` client authentication.
   // Only used when :ref:`auth_type <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.auth_type>`
   // is set to ``PRIVATE_KEY_JWT``.
-  PrivateKeyJwtConfig private_key_jwt_config = 31;
+  PrivateKeyJwtConfig private_key_jwt_config = 32;
 }
 
 // Per-route OAuth2 config.
