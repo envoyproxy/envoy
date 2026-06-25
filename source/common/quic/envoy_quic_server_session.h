@@ -131,6 +131,12 @@ public:
 
   using quic::QuicSession::PerformActionOnActiveStreams;
 
+  // Associates the stream with an HTTP request decoder (creates the HCM stream). For WebTransport
+  // sessions this is deferred from CreateIncomingStream() until real request headers arrive, so a
+  // WebTransport data stream (whose first frame is WEBTRANSPORT_STREAM, not HEADERS) never becomes
+  // an HCM stream. Called by EnvoyQuicServerStream::OnInitialHeadersComplete().
+  void setUpRequestDecoder(EnvoyQuicServerStream& stream);
+
 protected:
   // quic::QuicServerSessionBase
   std::unique_ptr<quic::QuicCryptoServerStreamBase>
@@ -145,6 +151,10 @@ protected:
 
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override { return http_datagram_support_; }
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  quic::WebTransportHttp3VersionSet LocallySupportedWebTransportVersions() const override;
+#endif
+
   // QuicFilterManagerConnectionImpl
   bool hasDataToWrite() override;
   // Used by base class to access quic connection after initialization.
@@ -156,7 +166,6 @@ protected:
   void MaybeRemoveSessionFromIdleList();
 
 private:
-  void setUpRequestDecoder(EnvoyQuicServerStream& stream);
   void ActivateStream(std::unique_ptr<quic::QuicStream> stream) override;
   // NOLINTNEXTLINE(readability-identifier-naming)
   void OnLastActiveStreamClosed();

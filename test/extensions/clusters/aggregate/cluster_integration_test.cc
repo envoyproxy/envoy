@@ -87,9 +87,9 @@ void setMaxConcurrentStreams(envoy::config::cluster::v3::Cluster& cluster,
       ->mutable_http2_protocol_options()
       ->mutable_max_concurrent_streams()
       ->set_value(max_concurrent_streams);
-  (*cluster.mutable_typed_extension_protocol_options())
-      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-          .PackFrom(http_protocol_options);
+  std::ignore = (*cluster.mutable_typed_extension_protocol_options())
+                    ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                        .PackFrom(http_protocol_options);
 };
 
 void reduceAggregateClustersListToOneCluster(
@@ -97,10 +97,10 @@ void reduceAggregateClustersListToOneCluster(
   auto* aggregate_cluster_type = aggregate_cluster.mutable_cluster_type();
   auto* aggregate_cluster_typed_config = aggregate_cluster_type->mutable_typed_config();
   envoy::extensions::clusters::aggregate::v3::ClusterConfig new_aggregate_cluster_typed_config;
-  aggregate_cluster_typed_config->UnpackTo(&new_aggregate_cluster_typed_config);
+  std::ignore = aggregate_cluster_typed_config->UnpackTo(&new_aggregate_cluster_typed_config);
   new_aggregate_cluster_typed_config.clear_clusters();
   new_aggregate_cluster_typed_config.add_clusters("cluster_1");
-  aggregate_cluster_typed_config->PackFrom(new_aggregate_cluster_typed_config);
+  std::ignore = aggregate_cluster_typed_config->PackFrom(new_aggregate_cluster_typed_config);
 };
 
 const std::string& config() {
@@ -779,7 +779,7 @@ TEST_P(AggregateIntegrationTest, CircuitBreakerMaxRetriesTest) {
     auto* filter = filter_chain->mutable_filters(0);
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
         http_connection_manager;
-    filter->mutable_typed_config()->UnpackTo(&http_connection_manager);
+    std::ignore = filter->mutable_typed_config()->UnpackTo(&http_connection_manager);
     auto* virtual_host = http_connection_manager.mutable_route_config()->mutable_virtual_hosts(0);
     auto* aggregate_cluster_route = virtual_host->mutable_routes(2);
     auto* cluster1_route = virtual_host->mutable_routes(0);
@@ -788,7 +788,7 @@ TEST_P(AggregateIntegrationTest, CircuitBreakerMaxRetriesTest) {
     aggregate_cluster_route->mutable_route()->mutable_retry_policy()->mutable_retry_on()->assign(
         "5xx");
     cluster1_route->mutable_route()->mutable_retry_policy()->mutable_retry_on()->assign("5xx");
-    filter->mutable_typed_config()->PackFrom(http_connection_manager);
+    std::ignore = filter->mutable_typed_config()->PackFrom(http_connection_manager);
 
     auto* aggregate_cluster = static_resources->mutable_clusters(1);
     reduceAggregateClustersListToOneCluster(*aggregate_cluster);

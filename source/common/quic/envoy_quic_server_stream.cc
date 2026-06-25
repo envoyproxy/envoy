@@ -161,6 +161,18 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (read_side_closed()) {
     return;
   }
+
+  // Receiving request HEADERS confirms this bidirectional stream is an HTTP request (a WebTransport
+  // data stream is signalled by a WEBTRANSPORT_STREAM frame and never reaches here). Lazily set up
+  // the request decoder / HCM stream if the session deferred it at stream creation (see
+  // EnvoyQuicServerSession::CreateIncomingStream). This must happen *before* the base call below:
+  // QuicSpdyServerStreamBase::OnInitialHeadersComplete validates the headers and resets the stream
+  // on failure, so deferring setup past it would leave rejected requests without an HCM stream and
+  // thus without an access log.
+  if (request_decoder_ == nullptr) {
+    static_cast<EnvoyQuicServerSession*>(session())->setUpRequestDecoder(*this);
+  }
+
   quic::QuicSpdyServerStreamBase::OnInitialHeadersComplete(fin, frame_len, header_list);
   if (read_side_closed()) {
     return;
@@ -220,16 +232,24 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   if (Http::HeaderUtility::isCapsuleProtocol(*headers) ||
       Http::HeaderUtility::isConnectUdpRequest(*headers)) {
-    useCapsuleProtocol();
     // HTTP/3 Datagrams sent over CONNECT-UDP are already congestion controlled, so make it bypass
     // the default Datagram queue.
-    if (Http::HeaderUtility::isConnectUdpRequest(*headers)) {
-      session()->SetForceFlushForDefaultQueue(true);
+    if (useCapsuleProtocol()) {
+      if (Http::HeaderUtility::isConnectUdpRequest(*headers)) {
+        session()->SetForceFlushForDefaultQueue(true);
+      }
     }
   }
 #endif
 
-  Http::RequestDecoder* decoder = request_decoder_->get().ptr();
+  Http::RequestDecoder* decoder = requestDecoderOrNull();
+  if (end_stream && Runtime::runtimeFeatureEnabled(
+                        "envoy.reloadable_features.quic_validate_headers_only_content_length")) {
+    updateReceivedContentBytes(0, true);
+    if (stream_error() != quic::QUIC_STREAM_NO_ERROR) {
+      return;
+    }
+  }
   if (decoder != nullptr) {
     decoder->decodeHeaders(std::move(headers), /*end_stream=*/end_stream);
   }
@@ -250,6 +270,11 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   if (read_side_closed()) {
     return;
   }
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  if (resetIfWebTransport("body")) {
+    return;
+  }
+#endif
   // If read has been disabled, QUIC should not deliver any more data upstream to increase the bytes
   // buffered/processed.
   if (Runtime::runtimeFeatureEnabled(
@@ -287,7 +312,7 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
       // A stream error has occurred, stop processing.
       return;
     }
-    Http::RequestDecoder* decoder = request_decoder_->get().ptr();
+    Http::RequestDecoder* decoder = requestDecoderOrNull();
     if (decoder != nullptr) {
       decoder->decodeData(*buffer, fin_read_and_no_trailers);
     }
@@ -327,6 +352,11 @@ void EnvoyQuicServerStream::OnHeadersTooLarge() {
 
 void EnvoyQuicServerStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+    if (resetIfWebTransport("trailers")) {
+      return;
+    }
+#endif
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
     updateReceivedContentBytes(0, true);
@@ -343,7 +373,7 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
       onStreamError(close_connection_upon_invalid_header_, rst);
       return;
     }
-    Http::RequestDecoder* decoder = request_decoder_->get().ptr();
+    Http::RequestDecoder* decoder = requestDecoderOrNull();
     if (decoder != nullptr) {
       decoder->decodeTrailers(std::move(trailers));
     }
@@ -520,8 +550,13 @@ void EnvoyQuicServerStream::OnMetadataComplete(size_t /*frame_len*/,
     onStreamError(true, quic::QUIC_HEADERS_TOO_LARGE);
     return;
   }
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  if (resetIfWebTransport("metadata")) {
+    return;
+  }
+#endif
   if (!header_list.empty()) {
-    Http::RequestDecoder* decoder = request_decoder_->get().ptr();
+    Http::RequestDecoder* decoder = requestDecoderOrNull();
     if (decoder != nullptr) {
       decoder->decodeMetadata(metadataMapFromHeaderList(header_list));
     }
@@ -565,11 +600,39 @@ bool EnvoyQuicServerStream::hasPendingData() {
 }
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-void EnvoyQuicServerStream::useCapsuleProtocol() {
+bool EnvoyQuicServerStream::useCapsuleProtocol() {
+  if (uses_capsules()) {
+    // A datagram visitor is already registered on this stream (e.g. the WebTransport session of
+    // QUICHE registered itself). Registering another would be a QUIC_BUG, so skip.
+    ENVOY_STREAM_LOG(
+        warn, "Skipping capsule protocol setup: a datagram visitor is already registered.", *this);
+    return false;
+  }
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
-  ASSERT(request_decoder_->get().has_value());
-  http_datagram_handler_->setStreamDecoder(request_decoder_->get().ptr());
+  Http::RequestDecoder* decoder = requestDecoderOrNull();
+  ASSERT(decoder != nullptr);
+  http_datagram_handler_->setStreamDecoder(decoder);
   RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
+  return true;
+}
+
+bool EnvoyQuicServerStream::resetIfWebTransport(absl::string_view frame_type) {
+  if (web_transport() == nullptr) {
+    return false;
+  }
+  // A WebTransport CONNECT stream is header-only at the HTTP layer: after the extended-CONNECT
+  // HEADERS it carries only WebTransport capsules/data, never HTTP body, trailers, or METADATA.
+  // QUICHE does not reject these, so a peer that sends them is violating the protocol. Reset just
+  // this stream rather than letting the frame be proxied upstream (which, written out of order
+  // ahead of the upstream HEADERS, would escalate to a connection-level H3_FRAME_UNEXPECTED on the
+  // upstream connection). DATA is normally consumed by capsule parser of QUICHE and never reaches
+  // OnBodyAvailable, but it is covered here defensively.
+  ENVOY_STREAM_LOG(debug,
+                   "Resetting WebTransport stream: {} is not allowed on a WebTransport CONNECT "
+                   "stream.",
+                   *this, frame_type);
+  Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+  return true;
 }
 #endif
 

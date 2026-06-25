@@ -68,9 +68,9 @@ public:
 
   explicit GenericSecretCommandParser(ProviderMap providers) : providers_(std::move(providers)) {}
 
-  Envoy::Formatter::FormatterProviderPtr parse(absl::string_view command,
-                                               absl::string_view subcommand,
-                                               absl::optional<size_t> max_length) const override {
+  absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
+  parse(absl::string_view command, absl::string_view subcommand,
+        absl::optional<size_t> max_length) const override {
     if (command != SecretCommand) {
       return nullptr;
     }

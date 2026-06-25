@@ -140,7 +140,7 @@ TEST_F(DynamicModuleTracerFactoryTest, CreateTracerDriverWithTracerConfig) {
 
   Protobuf::StringValue string_value;
   string_value.set_value("test_config_payload");
-  proto_config.mutable_tracer_config()->PackFrom(string_value);
+  std::ignore = proto_config.mutable_tracer_config()->PackFrom(string_value);
 
   auto driver = factory.createTracerDriver(proto_config, context_);
   EXPECT_NE(driver, nullptr);

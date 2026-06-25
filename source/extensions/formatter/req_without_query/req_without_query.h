@@ -33,9 +33,9 @@ private:
 class ReqWithoutQueryCommandParser : public ::Envoy::Formatter::CommandParser {
 public:
   ReqWithoutQueryCommandParser() = default;
-  ::Envoy::Formatter::FormatterProviderPtr parse(absl::string_view command,
-                                                 absl::string_view subcommand,
-                                                 absl::optional<size_t> max_length) const override;
+  absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
+  parse(absl::string_view command, absl::string_view subcommand,
+        absl::optional<size_t> max_length) const override;
 };
 
 } // namespace Formatter

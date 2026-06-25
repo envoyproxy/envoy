@@ -83,7 +83,7 @@ TEST_F(WorkerImplTest, BasicFlow) {
       absl::nullopt, listener, [&ci]() -> void { ci.setReady(); }, runtime_, random_);
 
   NiceMock<Stats::MockStore> store;
-  worker_.start(guard_dog_, emptyCallback);
+  worker_.start(guard_dog_, emptyCallback, absl::nullopt);
   worker_.initializeStats(*store.rootScope());
   ci.waitReady();
 
@@ -160,7 +160,7 @@ TEST_F(WorkerImplTest, DrainPostsToWorkerThread) {
   ON_CALL(listener, listenerTag()).WillByDefault(Return(7UL));
   EXPECT_CALL(*handler_, addListener(_, _, _, _));
   worker_.addListener(absl::nullopt, listener, [&ci]() { ci.setReady(); }, runtime_, random_);
-  worker_.start(guard_dog_, emptyCallback);
+  worker_.start(guard_dog_, emptyCallback, absl::nullopt);
   ci.waitReady();
 
   // onListenerDrain posts to the worker dispatcher and invokes handler->onListenerDrain on
@@ -190,7 +190,7 @@ TEST_F(WorkerImplTest, DrainPostsToWorkerThread) {
 TEST_F(WorkerImplTest, WorkerInvokesProvidedCallback) {
   absl::Notification callback_ran;
   auto cb = [&callback_ran]() { callback_ran.Notify(); };
-  worker_.start(guard_dog_, cb);
+  worker_.start(guard_dog_, cb, absl::nullopt);
 
   callback_ran.WaitForNotification();
   worker_.stop();

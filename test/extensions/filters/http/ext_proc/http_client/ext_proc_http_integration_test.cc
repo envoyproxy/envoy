@@ -122,7 +122,7 @@ public:
         envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter
             ext_proc_filter;
         ext_proc_filter.set_name(ext_proc_filter_name);
-        ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
+        std::ignore = ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
         config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
       }
 
@@ -134,7 +134,7 @@ public:
         logging_filter_config.set_http_rcd("via_upstream");
         envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;
         logging_filter.set_name("logging-test-filter");
-        logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
+        std::ignore = logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
 
         config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(logging_filter));
       }

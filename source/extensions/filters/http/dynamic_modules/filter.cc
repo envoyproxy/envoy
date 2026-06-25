@@ -167,6 +167,21 @@ void DynamicModuleHttpFilter::sendLocalReply(
   decoder_callbacks_->sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
+void DynamicModuleHttpFilter::sendResponseHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
+  sent_local_reply_ = true;
+  decoder_callbacks_->encodeHeaders(std::move(headers), end_stream, "");
+}
+
+void DynamicModuleHttpFilter::sendResponseData(Buffer::Instance& data, bool end_stream) {
+  sent_local_reply_ = true;
+  decoder_callbacks_->encodeData(data, end_stream);
+}
+
+void DynamicModuleHttpFilter::sendResponseTrailers(ResponseTrailerMapPtr&& trailers) {
+  sent_local_reply_ = true;
+  decoder_callbacks_->encodeTrailers(std::move(trailers));
+}
+
 void DynamicModuleHttpFilter::encodeComplete() {};
 
 envoy_dynamic_module_type_http_callout_init_result

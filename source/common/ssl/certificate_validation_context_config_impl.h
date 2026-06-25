@@ -61,6 +61,8 @@ public:
 
   bool autoSniSanMatch() const override { return auto_sni_san_match_; }
 
+  bool suppressClientCaList() const override { return suppress_client_ca_list_; }
+
 protected:
   CertificateValidationContextConfigImpl(
       std::string ca_cert, std::string certificate_revocation_list,
@@ -88,6 +90,7 @@ private:
   const bool only_verify_leaf_cert_crl_;
   absl::optional<uint32_t> max_verify_depth_;
   const bool auto_sni_san_match_;
+  const bool suppress_client_ca_list_;
 };
 
 } // namespace Ssl

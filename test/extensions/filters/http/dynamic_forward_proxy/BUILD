@@ -108,6 +108,7 @@ envoy_extension_cc_test(
         "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//test/integration:http_integration_lib",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",

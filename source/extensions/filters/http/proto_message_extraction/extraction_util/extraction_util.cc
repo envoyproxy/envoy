@@ -171,22 +171,22 @@ ExtractRepeatedFieldSizeHelper(const FieldExtractor& field_extractor, const std:
 
       while ((tag = input_stream->ReadTag()) != 0) {
         if (field->number() != WireFormatLite::GetTagFieldNumber(tag)) {
-          WireFormatLite::SkipField(input_stream, tag);
+          std::ignore = WireFormatLite::SkipField(input_stream, tag);
         } else {
           // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
           DCHECK_EQ(WireFormatLite::WIRETYPE_LENGTH_DELIMITED, WireFormatLite::GetTagWireType(tag));
 
           uint32_t length;
-          input_stream->ReadVarint32(&length);
+          std::ignore = input_stream->ReadVarint32(&length);
           if (field->kind() == Field::TYPE_BOOL) {
             count += length / WireFormatLite::kBoolSize;
-            input_stream->Skip(length);
+            std::ignore = input_stream->Skip(length);
           } else if (field_wire_type == WireFormatLite::WIRETYPE_FIXED32) {
             count += length / WireFormatLite::kFixed32Size;
-            input_stream->Skip(length);
+            std::ignore = input_stream->Skip(length);
           } else if (field_wire_type == WireFormatLite::WIRETYPE_FIXED64) {
             count += length / WireFormatLite::kFixed64Size;
-            input_stream->Skip(length);
+            std::ignore = input_stream->Skip(length);
           } else {
             CodedInputStream::Limit limit = input_stream->PushLimit(length);
             uint64_t varint = 0;
@@ -202,7 +202,7 @@ ExtractRepeatedFieldSizeHelper(const FieldExtractor& field_extractor, const std:
         if (field->number() == WireFormatLite::GetTagFieldNumber(tag)) {
           ++count;
         }
-        WireFormatLite::SkipField(input_stream, tag);
+        std::ignore = WireFormatLite::SkipField(input_stream, tag);
       }
     }
     return count;
@@ -306,7 +306,7 @@ absl::StatusOr<std::string> FindSingularLastValue(const Field* field,
     }
     position = input_stream->CurrentPosition();
     if (field->kind() == Field::TYPE_STRING) {
-      WireFormatLite::ReadString(input_stream, &resource);
+      std::ignore = WireFormatLite::ReadString(input_stream, &resource);
     }
   }
   return resource;
@@ -347,10 +347,10 @@ absl::StatusOr<std::string> ExtractStringFieldValue(
       while ((tag = input_stream->ReadTag()) != 0) {
         if (field->number() == WireFormatLite::GetTagFieldNumber(tag)) {
           uint32_t length;
-          input_stream->ReadVarint32(&length);
-          input_stream->ReadString(&result, length);
+          std::ignore = input_stream->ReadVarint32(&length);
+          std::ignore = input_stream->ReadString(&result, length);
         } else {
-          WireFormatLite::SkipField(input_stream, tag);
+          std::ignore = WireFormatLite::SkipField(input_stream, tag);
         }
       }
       return result;
@@ -358,8 +358,8 @@ absl::StatusOr<std::string> ExtractStringFieldValue(
       std::string result;
       if (FieldExtractor::SearchField(*field, input_stream)) {
         uint32_t length;
-        input_stream->ReadVarint32(&length);
-        input_stream->ReadString(&result, length);
+        std::ignore = input_stream->ReadVarint32(&length);
+        std::ignore = input_stream->ReadString(&result, length);
       }
 
       ASSIGN_OR_RETURN(result, SingularFieldUseLastValue(result, field, input_stream));

@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "test/mocks/network/mocks.h"
 
 #include "contrib/kafka/filters/network/source/mesh/filter.h"
@@ -179,7 +181,7 @@ class MockUpstreamKafkaConfiguration : public UpstreamKafkaConfiguration {
 public:
   MOCK_METHOD(void, onData, (Buffer::Instance&));
   MOCK_METHOD(void, reset, ());
-  MOCK_METHOD(absl::optional<ClusterConfig>, computeClusterConfigForTopic,
+  MOCK_METHOD(std::optional<ClusterConfig>, computeClusterConfigForTopic,
               (const std::string& topic), (const));
   MOCK_METHOD((std::pair<std::string, int32_t>), getAdvertisedAddress, (), (const));
 };

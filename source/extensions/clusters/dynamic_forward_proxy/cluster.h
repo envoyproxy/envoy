@@ -2,6 +2,7 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 #include "envoy/http/conn_pool.h"
@@ -272,6 +273,10 @@ private:
   const std::chrono::milliseconds sub_cluster_ttl_;
   const envoy::config::cluster::v3::Cluster_LbPolicy sub_cluster_lb_policy_;
   const bool enable_sub_cluster_;
+
+  // Optional DNS configuration for dynamically created sub clusters. When set, sub clusters are
+  // created using the DnsCluster extension rather than the legacy STRICT_DNS discovery type.
+  const absl::optional<envoy::extensions::clusters::dns::v3::DnsCluster> sub_cluster_dns_config_;
 
   friend class ClusterFactory;
   friend class ClusterTest;

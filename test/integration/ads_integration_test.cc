@@ -2888,7 +2888,8 @@ public:
             TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
       }
       ads_cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
-      ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
+      std::ignore =
+          ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
 
       // Add the second ADS cluster (copy the ads_cluster and update its name).
       auto* second_ads_cluster = bootstrap.mutable_static_resources()->add_clusters();

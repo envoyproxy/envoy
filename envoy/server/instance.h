@@ -1,14 +1,15 @@
 #pragma once
 
 #include <chrono>
-#include <cstdint>
+#include <ctime>
 #include <memory>
-#include <string>
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
 #include "envoy/common/mutex_tracer.h"
-#include "envoy/common/random_generator.h"
+#include "envoy/common/optref.h"
+#include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/config/xds_manager.h"
 #include "envoy/event/timer.h"
@@ -17,20 +18,27 @@
 #include "envoy/http/http_server_properties_cache.h"
 #include "envoy/init/manager.h"
 #include "envoy/local_info/local_info.h"
-#include "envoy/network/listen_socket.h"
+#include "envoy/network/connection_handler.h"
+#include "envoy/network/dns.h"
+#include "envoy/protobuf/message_validator.h"
+#include "envoy/router/context.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/server/options.h"
 #include "envoy/server/overload/overload_manager.h"
+#include "envoy/server/process_context.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/ssl/context_manager.h"
+#include "envoy/ssl/private_key/private_key.h"
+#include "envoy/stats/store.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/tracing/tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 namespace Envoy {

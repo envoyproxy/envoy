@@ -94,6 +94,7 @@ private:
   void initializeCertExpirationStats(Stats::Scope& scope, const std::string& cert_name);
 
   bool allow_expired_certificate_{false};
+  bool suppress_client_ca_list_{false};
 
   std::string ca_file_name_;
   std::shared_ptr<SpiffeData> spiffe_data_;
