@@ -113,6 +113,14 @@ const std::string CONFIG_RESP3_LISTENER_WITH_AUTH = CONFIG_RESP3_LISTENER + R"EO
           downstream_auth_password: { inline_string: somepassword }
 )EOF";
 
+// RESP3 listener with a non-Primary read policy: every routed upstream must negotiate HELLO 3,
+// then READONLY, before any user command. read_policy is a ConnPoolSettings field (12-space
+// indent, inside settings); protocol_version is a RedisProxy field (10-space indent).
+const std::string CONFIG_RESP3_PREFER_REPLICA = CONFIG + R"EOF(
+            read_policy: PREFER_REPLICA
+          protocol_version: RESP3
+)EOF";
+
 const std::string CONFIG_WITH_ROUTES_BASE = fmt::format(R"EOF(
 admin:
   access_log:
@@ -227,6 +235,13 @@ const std::string CONFIG_WITH_MIRROR = CONFIG_WITH_ROUTES_BASE + R"EOF(
                     numerator: 50
                     denominator: HUNDRED
                   runtime_key: "bogus_key"
+)EOF";
+
+// RESP3 + mirror: the filter-level protocol_version applies to the primary and every mirror conn
+// pool, so each negotiates HELLO 3 independently. Appended at the RedisProxy field level
+// (10-space indent), a sibling of the mirror prefix_routes block above.
+const std::string CONFIG_RESP3_WITH_MIRROR = CONFIG_WITH_MIRROR + R"EOF(
+          protocol_version: RESP3
 )EOF";
 
 const std::string CONFIG_WITH_DOWNSTREAM_AUTH_PASSWORD_SET = CONFIG + R"EOF(
@@ -647,6 +662,34 @@ std::string resp3HelloMapReply() {
          "$7\r\nmodules\r\n*0\r\n";
 }
 
+// Downstream RESP3 negotiation: HELLO 3, then consume the proxy's local HELLO map reply. The
+// size overload of waitForData returns an AssertionResult, so ASSERT_TRUE makes a short/missing
+// reply a fatal failure here (the string overload is void and cannot be asserted); ASSERT_EQ then
+// pins the exact bytes so a wrong HELLO reply aborts rather than flowing into the rest of the
+// test. Callers must wrap this in ASSERT_NO_FATAL_FAILURE so the fatal failure also stops the
+// calling test.
+void negotiateDownstreamResp3(IntegrationTcpClientPtr& redis_client) {
+  ASSERT_TRUE(redis_client->write(makeBulkStringArray({"hello", "3"})));
+  const std::string hello_reply = resp3HelloMapReply();
+  ASSERT_TRUE(redis_client->waitForData(hello_reply.size()));
+  ASSERT_EQ(hello_reply, redis_client->data());
+  redis_client->clearData();
+}
+
+// Upstream RESP3 negotiation on a freshly-accepted raw upstream connection: assert the proxy sent
+// exactly HELLO 3, then reply with a minimal proto:3 map. Appends the HELLO bytes to the caller's
+// cumulative accumulator so the per-command ordering assertions stay visible in the test body.
+// The internal ASSERT_* only return from this helper, so callers must wrap the call in
+// ASSERT_NO_FATAL_FAILURE to propagate a fatal failure to the test.
+void expectUpstreamHello3AndReply(FakeRawConnectionPtr& conn, std::string& expected_upstream) {
+  const std::string hello = makeBulkStringArray({"HELLO", "3"});
+  std::string seen;
+  ASSERT_TRUE(conn->waitForData(hello.size(), &seen));
+  ASSERT_EQ(hello, seen);
+  ASSERT_TRUE(conn->write("%1\r\n$5\r\nproto\r\n:3\r\n"));
+  expected_upstream += hello;
+}
+
 class RedisProxyIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                   public BaseIntegrationTest {
 public:
@@ -836,6 +879,12 @@ public:
   RedisProxyResp3ListenerIntegrationTest() : RedisProxyIntegrationTest(CONFIG_RESP3_LISTENER, 2) {}
 };
 
+class RedisProxyResp3PreferReplicaIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyResp3PreferReplicaIntegrationTest()
+      : RedisProxyIntegrationTest(CONFIG_RESP3_PREFER_REPLICA, 2) {}
+};
+
 class RedisProxyResp3ListenerWithAuthIntegrationTest : public RedisProxyIntegrationTest {
 public:
   RedisProxyResp3ListenerWithAuthIntegrationTest()
@@ -891,6 +940,12 @@ public:
 class RedisProxyWithMirrorsIntegrationTest : public RedisProxyIntegrationTest {
 public:
   RedisProxyWithMirrorsIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_MIRROR, 6) {}
+};
+
+class RedisProxyResp3WithMirrorsIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyResp3WithMirrorsIntegrationTest()
+      : RedisProxyIntegrationTest(CONFIG_RESP3_WITH_MIRROR, 6) {}
 };
 
 class RedisProxyWithCommandStatsIntegrationTest : public RedisProxyIntegrationTest {
@@ -1009,6 +1064,14 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyResp3ListenerIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyResp3ListenerWithAuthIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyResp3PreferReplicaIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyResp3WithMirrorsIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
@@ -1710,6 +1773,136 @@ TEST_P(RedisProxyResp3ListenerIntegrationTest, Hello2OnResp3ListenerRejectedNopr
   const std::string error_response = "-NOPROTO unsupported protocol version\r\n";
   initialize();
   simpleProxyResponse(makeBulkStringArray({"hello", "2"}), error_response);
+}
+
+// RESP3 + non-Primary read policy: a routed upstream must negotiate HELLO 3, then READONLY,
+// before the held user command flushes. Pins the wire-level init order (HELLO 3 -> READONLY ->
+// GET); the unit test covers only the state machine.
+TEST_P(RedisProxyResp3PreferReplicaIntegrationTest,
+       Resp3NonPrimaryReadPolicySendsReadonlyBeforeUserCommand) {
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_NO_FATAL_FAILURE(negotiateDownstreamResp3(redis_client));
+
+  // The first data command opens the upstream and is held behind init.
+  ASSERT_TRUE(redis_client->write(makeBulkStringArray({"get", "k"})));
+
+  FakeRawConnectionPtr conn;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(conn));
+
+  std::string seen;
+  std::string expected;
+  ASSERT_NO_FATAL_FAILURE(expectUpstreamHello3AndReply(conn, expected));
+
+  // READONLY follows HELLO 3 success. The GET must NOT be on the wire yet — the exact-size wait
+  // would fail if it had raced ahead of READONLY.
+  expected += makeBulkStringArray({"readonly"});
+  ASSERT_TRUE(conn->waitForData(expected.size(), &seen));
+  ASSERT_EQ(expected, seen);
+  ASSERT_TRUE(conn->write("+OK\r\n"));
+
+  // READONLY acked: the held GET flushes.
+  expected += makeBulkStringArray({"get", "k"});
+  ASSERT_TRUE(conn->waitForData(expected.size(), &seen));
+  ASSERT_EQ(expected, seen);
+  ASSERT_TRUE(conn->write("$3\r\nbar\r\n"));
+
+  redis_client->waitForData("$3\r\nbar\r\n");
+  EXPECT_EQ("$3\r\nbar\r\n", redis_client->data());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.redis_cluster.upstream_resp3_hello_failure")
+                   ->value());
+
+  EXPECT_TRUE(conn->close());
+  redis_client->close();
+}
+
+// RESP3 + transaction: the dedicated transaction client must negotiate HELLO 3 with the upstream
+// before MULTI...EXEC reaches Redis. The conn-pool unit test confirms the transaction path is
+// constructed with Resp3; this pins the real wire ordering end-to-end.
+TEST_P(RedisProxyResp3ListenerIntegrationTest, Resp3TransactionNegotiatesHello3BeforeMultiExec) {
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_NO_FATAL_FAILURE(negotiateDownstreamResp3(redis_client));
+
+  const std::string txn = makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"set", "k", "v"}) +
+                          makeBulkStringArray({"get", "k"}) + makeBulkStringArray({"exec"});
+  // A value, never a const-ref bound to a temporary.
+  const std::string response = "+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n+OK\r\n$1\r\nv\r\n";
+  ASSERT_TRUE(redis_client->write(txn));
+
+  FakeRawConnectionPtr conn;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(conn));
+
+  std::string seen;
+  std::string expected;
+  // Only HELLO 3 is on the wire so far — no transaction command precedes negotiation success.
+  ASSERT_NO_FATAL_FAILURE(expectUpstreamHello3AndReply(conn, expected));
+
+  // HELLO 3 acked: the held MULTI...EXEC flush in order on the same upstream connection.
+  expected += txn;
+  ASSERT_TRUE(conn->waitForData(expected.size(), &seen));
+  ASSERT_EQ(expected, seen);
+  ASSERT_TRUE(conn->write(response));
+
+  redis_client->waitForData(response);
+  EXPECT_EQ(response, redis_client->data());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.redis_cluster.upstream_resp3_hello_failure")
+                   ->value());
+
+  EXPECT_TRUE(conn->close());
+  redis_client->close();
+}
+
+// RESP3 + mirror: the filter-level protocol_version applies to the mirror conn pools too, so the
+// primary AND every mirror upstream negotiate HELLO 3 before the mirrored write. Pins that a
+// mirror does not silently stay on RESP2 and that the mirrored SET never precedes its HELLO 3.
+TEST_P(RedisProxyResp3WithMirrorsIntegrationTest,
+       Resp3MirroredWriteNegotiatesHello3OnPrimaryAndMirror) {
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_NO_FATAL_FAILURE(negotiateDownstreamResp3(redis_client));
+
+  const std::string set = makeBulkStringArray({"set", "mirror_key", "value"});
+  ASSERT_TRUE(redis_client->write(set));
+
+  // Primary cluster_0 ([0]) and mirror clusters cluster_1 ([2]) / cluster_2 ([4]) each open their
+  // own upstream and independently negotiate HELLO 3 before the SET. Distinct mirror replies make
+  // the "mirror reply is ignored" assertion meaningful.
+  std::array<FakeRawConnectionPtr, 3> conns;
+  auto negotiate_leg = [&](size_t slot, int upstream_index, const std::string& reply) {
+    ASSERT_TRUE(fake_upstreams_[upstream_index]->waitForRawConnection(conns[slot]));
+    std::string seen;
+    std::string expected;
+    ASSERT_NO_FATAL_FAILURE(expectUpstreamHello3AndReply(conns[slot], expected));
+    expected += set; // the mirrored SET must not appear before this leg's HELLO 3.
+    ASSERT_TRUE(conns[slot]->waitForData(expected.size(), &seen));
+    ASSERT_EQ(expected, seen);
+    ASSERT_TRUE(conns[slot]->write(reply));
+  };
+  ASSERT_NO_FATAL_FAILURE(negotiate_leg(0, 0, "+OK\r\n"));        // primary cluster_0
+  ASSERT_NO_FATAL_FAILURE(negotiate_leg(1, 2, "$4\r\nbar1\r\n")); // mirror cluster_1 (ignored)
+  ASSERT_NO_FATAL_FAILURE(negotiate_leg(2, 4, "$4\r\nbar2\r\n")); // mirror cluster_2 (ignored)
+
+  // Only the primary's reply reaches downstream.
+  redis_client->waitForData("+OK\r\n");
+  EXPECT_EQ("+OK\r\n", redis_client->data());
+
+  // HELLO 3 succeeded on every conn pool (primary + both mirrors).
+  for (const char* stat : {
+           "cluster.cluster_0.redis_cluster.upstream_resp3_hello_failure",
+           "cluster.cluster_1.redis_cluster.upstream_resp3_hello_failure",
+           "cluster.cluster_2.redis_cluster.upstream_resp3_hello_failure",
+       }) {
+    EXPECT_EQ(0, test_server_->counter(stat)->value());
+  }
+
+  for (auto& conn : conns) {
+    EXPECT_TRUE(conn->close());
+  }
+  redis_client->close();
 }
 
 // This test sends an invalid Redis command from a fake
