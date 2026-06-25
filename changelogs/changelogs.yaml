@@ -92,6 +92,8 @@ areas:
     title: router
   set_metadata_filter:
     title: set_metadata_filter
+  sip_proxy:
+    title: sip_proxy
   sockets:
     title: sockets
   spiffe_validator:

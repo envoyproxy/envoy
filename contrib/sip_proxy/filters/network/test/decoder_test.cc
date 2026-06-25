@@ -617,6 +617,47 @@ TEST_F(SipDecoderTest, DecodeNOTIFY) {
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
 
+// Regression test for a stack buffer overflow in Decoder::reassemble(). The width of the
+// Content-Length value field is attacker-controlled and was copied into a fixed 10-byte stack
+// buffer with a copyOut() call bounded only by the source buffer, so a value field wider than the
+// destination overflowed the stack with attacker-controlled bytes. Under ASAN the pre-fix decoder
+// crashes on both messages below; the fixed decoder must handle them without memory corruption and
+// without decoding a request.
+TEST_F(SipDecoderTest, DecodeContentLengthWideValueFieldDoesNotOverflowStack) {
+  initializeFilter(yaml);
+
+  // Value field far wider than the old 10-byte buffer but a benign numeric value (leading zeros).
+  // The advertised body is absent, so this is a partial message that is dropped -- but the decoder
+  // must not corrupt the stack while reading the over-wide value field.
+  const std::string SIP_WIDE_CONTENT_LENGTH =
+      "REGISTER sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0\x0d\x0a"
+      "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
+      "Via: SIP/2.0/TCP 11.0.0.10:15060;branch=z9hG4bK-3193-1-0\x0d\x0a"
+      "Content-Length: 0000000000000000000099\x0d\x0a"
+      "\x0d\x0a";
+  buffer_.add(SIP_WIDE_CONTENT_LENGTH);
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(0U, store_.counter("test.request").value());
+}
+
+TEST_F(SipDecoderTest, DecodeContentLengthOverlongValueFieldIsRejected) {
+  initializeFilter(yaml);
+
+  // An implausibly long value field (far wider than any legitimate decimal length) is rejected:
+  // reassembly stops and no request is dispatched (no exception is thrown on the data path).
+  const std::string SIP_HUGE_CONTENT_LENGTH =
+      "REGISTER sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0\x0d\x0a"
+      "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
+      "Via: SIP/2.0/TCP 11.0.0.10:15060;branch=z9hG4bK-3193-1-0\x0d\x0a"
+      "Content-Length: " +
+      std::string(64, '1') +
+      "\x0d\x0a"
+      "\x0d\x0a";
+  buffer_.add(SIP_HUGE_CONTENT_LENGTH);
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(0U, store_.counter("test.request").value());
+}
+
 TEST_F(SipDecoderTest, HeaderTest) {
   StateNameValues stateNameValues_;
   EXPECT_EQ("Done", stateNameValues_.name(State::Done));
