@@ -39,16 +39,16 @@ public:
   const std::string& methodName() const override { return method_name_; }
 
   void setServiceVersion(const std::string& version) { service_version_ = version; }
-  const absl::optional<std::string>& serviceVersion() const override { return service_version_; }
+  const std::optional<std::string>& serviceVersion() const override { return service_version_; }
 
   void setServiceGroup(const std::string& group) { group_ = group; }
-  const absl::optional<std::string>& serviceGroup() const override { return group_; }
+  const std::optional<std::string>& serviceGroup() const override { return group_; }
 
 protected:
   std::string service_name_;
   std::string method_name_;
-  absl::optional<std::string> service_version_;
-  absl::optional<std::string> group_;
+  std::optional<std::string> service_version_;
+  std::optional<std::string> group_;
 };
 
 class RpcInvocationImpl : public RpcInvocationBase {
@@ -114,7 +114,7 @@ public:
     attachment_lazy_callback_ = std::move(callback);
   }
 
-  const absl::optional<std::string>& serviceGroup() const override;
+  const std::optional<std::string>& serviceGroup() const override;
 
 private:
   void assignParametersIfNeed() const;

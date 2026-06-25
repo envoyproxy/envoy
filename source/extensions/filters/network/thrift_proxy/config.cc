@@ -93,7 +93,7 @@ ConfigImpl::ConfigImpl(
     envoy::extensions::filters::network::thrift_proxy::v3::ThriftFilter router;
     router.set_name("envoy.filters.thrift.router");
     envoy::extensions::filters::network::thrift_proxy::router::v3::Router default_router;
-    router.mutable_typed_config()->PackFrom(default_router);
+    std::ignore = router.mutable_typed_config()->PackFrom(default_router);
     processFilter(router);
   } else {
     for (const auto& filter : config.thrift_filters()) {

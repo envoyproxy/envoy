@@ -1,13 +1,13 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.network.peer_metadata.v3;
+package envoy.extensions.network_filters.peer_metadata;
 
 import "udpa/annotations/status.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.network.peer_metadata.v3";
+option java_package = "io.envoyproxy.envoy.extensions.network_filters.peer_metadata";
 option java_outer_classname = "PeerMetadataProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/filters/network/peer_metadata/v3;peer_metadatav3";
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/network_filters/peer_metadata";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Peer metadata network filter]
@@ -22,9 +22,25 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // response) and injects it as a data preamble to be consumed by the upstream
 // filter.
 message Config {
-  // Filter state key under which the baggage value encoding the proxy workload
-  // is stored. The upstream filter that populates the baggage header in the
-  // HBONE request should use the same key.
+  // What filter state to use to save the baggage value that encodes the proxy
+  // workload.
+  //
+  // The upstream filter that will populate the baggage header in the HBONE
+  // request should be configured to use the same key.
+  //
+  // Why share baggage value via filter state instead of to configure upstream
+  // filter to use the baggage key value directly?
+  //
+  // ztunnel and waypoint have to be aware of the baggage header format,
+  // because they should be able to parse baggage headers to extract the
+  // metadata and report the metrics. However, pilot does not need to be aware
+  // of the baggage encoding yet.
+  //
+  // If instead of using custom filter to generate baggage header value we just
+  // let pilot generate it, it would spread the logic for generating baggage to
+  // the pilot as well. While not a big deal, if there is no clear reason to do
+  // it, let's not duplicate the implementation of baggage logic in pilot and
+  // just re-use the logic we already have in Envoy.
   string baggage_key = 1;
 }
 

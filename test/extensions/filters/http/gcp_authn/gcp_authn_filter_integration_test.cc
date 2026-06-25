@@ -82,9 +82,9 @@ public:
         envoy::config::core::v3::Metadata* cluster_metadata = cluster_0->mutable_metadata();
         envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
         audience.set_url(std::string(AudienceValue));
-        (*cluster_metadata->mutable_typed_filter_metadata())
-            [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-                .PackFrom(audience);
+        std::ignore = (*cluster_metadata->mutable_typed_filter_metadata())
+                          [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                              .PackFrom(audience);
       }
 
       if (use_new_config_) {
@@ -105,7 +105,7 @@ public:
       // Create the filter.
       envoy::config::listener::v3::Filter gcp_authn_filter;
       gcp_authn_filter.set_name(std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName));
-      gcp_authn_filter.mutable_typed_config()->PackFrom(proto_config_);
+      std::ignore = gcp_authn_filter.mutable_typed_config()->PackFrom(proto_config_);
 
       // Add the filter to the filter chain.
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(gcp_authn_filter));
@@ -408,13 +408,13 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundJwtSuccess) {
     // Add bound_jwt audience metadata
     envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
     audience.mutable_bound_jwt()->set_url("http://test.com");
-    (*cluster_0->mutable_metadata()->mutable_typed_filter_metadata())
-        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-            .PackFrom(audience);
+    std::ignore = (*cluster_0->mutable_metadata()->mutable_typed_filter_metadata())
+                      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                          .PackFrom(audience);
   });
 
   config_helper_.configureUpstreamTls(
-      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/absl::nullopt,
+      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/std::nullopt,
       [](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
         const std::string rundir = TestEnvironment::runfilesDirectory();
         auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -464,13 +464,13 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundJwtCacheHit) {
     // Add bound_jwt audience metadata
     envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
     audience.mutable_bound_jwt()->set_url("http://test.com");
-    (*cluster_0->mutable_metadata()->mutable_typed_filter_metadata())
-        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-            .PackFrom(audience);
+    std::ignore = (*cluster_0->mutable_metadata()->mutable_typed_filter_metadata())
+                      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                          .PackFrom(audience);
   });
 
   config_helper_.configureUpstreamTls(
-      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/absl::nullopt,
+      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/std::nullopt,
       [](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
         const std::string rundir = TestEnvironment::runfilesDirectory();
         auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -548,13 +548,13 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundAccessTokenSuccess) {
     // Add bound_access_token audience metadata
     envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
     audience.mutable_bound_access_token();
-    (*cluster_0->mutable_metadata()->mutable_typed_filter_metadata())
-        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-            .PackFrom(audience);
+    std::ignore = (*cluster_0->mutable_metadata()->mutable_typed_filter_metadata())
+                      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                          .PackFrom(audience);
   });
 
   config_helper_.configureUpstreamTls(
-      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/absl::nullopt,
+      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/std::nullopt,
       [](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
         const std::string rundir = TestEnvironment::runfilesDirectory();
         auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -604,13 +604,13 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundAccessTokenCacheHit) {
     // Add bound_access_token audience metadata
     envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
     audience.mutable_bound_access_token();
-    (*cluster_0->mutable_metadata()->mutable_typed_filter_metadata())
-        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-            .PackFrom(audience);
+    std::ignore = (*cluster_0->mutable_metadata()->mutable_typed_filter_metadata())
+                      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                          .PackFrom(audience);
   });
 
   config_helper_.configureUpstreamTls(
-      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/absl::nullopt,
+      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/std::nullopt,
       [](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
         const std::string rundir = TestEnvironment::runfilesDirectory();
         auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();

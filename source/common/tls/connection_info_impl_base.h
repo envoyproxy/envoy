@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "envoy/ssl/connection.h"
@@ -7,7 +8,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/tls/utility.h"
 
-#include "absl/types/optional.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -49,8 +49,8 @@ public:
   absl::Span<const std::string> othernameSansLocalCertificate() const override;
   absl::Span<const std::string> oidsPeerCertificate() const override;
   absl::Span<const std::string> oidsLocalCertificate() const override;
-  absl::optional<SystemTime> validFromPeerCertificate() const override;
-  absl::optional<SystemTime> expirationPeerCertificate() const override;
+  std::optional<SystemTime> validFromPeerCertificate() const override;
+  std::optional<SystemTime> expirationPeerCertificate() const override;
   const std::string& sessionId() const override;
   uint16_t ciphersuiteId() const override;
   std::string ciphersuiteString() const override;

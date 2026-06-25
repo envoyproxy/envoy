@@ -12,7 +12,7 @@ namespace Server {
 ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
                                  Network::ConnectionSocketPtr&& socket,
                                  bool hand_off_restored_destination_connections,
-                                 const absl::optional<std::string>& network_namespace)
+                                 const std::optional<std::string>& network_namespace)
     : listener_(listener), socket_(std::move(socket)),
       hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
       iter_(accept_filters_.end()),
@@ -220,7 +220,7 @@ void ActiveTcpSocket::newConnection() {
     // Note also that we must account for the number of connections properly across both listeners.
     // TODO(mattklein123): See note in ~ActiveTcpSocket() related to making this accounting better.
     listener_.decNumConnections();
-    absl::optional<std::string> network_namespace;
+    std::optional<std::string> network_namespace;
     if (const auto* obj = stream_info_->filterState()->getDataReadOnlyGeneric(
             Network::DownstreamNetworkNamespace::key());
         obj) {

@@ -149,7 +149,7 @@ public:
       std::function<ConfigProvider::ConfigConstSharedPtr(ConfigProvider::ConfigConstSharedPtr)>;
 
   struct LastConfigInfo {
-    absl::optional<uint64_t> last_config_hash_;
+    std::optional<uint64_t> last_config_hash_;
     std::string last_config_version_;
   };
 
@@ -164,7 +164,7 @@ public:
 
   const SystemTime& lastUpdated() const { return last_updated_; }
 
-  const absl::optional<LastConfigInfo>& configInfo() const { return config_info_; }
+  const std::optional<LastConfigInfo>& configInfo() const { return config_info_; }
 
   ConfigProvider::ConfigConstSharedPtr getConfig() { return tls_->config_; }
 
@@ -209,12 +209,12 @@ protected:
 
   void setLastUpdated() { last_updated_ = time_source_.systemTime(); }
   Init::Manager& localInitManager() { return local_init_manager_; }
-  void setLastConfigInfo(absl::optional<LastConfigInfo>&& config_info) {
+  void setLastConfigInfo(std::optional<LastConfigInfo>&& config_info) {
     config_info_ = std::move(config_info);
   }
 
   const std::string name_;
-  absl::optional<LastConfigInfo> config_info_;
+  std::optional<LastConfigInfo> config_info_;
   // This slot holds a Config implementation in each thread, which is intended to be shared between
   // config providers from the same config source.
   ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;

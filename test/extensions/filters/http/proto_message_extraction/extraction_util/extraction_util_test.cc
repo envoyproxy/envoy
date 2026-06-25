@@ -647,7 +647,6 @@ TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_Error_NullptrFieldMask) {
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_EmptyFieldMask) {
-  FieldMask field_mask;
   EXPECT_GT(0, ExtractRepeatedFieldSize(*request_type_, type_finder_, &field_mask_,
                                         test_request_raw_proto_));
 }

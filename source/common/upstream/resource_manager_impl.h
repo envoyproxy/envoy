@@ -88,9 +88,8 @@ public:
                       uint64_t max_connections, uint64_t max_pending_requests,
                       uint64_t max_requests, uint64_t max_retries, uint64_t max_connection_pools,
                       uint64_t max_connections_per_host, ClusterCircuitBreakersStats cb_stats,
-                      absl::optional<double> budget_percent,
-                      absl::optional<uint64_t> budget_interval,
-                      absl::optional<uint32_t> min_retry_concurrency, Event::Dispatcher& dispatcher)
+                      std::optional<double> budget_percent, std::optional<uint64_t> budget_interval,
+                      std::optional<uint32_t> min_retry_concurrency, Event::Dispatcher& dispatcher)
       : connections_(max_connections, runtime, runtime_key + "max_connections", cb_stats.cx_open_,
                      cb_stats.remaining_cx_),
         pending_requests_(max_pending_requests, runtime, runtime_key + "max_pending_requests",
@@ -122,8 +121,8 @@ public:
 private:
   class RetryBudgetImpl : public ResourceLimit {
   public:
-    RetryBudgetImpl(absl::optional<double> budget_percent, absl::optional<uint64_t> budget_interval,
-                    absl::optional<uint32_t> min_retry_concurrency, uint64_t max_retries,
+    RetryBudgetImpl(std::optional<double> budget_percent, std::optional<uint64_t> budget_interval,
+                    std::optional<uint32_t> min_retry_concurrency, uint64_t max_retries,
                     Runtime::Loader& runtime, const std::string& retry_budget_runtime_key,
                     const std::string& max_retries_runtime_key, Stats::Gauge& open_gauge,
                     Stats::Gauge& remaining, const ResourceLimit& requests,
@@ -250,9 +249,9 @@ private:
     // The max_retry resource is nested within the budget to maintain state if the retry budget is
     // toggled.
     ManagedResourceImpl max_retry_resource_;
-    const absl::optional<double> budget_percent_;
-    const absl::optional<uint64_t> budget_interval_;
-    const absl::optional<uint32_t> min_retry_concurrency_;
+    const std::optional<double> budget_percent_;
+    const std::optional<uint64_t> budget_interval_;
+    const std::optional<uint32_t> min_retry_concurrency_;
     const std::string budget_percent_key_;
     const std::string budget_interval_key_;
     const std::string min_retry_concurrency_key_;

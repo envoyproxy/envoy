@@ -44,7 +44,7 @@ public:
 
   // Set buckets for tests.
   void setHistogramBucketSettings(const std::string& prefix, const std::vector<double>& buckets,
-                                  absl::optional<uint32_t> bins) {
+                                  std::optional<uint32_t> bins) {
     envoy::config::metrics::v3::StatsConfig config;
     auto& bucket_settings = *config.mutable_histogram_bucket_settings();
 

@@ -391,6 +391,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/load_balancing_policies/client_side_weighted_round_robin @wbpcode @adisuissa @efimki
 /*/extensions/load_balancing_policies/override_host @yanavlasov @tonya11en
 /*/extensions/load_balancing_policies/wrr_locality @wbpcode @adisuissa @efimki
+/*/extensions/load_balancing_policies/load_aware_locality @tonya11en @jukie @nezdolik
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @tyxia
 # Network matching extensions
@@ -454,7 +455,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/network/common @UNOWNED @UNOWNED
 /*/extensions/clusters/static @UNOWNED @UNOWNED
 /*/extensions/clusters/strict_dns @UNOWNED @UNOWNED
-/*/extensions/clusters/original_dst @UNOWNED @UNOWNED
+/*/extensions/clusters/original_dst @nezdolik @tonya11en @jronak
 /*/extensions/clusters/logical_dns/ @UNOWNED @UNOWNED
 /*/extensions/clusters/common/ @UNOWNED @UNOWNED
 /*/extensions/clusters/eds/ @UNOWNED @UNOWNED

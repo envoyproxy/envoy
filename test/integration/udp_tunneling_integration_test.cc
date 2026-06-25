@@ -354,8 +354,8 @@ public:
     uint32_t default_target_port_;
     bool use_post_;
     std::string post_path_;
-    absl::optional<BufferOptions> buffer_options_;
-    absl::optional<std::string> idle_timeout_;
+    std::optional<BufferOptions> buffer_options_;
+    std::optional<std::string> idle_timeout_;
     std::string session_access_log_config_ = "";
     std::string access_log_options_ = "";
     bool propagate_response_headers_ = false;
@@ -552,8 +552,7 @@ typed_config:
 };
 
 TEST_P(UdpTunnelingIntegrationTest, BasicFlowWithBuffering) {
-  TestConfig config{"host.com",           "target.com", 1, 30, false, "",
-                    BufferOptions{1, 30}, absl::nullopt};
+  TestConfig config{"host.com", "target.com", 1, 30, false, "", BufferOptions{1, 30}, std::nullopt};
   setup(config);
 
   const std::string datagram1 = "hello";
@@ -572,7 +571,7 @@ TEST_P(UdpTunnelingIntegrationTest, BasicFlowWithBuffering) {
 }
 
 TEST_P(UdpTunnelingIntegrationTest, BasicFlowNoBuffering) {
-  TestConfig config{"host.com", "target.com", 1, 30, false, "", absl::nullopt, absl::nullopt};
+  TestConfig config{"host.com", "target.com", 1, 30, false, "", std::nullopt, std::nullopt};
   setup(config);
 
   establishConnection("hello");
@@ -587,8 +586,8 @@ TEST_P(UdpTunnelingIntegrationTest, BasicFlowNoBuffering) {
 }
 
 TEST_P(UdpTunnelingIntegrationTest, BasicFlowWithPost) {
-  TestConfig config{"host.com",           "target.com", 1, 30, true, "/post/path",
-                    BufferOptions{1, 30}, absl::nullopt};
+  TestConfig config{"host.com",   "target.com",         1,           30, true,
+                    "/post/path", BufferOptions{1, 30}, std::nullopt};
   setup(config);
 
   const std::string datagram1 = "hello";
@@ -600,8 +599,7 @@ TEST_P(UdpTunnelingIntegrationTest, BasicFlowWithPost) {
 }
 
 TEST_P(UdpTunnelingIntegrationTest, TwoConsecutiveDownstreamSessions) {
-  TestConfig config{"host.com",           "target.com", 1, 30, false, "",
-                    BufferOptions{1, 30}, absl::nullopt};
+  TestConfig config{"host.com", "target.com", 1, 30, false, "", BufferOptions{1, 30}, std::nullopt};
   setup(config);
 
   establishConnection("hello1");
@@ -752,8 +750,7 @@ TEST_P(UdpTunnelingIntegrationTest, IdleTimeoutNoUpstreamConnection) {
 }
 
 TEST_P(UdpTunnelingIntegrationTest, BufferOverflowDueToCapacity) {
-  TestConfig config{"host.com",           "target.com", 1, 30, false, "",
-                    BufferOptions{1, 30}, absl::nullopt};
+  TestConfig config{"host.com", "target.com", 1, 30, false, "", BufferOptions{1, 30}, std::nullopt};
   setup(config);
 
   // Send two datagrams before the upstream is established. Since the buffer capacity is 1 datagram,
@@ -773,8 +770,8 @@ TEST_P(UdpTunnelingIntegrationTest, BufferOverflowDueToCapacity) {
 }
 
 TEST_P(UdpTunnelingIntegrationTest, BufferOverflowDueToSize) {
-  TestConfig config{"host.com",   "target.com", 1, 30, false, "", BufferOptions{100, 15},
-                    absl::nullopt};
+  TestConfig config{"host.com", "target.com",           1,           30, false,
+                    "",         BufferOptions{100, 15}, std::nullopt};
   setup(config);
 
   // Send two datagrams before the upstream is established. Since the buffer capacity is 6 bytes,
@@ -794,8 +791,8 @@ TEST_P(UdpTunnelingIntegrationTest, BufferOverflowDueToSize) {
 }
 
 TEST_P(UdpTunnelingIntegrationTest, ConnectionReuse) {
-  TestConfig config{"host.com",   "target.com", 1, 30, false, "", BufferOptions{100, 300},
-                    absl::nullopt};
+  TestConfig config{"host.com",  "target.com", 1, 30, false, "", BufferOptions{100, 300},
+                    std::nullopt};
   setup(config);
 
   // Establish connection for first session.
@@ -856,7 +853,7 @@ TEST_P(UdpTunnelingIntegrationTest, FailureOnBadResponseHeaders) {
                           false,
                           "",
                           BufferOptions{1, 30},
-                          absl::nullopt,
+                          std::nullopt,
                           session_access_log_config};
   setup(config);
 
@@ -905,7 +902,7 @@ TEST_P(UdpTunnelingIntegrationTest,
                           false,
                           "",
                           BufferOptions{1, 30},
-                          absl::nullopt,
+                          std::nullopt,
                           session_access_log_config};
   setup(config);
 
@@ -969,7 +966,7 @@ TEST_P(UdpTunnelingIntegrationTest,
                           false,
                           "",
                           BufferOptions{1, 30},
-                          absl::nullopt,
+                          std::nullopt,
                           session_access_log_config,
                           "",
                           false,
@@ -1032,7 +1029,7 @@ TEST_P(UdpTunnelingIntegrationTest,
                           false,
                           "",
                           BufferOptions{1, 30},
-                          absl::nullopt,
+                          std::nullopt,
                           session_access_log_config};
 
   setup(config);
@@ -1101,7 +1098,7 @@ TEST_P(UdpTunnelingIntegrationTest,
                           false,
                           "",
                           BufferOptions{1, 30},
-                          absl::nullopt,
+                          std::nullopt,
                           session_access_log_config,
                           "",
                           false,
@@ -1168,7 +1165,7 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateValidResponseHeaders) {
                           false,
                           "",
                           BufferOptions{1, 30},
-                          absl::nullopt,
+                          std::nullopt,
                           session_access_log_config,
                           "",
                           true,
@@ -1211,7 +1208,7 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateInvalidResponseHeaders) {
                           false,
                           "",
                           BufferOptions{1, 30},
-                          absl::nullopt,
+                          std::nullopt,
                           session_access_log_config,
                           "",
                           true,
@@ -1259,7 +1256,7 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateInvalidResponseHeadersWithRetry) {
                           false,
                           "",
                           BufferOptions{1, 30},
-                          absl::nullopt,
+                          std::nullopt,
                           session_access_log_config,
                           "",
                           true,
@@ -1316,7 +1313,7 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateResponseTrailers) {
                           false,
                           "",
                           BufferOptions{1, 30},
-                          absl::nullopt,
+                          std::nullopt,
                           session_access_log_config,
                           "",
                           false,
@@ -1368,7 +1365,7 @@ TEST_P(UdpTunnelingIntegrationTest, FlushAccessLogOnTunnelConnected) {
                           false,
                           "",
                           BufferOptions{1, 30},
-                          absl::nullopt,
+                          std::nullopt,
                           session_access_log_config,
                           access_log_options};
   setup(config);
@@ -1420,7 +1417,7 @@ TEST_P(UdpTunnelingIntegrationTest, DontFlushTunnelConnectedAccessLogWithInvalid
                           false,
                           "",
                           BufferOptions{1, 30},
-                          absl::nullopt,
+                          std::nullopt,
                           session_access_log_config,
                           access_log_options};
   setup(config);
@@ -1474,7 +1471,7 @@ TEST_P(UdpTunnelingIntegrationTest, FlushAccessLogPeriodically) {
                           false,
                           "",
                           BufferOptions{1, 30},
-                          absl::nullopt,
+                          std::nullopt,
                           session_access_log_config,
                           access_log_options};
   setup(config);
@@ -1518,7 +1515,7 @@ TEST_P(UdpTunnelingIntegrationTest, BytesMeterAccessLog) {
                           false,
                           "",
                           BufferOptions{1, 30},
-                          absl::nullopt,
+                          std::nullopt,
                           session_access_log_config,
                           ""};
   setup(config);
@@ -1561,8 +1558,7 @@ TEST_P(UdpTunnelingIntegrationTest, BytesMeterAccessLog) {
 }
 
 TEST_P(UdpTunnelingIntegrationTest, DrainListenersWhileTunnelingActiveSessionIsStillActive) {
-  TestConfig config{"host.com",           "target.com", 1, 30, false, "",
-                    BufferOptions{1, 30}, absl::nullopt};
+  TestConfig config{"host.com", "target.com", 1, 30, false, "", BufferOptions{1, 30}, std::nullopt};
   setup(config);
 
   const std::string datagram = "hello";

@@ -26,7 +26,7 @@ public:
   // Currently this writer doesn't support Explicit Congestion Notification.
   bool SupportsEcn() const override { return false; }
 
-  absl::optional<int> MessageTooBigErrorCode() const override;
+  std::optional<int> MessageTooBigErrorCode() const override;
   quic::QuicByteCount GetMaxPacketSize(const quic::QuicSocketAddress& peer_address) const override;
   quic::QuicPacketBuffer GetNextWriteLocation(const quic::QuicIpAddress& self_address,
                                               const quic::QuicSocketAddress& peer_address) override;

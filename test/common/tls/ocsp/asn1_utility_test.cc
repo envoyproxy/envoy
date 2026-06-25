@@ -156,7 +156,7 @@ TEST_F(Asn1UtilityTest, GetOptionalTest) {
   CBS_init(&cbs, asn1_true.data(), asn1_true.size());
 
   const uint8_t* start = CBS_data(&cbs);
-  EXPECT_EQ(absl::nullopt, Asn1Utility::getOptional(cbs, CBS_ASN1_INTEGER).value());
+  EXPECT_EQ(std::nullopt, Asn1Utility::getOptional(cbs, CBS_ASN1_INTEGER).value());
   EXPECT_EQ(start, CBS_data(&cbs));
 
   CBS value = Asn1Utility::getOptional(cbs, CBS_ASN1_BOOLEAN).value().value();
@@ -193,7 +193,7 @@ TEST_F(Asn1UtilityTest, ParseOptionalTest) {
     CBS_init(&cbs_explicit_optional_true, explicit_optional_true.data(),
              explicit_optional_true.size());
 
-    absl::optional<bool> expected(true);
+    std::optional<bool> expected(true);
     EXPECT_EQ(expected,
               Asn1Utility::parseOptional<bool>(cbs_explicit_optional_true, parse_bool,
                                                CBS_ASN1_CONTEXT_SPECIFIC | CBS_ASN1_CONSTRUCTED | 0)
@@ -204,7 +204,7 @@ TEST_F(Asn1UtilityTest, ParseOptionalTest) {
     CBS cbs_empty_seq;
     CBS_init(&cbs_empty_seq, asn1_empty_seq.data(), asn1_empty_seq.size());
     EXPECT_EQ(
-        absl::nullopt,
+        std::nullopt,
         Asn1Utility::parseOptional<bool>(cbs_empty_seq, parse_bool, CBS_ASN1_BOOLEAN).value());
   }
 
@@ -212,7 +212,7 @@ TEST_F(Asn1UtilityTest, ParseOptionalTest) {
     CBS cbs_nothing;
     CBS_init(&cbs_nothing, nothing.data(), nothing.size());
 
-    EXPECT_EQ(absl::nullopt,
+    EXPECT_EQ(std::nullopt,
               Asn1Utility::parseOptional<bool>(cbs_nothing, parse_bool, CBS_ASN1_BOOLEAN).value());
   }
 

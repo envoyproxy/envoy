@@ -25,10 +25,10 @@ public:
       : hash_key_(hash_key), is_read_(is_read), read_policy_(read_policy),
         client_zone_(client_zone) {}
 
-  TestLoadBalancerContext(absl::optional<uint64_t> hash) : hash_key_(hash) {}
+  TestLoadBalancerContext(std::optional<uint64_t> hash) : hash_key_(hash) {}
 
   // Upstream::LoadBalancerContext
-  absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
+  std::optional<uint64_t> computeHashKey() override { return hash_key_; }
 
   bool isReadCommand() const override { return is_read_; };
   NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
@@ -36,7 +36,7 @@ public:
   };
   const std::string& clientZone() const override { return client_zone_; }
 
-  absl::optional<uint64_t> hash_key_;
+  std::optional<uint64_t> hash_key_;
   bool is_read_{};
   NetworkFilters::Common::Redis::Client::ReadPolicy read_policy_{};
   std::string client_zone_;
@@ -134,7 +134,7 @@ TEST_F(RedisClusterLoadBalancerTest, LoadBalancerStubMethods) {
 
   // selectExistingConnection is not implemented and always returns nullopt.
   std::vector<uint8_t> hash_key;
-  EXPECT_EQ(absl::nullopt, lb->selectExistingConnection(nullptr, *hosts[0], hash_key));
+  EXPECT_EQ(std::nullopt, lb->selectExistingConnection(nullptr, *hosts[0], hash_key));
 
   // lifetimeCallbacks is not implemented and returns empty OptRef.
   EXPECT_FALSE(lb->lifetimeCallbacks().has_value());
@@ -158,7 +158,7 @@ TEST_F(RedisClusterLoadBalancerTest, NoHash) {
   };
   init();
   factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
-  TestLoadBalancerContext context(absl::nullopt);
+  TestLoadBalancerContext context(std::nullopt);
   EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->chooseHost(&context).host);
 };
 
@@ -548,7 +548,7 @@ TEST_F(RedisLoadBalancerContextImplTest, Basic) {
   RedisLoadBalancerContextImpl context1("foo", true, true, get_request,
                                         NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
-  EXPECT_EQ(absl::optional<uint64_t>(44950), context1.computeHashKey());
+  EXPECT_EQ(std::optional<uint64_t>(44950), context1.computeHashKey());
   EXPECT_EQ(true, context1.isReadCommand());
   EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context1.readPolicy());
 
@@ -568,7 +568,7 @@ TEST_F(RedisLoadBalancerContextImplTest, Basic) {
   RedisLoadBalancerContextImpl context2("foo", true, true, set_request,
                                         NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
-  EXPECT_EQ(absl::optional<uint64_t>(44950), context2.computeHashKey());
+  EXPECT_EQ(std::optional<uint64_t>(44950), context2.computeHashKey());
   EXPECT_EQ(false, context2.isReadCommand());
   EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context2.readPolicy());
 }
@@ -590,14 +590,14 @@ TEST_F(RedisLoadBalancerContextImplTest, CompositeArray) {
   RedisLoadBalancerContextImpl context1("foo", true, true, get_request1,
                                         NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
-  EXPECT_EQ(absl::optional<uint64_t>(44950), context1.computeHashKey());
+  EXPECT_EQ(std::optional<uint64_t>(44950), context1.computeHashKey());
   EXPECT_EQ(true, context1.isReadCommand());
   EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context1.readPolicy());
 
   RedisLoadBalancerContextImpl context2("bar", true, true, get_request2,
                                         NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
-  EXPECT_EQ(absl::optional<uint64_t>(37829), context2.computeHashKey());
+  EXPECT_EQ(std::optional<uint64_t>(37829), context2.computeHashKey());
   EXPECT_EQ(true, context2.isReadCommand());
   EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context2.readPolicy());
 
@@ -610,7 +610,7 @@ TEST_F(RedisLoadBalancerContextImplTest, CompositeArray) {
   RedisLoadBalancerContextImpl context3("foo", true, true, set_request,
                                         NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
-  EXPECT_EQ(absl::optional<uint64_t>(44950), context3.computeHashKey());
+  EXPECT_EQ(std::optional<uint64_t>(44950), context3.computeHashKey());
   EXPECT_EQ(false, context3.isReadCommand());
   EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context3.readPolicy());
 }
@@ -630,7 +630,7 @@ TEST_F(RedisLoadBalancerContextImplTest, UpperCaseCommand) {
   RedisLoadBalancerContextImpl context1("foo", true, true, get_request,
                                         NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
-  EXPECT_EQ(absl::optional<uint64_t>(44950), context1.computeHashKey());
+  EXPECT_EQ(std::optional<uint64_t>(44950), context1.computeHashKey());
   EXPECT_EQ(true, context1.isReadCommand());
   EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context1.readPolicy());
 
@@ -650,7 +650,7 @@ TEST_F(RedisLoadBalancerContextImplTest, UpperCaseCommand) {
   RedisLoadBalancerContextImpl context2("foo", true, true, set_request,
                                         NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
-  EXPECT_EQ(absl::optional<uint64_t>(44950), context2.computeHashKey());
+  EXPECT_EQ(std::optional<uint64_t>(44950), context2.computeHashKey());
   EXPECT_EQ(false, context2.isReadCommand());
   EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context2.readPolicy());
 }
@@ -666,7 +666,7 @@ TEST_F(RedisLoadBalancerContextImplTest, UnsupportedCommand) {
   RedisLoadBalancerContextImpl context3("foo", true, true, unknown_request,
                                         NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
-  EXPECT_EQ(absl::optional<uint64_t>(44950), context3.computeHashKey());
+  EXPECT_EQ(std::optional<uint64_t>(44950), context3.computeHashKey());
   EXPECT_EQ(false, context3.isReadCommand());
   EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context3.readPolicy());
 }
@@ -689,7 +689,7 @@ TEST_F(RedisLoadBalancerContextImplTest, EnforceHashTag) {
   RedisLoadBalancerContextImpl context2("{foo}bar", false, true, set_request,
                                         NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
-  EXPECT_EQ(absl::optional<uint64_t>(44950), context2.computeHashKey());
+  EXPECT_EQ(std::optional<uint64_t>(44950), context2.computeHashKey());
   EXPECT_EQ(false, context2.isReadCommand());
   EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context2.readPolicy());
 }

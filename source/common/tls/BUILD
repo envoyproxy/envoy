@@ -90,7 +90,6 @@ envoy_cc_library(
         "@abseil-cpp//absl/container:node_hash_set",
         "@abseil-cpp//absl/hash",
         "@abseil-cpp//absl/synchronization",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -104,7 +103,6 @@ envoy_cc_library(
         "@abseil-cpp//absl/container:node_hash_set",
         "@abseil-cpp//absl/hash",
         "@abseil-cpp//absl/synchronization",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -118,7 +116,6 @@ envoy_cc_library(
         "@abseil-cpp//absl/container:node_hash_set",
         "@abseil-cpp//absl/hash",
         "@abseil-cpp//absl/synchronization",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 

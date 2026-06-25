@@ -595,7 +595,7 @@ void Client::sendHeaders(envoy_stream_t stream, RequestHeaderMapPtr headers, boo
   if (headers->getSchemeValue() != "https" &&
       !SystemHelper::getInstance().isCleartextPermitted(headers->getHostValue())) {
     request_decoder->sendLocalReply(Http::Code::BadRequest, "Cleartext is not permitted", nullptr,
-                                    absl::nullopt, "");
+                                    std::nullopt, "");
     return;
   }
 

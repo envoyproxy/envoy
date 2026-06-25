@@ -698,6 +698,7 @@ mapping_func_filegroup(
         "SSL_CTX_set_verify_depth",
         "SSL_CTX_set_verify",
         "SSL_CTX_set1_curves_list",
+        "SSL_CTX_set1_group_ids",
         "SSL_CTX_set1_sigalgs_list",
         "SSL_CTX_use_certificate_chain_file",
         "SSL_CTX_use_certificate_file",

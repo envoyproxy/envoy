@@ -46,8 +46,8 @@ public:
                                      const std::string& data_to_send_downstream) PURE;
   virtual void close() PURE;
   virtual void waitForDisconnect() PURE;
-  virtual absl::optional<std::string> tlsSessionId() const PURE;
-  virtual absl::optional<std::string> peerCertificateSha256Digest() const PURE;
+  virtual std::optional<std::string> tlsSessionId() const PURE;
+  virtual std::optional<std::string> peerCertificateSha256Digest() const PURE;
 };
 
 class BaseTcpProxySslIntegrationTest : public BaseTcpProxyIntegrationTest {
@@ -69,8 +69,8 @@ protected:
                                const std::string& data_to_send_downstream) override;
     void close() override;
     void waitForDisconnect() override;
-    absl::optional<std::string> tlsSessionId() const override;
-    absl::optional<std::string> peerCertificateSha256Digest() const override;
+    std::optional<std::string> tlsSessionId() const override;
+    std::optional<std::string> peerCertificateSha256Digest() const override;
     BaseTcpProxySslIntegrationTest& parent_;
     ConnectionStatusCallbacks connect_callbacks_;
     MockWatermarkBuffer* client_write_buffer_;
@@ -89,8 +89,8 @@ protected:
     void sendAndReceiveTlsData(const std::string& data_to_send_upstream,
                                const std::string& data_to_send_downstream) override;
     void waitForDisconnect() override;
-    absl::optional<std::string> tlsSessionId() const override { return {}; }
-    absl::optional<std::string> peerCertificateSha256Digest() const override { return {}; }
+    std::optional<std::string> tlsSessionId() const override { return {}; }
+    std::optional<std::string> peerCertificateSha256Digest() const override { return {}; }
     BaseTcpProxySslIntegrationTest& parent_;
     IntegrationTcpClient tcp_client_;
     FakeRawConnectionPtr fake_upstream_connection_;

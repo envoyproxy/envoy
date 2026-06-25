@@ -108,6 +108,8 @@ public:
    */
   bool useLocalDecision() const override { return use_local_decision_; }
 
+  void disableLocalDecision() override { use_local_decision_ = false; }
+
   /**
    * @return whether the span will be exported to the OTLP backend.
    */
@@ -182,7 +184,7 @@ private:
   Tracer& parent_tracer_;
   Envoy::TimeSource& time_source_;
   bool sampled_;
-  const bool use_local_decision_{false};
+  bool use_local_decision_{false};
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;
