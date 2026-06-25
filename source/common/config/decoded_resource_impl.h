@@ -20,6 +20,16 @@ repeatedPtrFieldToVector(const Protobuf::RepeatedPtrField<std::string>& xs) {
   return ys;
 }
 
+static std::string
+getResourceName(const envoy::service::discovery::v3::Resource& resource) {
+  if (resource.has_resource_name() &&
+      !resource.resource_name().name().empty()) {
+    return resource.resource_name().name();
+  }
+
+  return resource.name();
+}
+
 } // namespace
 
 class DecodedResourceImpl;
@@ -42,26 +52,26 @@ public:
         version, absl::nullopt, absl::nullopt));
   }
 
-  static DecodedResourceImplPtr
-  fromResource(OpaqueResourceDecoder& resource_decoder,
-               const envoy::service::discovery::v3::Resource& resource) {
+  static DecodedResourceImplPtr fromResource(OpaqueResourceDecoder& resource_decoder, const envoy::service::discovery::v3::Resource& resource) {
     return std::make_unique<DecodedResourceImpl>(resource_decoder, resource);
   }
 
   DecodedResourceImpl(OpaqueResourceDecoder& resource_decoder,
                       const envoy::service::discovery::v3::Resource& resource)
       : DecodedResourceImpl(
-            resource_decoder, resource.name(), resource.aliases(), resource.resource(),
+            resource_decoder, getResourceName(resource), resource.aliases(), resource.resource(),
             resource.has_resource(), resource.version(),
             resource.has_ttl() ? absl::make_optional(std::chrono::milliseconds(
                                      DurationUtil::durationToMilliseconds(resource.ttl())))
                                : absl::nullopt,
             resource.has_metadata() ? absl::make_optional(resource.metadata()) : absl::nullopt) {}
+
   DecodedResourceImpl(OpaqueResourceDecoder& resource_decoder,
                       const xds::core::v3::CollectionEntry::InlineEntry& inline_entry)
       : DecodedResourceImpl(resource_decoder, inline_entry.name(),
                             Protobuf::RepeatedPtrField<std::string>(), inline_entry.resource(),
                             true, inline_entry.version(), absl::nullopt, absl::nullopt) {}
+                            
   DecodedResourceImpl(ProtobufTypes::MessagePtr resource, const std::string& name,
                       const std::vector<std::string>& aliases, const std::string& version)
       : resource_(std::move(resource)), has_resource_(true), name_(name), aliases_(aliases),

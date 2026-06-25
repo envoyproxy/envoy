@@ -148,6 +148,21 @@ TEST(DecodedResourceImplTest, All) {
     EXPECT_THAT(decoded_resource.resource(), ProtoEq(Protobuf::Empty()));
     EXPECT_TRUE(decoded_resource.hasResource());
   }
+
+    {
+    envoy::service::discovery::v3::Resource resource_wrapper;
+    resource_wrapper.set_name("");
+    resource_wrapper.mutable_resource_name()->set_name("resource_name");
+    resource_wrapper.mutable_resource()->MergeFrom(some_opaque_resource);
+    EXPECT_CALL(resource_decoder, decodeResource(ProtoEq(some_opaque_resource)))
+        .WillOnce(InvokeWithoutArgs(
+            []() -> ProtobufTypes::MessagePtr {
+              return std::make_unique<Protobuf::Empty>();
+            }));
+    EXPECT_CALL(resource_decoder, resourceName(_)).Times(0);
+    DecodedResourceImpl decoded_resource(resource_decoder, resource_wrapper);
+    EXPECT_EQ("resource_name", decoded_resource.name());
+  }
 }
 
 } // namespace
