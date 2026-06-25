@@ -475,7 +475,7 @@ TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoderUsePostWithCustomPath) {
 TEST_P(HttpUpstreamRequestEncoderTest, RequestIdGeneratedWhenEnabled) {
   envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension reqid_ext;
   envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_cfg;
-  reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
+  std::ignore = reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
   *this->tcp_proxy_.mutable_tunneling_config()->mutable_request_id_extension() = reqid_ext;
   this->setupUpstream();
 
@@ -502,7 +502,7 @@ MATCHER(HasNonEmptyTunnelRequestId, "Struct has non-empty tunnel_request_id") {
 TEST_P(HttpUpstreamRequestEncoderTest, RequestIdStoredInDynamicMetadataWhenEnabled) {
   envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension reqid_ext;
   envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_cfg;
-  reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
+  std::ignore = reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
   *this->tcp_proxy_.mutable_tunneling_config()->mutable_request_id_extension() = reqid_ext;
   this->setupUpstream();
   EXPECT_CALL(this->downstream_stream_info_,
@@ -514,7 +514,7 @@ TEST_P(HttpUpstreamRequestEncoderTest, RequestIdStoredInDynamicMetadataWhenEnabl
 TEST_P(HttpUpstreamRequestEncoderTest, RequestIdHeaderOverrideAndMetadataKeyOverride) {
   envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension reqid_ext;
   envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_cfg;
-  reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
+  std::ignore = reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
   auto* tunneling = this->tcp_proxy_.mutable_tunneling_config();
   *tunneling->mutable_request_id_extension() = reqid_ext;
   tunneling->set_request_id_header("x-rid");
@@ -672,7 +672,7 @@ TEST(TunnelingConfigHelperImplTest, FormatterExtensionRendersInHeader) {
   tunneling->set_hostname("host.example.com:443");
   auto* formatter = tunneling->add_formatters();
   formatter->set_name("envoy.formatter.TestFormatter");
-  formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue());
+  std::ignore = formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue());
   auto* header = tunneling->add_headers_to_add();
   header->mutable_header()->set_key("x-custom");
   header->mutable_header()->set_value("%COMMAND_EXTENSION()%");
@@ -827,7 +827,7 @@ TEST_F(CombinedUpstreamTest, WriteUpstream) {
 TEST_F(CombinedUpstreamTest, CombinedUpstreamGeneratesRequestIdWhenEnabled) {
   envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension reqid_ext;
   envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_cfg;
-  reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
+  std::ignore = reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
   *this->tcp_proxy_.mutable_tunneling_config()->mutable_request_id_extension() = reqid_ext;
   this->setup();
   auto* headers = this->upstream_->downstreamHeaders();

@@ -336,7 +336,7 @@ TEST_P(TcpProxyTest, ExplicitFactory) {
                    .cluster_.info_;
   info->upstream_config_ = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   envoy::extensions::upstreams::tcp::generic::v3::GenericConnectionPoolProto generic_config;
-  info->upstream_config_->mutable_typed_config()->PackFrom(generic_config);
+  std::ignore = info->upstream_config_->mutable_typed_config()->PackFrom(generic_config);
   setup(1);
 
   raiseEventUpstreamConnected(0);
@@ -360,7 +360,7 @@ TEST_P(TcpProxyTest, BadFactory) {
   info->upstream_config_ = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   // The HTTP Generic connection pool is not a valid type for TCP upstreams.
   envoy::extensions::upstreams::http::generic::v3::GenericConnectionPoolProto generic_config;
-  info->upstream_config_->mutable_typed_config()->PackFrom(generic_config);
+  std::ignore = info->upstream_config_->mutable_typed_config()->PackFrom(generic_config);
 
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
 
@@ -2365,8 +2365,6 @@ TEST_P(TcpProxyTest, OdcdsClusterMissingCauseConnectionClose) {
 
 // Test that upstream transport failure message is reflected in access logs.
 TEST_P(TcpProxyTest, UpstreamConnectFailureStreamInfoAccessLog) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
-
   setup(1, accessLogConfig("%UPSTREAM_TRANSPORT_FAILURE_REASON%"));
 
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure,

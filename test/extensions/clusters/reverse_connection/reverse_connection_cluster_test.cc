@@ -31,6 +31,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -97,7 +98,7 @@ public:
     // Both options_.config_proto_ and bootstrap_ are populated since validation may use either.
     auto* bootstrap_extension = server_context_.options_.config_proto_.add_bootstrap_extensions();
     bootstrap_extension->set_name("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
-    bootstrap_extension->mutable_typed_config()->PackFrom(config_);
+    std::ignore = bootstrap_extension->mutable_typed_config()->PackFrom(config_);
     *server_context_.bootstrap_.add_bootstrap_extensions() = *bootstrap_extension;
   }
 
@@ -1776,7 +1777,7 @@ public:
     auto& bootstrap = server_context_.bootstrap_;
     for (auto& extension : *bootstrap.mutable_bootstrap_extensions()) {
       if (extension.name() == "envoy.bootstrap.reverse_tunnel.upstream_socket_interface") {
-        extension.mutable_typed_config()->PackFrom(config_);
+        std::ignore = extension.mutable_typed_config()->PackFrom(config_);
         break;
       }
     }

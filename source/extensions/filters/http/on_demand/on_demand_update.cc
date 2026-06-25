@@ -275,6 +275,9 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
     // Whether or not the cluster exists, we continue decoding. Filters further down the
     // chain may want to weigh in on cluster selection, so we don't send a local reply
     // here.
+    if (cluster_status == Upstream::ClusterDiscoveryStatus::Available) {
+      callbacks_->downstreamCallbacks()->recreateClusterInfo();
+    }
     callbacks_->continueDecoding();
     return;
   }
@@ -298,6 +301,9 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
 
   // Cluster still does not exist or we did not recreate the stream. Either way,
   // continue with the filter chain.
+  if (cluster_status == Upstream::ClusterDiscoveryStatus::Available) {
+    callbacks_->downstreamCallbacks()->recreateClusterInfo();
+  }
   callbacks_->continueDecoding();
 }
 

@@ -128,12 +128,12 @@ enum class FilterStateFormat { String, Proto, Field };
  */
 class FilterStateFormatter : public StreamInfoFormatterProvider {
 public:
-  static std::unique_ptr<FilterStateFormatter>
+  static absl::StatusOr<std::unique_ptr<FilterStateFormatter>>
   create(absl::string_view format, absl::optional<size_t> max_length, bool is_upstream);
 
-  FilterStateFormatter(absl::string_view key, absl::optional<size_t> max_length,
-                       bool serialize_as_string, bool is_upstream = false,
-                       absl::string_view field_name = {});
+  static absl::StatusOr<std::unique_ptr<FilterStateFormatter>>
+  createForTest(absl::string_view key, absl::optional<size_t> max_length, bool serialize_as_string,
+                bool is_upstream = false, absl::string_view field_name = {});
 
   // StreamInfoFormatterProvider
   // Don't hide the other structure of format and formatValue.
@@ -143,6 +143,10 @@ public:
   Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
 
 private:
+  FilterStateFormatter(absl::string_view key, absl::optional<size_t> max_length,
+                       bool serialize_as_string, bool is_upstream = false,
+                       absl::string_view field_name = {});
+
   const Envoy::StreamInfo::FilterState::Object*
   filterState(const StreamInfo::StreamInfo& stream_info) const;
 
@@ -159,12 +163,8 @@ public:
   using TimePointGetter =
       std::function<absl::optional<MonotonicTime>(const StreamInfo::StreamInfo&)>;
 
-  static std::unique_ptr<CommonDurationFormatter> create(absl::string_view sub_command);
-
-  CommonDurationFormatter(TimePointGetter beg, TimePointGetter end,
-                          DurationPrecision duration_precision)
-      : time_point_beg_(std::move(beg)), time_point_end_(std::move(end)),
-        duration_precision_(duration_precision) {}
+  static absl::StatusOr<std::unique_ptr<CommonDurationFormatter>>
+  create(absl::string_view sub_command);
 
   // StreamInfoFormatterProvider
   // Don't hide the other structure of format and formatValue.
@@ -176,6 +176,11 @@ public:
   static const absl::flat_hash_map<absl::string_view, TimePointGetter> KnownTimePointGetters;
 
 private:
+  CommonDurationFormatter(TimePointGetter beg, TimePointGetter end,
+                          DurationPrecision duration_precision)
+      : time_point_beg_(std::move(beg)), time_point_end_(std::move(end)),
+        duration_precision_(duration_precision) {}
+
   absl::optional<uint64_t> getDurationCount(const StreamInfo::StreamInfo& info) const;
 
   static TimePointGetter getTimePointGetterByName(absl::string_view name);
@@ -359,7 +364,8 @@ public:
     OriginalHostOnly,
   };
 
-  RequestedServerNameFormatter(absl::string_view fallback, absl::string_view option);
+  static absl::StatusOr<std::unique_ptr<RequestedServerNameFormatter>>
+  create(absl::string_view source, absl::string_view option);
 
   // StreamInfoFormatterProvider
   // Don't hide the other structure of format and formatValue.
@@ -372,8 +378,10 @@ public:
   absl::optional<std::string> getSNIFromStreamInfo(const StreamInfo::StreamInfo& stream_info) const;
 
 private:
-  HostFormatterSource source_;
-  HostFormatterOption option_;
+  RequestedServerNameFormatter(HostFormatterSource source, HostFormatterOption option);
+
+  const HostFormatterSource source_;
+  const HostFormatterOption option_;
 };
 
 class DefaultBuiltInStreamInfoCommandParserFactory : public BuiltInCommandParserFactory {

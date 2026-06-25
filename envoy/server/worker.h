@@ -1,11 +1,23 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
+#include <list>
+#include <memory>
+#include <string>
 
-#include "envoy/event/dispatcher.h"
+#include "envoy/common/optref.h"
+#include "envoy/common/pure.h"
+#include "envoy/common/random_generator.h"
+#include "envoy/network/connection_handler.h"
+#include "envoy/network/filter.h"
+#include "envoy/network/listener.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/overload/overload_manager.h"
+#include "envoy/stats/scope.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {
@@ -47,8 +59,10 @@ public:
    * Start the worker thread.
    * @param guard_dog supplies the optional guard dog to use for thread watching.
    * @param cb a callback to run when the worker thread starts running.
+   * @param cpu_id an optional CPU to pin the worker thread to for CPU locality.
    */
-  virtual void start(OptRef<GuardDog> guard_dog, const std::function<void()>& cb) PURE;
+  virtual void start(OptRef<GuardDog> guard_dog, const std::function<void()>& cb,
+                     absl::optional<uint32_t> cpu_id) PURE;
 
   /**
    * Initialize stats for this worker's dispatcher, if available. The worker will output

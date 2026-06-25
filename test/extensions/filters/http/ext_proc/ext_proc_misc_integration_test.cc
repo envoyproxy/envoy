@@ -50,7 +50,7 @@ protected:
 
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
       ext_proc_filter.set_name("envoy.filters.http.ext_proc");
-      ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
+      std::ignore = ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
     });
 
@@ -132,7 +132,7 @@ TEST_P(ExtProcStatusOnErrorIntegrationTest, GrpcStreamErrorDefaultStatus) {
 
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
     ext_proc_filter.set_name("envoy.filters.http.ext_proc");
-    ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
+    std::ignore = ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
   });
 

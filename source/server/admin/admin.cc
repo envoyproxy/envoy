@@ -93,7 +93,7 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
 
   ::envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("default_universal_header_validator_for_admin");
-  config.mutable_typed_config()->PackFrom(uhv_config);
+  std::ignore = config.mutable_typed_config()->PackFrom(uhv_config);
 
   auto* factory = Envoy::Config::Utility::getFactory<Http::HeaderValidatorFactoryConfig>(config);
   ENVOY_BUG(factory != nullptr, "Default UHV is not linked into binary.");

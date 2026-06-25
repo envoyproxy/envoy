@@ -136,7 +136,7 @@ const auto& formatterProviderFuncTable() {
       });
 }
 
-::Envoy::Formatter::FormatterProviderPtr
+absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
 MetadataFormatterCommandParser::parse(absl::string_view command, absl::string_view subcommand,
                                       absl::optional<size_t> max_length) const {
   if (command == "METADATA") {

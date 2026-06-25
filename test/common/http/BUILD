@@ -570,6 +570,7 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:overload_manager_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:test_runtime_lib",
         "//test/common/quic:test_utils_lib",
@@ -598,6 +599,7 @@ envoy_cc_test(
         ":common_lib",
         "//source/common/http:http_server_properties_cache",
         "//test/mocks:common_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
 )

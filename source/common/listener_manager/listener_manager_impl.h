@@ -161,7 +161,8 @@ using ListenerImplPtr = std::unique_ptr<ListenerImpl>;
   GAUGE(total_listeners_active, NeverImport)                                                       \
   GAUGE(total_listeners_draining, NeverImport)                                                     \
   GAUGE(total_listeners_warming, NeverImport)                                                      \
-  GAUGE(workers_started, NeverImport)
+  GAUGE(workers_started, NeverImport)                                                              \
+  GAUGE(workers_pinned, NeverImport)
 
 /**
  * Struct definition for all listener manager stats. @see stats_macros.h
@@ -242,6 +243,7 @@ public:
   void endListenerUpdate(FailureStates&& failure_state) override;
   bool isWorkerStarted() override { return workers_started_; }
   Http::Context& httpContext() { return server_.httpContext(); }
+  using ListenerManager::apiListener;
   ApiListenerOptRef apiListener() override;
   ListenerUpdateCallbacksHandlePtr
   addListenerUpdateCallbacks(ListenerUpdateCallbacks& callbacks) override;
@@ -356,6 +358,13 @@ private:
   void maybeCloseSocketsForListener(ListenerImpl& listener);
   absl::Status setupSocketFactoryForListener(ListenerImpl& new_listener,
                                              const ListenerImpl& existing_listener);
+
+  /**
+   * Compute the per-worker CPU assignment used to pin worker threads, mapping worker i to entry i.
+   * Records the `workers_pinned` gauge and logs the outcome. Returns an empty vector when worker
+   * CPU affinity is disabled or no assignment is possible, in which case no worker is pinned.
+   */
+  std::vector<uint32_t> assignWorkerCpus();
 
   ApiListenerPtr api_listener_;
   // Active listeners are listeners that are currently accepting new connections on the workers.

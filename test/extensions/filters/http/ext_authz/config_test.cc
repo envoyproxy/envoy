@@ -323,14 +323,16 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteServiceTypeSwitching) {
   ProtobufTypes::MessagePtr less_specific_proto = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(less_specific_config_yaml, *less_specific_proto);
   FilterConfigPerRoute less_specific_config(
-      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+      *Envoy::Protobuf::DynamicCastMessage<
+          envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute>(
           less_specific_proto.get()));
 
   // Create more specific configuration with HTTP service
   ProtobufTypes::MessagePtr more_specific_proto = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(more_specific_config_yaml, *more_specific_proto);
   FilterConfigPerRoute more_specific_config(
-      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+      *Envoy::Protobuf::DynamicCastMessage<
+          envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute>(
           more_specific_proto.get()));
 
   // Merge configurations - should use HTTP service from more specific config
@@ -384,14 +386,16 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteServiceTypeSwitchingHttpToGrpc) {
   ProtobufTypes::MessagePtr less_specific_proto = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(less_specific_config_yaml, *less_specific_proto);
   FilterConfigPerRoute less_specific_config(
-      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+      *Envoy::Protobuf::DynamicCastMessage<
+          envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute>(
           less_specific_proto.get()));
 
   // Create more specific configuration with gRPC service
   ProtobufTypes::MessagePtr more_specific_proto = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(more_specific_config_yaml, *more_specific_proto);
   FilterConfigPerRoute more_specific_config(
-      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+      *Envoy::Protobuf::DynamicCastMessage<
+          envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute>(
           more_specific_proto.get()));
 
   // Merge configurations - should use gRPC service from more specific config
@@ -503,13 +507,15 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteEmptyContextExtensionsMerging) {
   ProtobufTypes::MessagePtr less_specific_proto = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(less_specific_config_yaml, *less_specific_proto);
   FilterConfigPerRoute less_specific_config(
-      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+      *Envoy::Protobuf::DynamicCastMessage<
+          envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute>(
           less_specific_proto.get()));
 
   ProtobufTypes::MessagePtr more_specific_proto = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(more_specific_config_yaml, *more_specific_proto);
   FilterConfigPerRoute more_specific_config(
-      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+      *Envoy::Protobuf::DynamicCastMessage<
+          envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute>(
           more_specific_proto.get()));
 
   FilterConfigPerRoute merged_config(less_specific_config, more_specific_config);
@@ -553,14 +559,16 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfigurationMerging) {
   ProtobufTypes::MessagePtr less_specific_proto = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(less_specific_config_yaml, *less_specific_proto);
   FilterConfigPerRoute less_specific_config(
-      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+      *Envoy::Protobuf::DynamicCastMessage<
+          envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute>(
           less_specific_proto.get()));
 
   // Create more specific configuration
   ProtobufTypes::MessagePtr more_specific_proto = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(more_specific_config_yaml, *more_specific_proto);
   FilterConfigPerRoute more_specific_config(
-      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+      *Envoy::Protobuf::DynamicCastMessage<
+          envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute>(
           more_specific_proto.get()));
 
   // Merge configurations

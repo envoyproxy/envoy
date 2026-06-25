@@ -182,9 +182,9 @@ void modifyPolicy(
     if (action.typed_config().type_url() == Traits<Policy>::getTypeUrl() && action.name() == name) {
       auto& any = *action.mutable_typed_config();
       Policy policy;
-      any.UnpackTo(&policy);
+      std::ignore = any.UnpackTo(&policy);
       function(policy);
-      any.PackFrom(policy);
+      std::ignore = any.PackFrom(policy);
     }
   }
 }

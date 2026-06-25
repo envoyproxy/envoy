@@ -18,8 +18,7 @@
 #include "contrib/istio/filters/network/metadata_exchange/source/metadata_exchange_initial_header.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace NetworkFilters {
+namespace Tcp {
 namespace MetadataExchange {
 
 using ::Envoy::Extensions::Filters::Common::Expr::CelState;
@@ -63,7 +62,7 @@ MetadataExchangeConfig::MetadataExchangeConfig(
       filter_direction_(filter_direction), stats_(generateStats(stat_prefix, scope)),
       additional_labels_(additional_labels) {
   if (enable_discovery) {
-    metadata_provider_ = Extensions::Common::WorkloadDiscovery::getProvider(factory_context);
+    metadata_provider_ = Extensions::Common::WorkloadDiscovery::GetProvider(factory_context);
   }
 }
 
@@ -184,6 +183,7 @@ void MetadataExchangeFilter::writeNodeMetadata() {
   Protobuf::Struct data;
   const auto obj = Istio::Common::convertStructToWorkloadMetadata(
       local_info_.node().metadata(), config_->additional_labels_, local_info_.node().locality());
+
   *(*data.mutable_fields())[ExchangeMetadataHeader].mutable_struct_value() =
       Istio::Common::convertWorkloadMetadataToStruct(*obj);
   std::string metadata_id = getMetadataId();
@@ -324,7 +324,7 @@ void MetadataExchangeFilter::setMetadataNotFoundFilterState() {
     auto downstream_peer_address = [&]() -> Network::Address::InstanceConstSharedPtr {
       if (upstream_peer) {
         // Query upstream peer data and save it in metadata for stats
-        const auto metadata_object = config_->metadata_provider_->getMetadata(upstream_peer);
+        const auto metadata_object = config_->metadata_provider_->GetMetadata(upstream_peer);
         if (metadata_object) {
           ENVOY_LOG(debug, "Metadata found for upstream peer address {}",
                     upstream_peer->asString());
@@ -347,7 +347,7 @@ void MetadataExchangeFilter::setMetadataNotFoundFilterState() {
         config_->filter_direction_ == FilterDirection::Downstream ? downstream_peer_address()
                                                                   : upstream_peer_address();
     ENVOY_LOG(debug, "Look up metadata based on peer address {}", peer_address->asString());
-    const auto metadata_object = config_->metadata_provider_->getMetadata(peer_address);
+    const auto metadata_object = config_->metadata_provider_->GetMetadata(peer_address);
     if (metadata_object) {
       ENVOY_LOG(trace, "Metadata found for peer address {}", peer_address->asString());
       updatePeer(metadata_object.value());
@@ -363,6 +363,5 @@ void MetadataExchangeFilter::setMetadataNotFoundFilterState() {
 }
 
 } // namespace MetadataExchange
-} // namespace NetworkFilters
-} // namespace Extensions
+} // namespace Tcp
 } // namespace Envoy

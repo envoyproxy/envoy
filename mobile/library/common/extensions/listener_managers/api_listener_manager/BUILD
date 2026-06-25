@@ -18,6 +18,7 @@ envoy_cc_extension(
     ],
     repository = "@envoy",
     deps = [
+        "//library/common:engine_types_lib",
         "//library/common/event:provisional_dispatcher_lib",
         "//library/common/http:client_lib",
         "@envoy//envoy/server:api_listener_interface",

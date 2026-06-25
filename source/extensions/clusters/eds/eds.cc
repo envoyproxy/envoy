@@ -210,7 +210,7 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
   }
 
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
-      dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
+      Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           resources[0].get().resource());
   if (cluster_load_assignment.cluster_name() != edsServiceName()) {
     const auto msg = fmt::format("Unexpected EDS cluster (expecting {}): {}", edsServiceName(),
@@ -466,7 +466,8 @@ void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReas
           "Did not receive EDS response on time, using cached ClusterLoadAssignment for cluster {}",
           edsServiceName());
       envoy::config::endpoint::v3::ClusterLoadAssignment cached_load_assignment =
-          dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(*cached_resource);
+          Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+              *cached_resource);
       info_->configUpdateStats().assignment_use_cached_.inc();
       using_cached_resource_ = true;
       update(std::move(cached_load_assignment));

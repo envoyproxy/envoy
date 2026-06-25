@@ -1,5 +1,7 @@
 #include <chrono>
+#include <memory>
 
+#include "source/common/network/listen_socket_impl.h"
 #include "source/common/quic/client_connection_factory_impl.h"
 #include "source/common/quic/quic_client_transport_socket_factory.h"
 
@@ -17,6 +19,7 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
+#include "absl/strings/str_cat.h"
 #include "quiche/quic/core/crypto/quic_client_session_cache.h"
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
 
@@ -85,6 +88,9 @@ protected:
 
     test_address_ = *Network::Utility::resolveUrl(absl::StrCat(
         "tcp://", Network::Test::getLoopbackAddressUrlString(GetParam()), ":", PEER_PORT));
+    local_address_ = *Network::Utility::resolveUrl(
+        absl::StrCat("tcp://", Network::Test::getLoopbackAddressUrlString(GetParam()), ":0"));
+    peer_socket_ = std::make_unique<Network::UdpListenSocket>(test_address_, nullptr, true);
     Ssl::ClientContextSharedPtr context{new Ssl::MockClientContext()};
     EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
         .WillOnce(Return(context));
@@ -108,6 +114,8 @@ protected:
   NiceMock<Random::MockRandomGenerator> random_;
   Upstream::ClusterConnectivityState state_;
   Network::Address::InstanceConstSharedPtr test_address_;
+  Network::Address::InstanceConstSharedPtr local_address_;
+  Network::UdpListenSocketPtr peer_socket_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
@@ -124,8 +132,8 @@ TEST_P(QuicNetworkConnectionTest, BufferLimits) {
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
-      dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(), nullptr,
-      nullptr, connection_id_generator_, *factory_);
+      dispatcher_, test_address_, local_address_, quic_stat_names_, {}, *store_.rootScope(),
+      nullptr, nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   session->Initialize();
   client_connection->connect();
@@ -149,8 +157,8 @@ TEST_P(QuicNetworkConnectionTest, QuicheHandlesMigrationOfIdleSessions) {
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
-      dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(), nullptr,
-      nullptr, connection_id_generator_, *factory_);
+      dispatcher_, test_address_, local_address_, quic_stat_names_, {}, *store_.rootScope(),
+      nullptr, nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   session->Initialize();
   client_connection->connect();
@@ -185,8 +193,8 @@ TEST_P(QuicNetworkConnectionTest, QuicheHandlesMigration) {
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
-      dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(), nullptr,
-      nullptr, connection_id_generator_, *factory_);
+      dispatcher_, test_address_, local_address_, quic_stat_names_, {}, *store_.rootScope(),
+      nullptr, nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   session->Initialize();
   client_connection->connect();
@@ -224,7 +232,7 @@ TEST_P(QuicNetworkConnectionTest, SocketOptions) {
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
-      dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(),
+      dispatcher_, test_address_, local_address_, quic_stat_names_, {}, *store_.rootScope(),
       socket_options, nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   session->Initialize();
@@ -244,7 +252,7 @@ TEST_P(QuicNetworkConnectionTest, PreBindSocketOptionsFailure) {
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
-      dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(),
+      dispatcher_, test_address_, local_address_, quic_stat_names_, {}, *store_.rootScope(),
       socket_options, nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   session->Initialize();
@@ -266,7 +274,7 @@ TEST_P(QuicNetworkConnectionTest, PostBindSocketOptionsFailure) {
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
-      dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(),
+      dispatcher_, test_address_, local_address_, quic_stat_names_, {}, *store_.rootScope(),
       socket_options, nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   session->Initialize();
@@ -277,15 +285,11 @@ TEST_P(QuicNetworkConnectionTest, PostBindSocketOptionsFailure) {
 
 TEST_P(QuicNetworkConnectionTest, LocalAddress) {
   initialize();
-  Network::Address::InstanceConstSharedPtr local_addr =
-      (GetParam() == Network::Address::IpVersion::v6)
-          ? Network::Utility::getIpv6LoopbackAddress()
-          : Network::Utility::getCanonicalIpv4LoopbackAddress();
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
-      dispatcher_, test_address_, local_addr, quic_stat_names_, {}, *store_.rootScope(), nullptr,
-      nullptr, connection_id_generator_, *factory_);
+      dispatcher_, test_address_, local_address_, quic_stat_names_, {}, *store_.rootScope(),
+      nullptr, nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   session->Initialize();
   client_connection->connect();
@@ -317,8 +321,8 @@ TEST_P(QuicNetworkConnectionTest, GetV6OnlySocketOptionFailure) {
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
-      dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(), nullptr,
-      nullptr, connection_id_generator_, *factory_);
+      dispatcher_, test_address_, local_address_, quic_stat_names_, {}, *store_.rootScope(),
+      nullptr, nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   session->Initialize();
   client_connection->connect();
@@ -338,7 +342,7 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
-      dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, *store_.rootScope(),
+      dispatcher_, test_address_, local_address_, quic_stat_names_, rtt_cache, *store_.rootScope(),
       nullptr, nullptr, connection_id_generator_, *factory_);
 
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());

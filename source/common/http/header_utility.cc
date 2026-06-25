@@ -37,16 +37,47 @@ using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues
 
 bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
                                  const std::vector<HeaderDataPtr>& config_headers) {
-  // No headers to match is considered a match.
-  if (!config_headers.empty()) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.match_headers_individually")) {
     for (const HeaderDataPtr& cfg_header_data : config_headers) {
       if (!cfg_header_data->matchesHeaders(request_headers)) {
         return false;
       }
     }
+    return true;
   }
-
+  for (const HeaderDataPtr& cfg_header_data : config_headers) {
+    if (!cfg_header_data->matchesHeadersIndividually(request_headers)) {
+      return false;
+    }
+  }
   return true;
+}
+
+template <typename PointerType>
+static bool matchAnyHeaderImpl(const HeaderMap& request_headers,
+                               const std::vector<PointerType>& config_headers) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.match_headers_individually")) {
+    for (const PointerType& cfg_header_data : config_headers) {
+      if (cfg_header_data->matchesHeaders(request_headers)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  for (const PointerType& cfg_header_data : config_headers) {
+    if (cfg_header_data->matchesHeadersIndividually(request_headers)) {
+      return true;
+    }
+  }
+  return false;
+}
+bool HeaderUtility::matchAnyHeader(const HeaderMap& request_headers,
+                                   const std::vector<HeaderDataPtr>& config_headers) {
+  return matchAnyHeaderImpl(request_headers, config_headers);
+}
+bool HeaderUtility::matchAnyHeader(const HeaderMap& request_headers,
+                                   const std::vector<HeaderMatcherSharedPtr>& config_headers) {
+  return matchAnyHeaderImpl(request_headers, config_headers);
 }
 
 HeaderUtility::GetAllOfHeaderAsStringResult

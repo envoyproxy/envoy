@@ -10,6 +10,8 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
 
+#include "openssl/mem.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -114,7 +116,12 @@ bool BasicAuthFilter::validateUser(const UserMap& users, absl::string_view usern
     return false;
   }
 
-  return computeSHA1(password) == user->second.hash;
+  const std::string computed = computeSHA1(password);
+  const std::string& expected = user->second.hash;
+  if (computed.length() != expected.length()) {
+    return false;
+  }
+  return CRYPTO_memcmp(computed.data(), expected.data(), computed.length()) == 0;
 }
 
 void BasicAuthFilter::setDynamicMetadata(absl::string_view username) {

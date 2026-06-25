@@ -12,7 +12,8 @@ namespace Thread {
 
 class ThreadHandle {
 public:
-  ThreadHandle(std::function<void()> thread_routine, absl::optional<int> thread_priority);
+  ThreadHandle(std::function<void()> thread_routine, absl::optional<int> thread_priority,
+               absl::optional<uint32_t> thread_cpu_affinity);
 
   /** Returns the thread routine. */
   std::function<void()>& routine();
@@ -20,12 +21,16 @@ public:
   /** Returns the thread priority, if any. */
   absl::optional<int> priority() const;
 
+  /** Returns the CPU to pin the thread to, if any. */
+  absl::optional<uint32_t> cpuAffinity() const;
+
   /** Returns the thread handle. */
   pthread_t& handle();
 
 private:
   std::function<void()> thread_routine_;
   const absl::optional<int> thread_priority_;
+  const absl::optional<uint32_t> thread_cpu_affinity_;
   pthread_t thread_handle_;
 };
 

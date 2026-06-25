@@ -92,8 +92,9 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
   if (!status.ok()) {
     return status;
   }
-  const auto& secret = dynamic_cast<const envoy::extensions::transport_sockets::tls::v3::Secret&>(
-      resources[0].get().resource());
+  const auto& secret =
+      Envoy::Protobuf::DynamicCastMessage<envoy::extensions::transport_sockets::tls::v3::Secret>(
+          resources[0].get().resource());
 
   if (secret.name() != sds_config_name_) {
     const auto msg =

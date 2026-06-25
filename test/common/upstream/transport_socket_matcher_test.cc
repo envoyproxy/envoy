@@ -75,7 +75,7 @@ public:
   absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message& proto,
                                Server::Configuration::TransportSocketFactoryContext&) override {
-    const auto& node = dynamic_cast<const envoy::config::core::v3::Node&>(proto);
+    const auto& node = Envoy::Protobuf::DynamicCastMessage<envoy::config::core::v3::Node>(proto);
     std::string id = "default-foo";
     if (!node.id().empty()) {
       id = node.id();
