@@ -1395,6 +1395,49 @@ TEST_F(McpJsonRestBridgeStreamingFilterTest, ErrorResponseSetsIsErrorTrue) {
           R"json({"id":123,"jsonrpc":"2.0","result":{"content":[{"text":"Internal Server Error","type":"text"}],"isError":true}})json"));
 }
 
+TEST_F(McpJsonRestBridgeStreamingFilterTest, TrailersAppendSuffix) {
+  sendToolsCallRequest();
+
+  response_headers_ = {{":status", "200"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::Continue);
+
+  Buffer::OwnedImpl chunk("hello");
+  EXPECT_EQ(filter_->encodeData(chunk, /*end_stream=*/false), Http::FilterDataStatus::Continue);
+  // First chunk should have prefix.
+  EXPECT_THAT(chunk.toString(), testing::StartsWith("{\"id\":"));
+
+  // Simulate trailers arriving without end_stream on data.
+  Http::TestResponseTrailerMapImpl response_trailers;
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce([&](Buffer::Instance& data, bool) {
+        // Verify the suffix is injected.
+        EXPECT_THAT(data.toString(), StrEq(R"(","type":"text"}],"isError":false}})"));
+      });
+
+  EXPECT_EQ(filter_->encodeTrailers(response_trailers), Http::FilterTrailersStatus::Continue);
+}
+
+TEST_F(McpJsonRestBridgeStreamingFilterTest, TrailersEmptyBodyEmitsPrefixAndSuffix) {
+  sendToolsCallRequest();
+
+  response_headers_ = {{":status", "200"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::Continue);
+
+  // No data chunks arrive. Trailers arrive.
+  Http::TestResponseTrailerMapImpl response_trailers;
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false)).WillOnce([&](Buffer::Instance& data, bool) {
+    // Verify both prefix and suffix are injected to form a valid envelope.
+    EXPECT_EQ(
+        nlohmann::json::parse(data.toString()),
+        nlohmann::json::parse(
+            R"json({"id":123,"jsonrpc":"2.0","result":{"content":[{"text":"","type":"text"}],"isError":false}})json"));
+  });
+
+  EXPECT_EQ(filter_->encodeTrailers(response_trailers), Http::FilterTrailersStatus::Continue);
+}
+
 TEST_F(McpJsonRestBridgeFilterTest, TraceContextExtractionDisabled) {
   request_headers_ = {{":method", "POST"},
                       {":path", "/mcp"},
@@ -2069,8 +2112,65 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListPerRouteConfigOverridesStaticConfig
   EXPECT_THAT(request_headers_.getMethodValue(), StrEq("GET"));
 }
 
-TEST_F(McpJsonRestBridgeFilterTest, EncodeTrailersReturnsContinue) {
+TEST_F(McpJsonRestBridgeFilterTest, EncodeTrailersWithBufferedBodyToolsList) {
+  // Simulate a tools/list request to set state.
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  filter_->decodeHeaders(request_headers_, /*end_stream=*/false);
+  Buffer::OwnedImpl request_body(R"json({"jsonrpc":"2.0","id":12,"method":"tools/list"})json");
+  filter_->decodeData(request_body, /*end_stream=*/true);
+
+  // Simulate response headers arriving without end_stream.
+  response_headers_ = {{":status", "200"}, {"content-type", "application/json"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  // Simulate body chunks arriving without end_stream.
+  Buffer::OwnedImpl body_chunk("{\"tools\":[]}");
+  EXPECT_EQ(filter_->encodeData(body_chunk, /*end_stream=*/false),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+
+  // Simulate trailers arriving, which should trigger transcoding and injection.
   Http::TestResponseTrailerMapImpl response_trailers;
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce([&](Buffer::Instance& data, bool) {
+        // Verify the injected data is the transcoded JSON-RPC response.
+        EXPECT_EQ(
+            nlohmann::json::parse(data.toString()),
+            nlohmann::json::parse(R"json({"id":12,"jsonrpc":"2.0","result":{"tools":[]}})json"));
+      });
+
+  EXPECT_EQ(filter_->encodeTrailers(response_trailers), Http::FilterTrailersStatus::Continue);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, EncodeTrailersWithBufferedBodyToolsCall) {
+  // Simulate a tools/call request to set state.
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  filter_->decodeHeaders(request_headers_, /*end_stream=*/false);
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":345,"method":"tools/call","params":{"name":"get_api_key"}})json");
+  filter_->decodeData(request_body, /*end_stream=*/true);
+
+  // Simulate response headers arriving without end_stream.
+  response_headers_ = {{":status", "200"}, {"content-type", "application/json"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  // Simulate body chunks arriving without end_stream.
+  Buffer::OwnedImpl body_chunk(R"({"key":"value"})");
+  EXPECT_EQ(filter_->encodeData(body_chunk, /*end_stream=*/false),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+
+  // Simulate trailers arriving, which should trigger transcoding and injection.
+  Http::TestResponseTrailerMapImpl response_trailers;
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false)).WillOnce([&](Buffer::Instance& data, bool) {
+    // Verify the injected data is the transcoded JSON-RPC response.
+    EXPECT_EQ(
+        nlohmann::json::parse(data.toString()),
+        nlohmann::json::parse(
+            R"json({"id":345,"jsonrpc":"2.0","result":{"content":[{"text":"{\"key\":\"value\"}","type":"text"}],"isError":false}})json"));
+  });
+
   EXPECT_EQ(filter_->encodeTrailers(response_trailers), Http::FilterTrailersStatus::Continue);
 }
 
