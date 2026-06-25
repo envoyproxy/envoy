@@ -297,12 +297,14 @@ public:
     return CgroupCpuUtil::accessCgroupV2Files(cgroup_info, fs);
   }
 
-  static std::optional<double> readActualLimitsV1(const CpuFiles& cpu_files) {
-    return CgroupCpuUtil::readActualLimitsV1(cpu_files);
+  static std::optional<double> readActualLimitsV1(const CpuFiles& cpu_files,
+                                                  CgroupDetectionDiagnostic* diag = nullptr) {
+    return CgroupCpuUtil::readActualLimitsV1(cpu_files, diag);
   }
 
-  static std::optional<double> readActualLimitsV2(const CpuFiles& cpu_files) {
-    return CgroupCpuUtil::readActualLimitsV2(cpu_files);
+  static std::optional<double> readActualLimitsV2(const CpuFiles& cpu_files,
+                                                  CgroupDetectionDiagnostic* diag = nullptr) {
+    return CgroupCpuUtil::readActualLimitsV2(cpu_files, diag);
   }
 };
 

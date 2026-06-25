@@ -17,7 +17,7 @@
 
 namespace Envoy {
 namespace {
-// Sets *diag when the caller passed one.
+// Sets `*diag` when the caller passed one.
 void setReason(CgroupDetectionDiagnostic* diag, absl::string_view message, bool is_error = false) {
   if (diag != nullptr) {
     diag->message = std::string(message);
