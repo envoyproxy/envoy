@@ -31,8 +31,8 @@ namespace {
 
 struct CompressedCertCache {
   absl::Mutex mu;
-  absl::flat_hash_map<std::pair<uint16_t, std::string>, std::string> compressed_by_alg_and_chain
-      ABSL_GUARDED_BY(mu);
+  absl::flat_hash_map<std::pair<uint16_t, std::string>, std::string>
+      compressed_by_alg_and_chain ABSL_GUARDED_BY(mu);
 };
 
 void freeCompressedCertCache(void*, void* ptr, CRYPTO_EX_DATA*, int, long, void*) {
@@ -74,8 +74,7 @@ int compressCached(SSL* ssl, uint16_t alg,
       SSL_CTX_get_ex_data(SSL_get_SSL_CTX(ssl), sslCtxCacheIndex()));
   ASSERT(cache != nullptr);
 
-  std::pair<uint16_t, std::string> key(alg,
-                                       std::string(reinterpret_cast<const char*>(in), in_len));
+  std::pair<uint16_t, std::string> key(alg, std::string(reinterpret_cast<const char*>(in), in_len));
 
   {
     absl::ReaderMutexLock lock(&cache->mu);
@@ -90,8 +89,8 @@ int compressCached(SSL* ssl, uint16_t alg,
     return CertCompression::FAILURE;
   }
   absl::WriterMutexLock lock(&cache->mu);
-  auto it = cache->compressed_by_alg_and_chain.try_emplace(std::move(key), std::move(*compressed))
-                .first;
+  auto it =
+      cache->compressed_by_alg_and_chain.try_emplace(std::move(key), std::move(*compressed)).first;
   return writeToCbb(out, it->second);
 }
 

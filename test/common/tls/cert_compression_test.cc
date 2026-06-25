@@ -237,9 +237,9 @@ TEST(CertCompressionBrotliTest, DistinctChainsDoNotCollide) {
   auto roundtrip = [](const std::string& compressed, size_t uncompressed_len) {
     CRYPTO_BUFFER* out = nullptr;
     EXPECT_EQ(CertCompression::SUCCESS,
-              CertCompression::decompressBrotli(
-                  nullptr, &out, uncompressed_len,
-                  reinterpret_cast<const uint8_t*>(compressed.data()), compressed.size()));
+              CertCompression::decompressBrotli(nullptr, &out, uncompressed_len,
+                                                reinterpret_cast<const uint8_t*>(compressed.data()),
+                                                compressed.size()));
     bssl::UniquePtr<CRYPTO_BUFFER> out_ptr(out);
     return std::string(reinterpret_cast<const char*>(CRYPTO_BUFFER_data(out)),
                        CRYPTO_BUFFER_len(out));
@@ -394,8 +394,8 @@ TEST(CertCompressionMatrixTest, CorrectCertPerAlgorithmAcrossHandshakes) {
       for (int i = 0; i < 2; i++) {
         bssl::UniquePtr<X509> served =
             handshakeAndGetServerCert(client_ctx.get(), server_ctx.get());
-        ASSERT_NE(served, nullptr) << "handshake failed: cert=" << cert.name
-                                   << " alg=" << alg.name << " iter=" << i;
+        ASSERT_NE(served, nullptr)
+            << "handshake failed: cert=" << cert.name << " alg=" << alg.name << " iter=" << i;
         EXPECT_EQ(0, X509_cmp(served.get(), cert.cert.get()))
             << "wrong certificate served: cert=" << cert.name << " alg=" << alg.name
             << " iter=" << i;
