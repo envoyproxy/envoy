@@ -18,7 +18,6 @@
 #include "test/extensions/filters/network/common/redis/test_utils.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/api/mocks.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster.h"
 #include "test/mocks/upstream/cluster_manager.h"

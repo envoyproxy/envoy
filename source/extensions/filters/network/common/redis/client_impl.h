@@ -261,6 +261,13 @@ private:
   void replayHeldUserRequests();
   void failHeldUserRequests();
   void removeHeldUserRequest(HeldUserRequest* held);
+  // True while any request-related work is outstanding: either an upstream request is in
+  // flight (including init requests such as HELLO/AUTH/READONLY in pending_requests_) or
+  // user requests are queued during init (held_user_requests_). Drives whether the
+  // post-connect op timeout should be armed.
+  bool hasOutstandingWork() const {
+    return !pending_requests_.empty() || !held_user_requests_.empty();
+  }
   void sendResp3InitCommands(const std::string& auth_username, const std::string& auth_password);
   void sendReadonlyInit();
   void onInitStepSuccess(InitState completed_step);

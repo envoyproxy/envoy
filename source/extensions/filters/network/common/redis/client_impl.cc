@@ -236,11 +236,20 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   // init command on the wire. queue_enabled_ blocks flush only, not append, so it cannot
   // substitute for this gate.
   if (isUserTrafficGated(init_state_)) {
+    // Capture idle state before the push: only the idle->work transition starts the op clock,
+    // so later held requests do not reset the deadline (mirrors the first-pending-request rule
+    // in makeRequestInternal).
+    const bool was_idle = !hasOutstandingWork();
     auto held = std::make_unique<HeldUserRequest>(*this, callbacks);
     held->request_ = std::make_unique<RespValue>(request);
     auto* raw = held.get();
     held_user_requests_.push_back(std::move(held));
     raw->self_iter_ = std::prev(held_user_requests_.end());
+    // Pre-connect the connect timeout governs; once connected this held request is the first
+    // outstanding work, so start the op timer.
+    if (connected_ && was_idle) {
+      connect_or_op_timer_->enableTimer(config_->opTimeout());
+    }
     return raw;
   }
   return makeRequestInternal(request, callbacks);
@@ -348,11 +357,14 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
     connect_or_op_timer_->disableTimer();
   } else if (event == Network::ConnectionEvent::Connected) {
     connected_ = true;
-    // IAM token acquisition can leave init with no pending request until the token arrives, so
-    // only arm the op timer when there is an in-flight request to time; otherwise leave it for
-    // the request that follows.
-    if (!pending_requests_.empty()) {
+    // TCP connect can complete while AWS IAM credentials are still pending: there may be held
+    // user requests but no pending upstream request yet. Once connected, this timer is the op
+    // timer — bound any outstanding (held or pending) work with the op timeout, and disable it
+    // when there is none so the connect timeout cannot fire after connect.
+    if (hasOutstandingWork()) {
       connect_or_op_timer_->enableTimer(config_->opTimeout());
+    } else {
+      connect_or_op_timer_->disableTimer();
     }
   }
 
@@ -643,7 +655,13 @@ void ClientImpl::HeldUserRequest::cancel() {
   // increment lives here because no canceled-branch fires for a request that never reached
   // pending_requests_.
   parent_.host_->cluster().trafficStats()->upstream_rq_cancelled_.inc();
-  parent_.removeHeldUserRequest(this); // self-destructs; do NOT touch *this after.
+  // removeHeldUserRequest destroys *this; only the saved parent reference may be used after
+  // this line. Disable the now-idle op timer so the connected-but-no-work state stays clean.
+  ClientImpl& parent = parent_;
+  parent.removeHeldUserRequest(this);
+  if (parent.connected_ && !parent.hasOutstandingWork()) {
+    parent.connect_or_op_timer_->disableTimer();
+  }
 }
 
 void ClientImpl::HeldUserRequest::onCancelComplete() {

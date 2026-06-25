@@ -1864,6 +1864,174 @@ TEST_F(RedisClientImplTest, Resp3AwsIamPendingTokenHoldsUserRequestUntilHello) {
   EXPECT_EQ(1UL, hello3_failure_counter_->value());
 }
 
+// Timer state machine — AWS IAM pending token, request held before connect. On connect there
+// is a held user request but no pending upstream request; the op timer must arm with the op
+// timeout. Pre-fix this connect transition was a no-op when pending_requests_ was empty,
+// leaving the connect timer stale while connected_ == true.
+TEST_F(RedisClientImplTest, Resp3AwsIamPendingTokenHeldRequestArmsOpTimerOnConnect) {
+  // A held request is never encoded; keep this negative expectation out of the InSequence below.
+  Common::Redis::RespValue user_request;
+  MockClientCallbacks user_callbacks;
+  EXPECT_CALL(*encoder_, encode(Ref(user_request), _)).Times(0);
+
+  InSequence s;
+  enableResp3();
+  enableAwsIam();
+  setup();
+
+  EXPECT_CALL(
+      *mock_aws_iam_authenticator_,
+      addCallbackIfCredentialsPending(An<Extensions::Common::Aws::CredentialsPendingCallback&&>()))
+      .WillOnce(Return(true));
+  client_->initialize("alice", "");
+
+  // Held while the token is pending: pending_requests_ stays empty, held_user_requests_ has one.
+  PoolRequest* held = client_->makeRequest(user_request, user_callbacks);
+  ASSERT_NE(nullptr, held);
+
+  // Connect: hasOutstandingWork() is true via the held request, so the op timer arms. Matching
+  // the exact op timeout proves the connect -> op transition, not a leftover connect timer.
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(config_->opTimeout(), _));
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(user_callbacks, onFailure());
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+// Timer state machine — AWS IAM pending token, no held request. On connect there is no
+// outstanding work, so the stale connect timer must be disabled. Pre-fix it was left armed and
+// would fire as a spurious op timeout (connected_ == true) on the connect-timeout duration.
+TEST_F(RedisClientImplTest, Resp3AwsIamPendingTokenNoHeldRequestDisablesTimerOnConnect) {
+  InSequence s;
+  enableResp3();
+  enableAwsIam();
+  setup();
+
+  EXPECT_CALL(
+      *mock_aws_iam_authenticator_,
+      addCallbackIfCredentialsPending(An<Extensions::Common::Aws::CredentialsPendingCallback&&>()))
+      .WillOnce(Return(true));
+  client_->initialize("alice", "");
+
+  // Connect with nothing outstanding: the timer is disabled.
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+// Timer state machine — a user request held AFTER connect (token still pending) must start the
+// op timer via the gated makeRequest path (idle -> work transition while connected_).
+TEST_F(RedisClientImplTest, Resp3AwsIamPendingTokenHeldRequestAddedAfterConnectArmsOpTimer) {
+  Common::Redis::RespValue user_request;
+  MockClientCallbacks user_callbacks;
+  EXPECT_CALL(*encoder_, encode(Ref(user_request), _)).Times(0);
+
+  InSequence s;
+  enableResp3();
+  enableAwsIam();
+  setup();
+
+  EXPECT_CALL(
+      *mock_aws_iam_authenticator_,
+      addCallbackIfCredentialsPending(An<Extensions::Common::Aws::CredentialsPendingCallback&&>()))
+      .WillOnce(Return(true));
+  client_->initialize("alice", "");
+
+  // Connect first with no work: timer disabled.
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Now a user request arrives while still gated: held (not encoded) and the op timer arms.
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(config_->opTimeout(), _));
+  PoolRequest* held = client_->makeRequest(user_request, user_callbacks);
+  ASSERT_NE(nullptr, held);
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(user_callbacks, onFailure());
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+// Timer state machine — cancelling the last held request while connected returns the client to
+// the no-work state, so the op timer is disabled. disableTimer() also fires again at close;
+// both are expected and ordered (do not pin Times(1)).
+TEST_F(RedisClientImplTest, Resp3AwsIamPendingTokenHeldRequestCancelDisablesTimerWhenNoWork) {
+  Common::Redis::RespValue user_request;
+  MockClientCallbacks user_callbacks;
+  EXPECT_CALL(*encoder_, encode(Ref(user_request), _)).Times(0);
+
+  InSequence s;
+  enableResp3();
+  enableAwsIam();
+  setup();
+
+  EXPECT_CALL(
+      *mock_aws_iam_authenticator_,
+      addCallbackIfCredentialsPending(An<Extensions::Common::Aws::CredentialsPendingCallback&&>()))
+      .WillOnce(Return(true));
+  client_->initialize("alice", "");
+
+  PoolRequest* held = client_->makeRequest(user_request, user_callbacks);
+  ASSERT_NE(nullptr, held);
+
+  // Connect with the held request outstanding: op timer armed with the op timeout.
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(config_->opTimeout(), _));
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Pre-replay cancel removes the only outstanding work → op timer disabled.
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  held->cancel();
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_cancelled_.value());
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+// Timer state machine — end-to-end regression for the original symptom. In the connected +
+// held-only state the bug left a stale connect timer that could reach the timeout path. With
+// the op timer correctly armed, firing it must fail the held request, increment the op-timeout
+// stats, and close the connection.
+TEST_F(RedisClientImplTest, Resp3AwsIamPendingTokenHeldRequestOpTimeoutFiresFailsRequest) {
+  Common::Redis::RespValue user_request;
+  MockClientCallbacks user_callbacks;
+  EXPECT_CALL(*encoder_, encode(Ref(user_request), _)).Times(0);
+
+  InSequence s;
+  enableResp3();
+  enableAwsIam();
+  setup();
+
+  EXPECT_CALL(
+      *mock_aws_iam_authenticator_,
+      addCallbackIfCredentialsPending(An<Extensions::Common::Aws::CredentialsPendingCallback&&>()))
+      .WillOnce(Return(true));
+  client_->initialize("alice", "");
+
+  PoolRequest* held = client_->makeRequest(user_request, user_callbacks);
+  ASSERT_NE(nullptr, held);
+
+  // Connect with the held request outstanding: op timer armed with the op timeout.
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(config_->opTimeout(), _));
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Fire the op timer: the held request fails, the op-timeout stat increments, the conn closes.
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(user_callbacks, onFailure());
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  connect_or_op_timer_->invokeCallback();
+
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_timeout_.value());
+  EXPECT_EQ(1UL, host_->stats_.rq_timeout_.value());
+}
+
 // AWS IAM token-fetch callback fires after ClientImpl destruction → weak_ptr guard short-
 // circuits, getAuthToken is never called. Pins against UAF.
 TEST_F(RedisClientImplTest, Resp3AwsIamCallbackAfterClientDestroyedIsNoOp) {

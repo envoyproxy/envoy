@@ -17,7 +17,6 @@
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/printers.h"
@@ -64,8 +63,6 @@ public:
   Network::MockDrainDecision drain_decision_;
   Runtime::MockLoader runtime_;
   NiceMock<Api::MockApi> api_;
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
-  NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Event::SimulatedTimeSystem time_source_;
 };
 
@@ -408,8 +405,6 @@ public:
   std::unique_ptr<ProxyFilter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Api::MockApi> api_;
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
-  NiceMock<Upstream::MockClusterManager> cluster_manager_;
   ExternalAuth::MockExternalAuthClient* external_auth_client_;
   Event::SimulatedTimeSystem time_source_;
 };
