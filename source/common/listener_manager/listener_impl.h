@@ -205,7 +205,7 @@ private:
  */
 class ListenerImpl final : public Network::ListenerConfig,
                            public Network::FilterChainFactory,
-                           public FilterChainUpdateCallbacks,
+                           public FcdsClientCallbacks,
                            Logger::Loggable<Logger::Id::config> {
 public:
   /**
@@ -344,9 +344,7 @@ public:
   }
 
   // FilterChainUpdateCallbacks
-  absl::Status
-  onFilterChainUpdate(const std::vector<Network::DrainableFilterChainSharedPtr>& added_or_updated,
-                      const std::vector<Network::DrainableFilterChainSharedPtr>& draining) override;
+  void drainFilterChain(Network::DrainableFilterChainSharedPtr draining) override;
 
   void ensureSocketOptions(Network::Socket::OptionsSharedPtr& options) {
     if (options == nullptr) {
@@ -434,6 +432,7 @@ private:
   void buildSocketOptions(const envoy::config::listener::v3::Listener& config);
   void buildOriginalDstListenerFilter(const envoy::config::listener::v3::Listener& config);
   void buildProxyProtocolListenerFilter(const envoy::config::listener::v3::Listener& config);
+  absl::Status buildFilterChainSubscriptions(const envoy::config::listener::v3::Listener& config);
   absl::Status checkIpv4CompatAddress(const Network::Address::InstanceConstSharedPtr& address,
                                       const envoy::config::core::v3::Address& proto_address);
 
@@ -448,6 +447,7 @@ private:
   const envoy::config::listener::v3::Listener& configInternal() const {
     return config_maybe_partial_filter_chains_;
   }
+  bool isQuic();
 
   ListenerManagerImpl& parent_;
   std::vector<Network::Address::InstanceConstSharedPtr> addresses_;
@@ -508,16 +508,14 @@ private:
   const std::string cx_limit_runtime_key_;
   std::shared_ptr<BasicResourceLimitImpl> open_connections_;
 
+  std::shared_ptr<FcdsSharedFilterChainManager> fcds_shared_placeholder_;
+  std::vector<FcdsSubscriptionHandlePtr> fcds_subscriptions_;
+
   // This init watcher, if workers_started_ is false, notifies the "parent" listener manager when
   // listener initialization is complete.
   // Important: local_init_watcher_ must be the last field in the class to avoid unexpected
   // watcher callback during the destroy of ListenerImpl.
   Init::WatcherImpl local_init_watcher_;
-  std::vector<std::unique_ptr<Init::TargetImpl>> fcds_targets_;
-  std::vector<FcdsSubscriptionHandlePtr> fcds_subscriptions_;
-
-  static absl::flat_hash_set<std::string>
-  getFilterChainNamesFromMatcher(const xds::type::matcher::v3::Matcher& matcher);
 
   std::shared_ptr<Server::Configuration::TransportSocketFactoryContextImpl>
       transport_factory_context_;

@@ -75,7 +75,7 @@ public:
         parent_context_.server_factory_context_, listener_component_factory_);
     parent_context_.server_factory_context_.singleton_manager_
         ->getTyped<FcdsSharedFilterChainManager>(
-            FcdsSharedFilterChainManagerName,
+            std::string(FcdsSharedFilterChainManagerName),
             [this]() -> Singleton::InstanceSharedPtr { return shared_filter_chain_manager_; });
 
     filter_chain_manager_ =
@@ -369,7 +369,6 @@ TEST_P(FilterChainManagerImplTest, DuplicateFilterChainMatchFails) {
 #endif
   );
 }
-
 
 INSTANTIATE_TEST_SUITE_P(Matcher, FilterChainManagerImplTest, ::testing::Values(true, false));
 

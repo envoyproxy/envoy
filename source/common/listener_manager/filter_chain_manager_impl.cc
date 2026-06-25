@@ -71,11 +71,11 @@ public:
                                              FilterChainActionFactoryContext& context,
                                              ProtobufMessage::ValidationVisitor&) override {
     std::shared_ptr<FcdsSharedFilterChainManager> fcds_manager =
-        context.singletonManager()
-            .getTyped<FcdsSharedFilterChainManager>(FcdsSharedFilterChainManagerName);
-    return std::make_shared<FilterChainNameAction>(
-        Envoy::Protobuf::DynamicCastMessage<Protobuf::StringValue>(config).value(),
-        std::move(fcds_manager));
+        context.server_.singletonManager().getTyped<FcdsSharedFilterChainManager>(
+            std::string(FcdsSharedFilterChainManagerName));
+    std::string name = Envoy::Protobuf::DynamicCastMessage<Protobuf::StringValue>(config).value();
+    context.names_.insert(name);
+    return std::make_shared<FilterChainNameAction>(name, std::move(fcds_manager));
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<Protobuf::StringValue>();
@@ -151,20 +151,6 @@ absl::Status FilterChainManagerImpl::addFilterChains(
   uint32_t new_filter_chain_size = 0;
   FilterChainsByName filter_chains_by_name;
 
-  const auto* origin = getOriginFilterChainManager();
-  if (origin != nullptr) {
-    for (const auto& pair : origin->filter_chains_by_name_) {
-      if (pair.second->addedViaApi()) {
-        filter_chains_by_name.insert(pair);
-      }
-    }
-    for (const auto& message_and_filter_chain : origin->fc_contexts_) {
-      if (message_and_filter_chain.second->addedViaApi()) {
-        fc_contexts_.insert(message_and_filter_chain);
-      }
-    }
-  }
-
   for (const auto& filter_chain : filter_chain_span) {
     RETURN_IF_NOT_OK(verifyNoDuplicateMatchers(filter_chain_matcher, filter_chains, *filter_chain));
 
@@ -189,6 +175,7 @@ absl::Status FilterChainManagerImpl::addFilterChains(
                                                    filter_chain_factory_builder, context_creator));
   maybeConstructMatcher(filter_chain_matcher, filter_chains_by_name, parent_context_);
 
+  const auto* origin = getOriginFilterChainManager();
   if (origin != nullptr) {
     for (const auto& message_and_filter_chain : origin->fc_contexts_) {
       if (fc_contexts_.find(message_and_filter_chain.first) == fc_contexts_.end()) {
@@ -316,13 +303,18 @@ void FilterChainManagerImpl::maybeConstructMatcher(
     const FilterChainsByName& filter_chains_by_name,
     Configuration::FactoryContext& parent_context) {
   // Construct matcher if it is present in the listener configuration.
+  // Discover FCDS filter chain names by filtering inlined names from the actions.
   if (filter_chain_matcher) {
     filter_chains_by_name_ = filter_chains_by_name;
     FilterChain::FilterChainNameActionValidationVisitor validation_visitor;
+    FilterChainActionFactoryContext action_factory_context{
+        .server_ = parent_context.serverFactoryContext()};
     Matcher::MatchTreeFactory<Network::MatchingData, FilterChainActionFactoryContext> factory(
-        parent_context.serverFactoryContext(), parent_context.serverFactoryContext(),
-        validation_visitor);
+        action_factory_context, parent_context.serverFactoryContext(), validation_visitor);
     matcher_ = factory.create(*filter_chain_matcher)();
+    absl::erase_if(action_factory_context.names_,
+                   [&](const std::string& name) { return filter_chains_by_name_.contains(name); });
+    fcds_names_ = std::move(action_factory_context.names_);
   }
 }
 
@@ -965,37 +957,6 @@ ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
   return filter_chain_res;
 }
 
-absl::StatusOr<Network::DrainableFilterChainSharedPtr>
-FcdsSharedFilterChainManager::createOrUpdateSharedFilterChain(
-    const envoy::config::listener::v3::FilterChain& config) {
-  FcdsFilterChainFactoryBuilder builder(server_context_, listener_component_factory_,
-                                        *transport_factory_context_);
-
-  auto filter_chain_or_error = builder.buildFilterChain(config, *this, true);
-  RETURN_IF_NOT_OK(filter_chain_or_error.status());
-
-  auto filter_chain = filter_chain_or_error.value();
-  std::string name(filter_chain->name());
-
-  ENVOY_LOG(debug, "FcdsSharedFilterChainManager: updating shared filter chain name={}", name);
-  tls_slot_->runOnAllThreads([name, filter_chain](OptRef<ThreadLocalState> state) {
-    if (state.has_value()) {
-      state->filter_chains_[name] = filter_chain;
-    }
-  });
-
-  return filter_chain;
-}
-
-void FcdsSharedFilterChainManager::removeSharedFilterChain(const std::string& name) {
-  ENVOY_LOG(debug, "FcdsSharedFilterChainManager: removing shared filter chain name={}", name);
-  tls_slot_->runOnAllThreads([name](OptRef<ThreadLocalState> state) {
-    if (state.has_value()) {
-      state->filter_chains_.erase(name);
-    }
-  });
-}
-
 const Network::FilterChain*
 FcdsSharedFilterChainManager::findThreadLocalFilterChain(const std::string& name) const {
   auto state = tls_slot_->get();
@@ -1004,15 +965,6 @@ FcdsSharedFilterChainManager::findThreadLocalFilterChain(const std::string& name
     if (iter != state->filter_chains_.end()) {
       return iter->second.get();
     }
-  }
-  return nullptr;
-}
-
-Network::DrainableFilterChainSharedPtr
-FcdsSharedFilterChainManager::findSharedFilterChain(const std::string& name) const {
-  auto iter = name_to_subscription_.find(name);
-  if (iter != name_to_subscription_.end()) {
-    return iter->second->filterChain();
   }
   return nullptr;
 }
@@ -1027,76 +979,151 @@ FcdsSharedFilterChainManager::FcdsSharedFilterChainManager(
               server_context,
               server_context.messageValidationContext().dynamicValidationVisitor())),
       scope_(server_context_.scope().createScope("filter_chain_manager.")) {
-  tls_slot_->set([](Event::Dispatcher&) {
-    return std::make_shared<ThreadLocalState>();
-  });
+  tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalState>(); });
 }
-
-FcdsSharedFilterChainManager::~FcdsSharedFilterChainManager() = default;
 
 Configuration::FilterChainFactoryContextPtr
 FcdsSharedFilterChainManager::createFilterChainFactoryContext(
     const ::envoy::config::listener::v3::FilterChain* const filter_chain) {
-  UNREFERENCED_PARAMETER(filter_chain);
-  return std::make_unique<FcdsFilterChainFactoryContextImpl>(server_context_);
+  ASSERT(filter_chain != nullptr);
+  auto context =
+      std::make_unique<FcdsFilterChainFactoryContextImpl>(server_context_, *filter_chain);
+  last_created_context_ = context.get();
+  return context;
 }
 
 class FcdsSubscriptionHandleImpl : public FcdsSubscriptionHandle {
 public:
   FcdsSubscriptionHandleImpl(std::shared_ptr<FcdsSharedFilterChainManager> shared_manager,
-                             const envoy::config::listener::v3::Listener::FcdsConfig& fcds_config,
-                             const std::string& filter_chain_name,
-                             FilterChainUpdateCallbacks& callbacks)
-      : shared_manager_(std::move(shared_manager)), fcds_config_(fcds_config),
-        filter_chain_name_(filter_chain_name), callbacks_(callbacks) {}
+                             const std::string& filter_chain_name, FcdsClientCallbacks& callbacks)
+      : shared_manager_(std::move(shared_manager)), filter_chain_name_(filter_chain_name),
+        callbacks_(callbacks) {}
 
   ~FcdsSubscriptionHandleImpl() override {
-    shared_manager_->unsubscribe(fcds_config_, filter_chain_name_, callbacks_);
+    shared_manager_->unsubscribe(filter_chain_name_, callbacks_);
   }
 
 private:
   const std::shared_ptr<FcdsSharedFilterChainManager> shared_manager_;
-  const envoy::config::listener::v3::Listener::FcdsConfig fcds_config_;
   const std::string filter_chain_name_;
-  FilterChainUpdateCallbacks& callbacks_;
+  FcdsClientCallbacks& callbacks_;
 };
 
-absl::StatusOr<FcdsSubscriptionHandlePtr> FcdsSharedFilterChainManager::subscribe(
-    const envoy::config::listener::v3::Listener::FcdsConfig& fcds_config,
-    const std::string& filter_chain_name, FilterChainUpdateCallbacks& callbacks,
-    Init::TargetImpl& init_target) {
-  const uint64_t config_hash = MessageUtil::hash(fcds_config);
-  const SubscriptionKey key{config_hash, filter_chain_name};
-  auto iter = subscriptions_.find(key);
+absl::StatusOr<FcdsSubscriptionHandlePtr>
+FcdsSharedFilterChainManager::subscribe(const envoy::config::core::v3::ConfigSource& config_source,
+                                        const std::string& filter_chain_name,
+                                        FcdsClientCallbacks& callbacks,
+                                        Init::Manager& init_manager) {
+  auto iter = subscriptions_.find(filter_chain_name);
+  // Assume config_source is the same for the same filter chain name. This would be the case for
+  // xdstp names.
   if (iter == subscriptions_.end()) {
     absl::Status creation_status;
     auto api = std::make_unique<FcdsApiImpl>(
-        fcds_config.config_source(), filter_chain_name, *this, server_context_.clusterManager(),
-        *scope_,
-        server_context_.messageValidationContext().dynamicValidationVisitor(),
-        creation_status);
+        config_source, filter_chain_name, *this, server_context_.clusterManager(), *scope_,
+        server_context_.messageValidationContext().dynamicValidationVisitor(), creation_status);
     RETURN_IF_NOT_OK(creation_status);
-    iter = subscriptions_.emplace(key, std::move(api)).first;
+    auto state = std::make_unique<SubscriptionState>();
+    state->api_ = std::move(api);
+    iter = subscriptions_.emplace(filter_chain_name, std::move(state)).first;
   }
-
-  name_to_subscription_[filter_chain_name] = iter->second.get();
-  RETURN_IF_NOT_OK(iter->second->subscribeClient(callbacks, init_target));
-  return std::make_unique<FcdsSubscriptionHandleImpl>(shared_from_this(), fcds_config, filter_chain_name, callbacks);
+  SubscriptionState& state = *iter->second;
+  state.callbacks_.insert(&callbacks);
+  init_manager.add(state.api_->initTarget());
+  return std::make_unique<FcdsSubscriptionHandleImpl>(shared_from_this(), filter_chain_name,
+                                                      callbacks);
 }
 
-void FcdsSharedFilterChainManager::unsubscribe(
-    const envoy::config::listener::v3::Listener::FcdsConfig& fcds_config,
-    const std::string& filter_chain_name, FilterChainUpdateCallbacks& callbacks) {
-  const uint64_t config_hash = MessageUtil::hash(fcds_config);
-  const SubscriptionKey key{config_hash, filter_chain_name};
-  auto iter = subscriptions_.find(key);
+void FcdsSharedFilterChainManager::unsubscribe(const std::string& filter_chain_name,
+                                               FcdsClientCallbacks& callbacks) {
+  auto iter = subscriptions_.find(filter_chain_name);
   if (iter != subscriptions_.end()) {
-    iter->second->unsubscribeClient(callbacks);
-    if (!iter->second->hasClients()) {
-      name_to_subscription_.erase(filter_chain_name);
+    SubscriptionState& state = *iter->second;
+    state.callbacks_.erase(&callbacks);
+    if (state.callbacks_.empty()) {
       subscriptions_.erase(iter);
     }
   }
+}
+
+absl::Status FcdsSharedFilterChainManager::onFilterChainUpdated(const FilterChainProto& proto) {
+  auto state_iter = subscriptions_.find(proto.name());
+  if (state_iter == subscriptions_.end()) {
+    return absl::NotFoundError(
+        fmt::format("no subscription found for filter chain {}", proto.name()));
+  }
+  SubscriptionState& state = *state_iter->second;
+  ListenerFilterChainFactoryBuilder builder(false, server_context_.messageValidationVisitor(),
+                                            listener_component_factory_,
+                                            *transport_factory_context_);
+  last_created_context_ = nullptr;
+  auto filter_chain_or_error = builder.buildFilterChain(proto, *this, true);
+  RETURN_IF_NOT_OK(filter_chain_or_error.status());
+  Network::DrainableFilterChainSharedPtr filter_chain = std::move(filter_chain_or_error).value();
+
+  FcdsFilterChainFactoryContextImpl* context = last_created_context_;
+  ASSERT(context != nullptr);
+
+  state.warming_filter_chain_ = filter_chain;
+  const std::string filter_chain_name = proto.name();
+  context->initManager().initialize(
+      Init::WatcherImpl(fmt::format("FCDS warming watcher {}", filter_chain_name),
+                        [this, filter_chain_name, filter_chain]() {
+                          onFilterChainWarmed(filter_chain_name, filter_chain);
+                        }));
+  return absl::OkStatus();
+}
+
+void FcdsSharedFilterChainManager::onFilterChainWarmed(
+    const std::string& filter_chain_name, Network::DrainableFilterChainSharedPtr filter_chain) {
+  auto iter = subscriptions_.find(filter_chain_name);
+  if (iter == subscriptions_.end()) {
+    return;
+  }
+  SubscriptionState& state = *iter->second;
+  if (state.warming_filter_chain_ != filter_chain) {
+    return;
+  }
+
+  Network::DrainableFilterChainSharedPtr draining = state.api_->filterChain();
+  ENVOY_LOG(debug, "FCDS: updating shared filter chain name={}", filter_chain->name());
+
+  state.api_->setFilterChain(std::move(filter_chain));
+  updateTlsState();
+
+  if (draining) {
+    for (auto* callback : state.callbacks_) {
+      callback->drainFilterChain(draining);
+    }
+  }
+  state.warming_filter_chain_ = nullptr;
+}
+
+void FcdsSharedFilterChainManager::onFilterChainRemoved(
+    Network::DrainableFilterChainSharedPtr&& draining) {
+  auto state_iter = subscriptions_.find(draining->name());
+  if (state_iter == subscriptions_.end()) {
+    return;
+  }
+  SubscriptionState& state = *state_iter->second;
+  ENVOY_LOG(debug, "FCDS: removing shared filter chain name={}", draining->name());
+
+  updateTlsState();
+
+  for (auto* callback : state.callbacks_) {
+    callback->drainFilterChain(draining);
+  }
+}
+
+void FcdsSharedFilterChainManager::updateTlsState() {
+  auto filter_chains = std::make_shared<ThreadLocalState>();
+  for (const auto& name_and_state : subscriptions_) {
+    auto active_chain = name_and_state.second->api_->filterChain();
+    if (active_chain != nullptr) {
+      filter_chains->filter_chains_[name_and_state.first] = active_chain;
+    }
+  }
+  tls_slot_->set([filter_chains](Event::Dispatcher&) { return filter_chains; });
 }
 
 } // namespace Server

@@ -176,14 +176,16 @@ class DrainingFilterChainsManager {
 public:
   DrainingFilterChainsManager(ListenerImplPtr&& draining_listener,
                               uint64_t workers_pending_removal);
-  DrainingFilterChainsManager(std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains,
-                              uint64_t listener_tag,
-                              uint64_t workers_pending_removal);
+  DrainingFilterChainsManager(
+      std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains,
+      uint64_t listener_tag, uint64_t workers_pending_removal);
   uint64_t getDrainingListenerTag() const { return listener_tag_; }
   const std::list<const Network::FilterChain*>& getDrainingFilterChains() const {
     return draining_filter_chains_;
   }
-  OptRef<ListenerImpl> getDrainingListener() const { return makeOptRefFromPtr(draining_listener_.get()); }
+  OptRef<ListenerImpl> getDrainingListener() const {
+    return makeOptRefFromPtr(draining_listener_.get());
+  }
   uint64_t decWorkersPendingRemoval() { return --workers_pending_removal_; }
 
   // Schedule listener destroy.
@@ -227,10 +229,6 @@ public:
 
   void onListenerWarmed(ListenerImpl& listener);
   void inPlaceFilterChainUpdate(ListenerImpl& listener);
-  void drainGroup(std::list<DrainingFilterChainsManager>::iterator draining_group);
-  void
-  drainFilterChains(ListenerImpl& listener,
-                    std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains);
 
   // Server::ListenerManager
   absl::StatusOr<bool> addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
@@ -257,6 +255,9 @@ public:
   ApiListenerOptRef apiListener() override;
   ListenerUpdateCallbacksHandlePtr
   addListenerUpdateCallbacks(ListenerUpdateCallbacks& callbacks) override;
+  void
+  drainFilterChains(ListenerImpl& listener,
+                    std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains);
 
   Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
 
@@ -337,6 +338,8 @@ private:
    */
   void drainFilterChains(ListenerImplPtr&& draining_listener, ListenerImpl& new_listener);
 
+  void drainGroup(std::list<DrainingFilterChainsManager>::iterator draining_group);
+
   /**
    * Stop a listener. The listener will stop accepting new connections and its socket will be
    * closed.
@@ -404,7 +407,6 @@ private:
   Quic::QuicStatNames& quic_stat_names_;
   absl::flat_hash_set<uint64_t> stopped_listener_tags_;
   std::list<ListenerUpdateCallbacks*> update_callbacks_;
-  std::shared_ptr<FcdsSharedFilterChainManager> fcds_shared_filter_chain_manager_;
 };
 
 class DefaultListenerManagerFactoryImpl : public ListenerManagerFactory {

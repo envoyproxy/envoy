@@ -87,8 +87,6 @@ public:
 
       // Add a dynamic filter chain reference.
       listener_config_.mutable_filter_chains()->Clear();
-      auto* dynamic_fc = listener_config_.add_filter_chains();
-      dynamic_fc->set_name("dynamic_filter_chain_1");
 
       const std::string matcher_yaml = R"EOF(
         matcher_tree:
@@ -275,8 +273,7 @@ TEST_P(ListenerFcdsIntegrationTest, BasicFcdsInPlaceUpdate) {
   sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 404)}, "2");
 
   // Wait for Envoy's local stats to increment indicating FCDS update has completed
-  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success",
-                               Eq(2));
+  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
   // Wait for the new config to take effect. Since there's no listener reconstruction,
   // we just make a new connection.
   IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort(listener_name_));
@@ -323,8 +320,7 @@ TEST_P(ListenerFcdsIntegrationTest, TwoListenersSharedFilterChain) {
   sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 404)}, "2");
 
   // Wait for Envoy's local stats to increment indicating FCDS update has completed
-  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success",
-                               Eq(2));
+  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
 
   // Verify both listeners serve HTTP 404 correctly.
   IntegrationCodecClientPtr codec_client1_updated = makeHttpConnection(lookupPort(listener_name_));
@@ -383,8 +379,7 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsFilterChainRemovalAndDraining) {
   sendFcdsResponse({}, {"dynamic_filter_chain_1"}, "2");
 
   // Wait for Envoy's local stats to increment indicating FCDS update has completed.
-  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success",
-                               Eq(2));
+  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
 
   // Check that the filter chain is now in draining state!
   test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(1));
@@ -397,7 +392,8 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsFilterChainRemovalAndDraining) {
   // Verify that the client saw the GOAWAY frame!
   EXPECT_TRUE(codec_client->sawGoAway());
 
-  // Wait for the client connection to be disconnected (which happens after GOAWAY is processed and drain timer fires).
+  // Wait for the client connection to be disconnected (which happens after GOAWAY is processed and
+  // drain timer fires).
   ASSERT_TRUE(codec_client->waitForDisconnect());
 
   // Wait for the draining filter chain count to drop to 0.
