@@ -140,6 +140,14 @@ BaseTcpProxySslIntegrationTest::ClientSslConnection::tlsSessionId() const {
   return ssl_info ? absl::make_optional<std::string>(ssl_info->sessionId()) : absl::nullopt;
 }
 
+absl::optional<std::string>
+BaseTcpProxySslIntegrationTest::ClientSslConnection::peerCertificateSha256Digest() const {
+  const Ssl::ConnectionInfoConstSharedPtr ssl_info =
+      ssl_client_->connectionInfoProvider().sslConnection();
+  return ssl_info ? absl::make_optional<std::string>(ssl_info->sha256PeerCertificateDigest())
+                  : absl::nullopt;
+}
+
 void BaseTcpProxySslIntegrationTest::setupConnections() {
   initialize();
   client_ = std::make_unique<ClientSslConnection>(*this);

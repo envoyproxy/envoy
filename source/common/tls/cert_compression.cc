@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
@@ -12,7 +13,6 @@
 #include "absl/types/optional.h"
 #include "brotli/decode.h"
 #include "brotli/encode.h"
-#include "openssl/sha.h"
 #include "openssl/tls1.h"
 
 #define ZLIB_CONST
@@ -30,21 +30,11 @@ void CertCompression::registerZlib(SSL_CTX*) {}
 
 namespace {
 
-struct CachedCompressedCert {
-  std::string compressed;
-  std::string chain_hash;
-};
-
 struct CompressedCertCache {
   absl::Mutex mu;
-  absl::flat_hash_map<uint16_t, CachedCompressedCert> by_alg ABSL_GUARDED_BY(mu);
+  absl::flat_hash_map<std::pair<uint16_t, std::string>, std::string> compressed_by_alg_and_chain
+      ABSL_GUARDED_BY(mu);
 };
-
-std::string certChainHash(const uint8_t* in, size_t in_len) {
-  std::string hash(SHA256_DIGEST_LENGTH, '\0');
-  SHA256(in, in_len, reinterpret_cast<uint8_t*>(hash.data()));
-  return hash;
-}
 
 void freeCompressedCertCache(void*, void* ptr, CRYPTO_EX_DATA*, int, long, void*) {
   delete static_cast<CompressedCertCache*>(ptr);
@@ -85,13 +75,14 @@ int compressCached(SSL* ssl, uint16_t alg,
       SSL_CTX_get_ex_data(SSL_get_SSL_CTX(ssl), sslCtxCacheIndex()));
   ASSERT(cache != nullptr);
 
+  std::pair<uint16_t, std::string> key(alg,
+                                       std::string(reinterpret_cast<const char*>(in), in_len));
+
   {
     absl::ReaderMutexLock lock(&cache->mu);
-    auto it = cache->by_alg.find(alg);
-    if (it != cache->by_alg.end()) {
-      ASSERT(certChainHash(in, in_len) == it->second.chain_hash,
-             "compressed certificate cache hit for a different certificate chain");
-      return writeToCbb(out, it->second.compressed);
+    auto it = cache->compressed_by_alg_and_chain.find(key);
+    if (it != cache->compressed_by_alg_and_chain.end()) {
+      return writeToCbb(out, it->second);
     }
   }
 
@@ -100,11 +91,9 @@ int compressCached(SSL* ssl, uint16_t alg,
     return CertCompression::FAILURE;
   }
   absl::WriterMutexLock lock(&cache->mu);
-  auto it =
-      cache->by_alg
-          .try_emplace(alg, CachedCompressedCert{std::move(*compressed), certChainHash(in, in_len)})
-          .first;
-  return writeToCbb(out, it->second.compressed);
+  auto it = cache->compressed_by_alg_and_chain.try_emplace(std::move(key), std::move(*compressed))
+                .first;
+  return writeToCbb(out, it->second);
 }
 
 absl::optional<std::string> doBrotliCompress(const uint8_t* in, size_t in_len) {

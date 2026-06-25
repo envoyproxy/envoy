@@ -13,6 +13,8 @@
 #include "envoy/service/secret/v3/sds.pb.h"
 
 #include "test/config/integration/certs/clientcert_hash.h"
+#include "test/config/integration/certs/server2cert_hash.h"
+#include "test/config/integration/certs/servercert_hash.h"
 #include "test/integration/fake_upstream.h"
 #include "test/integration/integration.h"
 #include "test/integration/ssl_utility.h"
@@ -20,6 +22,8 @@
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 
 using testing::Eq;
@@ -651,18 +655,15 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessFilterStateOverride) {
   conn.reset();
 }
 
-// Exercises the RFC 8879 compressed-certificate cache together with the on-demand
-// selector to confirm the "one certificate chain per SSL_CTX" invariant holds.
+// Exercises the RFC 8879 compressed-certificate cache together with the on-demand selector,
+// verifying the correct certificate is served as the certificate behind a name changes.
 //
-// Certificate compression is registered per SSL_CTX and caches the compressed chain
-// keyed by algorithm. The on-demand selector builds a distinct SSL_CTX per certificate
-// and switches the connection to it via SSL_set_SSL_CTX during the handshake, so each
-// cache must only ever see its own chain. The compression callback's debug-build
-// assertion (compressCached() in cert_compression.cc) verifies, on every cache hit, that
-// the cached entry's chain hash matches the chain being compressed -- so any
-// cross-contamination aborts the server in this test. Each certificate is used by two
-// sequential connections to drive the cache-hit (assertion) path, and the secret is then
-// updated to a different chain, which the selector serves from a new SSL_CTX.
+// Each certificate gets its own SSL_CTX (the on-demand selector switches to it via
+// SSL_set_SSL_CTX during the handshake) with its own compressed-cert cache, keyed by
+// (algorithm, certificate chain). Two sequential connections per certificate exercise a
+// cache miss then a cache hit; after the secret is updated to a different chain, the selector
+// serves it from a new SSL_CTX. Each connection validates that the certificate presented to
+// the client is the one currently configured -- never a stale cached chain.
 TEST_P(OnDemandIntegrationTest, CertCompressionCacheAcrossContexts) {
   if (upstream_selector_) {
     GTEST_SKIP() << "Certificate compression applies to the downstream server certificate path";
@@ -671,6 +672,14 @@ TEST_P(OnDemandIntegrationTest, CertCompressionCacheAcrossContexts) {
                                     "true");
   setup();
 
+  // sha256PeerCertificateDigest() is lowercase, separator-free hex; the cert hash headers are
+  // uppercase and colon-separated.
+  const auto normalize = [](absl::string_view hash) {
+    return absl::AsciiStrToLower(absl::StrReplaceAll(hash, {{":", ""}}));
+  };
+  const std::string server_digest = normalize(TEST_SERVER_CERT_HASH);
+  const std::string server2_digest = normalize(TEST_SERVER2_CERT_HASH);
+
   // First connection: cache miss compresses and stores the chain for "server".
   auto conn1 = createClientConnection();
   waitCertsRequested(1);
@@ -678,13 +687,14 @@ TEST_P(OnDemandIntegrationTest, CertCompressionCacheAcrossContexts) {
   auto& stream = waitSendSdsResponse("server");
   conn1->waitForUpstreamConnection();
   conn1->sendAndReceiveTlsData("hello", "world");
+  EXPECT_EQ(server_digest, conn1->peerCertificateSha256Digest().value_or(""));
   conn1.reset();
 
-  // Second connection on the same, unchanged certificate: cache hit on the same SSL_CTX,
-  // running the debug chain-hash assertion.
+  // Second connection on the same, unchanged certificate: cache hit on the same SSL_CTX.
   auto conn1b = createClientConnection();
   conn1b->waitForUpstreamConnection();
   conn1b->sendAndReceiveTlsData("hello", "world");
+  EXPECT_EQ(server_digest, conn1b->peerCertificateSha256Digest().value_or(""));
   conn1b.reset();
 
   // Update "server" to a different certificate chain. The on-demand selector builds a new
@@ -692,11 +702,13 @@ TEST_P(OnDemandIntegrationTest, CertCompressionCacheAcrossContexts) {
   sendSecret(stream, "server", "server2");
   test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(2));
 
-  // Two more connections now serve the new chain: miss then hit on the new SSL_CTX.
+  // Two more connections now serve the new chain: miss then hit on the new SSL_CTX. Each must
+  // present the new certificate, proving no stale chain is served from a cache.
   for (int i = 0; i < 2; i++) {
     auto conn = createClientConnection();
     conn->waitForUpstreamConnection();
     conn->sendAndReceiveTlsData("hello", "world");
+    EXPECT_EQ(server2_digest, conn->peerCertificateSha256Digest().value_or(""));
     conn.reset();
   }
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
