@@ -386,6 +386,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "persistent_host_map_lib",
+    srcs = ["persistent_host_map.cc"],
+    hdrs = ["persistent_host_map.h"],
+    rbe_pool = "6gig",
+    deps = [
+        "//envoy/upstream:upstream_interface",
+        "@abseil-cpp//absl/functional:function_ref",
+        "@abseil-cpp//absl/strings:string_view",
+        "@immer",
+    ],
+)
+
+envoy_cc_library(
     name = "upstream_lib",
     srcs = ["upstream_impl.cc"],
     rbe_pool = "6gig",
@@ -393,6 +406,7 @@ envoy_cc_library(
         ":cluster_factory_lib",
         ":default_local_address_selector_factory",
         ":health_checker_lib",
+        ":persistent_host_map_lib",
         # TODO(mattklein123): Move the clusters to extensions so they can be compiled out.
         ":upstream_includes",
         ":transport_socket_match_lib",
@@ -504,6 +518,7 @@ envoy_cc_library(
         "//source/extensions/upstreams/http:config",
         "//source/extensions/upstreams/tcp:config",
         "//source/server:transport_socket_config_lib",
+        "@abseil-cpp//absl/functional:function_ref",
         "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

@@ -331,6 +331,12 @@ pub trait EnvoyCluster: Send + Sync {
   /// routing traffic to this cluster.
   fn pre_init_complete(&self);
 
+  /// Select the persistent cross-priority host map backing for this cluster.
+  ///
+  /// This may be called during [`Cluster::on_init`], before the cluster discovers any hosts, to
+  /// trade the per-update O(N) host-map copy for O(delta) updates.
+  fn set_use_persistent_host_map(&self, use_persistent: bool);
+
   /// Add multiple hosts to the cluster with per-host locality and metadata.
   ///
   /// Each address must be in `ip:port` format (e.g., `127.0.0.1:8080`).
@@ -1024,6 +1030,12 @@ impl EnvoyCluster for EnvoyClusterImpl {
   fn pre_init_complete(&self) {
     unsafe {
       abi::envoy_dynamic_module_callback_cluster_pre_init_complete(self.raw);
+    }
+  }
+
+  fn set_use_persistent_host_map(&self, use_persistent: bool) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_use_persistent_host_map(self.raw, use_persistent);
     }
   }
 

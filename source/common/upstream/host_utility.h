@@ -52,8 +52,9 @@ public:
    * @return OverrideHostSelectionResult containing the selected host, whether strict mode was
    *         requested, and the reason for the selection outcome.
    */
-  static OverrideHostSelectionResult
-  selectOverrideHost(const HostMap* host_map, HostStatusSet status, LoadBalancerContext* context);
+  static OverrideHostSelectionResult selectOverrideHost(const HostLookupTable* host_map,
+                                                        HostStatusSet status,
+                                                        LoadBalancerContext* context);
 
   // Iterate over all per-endpoint metrics, for clusters with `per_endpoint_stats` enabled.
   static void

@@ -4312,7 +4312,8 @@ TEST(PrioritySet, Extend) {
   auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
   HostVectorSharedPtr hosts(new HostVector({makeTestHost(info, "tcp://127.0.0.1:80")}));
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
-  HostMapConstSharedPtr fake_cross_priority_host_map = std::make_shared<HostMap>();
+  HostLookupTableConstSharedPtr fake_cross_priority_host_map =
+      makeFlatHostLookupTable(std::make_shared<HostMap>());
   {
     HostVector hosts_added{hosts->front()};
     HostVector hosts_removed{};
@@ -4329,7 +4330,7 @@ TEST(PrioritySet, Extend) {
   EXPECT_EQ(1, priority_set.hostSetsPerPriority()[1]->hosts().size());
 
   // Simply verify the set and get the cross-priority host map is working properly in the priority
-  // set.
+  // set. The worker-local set publishes exactly the lookup table it was handed.
   EXPECT_EQ(fake_cross_priority_host_map.get(), priority_set.crossPriorityHostMap().get());
 
   // Test iteration.
@@ -4441,14 +4442,18 @@ public:
   HostMapSharedPtr mutableHostMapForTest() { return mutable_cross_priority_host_map_; }
 };
 
-// Test that the priority set in the main thread can work correctly.
+// Test that the priority set in the main thread can work correctly with the legacy flat backing
+// (the default).
 TEST(PrioritySet, MainPrioritySetTest) {
   TestMainPrioritySetImpl priority_set;
+  priority_set.setUsePersistentCrossPriorityHostMap(false);
   priority_set.getOrCreateHostSet(0);
 
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
   auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
-  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info, "tcp://127.0.0.1:80")}));
+  // Create the host at priority 1 so the priority-guarded removal below (also at priority 1) takes
+  // effect.
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info, "tcp://127.0.0.1:80", 1, 1)}));
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
 
   // The host map is initially empty or null.
@@ -4473,8 +4478,11 @@ TEST(PrioritySet, MainPrioritySetTest) {
 
   // Mutable host map will be moved to read only host map after `crossPriorityHostMap` is called.
   HostMapSharedPtr host_map = priority_set.mutableHostMapForTest();
-  EXPECT_EQ(host_map.get(), priority_set.crossPriorityHostMap().get());
+  HostLookupTableConstSharedPtr lookup = priority_set.crossPriorityHostMap();
+  EXPECT_EQ(host_map.get(), priority_set.constHostMapForTest().get());
   EXPECT_EQ(nullptr, priority_set.mutableHostMapForTest().get());
+  EXPECT_EQ(1, lookup->size());
+  EXPECT_NE(nullptr, lookup->findHost("127.0.0.1:80"));
 
   {
     HostVector hosts_added{};
@@ -4496,8 +4504,224 @@ TEST(PrioritySet, MainPrioritySetTest) {
   // Again, mutable host map will be moved to read only host map after `crossPriorityHostMap` is
   // called.
   host_map = priority_set.mutableHostMapForTest();
-  EXPECT_EQ(host_map.get(), priority_set.crossPriorityHostMap().get());
+  lookup = priority_set.crossPriorityHostMap();
+  EXPECT_EQ(host_map.get(), priority_set.constHostMapForTest().get());
   EXPECT_EQ(nullptr, priority_set.mutableHostMapForTest().get());
+  EXPECT_EQ(0, lookup->size());
+  EXPECT_EQ(nullptr, lookup->findHost("127.0.0.1:80"));
+}
+
+// Test that the priority set in the main thread can work correctly under both the legacy flat
+// backing and the persistent backing, and that a snapshot taken before a later add is isolated
+// from the add (structural-sharing isolation) on the persistent path.
+class MainPrioritySetParamTest : public testing::TestWithParam<bool> {};
+
+INSTANTIATE_TEST_SUITE_P(PersistentBacking, MainPrioritySetParamTest, testing::Bool());
+
+TEST_P(MainPrioritySetParamTest, AddRemoveAndSnapshotIsolation) {
+  MainPrioritySetImpl priority_set;
+  priority_set.setUsePersistentCrossPriorityHostMap(GetParam());
+  priority_set.getOrCreateHostSet(0);
+
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  HostSharedPtr host_a = makeTestHost(info, "tcp://127.0.0.1:80");
+  HostSharedPtr host_b = makeTestHost(info, "tcp://127.0.0.1:81");
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+
+  // Add A and B.
+  {
+    HostVectorSharedPtr hosts(new HostVector({host_a, host_b}));
+    HostVector hosts_added{host_a, host_b};
+    HostVector hosts_removed{};
+    priority_set.updateHosts(0,
+                             updateHostsParams(hosts, hosts_per_locality,
+                                               std::make_shared<const HealthyHostVector>(*hosts),
+                                               hosts_per_locality),
+                             {}, hosts_added, hosts_removed, std::nullopt);
+  }
+  HostLookupTableConstSharedPtr snapshot = priority_set.crossPriorityHostMap();
+  EXPECT_EQ(2, snapshot->size());
+  EXPECT_EQ(host_a, snapshot->findHost("127.0.0.1:80"));
+  EXPECT_EQ(host_b, snapshot->findHost("127.0.0.1:81"));
+
+  // Exercise the rest of the HostLookupTable interface on the published table for both backings.
+  EXPECT_FALSE(snapshot->empty());
+  HostMap for_each_hosts;
+  snapshot->forEach([&for_each_hosts](const std::string& address, const HostSharedPtr& host) {
+    for_each_hosts.emplace(address, host);
+  });
+  EXPECT_EQ((HostMap{{"127.0.0.1:80", host_a}, {"127.0.0.1:81", host_b}}), for_each_hosts);
+  // A lookup table with no hosts reports empty.
+  EXPECT_TRUE(MainPrioritySetImpl().crossPriorityHostMap()->empty());
+
+  // Remove A.
+  {
+    HostVectorSharedPtr hosts(new HostVector({host_b}));
+    HostVector hosts_added{};
+    HostVector hosts_removed{host_a};
+    priority_set.updateHosts(0,
+                             updateHostsParams(hosts, hosts_per_locality,
+                                               std::make_shared<const HealthyHostVector>(*hosts),
+                                               hosts_per_locality),
+                             {}, hosts_added, hosts_removed, std::nullopt);
+  }
+  HostLookupTableConstSharedPtr after_remove = priority_set.crossPriorityHostMap();
+  EXPECT_EQ(1, after_remove->size());
+  EXPECT_EQ(nullptr, after_remove->findHost("127.0.0.1:80"));
+  EXPECT_EQ(host_b, after_remove->findHost("127.0.0.1:81"));
+
+  // The persistent path structurally shares nodes, so a snapshot taken before the removal must
+  // still observe the old contents. The flat path copies on publish, so it is also isolated.
+  EXPECT_EQ(2, snapshot->size());
+  EXPECT_EQ(host_a, snapshot->findHost("127.0.0.1:80"));
+  EXPECT_EQ(host_b, snapshot->findHost("127.0.0.1:81"));
+
+  // Remove the last host so the published table reports empty. This exercises `empty()` returning
+  // true on the active backing. The fresh-object check above reaches it only for the flat table.
+  {
+    HostVectorSharedPtr hosts(new HostVector({}));
+    HostVector hosts_added{};
+    HostVector hosts_removed{host_b};
+    priority_set.updateHosts(0,
+                             updateHostsParams(hosts, hosts_per_locality,
+                                               std::make_shared<const HealthyHostVector>(*hosts),
+                                               hosts_per_locality),
+                             {}, hosts_added, hosts_removed, std::nullopt);
+  }
+  HostLookupTableConstSharedPtr after_remove_all = priority_set.crossPriorityHostMap();
+  EXPECT_TRUE(after_remove_all->empty());
+  EXPECT_EQ(0, after_remove_all->size());
+}
+
+// A removal that names an address never published must be a no-op under either backing. This
+// exercises the absent-address branch where the lookup misses before the priority guard.
+TEST_P(MainPrioritySetParamTest, RemoveAbsentAddressIsNoOp) {
+  MainPrioritySetImpl priority_set;
+  priority_set.setUsePersistentCrossPriorityHostMap(GetParam());
+  priority_set.getOrCreateHostSet(0);
+
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  HostSharedPtr host_a = makeTestHost(info, "tcp://127.0.0.1:80");
+  HostSharedPtr host_absent = makeTestHost(info, "tcp://127.0.0.1:99");
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+
+  // Publish A.
+  {
+    HostVectorSharedPtr hosts(new HostVector({host_a}));
+    HostVector hosts_added{host_a};
+    HostVector hosts_removed{};
+    priority_set.updateHosts(0,
+                             updateHostsParams(hosts, hosts_per_locality,
+                                               std::make_shared<const HealthyHostVector>(*hosts),
+                                               hosts_per_locality),
+                             {}, hosts_added, hosts_removed, std::nullopt);
+  }
+
+  // Remove an address that was never added. The lookup misses, so the published map is unchanged.
+  {
+    HostVectorSharedPtr hosts(new HostVector({host_a}));
+    HostVector hosts_added{};
+    HostVector hosts_removed{host_absent};
+    priority_set.updateHosts(0,
+                             updateHostsParams(hosts, hosts_per_locality,
+                                               std::make_shared<const HealthyHostVector>(*hosts),
+                                               hosts_per_locality),
+                             {}, hosts_added, hosts_removed, std::nullopt);
+  }
+
+  HostLookupTableConstSharedPtr lookup = priority_set.crossPriorityHostMap();
+  EXPECT_EQ(1, lookup->size());
+  EXPECT_EQ(host_a, lookup->findHost("127.0.0.1:80"));
+  EXPECT_EQ(nullptr, lookup->findHost("127.0.0.1:99"));
+}
+
+// By contract the per-cluster setter is set once before the first host update, not toggled in
+// production. The reseed-on-switch path exists only for setter robustness and this test. Verify the
+// accumulated membership carries across a switch in both directions with no host lost or
+// duplicated. The flat-to-persistent switch seeds from the un-promoted flat copy, and the
+// persistent-to-flat switch seeds from the persistent map and then honors the priority-guarded
+// removal.
+TEST(MainPrioritySetTest, CrossPriorityHostMapBackingSwitch) {
+  MainPrioritySetImpl priority_set;
+  priority_set.getOrCreateHostSet(0);
+  auto set_backing = [&](bool on) { priority_set.setUsePersistentCrossPriorityHostMap(on); };
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  HostSharedPtr host_a = makeTestHost(info, "tcp://127.0.0.1:80");
+  HostSharedPtr host_b = makeTestHost(info, "tcp://127.0.0.1:81");
+  HostSharedPtr host_c = makeTestHost(info, "tcp://127.0.0.1:82");
+  HostsPerLocalitySharedPtr per_locality = std::make_shared<HostsPerLocalityImpl>();
+
+  auto apply = [&](const HostVector& all, const HostVector& added, const HostVector& removed) {
+    HostVectorSharedPtr hosts(new HostVector(all));
+    priority_set.updateHosts(0,
+                             updateHostsParams(hosts, per_locality,
+                                               std::make_shared<const HealthyHostVector>(*hosts),
+                                               per_locality),
+                             {}, added, removed, std::nullopt);
+  };
+
+  // Flat backing, add A. The map is not read here, so the flat copy stays un-promoted and the next
+  // switch must seed from it.
+  set_backing(false);
+  apply({host_a}, {host_a}, {});
+
+  // Switch to persistent. The first update seeds the persistent map from the un-promoted flat
+  // backing, A carries across and B is added.
+  set_backing(true);
+  apply({host_a, host_b}, {host_b}, {});
+  {
+    HostLookupTableConstSharedPtr lookup = priority_set.crossPriorityHostMap();
+    EXPECT_EQ(2, lookup->size());
+    EXPECT_EQ(host_a, lookup->findHost("127.0.0.1:80"));
+    EXPECT_EQ(host_b, lookup->findHost("127.0.0.1:81"));
+  }
+
+  // Switch back to flat. The first update seeds the flat backing from the persistent map, A and B
+  // carry across, then A is removed and C is added.
+  set_backing(false);
+  apply({host_b, host_c}, {host_c}, {host_a});
+  {
+    HostLookupTableConstSharedPtr lookup = priority_set.crossPriorityHostMap();
+    EXPECT_EQ(2, lookup->size());
+    EXPECT_EQ(nullptr, lookup->findHost("127.0.0.1:80"));
+    EXPECT_EQ(host_b, lookup->findHost("127.0.0.1:81"));
+    EXPECT_EQ(host_c, lookup->findHost("127.0.0.1:82"));
+  }
+}
+
+// Two hosts can share an address across priorities. The first writer must win the cross-priority
+// entry (matching the flat map's `insert`), and a removal at a non-matching priority must not evict
+// it (the priority guard). Both must hold identically under either backing.
+TEST_P(MainPrioritySetParamTest, CollisionKeepFirstAndPriorityGuardedRemovalSkip) {
+  MainPrioritySetImpl priority_set;
+  priority_set.setUsePersistentCrossPriorityHostMap(GetParam());
+  priority_set.getOrCreateHostSet(0);
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  HostSharedPtr host_p0 = makeTestHost(info, "tcp://127.0.0.1:80", 1, 0);
+  HostSharedPtr host_p1 = makeTestHost(info, "tcp://127.0.0.1:80", 1, 1);
+  HostsPerLocalitySharedPtr per_locality = std::make_shared<HostsPerLocalityImpl>();
+
+  auto apply = [&](uint32_t priority, const HostVector& all, const HostVector& added,
+                   const HostVector& removed) {
+    HostVectorSharedPtr hosts(new HostVector(all));
+    priority_set.updateHosts(priority,
+                             updateHostsParams(hosts, per_locality,
+                                               std::make_shared<const HealthyHostVector>(*hosts),
+                                               per_locality),
+                             {}, added, removed, std::nullopt);
+  };
+
+  // Record the priority-0 host, then deliver the same address at priority 1. The first writer wins.
+  apply(0, {host_p0}, {host_p0}, {});
+  apply(1, {host_p1}, {host_p1}, {});
+  EXPECT_EQ(host_p0, priority_set.crossPriorityHostMap()->findHost("127.0.0.1:80"));
+
+  // Removing the priority-1 host must not evict the recorded priority-0 host, the stored host's
+  // priority does not match the removal priority so the guard skips the erase.
+  apply(1, {}, {}, {host_p1});
+  HostLookupTableConstSharedPtr lookup = priority_set.crossPriorityHostMap();
+  EXPECT_EQ(1, lookup->size());
+  EXPECT_EQ(host_p0, lookup->findHost("127.0.0.1:80"));
 }
 
 class ClusterInfoImplTest : public testing::Test, public UpstreamImplTestBase {

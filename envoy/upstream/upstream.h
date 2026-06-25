@@ -29,6 +29,7 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/types.h"
 
+#include "absl/functional/function_ref.h"
 #include "absl/strings/string_view.h"
 #include "fmt/format.h"
 
@@ -362,6 +363,53 @@ using ExcludedHostVector = Phantom<HostVector, Excluded>;
 using HostMap = absl::flat_hash_map<std::string, Upstream::HostSharedPtr>;
 using HostMapSharedPtr = std::shared_ptr<HostMap>;
 using HostMapConstSharedPtr = std::shared_ptr<const HostMap>;
+
+/**
+ * Read-only host-by-address lookup published to workers. Backed by either the flat HostMap (the
+ * default) or a persistent map, selected per cluster via
+ * `MainPrioritySetImpl::setUsePersistentCrossPriorityHostMap`, so the backing is swappable without
+ * changing consumers.
+ */
+class HostLookupTable {
+public:
+  virtual ~HostLookupTable() = default;
+
+  /**
+   * @param address the host address to look up.
+   * @return HostSharedPtr the host for the address, or nullptr if absent.
+   */
+  virtual HostSharedPtr findHost(absl::string_view address) const PURE;
+
+  /**
+   * @return size_t the number of hosts in the table.
+   */
+  virtual size_t size() const PURE;
+
+  /**
+   * @return bool true if the table holds no hosts.
+   */
+  virtual bool empty() const PURE;
+
+  /**
+   * Invokes a callback for each (address, host) entry. Iteration order is unspecified.
+   *
+   * @param cb the callback to invoke for each entry.
+   */
+  virtual void
+  forEach(absl::FunctionRef<void(const std::string&, const HostSharedPtr&)> cb) const PURE;
+};
+using HostLookupTableConstSharedPtr = std::shared_ptr<const HostLookupTable>;
+
+/**
+ * Wraps a flat HostMap in the HostLookupTable interface. Defined in upstream_impl.cc so the
+ * concrete type stays private. Available to tests and consumers that hold a HostMap but need to
+ * publish a HostLookupTable.
+ *
+ * @param map the flat host map to wrap.
+ * @return HostLookupTableConstSharedPtr a lookup table backed by the given map.
+ */
+HostLookupTableConstSharedPtr makeFlatHostLookupTable(HostMapConstSharedPtr map);
+
 using HostVectorSharedPtr = std::shared_ptr<HostVector>;
 using HostVectorConstSharedPtr = std::shared_ptr<const HostVector>;
 
@@ -590,10 +638,10 @@ public:
   virtual const std::vector<HostSetPtr>& hostSetsPerPriority() const PURE;
 
   /**
-   * @return HostMapConstSharedPtr read only cross priority host map that indexed by host address
-   * string.
+   * @return HostLookupTableConstSharedPtr read only cross priority host lookup table indexed by
+   * host address string.
    */
-  virtual HostMapConstSharedPtr crossPriorityHostMap() const PURE;
+  virtual HostLookupTableConstSharedPtr crossPriorityHostMap() const PURE;
 
   /**
    * Parameter class for updateHosts.
@@ -627,7 +675,7 @@ public:
                            const HostVector& hosts_added, const HostVector& hosts_removed,
                            std::optional<bool> weighted_priority_health,
                            std::optional<uint32_t> overprovisioning_factor,
-                           HostMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
+                           HostLookupTableConstSharedPtr cross_priority_host_map = nullptr) PURE;
 
   /**
    * Callback provided during batch updates that can be used to update hosts.

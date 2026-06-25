@@ -1194,7 +1194,8 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
     per_priority.overprovisioning_factor_ = host_set->overprovisioningFactor();
   }
 
-  HostMapConstSharedPtr host_map = cm_cluster.cluster().prioritySet().crossPriorityHostMap();
+  HostLookupTableConstSharedPtr host_map =
+      cm_cluster.cluster().prioritySet().crossPriorityHostMap();
 
   pending_cluster_creations_.erase(cm_cluster.cluster().info()->name());
 
@@ -1304,7 +1305,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
 ClusterManagerImpl::ClusterInitializationObjectConstSharedPtr
 ClusterManagerImpl::addOrUpdateClusterInitializationObjectIfSupported(
     const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
-    LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+    LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupTableConstSharedPtr map,
     UnitFloat drop_overload, absl::string_view drop_category) {
   if (!deferralIsSupportedForCluster(cluster_info)) {
     return nullptr;
@@ -1386,7 +1387,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::initializeClusterInlineIfExis
 
 ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
     const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
-    LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+    LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupTableConstSharedPtr map,
     UnitFloat drop_overload, absl::string_view drop_category)
     : cluster_info_(std::move(cluster_info)), load_balancer_factory_(load_balancer_factory),
       cross_priority_host_map_(map), drop_overload_(drop_overload), drop_category_(drop_category) {
@@ -1399,7 +1400,7 @@ ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
 ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
     const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>& per_priority_state,
     const ThreadLocalClusterUpdateParams& update_params, ClusterInfoConstSharedPtr cluster_info,
-    LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+    LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupTableConstSharedPtr map,
     UnitFloat drop_overload, absl::string_view drop_category)
     : per_priority_state_(per_priority_state), cluster_info_(std::move(cluster_info)),
       load_balancer_factory_(load_balancer_factory), cross_priority_host_map_(map),
@@ -1513,7 +1514,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, std::optional<bool> weighted_priority_health,
     std::optional<uint32_t> overprovisioning_factor,
-    HostMapConstSharedPtr cross_priority_host_map) {
+    HostLookupTableConstSharedPtr cross_priority_host_map) {
   ENVOY_LOG(debug, "membership update for TLS cluster {} added {} removed {}", name,
             hosts_added.size(), hosts_removed.size());
   priority_set_.updateHosts(priority, std::move(update_hosts_params), std::move(locality_weights),
@@ -1841,7 +1842,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, uint32_t priority, PrioritySet::UpdateHostsParams update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, bool weighted_priority_health,
-    uint64_t overprovisioning_factor, HostMapConstSharedPtr cross_priority_host_map) {
+    uint64_t overprovisioning_factor, HostLookupTableConstSharedPtr cross_priority_host_map) {
   ASSERT(thread_local_clusters_.find(name) != thread_local_clusters_.end());
   const auto& cluster_entry = thread_local_clusters_[name];
   cluster_entry->updateHosts(name, priority, std::move(update_hosts_params),

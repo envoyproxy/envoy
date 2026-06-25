@@ -19,6 +19,7 @@
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
@@ -166,7 +167,8 @@ protected:
         host_map->insert({host->address()->asString(), host});
       }
     }
-    thread_local_priority_set_.cross_priority_host_map_ = host_map;
+    thread_local_priority_set_.cross_priority_host_map_ =
+        Envoy::Upstream::makeFlatHostLookupTable(host_map);
   }
 
   Locality makeLocality(absl::string_view region, absl::string_view zone) {
@@ -218,6 +220,32 @@ TEST_F(OverrideHostLoadBalancerTest, NoMetadataOrHeaders) {
   EXPECT_FALSE(load_balancer_->selectExistingConnection(&load_balancer_context_, *host, out_value)
                    .has_value());
   EXPECT_EQ(load_balancer_->peekAnotherHost(&load_balancer_context_), nullptr);
+}
+
+TEST_F(OverrideHostLoadBalancerTest, FindHostTraceLogsCandidateAddresses) {
+  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
+
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
+      cluster_info_, "tcp://127.0.0.1:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
+  makeCrossPriorityHostMap();
+
+  createLoadBalancer(makeDefaultConfig());
+
+  setSelectedEndpointsMetadata("envoy.lb", R"pb(
+    fields {
+      key: "x-gateway-destination-endpoint"
+      value: { string_value: "127.0.0.1:80" }
+    }
+  )pb");
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+
+  // With trace logging enabled, findHost enumerates the lookup table before resolving the endpoint.
+  EXPECT_LOG_CONTAINS("trace", "Looking up 127.0.0.1:80 in 127.0.0.1:80", {
+    HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+    EXPECT_EQ(host->address()->asString(), "127.0.0.1:80");
+  });
 }
 
 TEST_F(OverrideHostLoadBalancerTest, NullptrHeaders) {

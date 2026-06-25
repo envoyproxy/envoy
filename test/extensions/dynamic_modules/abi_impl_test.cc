@@ -367,6 +367,8 @@ WEAK_STUB(ClusterAddHosts,
 WEAK_STUB(ClusterRemoveHosts,
           envoy_dynamic_module_callback_cluster_remove_hosts(nullptr, nullptr, 0))
 WEAK_STUB(ClusterPreInitComplete, envoy_dynamic_module_callback_cluster_pre_init_complete(nullptr))
+WEAK_STUB(ClusterUsePersistentHostMap,
+          envoy_dynamic_module_callback_cluster_use_persistent_host_map(nullptr, true))
 WEAK_STUB(ClusterLbGetHealthyHostCount,
           envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(nullptr, 0))
 WEAK_STUB(ClusterLbGetHealthyHost,

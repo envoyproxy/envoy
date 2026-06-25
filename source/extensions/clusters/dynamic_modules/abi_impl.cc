@@ -236,6 +236,16 @@ void envoy_dynamic_module_callback_cluster_pre_init_complete(
   getCluster(cluster_envoy_ptr)->preInitComplete();
 }
 
+void envoy_dynamic_module_callback_cluster_use_persistent_host_map(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, bool use_persistent_host_map) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_use_persistent_host_map must be called on "
+                 "the main thread");
+    return;
+  }
+  getCluster(cluster_envoy_ptr)->setUsePersistentHostMap(use_persistent_host_map);
+}
+
 size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority) {
   if (lb_envoy_ptr == nullptr) {
@@ -401,11 +411,11 @@ bool envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(
     return false;
   }
   std::string address_str(address.ptr, address.length);
-  const auto it = host_map->find(address_str);
-  if (it == host_map->end()) {
+  const auto host = host_map->findHost(address_str);
+  if (host == nullptr) {
     return false;
   }
-  switch (it->second->coarseHealth()) {
+  switch (host->coarseHealth()) {
   case Envoy::Upstream::Host::Health::Unhealthy:
     *result = envoy_dynamic_module_type_host_health_Unhealthy;
     break;
@@ -431,11 +441,11 @@ envoy_dynamic_module_callback_cluster_lb_find_host_by_address(
     return nullptr;
   }
   std::string address_str(address.ptr, address.length);
-  const auto it = host_map->find(address_str);
-  if (it == host_map->end()) {
+  const auto host = host_map->findHost(address_str);
+  if (host == nullptr) {
     return nullptr;
   }
-  return const_cast<Envoy::Upstream::Host*>(it->second.get());
+  return const_cast<Envoy::Upstream::Host*>(host.get());
 }
 
 envoy_dynamic_module_type_cluster_host_envoy_ptr envoy_dynamic_module_callback_cluster_lb_get_host(

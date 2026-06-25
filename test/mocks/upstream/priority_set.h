@@ -27,9 +27,9 @@ public:
                LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                const HostVector& hosts_removed, std::optional<bool> weighted_priority_health,
                std::optional<uint32_t> overprovisioning_factor,
-               HostMapConstSharedPtr cross_priority_host_map));
+               HostLookupTableConstSharedPtr cross_priority_host_map));
   MOCK_METHOD(void, batchHostUpdate, (BatchUpdateCb&));
-  MOCK_METHOD(HostMapConstSharedPtr, crossPriorityHostMap, (), (const));
+  MOCK_METHOD(HostLookupTableConstSharedPtr, crossPriorityHostMap, (), (const));
 
   MockHostSet* getMockHostSet(uint32_t priority) {
     getHostSet(priority); // Ensure the host set exists.
@@ -42,7 +42,8 @@ public:
   Common::CallbackManager<void, uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;
 
-  HostMapConstSharedPtr cross_priority_host_map_{std::make_shared<HostMap>()};
+  HostLookupTableConstSharedPtr cross_priority_host_map_{
+      makeFlatHostLookupTable(std::make_shared<HostMap>())};
 };
 } // namespace Upstream
 } // namespace Envoy
