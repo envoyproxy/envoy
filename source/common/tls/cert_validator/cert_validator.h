@@ -38,9 +38,9 @@ struct ValidationResults {
   // `status` may be valid but `detailed_status` might not be.
   Envoy::Ssl::ClientValidationStatus detailed_status;
   // The TLS alert used to interpret validation error if the validation failed.
-  absl::optional<uint8_t> tls_alert;
+  std::optional<uint8_t> tls_alert;
   // The detailed error messages populated during validation.
-  absl::optional<std::string> error_details;
+  std::optional<std::string> error_details;
   // The validated certificate chain built by the cert validator.
   // chain[0] = leaf, chain[1] = direct issuer, ..., chain[n] = trust anchor.
   // Only populated on successful validation when a trust store is configured.
@@ -115,7 +115,7 @@ public:
                                         uint8_t hash_buffer[EVP_MAX_MD_SIZE],
                                         unsigned hash_length) PURE;
 
-  virtual absl::optional<uint32_t> daysUntilFirstCertExpires() const PURE;
+  virtual std::optional<uint32_t> daysUntilFirstCertExpires() const PURE;
   virtual std::string getCaFileName() const PURE;
   virtual Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const PURE;
 };

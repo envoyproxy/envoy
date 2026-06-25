@@ -45,7 +45,6 @@ envoy_cc_library(
         "//envoy/http:context_interface",
         "//envoy/stats:sink_interface",
         "//envoy/upstream:cluster_manager_interface",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
@@ -119,7 +118,6 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/thread:thread_interface",
         "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -190,7 +188,6 @@ envoy_cc_library(
         "//envoy/server:guarddog_interface",
         "//envoy/server/overload:overload_manager_interface",
         "//envoy/stats:stats_interface",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 

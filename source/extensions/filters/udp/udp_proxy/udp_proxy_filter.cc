@@ -945,7 +945,7 @@ TunnelingConnectionPoolImpl::TunnelingConnectionPoolImpl(
     : upstream_callbacks_(upstream_callbacks), tunnel_config_(tunnel_config),
       downstream_info_(downstream_info) {
   // TODO(ohadvano): support upstream HTTP/3.
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
+  std::optional<Http::Protocol> protocol = Http::Protocol::Http2;
   auto host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
       thread_local_cluster.loadBalancer().chooseHost(context));
   conn_pool_data_ = thread_local_cluster.httpConnPool(host, Upstream::ResourcePriority::Default,
@@ -981,7 +981,7 @@ void TunnelingConnectionPoolImpl::onPoolFailure(Http::ConnectionPool::PoolFailur
 void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_encoder,
                                               Upstream::HostDescriptionConstSharedPtr upstream_host,
                                               StreamInfo::StreamInfo& upstream_info,
-                                              absl::optional<Http::Protocol>) {
+                                              std::optional<Http::Protocol>) {
   auto upstream_connection_id = upstream_info.downstreamAddressProvider().connectionID().value();
   ENVOY_LOG(debug, "Upstream connection [C{}] ready, creating tunnel stream",
             upstream_connection_id);

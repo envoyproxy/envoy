@@ -111,7 +111,7 @@ protected:
   // Last update time to determine expiration.
   SystemTime last_updated_;
   // The expiration time received in any returned token
-  absl::optional<SystemTime> expiration_time_;
+  std::optional<SystemTime> expiration_time_;
   // Tls slot
   ThreadLocal::TypedSlotPtr<ThreadLocalCredentialsCache> tls_slot_ = nullptr;
   // Stats scope

@@ -93,7 +93,7 @@ Api::SysCallIntResult TestIoSocketHandle::connect(Address::InstanceConstSharedPt
 }
 
 IoHandlePtr TestSocketInterface::makeSocket(int socket_fd, bool socket_v6only, Socket::Type,
-                                            absl::optional<int> domain,
+                                            std::optional<int> domain,
                                             const SocketCreationOptions& options) const {
   return std::make_unique<TestIoSocketHandle>(
       connect_override_proc_, write_override_proc_, read_override_proc_,

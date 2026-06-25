@@ -26,7 +26,7 @@ TEST_P(ListenerTypedMetadataIntegrationTest, Hello) {
   Protobuf::StringValue value;
   value.set_value("hello world");
   Protobuf::Any packed_value;
-  packed_value.PackFrom(value);
+  std::ignore = packed_value.PackFrom(value);
   config_helper_.addListenerTypedMetadata("test.listener.typed.metadata", packed_value);
 
   // Add the filter that reads the listener typed metadata.
@@ -90,14 +90,15 @@ TEST_P(ListenerTypedMetadataIntegrationTest, ListenerMetadataPlumbingToAccessLog
   Protobuf::StringValue value;
   value.set_value("hello world");
   Protobuf::Any packed_value;
-  packed_value.PackFrom(value);
+  std::ignore = packed_value.PackFrom(value);
   config_helper_.addListenerTypedMetadata("test.listener.typed.metadata", packed_value);
 
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
         test::integration::typed_metadata::TestAccessLog access_log_config;
-        hcm.mutable_access_log(0)->mutable_typed_config()->PackFrom(access_log_config);
+        std::ignore =
+            hcm.mutable_access_log(0)->mutable_typed_config()->PackFrom(access_log_config);
       });
 
   initialize();

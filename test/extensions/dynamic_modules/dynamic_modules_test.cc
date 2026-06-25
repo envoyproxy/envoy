@@ -613,7 +613,7 @@ TEST(DynamicModuleStats, IncrementConfigLoadFailure) {
   EXPECT_EQ(1U, failureCounter(scope, RemoteFetchErrorStat, "default"));
 
   // An absent context is a no-op (the context-less caller path).
-  incrementLoadFailure(absl::nullopt, "my-filter", ModuleLoadErrorStat);
+  incrementLoadFailure(std::nullopt, "my-filter", ModuleLoadErrorStat);
   EXPECT_EQ(2U, failureCounter(scope, ModuleLoadErrorStat, "my-filter"));
 }
 

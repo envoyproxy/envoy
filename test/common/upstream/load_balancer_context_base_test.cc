@@ -16,10 +16,10 @@ TEST(LoadBalancerContextBaseTest, LoadBalancerContextBaseTest) {
     HealthyAndDegradedLoad priority_load{Upstream::HealthyLoad({100, 0, 0}),
                                          Upstream::DegradedLoad({0, 0, 0})};
     RetryPriority::PriorityMappingFunc empty_func =
-        [](const Upstream::HostDescription&) -> absl::optional<uint32_t> { return absl::nullopt; };
+        [](const Upstream::HostDescription&) -> std::optional<uint32_t> { return std::nullopt; };
     MockHost mock_host;
 
-    EXPECT_EQ(absl::nullopt, context.computeHashKey());
+    EXPECT_EQ(std::nullopt, context.computeHashKey());
     EXPECT_EQ(nullptr, context.downstreamConnection());
     EXPECT_EQ(nullptr, context.metadataMatchCriteria());
     EXPECT_EQ(nullptr, context.downstreamHeaders());

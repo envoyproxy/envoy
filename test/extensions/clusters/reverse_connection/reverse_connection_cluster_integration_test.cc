@@ -102,7 +102,7 @@ protected:
     response.set_version_info(version);
     response.set_type_url(Config::TestTypeUrl::get().Listener);
     for (const auto& listener_config : listener_configs) {
-      response.add_resources()->PackFrom(listener_config);
+      std::ignore = response.add_resources()->PackFrom(listener_config);
     }
     ASSERT_NE(nullptr, lds_upstream_info_.stream_);
     lds_upstream_info_.stream_->sendGrpcMessage(response);
@@ -156,7 +156,7 @@ protected:
     rt_config.set_auto_close_connections(true);
     rt_config.set_request_path("/reverse_connections/request");
     rt_config.set_request_method(envoy::config::core::v3::GET);
-    rt_filter->mutable_typed_config()->PackFrom(rt_config);
+    std::ignore = rt_filter->mutable_typed_config()->PackFrom(rt_config);
 
     // Create the upstream egress listener that accepts client HTTP connections and routes
     // traffic to the reverse connection cluster.
@@ -215,15 +215,15 @@ protected:
       end
     )",
                                                                               node_id));
-      lua_filter->mutable_typed_config()->PackFrom(lua_config);
+      std::ignore = lua_filter->mutable_typed_config()->PackFrom(lua_config);
     }
 
     auto* egress_router = egress_hcm.add_http_filters();
     egress_router->set_name("envoy.filters.http.router");
-    egress_router->mutable_typed_config()->PackFrom(
+    std::ignore = egress_router->mutable_typed_config()->PackFrom(
         envoy::extensions::filters::http::router::v3::Router());
 
-    egress_hcm_filter->mutable_typed_config()->PackFrom(egress_hcm);
+    std::ignore = egress_hcm_filter->mutable_typed_config()->PackFrom(egress_hcm);
 
     // Create the upstream reverse connection cluster that looks up cached sockets.
     auto* rc_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -240,14 +240,14 @@ protected:
     // This should match the node_id used in the reverse tunnel handshake.
     rc_config.set_host_id_format("%REQ(x-computed-host-id)%");
     rc_config.mutable_cleanup_interval()->set_seconds(60);
-    cluster_type->mutable_typed_config()->PackFrom(rc_config);
+    std::ignore = cluster_type->mutable_typed_config()->PackFrom(rc_config);
 
     // Configure HTTP/2 protocol for the reverse connection cluster.
     envoy::extensions::upstreams::http::v3::HttpProtocolOptions http_options;
     http_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
-    (*rc_cluster->mutable_typed_extension_protocol_options())
-        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-            .PackFrom(http_options);
+    std::ignore = (*rc_cluster->mutable_typed_extension_protocol_options())
+                      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                          .PackFrom(http_options);
 
     // Create the downstream initiating listener that establishes reverse tunnel connections
     // using the rc:// address format.
@@ -288,10 +288,10 @@ protected:
 
     auto* init_router = init_hcm.add_http_filters();
     init_router->set_name("envoy.filters.http.router");
-    init_router->mutable_typed_config()->PackFrom(
+    std::ignore = init_router->mutable_typed_config()->PackFrom(
         envoy::extensions::filters::http::router::v3::Router());
 
-    init_hcm_filter->mutable_typed_config()->PackFrom(init_hcm);
+    std::ignore = init_hcm_filter->mutable_typed_config()->PackFrom(init_hcm);
 
     // Create the tunnel cluster that points to the upstream tunnel listener.
     // This cluster is used by the rc:// address to establish reverse tunnel connections.
@@ -561,7 +561,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTestWithMut
 
       tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
 
-      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
     };
 
     auto tunnel_cluster_modifier = [&rundir](envoy::config::cluster::v3::Cluster* cluster) {
@@ -586,7 +586,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTestWithMut
 
       tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
 
-      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
     };
 
     configureReverseTunnelSetup(bootstrap, loopback_addr, tunnel_listener_port, "test-node-id",
@@ -712,9 +712,9 @@ TEST_P(ReverseConnectionClusterIntegrationTest, ReverseTunnelResiliencyTest) {
 
     envoy::extensions::upstreams::http::v3::HttpProtocolOptions lds_http_options;
     lds_http_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
-    (*lds_cluster->mutable_typed_extension_protocol_options())
-        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-            .PackFrom(lds_http_options);
+    std::ignore = (*lds_cluster->mutable_typed_extension_protocol_options())
+                      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                          .PackFrom(lds_http_options);
 
     auto* lds_load_assignment = lds_cluster->mutable_load_assignment();
     lds_load_assignment->set_cluster_name("lds_cluster");
@@ -769,10 +769,10 @@ TEST_P(ReverseConnectionClusterIntegrationTest, ReverseTunnelResiliencyTest) {
 
       auto* init_router = init_hcm.add_http_filters();
       init_router->set_name("envoy.filters.http.router");
-      init_router->mutable_typed_config()->PackFrom(
+      std::ignore = init_router->mutable_typed_config()->PackFrom(
           envoy::extensions::filters::http::router::v3::Router());
 
-      init_hcm_filter->mutable_typed_config()->PackFrom(init_hcm);
+      std::ignore = init_hcm_filter->mutable_typed_config()->PackFrom(init_hcm);
     };
 
     // Build initiator listener configs.
@@ -798,7 +798,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, ReverseTunnelResiliencyTest) {
       rt_config.set_auto_close_connections(true);
       rt_config.set_request_path("/reverse_connections/request");
       rt_config.set_request_method(envoy::config::core::v3::GET);
-      rt_filter->mutable_typed_config()->PackFrom(rt_config);
+      std::ignore = rt_filter->mutable_typed_config()->PackFrom(rt_config);
     }
 
     // Create static egress listener.
@@ -841,14 +841,14 @@ TEST_P(ReverseConnectionClusterIntegrationTest, ReverseTunnelResiliencyTest) {
             headers:add("x-computed-host-id", host_id)
           end
         )");
-    lua_filter->mutable_typed_config()->PackFrom(lua_config);
+    std::ignore = lua_filter->mutable_typed_config()->PackFrom(lua_config);
 
     auto* egress_router = egress_hcm.add_http_filters();
     egress_router->set_name("envoy.filters.http.router");
-    egress_router->mutable_typed_config()->PackFrom(
+    std::ignore = egress_router->mutable_typed_config()->PackFrom(
         envoy::extensions::filters::http::router::v3::Router());
 
-    egress_hcm_filter->mutable_typed_config()->PackFrom(egress_hcm);
+    std::ignore = egress_hcm_filter->mutable_typed_config()->PackFrom(egress_hcm);
 
     // Create reverse connection cluster.
     auto* rc_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -862,13 +862,13 @@ TEST_P(ReverseConnectionClusterIntegrationTest, ReverseTunnelResiliencyTest) {
     envoy::extensions::clusters::reverse_connection::v3::ReverseConnectionClusterConfig rc_config;
     rc_config.set_host_id_format("%REQ(x-computed-host-id)%");
     rc_config.mutable_cleanup_interval()->set_seconds(60);
-    cluster_type->mutable_typed_config()->PackFrom(rc_config);
+    std::ignore = cluster_type->mutable_typed_config()->PackFrom(rc_config);
 
     envoy::extensions::upstreams::http::v3::HttpProtocolOptions http_options;
     http_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
-    (*rc_cluster->mutable_typed_extension_protocol_options())
-        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-            .PackFrom(http_options);
+    std::ignore = (*rc_cluster->mutable_typed_extension_protocol_options())
+                      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                          .PackFrom(http_options);
 
     // Create 2 tunnel clusters pointing to the 2 cloud listeners.
     for (int i = 1; i <= 2; i++) {

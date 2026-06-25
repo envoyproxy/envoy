@@ -23,7 +23,7 @@ TEST(ClusterProvidedConfigTest, ClusterProvidedConfigTest) {
   envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("envoy.load_balancing_policies.cluster_provided");
   envoy::extensions::load_balancing_policies::cluster_provided::v3::ClusterProvided config_msg;
-  config.mutable_typed_config()->PackFrom(config_msg);
+  std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
   EXPECT_EQ("envoy.load_balancing_policies.cluster_provided", factory.name());

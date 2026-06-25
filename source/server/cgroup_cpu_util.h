@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 #include "envoy/filesystem/filesystem.h"
 
@@ -9,7 +10,6 @@
 #include "absl/base/thread_annotations.h"
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 
@@ -23,9 +23,9 @@ public:
   /**
    * Detects CPU limit from `cgroup` subsystem.
    * @param fs Filesystem instance for file operations.
-   * @return CPU limit or absl::nullopt if no `cgroup` limit found.
+   * @return CPU limit or std::nullopt if no `cgroup` limit found.
    */
-  virtual absl::optional<uint32_t> getCpuLimit(Filesystem::Instance& fs) PURE;
+  virtual std::optional<uint32_t> getCpuLimit(Filesystem::Instance& fs) PURE;
 };
 
 /**
@@ -33,7 +33,7 @@ public:
  */
 class CgroupDetectorImpl : public CgroupDetector {
 public:
-  absl::optional<uint32_t> getCpuLimit(Filesystem::Instance& fs) override;
+  std::optional<uint32_t> getCpuLimit(Filesystem::Instance& fs) override;
 
   // Detection runs in the OptionsImpl constructor before logging is configured. The result is
   // stashed and logged by logResult() once logging is initialized, so the diagnostic doesn't leak
@@ -43,7 +43,7 @@ public:
 private:
   absl::Mutex mutex_;
   bool ran_ ABSL_GUARDED_BY(mutex_) = false;
-  absl::optional<uint32_t> detected_limit_ ABSL_GUARDED_BY(mutex_);
+  std::optional<uint32_t> detected_limit_ ABSL_GUARDED_BY(mutex_);
 };
 
 using CgroupDetectorSingleton = ThreadSafeSingleton<CgroupDetectorImpl>;
@@ -99,9 +99,9 @@ public:
    * Detects CPU limit from `cgroup` `v2` or `v1` with hierarchy scanning.
    * Scans `cgroup` hierarchy and takes minimum effective limit for container-aware CPU detection.
    * @param fs Filesystem instance for file operations.
-   * @return CPU limit or absl::nullopt if no `cgroup` limit found.
+   * @return CPU limit or std::nullopt if no `cgroup` limit found.
    */
-  static absl::optional<uint32_t> getCpuLimit(Filesystem::Instance& fs);
+  static std::optional<uint32_t> getCpuLimit(Filesystem::Instance& fs);
 
 private:
   /**
@@ -109,14 +109,14 @@ private:
    * @param fs Filesystem instance.
    * @param quota_path Path to `cpu.cfs_quota_us` file.
    * @param period_path Path to `cpu.cfs_period_us` file.
-   * @return CPU limit or absl::nullopt if not available/unlimited.
+   * @return CPU limit or std::nullopt if not available/unlimited.
    */
 
   // Validates `cgroup` file content following Go's strict requirements:
   // - Content must end with newline (matching Go's validation)
   // Returns string_view without trailing newline on success, nullopt on failure.
-  static absl::optional<absl::string_view> validateCgroupFileContent(const std::string& content,
-                                                                     const std::string& file_path);
+  static std::optional<absl::string_view> validateCgroupFileContent(const std::string& content,
+                                                                    const std::string& file_path);
 
   // Parses `/proc/self/cgroup` to find the current process's `cgroup` path with priority handling.
 
@@ -126,7 +126,7 @@ private:
    * @param fs Filesystem instance.
    * @return CgroupPathInfo with relative path and version, nullopt if not found.
    */
-  static absl::optional<CgroupPathInfo> getCurrentCgroupPath(Filesystem::Instance& fs);
+  static std::optional<CgroupPathInfo> getCurrentCgroupPath(Filesystem::Instance& fs);
 
   /**
    * Discovers cgroup filesystem mounts by parsing `/proc/self/mountinfo`.
@@ -134,7 +134,7 @@ private:
    * @param fs Filesystem instance.
    * @return Mount point string on success, nullopt if no suitable `cgroup` found.
    */
-  static absl::optional<std::string> discoverCgroupMount(Filesystem::Instance& fs);
+  static std::optional<std::string> discoverCgroupMount(Filesystem::Instance& fs);
 
   /**
    * Parses a single line from `/proc/self/mountinfo` to extract cgroup mount point.
@@ -144,7 +144,7 @@ private:
    * @return Mount point string if line contains `cgroup` filesystem, nullopt if not a `cgroup`
    * line.
    */
-  static absl::optional<std::string> parseMountInfoLine(absl::string_view line);
+  static std::optional<std::string> parseMountInfoLine(absl::string_view line);
 
   /**
    * Unescapes octal escape sequences in paths from `/proc/self/mountinfo`.
@@ -164,8 +164,8 @@ private:
    * @param fs Filesystem instance.
    * @return CgroupInfo with combined path + final version, nullopt if not found.
    */
-  static absl::optional<CgroupInfo> constructCgroupPath(const std::string& mount_point,
-                                                        Filesystem::Instance& fs);
+  static std::optional<CgroupInfo> constructCgroupPath(const std::string& mount_point,
+                                                       Filesystem::Instance& fs);
 
   /**
    * Accesses `cgroup` CPU files with version-specific filename appending.
@@ -178,8 +178,8 @@ private:
    * @param fs Filesystem instance.
    * @return CpuFiles struct with cached file content, nullopt if files not accessible.
    */
-  static absl::optional<CpuFiles> accessCgroupFiles(const CgroupInfo& cgroup_info,
-                                                    Filesystem::Instance& fs);
+  static std::optional<CpuFiles> accessCgroupFiles(const CgroupInfo& cgroup_info,
+                                                   Filesystem::Instance& fs);
 
   /**
    * Accesses `cgroup` `v1` CPU files (quota and period).
@@ -187,8 +187,8 @@ private:
    * @param fs Filesystem instance.
    * @return CpuFiles struct with cached file content, nullopt if files not accessible.
    */
-  static absl::optional<CpuFiles> accessCgroupV1Files(const CgroupInfo& cgroup_info,
-                                                      Filesystem::Instance& fs);
+  static std::optional<CpuFiles> accessCgroupV1Files(const CgroupInfo& cgroup_info,
+                                                     Filesystem::Instance& fs);
 
   /**
    * Accesses `cgroup` `v2` CPU file (`cpu.max`).
@@ -196,8 +196,8 @@ private:
    * @param fs Filesystem instance.
    * @return CpuFiles struct with cached file content, nullopt if files not accessible.
    */
-  static absl::optional<CpuFiles> accessCgroupV2Files(const CgroupInfo& cgroup_info,
-                                                      Filesystem::Instance& fs);
+  static std::optional<CpuFiles> accessCgroupV2Files(const CgroupInfo& cgroup_info,
+                                                     Filesystem::Instance& fs);
 
   /**
    * Reads actual CPU limits from `cgroup` files with version-specific parsing.
@@ -209,22 +209,22 @@ private:
    * @param fs Filesystem instance.
    * @return CPU limit as float64 ratio, nullopt if unlimited/invalid.
    */
-  static absl::optional<double> readActualLimits(const CpuFiles& cpu_files,
-                                                 Filesystem::Instance& fs);
+  static std::optional<double> readActualLimits(const CpuFiles& cpu_files,
+                                                Filesystem::Instance& fs);
 
   /**
    * Reads actual CPU limits from `cgroup` `v1` files with quota/period parsing.
    * @param cpu_files Cached file content from `v1` files.
    * @return CPU limit as float64 ratio, nullopt if unlimited/invalid.
    */
-  static absl::optional<double> readActualLimitsV1(const CpuFiles& cpu_files);
+  static std::optional<double> readActualLimitsV1(const CpuFiles& cpu_files);
 
   /**
    * Reads actual CPU limits from `cgroup` `v2` files with "quota period" parsing.
    * @param cpu_files Cached file content from `v2` files.
    * @return CPU limit as float64 ratio, nullopt if unlimited/invalid.
    */
-  static absl::optional<double> readActualLimitsV2(const CpuFiles& cpu_files);
+  static std::optional<double> readActualLimitsV2(const CpuFiles& cpu_files);
 
   // `Cgroup` `v2` paths
   static constexpr absl::string_view CGROUP_V2_CPU_MAX = "/sys/fs/cgroup/cpu.max";
@@ -250,15 +250,15 @@ private:
  */
 class CgroupCpuUtil::TestUtil {
 public:
-  static absl::optional<CgroupPathInfo> getCurrentCgroupPath(Filesystem::Instance& fs) {
+  static std::optional<CgroupPathInfo> getCurrentCgroupPath(Filesystem::Instance& fs) {
     return CgroupCpuUtil::getCurrentCgroupPath(fs);
   }
 
-  static absl::optional<std::string> discoverCgroupMount(Filesystem::Instance& fs) {
+  static std::optional<std::string> discoverCgroupMount(Filesystem::Instance& fs) {
     return CgroupCpuUtil::discoverCgroupMount(fs);
   }
 
-  static absl::optional<std::string> parseMountInfoLine(const std::string& line) {
+  static std::optional<std::string> parseMountInfoLine(const std::string& line) {
     return CgroupCpuUtil::parseMountInfoLine(line);
   }
 
@@ -266,27 +266,27 @@ public:
     return CgroupCpuUtil::unescapePath(path);
   }
 
-  static absl::optional<absl::string_view> validateCgroupFileContent(const std::string& content,
-                                                                     const std::string& file_path) {
+  static std::optional<absl::string_view> validateCgroupFileContent(const std::string& content,
+                                                                    const std::string& file_path) {
     return CgroupCpuUtil::validateCgroupFileContent(content, file_path);
   }
 
   // TestUtil wrappers for our new `modularized` functions
-  static absl::optional<CpuFiles> accessCgroupV1Files(const CgroupInfo& cgroup_info,
-                                                      Filesystem::Instance& fs) {
+  static std::optional<CpuFiles> accessCgroupV1Files(const CgroupInfo& cgroup_info,
+                                                     Filesystem::Instance& fs) {
     return CgroupCpuUtil::accessCgroupV1Files(cgroup_info, fs);
   }
 
-  static absl::optional<CpuFiles> accessCgroupV2Files(const CgroupInfo& cgroup_info,
-                                                      Filesystem::Instance& fs) {
+  static std::optional<CpuFiles> accessCgroupV2Files(const CgroupInfo& cgroup_info,
+                                                     Filesystem::Instance& fs) {
     return CgroupCpuUtil::accessCgroupV2Files(cgroup_info, fs);
   }
 
-  static absl::optional<double> readActualLimitsV1(const CpuFiles& cpu_files) {
+  static std::optional<double> readActualLimitsV1(const CpuFiles& cpu_files) {
     return CgroupCpuUtil::readActualLimitsV1(cpu_files);
   }
 
-  static absl::optional<double> readActualLimitsV2(const CpuFiles& cpu_files) {
+  static std::optional<double> readActualLimitsV2(const CpuFiles& cpu_files) {
     return CgroupCpuUtil::readActualLimitsV2(cpu_files);
   }
 };

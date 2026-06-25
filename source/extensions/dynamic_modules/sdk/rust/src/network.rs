@@ -315,6 +315,24 @@ pub trait EnvoyNetworkFilter {
   /// Set the string-typed dynamic metadata value with the given namespace and key value.
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str);
 
+  /// Set the dynamic metadata value with the given namespace and key to raw bytes.
+  ///
+  /// The bytes are stored as the metadata value as is, so non-UTF-8 values are preserved. Read
+  /// them back with [`Self::get_dynamic_metadata_string`].
+  fn set_dynamic_metadata_bytes(&mut self, namespace: &str, key: &str, value: &[u8]);
+
+  /// Set multiple string-typed dynamic metadata entries under `namespace` in a single call.
+  ///
+  /// Equivalent to calling [`Self::set_dynamic_metadata_string`] once per entry but resolves the
+  /// namespace and merges into the metadata struct only once. Existing entries with the same key
+  /// are overwritten. Within `entries`, a later entry overwrites an earlier one with the same key.
+  /// An empty `entries` is a no-op and does not create the namespace.
+  fn set_dynamic_metadata_string_batch<'a>(
+    &mut self,
+    namespace: &'a str,
+    entries: &'a [(&'a str, &'a str)],
+  );
+
   /// Get the string-typed dynamic metadata value with the given namespace and key value.
   /// Returns None if the metadata is not found or is the wrong type.
   fn get_dynamic_metadata_string<'a>(
@@ -572,6 +590,10 @@ pub trait EnvoyNetworkFilterScheduler: Send + Sync {
   /// Once this is called, [`NetworkFilter::on_scheduled`] will be called with
   /// the same `event_id` on the worker thread where the filter is running IF
   /// by the time the event is committed, the filter is still alive.
+  ///
+  /// This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+  /// module must join or quiesce any thread that may call this before worker shutdown so a
+  /// scheduled event cannot race the worker dispatcher teardown.
   fn commit(&self, event_id: u64);
 }
 
@@ -1227,6 +1249,41 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
         str_to_module_buffer(namespace),
         str_to_module_buffer(key),
         str_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_bytes(&mut self, namespace: &str, key: &str, value: &[u8]) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
+        self.raw,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_string_batch(&mut self, namespace: &str, entries: &[(&str, &str)]) {
+    // `pairs` borrows the key/value bytes of `entries`, which outlive this call. Envoy copies the
+    // bytes into the metadata Struct synchronously, so the pointers never dangle. An empty
+    // `entries` yields an empty Vec paired with a zero length the callback treats as a no-op.
+    let mut pairs: Vec<abi::envoy_dynamic_module_type_module_key_value_pair> =
+      Vec::with_capacity(entries.len());
+    for (key, value) in entries {
+      pairs.push(abi::envoy_dynamic_module_type_module_key_value_pair {
+        key_ptr: key.as_ptr() as *const _,
+        key_length: key.len(),
+        value_ptr: value.as_ptr() as *const _,
+        value_length: value.len(),
+      });
+    }
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
+        self.raw,
+        str_to_module_buffer(namespace),
+        pairs.as_ptr(),
+        pairs.len(),
       )
     }
   }

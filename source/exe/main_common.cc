@@ -91,7 +91,7 @@ bool MainCommonBase::run() {
     ret = Server::validateConfig(
         options_, Network::Utility::getLocalAddress(options_.localAddressIpVersion()),
         component_factory_, platform_impl_->threadFactory(), platform_impl_->fileSystem(),
-        process_context_ ? ProcessContextOptRef(std::ref(*process_context_)) : absl::nullopt);
+        process_context_ ? ProcessContextOptRef(std::ref(*process_context_)) : std::nullopt);
     break;
   case Server::Mode::InitOnly:
     PERF_DUMP();

@@ -11,7 +11,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
+#include <optional>
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -171,7 +171,7 @@ public:
 
     auto envoy_engine = std::make_unique<::Envoy::InternalEngine>(
         std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
-        /*thread_priority=*/absl::nullopt, high_watermark_, enable_logger_, useWorkerThread());
+        /*thread_priority=*/std::nullopt, high_watermark_, enable_logger_, useWorkerThread());
 
     // Pre-run setup (to be implemented by derived classes if needed)
     static_cast<T*>(this)->preRunSetup(envoy_engine.get());
@@ -317,9 +317,10 @@ protected:
     router_filter->set_name("envoy.router");
     ::envoy::extensions::filters::http::router::v3::Router router_config;
     static_cast<T*>(this)->configureCustomRouterFilter(router_config);
-    router_filter->mutable_typed_config()->PackFrom(router_config);
+    std::ignore = router_filter->mutable_typed_config()->PackFrom(router_config);
 
-    listener.mutable_api_listener()->mutable_api_listener()->PackFrom(api_listener_config);
+    std::ignore =
+        listener.mutable_api_listener()->mutable_api_listener()->PackFrom(api_listener_config);
 
     return listener;
   }
@@ -405,12 +406,12 @@ private:
           envoy::config::bootstrap::v3::ApiListenerManager::STANDALONE_WORKER_THREAD);
     }
     auto* listener_manager = bootstrap.mutable_listener_manager();
-    listener_manager->mutable_typed_config()->PackFrom(api);
+    std::ignore = listener_manager->mutable_typed_config()->PackFrom(api);
     listener_manager->set_name("envoy.listener_manager_impl.api");
   }
 
-  absl::optional<envoy::config::bootstrap::v3::Watchdogs> watchdog_;
-  absl::optional<envoy::type::matcher::v3::ListStringMatcher> stats_inclusion_list_;
+  std::optional<envoy::config::bootstrap::v3::Watchdogs> watchdog_;
+  std::optional<envoy::type::matcher::v3::ListStringMatcher> stats_inclusion_list_;
   uint32_t per_connection_buffer_limit_bytes_ = 10485760;
   int stream_idle_timeout_seconds_ = 15;
   int request_timeout_ms_ = 0;
@@ -424,7 +425,7 @@ private:
   bool enable_logger_{true};
   std::unique_ptr<EngineCallbacks> callbacks_;
   std::unique_ptr<EnvoyEventTracker> event_tracker_{nullptr};
-  absl::optional<size_t> high_watermark_ = absl::nullopt;
+  std::optional<size_t> high_watermark_ = std::nullopt;
   bool enable_stats_collection_ = true;
   bool use_worker_thread_ = false;
 };

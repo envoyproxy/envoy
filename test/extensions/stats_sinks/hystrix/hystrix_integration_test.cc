@@ -21,7 +21,7 @@ TEST_P(HystrixIntegrationTest, NoChunkEncoding) {
     auto* metrics_sink = bootstrap.add_stats_sinks();
     metrics_sink->set_name("envoy.stat_sinks.hystrix");
     envoy::config::metrics::v3::HystrixSink config;
-    metrics_sink->mutable_typed_config()->PackFrom(config);
+    std::ignore = metrics_sink->mutable_typed_config()->PackFrom(config);
     bootstrap.mutable_stats_flush_interval()->CopyFrom(
         Protobuf::util::TimeUtil::MillisecondsToDuration(100));
   });

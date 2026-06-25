@@ -23,7 +23,7 @@ TEST(RandomConfigTest, ValidateFail) {
   envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("envoy.load_balancing_policies.random");
   envoy::extensions::load_balancing_policies::random::v3::Random config_msg;
-  config.mutable_typed_config()->PackFrom(config_msg);
+  std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
   EXPECT_EQ("envoy.load_balancing_policies.random", factory.name());

@@ -13,7 +13,7 @@ namespace {
 using ::testing::ElementsAre;
 
 TEST(ListMatcherTest, BasicUsage) {
-  ListMatcher<TestData> matcher(absl::nullopt);
+  ListMatcher<TestData> matcher(std::nullopt);
 
   matcher.addMatcher(createSingleMatcher("string", [](auto) { return true; }),
                      stringOnMatch<TestData>("match"));
@@ -22,7 +22,7 @@ TEST(ListMatcherTest, BasicUsage) {
 }
 
 TEST(ListMatcherTest, MissingData) {
-  ListMatcher<TestData> matcher(absl::nullopt);
+  ListMatcher<TestData> matcher(std::nullopt);
 
   matcher.addMatcher(createSingleMatcher(
                          "string", [](auto) { return true; }, DataAvailability::NotAvailable),
@@ -33,7 +33,7 @@ TEST(ListMatcherTest, MissingData) {
 
 TEST(ListMatcherTest, KeepMatching) {
   // Expect a no-match return due to keep_matching = true.
-  Envoy::Matcher::ListMatcher<TestData> matcher(absl::nullopt);
+  Envoy::Matcher::ListMatcher<TestData> matcher(std::nullopt);
   matcher.addMatcher(createSingleMatcher("string", [](auto) { return true; }),
                      stringOnMatch<TestData>("keep matching", /*keep_matching=*/true));
   matcher.addMatcher(createSingleMatcher("string", [](auto) { return true; }),
@@ -67,17 +67,17 @@ TEST(ListMatcherTest, KeepMatchingOnNoMatch) {
 
 TEST(ListMatcherTest, KeepMatchingWithRecursion) {
   // First sub-matcher should return a keep_matching match.
-  auto sub_matcher_1 = std::make_shared<Envoy::Matcher::ListMatcher<TestData>>(absl::nullopt);
+  auto sub_matcher_1 = std::make_shared<Envoy::Matcher::ListMatcher<TestData>>(std::nullopt);
   sub_matcher_1->addMatcher(
       createSingleMatcher("string", [](auto) { return true; }),
       stringOnMatch<TestData>("sub match keep_matching", /*keep_matching=*/true));
   // Second sub-matcher returns a matching action but the top-level matchers will be set with
   // keep_matching.
-  auto sub_matcher_2 = std::make_shared<Envoy::Matcher::ListMatcher<TestData>>(absl::nullopt);
+  auto sub_matcher_2 = std::make_shared<Envoy::Matcher::ListMatcher<TestData>>(std::nullopt);
   sub_matcher_2->addMatcher(createSingleMatcher("string", [](auto) { return true; }),
                             stringOnMatch<TestData>("match 1", /*keep_matching=*/false));
   // Third sub-matcher returns a match that will be actually returned.
-  auto sub_matcher_3 = std::make_shared<Envoy::Matcher::ListMatcher<TestData>>(absl::nullopt);
+  auto sub_matcher_3 = std::make_shared<Envoy::Matcher::ListMatcher<TestData>>(std::nullopt);
   sub_matcher_3->addMatcher(createSingleMatcher("string", [](auto) { return true; }),
                             stringOnMatch<TestData>("match 2", /*keep_matching=*/false));
 
@@ -109,7 +109,7 @@ TEST(ListMatcherTest, KeepMatchingWithRecursiveOnNoMatch) {
   sub_matcher_1->addMatcher(
       createSingleMatcher("string", [](auto) { return true; }),
       stringOnMatch<TestData>("sub match keep_matching", /*keep_matching=*/true));
-  auto sub_matcher_2 = std::make_shared<Envoy::Matcher::ListMatcher<TestData>>(absl::nullopt);
+  auto sub_matcher_2 = std::make_shared<Envoy::Matcher::ListMatcher<TestData>>(std::nullopt);
   sub_matcher_2->addMatcher(createSingleMatcher("string", [](auto) { return false; }),
                             stringOnMatch<TestData>("no match", /*keep_matching=*/false));
   auto on_no_match_sub_matcher = std::make_shared<Envoy::Matcher::ListMatcher<TestData>>(

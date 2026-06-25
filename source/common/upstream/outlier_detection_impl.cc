@@ -105,7 +105,7 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
   }
 }
 
-absl::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result result) {
+std::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result result) {
   Http::Code http_code = Http::Code::InternalServerError;
 
   switch (result) {
@@ -131,7 +131,7 @@ absl::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result resu
     // HTTP code indicating error. In order not to intervene with result of
     // higher layer protocol, this code is not mapped to HTTP code.
   case Result::LocalOriginConnectSuccess:
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return {http_code};
@@ -143,7 +143,7 @@ absl::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result resu
 // - if the *code* is not defined, mapping uses resultToHttpCode method to do mapping.
 // - if *code* is defined, it is taken as HTTP code and reported as such to outlier detector.
 void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result,
-                                                            absl::optional<uint64_t> code) {
+                                                            std::optional<uint64_t> code) {
   // Mark host as degraded if needed, then process normally
   if (result == Result::ExtOriginRequestDegraded) {
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
@@ -155,7 +155,7 @@ void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result,
   if (code) {
     putHttpResponseCode(code.value());
   } else {
-    absl::optional<Http::Code> http_code = resultToHttpCode(result);
+    std::optional<Http::Code> http_code = resultToHttpCode(result);
     if (http_code) {
       putHttpResponseCode(enumToInt(http_code.value()));
     }
@@ -166,7 +166,7 @@ void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result,
 // are treated separately. Local origin errors have separate counters and
 // separate success rate monitor.
 void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
-                                                              absl::optional<uint64_t> code) {
+                                                              std::optional<uint64_t> code) {
   switch (result) {
   // SUCCESS is used to report success for connection level. Server may still respond with
   // error, but connection to server was OK.
@@ -205,7 +205,7 @@ void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
 // It calls putResultWithLocalExternalSplit or put putResultNoLocalExternalSplit via
 // std::function. The setting happens in constructor based on split_external_local_origin_errors
 // config parameter.
-void DetectorHostMonitorImpl::putResult(Result result, absl::optional<uint64_t> code) {
+void DetectorHostMonitorImpl::putResult(Result result, std::optional<uint64_t> code) {
   put_result_func_(this, result, code);
 }
 
@@ -797,7 +797,7 @@ void DetectorImpl::processSuccessRateEjections(
   for (const auto& host : host_monitors_) {
     // Don't do work if the host is already ejected.
     if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-      absl::optional<std::pair<double, uint64_t>> host_success_rate_and_volume =
+      std::optional<std::pair<double, uint64_t>> host_success_rate_and_volume =
           host.second->getSRMonitor(monitor_type)
               .successRateAccumulator()
               .getSuccessRateAndVolume();
@@ -932,7 +932,7 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
   envoy::data::cluster::v3::OutlierDetectionEvent event;
   event.set_type(type);
 
-  absl::optional<MonotonicTime> time = host->outlierDetector().lastUnejectionTime();
+  std::optional<MonotonicTime> time = host->outlierDetector().lastUnejectionTime();
   setCommonEventParams(event, host, time);
 
   event.set_action(envoy::data::cluster::v3::EJECT);
@@ -976,7 +976,7 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
 void EventLoggerImpl::logUneject(const HostDescriptionConstSharedPtr& host) {
   envoy::data::cluster::v3::OutlierDetectionEvent event;
 
-  absl::optional<MonotonicTime> time = host->outlierDetector().lastEjectionTime();
+  std::optional<MonotonicTime> time = host->outlierDetector().lastEjectionTime();
   setCommonEventParams(event, host, time);
 
   event.set_action(envoy::data::cluster::v3::UNEJECT);
@@ -993,7 +993,7 @@ void EventLoggerImpl::logUneject(const HostDescriptionConstSharedPtr& host) {
 
 void EventLoggerImpl::setCommonEventParams(envoy::data::cluster::v3::OutlierDetectionEvent& event,
                                            const HostDescriptionConstSharedPtr& host,
-                                           absl::optional<MonotonicTime> time) {
+                                           std::optional<MonotonicTime> time) {
   MonotonicTime monotonic_now = time_source_.monotonicTime();
   if (time) {
     std::chrono::seconds secsFromLastAction =
@@ -1016,9 +1016,9 @@ SuccessRateAccumulatorBucket* SuccessRateAccumulator::updateCurrentWriter() {
   return current_success_rate_bucket_.get();
 }
 
-absl::optional<std::pair<double, uint64_t>> SuccessRateAccumulator::getSuccessRateAndVolume() {
+std::optional<std::pair<double, uint64_t>> SuccessRateAccumulator::getSuccessRateAndVolume() {
   if (!backup_success_rate_bucket_->total_request_counter_) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   double success_rate = backup_success_rate_bucket_->success_request_counter_ * 100.0 /

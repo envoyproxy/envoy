@@ -19,9 +19,9 @@ MirrorPolicyImpl::MirrorPolicyImpl(const envoy::extensions::filters::network::re
                                    Runtime::Loader& runtime)
     : runtime_key_(config.runtime_fraction().runtime_key()),
       default_value_(config.has_runtime_fraction()
-                         ? absl::optional<envoy::type::v3::FractionalPercent>(
+                         ? std::optional<envoy::type::v3::FractionalPercent>(
                                config.runtime_fraction().default_value())
-                         : absl::nullopt),
+                         : std::nullopt),
       exclude_read_commands_(config.exclude_read_commands()), upstream_(upstream),
       runtime_(runtime) {}
 

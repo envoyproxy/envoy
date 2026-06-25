@@ -73,12 +73,12 @@ TEST_F(HttpMuxDemuxTest, MulticastFailsWithoutClusters) {
                                          {
                                              .cluster_name = "cluster1",
                                              .callbacks = callbacks,
-                                             .options = absl::nullopt,
+                                             .options = std::nullopt,
                                          },
                                          {
                                              .cluster_name = "cluster2",
                                              .callbacks = callbacks,
-                                             .options = absl::nullopt,
+                                             .options = std::nullopt,
                                          },
                                      }),
               StatusIs(absl::StatusCode::kInternal));
@@ -95,12 +95,12 @@ TEST_F(HttpMuxDemuxTest, MulticastFailsWithNoStreamsStarted) {
                                          {
                                              .cluster_name = "cluster1",
                                              .callbacks = callbacks,
-                                             .options = absl::nullopt,
+                                             .options = std::nullopt,
                                          },
                                          {
                                              .cluster_name = "cluster2",
                                              .callbacks = callbacks,
-                                             .options = absl::nullopt,
+                                             .options = std::nullopt,
                                          },
                                      }),
               StatusIs(absl::StatusCode::kInternal));
@@ -123,7 +123,7 @@ TEST_F(HttpMuxDemuxTest, IdleInvariants) {
                                                                     {
                                                                         .cluster_name = "cluster",
                                                                         .callbacks = callbacks,
-                                                                        .options = absl::nullopt,
+                                                                        .options = std::nullopt,
                                                                     },
                                                                 }));
   EXPECT_FALSE(multiplexer->isIdle());
@@ -146,12 +146,12 @@ TEST_F(HttpMuxDemuxTest, Multicast) {
                                                                     {
                                                                         .cluster_name = "cluster1",
                                                                         .callbacks = callbacks1,
-                                                                        .options = absl::nullopt,
+                                                                        .options = std::nullopt,
                                                                     },
                                                                     {
                                                                         .cluster_name = "cluster2",
                                                                         .callbacks = callbacks2,
-                                                                        .options = absl::nullopt,
+                                                                        .options = std::nullopt,
                                                                     },
                                                                 }));
   EXPECT_FALSE(multiplexer->isIdle());
@@ -213,12 +213,12 @@ TEST_F(HttpMuxDemuxTest, DeletingMultistreamResetsActiveStareams) {
                                                                     {
                                                                         .cluster_name = "cluster1",
                                                                         .callbacks = callbacks1,
-                                                                        .options = absl::nullopt,
+                                                                        .options = std::nullopt,
                                                                     },
                                                                     {
                                                                         .cluster_name = "cluster2",
                                                                         .callbacks = callbacks2,
-                                                                        .options = absl::nullopt,
+                                                                        .options = std::nullopt,
                                                                     },
                                                                 }));
 
@@ -302,12 +302,12 @@ TEST_F(HttpMuxDemuxTest, MulticastDifferentHeaders) {
                                                                     {
                                                                         .cluster_name = "cluster1",
                                                                         .callbacks = callbacks1,
-                                                                        .options = absl::nullopt,
+                                                                        .options = std::nullopt,
                                                                     },
                                                                     {
                                                                         .cluster_name = "cluster2",
                                                                         .callbacks = callbacks2,
-                                                                        .options = absl::nullopt,
+                                                                        .options = std::nullopt,
                                                                     },
                                                                 }));
 
