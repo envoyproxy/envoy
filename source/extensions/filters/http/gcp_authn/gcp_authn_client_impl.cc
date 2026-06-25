@@ -24,7 +24,7 @@ constexpr absl::string_view TokenUrlPath = "token";
 constexpr absl::string_view AudienceQueryKey = "audience";
 constexpr char MetadataFlavorKey[] = "Metadata-Flavor";
 constexpr char MetadataFlavor[] = "Google";
-constexpr char ClientCertificateSha256Key[] = "client_certificate_sha256";
+constexpr char BindCertificateFingerprintKey[] = "bindCertificateFingerprint";
 
 Http::RequestMessagePtr buildRequest(absl::string_view url) {
   absl::string_view host;
@@ -100,7 +100,9 @@ void GcpAuthnClientImpl::fetchBoundJwt(
     const std::string& fingerprint, GcpAuthnClient::Callbacks& callbacks) {
   Http::Utility::QueryParamsMulti query_params;
   query_params.add(AudienceQueryKey, audience.bound_jwt().url());
-  query_params.add(ClientCertificateSha256Key, fingerprint);
+  const std::string double_encoded_fingerprint = Http::Utility::PercentEncoding::urlEncode(
+      Http::Utility::PercentEncoding::urlEncode(fingerprint));
+  query_params.add(BindCertificateFingerprintKey, double_encoded_fingerprint);
   const std::string final_url =
       absl::StrCat(DefaultServiceAccountPrefix, IdentityUrlPath, query_params.toString());
   makeTokenRequest(TokenType::BoundJwt, audience, final_url, fingerprint, callbacks);
@@ -110,7 +112,9 @@ void GcpAuthnClientImpl::fetchBoundAccessToken(
     const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
     const std::string& fingerprint, GcpAuthnClient::Callbacks& callbacks) {
   Http::Utility::QueryParamsMulti query_params;
-  query_params.add(ClientCertificateSha256Key, fingerprint);
+  const std::string double_encoded_fingerprint = Http::Utility::PercentEncoding::urlEncode(
+      Http::Utility::PercentEncoding::urlEncode(fingerprint));
+  query_params.add(BindCertificateFingerprintKey, double_encoded_fingerprint);
   const std::string final_url =
       absl::StrCat(DefaultServiceAccountPrefix, TokenUrlPath, query_params.toString());
   makeTokenRequest(TokenType::BoundAccessToken, audience, final_url, fingerprint, callbacks);

@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.validate.h"
 
+#include "source/common/http/utility.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_filter.h"
 
 #include "test/integration/http_integration.h"
@@ -169,7 +170,9 @@ public:
 
     std::string expected_path = absl::StrCat(
         "/computeMetadata/v1/instance/service-accounts/default/identity?audience=http://test.com",
-        "&client_certificate_sha256=", expected_fingerprint);
+        "&bindCertificateFingerprint=",
+        Http::Utility::PercentEncoding::urlEncode(
+            Http::Utility::PercentEncoding::urlEncode(expected_fingerprint)));
 
     // Need to wait for headers complete before reading headers value.
     result = request_->waitForHeadersComplete();
@@ -197,8 +200,9 @@ public:
 
     std::string expected_path =
         absl::StrCat("/computeMetadata/v1/instance/service-accounts/default/token"
-                     "?client_certificate_sha256=",
-                     expected_fingerprint);
+                     "?bindCertificateFingerprint=",
+                     Http::Utility::PercentEncoding::urlEncode(
+                         Http::Utility::PercentEncoding::urlEncode(expected_fingerprint)));
 
     // Need to wait for headers complete before reading headers value.
     result = request_->waitForHeadersComplete();
@@ -502,7 +506,9 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundJwtCacheHit) {
 
   std::string expected_path = absl::StrCat(
       "/computeMetadata/v1/instance/service-accounts/default/identity?audience=http://test.com",
-      "&client_certificate_sha256=", expected_fingerprint);
+      "&bindCertificateFingerprint=",
+      Http::Utility::PercentEncoding::urlEncode(
+          Http::Utility::PercentEncoding::urlEncode(expected_fingerprint)));
 
   result = request_->waitForHeadersComplete();
   RELEASE_ASSERT(result, result.message());
