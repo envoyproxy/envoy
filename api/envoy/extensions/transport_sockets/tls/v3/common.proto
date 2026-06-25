@@ -57,7 +57,7 @@ message TlsParameters {
     //
     // .. attention::
     //
-    //   Please refer to `BoringSSL policies <https://boringssl.googlesource.com/boringssl/+/refs/tags/0.20240913.0/include/openssl/ssl.h#5608>`_
+    //   Please refer to the `BoringSSL FIPS_202205 compliance policy <https://boringssl.googlesource.com/boringssl/+/refs/tags/0.20240913.0/include/openssl/ssl.h#5608>`_
     //   for details.
     FIPS_202205 = 0;
 
@@ -74,7 +74,7 @@ message TlsParameters {
     //
     // .. attention::
     //
-    //   Please refer to `BoringSSL policies <https://boringssl.googlesource.com/boringssl/+/refs/tags/0.20260413.0/include/openssl/ssl.h#6293>`_
+    //   Please refer to the `BoringSSL CNSA2_202603 compliance policy <https://boringssl.googlesource.com/boringssl/+/refs/tags/0.20260413.0/include/openssl/ssl.h#6293>`_
     //   for details.
     CNSA2_202603 = 1;
   }
