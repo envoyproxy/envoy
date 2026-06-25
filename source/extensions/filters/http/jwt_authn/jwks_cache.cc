@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <memory>
+#include <optional>
 
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
@@ -18,7 +19,6 @@
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
@@ -205,8 +205,8 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalCache> tls_;
   // async fetcher
   JwksAsyncFetcherPtr async_fetcher_;
-  absl::optional<Matchers::StringMatcherImpl> sub_matcher_;
-  absl::optional<absl::Duration> max_exp_;
+  std::optional<Matchers::StringMatcherImpl> sub_matcher_;
+  std::optional<absl::Duration> max_exp_;
 };
 
 using JwksDataImplPtr = std::unique_ptr<JwksDataImpl>;

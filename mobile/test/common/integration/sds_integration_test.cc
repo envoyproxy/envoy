@@ -47,7 +47,7 @@ protected:
     setUpSdsConfig(secret_config, SECRET_NAME);
     auto* transport_socket = cds_cluster.mutable_transport_socket();
     transport_socket->set_name("envoy.transport_sockets.tls");
-    transport_socket->mutable_typed_config()->PackFrom(tls_context);
+    std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
     sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
         Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(), {cds_cluster}, {cds_cluster}, {},
         "55");
@@ -58,7 +58,7 @@ protected:
     discovery_response.set_version_info("1");
     discovery_response.set_type_url(
         Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>());
-    discovery_response.add_resources()->PackFrom(secret);
+    std::ignore = discovery_response.add_resources()->PackFrom(secret);
     xds_stream_->sendGrpcMessage(discovery_response);
   }
 

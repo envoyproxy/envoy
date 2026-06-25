@@ -159,7 +159,7 @@ public:
    * @return IoCallUint64Result indicating the result of the read operation.
    */
   Api::IoCallUint64Result read(Buffer::Instance& buffer,
-                               absl::optional<uint64_t> max_length) override;
+                               std::optional<uint64_t> max_length) override;
 
   /**
    * Override of write method for reverse connections.

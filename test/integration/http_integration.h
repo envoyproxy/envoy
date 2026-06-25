@@ -173,9 +173,9 @@ protected:
   // Makes a http connection object without checking its connected state.
   virtual IntegrationCodecClientPtr makeRawHttpConnection(
       Network::ClientConnectionPtr&& conn,
-      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
-      absl::optional<envoy::config::core::v3::HttpProtocolOptions> common_http_options =
-          absl::nullopt,
+      std::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+      std::optional<envoy::config::core::v3::HttpProtocolOptions> common_http_options =
+          std::nullopt,
       bool wait_till_connected = true);
   // Makes a downstream network connection object based on client codec version.
   Network::ClientConnectionPtr makeClientConnectionWithOptions(
@@ -211,7 +211,7 @@ protected:
 
   struct Result {
     IntegrationStreamDecoderPtr response;
-    absl::optional<uint64_t> upstream_index;
+    std::optional<uint64_t> upstream_index;
   };
 
   Result sendRequestAndWaitForResponse(
@@ -224,14 +224,14 @@ protected:
   // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.
   // In cases where the upstream that will receive the request is not deterministic, a second
   // upstream index may be provided, in which case both upstreams will be checked for requests.
-  absl::optional<uint64_t> waitForNextUpstreamRequest(
+  std::optional<uint64_t> waitForNextUpstreamRequest(
       const std::vector<uint64_t>& upstream_indices,
       std::chrono::milliseconds connection_wait_timeout = TestUtility::DefaultTimeout);
   void waitForNextUpstreamRequest(
       uint64_t upstream_index = 0,
       std::chrono::milliseconds connection_wait_timeout = TestUtility::DefaultTimeout);
 
-  absl::optional<uint64_t>
+  std::optional<uint64_t>
   waitForNextUpstreamConnection(const std::vector<uint64_t>& upstream_indices,
                                 std::chrono::milliseconds connection_wait_timeout,
                                 FakeHttpConnectionPtr& fake_upstream_connection);
@@ -252,8 +252,8 @@ protected:
                                     const int request_size,
                                     const Http::TestResponseHeaderMapImpl& response_headers,
                                     const int response_size, const int backend_idx,
-                                    absl::optional<const Http::TestResponseHeaderMapImpl>
-                                        expected_response_headers = absl::nullopt);
+                                    std::optional<const Http::TestResponseHeaderMapImpl>
+                                        expected_response_headers = std::nullopt);
 
   // Check for completion of upstream_request_, and a simple "200" response.
   void checkSimpleRequestSuccess(uint64_t expected_request_size, uint64_t expected_response_size,

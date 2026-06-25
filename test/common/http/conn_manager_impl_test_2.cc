@@ -546,7 +546,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDurationNoJitter) {
   delete codec_;
 
   max_connection_duration_ = std::chrono::milliseconds(10000);
-  // max_connection_duration_jitter_percentage_ is absl::nullopt by default
+  // max_connection_duration_jitter_percentage_ is std::nullopt by default
 
   Event::MockTimer* connection_duration_timer = setUpTimer();
   EXPECT_CALL(*connection_duration_timer, enableTimer(std::chrono::milliseconds(10000), _));
@@ -1441,7 +1441,7 @@ TEST_F(HttpConnectionManagerImplTest, Filter) {
         EXPECT_EQ(route2.get(), decoder_filters_[1]->callbacks_->route().ptr());
         EXPECT_EQ(route2.get(), decoder_filters_[1]->callbacks_->streamInfo().route().ptr());
         // RDS & CDS consistency problem: route2 points to fake_cluster2, which doesn't exist.
-        EXPECT_EQ(absl::nullopt, decoder_filters_[1]->callbacks_->clusterInfo());
+        EXPECT_EQ(std::nullopt, decoder_filters_[1]->callbacks_->clusterInfo());
         decoder_filters_[1]->callbacks_->downstreamCallbacks()->clearRouteCache();
         return FilterHeadersStatus::Continue;
       }));
@@ -1516,7 +1516,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToNullPtr) {
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_FALSE(decoder_filters_[1]->callbacks_->route().has_value());
-        EXPECT_EQ(absl::nullopt, decoder_filters_[1]->callbacks_->clusterInfo());
+        EXPECT_EQ(std::nullopt, decoder_filters_[1]->callbacks_->clusterInfo());
 
         EXPECT_FALSE(decoder_filters_[1]->callbacks_->streamInfo().route().has_value());
         EXPECT_FALSE(decoder_filters_[1]->callbacks_->streamInfo().virtualHost().has_value());
@@ -2000,7 +2000,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         decoder_filters_[0]->callbacks_->sendLocalReply(Code::BadRequest, "Bad request", nullptr,
-                                                        absl::nullopt, "");
+                                                        std::nullopt, "");
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -2042,7 +2042,7 @@ TEST_F(HttpConnectionManagerImplTest, LocalReplyStopsDecoding) {
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         decoder_filters_[0]->callbacks_->sendLocalReply(Code::BadRequest, "Bad request", nullptr,
-                                                        absl::nullopt, "");
+                                                        std::nullopt, "");
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -2073,7 +2073,7 @@ TEST_F(HttpConnectionManagerImplTest, ResetWithStoppedFilter) {
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         decoder_filters_[0]->callbacks_->sendLocalReply(Code::BadRequest, "Bad request", nullptr,
-                                                        absl::nullopt, "");
+                                                        std::nullopt, "");
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -2431,7 +2431,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainTimeoutJitterZeroPercent) {
 // Verify that when drain jitter is not set, the base drain timeout is used unchanged.
 TEST_F(HttpConnectionManagerImplTest, DrainTimeoutNoJitter) {
   max_connection_duration_ = std::chrono::milliseconds(10000);
-  // drain_timeout_jitter_percentage_ is absl::nullopt by default
+  // drain_timeout_jitter_percentage_ is std::nullopt by default
   Event::MockTimer* connection_duration_timer = setUpTimer();
   EXPECT_CALL(*connection_duration_timer, enableTimer(std::chrono::milliseconds(10000), _));
   setup();

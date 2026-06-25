@@ -4,6 +4,7 @@
 #include <functional>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -17,7 +18,6 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/node_hash_map.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 
@@ -34,10 +34,10 @@ class Snapshot : public ThreadLocal::ThreadLocalObject {
 public:
   struct Entry {
     std::string raw_string_value_;
-    absl::optional<uint64_t> uint_value_;
-    absl::optional<double> double_value_;
-    absl::optional<envoy::type::v3::FractionalPercent> fractional_percent_value_;
-    absl::optional<bool> bool_value_;
+    std::optional<uint64_t> uint_value_;
+    std::optional<double> double_value_;
+    std::optional<envoy::type::v3::FractionalPercent> fractional_percent_value_;
+    std::optional<bool> bool_value_;
   };
 
   using EntryMap = absl::flat_hash_map<std::string, Entry>;
@@ -165,11 +165,11 @@ public:
                               const envoy::type::v3::FractionalPercent& default_value,
                               uint64_t random_value) const PURE;
 
-  using ConstStringOptRef = absl::optional<std::reference_wrapper<const std::string>>;
+  using ConstStringOptRef = std::optional<std::reference_wrapper<const std::string>>;
   /**
    * Fetch raw runtime data based on key.
    * @param key supplies the key to fetch.
-   * @return absl::nullopt if the key does not exist or reference to the value std::string.
+   * @return std::nullopt if the key does not exist or reference to the value std::string.
    */
   virtual ConstStringOptRef get(absl::string_view key) const PURE;
 

@@ -8,6 +8,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/common/cpu_affinity.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/socket_option_factory.h"
@@ -171,6 +172,30 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   codec_client_->close();
   codec_client2->close();
   check_listener_stats(0, 1);
+}
+
+// Verify that Envoy starts and serves traffic with worker CPU affinity enabled. On Linux this pins
+// each worker thread to a CPU, on other platforms it is a no-op.
+TEST_P(IntegrationTest, WorkerCpuAffinity) {
+  concurrency_ = 2;
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.set_enable_worker_cpu_affinity(true);
+  });
+  initialize();
+
+  // Worker pinning happens during startup, so the gauge reflects the per-worker CPU assignment
+  // derived from the same process affinity mask observed here.
+  const uint64_t expected_pinned_workers = Thread::workerCpuAssignment(concurrency_).size();
+  test_server_->waitForGauge("listener_manager.workers_pinned", Eq(expected_pinned_workers));
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  codec_client_->close();
 }
 
 class TestConnectionBalanceFactory : public Network::ConnectionBalanceFactory {

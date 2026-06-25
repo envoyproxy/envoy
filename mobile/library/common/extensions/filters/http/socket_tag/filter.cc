@@ -28,7 +28,7 @@ Http::FilterHeadersStatus SocketTagFilter::decodeHeaders(Http::RequestHeaderMap&
     decoder_callbacks_->sendLocalReply(
         Http::Code::BadRequest,
         absl::StrCat("Invalid x-envoy-mobile-socket-tag header: ", tag_string), nullptr,
-        absl::nullopt, "");
+        std::nullopt, "");
     return Http::FilterHeadersStatus::StopIteration;
   }
   auto options = std::make_shared<Network::Socket::Options>();

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -9,7 +10,6 @@
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
-#include "absl/types/optional.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -25,7 +25,7 @@ public:
 
   static absl::Status verifySyntax(CommandSyntaxChecker::CommandSyntaxFlags flags,
                                    absl::string_view command, absl::string_view subcommand,
-                                   absl::optional<size_t> length);
+                                   std::optional<size_t> length);
 };
 
 /**
@@ -35,11 +35,11 @@ class SubstitutionFormatUtils {
 public:
   // Optional references are not supported, but this method has large performance
   // impact, so using reference_wrapper.
-  static const absl::optional<std::reference_wrapper<const std::string>>
-  protocolToString(const absl::optional<Http::Protocol>& protocol);
+  static const std::optional<std::reference_wrapper<const std::string>>
+  protocolToString(const std::optional<Http::Protocol>& protocol);
   static const std::string&
-  protocolToStringOrDefault(const absl::optional<Http::Protocol>& protocol);
-  static const absl::optional<std::string> getHostname();
+  protocolToStringOrDefault(const std::optional<Http::Protocol>& protocol);
+  static const std::optional<std::string> getHostname();
 
   /**
    * Unspecified value for protobuf.
@@ -51,7 +51,7 @@ public:
    * max_length is greater than the length of the string.
    * @return true if the string was truncated, false otherwise.
    */
-  static bool truncate(std::string& str, absl::optional<size_t> max_length);
+  static bool truncate(std::string& str, std::optional<size_t> max_length);
 
   /**
    * Truncate an input string view to a maximum length, and return the resulting string view. Do not
@@ -59,7 +59,7 @@ public:
    * view.
    */
   static absl::string_view truncateStringView(absl::string_view str,
-                                              absl::optional<size_t> max_length);
+                                              std::optional<size_t> max_length);
 
   /**
    * Parse a header subcommand of the form: X?Y .

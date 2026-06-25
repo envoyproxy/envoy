@@ -2,6 +2,7 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -11,8 +12,6 @@
 #include "envoy/tracing/trace_context.h"
 
 #include "source/extensions/tracers/opentelemetry/otlp_utils.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -71,7 +70,7 @@ public:
    * @return SamplingResult @see SamplingResult
    */
   virtual SamplingResult shouldSample(const StreamInfo::StreamInfo& stream_info,
-                                      const absl::optional<SpanContext> parent_context,
+                                      const std::optional<SpanContext> parent_context,
                                       const std::string& trace_id, const std::string& name,
                                       OTelSpanKind spankind,
                                       OptRef<const Tracing::TraceContext> trace_context,

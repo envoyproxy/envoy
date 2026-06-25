@@ -17,7 +17,7 @@ void HotRestartingChild::UdpForwardingContext::registerListener(
   ASSERT(inserted, "Two udp listeners on the same address shouldn't be possible");
 }
 
-absl::optional<HotRestartingChild::UdpForwardingContext::ForwardEntry>
+std::optional<HotRestartingChild::UdpForwardingContext::ForwardEntry>
 HotRestartingChild::UdpForwardingContext::getListenerForDestination(
     const Network::Address::Instance& address) {
   auto it = listener_map_.find(address.asString());
@@ -41,7 +41,7 @@ HotRestartingChild::UdpForwardingContext::getListenerForDestination(
     }
   }
   if (it == listener_map_.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return it->second;
 }
@@ -201,10 +201,10 @@ void HotRestartingChild::allDrainsImplicitlyComplete() {
   parent_drained_ = true;
 }
 
-absl::optional<HotRestart::AdminShutdownResponse>
+std::optional<HotRestart::AdminShutdownResponse>
 HotRestartingChild::sendParentAdminShutdownRequest() {
   if (parent_terminated_) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   HotRestartMessage wrapped_request;

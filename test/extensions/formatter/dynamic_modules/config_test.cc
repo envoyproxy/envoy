@@ -130,7 +130,7 @@ TEST_F(DynamicModuleFormatterFactoryTest, FormatterConfigStringValue) {
   auto proto_config = protoConfig("formatter_no_op", "test_formatter");
   Protobuf::StringValue string_value;
   string_value.set_value("x-request-id");
-  proto_config.mutable_formatter_config()->PackFrom(string_value);
+  std::ignore = proto_config.mutable_formatter_config()->PackFrom(string_value);
   auto parser = factory_.createCommandParserFromProto(proto_config, context_);
   EXPECT_NE(nullptr, parser);
 }
@@ -140,7 +140,7 @@ TEST_F(DynamicModuleFormatterFactoryTest, FormatterConfigStruct) {
   auto proto_config = protoConfig("formatter_no_op", "test_formatter");
   Protobuf::Struct struct_value;
   (*struct_value.mutable_fields())["key"] = ValueUtil::stringValue("value");
-  proto_config.mutable_formatter_config()->PackFrom(struct_value);
+  std::ignore = proto_config.mutable_formatter_config()->PackFrom(struct_value);
   auto parser = factory_.createCommandParserFromProto(proto_config, context_);
   EXPECT_NE(nullptr, parser);
 }

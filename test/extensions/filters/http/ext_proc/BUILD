@@ -71,7 +71,6 @@ envoy_extension_cc_test_library(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
@@ -180,7 +179,6 @@ envoy_extension_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
@@ -207,7 +205,6 @@ envoy_extension_cc_test(
         "//test/common/http:common_lib",
         "//test/mocks/event:event_mocks",
         "//test/test_common:utility_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
@@ -236,7 +233,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ext_proc",
         "//test/common/http:common_lib",
         "//test/test_common:utility_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
@@ -465,6 +461,7 @@ envoy_extension_cc_test(
         "//test/integration/filters:common_lib",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
         "//test/proto:helloworld_proto_cc_proto",
+        "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",

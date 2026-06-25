@@ -76,6 +76,13 @@ public:
     }
   }
 
+  OptRef<WebTransportSession> downstreamWebTransportSession() override {
+    if (Http::ResponseDecoder* inner = getInnerDecoder()) {
+      return inner->downstreamWebTransportSession();
+    }
+    return {};
+  }
+
 protected:
   ResponseDecoderWrapper(ResponseDecoder& inner) : inner_(&inner) {}
 

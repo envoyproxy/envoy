@@ -22,7 +22,7 @@ public:
   ConfigConstSharedPtr createConfig(const Protobuf::Message& rc,
                                     Server::Configuration::ServerFactoryContext& context,
                                     bool validate_clusters_default) const override {
-    ASSERT(dynamic_cast<const RouteConfiguration*>(&rc));
+    ASSERT(Envoy::Protobuf::DynamicCastMessage<RouteConfiguration>(&rc));
     return std::make_shared<const ConfigImpl>(static_cast<const RouteConfiguration&>(rc), context,
                                               validate_clusters_default);
   }

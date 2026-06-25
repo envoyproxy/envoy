@@ -141,8 +141,8 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
   // TODO(asraa): Resolve MessageToJsonString failure on recursive filter metadata.
   for (auto& pair : *test_stream_info->metadata_.mutable_filter_metadata()) {
     std::string value;
-    pair.second.SerializeToString(&value);
-    pair.second.ParseFromString(value.substr(0, 128));
+    std::ignore = pair.second.SerializeToString(&value);
+    std::ignore = pair.second.ParseFromString(value.substr(0, 128));
   }
   // libc++ clocks don't track at nanosecond on macOS.
   const auto start_time =

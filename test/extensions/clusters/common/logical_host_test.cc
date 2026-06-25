@@ -56,7 +56,6 @@ TEST_F(RealHostDescriptionTest, UnitTest) {
   description_.addressListOrNull();
 
   const envoy::config::core::v3::Metadata metadata;
-  const envoy::config::cluster::v3::Cluster cluster;
   Network::MockTransportSocketFactory socket_factory;
   EXPECT_CALL(*mock_host_, resolveTransportSocketFactory(_, _, _))
       .WillOnce(ReturnRef(socket_factory));
@@ -101,7 +100,7 @@ public:
     auto shared_objects = filter_state->objectsSharedWithUpstreamConnection();
     return std::make_shared<Network::TransportSocketOptionsImpl>(
         "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-        absl::nullopt, std::move(shared_objects));
+        std::nullopt, std::move(shared_objects));
   }
 
   // Helper to compute the per-connection resolution condition as used in LogicalHost.

@@ -250,7 +250,7 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
                                      std::move(healthy_hosts), HostsPerLocalityImpl::empty(),
                                      std::move(degraded_hosts), HostsPerLocalityImpl::empty(),
                                      std::move(excluded_hosts), HostsPerLocalityImpl::empty()),
-      {}, {std::move(host)}, {}, absl::nullopt, absl::nullopt);
+      {}, {std::move(host)}, {}, std::nullopt, std::nullopt);
 }
 
 void OriginalDstCluster::cleanup() {
@@ -331,7 +331,7 @@ void OriginalDstCluster::cleanup() {
                                        std::move(healthy_hosts), HostsPerLocalityImpl::empty(),
                                        std::move(degraded_hosts), HostsPerLocalityImpl::empty(),
                                        std::move(excluded_hosts), HostsPerLocalityImpl::empty()),
-        {}, {}, to_be_removed, false, absl::nullopt);
+        {}, {}, to_be_removed, false, std::nullopt);
   }
 
   cleanup_timer_->enableTimer(cleanup_interval_ms_);

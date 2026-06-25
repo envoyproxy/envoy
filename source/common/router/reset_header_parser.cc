@@ -23,13 +23,13 @@ ResetHeaderParserImpl::ResetHeaderParserImpl(
   }
 }
 
-absl::optional<std::chrono::milliseconds>
+std::optional<std::chrono::milliseconds>
 ResetHeaderParserImpl::parseInterval(TimeSource& time_source,
                                      const Http::HeaderMap& headers) const {
   const auto header = headers.get(name_);
 
   if (header.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   // This is effectively a trusted header so per the API only using the first value is used.
@@ -39,7 +39,7 @@ ResetHeaderParserImpl::parseInterval(TimeSource& time_source,
   switch (format_) {
   case ResetHeaderFormat::Seconds:
     if (absl::SimpleAtoi(header_value, &num_seconds)) {
-      return absl::optional<std::chrono::milliseconds>(num_seconds * 1000UL);
+      return std::optional<std::chrono::milliseconds>(num_seconds * 1000UL);
     }
     break;
 
@@ -48,16 +48,16 @@ ResetHeaderParserImpl::parseInterval(TimeSource& time_source,
       const uint64_t timestamp = DateUtil::nowToSeconds(time_source);
 
       if (num_seconds < timestamp) {
-        return absl::nullopt;
+        return std::nullopt;
       }
 
       const uint64_t interval = num_seconds - timestamp;
-      return absl::optional<std::chrono::milliseconds>(interval * 1000UL);
+      return std::optional<std::chrono::milliseconds>(interval * 1000UL);
     }
     break;
   }
 
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 } // namespace Router
