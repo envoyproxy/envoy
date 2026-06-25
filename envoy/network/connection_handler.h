@@ -340,10 +340,8 @@ public:
    * the os in case of auto-bind sockets.
    * @return a status indicating if an error occurred.
    */
-  virtual absl::Status
-  doFinalPreWorkerInit(absl::Span<const Network::ListenSocketFactoryPtr> listen_socket_factories) {
-    return absl::OkStatus();
-  }
+  virtual absl::Status doFinalPreWorkerInit(
+      absl::Span<const Network::ListenSocketFactoryPtr> listen_socket_factories) PURE;
 };
 
 using ActiveUdpListenerFactoryPtr = std::unique_ptr<ActiveUdpListenerFactory>;
