@@ -37,8 +37,6 @@ namespace Configuration {
 using TransportSocketFactoryContextImpl = Server::GenericFactoryContextImpl;
 }
 
-class ListenerFilterChainFactoryBuilder;
-
 /**
  * Prod implementation of ListenerComponentFactory that creates real sockets and attempts to fetch
  * sockets from the parent process via the hot restarter. The filter factory list is created from
@@ -394,28 +392,6 @@ private:
   Quic::QuicStatNames& quic_stat_names_;
   absl::flat_hash_set<uint64_t> stopped_listener_tags_;
   std::list<ListenerUpdateCallbacks*> update_callbacks_;
-};
-
-class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
-public:
-  ListenerFilterChainFactoryBuilder(
-      ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context);
-
-  absl::StatusOr<Network::DrainableFilterChainSharedPtr>
-  buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
-                   FilterChainFactoryContextCreator& context_creator,
-                   bool added_via_api) const override;
-
-private:
-  absl::StatusOr<Network::DrainableFilterChainSharedPtr> buildFilterChainInternal(
-      const envoy::config::listener::v3::FilterChain& filter_chain,
-      Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context,
-      bool added_via_api) const;
-
-  ListenerImpl& listener_;
-  ProtobufMessage::ValidationVisitor& validator_;
-  ListenerComponentFactory& listener_component_factory_;
-  Configuration::TransportSocketFactoryContextImpl& factory_context_;
 };
 
 class DefaultListenerManagerFactoryImpl : public ListenerManagerFactory {

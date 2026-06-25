@@ -316,14 +316,14 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
   return [singletons, filter_config, &context,
           clear_hop_by_hop_headers](Network::FilterManager& filter_manager) -> void {
     auto& server_context = context.serverFactoryContext();
-    Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager()
+    Server::OverloadManager& overload_manager = context.shouldBypassOverloadManager()
                                                     ? server_context.nullOverloadManager()
                                                     : server_context.overloadManager();
     auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
         filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
         server_context.clusterManager(), overload_manager,
-        server_context.mainThreadDispatcher().timeSource(), context.listenerInfo().direction());
+        server_context.mainThreadDispatcher().timeSource(), context.direction());
     if (!clear_hop_by_hop_headers) {
       hcm->setClearHopByHopResponseHeaders(false);
     }
@@ -418,7 +418,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       always_set_request_id_in_response_(config.always_set_request_id_in_response()),
       date_provider_(date_provider),
       listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
-                                                                         context_.listenerScope())),
+                                                                         context_.prefixedScope())),
       proxy_100_continue_(config.proxy_100_continue()),
       stream_error_on_invalid_http_messaging_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stream_error_on_invalid_http_message, false)),
@@ -641,8 +641,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   if (config.has_tracing()) {
     tracer_ = tracer_manager.getOrCreateTracer(getPerFilterTracerConfig(config));
-    tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(
-        context.listenerInfo().direction(), config.tracing());
+    tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(context.direction(),
+                                                                             config.tracing());
   }
 
   for (const auto& access_log : config.access_log()) {
@@ -719,7 +719,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       HTTP3:
 #ifdef ENVOY_ENABLE_QUIC
     codec_type_ = CodecType::HTTP3;
-    if (!context_.listenerInfo().isQuic()) {
+    if (!context_.isQuic()) {
       creation_status = absl::InvalidArgumentError("HTTP/3 codec configured on non-QUIC listener.");
       return;
     }
@@ -729,7 +729,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 #endif
     break;
   }
-  if (codec_type_ != CodecType::HTTP3 && context_.listenerInfo().isQuic()) {
+  if (codec_type_ != CodecType::HTTP3 && context_.isQuic()) {
     creation_status = absl::InvalidArgumentError("Non-HTTP/3 codec configured on QUIC listener.");
     return;
   }
@@ -957,7 +957,7 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   return [singletons, filter_config, &context, clear_hop_by_hop_headers](
              Network::ReadFilterCallbacks& read_callbacks) -> Http::ApiListenerPtr {
     auto& server_context = context.serverFactoryContext();
-    Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager()
+    Server::OverloadManager& overload_manager = context.shouldBypassOverloadManager()
                                                     ? server_context.nullOverloadManager()
                                                     : server_context.overloadManager();
 
@@ -965,7 +965,7 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
         filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
         server_context.clusterManager(), overload_manager,
-        server_context.mainThreadDispatcher().timeSource(), context.listenerInfo().direction());
+        server_context.mainThreadDispatcher().timeSource(), context.direction());
     if (!clear_hop_by_hop_headers) {
       conn_manager->setClearHopByHopResponseHeaders(false);
     }

@@ -567,8 +567,7 @@ std::pair<OptRef<PluginConfig::SinglePluginHandle>, Wasm*> PluginConfig::getPlug
 PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
                            Server::Configuration::ServerFactoryContext& context,
                            Stats::Scope& scope, Init::Manager& init_manager,
-                           envoy::config::core::v3::TrafficDirection direction,
-                           const envoy::config::core::v3::Metadata* metadata, bool singleton)
+                           envoy::config::core::v3::TrafficDirection direction, bool singleton)
     : is_singleton_handle_(singleton) {
 
   if (config.fail_open()) {
@@ -612,7 +611,7 @@ PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& conf
   }
 
   stats_handler_ = std::make_shared<StatsHandler>(scope, absl::StrCat("wasm.", config.name(), "."));
-  plugin_ = std::make_shared<Plugin>(config, direction, context.localInfo(), metadata);
+  plugin_ = std::make_shared<Plugin>(config, direction, context.localInfo());
 
   auto callback = [this, &context](WasmHandleSharedPtr base_wasm) {
     base_wasm_ = base_wasm;
