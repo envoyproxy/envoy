@@ -824,15 +824,6 @@ bool ListenerManagerImpl::doFinalPreWorkerListenerInit(ListenerImpl& listener) {
                 listener.name(), success.message());
       return false;
     }
-    for (auto& socket_factory : listener.listenSocketFactories()) {
-      absl::Status success = (socket_factory->doFinalPreWorkerInit());
-      if (!success.ok()) {
-        ENVOY_LOG(error, "final pre-worker listener init for listener '{}' and socket '{}': {}",
-                  listener.name(), socket_factory->localAddress()->asStringView(),
-                  success.message());
-        return false;
-      }
-    }
     return true;
   }
   END_TRY

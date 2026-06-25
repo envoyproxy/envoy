@@ -387,7 +387,8 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   }
 }
 
-absl::Status ActiveQuicListenerFactory::doFinalPreWorkerInit() {
+absl::Status ActiveQuicListenerFactory::doFinalPreWorkerInit(
+    absl::Span<const Network::ListenSocketFactoryPtr> socket_factories) {
   ASSERT(quic_cid_generator_factory_ != nullptr);
   quic_cid_generator_context_ =
       quic_cid_generator_factory_->createQuicConnectionIdGeneratorContext();
@@ -419,6 +420,19 @@ absl::Status ActiveQuicListenerFactory::doFinalPreWorkerInit() {
       kernel_worker_routing_ = true;
     }
   }
+
+  for (const auto& factory : socket_factories) {
+    for (uint32_t i = 0; i < concurrency_; i++) {
+      auto socket = factory->getListenSocket(i);
+      if (!Network::Socket::applyOptions(options_, *socket,
+                                         envoy::config::core::v3::SocketOption::STATE_BOUND)) {
+        return absl::InvalidArgumentError(
+            fmt::format("cannot apply listener factory socket options on socket: {}",
+                        socket->connectionInfoProvider().localAddress()->asString()));
+      }
+    }
+  }
+
   return absl::OkStatus();
 }
 

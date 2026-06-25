@@ -684,7 +684,11 @@ bool ListenerImpl::buildUdpListenerWorkerRouter(const Network::Address::Instance
 
 absl::Status ListenerImpl::doFinalPreWorkerInit() {
   if (udp_listener_config_) {
-    RETURN_IF_NOT_OK(udp_listener_config_->listener_factory_->doFinalPreWorkerInit());
+    RETURN_IF_NOT_OK(
+        udp_listener_config_->listener_factory_->doFinalPreWorkerInit(listenSocketFactories()));
+  }
+  for (auto& socket_factory : listenSocketFactories()) {
+    RETURN_IF_NOT_OK(socket_factory->doFinalPreWorkerInit());
   }
   return absl::OkStatus();
 }
@@ -795,12 +799,6 @@ void ListenerImpl::buildListenSocketOptions(
                 /*mapped_v6*/ addresses_[i]->ip()->version() == Network::Address::IpVersion::v6 &&
                 !addresses_[i]->ip()->ipv6()->v6only()));
       }
-
-      // Additional factory specific options.
-      ASSERT(udp_listener_config_->listener_factory_ != nullptr,
-             "buildUdpListenerFactory() must run first");
-      addListenSocketOptions(listen_socket_options_list_[i],
-                             udp_listener_config_->listener_factory_->socketOptions());
     }
   }
 }
