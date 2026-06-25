@@ -473,7 +473,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteCacheHitAfterFetch) {
   DynamicModuleConfigFactory factory2;
   auto result2 =
       factory2.createFilterFactory(proto_config, "", context_.server_factory_context_, stats_scope_,
-                                   /*init_manager=*/absl::nullopt);
+                                   /*init_manager=*/std::nullopt);
   EXPECT_TRUE(result2.ok()) << result2.status().message();
 
   // Verify the cache-loaded factory callback installs the filter.
@@ -741,7 +741,7 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeWithoutInitManager) {
 
   DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
-                                            stats_scope_, /*init_manager=*/absl::nullopt);
+                                            stats_scope_, /*init_manager=*/std::nullopt);
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(), testing::HasSubstr("not cached"));
   EXPECT_THAT(result.status().message(), testing::Not(testing::HasSubstr("init manager")));
@@ -929,7 +929,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteCacheInvalidationOnMissingFile) {
   // Second call with init_manager=nullptr: file is gone, so it needs an init manager.
   auto result2 =
       factory.createFilterFactory(proto_config, "", context_.server_factory_context_, stats_scope_,
-                                  /*init_manager=*/absl::nullopt);
+                                  /*init_manager=*/std::nullopt);
   EXPECT_FALSE(result2.ok());
   EXPECT_THAT(result2.status().message(),
               testing::HasSubstr("Remote module sources require an init manager"));

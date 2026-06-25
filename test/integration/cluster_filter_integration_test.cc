@@ -101,7 +101,7 @@ class ClusterFilterIntegrationTestBase : public testing::TestWithParam<Network::
 public:
   ClusterFilterIntegrationTestBase() : factory_(*this), registration_(factory_) {}
 
-  void initialize() { on_new_connection_called_after_on_write_.store(absl::optional<bool>{}); }
+  void initialize() { on_new_connection_called_after_on_write_.store(std::optional<bool>{}); }
 
   // TestParent
   void onNewConnectionCalled(bool on_write_called) override {
@@ -124,7 +124,7 @@ public:
 
 private:
   // Atomic so that this may be safely accessed from multiple threads
-  std::atomic<absl::optional<bool>> on_new_connection_called_after_on_write_;
+  std::atomic<std::optional<bool>> on_new_connection_called_after_on_write_;
 };
 
 class ClusterFilterTcpIntegrationTest : public ClusterFilterIntegrationTestBase,

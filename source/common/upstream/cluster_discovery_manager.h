@@ -2,6 +2,7 @@
 
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -11,7 +12,6 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -109,7 +109,7 @@ private:
     CallbackListItem(ClusterDiscoveryCallbackPtr callback) : callback_(std::move(callback)) {}
 
     ClusterDiscoveryCallbackPtr callback_;
-    absl::optional<CallbackListIterator> self_iterator_;
+    std::optional<CallbackListIterator> self_iterator_;
   };
 
   /**

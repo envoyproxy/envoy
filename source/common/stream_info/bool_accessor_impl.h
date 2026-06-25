@@ -19,7 +19,7 @@ public:
     return message;
   }
 
-  absl::optional<std::string> serializeAsString() const override {
+  std::optional<std::string> serializeAsString() const override {
     return value_ ? "true" : "false";
   }
 

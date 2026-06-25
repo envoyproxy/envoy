@@ -76,14 +76,14 @@ bool contains(const std::vector<Http::Protocol>& protocols,
   return true;
 }
 
-absl::optional<Http::HttpServerPropertiesCache::Origin>
+std::optional<Http::HttpServerPropertiesCache::Origin>
 getOrigin(const Network::TransportSocketOptionsConstSharedPtr& options, HostConstSharedPtr host) {
   std::string sni = std::string(host->transportSocketFactory().defaultServerNameIndication());
   if (options && options->serverNameOverride().has_value()) {
     sni = options->serverNameOverride().value();
   }
   if (sni.empty() || !host->address() || !host->address()->ip()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return {{"https", sni, host->address()->ip()->port()}};
 }
@@ -312,8 +312,8 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v3::Boots
       xds_manager_(context.xdsManager()), random_(context.api().randomGenerator()),
       deferred_cluster_creation_(bootstrap.cluster_manager().enable_deferred_cluster_creation()),
       bind_config_(bootstrap.cluster_manager().has_upstream_bind_config()
-                       ? absl::make_optional(bootstrap.cluster_manager().upstream_bind_config())
-                       : absl::nullopt),
+                       ? std::make_optional(bootstrap.cluster_manager().upstream_bind_config())
+                       : std::nullopt),
       local_info_(context.localInfo()), cm_stats_(generateStats(*stats_.rootScope())),
       init_helper_(xds_manager_,
                    [this](ClusterManagerCluster& cluster) { return onClusterInit(cluster); }),
@@ -427,7 +427,7 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
   cm_stats_.cluster_added_.add(bootstrap.static_resources().clusters().size());
   updateClusterCounts();
 
-  absl::optional<ThreadLocalClusterManagerImpl::LocalClusterParams> local_cluster_params;
+  std::optional<ThreadLocalClusterManagerImpl::LocalClusterParams> local_cluster_params;
   if (local_cluster_name_) {
     auto local_cluster = active_clusters_.find(local_cluster_name_.value());
     if (local_cluster == active_clusters_.end()) {
@@ -1024,14 +1024,14 @@ void ClusterManagerImpl::maybePreconnect(
   }
 }
 
-absl::optional<HttpPoolData>
+std::optional<HttpPoolData>
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
-    HostConstSharedPtr host, ResourcePriority priority, absl::optional<Http::Protocol> protocol,
+    HostConstSharedPtr host, ResourcePriority priority, std::optional<Http::Protocol> protocol,
     LoadBalancerContext* context) {
   // Select a host and create a connection pool for it if it does not already exist.
   auto pool = httpConnPoolImpl(host, priority, protocol, context);
   if (pool == nullptr) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   HttpPoolData data(
@@ -1047,16 +1047,16 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
   return data;
 }
 
-absl::optional<TcpPoolData>
+std::optional<TcpPoolData>
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     HostConstSharedPtr host, ResourcePriority priority, LoadBalancerContext* context) {
   if (!host) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   // Select a host and create a connection pool for it if it does not already exist.
   auto pool = tcpConnPoolImpl(host, priority, context);
   if (pool == nullptr) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   TcpPoolData data(
@@ -1070,12 +1070,12 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   return data;
 }
 
-absl::optional<TcpPoolData>
+std::optional<TcpPoolData>
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     ResourcePriority priority, LoadBalancerContext* context) {
   HostConstSharedPtr host = LoadBalancer::onlyAllowSynchronousHostSelection(chooseHost(context));
   if (!host) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return tcpConnPool(host, priority, context);
 }
@@ -1511,8 +1511,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
     const std::string& name, uint32_t priority,
     PrioritySet::UpdateHostsParams&& update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-    const HostVector& hosts_removed, absl::optional<bool> weighted_priority_health,
-    absl::optional<uint32_t> overprovisioning_factor,
+    const HostVector& hosts_removed, std::optional<bool> weighted_priority_health,
+    std::optional<uint32_t> overprovisioning_factor,
     HostMapConstSharedPtr cross_priority_host_map) {
   ENVOY_LOG(debug, "membership update for TLS cluster {} added {} removed {}", name,
             hosts_added.size(), hosts_removed.size());
@@ -1766,7 +1766,7 @@ ClusterManagerImpl::dumpClusterConfigs(const Matchers::StringMatcher& name_match
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl(
     ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
-    const absl::optional<LocalClusterParams>& local_cluster_params)
+    const std::optional<LocalClusterParams>& local_cluster_params)
     : parent_(parent), thread_local_dispatcher_(dispatcher), cdm_(dispatcher.name(), *this),
       local_stats_(generateStats(*parent.stats_.rootScope(), dispatcher.name())) {
   // If local cluster is defined then we need to initialize it first.
@@ -1854,7 +1854,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     const HostSharedPtr& host) {
   if (host->cluster().features() &
       ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
-    drainOrCloseConnPools(host, absl::nullopt);
+    drainOrCloseConnPools(host, std::nullopt);
 
     // Close non connection pool TCP connections obtained from tcpConn()
     //
@@ -1967,7 +1967,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainOrCloseConnPools(
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainOrCloseConnPools(
-    const HostSharedPtr& host, absl::optional<ConnectionPool::DrainBehavior> drain_behavior) {
+    const HostSharedPtr& host, std::optional<ConnectionPool::DrainBehavior> drain_behavior) {
   // Drain or close any HTTP connection pool for the host.
   {
     const auto container = getHttpConnPoolsContainer(host);
@@ -2025,7 +2025,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
 Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImpl(
     HostConstSharedPtr host, ResourcePriority priority,
-    absl::optional<Http::Protocol> downstream_protocol, LoadBalancerContext* context) {
+    std::optional<Http::Protocol> downstream_protocol, LoadBalancerContext* context) {
   if (!host) {
     return nullptr;
   }
@@ -2040,7 +2040,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
     hash_key.push_back(uint8_t(protocol));
   }
 
-  absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+  std::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
       alternate_protocol_options =
           host->cluster().httpProtocolOptions().alternateProtocolsCacheOptions();
   Network::Socket::OptionsSharedPtr upstream_options(std::make_shared<Network::Socket::Options>());
@@ -2266,7 +2266,7 @@ absl::StatusOr<ClusterManagerPtr> ProdClusterManagerFactory::clusterManagerFromP
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     std::vector<Http::Protocol>& protocols,
-    const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+    const std::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
         alternate_protocol_options,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
@@ -2291,7 +2291,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
         alternate_protocols_cache_manager_.getCache(default_options, dispatcher);
   }
 
-  absl::optional<Http::HttpServerPropertiesCache::Origin> origin =
+  std::optional<Http::HttpServerPropertiesCache::Origin> origin =
       getOrigin(transport_socket_options, host);
   if (protocols.size() == 3 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100) &&
@@ -2365,7 +2365,7 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     ClusterConnectivityState& state,
-    absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) {
+    std::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) {
   ENVOY_LOG_MISC(debug, "Allocating TCP conn pool");
   return std::make_unique<Tcp::ConnPoolImpl>(dispatcher, host, priority, options,
                                              transport_socket_options, state, tcp_pool_idle_timeout,

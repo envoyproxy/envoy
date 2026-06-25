@@ -280,7 +280,7 @@ private:
   };
 
   bool doFinalPreWorkerListenerInit(ListenerImpl& listener);
-  void addListenerToWorker(Worker& worker, absl::optional<uint64_t> overridden_listener,
+  void addListenerToWorker(Worker& worker, std::optional<uint64_t> overridden_listener,
                            ListenerImpl& listener, ListenerCompletionCallback completion_callback);
 
   ProtobufTypes::MessagePtr dumpListenerConfigs(const Matchers::StringMatcher& name_matcher);
@@ -380,7 +380,7 @@ private:
 
   std::vector<WorkerPtr> workers_;
   bool workers_started_{};
-  absl::optional<StopListenersType> stop_listeners_type_;
+  std::optional<StopListenersType> stop_listeners_type_;
   Stats::ScopeSharedPtr scope_;
   ListenerManagerStats stats_;
   ConfigTracker::EntryOwnerPtr listeners_config_tracker_entry_;

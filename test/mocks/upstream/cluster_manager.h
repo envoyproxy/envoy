@@ -55,13 +55,13 @@ public:
   MOCK_METHOD(bool, removeCluster, (const std::string& cluster, const bool remove_ignored));
   MOCK_METHOD(void, shutdown, ());
   MOCK_METHOD(bool, isShutdown, ());
-  MOCK_METHOD(const absl::optional<envoy::config::core::v3::BindConfig>&, bindConfig, (), (const));
+  MOCK_METHOD(const std::optional<envoy::config::core::v3::BindConfig>&, bindConfig, (), (const));
   MOCK_METHOD(Config::GrpcMuxSharedPtr, adsMux, ());
   MOCK_METHOD(absl::Status, replaceAdsMux,
               (const envoy::config::core::v3::ApiConfigSource& ads_config));
   MOCK_METHOD(Grpc::AsyncClientManager&, grpcAsyncClientManager, ());
   MOCK_METHOD(const std::string, versionInfo, (), (const));
-  MOCK_METHOD(const absl::optional<std::string>&, localClusterName, (), (const));
+  MOCK_METHOD(const std::optional<std::string>&, localClusterName, (), (const));
   MOCK_METHOD(ClusterUpdateCallbacksHandle*, addThreadLocalClusterUpdateCallbacks_,
               (ClusterUpdateCallbacks & callbacks));
   MOCK_METHOD(Config::SubscriptionFactory&, subscriptionFactory, ());
@@ -112,10 +112,10 @@ public:
   envoy::config::core::v3::BindConfig& mutableBindConfig();
 
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
-  absl::optional<envoy::config::core::v3::BindConfig> bind_config_;
+  std::optional<envoy::config::core::v3::BindConfig> bind_config_;
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
-  absl::optional<std::string> local_cluster_name_;
+  std::optional<std::string> local_cluster_name_;
   NiceMock<Config::MockSubscriptionFactory> subscription_factory_;
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> active_clusters_;
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> warming_clusters_;

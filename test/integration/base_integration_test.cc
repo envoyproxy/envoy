@@ -303,7 +303,7 @@ void BaseIntegrationTest::setUpstreamProtocol(Http::CodecType protocol) {
   }
 }
 
-absl::optional<uint64_t> BaseIntegrationTest::waitForNextRawUpstreamConnection(
+std::optional<uint64_t> BaseIntegrationTest::waitForNextRawUpstreamConnection(
     const std::vector<uint64_t>& upstream_indices, FakeRawConnectionPtr& fake_upstream_connection,
     std::chrono::milliseconds connection_wait_timeout) {
   AssertionResult result = AssertionFailure();
@@ -528,7 +528,7 @@ void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
 std::vector<std::string>
 BaseIntegrationTest::waitForAccessLogEntries(const std::string& filename,
                                              Network::ClientConnection* client_connection,
-                                             absl::optional<uint32_t> min_entries) {
+                                             std::optional<uint32_t> min_entries) {
   // Wait a max of 1s for logs to flush to disk.
   std::string contents;
   std::vector<std::string> entries;

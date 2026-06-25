@@ -8811,7 +8811,7 @@ TEST_P(ListenerManagerImplTest, WorkerCpuAffinityPinsWorkerThreads) {
   // Worker 0 is pinned to the first CPU of the process affinity mask.
   const std::vector<uint32_t> expected = Thread::workerCpuAssignment(1);
   ASSERT_FALSE(expected.empty());
-  EXPECT_CALL(*worker_, start(_, _, absl::optional<uint32_t>(expected[0])));
+  EXPECT_CALL(*worker_, start(_, _, std::optional<uint32_t>(expected[0])));
   ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
   EXPECT_EQ(1, server_.stats_store_
                    .gauge("listener_manager.workers_pinned", Stats::Gauge::ImportMode::NeverImport)
@@ -8825,7 +8825,7 @@ TEST_P(ListenerManagerImplTest, WorkerCpuAffinityDoesNotPinWhenNoCpusAvailable) 
   EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
       .WillOnce(Return(Api::SysCallIntResult{-1, EINVAL}));
   // With no available CPUs the worker keeps its inherited affinity and still starts.
-  EXPECT_CALL(*worker_, start(_, _, absl::optional<uint32_t>(absl::nullopt)));
+  EXPECT_CALL(*worker_, start(_, _, std::optional<uint32_t>(std::nullopt)));
   EXPECT_LOG_CONTAINS(
       "warn", "no worker could be pinned",
       ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok()));
@@ -8837,7 +8837,7 @@ TEST_P(ListenerManagerImplTest, WorkerCpuAffinityDoesNotPinWhenNoCpusAvailable) 
 
 TEST_P(ListenerManagerImplTest, WorkerCpuAffinityDisabledByDefault) {
   // With the bootstrap field unset no worker is pinned and the gauge stays zero.
-  EXPECT_CALL(*worker_, start(_, _, absl::optional<uint32_t>(absl::nullopt)));
+  EXPECT_CALL(*worker_, start(_, _, std::optional<uint32_t>(std::nullopt)));
   ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
   EXPECT_EQ(0, server_.stats_store_
                    .gauge("listener_manager.workers_pinned", Stats::Gauge::ImportMode::NeverImport)
@@ -8932,7 +8932,7 @@ public:
   const Network::Address::EnvoyInternalAddress* envoyInternalAddress() const override {
     return nullptr;
   }
-  absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+  std::optional<std::string> networkNamespace() const override { return std::nullopt; }
   Network::Address::InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override {
     return nullptr;
   }
@@ -8968,7 +8968,7 @@ public:
   const Network::Address::EnvoyInternalAddress* envoyInternalAddress() const override {
     return nullptr;
   }
-  absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+  std::optional<std::string> networkNamespace() const override { return std::nullopt; }
   Network::Address::InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override {
     return nullptr;
   }

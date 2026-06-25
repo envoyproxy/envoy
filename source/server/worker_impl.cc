@@ -69,7 +69,7 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
       [this](OverloadActionState state) { closeIdleHttpConnectionsCb(state.phase()); });
 }
 
-void WorkerImpl::addListener(absl::optional<uint64_t> overridden_listener,
+void WorkerImpl::addListener(std::optional<uint64_t> overridden_listener,
                              Network::ListenerConfig& listener, AddListenerCompletion completion,
                              Runtime::Loader& runtime, Random::RandomGenerator& random) {
   dispatcher_->post(
@@ -110,7 +110,7 @@ void WorkerImpl::removeFilterChains(uint64_t listener_tag,
 }
 
 void WorkerImpl::start(OptRef<GuardDog> guard_dog, const std::function<void()>& cb,
-                       absl::optional<uint32_t> cpu_id) {
+                       std::optional<uint32_t> cpu_id) {
   ASSERT(!thread_);
 
   // In posix, thread names are limited to 15 characters, so contrive to make

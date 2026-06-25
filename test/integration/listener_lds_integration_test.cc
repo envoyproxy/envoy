@@ -1009,7 +1009,7 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterInPlaceUpdate) {
   // the sockets in the filter chain draining listener. The new connection should be reset.
   while (true) {
     auto codec =
-        makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
+        makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), std::nullopt);
     // The socket are closed asynchronously, if the socket is connected directly, it means
     // the listener socket isn't closed yet, we will try next connection.
     if (codec->connected()) {
@@ -1103,7 +1103,7 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterMultipleInPlaceUpdate) {
   // the sockets in the filter chain draining listener. The new connection should be reset.
   while (true) {
     auto codec =
-        makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
+        makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), std::nullopt);
     // The socket are closed asynchronously, if the socket is connected directly, it means
     // the listener socket isn't closed yet, we will try next connection.
     if (codec->connected()) {

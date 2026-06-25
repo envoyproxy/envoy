@@ -56,15 +56,15 @@ ExecuteFilterActionFactory::createAction(const Protobuf::Message& config,
   if (!composite_action.filter_chain_name().empty()) {
     // Create an action that just stores the name. The actual filter chain lookup
     // will happen at runtime in the Composite filter.
-    ASSERT(context.server_factory_context_ != absl::nullopt);
+    ASSERT(context.server_factory_context_ != std::nullopt);
     Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
 
     return std::make_shared<ExecuteFilterAction>(
         composite_action.filter_chain_name(),
         composite_action.has_sample_percent()
-            ? absl::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
+            ? std::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
                   composite_action.sample_percent())
-            : absl::nullopt,
+            : std::nullopt,
         runtime);
   }
 
@@ -125,15 +125,15 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createActionCommon(
         fmt::format("Failed to get {} filter factory creation function", stream_str));
   }
   std::string name = composite_action.typed_config().name();
-  ASSERT(context.server_factory_context_ != absl::nullopt);
+  ASSERT(context.server_factory_context_ != std::nullopt);
   Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
 
   return std::make_shared<ExecuteFilterAction>(
       [cb = std::move(callback)]() mutable -> OptRef<Http::FilterFactoryCb> { return cb; }, name,
       composite_action.has_sample_percent()
-          ? absl::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
+          ? std::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
                 composite_action.sample_percent())
-          : absl::nullopt,
+          : std::nullopt,
       runtime);
 }
 
@@ -255,16 +255,16 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createFilterChainActio
     filter_factories.push_back(std::move(callback));
   }
 
-  ASSERT(context.server_factory_context_ != absl::nullopt);
+  ASSERT(context.server_factory_context_ != std::nullopt);
   Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
 
   // Use "filter_chain" as the action name for filter chains.
   return std::make_shared<ExecuteFilterAction>(
       std::move(filter_factories), "filter_chain",
       composite_action.has_sample_percent()
-          ? absl::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
+          ? std::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
                 composite_action.sample_percent())
-          : absl::nullopt,
+          : std::nullopt,
       runtime);
 }
 

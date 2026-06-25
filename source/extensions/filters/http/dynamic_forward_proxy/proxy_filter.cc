@@ -102,7 +102,7 @@ LoadClusterEntryHandlePtr ProxyFilterConfig::addDynamicCluster(
     Extensions::Common::DynamicForwardProxy::DfpClusterSharedPtr cluster,
     const std::string& cluster_name, const std::string& host, const int port,
     LoadClusterEntryCallbacks& callbacks) {
-  std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>> sub_cluster_pair =
+  std::pair<bool, std::optional<envoy::config::cluster::v3::Cluster>> sub_cluster_pair =
       cluster->createSubClusterConfig(cluster_name, host, port);
 
   if (!sub_cluster_pair.first) {
@@ -257,7 +257,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     ENVOY_STREAM_LOG(debug, "dynamic forward cluster is gone", *this->decoder_callbacks_);
     this->decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
                                              ResponseStrings::get().DFPClusterIsGone, nullptr,
-                                             absl::nullopt, RcDetails::get().DFPClusterIsGone);
+                                             std::nullopt, RcDetails::get().DFPClusterIsGone);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -269,9 +269,9 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   if (circuit_breaker_ == nullptr) {
     ENVOY_STREAM_LOG(debug, "pending request overflow", *this->decoder_callbacks_);
-    this->decoder_callbacks_->sendLocalReply(
-        Http::Code::ServiceUnavailable, ResponseStrings::get().PendingRequestOverflow, nullptr,
-        absl::nullopt, RcDetails::get().PendingRequestOverflow);
+    this->decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
+                                             ResponseStrings::get().PendingRequestOverflow, nullptr,
+                                             std::nullopt, RcDetails::get().PendingRequestOverflow);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -306,7 +306,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   if (headers.Host()->value().getStringView().empty()) {
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
                                        ResponseStrings::get().EmptyHostHeader, nullptr,
-                                       absl::nullopt, RcDetails::get().EmptyHostHeader);
+                                       std::nullopt, RcDetails::get().EmptyHostHeader);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -366,7 +366,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     ENVOY_STREAM_LOG(debug, "DNS cache overflow", *decoder_callbacks_);
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
                                        ResponseStrings::get().DnsCacheOverflow, nullptr,
-                                       absl::nullopt, RcDetails::get().DnsCacheOverflow);
+                                       std::nullopt, RcDetails::get().DnsCacheOverflow);
     return Http::FilterHeadersStatus::StopIteration;
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
@@ -412,7 +412,7 @@ ProxyFilter::loadDynamicCluster(const Common::DynamicForwardProxy::DfpClusterSha
     ENVOY_STREAM_LOG(debug, "sub clusters overflow", *this->decoder_callbacks_);
     this->decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
                                              ResponseStrings::get().SubClusterOverflow, nullptr,
-                                             absl::nullopt, RcDetails::get().SubClusterOverflow);
+                                             std::nullopt, RcDetails::get().SubClusterOverflow);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -459,7 +459,7 @@ void ProxyFilter::onClusterInitTimeout() {
   cluster_load_handle_.reset();
   decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
                                      ResponseStrings::get().SubClusterWarmingTimeout, nullptr,
-                                     absl::nullopt, RcDetails::get().SubClusterWarmingTimeout);
+                                     std::nullopt, RcDetails::get().SubClusterWarmingTimeout);
 }
 
 void ProxyFilter::onDnsResolutionFail(absl::string_view details) {
@@ -472,7 +472,7 @@ void ProxyFilter::onDnsResolutionFail(absl::string_view details) {
       StreamInfo::CoreResponseFlag::DnsResolutionFailed);
   decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
                                      ResponseStrings::get().DnsResolutionFailure, nullptr,
-                                     absl::nullopt, details);
+                                     std::nullopt, details);
 }
 
 void ProxyFilter::onLoadDnsCacheComplete(

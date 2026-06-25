@@ -2,6 +2,7 @@
 
 #include <deque>
 #include <memory>
+#include <optional>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -17,7 +18,6 @@
 #include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
 #include "absl/status/status.h"
-#include "absl/types/optional.h"
 #include "matching_utils.h"
 
 namespace Envoy {
@@ -43,7 +43,7 @@ public:
   bool empty() const { return queue_.empty(); }
   void push(Buffer::Instance& data, bool end_stream);
   void clear();
-  absl::optional<QueuedChunk> pop(Buffer::OwnedImpl& out_data);
+  std::optional<QueuedChunk> pop(Buffer::OwnedImpl& out_data);
   const QueuedChunk& consolidate();
   Buffer::OwnedImpl& receivedData() { return received_data_; }
   const std::deque<QueuedChunk>& queue() const { return queue_; }
@@ -189,7 +189,7 @@ public:
   virtual const Http::RequestOrResponseHeaderMap* responseHeaders() const PURE;
   const Http::HeaderMap* responseTrailers() const { return trailers_; }
 
-  const absl::optional<MonotonicTime>& getCallStartTime() const { return call_start_time_; }
+  const std::optional<MonotonicTime>& getCallStartTime() const { return call_start_time_; }
   void onStartProcessorCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
                             CallbackState callback_state, bool send_body);
   void onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
@@ -228,7 +228,7 @@ public:
   // Move the contents of "data" into a QueuedChunk object on the streaming queue.
   void enqueueStreamingChunk(Buffer::Instance& data, bool end_stream);
   // If the queue has chunks, return the head of the queue.
-  absl::optional<QueuedChunk> dequeueStreamingChunk(Buffer::OwnedImpl& out_data);
+  std::optional<QueuedChunk> dequeueStreamingChunk(Buffer::OwnedImpl& out_data);
   // Consolidate all the chunks on the queue into a single one and return a reference.
   const QueuedChunk& consolidateStreamedChunks() { return chunk_queue_.consolidate(); }
   bool queueOverHighLimit() const { return chunk_queue_.bytesEnqueued() > bufferLimit(); }
@@ -399,7 +399,7 @@ protected:
   Http::HeaderMap* trailers_ = nullptr;
   Event::TimerPtr message_timer_;
   ChunkQueue chunk_queue_;
-  absl::optional<MonotonicTime> call_start_time_ = absl::nullopt;
+  std::optional<MonotonicTime> call_start_time_ = std::nullopt;
 
   const std::vector<std::string>* untyped_forwarding_namespaces_{};
   const std::vector<std::string>* typed_forwarding_namespaces_{};

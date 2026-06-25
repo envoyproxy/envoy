@@ -85,7 +85,7 @@ bool useHttp3(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions&
   return false;
 }
 
-absl::StatusOr<absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>>
+absl::StatusOr<std::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>>
 getAlternateProtocolsCacheOptions(
     const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
     Server::Configuration::ServerFactoryContext& server_context) {
@@ -104,7 +104,7 @@ getAlternateProtocolsCacheOptions(
 
     return cache_options;
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 absl::StatusOr<Envoy::Http::HeaderValidatorFactoryPtr> createHeaderValidatorFactory(
@@ -261,7 +261,7 @@ ProtocolOptionsConfigImpl::createProtocolOptionsConfig(
     const envoy::config::core::v3::Http1ProtocolOptions& http1_settings,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     const envoy::config::core::v3::HttpProtocolOptions& common_options,
-    const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
+    const std::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
     bool use_downstream_protocol, bool use_http2,
     Server::Configuration::ServerFactoryContext& server_context,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
@@ -285,7 +285,7 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
     envoy::config::core::v3::Http2ProtocolOptions http2_options,
     Envoy::Http::HeaderValidatorFactoryPtr&& header_validator_factory,
-    absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> cache_options,
+    std::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> cache_options,
     std::vector<Envoy::Router::ShadowPolicyPtr>&& shadow_policies,
     std::shared_ptr<const Envoy::Router::RetryPolicy>&& retry_policy,
     std::unique_ptr<Envoy::Http::HashPolicy>&& hash_policy,
@@ -296,9 +296,9 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
       common_http_protocol_options_(options.common_http_protocol_options()),
       upstream_http_protocol_options_(
           options.has_upstream_http_protocol_options()
-              ? absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>(
+              ? std::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>(
                     options.upstream_http_protocol_options())
-              : absl::nullopt),
+              : std::nullopt),
       http_filters_(options.http_filters()),
       alternate_protocol_cache_options_(std::move(cache_options)),
       header_validator_factory_(std::move(header_validator_factory)),
@@ -319,7 +319,7 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::config::core::v3::Http1ProtocolOptions& http1_settings,
     const envoy::config::core::v3::Http2ProtocolOptions& validated_http2_options,
     const envoy::config::core::v3::HttpProtocolOptions& common_options,
-    const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
+    const std::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
     bool use_downstream_protocol, bool use_http2,
     Server::Configuration::ServerFactoryContext& server_context,
     ProtobufMessage::ValidationVisitor& validation_visitor)

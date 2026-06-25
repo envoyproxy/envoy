@@ -741,7 +741,7 @@ Protobuf::Value ValueUtil::stringValue(absl::string_view str) {
   return val;
 }
 
-Protobuf::Value ValueUtil::optionalStringValue(const absl::optional<std::string>& str) {
+Protobuf::Value ValueUtil::optionalStringValue(const std::optional<std::string>& str) {
   if (str.has_value()) {
     return ValueUtil::stringValue(str.value());
   }

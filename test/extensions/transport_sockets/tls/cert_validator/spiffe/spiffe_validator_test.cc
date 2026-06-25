@@ -60,7 +60,7 @@ public:
     TestUtility::loadFromYaml(yaml, typed_conf);
     config_ = std::make_unique<TestCertificateValidationContextConfig>(
         typed_conf, allow_expired_certificate_, san_matchers_, /*ca_cert=*/"",
-        /*verify_depth=*/absl::nullopt, suppress_client_ca_list_);
+        /*verify_depth=*/std::nullopt, suppress_client_ca_list_);
 
     // Mocking time source
     ON_CALL(factory_context_, timeSource()).WillByDefault(testing::ReturnRef(time_source));
@@ -106,7 +106,7 @@ public:
     TestUtility::loadFromYaml(yaml, typed_conf);
     config_ = std::make_unique<TestCertificateValidationContextConfig>(
         typed_conf, allow_expired_certificate_, san_matchers_, /*ca_cert=*/"",
-        /*verify_depth=*/absl::nullopt, suppress_client_ca_list_);
+        /*verify_depth=*/std::nullopt, suppress_client_ca_list_);
 
     if (!trust_bundle_file.empty()) {
       EXPECT_CALL(factory_context_.dispatcher_, createFilesystemWatcher_())
@@ -859,7 +859,7 @@ typed_config:
   )EOF"),
                        time_system));
 
-  EXPECT_EQ(absl::nullopt, validator().daysUntilFirstCertExpires());
+  EXPECT_EQ(std::nullopt, validator().daysUntilFirstCertExpires());
 }
 
 TEST_F(TestSPIFFEValidator, TestAddClientValidationContext) {

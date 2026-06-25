@@ -95,14 +95,14 @@ protoToSharedState(const ProtoConfig& config,
   return std::make_shared<FilterConfig>(
       context, bucket_singleton,
       config.has_request_limit()
-          ? absl::optional<absl::string_view>(config.request_limit().bucket_id())
-          : absl::nullopt,
+          ? std::optional<absl::string_view>(config.request_limit().bucket_id())
+          : std::nullopt,
       config.has_response_limit()
-          ? absl::optional<absl::string_view>(config.response_limit().bucket_id())
-          : absl::nullopt,
+          ? std::optional<absl::string_view>(config.response_limit().bucket_id())
+          : std::nullopt,
       config.enable_response_trailers()
-          ? absl::optional<absl::string_view>(config.response_trailer_prefix())
-          : absl::nullopt,
+          ? std::optional<absl::string_view>(config.response_trailer_prefix())
+          : std::nullopt,
       std::move(tenant_name_selector), std::move(tenant_configs), std::move(default_tenant_config));
 }
 } // namespace

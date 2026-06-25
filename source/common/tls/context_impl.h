@@ -102,10 +102,10 @@ public:
 
   static int sslSocketIndex();
   // Ssl::Context
-  absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
+  std::optional<uint32_t> daysUntilFirstCertExpires() const override;
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
   std::vector<Envoy::Ssl::CertificateDetailsPtr> getCertChainInformation() const override;
-  absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override;
+  std::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override;
 
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 

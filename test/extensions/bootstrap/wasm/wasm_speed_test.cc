@@ -4,6 +4,8 @@
  * Run with:
  * `bazel run --config=libc++ -c opt //test/extensions/bootstrap/wasm:wasm_speed_test`
  */
+#include <optional>
+
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/common/wasm/wasm.h"
@@ -13,7 +15,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "benchmark/benchmark.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

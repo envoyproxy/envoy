@@ -1,10 +1,11 @@
 #pragma once
 
+#include <optional>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/grpc/codec.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -36,7 +37,7 @@ protected:
 
   ConnectEndFrameState connect_state_{ConnectEndFrameState::None};
   std::unique_ptr<Buffer::OwnedImpl> connect_eos_buffer_;
-  absl::optional<absl::string_view> connect_error_code_;
+  std::optional<absl::string_view> connect_error_code_;
 };
 
 } // namespace GrpcStats

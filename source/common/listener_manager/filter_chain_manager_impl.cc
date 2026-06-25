@@ -129,7 +129,7 @@ absl::Status FilterChainManagerImpl::addFilterChains(
     const envoy::config::listener::v3::FilterChain* default_filter_chain,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
-  Cleanup cleanup([this]() { origin_ = absl::nullopt; });
+  Cleanup cleanup([this]() { origin_ = std::nullopt; });
   FilterChainsByMatcher filter_chains;
   uint32_t new_filter_chain_size = 0;
   FilterChainsByName filter_chains_by_name;
@@ -307,7 +307,7 @@ absl::Status FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
   if (default_filter_chain == nullptr) {
     return absl::OkStatus();
   }
-  default_filter_chain_message_ = absl::make_optional(*default_filter_chain);
+  default_filter_chain_message_ = std::make_optional(*default_filter_chain);
 
   // Origin filter chain manager could be empty if the current is the ancestor.
   const auto* origin = getOriginFilterChainManager();

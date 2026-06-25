@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -13,7 +14,6 @@
 #include "envoy/ssl/connection.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Network {
@@ -35,7 +35,7 @@ struct SocketOptionName {
   bool operator==(const SocketOptionName& rhs) const { return value_ == rhs.value_; }
 
 private:
-  absl::optional<std::tuple<int, int, std::string>> value_;
+  std::optional<std::tuple<int, int, std::string>> value_;
 };
 
 // ENVOY_MAKE_SOCKET_OPTION_NAME is a helper macro to generate a
@@ -256,13 +256,13 @@ public:
   /**
    * @return Connection ID of the downstream connection, or unset if not available.
    **/
-  virtual absl::optional<uint64_t> connectionID() const PURE;
+  virtual std::optional<uint64_t> connectionID() const PURE;
 
   /**
    * @return the name of the network interface used by local end of the connection, or unset if not
    *available.
    **/
-  virtual absl::optional<absl::string_view> interfaceName() const PURE;
+  virtual std::optional<absl::string_view> interfaceName() const PURE;
 
   /**
    * Dumps the state of the ConnectionInfoProvider to the given ostream.
@@ -291,7 +291,7 @@ public:
   /**
    * @return roundTripTime of the connection
    */
-  virtual const absl::optional<std::chrono::milliseconds>& roundTripTime() const PURE;
+  virtual const std::optional<std::chrono::milliseconds>& roundTripTime() const PURE;
 
   /**
    * @return the filter chain info provider backing this socket.
@@ -440,9 +440,9 @@ public:
   virtual Address::Type addressType() const PURE;
 
   /**
-   * @return the IP version used by the socket if address type is IP, absl::nullopt otherwise
+   * @return the IP version used by the socket if address type is IP, std::nullopt otherwise
    */
-  virtual absl::optional<Address::IpVersion> ipVersion() const PURE;
+  virtual std::optional<Address::IpVersion> ipVersion() const PURE;
 
   /**
    * Close the underlying socket.
@@ -544,7 +544,7 @@ public:
      * @param state The state at which we would apply the options.
      * @return What we would apply to the socket at the provided state. Empty if we'd apply nothing.
      */
-    virtual absl::optional<Details>
+    virtual std::optional<Details>
     getOptionDetails(const Socket& socket,
                      envoy::config::core::v3::SocketOption::SocketState state) const PURE;
 
@@ -600,13 +600,13 @@ public:
    * @return a ParentDrainedCallbackRegistrar for UDP listen sockets during hot restart.
    */
   virtual OptRef<class ParentDrainedCallbackRegistrar> parentDrainedCallbackRegistrar() const {
-    return absl::nullopt;
+    return std::nullopt;
   }
 };
 
 using SocketPtr = std::unique_ptr<Socket>;
 using SocketSharedPtr = std::shared_ptr<Socket>;
-using SocketOptRef = absl::optional<std::reference_wrapper<Socket>>;
+using SocketOptRef = std::optional<std::reference_wrapper<Socket>>;
 
 } // namespace Network
 } // namespace Envoy

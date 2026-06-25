@@ -1,6 +1,7 @@
 #include <chrono>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -25,7 +26,6 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -77,7 +77,7 @@ void makeLocalResponseTrailers(envoy::config::core::v3::HeaderMap& trailers_resp
 class StreamingLocalReplyTest : public HttpFilterTest {
 public:
   void processRequestHeadersAndStartLocalResponse(
-      absl::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HttpHeaders&)>>
+      std::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HttpHeaders&)>>
           cb) {
     ASSERT_TRUE(last_request_.has_request_headers());
     const auto& headers = last_request_.request_headers();
@@ -100,7 +100,7 @@ public:
   }
 
   void processRequestBodyAndSendLocalResponse(
-      absl::optional<
+      std::optional<
           std::function<void(const HttpBody&, ProcessingResponse&, StreamedBodyResponse&)>>
           cb) {
     ASSERT_TRUE(last_request_.has_request_body());
@@ -117,8 +117,8 @@ public:
   }
 
   void processRequestTrailersAndSendLocalResponse(
-      absl::optional<std::function<void(const HttpTrailers&, ProcessingResponse&,
-                                        envoy::config::core::v3::HeaderMap&)>>
+      std::optional<std::function<void(const HttpTrailers&, ProcessingResponse&,
+                                       envoy::config::core::v3::HeaderMap&)>>
           cb) {
     ASSERT_TRUE(last_request_.has_request_trailers());
     const auto& trailers = last_request_.request_trailers();
@@ -135,7 +135,7 @@ public:
   }
 
   void sendStreamingLocalResponseBody(
-      absl::optional<std::function<void(ProcessingResponse&, StreamedBodyResponse&)>> cb) {
+      std::optional<std::function<void(ProcessingResponse&, StreamedBodyResponse&)>> cb) {
     auto response = std::make_unique<ProcessingResponse>();
     auto* body_response = response->mutable_streamed_immediate_response()->mutable_body_response();
     if (cb) {
@@ -146,7 +146,7 @@ public:
   }
 
   void sendStreamingLocalResponseTrailers(
-      absl::optional<std::function<void(ProcessingResponse&, envoy::config::core::v3::HeaderMap&)>>
+      std::optional<std::function<void(ProcessingResponse&, envoy::config::core::v3::HeaderMap&)>>
           cb) {
     auto response = std::make_unique<ProcessingResponse>();
     auto* trailers_response =
@@ -181,7 +181,7 @@ public:
     EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
     EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
-                                                   Eq(absl::nullopt), error_details));
+                                                   Eq(std::nullopt), error_details));
     // Indicate that local response body is expected. Request should fail as the body send mode
     // is BUFFERED.
     processRequestHeadersAndStartLocalResponse(
@@ -911,7 +911,7 @@ TEST_F(StreamingLocalReplyTest, LocalBodyWithoutHeadersResponse) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   EXPECT_CALL(encoder_callbacks_,
-              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(absl::nullopt),
+              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(std::nullopt),
                              "local_response_body_received_before_headers"));
   // Skip sending local response headers and send local response body instead.
   sendStreamingLocalResponseBody([](const ProcessingResponse&, StreamedBodyResponse& body_resp) {
@@ -944,7 +944,7 @@ TEST_F(StreamingLocalReplyTest, LocalTrailersWithoutHeadersResponse) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   EXPECT_CALL(encoder_callbacks_,
-              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(absl::nullopt),
+              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(std::nullopt),
                              "local_response_trailers_received_before_headers"));
   // Skip sending local response headers and send local response body instead.
   sendStreamingLocalResponseTrailers(
@@ -1065,8 +1065,8 @@ TEST_F(StreamingLocalReplyTest, InvalidBodyMessageAfterLocalResponseStarted) {
   Buffer::OwnedImpl data("foo");
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, false));
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
-                                                 Eq(absl::nullopt), "spurious_message"));
-  processRequestBody(absl::nullopt, false);
+                                                 Eq(std::nullopt), "spurious_message"));
+  processRequestBody(std::nullopt, false);
   filter_->onDestroy();
 
   EXPECT_EQ(1, config_->stats().streams_started_.value());
@@ -1105,7 +1105,7 @@ TEST_F(StreamingLocalReplyTest, InvalidTrailersMessageAfterLocalResponseStarted)
   Buffer::OwnedImpl data("foo");
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, false));
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
-                                                 Eq(absl::nullopt), "spurious_message"));
+                                                 Eq(std::nullopt), "spurious_message"));
 
   auto response = std::make_unique<ProcessingResponse>();
   response->mutable_request_trailers();
@@ -1148,7 +1148,7 @@ TEST_F(StreamingLocalReplyTest, InvalidBodyMessageAfterLocalResponseStartedWithF
       });
 
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
-                                                 Eq(absl::nullopt), "spurious_message"));
+                                                 Eq(std::nullopt), "spurious_message"));
   auto response = std::make_unique<ProcessingResponse>();
   response->mutable_request_body();
   stream_callbacks_->onReceiveMessage(std::move(response));
@@ -1179,7 +1179,7 @@ TEST_F(StreamingLocalReplyTest, InitiateLocalSteramingResponseWithoutRequestHead
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
-                                                 Eq(absl::nullopt), "spurious_message"));
+                                                 Eq(std::nullopt), "spurious_message"));
 
   Buffer::OwnedImpl data("foo");
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, true));

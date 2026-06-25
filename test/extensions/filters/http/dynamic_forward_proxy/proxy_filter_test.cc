@@ -139,7 +139,7 @@ TEST_F(ProxyFilterTest, HttpDefaultPort) {
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -167,7 +167,7 @@ TEST_F(ProxyFilterTest, HttpsDefaultPort) {
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -218,7 +218,7 @@ TEST_F(ProxyFilterTest, CacheOverflow) {
 
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Overflow, nullptr, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Overflow, nullptr, std::nullopt}));
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, Eq("DNS cache overflow"),
                                          _, _, Eq("dns_cache_overflow")));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
@@ -248,7 +248,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflow) {
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -292,7 +292,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflowWithDnsCacheResourceManager) {
   EXPECT_CALL(callbacks_, streamInfo());
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -389,7 +389,7 @@ TEST_F(ProxyFilterTest, HostRewrite) {
   EXPECT_CALL(callbacks_, streamInfo());
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("bar"), 80, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -420,7 +420,7 @@ TEST_F(ProxyFilterTest, HostRewriteViaHeader) {
   EXPECT_CALL(callbacks_, streamInfo());
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("bar"), 82, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
 
   Http::TestRequestHeaderMapImpl headers{{":authority", "foo"}, {"x-set-header", "bar:82"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
@@ -444,7 +444,7 @@ TEST_F(ProxyFilterTest, SubClusterNotExists) {
               getThreadLocalCluster(Eq("DFPCluster:foo:80")));
   // "true" means another thread already created it.
   EXPECT_CALL(*(dfp_cluster_.get()), createSubClusterConfig(_, _, _))
-      .WillOnce(Return(std::make_pair(true, absl::nullopt)));
+      .WillOnce(Return(std::make_pair(true, std::nullopt)));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -489,7 +489,7 @@ TEST_F(ProxyFilterTest, SubClusterOverflow) {
               getThreadLocalCluster(Eq("DFPCluster:foo:80")));
   // reach the max_sub_clusters limitation.
   EXPECT_CALL(*(dfp_cluster_.get()), createSubClusterConfig(_, _, _))
-      .WillOnce(Return(std::make_pair(false, absl::nullopt)));
+      .WillOnce(Return(std::make_pair(false, std::nullopt)));
 
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, Eq("Sub cluster overflow"),
                                          _, _, Eq("sub_cluster_overflow")));
@@ -538,7 +538,7 @@ TEST_F(ProxyFilterTest, SubClusterInitTimeout) {
               getThreadLocalCluster(Eq("DFPCluster:foo:80")));
   // "true" means another thread already created it.
   EXPECT_CALL(*(dfp_cluster_.get()), createSubClusterConfig(_, _, _))
-      .WillOnce(Return(std::make_pair(true, absl::nullopt)));
+      .WillOnce(Return(std::make_pair(true, std::nullopt)));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -815,7 +815,7 @@ TEST_F(ProxyFilterWithFilterStateHostTest, NoFilterStatePresent) {
       new Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
 
   filter_->decodeHeaders(request_headers_, false);
 
@@ -848,7 +848,7 @@ TEST_F(ProxyFilterWithFilterStateHostTest, WithFilterStateHostPresent) {
       new Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq(filter_state_host), 80, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
 
   filter_->decodeHeaders(request_headers_, false);
 
@@ -920,7 +920,7 @@ TEST_F(ProxyFilterWithFilterStateHostDisabledTest, DoesNotUseFilterStateWhenFlag
       new Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -953,7 +953,7 @@ TEST_F(ProxyFilterWithFilterStateHostDisabledTest, IgnoresFilterStateHostWhenFla
       new Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
 
   filter_->decodeHeaders(request_headers_, false);
 
@@ -987,7 +987,7 @@ TEST_F(ProxyFilterWithFilterStateHostTest, WithFilterStatePortPresent) {
   EXPECT_CALL(*dns_cache_manager_->dns_cache_,
               loadDnsCacheEntry_(Eq("foo"), filter_state_port, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
 
   filter_->decodeHeaders(request_headers_, false);
 
@@ -1025,7 +1025,7 @@ TEST_F(ProxyFilterWithFilterStateHostTest, WithFilterStateHostAndPortPresent) {
   EXPECT_CALL(*dns_cache_manager_->dns_cache_,
               loadDnsCacheEntry_(Eq(filter_state_host), filter_state_port, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
 
   filter_->decodeHeaders(request_headers_, false);
 
@@ -1062,7 +1062,7 @@ TEST_F(ProxyFilterWithFilterStateHostDisabledTest, IgnoresFilterStatePortWhenFla
       new Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
 
   filter_->decodeHeaders(request_headers_, false);
 
@@ -1091,7 +1091,7 @@ TEST_F(ProxyFilterTest, IPv6BracketStrippingBug) {
       new Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("[::1]"), 8080, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
 
   // Test with IPv6 literal host header.
   Http::TestRequestHeaderMapImpl headers{{":authority", "[::1]:8080"}};
@@ -1135,7 +1135,7 @@ TEST_P(ProxyFilterIPv6ParameterizedTest, IPv6BracketVariations) {
   EXPECT_CALL(*dns_cache_manager_->dns_cache_,
               loadDnsCacheEntry_(Eq(test_case.expected_host), test_case.expected_port, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
 
   Http::TestRequestHeaderMapImpl headers{{":authority", test_case.host_header}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,

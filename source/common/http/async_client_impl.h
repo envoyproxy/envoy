@@ -164,13 +164,13 @@ protected:
 
   AsyncClientImpl& parent_;
   // Callback to listen for stream destruction.
-  absl::optional<AsyncClient::StreamDestructorCallbacks> destructor_callback_;
+  std::optional<AsyncClient::StreamDestructorCallbacks> destructor_callback_;
   // Callback to listen for low/high/overflow watermark events.
-  absl::optional<std::reference_wrapper<SidestreamWatermarkCallbacks>> watermark_callbacks_;
+  std::optional<std::reference_wrapper<SidestreamWatermarkCallbacks>> watermark_callbacks_;
   bool complete_{};
   const bool discard_response_body_;
   const bool new_async_client_retry_logic_{};
-  absl::optional<uint64_t> buffer_limit_{absl::nullopt};
+  std::optional<uint64_t> buffer_limit_{std::nullopt};
 
 private:
   void cleanup();
@@ -223,7 +223,7 @@ private:
   void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {}
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
-                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
   // The async client won't pause if sending 1xx headers so simply swallow any.
   void encode1xxHeaders(ResponseHeaderMapPtr&&) override {}

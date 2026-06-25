@@ -403,7 +403,7 @@ void EdsClusterImpl::reloadHealthyHostsHelper(const HostSharedPtr& host) {
 
     prioritySet().updateHosts(
         priority, HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
-        host_set->localityWeights(), {}, hosts_to_remove, absl::nullopt, absl::nullopt);
+        host_set->localityWeights(), {}, hosts_to_remove, std::nullopt, std::nullopt);
   }
 }
 
@@ -442,7 +442,7 @@ bool EdsClusterImpl::updateHostsPerLocality(
               info_->name(), host_set.hosts().size(), host_set.priority());
 
     priority_state_manager.updateClusterPrioritySet(
-        priority, std::move(current_hosts_copy), hosts_added, hosts_removed, absl::nullopt,
+        priority, std::move(current_hosts_copy), hosts_added, hosts_removed, std::nullopt,
         weighted_priority_health, overprovisioning_factor);
     return true;
   }

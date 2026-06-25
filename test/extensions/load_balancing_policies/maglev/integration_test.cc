@@ -100,7 +100,7 @@ public:
   }
 
   void runNormalLoadBalancing() {
-    absl::optional<uint64_t> unique_upstream_index;
+    std::optional<uint64_t> unique_upstream_index;
 
     for (uint64_t i = 0; i < 8; i++) {
       codec_client_ = makeHttpConnection(lookupPort("http"));

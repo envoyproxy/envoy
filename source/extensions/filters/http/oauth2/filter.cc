@@ -151,9 +151,9 @@ bool cookieNameMatchesBase(absl::string_view cookie_name, absl::string_view base
   return cookie_name.starts_with(absl::StrCat(base_name, CookieSuffixDelimiter));
 }
 
-absl::optional<std::string> readCookieValueWithSuffix(const Http::RequestHeaderMap& headers,
-                                                      absl::string_view base_name,
-                                                      absl::string_view suffix) {
+std::optional<std::string> readCookieValueWithSuffix(const Http::RequestHeaderMap& headers,
+                                                     absl::string_view base_name,
+                                                     absl::string_view suffix) {
   const std::string suffixed_name = cookieNameWithSuffix(base_name, suffix);
   std::string value = Http::Utility::parseCookieValue(headers, suffixed_name);
   if (!value.empty()) {
@@ -167,7 +167,7 @@ absl::optional<std::string> readCookieValueWithSuffix(const Http::RequestHeaderM
   if (!value.empty()) {
     return value;
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 std::string findValue(const absl::flat_hash_map<std::string, std::string>& map,
@@ -1036,7 +1036,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
   const auto redirect_uri = formatter->format({&headers}, decoder_callbacks_->streamInfo());
 
-  absl::optional<std::string> encrypted_code_verifier =
+  std::optional<std::string> encrypted_code_verifier =
       readCookieValueWithSuffix(headers, config_->cookieNames().code_verifier_, result.flow_id_);
   if (!encrypted_code_verifier.has_value()) {
     sendUnauthorizedResponse("Code verifier cookie is missing in the request");
@@ -1720,7 +1720,7 @@ void OAuth2Filter::sendUnauthorizedResponse(const std::string& details) {
           addFlowCookieDeletionHeaders(headers, flow_id_);
         }
       },
-      absl::nullopt, details);
+      std::nullopt, details);
 }
 
 void OAuth2Filter::sendSecretsNotReadyResponse(const std::string& details) {
@@ -1728,7 +1728,7 @@ void OAuth2Filter::sendSecretsNotReadyResponse(const std::string& details) {
                    details);
   config_->stats().oauth_failure_.inc();
   decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, ServiceUnavailableBodyMessage,
-                                     nullptr, absl::nullopt, details);
+                                     nullptr, std::nullopt, details);
 }
 
 bool OAuth2Filter::shouldAllowFailed(const Http::RequestHeaderMap& headers) const {
@@ -1880,7 +1880,7 @@ CallbackValidationResult OAuth2Filter::validateState(const Http::RequestHeaderMa
 bool OAuth2Filter::validateCsrfToken(const Http::RequestHeaderMap& headers,
                                      const std::string& csrf_token,
                                      absl::string_view flow_id) const {
-  absl::optional<std::string> cookie_value =
+  std::optional<std::string> cookie_value =
       readCookieValueWithSuffix(headers, config_->cookieNames().oauth_nonce_, flow_id);
   if (!cookie_value.has_value()) {
     return false;

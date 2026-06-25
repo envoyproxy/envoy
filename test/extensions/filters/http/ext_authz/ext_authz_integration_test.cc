@@ -51,7 +51,7 @@ struct GrpcInitializeConfigOpts {
   uint32_t max_denied_response_body_bytes = 0;
   // In some tests a request is never sent. If a request is never sent, stats are not set. In those
   // tests, we need to be able to override this to false.
-  absl::optional<bool> expect_stats_override = absl::nullopt;
+  std::optional<bool> expect_stats_override = std::nullopt;
   // In timeout tests we expect zero response bytes.
   bool stats_expect_response_bytes = true;
   bool enforce_response_header_limits = false;
@@ -316,7 +316,7 @@ public:
       EXPECT_FALSE(http_request->headers_size());
       // Verify headers in check request, making sure that duplicate headers
       // are not merged (since we are encoding the raw headers).
-      std::vector<std::pair<absl::string_view, absl::optional<absl::string_view>>> expected_headers{
+      std::vector<std::pair<absl::string_view, std::optional<absl::string_view>>> expected_headers{
           {"allowed-prefix-one", "one"},
           {"allowed-prefix-two", "two"},
           {"x-duplicate", "one"},
@@ -339,7 +339,7 @@ public:
                                           key, value == std::nullopt ? "*" : *value);
       }
       // Check that not-allowed is not present.
-      std::vector<std::pair<absl::string_view, absl::optional<absl::string_view>>>
+      std::vector<std::pair<absl::string_view, std::optional<absl::string_view>>>
           unexpected_headers{
               // There will be a header with this key, but it should NOT have this value.
               {Envoy::Extensions::Filters::Common::ExtAuthz::Headers::get()
@@ -620,7 +620,7 @@ public:
 
   const std::string
   expectedCheckRequest(Http::CodecType downstream_protocol,
-                       absl::optional<uint64_t> override_expected_size = absl::nullopt) {
+                       std::optional<uint64_t> override_expected_size = std::nullopt) {
     const std::string expected_downstream_protocol =
         downstream_protocol == Http::CodecType::HTTP1 ? "HTTP/1.1" : "HTTP/2";
     constexpr absl::string_view expected_format = R"EOF(

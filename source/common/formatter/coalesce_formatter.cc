@@ -8,7 +8,7 @@ namespace Envoy {
 namespace Formatter {
 
 absl::StatusOr<FormatterProviderPtr> CoalesceFormatter::create(absl::string_view json_config,
-                                                               absl::optional<size_t> max_length) {
+                                                               std::optional<size_t> max_length) {
   if (json_config.empty()) {
     return absl::InvalidArgumentError("COALESCE requires a JSON configuration parameter");
   }
@@ -59,7 +59,7 @@ CoalesceFormatter::parseOperatorEntry(const Json::Object& entry) {
   // Check if this is a simple string command with command-only and no parameters.
   auto string_value = entry.asString();
   if (string_value.ok()) {
-    return createFormatterForCommand(string_value.value(), "", absl::nullopt);
+    return createFormatterForCommand(string_value.value(), "", std::nullopt);
   }
 
   // Otherwise, it should be an object with "command" field.
@@ -84,7 +84,7 @@ CoalesceFormatter::parseOperatorEntry(const Json::Object& entry) {
     param = param_or_error.value();
   }
 
-  absl::optional<size_t> entry_max_length;
+  std::optional<size_t> entry_max_length;
   if (entry.hasObject("max_length")) {
     auto max_length_or_error = entry.getInteger("max_length");
     if (!max_length_or_error.ok()) {
@@ -102,7 +102,7 @@ CoalesceFormatter::parseOperatorEntry(const Json::Object& entry) {
 
 absl::StatusOr<FormatterProviderPtr>
 CoalesceFormatter::createFormatterForCommand(absl::string_view command, absl::string_view param,
-                                             absl::optional<size_t> max_length) {
+                                             std::optional<size_t> max_length) {
   // Try built-in command parsers to create the formatter.
   for (const auto& parser : BuiltInCommandParserFactoryHelper::commandParsers()) {
     absl::StatusOr<FormatterProviderPtr> formatter_result =
@@ -117,7 +117,7 @@ CoalesceFormatter::createFormatterForCommand(absl::string_view command, absl::st
   return absl::InvalidArgumentError(fmt::format("unknown command: '{}'", command));
 }
 
-absl::optional<std::string>
+std::optional<std::string>
 CoalesceFormatter::format(const Context& context, const StreamInfo::StreamInfo& stream_info) const {
   for (const auto& formatter : formatters_) {
     auto result = formatter->format(context, stream_info);
@@ -128,7 +128,7 @@ CoalesceFormatter::format(const Context& context, const StreamInfo::StreamInfo& 
       return result;
     }
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 Protobuf::Value CoalesceFormatter::formatValue(const Context& context,

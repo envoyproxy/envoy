@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "envoy/extensions/filters/network/geoip/v3/geoip.pb.h"
 #include "envoy/extensions/filters/network/geoip/v3/geoip.pb.validate.h"
 
@@ -8,7 +10,6 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -24,7 +25,7 @@ public:
 
   Geolocation::DummyGeoipProviderFactory dummy_factory_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  absl::optional<Registry::InjectFactory<Geolocation::GeoipProviderFactory>> registration_;
+  std::optional<Registry::InjectFactory<Geolocation::GeoipProviderFactory>> registration_;
 };
 
 TEST_F(GeoipConfigTest, CreateFilterFactory) {

@@ -22,7 +22,7 @@ public:
    * @param stat_name_tags optionally StatNameTagVector the stat name tags to add to the stat name.
    */
   TagStatNameJoiner(StatName prefix, StatName stat_name,
-                    absl::optional<StatNameTagSpan> stat_name_tags, SymbolTable& symbol_table);
+                    std::optional<StatNameTagSpan> stat_name_tags, SymbolTable& symbol_table);
 
   /**
    * Combines a scope's tag-extracted prefix, prefix tags, and tagged (flat) prefix, together with
@@ -56,21 +56,21 @@ public:
   StatName tagExtractedName() const { return tag_extracted_name_; }
 
   /**
-   * @return the optional effective tags. absl::nullopt (no explicit tags) is preserved so that
+   * @return the optional effective tags. std::nullopt (no explicit tags) is preserved so that
    *         downstream code performs tag extraction on the name.
    *
    * Tags come from one of two mutually-exclusive sources depending on the constructor used:
    * the legacy constructor stores the caller-owned span directly (`stat_name_tags_`); the
    * tag-aware constructor derives and owns them in `effective_tags_`.
    */
-  absl::optional<StatNameTagSpan> effectiveTags() const {
+  std::optional<StatNameTagSpan> effectiveTags() const {
     if (stat_name_tags_.has_value()) {
       return stat_name_tags_;
     }
     if (!effective_tags_.empty()) {
       return StatNameTagSpan(effective_tags_);
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
 private:
@@ -84,7 +84,7 @@ private:
   // Set only by the legacy constructor: a (non-owning) span of the caller-provided tags. The
   // TagStatNameJoiner must not outlive those tags, so callers must keep them valid for its
   // lifetime. effectiveTags() returns this directly when set.
-  absl::optional<StatNameTagSpan> stat_name_tags_;
+  std::optional<StatNameTagSpan> stat_name_tags_;
 
   // Set only by the tag-aware constructor: the inherited (prefix) tags followed by this
   // element's own (name) tags, owned (copied) by this joiner. effectiveTags() returns a span over

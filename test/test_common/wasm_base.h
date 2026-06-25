@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdio>
+#include <optional>
 
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/server/lifecycle_notifier.h"
@@ -22,7 +23,6 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -134,7 +134,7 @@ private:
   std::string root_id_ = "";
   std::string vm_configuration_ = "";
   bool fail_open_ = false;
-  absl::optional<bool> allow_on_headers_stop_iteration_ = absl::nullopt;
+  std::optional<bool> allow_on_headers_stop_iteration_ = std::nullopt;
   std::string plugin_configuration_ = "";
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_;
   envoy::extensions::wasm::v3::EnvironmentVariables envs_;

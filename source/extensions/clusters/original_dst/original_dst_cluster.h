@@ -106,11 +106,11 @@ public:
     // Preconnecting is not implemented for OriginalDstCluster
     HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
     // Pool selection not implemented for OriginalDstCluster
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                              const Upstream::Host& /*host*/,
                              std::vector<uint8_t>& /*hash_key*/) override {
-      return absl::nullopt;
+      return std::nullopt;
     }
     // Lifetime tracking not implemented for OriginalDstCluster
     OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
@@ -124,16 +124,16 @@ public:
   private:
     const OriginalDstClusterHandleSharedPtr parent_;
     // The optional original host provider that extracts the address from HTTP header map.
-    const absl::optional<Http::LowerCaseString>& http_header_name_;
-    const absl::optional<Config::MetadataKey>& metadata_key_;
-    const absl::optional<uint32_t> port_override_;
+    const std::optional<Http::LowerCaseString>& http_header_name_;
+    const std::optional<Config::MetadataKey>& metadata_key_;
+    const std::optional<uint32_t> port_override_;
     HostMultiMapConstSharedPtr host_map_;
     Common::CallbackHandlePtr member_update_cb_;
   };
 
-  const absl::optional<Http::LowerCaseString>& httpHeaderName() { return http_header_name_; }
-  const absl::optional<Config::MetadataKey>& metadataKey() { return metadata_key_; }
-  const absl::optional<uint32_t> portOverride() { return port_override_; }
+  const std::optional<Http::LowerCaseString>& httpHeaderName() { return http_header_name_; }
+  const std::optional<Config::MetadataKey>& metadataKey() { return metadata_key_; }
+  const std::optional<uint32_t> portOverride() { return port_override_; }
 
 protected:
   OriginalDstCluster(
@@ -191,9 +191,9 @@ private:
 
   absl::Mutex host_map_lock_;
   HostMultiMapConstSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);
-  absl::optional<Http::LowerCaseString> http_header_name_;
-  absl::optional<Config::MetadataKey> metadata_key_;
-  absl::optional<uint32_t> port_override_;
+  std::optional<Http::LowerCaseString> http_header_name_;
+  std::optional<Config::MetadataKey> metadata_key_;
+  std::optional<uint32_t> port_override_;
   friend class OriginalDstClusterFactory;
   friend class OriginalDstClusterHandle;
 };
