@@ -263,7 +263,7 @@ void JsonTranscoderConfig::addBuiltinSymbolDescriptor(const std::string& symbol_
 
   Protobuf::DescriptorPoolDatabase pool_database(*builtin_pool);
   Protobuf::FileDescriptorProto file_proto;
-  pool_database.FindFileContainingSymbol(symbol_name, &file_proto);
+  std::ignore = pool_database.FindFileContainingSymbol(symbol_name, &file_proto);
   addFileDescriptor(file_proto);
 }
 

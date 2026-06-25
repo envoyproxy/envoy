@@ -1,3 +1,5 @@
+#include <thread>
+
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/stat_sinks/dynamic_modules/flush_context.h"
 #include "source/extensions/stat_sinks/dynamic_modules/sink.h"
@@ -179,8 +181,8 @@ TEST_F(DynamicModuleStatsSinkTest, FlushPassesSnapshotContext) {
   g_recorder = nullptr;
 }
 
-// onHistogramComplete must bind the histogram name to a local std::string so the
-// buffer stays valid for the module call, since Metric::name() returns by value.
+// onHistogramComplete serializes the histogram name into a thread-local buffer before handing it
+// to the module, so repeated calls reuse the buffer and still report the full name.
 TEST_F(DynamicModuleStatsSinkTest, OnHistogramCompletePassesNameAndValue) {
   CallRecorder recorder;
   g_recorder = &recorder;
@@ -274,6 +276,44 @@ TEST_F(DynamicModuleStatsSinkGaugeTest, SetGaugeInvalidIdIsRejected) {
 
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound, config->setGauge(0, 1));
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound, config->setGauge(2, 1));
+}
+
+// defineGauge fails closed when invoked off the main thread, so a misbehaving module cannot mutate
+// the gauge storage from a worker thread.
+TEST_F(DynamicModuleStatsSinkGaugeTest, DefineGaugeOffMainThreadFailsClosed) {
+  auto config = makeConfig();
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([&] {
+          size_t id = 0;
+          EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+                    config->defineGauge("off_thread", &id));
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_stat_sink_config_define_gauge must be called on the main "
+      "thread");
+  EXPECT_EQ(nullptr, TestUtility::findGauge(context_.store_, "off_thread"));
+}
+
+// setGauge fails closed when invoked off the main thread, leaving the gauge value untouched.
+TEST_F(DynamicModuleStatsSinkGaugeTest, SetGaugeOffMainThreadFailsClosed) {
+  auto config = makeConfig();
+  size_t id = 0;
+  ASSERT_EQ(envoy_dynamic_module_type_metrics_result_Success, config->defineGauge("g", &id));
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([&] {
+          EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+                    config->setGauge(id, 99));
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_stat_sink_config_set_gauge must be called on the main thread");
+  auto gauge = TestUtility::findGauge(context_.store_, "g");
+  ASSERT_NE(nullptr, gauge);
+  EXPECT_EQ(0u, gauge->value());
 }
 
 // onScheduled is a no-op when the module does not implement the scheduled hook.

@@ -1,11 +1,11 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_package",
     "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
     "envoy_extension_cc_test_library",
 )
@@ -346,6 +346,33 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "save_processing_response_test",
+    size = "small",
+    srcs = ["save_processing_response_test.cc"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "6gig",
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/extensions/http/ext_proc/response_processors/save_processing_response:save_processing_response_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "logging_info_test",
+    size = "small",
+    srcs = ["logging_info_test.cc"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "6gig",
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/extensions/filters/http/ext_proc",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "mutation_utils_test",
     size = "small",
     srcs = ["mutation_utils_test.cc"],
@@ -438,6 +465,7 @@ envoy_extension_cc_test(
         "//test/integration/filters:common_lib",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
         "//test/proto:helloworld_proto_cc_proto",
+        "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
@@ -768,21 +796,23 @@ EXT_PROC_GRPC_FUZZ_TEST_DEPS = [
     "@envoy_api//envoy/type/v3:pkg_cc_proto",
 ]
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "ext_proc_grpc_fuzz_test",
     srcs = ["ext_proc_grpc_fuzz.cc"],
     hdrs = ["ext_proc_grpc_fuzz.h"],
     corpus = "ext_proc_grpc_corpus",
+    extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = EXT_PROC_GRPC_FUZZ_TEST_DEPS,
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "ext_proc_grpc_persistent_fuzz_test",
     srcs = ["ext_proc_grpc_fuzz_persistent.cc"],
     hdrs = ["ext_proc_grpc_fuzz.h"],
     corpus = "ext_proc_grpc_corpus",
+    extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = EXT_PROC_GRPC_FUZZ_TEST_DEPS,

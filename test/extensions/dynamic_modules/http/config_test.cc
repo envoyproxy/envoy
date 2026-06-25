@@ -8,6 +8,7 @@
 #include "source/common/crypto/utility.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/background_fetch_manager.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/dynamic_modules/factory.h"
@@ -28,6 +29,20 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Server {
 namespace Configuration {
+
+namespace {
+
+// Reads the value of a ``dynamic_modules.<leaf>`` failure counter tagged with the given filter
+// name.
+uint64_t failureCounter(Stats::Scope& scope, absl::string_view leaf, absl::string_view filter) {
+  Stats::StatNameDynamicPool pool(scope.symbolTable());
+  Stats::StatNameTagVector tags{{pool.add("config_name"), pool.add(filter)}};
+  return Stats::Utility::counterFromElements(
+             scope, {Stats::DynamicName("dynamic_modules"), Stats::DynamicName(leaf)}, tags)
+      .value();
+}
+
+} // namespace
 
 class DynamicModuleFilterConfigTest : public Event::TestUsingSimulatedTime, public testing::Test {
 protected:
@@ -195,6 +210,10 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchFailureFailOpen) {
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(testing::_)).Times(0);
   cb_or_error.value()(filter_callbacks);
+
+  // The fail-open remote fetch failure is otherwise invisible; it must bump remote_fetch_error.
+  EXPECT_EQ(1U, failureCounter(context_.server_factory_context_.scope(), "remote_fetch_error",
+                               "test_filter"));
 }
 
 TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchSuccess) {
@@ -318,6 +337,10 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchSuccessInvalidModule) {
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(testing::_)).Times(0);
   cb_or_error.value()(filter_callbacks);
+
+  // Fetched bytes that fail to load as a module bump remote_fetch_error.
+  EXPECT_EQ(1U, failureCounter(context_.server_factory_context_.scope(), "remote_fetch_error",
+                               "test_filter"));
 }
 
 // Remote fetch returns a valid shared object that loads successfully, but the module is missing
@@ -379,6 +402,10 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchSuccessMissingFilterSymbo
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(testing::_)).Times(0);
   cb_or_error.value()(filter_callbacks);
+
+  // The module loaded but its HTTP filter symbols could not be resolved during config init.
+  EXPECT_EQ(1U, failureCounter(context_.server_factory_context_.scope(), "config_init_error",
+                               "test_filter"));
 
   // Clean up the temp file.
   std::filesystem::path temp_path = Extensions::DynamicModules::moduleTempPath(sha256);
@@ -582,6 +609,10 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeCacheMissReturnsError) {
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_FALSE(cb_or_error.ok());
   EXPECT_THAT(cb_or_error.status().message(), testing::HasSubstr("not cached"));
+
+  // A NACK-mode cache miss rejects the config; it bumps remote_fetch_error.
+  EXPECT_EQ(1U, failureCounter(context_.server_factory_context_.scope(), "remote_fetch_error",
+                               "test_filter"));
 }
 
 // The background fetch triggered by NACK mode writes the module to disk, so a subsequent

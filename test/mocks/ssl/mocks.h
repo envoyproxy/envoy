@@ -231,6 +231,7 @@ public:
   MOCK_METHOD(bool, onlyVerifyLeafCertificateCrl, (), (const));
   MOCK_METHOD(absl::optional<uint32_t>, maxVerifyDepth, (), (const));
   MOCK_METHOD(bool, autoSniSanMatch, (), (const));
+  MOCK_METHOD(bool, suppressClientCaList, (), (const));
 };
 
 class MockPrivateKeyMethodManager : public PrivateKeyMethodManager {

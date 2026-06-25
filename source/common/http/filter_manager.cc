@@ -489,6 +489,10 @@ void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance&
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
 
+OptRef<WebTransportSession> ActiveStreamDecoderFilter::webTransportSession() {
+  return parent_.webTransportSession();
+}
+
 void ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
 const Buffer::Instance* ActiveStreamDecoderFilter::decodingBuffer() {
   return parent_.buffered_request_data_.get();

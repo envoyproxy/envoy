@@ -11,6 +11,7 @@
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 using testing::Eq;

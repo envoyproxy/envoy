@@ -169,6 +169,14 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_dumpStats(JNIEnv* env,
   return jni_helper.newStringUtf(stats.c_str()).release();
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_drainConnectionsBySocketTag(JNIEnv*, jclass,
+                                                                             jlong engine_handle,
+                                                                             jint tag) {
+  auto engine = reinterpret_cast<Envoy::InternalEngine*>(engine_handle);
+  engine->drainConnectionsBySocketTag(static_cast<uint32_t>(tag));
+}
+
 // JvmCallbackContext
 
 static void passHeaders(const char* method, const Envoy::Types::ManagedEnvoyHeaders& headers,

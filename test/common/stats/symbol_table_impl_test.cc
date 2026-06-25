@@ -8,6 +8,7 @@
 #include "test/common/memory/memory_test_utility.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
 #include "absl/hash/hash_testing.h"

@@ -64,6 +64,12 @@ impl AccessLoggerConfig for TestAccessLoggerConfig {
     let log_counter = ctx
       .define_counter("test_log_count")
       .ok_or("Failed to define counter")?;
+    // Emit a metric directly from the config context (no log event), exercising the config-scoped
+    // emission path. This would typically be done from a scheduled background task.
+    let config_total = ctx
+      .define_counter("config_total")
+      .ok_or("Failed to define config counter")?;
+    ctx.increment_counter(config_total, 1);
     Ok(Self {
       _name: name.to_string(),
       log_counter,
@@ -139,6 +145,11 @@ impl AccessLogger for TestAccessLogger {
     // Test request ID and metadata.
     let _request_id = ctx.request_id();
     let _filter_state = ctx.get_filter_state("test_key");
+
+    // Test typed dynamic metadata accessors.
+    let _dm_string = ctx.get_dynamic_metadata("test_filter", "string_key");
+    let _dm_number = ctx.get_dynamic_metadata_number("test_filter", "handshake_state");
+    let _dm_bool = ctx.get_dynamic_metadata_bool("test_filter", "tls_enabled");
 
     // Test tracing (stubs that always return None).
     let _trace_id = ctx.get_trace_id();

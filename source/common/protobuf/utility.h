@@ -2,6 +2,7 @@
 
 #include <numeric>
 #include <string>
+#include <type_traits>
 
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
@@ -180,7 +181,7 @@ public:
       printer.SetHideUnknownFields(true);
       for (const auto& message : source) {
         std::string text_message;
-        printer.PrintToString(message, &text_message);
+        std::ignore = printer.PrintToString(message, &text_message);
         absl::StrAppend(&text, text_message);
       }
     }
@@ -379,7 +380,8 @@ public:
   static const MessageType&
   downcastAndValidate(const Protobuf::Message& config,
                       ProtobufMessage::ValidationVisitor& validation_visitor) {
-    const auto& typed_config = dynamic_cast<MessageType>(config);
+    const auto& typed_config =
+        Envoy::Protobuf::DynamicCastMessage<std::remove_reference_t<MessageType>>(config);
     validate(typed_config, validation_visitor);
     return typed_config;
   }

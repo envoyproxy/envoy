@@ -1,23 +1,24 @@
 #pragma once
 
-#include <atomic>
+#include <cstddef>
+#include <cstdint>
 #include <map>
 #include <memory>
+#include <string_view>
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/http/filter.h"
+#include "envoy/network/dns.h"
 #include "envoy/stats/sink.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/filters/common/expr/cel_state.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 
-#include "eval/public/activation.h"
 #include "include/proxy-wasm/wasm.h"
 
 namespace Envoy {

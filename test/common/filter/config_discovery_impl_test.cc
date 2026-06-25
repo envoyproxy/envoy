@@ -217,7 +217,7 @@ public:
     config_source.set_apply_default_config_without_warming(!warm);
     if (default_configuration || !warm) {
       Protobuf::StringValue default_config;
-      config_source.mutable_default_config()->PackFrom(default_config);
+      std::ignore = config_source.mutable_default_config()->PackFrom(default_config);
     }
 
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
@@ -245,7 +245,7 @@ public:
     envoy::config::core::v3::TypedExtensionConfig extension_config;
     extension_config.set_name(name);
     extension_config.mutable_typed_config()->set_type_url("type.googleapis.com/" + getTypeUrl());
-    response.add_resources()->PackFrom(extension_config);
+    std::ignore = response.add_resources()->PackFrom(extension_config);
     return response;
   }
 
@@ -518,7 +518,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TooManyResources) {
   extension_config.set_name("foo");
   extension_config.mutable_typed_config()->set_type_url("type.googleapis.com/" +
                                                         config_discovery_test.getTypeUrl());
-  response.add_resources()->PackFrom(extension_config);
+  std::ignore = response.add_resources()->PackFrom(extension_config);
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
   EXPECT_CALL(config_discovery_test.init_watcher_, ready());
@@ -616,10 +616,10 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProvidersInvalid) {
   add_body_filter_config.set_body_size(10);
   envoy::config::core::v3::TypedExtensionConfig extension_config;
   extension_config.set_name("foo");
-  extension_config.mutable_typed_config()->PackFrom(add_body_filter_config);
+  std::ignore = extension_config.mutable_typed_config()->PackFrom(add_body_filter_config);
   envoy::service::discovery::v3::DiscoveryResponse response;
   response.set_version_info("1");
-  response.add_resources()->PackFrom(extension_config);
+  std::ignore = response.add_resources()->PackFrom(extension_config);
 
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);

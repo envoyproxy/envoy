@@ -17,6 +17,8 @@
 #include "test/extensions/filters/http/cache_v2/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/file_system_for_test.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
@@ -88,7 +90,7 @@ public:
 
   envoy::extensions::filters::http::cache_v2::v3::CacheV2Config cacheConfig(ConfigProto cfg) {
     envoy::extensions::filters::http::cache_v2::v3::CacheV2Config cache_config;
-    cache_config.mutable_typed_config()->PackFrom(cfg);
+    std::ignore = cache_config.mutable_typed_config()->PackFrom(cfg);
     return cache_config;
   }
 

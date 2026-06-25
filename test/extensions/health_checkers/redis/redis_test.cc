@@ -777,8 +777,6 @@ TEST(RedisHealthCheckerIamAuthTest, CheckTokenIsRetrieved) {
   aws_iam_config.set_region("region");
   aws_iam_config.set_cache_name("cachename");
   aws_iam_config.set_service_name("elasticache");
-  const envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config_const =
-      aws_iam_config;
 
   auto signer = std::make_unique<Extensions::Common::Aws::MockSigner>();
 

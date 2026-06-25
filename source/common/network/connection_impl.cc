@@ -1073,11 +1073,14 @@ void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
 }
 bool ServerConnectionImpl::initializeReadFilters() {
   bool initialized = ConnectionImpl::initializeReadFilters();
-  if (initialized) {
+  if (initialized && state() == State::Open) {
     // Server connection starts as connected, and we must explicitly signal to
     // the downstream transport socket that the underlying socket is connected.
     // We delay this step until after the filters are initialized and can
     // receive the connection events.
+    // A filter may close the connection during onNewConnection() (e.g. circuit
+    // breaker overflow), in which case the state is no longer Open and we must
+    // skip signaling onConnected to the transport socket.
     onConnected();
   }
   return initialized;

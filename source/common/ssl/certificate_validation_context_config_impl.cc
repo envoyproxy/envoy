@@ -45,7 +45,8 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
       max_verify_depth_(config.has_max_verify_depth()
                             ? absl::optional<uint32_t>(config.max_verify_depth().value())
                             : absl::nullopt),
-      auto_sni_san_match_(auto_sni_san_match) {}
+      auto_sni_san_match_(auto_sni_san_match),
+      suppress_client_ca_list_(config.suppress_client_ca_list()) {}
 
 absl::StatusOr<std::unique_ptr<CertificateValidationContextConfigImpl>>
 CertificateValidationContextConfigImpl::create(

@@ -66,6 +66,7 @@ public:
   MOCK_METHOD(void, decode1xxHeaders_, (ResponseHeaderMapPtr & headers));
   MOCK_METHOD(void, decodeHeaders_, (ResponseHeaderMapPtr & headers, bool end_stream));
   MOCK_METHOD(void, decodeTrailers_, (ResponseTrailerMapPtr & trailers));
+  MOCK_METHOD(OptRef<WebTransportSession>, downstreamWebTransportSession, (), (override));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 };
 

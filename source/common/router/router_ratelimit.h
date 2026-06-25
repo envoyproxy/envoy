@@ -43,6 +43,24 @@ private:
 };
 
 /**
+ * Populate rate limit override from a static configuration value.
+ */
+class StaticRateLimitOverride : public RateLimitOverrideAction {
+public:
+  StaticRateLimitOverride(
+      const envoy::config::route::v3::RateLimit::Override::RateLimitOverride& config)
+      : requests_per_unit_(config.requests_per_unit()), unit_(config.unit()) {}
+
+  // Router::RateLimitOverrideAction
+  bool populateOverride(RateLimit::Descriptor& descriptor,
+                        const envoy::config::core::v3::Metadata* metadata) const override;
+
+private:
+  const uint32_t requests_per_unit_;
+  const envoy::type::v3::RateLimitUnit unit_;
+};
+
+/**
  * Action for source cluster rate limiting.
  */
 class SourceClusterAction : public RateLimit::DescriptorProducer {

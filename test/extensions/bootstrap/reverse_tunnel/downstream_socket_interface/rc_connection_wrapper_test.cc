@@ -5,12 +5,14 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
 
+#include "test/common/formatter/command_extension.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -38,6 +40,16 @@ getDeletableConn(Event::Dispatcher& dispatcher) {
   EXPECT_CALL(*mock_connection, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
 
   return mock_connection;
+}
+
+// Builds one handshake header; an empty command_parsers list yields a literal value.
+HandshakeHeader
+makeHandshakeHeader(absl::string_view key, absl::string_view value,
+                    envoy::config::core::v3::HeaderValueOption::HeaderAppendAction action =
+                        envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD,
+                    Formatter::CommandParserPtrVector command_parsers = {}) {
+  return HandshakeHeader{Http::LowerCaseString(std::string(key)), action,
+                         Formatter::FormatterImpl::create(value, true, command_parsers).value()};
 }
 
 class RCConnectionWrapperTest : public testing::Test {
@@ -346,14 +358,10 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWithAdditionalHeaders) {
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
   ReverseConnectionSocketConfig custom_config = createDefaultTestConfig();
-  envoy::config::core::v3::HeaderValueOption hdr1;
-  hdr1.mutable_header()->set_key("x-custom-auth");
-  hdr1.mutable_header()->set_value("token123");
-  custom_config.additional_headers.push_back(hdr1);
-  envoy::config::core::v3::HeaderValueOption hdr2;
-  hdr2.mutable_header()->set_key("x-request-id");
-  hdr2.mutable_header()->set_value("abc-def");
-  custom_config.additional_headers.push_back(hdr2);
+  auto handshake_headers = std::make_shared<std::vector<HandshakeHeader>>();
+  handshake_headers->push_back(makeHandshakeHeader("x-custom-auth", "token123"));
+  handshake_headers->push_back(makeHandshakeHeader("x-request-id", "abc-def"));
+  custom_config.handshake_headers = handshake_headers;
   auto local_io_handle = createTestIOHandle(custom_config);
 
   RCConnectionWrapper wrapper(*local_io_handle, std::move(mock_connection), mock_host,
@@ -397,11 +405,11 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeAdditionalHeadersOverwrite) 
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
   ReverseConnectionSocketConfig custom_config = createDefaultTestConfig();
-  envoy::config::core::v3::HeaderValueOption hdr;
-  hdr.mutable_header()->set_key("host");
-  hdr.mutable_header()->set_value("custom-host:9090");
-  hdr.set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
-  custom_config.additional_headers.push_back(hdr);
+  auto handshake_headers = std::make_shared<std::vector<HandshakeHeader>>();
+  handshake_headers->push_back(
+      makeHandshakeHeader("host", "custom-host:9090",
+                          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD));
+  custom_config.handshake_headers = handshake_headers;
   auto local_io_handle = createTestIOHandle(custom_config);
 
   RCConnectionWrapper wrapper(*local_io_handle, std::move(mock_connection), mock_host,
@@ -446,18 +454,14 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeAdditionalHeadersAddIfAbsent
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
   ReverseConnectionSocketConfig custom_config = createDefaultTestConfig();
-  // Try to add "host" with ADD_IF_ABSENT — should be skipped since host already exists.
-  envoy::config::core::v3::HeaderValueOption hdr1;
-  hdr1.mutable_header()->set_key("host");
-  hdr1.mutable_header()->set_value("should-not-appear");
-  hdr1.set_append_action(envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT);
-  custom_config.additional_headers.push_back(hdr1);
-  // Add a new header with ADD_IF_ABSENT — should be added since it doesn't exist.
-  envoy::config::core::v3::HeaderValueOption hdr2;
-  hdr2.mutable_header()->set_key("x-new-header");
-  hdr2.mutable_header()->set_value("new-value");
-  hdr2.set_append_action(envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT);
-  custom_config.additional_headers.push_back(hdr2);
+  auto handshake_headers = std::make_shared<std::vector<HandshakeHeader>>();
+  // "host" already exists, so ADD_IF_ABSENT should skip "should-not-appear".
+  handshake_headers->push_back(makeHandshakeHeader(
+      "host", "should-not-appear", envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT));
+  // "x-new-header" is absent, so ADD_IF_ABSENT should add it.
+  handshake_headers->push_back(makeHandshakeHeader(
+      "x-new-header", "new-value", envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT));
+  custom_config.handshake_headers = handshake_headers;
   auto local_io_handle = createTestIOHandle(custom_config);
 
   RCConnectionWrapper wrapper(*local_io_handle, std::move(mock_connection), mock_host,
@@ -503,18 +507,15 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeAdditionalHeadersOverwriteIf
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
   ReverseConnectionSocketConfig custom_config = createDefaultTestConfig();
-  // Overwrite "host" which exists — should replace the value.
-  envoy::config::core::v3::HeaderValueOption hdr1;
-  hdr1.mutable_header()->set_key("host");
-  hdr1.mutable_header()->set_value("overwritten-host");
-  hdr1.set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
-  custom_config.additional_headers.push_back(hdr1);
-  // Try to overwrite "x-nonexistent" which doesn't exist — should be a no-op.
-  envoy::config::core::v3::HeaderValueOption hdr2;
-  hdr2.mutable_header()->set_key("x-nonexistent");
-  hdr2.mutable_header()->set_value("should-not-appear");
-  hdr2.set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
-  custom_config.additional_headers.push_back(hdr2);
+  auto handshake_headers = std::make_shared<std::vector<HandshakeHeader>>();
+  // "host" exists, so OVERWRITE_IF_EXISTS should replace it.
+  handshake_headers->push_back(makeHandshakeHeader(
+      "host", "overwritten-host", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS));
+  // "x-nonexistent" doesn't exist, so OVERWRITE_IF_EXISTS should be a no-op.
+  handshake_headers->push_back(
+      makeHandshakeHeader("x-nonexistent", "should-not-appear",
+                          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS));
+  custom_config.handshake_headers = handshake_headers;
   auto local_io_handle = createTestIOHandle(custom_config);
 
   RCConnectionWrapper wrapper(*local_io_handle, std::move(mock_connection), mock_host,
@@ -528,6 +529,167 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeAdditionalHeadersOverwriteIf
   EXPECT_EQ(encoded_request.find("192.168.1.1:8080"), std::string::npos);
   // "x-nonexistent" didn't exist, so OVERWRITE_IF_EXISTS should not add it.
   EXPECT_EQ(encoded_request.find("should-not-appear"), std::string::npos);
+}
+
+// When a value formatter is configured, the additional header value is substituted.
+TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeFormatterHeaders) {
+  auto mock_connection = getDeletableConn(dispatcher_);
+
+  EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, addReadFilter(_));
+  EXPECT_CALL(*mock_connection, connect());
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12345));
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+
+  auto mock_address = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1", 8080);
+  auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
+
+  EXPECT_CALL(*mock_connection, connectionInfoProvider())
+      .WillRepeatedly(Invoke([mock_address,
+                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+        static auto mock_provider =
+            std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
+        return *mock_provider;
+      }));
+
+  Buffer::OwnedImpl captured_buffer;
+  EXPECT_CALL(*mock_connection, write(_, _))
+      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+        captured_buffer.add(buffer);
+        buffer.drain(buffer.length());
+      }));
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  ReverseConnectionSocketConfig custom_config = createDefaultTestConfig();
+  Formatter::CommandParserPtrVector command_parsers;
+  command_parsers.push_back(std::make_unique<Formatter::TestCommandParser>());
+  auto handshake_headers = std::make_shared<std::vector<HandshakeHeader>>();
+  handshake_headers->push_back(
+      makeHandshakeHeader("authorization", "Bearer %COMMAND_EXTENSION()%",
+                          envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD,
+                          std::move(command_parsers)));
+  custom_config.handshake_headers = handshake_headers;
+  auto local_io_handle = createTestIOHandle(custom_config);
+
+  RCConnectionWrapper wrapper(*local_io_handle, std::move(mock_connection), mock_host,
+                              "test-cluster");
+
+  wrapper.connect("test-tenant", "test-cluster", "test-node");
+
+  const std::string encoded_request = captured_buffer.toString();
+  EXPECT_NE(encoded_request.find("authorization: Bearer TestFormatter"), std::string::npos);
+}
+
+// With formatters unset, additional_headers are applied literally including '%'
+// that would otherwise fail format-string parsing.
+TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeLiteralHeaders) {
+  auto mock_connection = getDeletableConn(dispatcher_);
+
+  EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, addReadFilter(_));
+  EXPECT_CALL(*mock_connection, connect());
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12345));
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+
+  auto mock_address = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1", 8080);
+  auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
+
+  EXPECT_CALL(*mock_connection, connectionInfoProvider())
+      .WillRepeatedly(Invoke([mock_address,
+                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+        static auto mock_provider =
+            std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
+        return *mock_provider;
+      }));
+
+  Buffer::OwnedImpl captured_buffer;
+  EXPECT_CALL(*mock_connection, write(_, _))
+      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+        captured_buffer.add(buffer);
+        buffer.drain(buffer.length());
+      }));
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  ReverseConnectionSocketConfig custom_config = createDefaultTestConfig();
+  envoy::config::core::v3::HeaderValueOption hdr;
+  hdr.mutable_header()->set_key("x-literal");
+  hdr.mutable_header()->set_value("100% literal");
+  custom_config.additional_headers.push_back(hdr);
+  // handshake_headers left null -> literal application path.
+  auto local_io_handle = createTestIOHandle(custom_config);
+
+  RCConnectionWrapper wrapper(*local_io_handle, std::move(mock_connection), mock_host,
+                              "test-cluster");
+
+  wrapper.connect("test-tenant", "test-cluster", "test-node");
+
+  const std::string encoded_request = captured_buffer.toString();
+  EXPECT_NE(encoded_request.find("x-literal: 100% literal"), std::string::npos);
+}
+
+// Test that connect() includes an x-envoy-reverse-tunnel-initiation-time header
+// with a valid epoch milliseconds value.
+TEST_F(RCConnectionWrapperTest, ConnectIncludesInitiationTimeHeader) {
+  auto mock_connection = getDeletableConn(dispatcher_);
+
+  EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, addReadFilter(_));
+  EXPECT_CALL(*mock_connection, connect());
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12345));
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+
+  auto mock_address = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1", 8080);
+  auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
+
+  EXPECT_CALL(*mock_connection, connectionInfoProvider())
+      .WillRepeatedly(Invoke([mock_address,
+                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+        static auto mock_provider =
+            std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
+        return *mock_provider;
+      }));
+
+  Buffer::OwnedImpl captured_buffer;
+  EXPECT_CALL(*mock_connection, write(_, _))
+      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+        captured_buffer.add(buffer);
+        buffer.drain(buffer.length());
+      }));
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+
+  auto before_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          dispatcher_.timeSource().systemTime().time_since_epoch()) // NO_CHECK_FORMAT(real_time)
+          .count();
+  wrapper.connect("test-tenant", "test-cluster", "test-node");
+  auto after_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          dispatcher_.timeSource().systemTime().time_since_epoch()) // NO_CHECK_FORMAT(real_time)
+          .count();
+
+  const std::string encoded_request = captured_buffer.toString();
+
+  // Verify the initiation-time header is present.
+  const std::string header_prefix = "x-envoy-reverse-tunnel-initiation-time: ";
+  auto pos = encoded_request.find(header_prefix);
+  ASSERT_NE(pos, std::string::npos) << "initiation-time header not found in handshake request";
+
+  // Extract and validate the timestamp value.
+  auto value_start = pos + header_prefix.size();
+  auto value_end = encoded_request.find("\r\n", value_start);
+  ASSERT_NE(value_end, std::string::npos);
+  std::string timestamp_str = encoded_request.substr(value_start, value_end - value_start);
+
+  int64_t timestamp_ms;
+  ASSERT_TRUE(absl::SimpleAtoi(timestamp_str, &timestamp_ms))
+      << "initiation-time header value is not a valid integer: " << timestamp_str;
+  EXPECT_GE(timestamp_ms, before_ms);
+  EXPECT_LE(timestamp_ms, after_ms);
 }
 
 // Test RCConnectionWrapper::connect() method with connection write failure.

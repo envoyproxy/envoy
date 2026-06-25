@@ -277,16 +277,16 @@ public:
     for (const auto& message : messages) {
       if (!metadata.empty()) {
         envoy::service::discovery::v3::Resource resource;
-        resource.mutable_resource()->PackFrom(message);
+        std::ignore = resource.mutable_resource()->PackFrom(message);
         resource.set_name(intResourceName(message));
         resource.set_version(version);
         for (const auto& kvp : metadata) {
           auto* map = resource.mutable_metadata()->mutable_typed_filter_metadata();
           (*map)[std::string(kvp.first)] = kvp.second;
         }
-        discovery_response.add_resources()->PackFrom(resource);
+        std::ignore = discovery_response.add_resources()->PackFrom(resource);
       } else {
-        discovery_response.add_resources()->PackFrom(message);
+        std::ignore = discovery_response.add_resources()->PackFrom(message);
       }
     }
     static int next_nonce_counter = 0;
@@ -308,20 +308,20 @@ public:
     for (const auto& [name, message] : messages) {
       if (!metadata.empty()) {
         envoy::service::discovery::v3::Resource resource;
-        resource.mutable_resource()->PackFrom(message);
+        std::ignore = resource.mutable_resource()->PackFrom(message);
         resource.set_name(name);
         resource.set_version(version);
         for (const auto& kvp : metadata) {
           auto* map = resource.mutable_metadata()->mutable_typed_filter_metadata();
           (*map)[std::string(kvp.first)] = kvp.second;
         }
-        discovery_response.add_resources()->PackFrom(resource);
+        std::ignore = discovery_response.add_resources()->PackFrom(resource);
       } else {
         envoy::service::discovery::v3::Resource resource;
-        resource.mutable_resource()->PackFrom(message);
+        std::ignore = resource.mutable_resource()->PackFrom(message);
         resource.set_name(name);
         resource.set_version(version);
-        discovery_response.add_resources()->PackFrom(resource);
+        std::ignore = discovery_response.add_resources()->PackFrom(resource);
       }
     }
     static int next_nonce_counter = 0;
@@ -407,7 +407,7 @@ public:
     std::vector<envoy::service::discovery::v3::Resource> resources;
     for (const auto& message : added_or_updated) {
       envoy::service::discovery::v3::Resource resource;
-      resource.mutable_resource()->PackFrom(message);
+      std::ignore = resource.mutable_resource()->PackFrom(message);
       resource.set_name(intResourceName(message));
       resource.set_version(version);
       for (const auto& alias : aliases) {
@@ -431,7 +431,7 @@ public:
     std::vector<envoy::service::discovery::v3::Resource> resources;
     for (const auto& [name, message] : added_or_updated) {
       envoy::service::discovery::v3::Resource resource;
-      resource.mutable_resource()->PackFrom(message);
+      std::ignore = resource.mutable_resource()->PackFrom(message);
       resource.set_name(name);
       resource.set_version(version);
       for (const auto& alias : aliases) {

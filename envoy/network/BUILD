@@ -57,7 +57,7 @@ envoy_cc_library(
         ":listener_interface",
         "//envoy/common:random_generator_interface",
         "//envoy/runtime:runtime_interface",
-        "//envoy/ssl:context_interface",
+        "//envoy/server/overload:thread_local_overload_state",
         "//source/common/common:interval_value",
     ],
 )
@@ -109,6 +109,7 @@ envoy_cc_library(
     name = "dns_resolver_interface",
     hdrs = ["dns_resolver.h"],
     deps = [
+        ":dns_interface",
         "//envoy/api:api_interface",
         "//source/common/config:utility_lib",
     ],

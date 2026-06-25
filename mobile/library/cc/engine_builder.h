@@ -61,6 +61,7 @@ public:
   EngineBuilder& setDeviceOs(std::string app_id);
   EngineBuilder& setStreamIdleTimeoutSeconds(int stream_idle_timeout_seconds);
   EngineBuilder& setPerTryIdleTimeoutSeconds(int per_try_idle_timeout_seconds);
+  EngineBuilder& setRequestTimeoutMilliseconds(int request_timeout_ms);
   EngineBuilder& enableGzipDecompression(bool gzip_decompression_on);
   EngineBuilder& enableBrotliDecompression(bool brotli_decompression_on);
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
@@ -220,6 +221,7 @@ private:
   std::string device_os_ = "unspecified";
   int stream_idle_timeout_seconds_ = 15;
   int per_try_idle_timeout_seconds_ = 15;
+  int request_timeout_ms_ = 0;
   bool gzip_decompression_filter_ = true;
   bool brotli_decompression_filter_ = false;
   bool socket_tagging_filter_ = false;

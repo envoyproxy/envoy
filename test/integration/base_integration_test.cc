@@ -213,7 +213,7 @@ std::string BaseIntegrationTest::finalizeConfigWithPorts(ConfigHelper& config_he
     lds.set_version_info("0");
     for (auto& listener : config_helper.bootstrap().static_resources().listeners()) {
       Protobuf::Any* resource = lds.add_resources();
-      resource->PackFrom(listener);
+      std::ignore = resource->PackFrom(listener);
     }
 #ifdef ENVOY_ENABLE_YAML
     TestEnvironment::writeStringToFileForTest(
@@ -427,7 +427,8 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 std::string getListenerDetails(Envoy::Server::Instance& server) {
   const auto& cbs_maps = server.admin()->getConfigTracker().getCallbacksMap();
   ProtobufTypes::MessagePtr details = cbs_maps.at("listeners")(Matchers::UniversalStringMatcher());
-  auto listener_info = dynamic_cast<envoy::admin::v3::ListenersConfigDump&>(*details);
+  auto listener_info =
+      Envoy::Protobuf::DynamicCastMessage<envoy::admin::v3::ListenersConfigDump>(*details);
 #ifdef ENVOY_ENABLE_YAML
   return MessageUtil::getYamlStringFromMessage(listener_info.dynamic_listeners(0).error_state());
 #else

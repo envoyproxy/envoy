@@ -22,8 +22,9 @@ public:
 
 class TestCommandParser : public CommandParser {
 public:
-  FormatterProviderPtr parse(absl::string_view command, absl::string_view subcommand,
-                             absl::optional<size_t> max_length) const override;
+  absl::StatusOr<FormatterProviderPtr> parse(absl::string_view command,
+                                             absl::string_view subcommand,
+                                             absl::optional<size_t> max_length) const override;
 };
 
 class TestCommandFactory : public CommandParserFactory {
@@ -48,8 +49,9 @@ public:
 
 class AdditionalCommandParser : public CommandParser {
 public:
-  FormatterProviderPtr parse(absl::string_view command, absl::string_view subcommand,
-                             absl::optional<size_t> max_length) const override;
+  absl::StatusOr<FormatterProviderPtr> parse(absl::string_view command,
+                                             absl::string_view subcommand,
+                                             absl::optional<size_t> max_length) const override;
 };
 
 class AdditionalCommandFactory : public CommandParserFactory {

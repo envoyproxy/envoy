@@ -28,7 +28,7 @@ public:
     envoy::config::core::v3::TypedExtensionConfig formatter_ext;
     formatter_ext.set_name("envoy.formatter.file_content");
     envoy::extensions::formatter::file_content::v3::FileContent file_content_cfg;
-    formatter_ext.mutable_typed_config()->PackFrom(file_content_cfg);
+    std::ignore = formatter_ext.mutable_typed_config()->PackFrom(file_content_cfg);
 
     useAccessLog(fmt::format("%FILE_CONTENT({})%", token_path_), {formatter_ext});
     HttpIntegrationTest::initialize();

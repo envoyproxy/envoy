@@ -147,6 +147,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
     : stats_(stats), time_source_(context.timeSource()) {
   ASSERT(config != nullptr);
   allow_expired_certificate_ = config->allowExpiredCertificate();
+  suppress_client_ca_list_ = config->suppressClientCaList();
 
   SPIFFEConfig message;
   SET_AND_RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
@@ -249,6 +250,14 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
 }
 
 absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
+  // When suppressed, CAs are still used for validation (loaded via the trust bundle
+  // in initializeSslContexts) but their names are not advertised in the TLS
+  // CertificateRequest. Skip building the name stack entirely — this is the common
+  // case for deployments with very large CA sets.
+  if (suppress_client_ca_list_) {
+    return absl::OkStatus();
+  }
+
   // Use a generic lambda to be compatible with BoringSSL before and after
   // https://boringssl-review.googlesource.com/c/boringssl/+/56190
   bssl::UniquePtr<STACK_OF(X509_NAME)> list(
@@ -283,6 +292,13 @@ void SPIFFEValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
     RELEASE_ASSERT(hash_length == SHA256_DIGEST_LENGTH,
                    fmt::format("invalid SHA256 hash length {}", hash_length));
     rc = EVP_DigestUpdate(md.get(), hash_buffer, hash_length);
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+  }
+  // Only hash when the flag is enabled, so session IDs for existing deployments
+  // (where the flag defaults to false) stay byte-identical to pre-feature behavior.
+  if (suppress_client_ca_list_) {
+    bool suppress = true;
+    rc = EVP_DigestUpdate(md.get(), &suppress, sizeof(suppress));
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
   }
 }

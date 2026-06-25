@@ -410,6 +410,122 @@ invocation_mode: asynchronous
   cb(filter_callbacks);
 }
 
+TEST(AwsLambdaFilterConfigTest, ConfigWithExcludedHeaders) {
+  const std::string yaml = R"EOF(
+arn: "arn:aws:lambda:us-west-2:424242:function:fun"
+payload_passthrough: true
+match_excluded_headers:
+  - prefix: x-amzn
+  - exact: foo
+  - exact: bar
+  )EOF";
+
+  LambdaConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  LambdaConfig expected_config;
+  expected_config.set_arn("arn:aws:lambda:us-west-2:424242:function:fun");
+  expected_config.set_payload_passthrough(true);
+  expected_config.add_match_excluded_headers()->set_prefix("x-amzn");
+  expected_config.add_match_excluded_headers()->set_exact("foo");
+  expected_config.add_match_excluded_headers()->set_exact("bar");
+
+  Protobuf::util::MessageDifferencer differencer;
+  differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUAL);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+  EXPECT_TRUE(differencer.Compare(expected_config, proto_config));
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsLambdaFilterFactory factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamFilter(_));
+  cb(filter_callbacks);
+}
+
+TEST(AwsLambdaFilterConfigTest, ConfigWithIncludedHeaders) {
+  const std::string yaml = R"EOF(
+arn: "arn:aws:lambda:us-west-2:424242:function:fun"
+payload_passthrough: true
+match_included_headers:
+  - prefix: x-custom
+  - exact: user-agent
+  )EOF";
+
+  LambdaConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  LambdaConfig expected_config;
+  expected_config.set_arn("arn:aws:lambda:us-west-2:424242:function:fun");
+  expected_config.set_payload_passthrough(true);
+  expected_config.add_match_included_headers()->set_prefix("x-custom");
+  expected_config.add_match_included_headers()->set_exact("user-agent");
+
+  Protobuf::util::MessageDifferencer differencer;
+  differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUAL);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+  EXPECT_TRUE(differencer.Compare(expected_config, proto_config));
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsLambdaFilterFactory factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamFilter(_));
+  cb(filter_callbacks);
+}
+
+TEST(AwsLambdaFilterConfigTest, PerRouteConfigWithExcludedHeaders) {
+  const std::string yaml = R"EOF(
+  invoke_config:
+    arn: "arn:aws:lambda:us-west-2:424242:function:fun"
+    payload_passthrough: true
+    match_excluded_headers:
+      - prefix: x-amzn
+      - exact: x-custom-header
+  )EOF";
+
+  LambdaPerRouteConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  AwsLambdaFilterFactory factory;
+
+  auto route_specific_config_ptr =
+      factory
+          .createRouteSpecificFilterConfig(proto_config, context,
+                                           ProtobufMessage::getStrictValidationVisitor())
+          .value();
+  ASSERT_NE(route_specific_config_ptr, nullptr);
+}
+
+TEST(AwsLambdaFilterConfigTest, PerRouteConfigWithIncludedHeaders) {
+  const std::string yaml = R"EOF(
+  invoke_config:
+    arn: "arn:aws:lambda:us-west-2:424242:function:fun"
+    payload_passthrough: true
+    match_included_headers:
+      - prefix: x-custom
+      - exact: authorization
+  )EOF";
+
+  LambdaPerRouteConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  AwsLambdaFilterFactory factory;
+
+  auto route_specific_config_ptr =
+      factory
+          .createRouteSpecificFilterConfig(proto_config, context,
+                                           ProtobufMessage::getStrictValidationVisitor())
+          .value();
+  ASSERT_NE(route_specific_config_ptr, nullptr);
+}
+
 } // namespace
 } // namespace AwsLambdaFilter
 } // namespace HttpFilters

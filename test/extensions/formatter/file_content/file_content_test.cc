@@ -131,7 +131,7 @@ TEST_F(FileContentFormatterTest, FormatValueReturnsStringValue) {
   auto empty_config = factory.createEmptyConfigProto();
   auto parser = factory.createCommandParserFromProto(*empty_config, context_);
 
-  auto provider = parser->parse("FILE_CONTENT", file_path, absl::nullopt);
+  auto provider = parser->parse("FILE_CONTENT", file_path, absl::nullopt).value();
   ASSERT_NE(nullptr, provider);
 
   auto value = provider->formatValue(formatter_context_, stream_info_);
@@ -144,7 +144,7 @@ TEST_F(FileContentFormatterTest, FormatValueMissingFileReturnsEmpty) {
   auto empty_config = factory.createEmptyConfigProto();
   auto parser = factory.createCommandParserFromProto(*empty_config, context_);
 
-  auto provider = parser->parse("NOT_FILE_CONTENT", "/some/path", absl::nullopt);
+  auto provider = parser->parse("NOT_FILE_CONTENT", "/some/path", absl::nullopt).value();
   EXPECT_EQ(nullptr, provider);
 }
 
@@ -173,7 +173,7 @@ TEST_F(FileContentFormatterTest, WatchDirectoryUpdatesOnSymlinkSwap) {
   auto parser = factory.createCommandParserFromProto(*empty_config, context_);
 
   const std::string subcommand = fmt::format("{}:{}", link, dir);
-  auto provider = parser->parse("FILE_CONTENT", subcommand, absl::nullopt);
+  auto provider = parser->parse("FILE_CONTENT", subcommand, absl::nullopt).value();
   ASSERT_NE(nullptr, provider);
 
   // Initial content.
@@ -196,8 +196,8 @@ TEST_F(FileContentFormatterTest, TooManyColonsThrows) {
   auto empty_config = factory.createEmptyConfigProto();
   auto parser = factory.createCommandParserFromProto(*empty_config, context_);
 
-  EXPECT_THROW_WITH_REGEX(parser->parse("FILE_CONTENT", "/a:/b:/c", absl::nullopt), EnvoyException,
-                          "FILE_CONTENT: expected format");
+  EXPECT_THROW_WITH_REGEX(parser->parse("FILE_CONTENT", "/a:/b:/c", absl::nullopt).value(),
+                          EnvoyException, "FILE_CONTENT: expected format");
 }
 
 } // namespace Formatter

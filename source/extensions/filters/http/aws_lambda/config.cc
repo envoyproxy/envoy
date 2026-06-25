@@ -70,12 +70,15 @@ absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactor
 
   auto credentials_provider = getCredentialsProvider(proto_config, server_context, region);
 
+  const auto include_matcher_config = Extensions::Common::Aws::AwsSigningHeaderMatcherVector(
+      proto_config.match_included_headers().begin(), proto_config.match_included_headers().end());
+
+  const auto exclude_matcher_config = Extensions::Common::Aws::AwsSigningHeaderMatcherVector(
+      proto_config.match_excluded_headers().begin(), proto_config.match_excluded_headers().end());
+
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
-      service_name, region, std::move(credentials_provider), server_context,
-      // TODO: extend API to allow specifying header exclusion. ref:
-      // https://github.com/envoyproxy/envoy/pull/18998
-      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
-      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{});
+      service_name, region, std::move(credentials_provider), server_context, exclude_matcher_config,
+      include_matcher_config);
 
   auto filter_settings = std::make_shared<FilterSettingsImpl>(
       *arn, getInvocationMode(proto_config), proto_config.payload_passthrough(),
@@ -111,12 +114,17 @@ AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
   auto credentials_provider =
       getCredentialsProvider(per_route_config.invoke_config(), server_context, region);
 
+  const auto include_matcher_config = Extensions::Common::Aws::AwsSigningHeaderMatcherVector(
+      per_route_config.invoke_config().match_included_headers().begin(),
+      per_route_config.invoke_config().match_included_headers().end());
+
+  const auto exclude_matcher_config = Extensions::Common::Aws::AwsSigningHeaderMatcherVector(
+      per_route_config.invoke_config().match_excluded_headers().begin(),
+      per_route_config.invoke_config().match_excluded_headers().end());
+
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
-      service_name, region, std::move(credentials_provider), server_context,
-      // TODO: extend API to allow specifying header exclusion. ref:
-      // https://github.com/envoyproxy/envoy/pull/18998
-      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
-      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{});
+      service_name, region, std::move(credentials_provider), server_context, exclude_matcher_config,
+      include_matcher_config);
 
   auto filter_settings = std::make_shared<FilterSettingsImpl>(
       *arn, getInvocationMode(per_route_config.invoke_config()),

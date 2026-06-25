@@ -43,7 +43,7 @@ protected:
       ::envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter
           assertion_filter;
       assertion_filter.set_name("envoy.filters.http.assertion");
-      assertion_filter.mutable_typed_config()->PackFrom(assertion_config.value());
+      std::ignore = assertion_filter.mutable_typed_config()->PackFrom(assertion_config.value());
       engine_builder.addHcmHttpFilter(std::move(assertion_filter));
     }
 
