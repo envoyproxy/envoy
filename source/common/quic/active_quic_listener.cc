@@ -116,6 +116,10 @@ ActiveQuicListener::ActiveQuicListener(
     quic_packet_writer_ = quic_writer.get();
     quic_dispatcher_->InitializeWithWriter(quic_writer.release());
   } else {
+    // TODO(panting): This fallback is a temporary migration bridge. We must keep this
+    // logic because there is currently no QUIC GSO batch factory implemented to create
+    // GSO writers natively. Once a native QuicGsoBatchWriterFactory is implemented
+    // and default configurations are migrated, this fallback can be removed.
     // Create udp_packet_writer
     Network::UdpPacketWriterPtr udp_packet_writer =
         listener_config.udpListenerConfig()->packetWriterFactory().createUdpPacketWriter(
@@ -123,7 +127,17 @@ ActiveQuicListener::ActiveQuicListener(
             std::move(on_can_write_cb));
     udp_packet_writer_ = udp_packet_writer.get();
 
-    quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(std::move(udp_packet_writer)));
+    // Some packet writers (like `UdpGsoBatchWriter`) already directly implement
+    // `quic::QuicPacketWriter` and can be used directly here. Other types need
+    // `EnvoyQuicPacketWriter` as an adapter.
+    auto* quic_packet_writer = dynamic_cast<quic::QuicPacketWriter*>(udp_packet_writer.get());
+    if (quic_packet_writer != nullptr) {
+      quic_dispatcher_->InitializeWithWriter(quic_packet_writer);
+      udp_packet_writer.release();
+    } else {
+      quic_dispatcher_->InitializeWithWriter(
+          new EnvoyQuicPacketWriter(std::move(udp_packet_writer)));
+    }
   }
 
   if (listener_config.udpListenerConfig()) {
