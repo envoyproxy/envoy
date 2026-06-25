@@ -1698,7 +1698,7 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestWithExpiredAssignmentAllow
   for (int i = 0; i < 3; ++i) {
     // Advance the time to make cached assignment expired.
     if (i == 1) {
-      simTime().advanceTimeWait(std::chrono::seconds(expiration_secs));
+      simTime().advanceTimeWait(std::chrono::seconds(expiration_secs + 1));
     }
     // Send downstream client request to upstream.
     sendClientRequest(&custom_headers);
@@ -1721,7 +1721,9 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestWithExpiredAssignmentAllow
         // 3rd request won't start gRPC stream again since it is kept open and
         // the usage will be aggregated instead of spawning an immediate report.
         RateLimitQuotaUsageReports reports;
-        ASSERT_FALSE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+        EXPECT_FALSE(
+            rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports, std::chrono::milliseconds(100)))
+            << "Unexpected report: " << reports.DebugString();
       }
 
       // Build the response.

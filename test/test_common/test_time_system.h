@@ -19,6 +19,11 @@ public:
   ~TestTimeSystem() override = default;
 
   /**
+   * Returns true if this is a simulated time system.
+   */
+  virtual bool isSimulated() const { return false; }
+
+  /**
    * This class will use the real monotonic time regardless of the time system in use (real
    * or simulated). This should only be used when time is needed for real timeouts that govern
    * networking, etc. It should never be used for time that only advances explicitly for alarms.
@@ -173,10 +178,13 @@ public:
   }
   SystemTime systemTime() override { return timeSystem().systemTime(); }
   MonotonicTime monotonicTime() override { return timeSystem().monotonicTime(); }
+  bool isSimulated() const override { return timeSystem().isSimulated(); }
 
   TimeSystemVariant& operator*() { return timeSystem(); }
+  const TimeSystemVariant& operator*() const { return timeSystem(); }
 
   virtual TimeSystemVariant& timeSystem() PURE;
+  virtual const TimeSystemVariant& timeSystem() const PURE;
 };
 
 // Wraps a concrete time-system in a delegate that ensures there is only one
@@ -192,6 +200,7 @@ public:
   DelegatingTestTimeSystem() : time_system_(initTimeSystem()) {}
 
   TimeSystemVariant& timeSystem() override { return time_system_; }
+  const TimeSystemVariant& timeSystem() const override { return time_system_; }
 
 private:
   TimeSystemVariant& initTimeSystem() {

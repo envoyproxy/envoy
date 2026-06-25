@@ -66,6 +66,7 @@ public:
     // Clear default stream id provider.
     stream_info_.stream_id_provider_ = nullptr;
     time_system_ = new Envoy::Event::SimulatedTimeSystem();
+    start_time_ = time_system_->monotonicTime();
     context_.server_factory_context_.dispatcher_.time_system_.reset(time_system_);
 
     ON_CALL(context_.server_factory_context_.xds_manager_,
@@ -141,6 +142,7 @@ fill_interval:
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Envoy::Event::SimulatedTimeSystem* time_system_;
+  MonotonicTime start_time_;
 
   absl::flat_hash_map<std::string, Config::MockSubscription*> subscriptions_;
   absl::flat_hash_map<std::string, Config::SubscriptionCallbacks*> callbackss_;
@@ -208,7 +210,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, HappyPath) {
 
   EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.denied").value(), 1);
 
-  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  time_system_->setMonotonicTime(start_time_ + std::chrono::seconds(1));
   // Third log is written, fourth is rate limited.
   expectWritesAndLog(log, /*expect_write_times=*/1, /*log_call_times=*/2);
   EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.allowed").value(), 2);
@@ -231,7 +233,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, SharedTokenBucketInitTogether) {
   expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/1);
   expectWritesAndLog(log2, /*expect_write_times=*/0, /*log_call_times=*/1);
 
-  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  time_system_->setMonotonicTime(start_time_ + std::chrono::seconds(1));
   expectWritesAndLog(log2, /*expect_write_times=*/1, /*log_call_times=*/1);
   expectWritesAndLog(log1, /*expect_write_times=*/0, /*log_call_times=*/1);
 }
@@ -254,7 +256,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, SharedTokenBucketInitSeparately) {
       parseAccessLogFromV3Yaml(default_access_log_), context_);
   context_.init_manager_.initialize(init_watcher_);
   expectWritesAndLog(log2, /*expect_write_times=*/0, /*log_call_times=*/1);
-  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  time_system_->setMonotonicTime(start_time_ + std::chrono::seconds(1));
   expectWritesAndLog(log2, /*expect_write_times=*/1, /*log_call_times=*/1);
   expectWritesAndLog(log1, /*expect_write_times=*/0, /*log_call_times=*/1);
 }
@@ -303,7 +305,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, RemoveAndAddResource) {
   EXPECT_TRUE(callbackss_["token_bucket_name"]->onConfigUpdate(decoded_resources.refvec_, "").ok());
   expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/2);
 
-  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  time_system_->setMonotonicTime(start_time_ + std::chrono::seconds(1));
 
   // 2. Remove the token bucket.
   Protobuf::RepeatedPtrField<std::string> removed_resources;
@@ -324,7 +326,7 @@ fill_interval:
   EXPECT_TRUE(
       callbackss_["token_bucket_name"]->onConfigUpdate(decoded_resources.refvec_, {}, "").ok());
   // The rate limiter should be working with the new config.
-  // time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(4)));
+  // time_system_->setMonotonicTime(start_time_ + std::chrono::seconds(4));
   expectWritesAndLog(log1, /*expect_write_times=*/3, /*log_call_times=*/4);
 
   // A new log instance should also pick up the re-added config.
@@ -334,7 +336,7 @@ fill_interval:
   // It shares the same token bucket, so it's rate limited.
   expectWritesAndLog(log2, /*expect_write_times=*/0, /*log_call_times=*/1);
 
-  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(4)));
+  time_system_->setMonotonicTime(start_time_ + std::chrono::seconds(4));
   expectWritesAndLog(log2, /*expect_write_times=*/3, /*log_call_times=*/4);
 }
 
@@ -353,7 +355,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter,
   EXPECT_TRUE(callbackss_["token_bucket_name"]->onConfigUpdate(decoded_resources.refvec_, "").ok());
   expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/2);
 
-  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  time_system_->setMonotonicTime(start_time_ + std::chrono::seconds(1));
 
   // 2. Remove the token bucket.
   Protobuf::RepeatedPtrField<std::string> removed_resources;
@@ -386,7 +388,7 @@ fill_interval:
   // It shares the same token bucket, so it's rate limited.
   expectWritesAndLog(log2, /*expect_write_times=*/0, /*log_call_times=*/1);
 
-  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(4)));
+  time_system_->setMonotonicTime(start_time_ + std::chrono::seconds(4));
   expectWritesAndLog(log2, /*expect_write_times=*/3, /*log_call_times=*/4);
 }
 

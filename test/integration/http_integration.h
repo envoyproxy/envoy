@@ -107,6 +107,7 @@ private:
   void flushWrite();
 
   Event::Dispatcher& dispatcher_;
+  Event::TestTimeSystem& time_system_;
   ConnectionCallbacks callbacks_;
   CodecCallbacks codec_callbacks_;
   CodecClientCallbacks codec_client_callbacks_;

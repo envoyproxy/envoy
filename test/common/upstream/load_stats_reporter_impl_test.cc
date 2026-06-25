@@ -34,6 +34,8 @@ namespace {
 
 class LoadStatsReporterImplTest : public testing::Test {
 public:
+  void SetUp() override { start_time_ = time_system_.monotonicTime(); }
+
   LoadStatsReporterImplTest()
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),
         async_client_(new Grpc::MockAsyncClient()) {}
@@ -106,6 +108,7 @@ public:
   }
 
   Event::SimulatedTimeSystem time_system_;
+  MonotonicTime start_time_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -152,7 +155,7 @@ TEST_F(LoadStatsReporterImplTest, ExistingClusters) {
   // Initially, we have no clusters to report on.
   expectSendMessage({});
   createLoadStatsReporter();
-  time_system_.setMonotonicTime(std::chrono::microseconds(3));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(3));
   // Start reporting on foo.
   NiceMock<MockClusterMockPrioritySet> foo_cluster;
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(2);
@@ -166,7 +169,7 @@ TEST_F(LoadStatsReporterImplTest, ExistingClusters) {
   // Initial stats report for foo on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
   foo_cluster.info_->load_report_stats_.upstream_rq_drop_overload_.add(7);
-  time_system_.setMonotonicTime(std::chrono::microseconds(4));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(4));
   {
     envoy::config::endpoint::v3::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
@@ -186,13 +189,13 @@ TEST_F(LoadStatsReporterImplTest, ExistingClusters) {
   bar_cluster.info_->load_report_stats_.upstream_rq_drop_overload_.add(5);
 
   // Start reporting on bar.
-  time_system_.setMonotonicTime(std::chrono::microseconds(6));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(6));
   deliverLoadStatsResponse({"foo", "bar"});
   // Stats report foo/bar on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
   bar_cluster.info_->load_report_stats_.upstream_rq_drop_overload_.add(3);
-  time_system_.setMonotonicTime(std::chrono::microseconds(28));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(28));
   {
     envoy::config::endpoint::v3::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
@@ -222,7 +225,7 @@ TEST_F(LoadStatsReporterImplTest, ExistingClusters) {
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
   bar_cluster.info_->load_report_stats_.upstream_rq_drop_overload_.add(7);
-  time_system_.setMonotonicTime(std::chrono::microseconds(33));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(33));
   {
     envoy::config::endpoint::v3::ClusterStats bar_cluster_stats;
     bar_cluster_stats.set_cluster_name("bar");
@@ -242,14 +245,14 @@ TEST_F(LoadStatsReporterImplTest, ExistingClusters) {
   bar_cluster.info_->load_report_stats_.upstream_rq_drop_overload_.add(3);
 
   // Start tracking foo again, we should forget earlier history for foo.
-  time_system_.setMonotonicTime(std::chrono::microseconds(43));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(43));
   deliverLoadStatsResponse({"foo", "bar"});
   // Stats report foo/bar on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
   foo_cluster.info_->load_report_stats_.upstream_rq_drop_overload_.add(9);
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
   bar_cluster.info_->load_report_stats_.upstream_rq_drop_overload_.add(4);
-  time_system_.setMonotonicTime(std::chrono::microseconds(47));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(47));
   {
     envoy::config::endpoint::v3::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
@@ -315,7 +318,7 @@ TEST_F(LoadStatsReporterImplTest, EndpointLevelLoadStatsReporting) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
-  time_system_.setMonotonicTime(std::chrono::microseconds(100));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(100));
 
   NiceMock<MockClusterMockPrioritySet> cluster;
   MockHostSet& host_set = *cluster.prioritySet().getMockHostSet(0);
@@ -334,7 +337,7 @@ TEST_F(LoadStatsReporterImplTest, EndpointLevelLoadStatsReporting) {
   ON_CALL(cm_, getActiveCluster("foo"))
       .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
   deliverLoadStatsResponse({"foo"}, true);
-  time_system_.setMonotonicTime(std::chrono::microseconds(101));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(101));
   {
     envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
 
@@ -383,7 +386,7 @@ TEST_F(LoadStatsReporterImplTest, EndpointLevelLoadStatsReportingNoUpdate) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
-  time_system_.setMonotonicTime(std::chrono::microseconds(100));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(100));
 
   NiceMock<MockClusterMockPrioritySet> cluster;
   MockHostSet& host_set = *cluster.prioritySet().getMockHostSet(0);
@@ -402,7 +405,7 @@ TEST_F(LoadStatsReporterImplTest, EndpointLevelLoadStatsReportingNoUpdate) {
   ON_CALL(cm_, getActiveCluster("foo"))
       .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
   deliverLoadStatsResponse({"foo"}, true);
-  time_system_.setMonotonicTime(std::chrono::microseconds(101));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(101));
   {
     envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
 
@@ -441,7 +444,7 @@ TEST_F(LoadStatsReporterImplTest, UpstreamLocalityStats) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
-  time_system_.setMonotonicTime(std::chrono::microseconds(3));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(3));
 
   // Set up some load metrics
   NiceMock<MockClusterMockPrioritySet> cluster;
@@ -464,7 +467,7 @@ TEST_F(LoadStatsReporterImplTest, UpstreamLocalityStats) {
       .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
   deliverLoadStatsResponse({"foo"});
   // First stats report on timer tick.
-  time_system_.setMonotonicTime(std::chrono::microseconds(4));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(4));
   {
     envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
     expected_cluster_stats.set_cluster_name("foo");
@@ -500,10 +503,10 @@ TEST_F(LoadStatsReporterImplTest, UpstreamLocalityStats) {
   host1->loadMetricStats().add("metric_a", 1.41421);
   host1->loadMetricStats().add("metric_e", 2.71828);
 
-  time_system_.setMonotonicTime(std::chrono::microseconds(6));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(6));
   deliverLoadStatsResponse({"foo"});
   // Second stats report on timer tick.
-  time_system_.setMonotonicTime(std::chrono::microseconds(28));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(28));
   {
     envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
     expected_cluster_stats.set_cluster_name("foo");
@@ -566,7 +569,7 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadWhenRqActiveIsNonZero) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
-  time_system_.setMonotonicTime(std::chrono::microseconds(100));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(100));
 
   NiceMock<MockClusterMockPrioritySet> cluster;
   MockHostSet& host_set = *cluster.prioritySet().getMockHostSet(0);
@@ -585,7 +588,7 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadWhenRqActiveIsNonZero) {
   ON_CALL(cm_, getActiveCluster("foo"))
       .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
   deliverLoadStatsResponse({"foo"});
-  time_system_.setMonotonicTime(std::chrono::microseconds(101));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(101));
   {
     envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
 
@@ -622,7 +625,7 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqSuccess) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
-  time_system_.setMonotonicTime(std::chrono::microseconds(100));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(100));
 
   NiceMock<MockClusterMockPrioritySet> cluster;
   MockHostSet& host_set = *cluster.prioritySet().getMockHostSet(0);
@@ -640,7 +643,7 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqSuccess) {
   ON_CALL(cm_, getActiveCluster("foo"))
       .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
   deliverLoadStatsResponse({"foo"});
-  time_system_.setMonotonicTime(std::chrono::microseconds(101));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(101));
   {
     envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
 
@@ -677,7 +680,7 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqError) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
-  time_system_.setMonotonicTime(std::chrono::microseconds(100));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(100));
 
   NiceMock<MockClusterMockPrioritySet> cluster;
   MockHostSet& host_set = *cluster.prioritySet().getMockHostSet(0);
@@ -695,7 +698,7 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqError) {
   ON_CALL(cm_, getActiveCluster("foo"))
       .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
   deliverLoadStatsResponse({"foo"});
-  time_system_.setMonotonicTime(std::chrono::microseconds(101));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(101));
   {
     envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
 
@@ -732,7 +735,7 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsCustomMetric) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
-  time_system_.setMonotonicTime(std::chrono::microseconds(100));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(100));
 
   NiceMock<MockClusterMockPrioritySet> cluster;
   MockHostSet& host_set = *cluster.prioritySet().getMockHostSet(0);
@@ -750,7 +753,7 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsCustomMetric) {
   ON_CALL(cm_, getActiveCluster("foo"))
       .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
   deliverLoadStatsResponse({"foo"});
-  time_system_.setMonotonicTime(std::chrono::microseconds(101));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(101));
   {
     envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
 
@@ -787,7 +790,7 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsDisabled) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
-  time_system_.setMonotonicTime(std::chrono::microseconds(100));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(100));
 
   NiceMock<MockClusterMockPrioritySet> cluster;
   MockHostSet& host_set = *cluster.prioritySet().getMockHostSet(0);
@@ -805,7 +808,7 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsDisabled) {
   ON_CALL(cm_, getActiveCluster("foo"))
       .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
   deliverLoadStatsResponse({"foo"});
-  time_system_.setMonotonicTime(std::chrono::microseconds(101));
+  time_system_.setMonotonicTime(start_time_ + std::chrono::microseconds(101));
   {
     // Expect no UpstreamLocalityStats
     envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;

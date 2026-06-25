@@ -1,3 +1,5 @@
+#include <future>
+
 #include "source/common/common/thread.h"
 #include "source/common/event/libevent.h"
 #include "source/common/event/libevent_scheduler.h"
@@ -234,16 +236,47 @@ TEST_F(SimulatedTimeSystemTest, AdvanceTimeWait) {
   EXPECT_EQ(start_monotonic_time_, time_system_.monotonicTime());
   EXPECT_EQ(start_system_time_, time_system_.systemTime());
 
-  addTask(4, 'Z');
-  addTask(2, 'X');
-  addTask(3, 'Y');
-  addTask(6, 'A'); // This timer will never be run, so "A" will not be appended.
+  struct ThreadContext {
+    LibeventScheduler base_scheduler;
+    SchedulerPtr scheduler;
+    Event::MockDispatcher dispatcher;
+    std::vector<TimerPtr> timers;
+  };
+
+  std::unique_ptr<ThreadContext> ctx;
+  std::promise<void> ready_promise;
+  std::future<void> ready_future = ready_promise.get_future();
   std::atomic<bool> done(false);
-  auto thread = Thread::threadFactoryForTest().createThread([this, &done]() {
+
+  auto thread = Thread::threadFactoryForTest().createThread([&]() {
+    ctx = std::make_unique<ThreadContext>();
+    ctx->scheduler = time_system_.createScheduler(ctx->base_scheduler, ctx->base_scheduler);
+    ready_promise.set_value();
+
     while (!done) {
-      base_scheduler_.run(Dispatcher::RunType::Block);
+      ctx->base_scheduler.run(Dispatcher::RunType::Block);
     }
   });
+
+  ready_future.wait();
+
+  auto add_thread_task = [&](int64_t delay_ms, char marker) {
+    std::chrono::milliseconds delay(delay_ms);
+    TimerPtr timer = ctx->scheduler->createTimer(
+        [this, marker, delay]() {
+          output_.append(1, marker);
+          EXPECT_GE(time_system_.monotonicTime(), start_monotonic_time_ + delay);
+        },
+        ctx->dispatcher);
+    timer->enableTimer(delay);
+    ctx->timers.push_back(std::move(timer));
+  };
+
+  add_thread_task(4, 'Z');
+  add_thread_task(2, 'X');
+  add_thread_task(3, 'Y');
+  add_thread_task(6, 'A'); // This timer will never be run, so "A" will not be appended.
+
   time_system_.advanceTimeWait(std::chrono::milliseconds(5));
   EXPECT_EQ("XYZ", output_);
   done = true;
@@ -287,7 +320,7 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
     EXPECT_FALSE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::milliseconds(1)));
   }
   EXPECT_FALSE(done);
-  EXPECT_EQ(MonotonicTime(std::chrono::seconds(0)), time_system_.monotonicTime());
+  EXPECT_EQ(start_monotonic_time_, time_system_.monotonicTime());
 
   // Fire the timeout by advancing time and then verify that waitFor() returns without any timeout.
   time_system_.advanceTimeWait(std::chrono::seconds(60));
@@ -296,7 +329,7 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
     EXPECT_TRUE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(0)));
   }
   EXPECT_TRUE(done);
-  EXPECT_EQ(MonotonicTime(std::chrono::seconds(60)), time_system_.monotonicTime());
+  EXPECT_EQ(start_monotonic_time_ + std::chrono::seconds(60), time_system_.monotonicTime());
   thread->join();
 
   // Waiting a third time, with no pending timeouts, will just sleep out for
@@ -307,7 +340,7 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
     EXPECT_FALSE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(0)));
   }
   EXPECT_FALSE(done);
-  EXPECT_EQ(MonotonicTime(std::chrono::seconds(60)), time_system_.monotonicTime());
+  EXPECT_EQ(start_monotonic_time_ + std::chrono::seconds(60), time_system_.monotonicTime());
 }
 
 TEST_F(SimulatedTimeSystemTest, Monotonic) {

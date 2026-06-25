@@ -2172,6 +2172,12 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesInsideWindow) {
         EXPECT_EQ(0, priority);
         EXPECT_EQ(2, hosts_added.size());
         EXPECT_EQ(0, hosts_removed.size());
+      }))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(0, hosts_added.size());
+        EXPECT_EQ(0, hosts_removed.size());
       }));
 
   createWithLocalClusterUpdate();
@@ -2183,19 +2189,26 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesInsideWindow) {
   HostVector hosts_added;
   HostVector hosts_removed;
 
-  // The first update will not be applied, as we make it inside the default mergeable window of
-  // 3 seconds (found in debugger as value of cluster.info()->lbConfig().update_merge_window()
-  // in ClusterManagerImpl::scheduleUpdate. Note that initially the update-time is
-  // default-initialized to a monotonic time of 0, as is SimulatedTimeSystem::monotonic_time_.
+  // Trigger an initial update to set last_updated_ to now (10000s).
+  cluster.prioritySet().updateHosts(
+      0,
+      updateHostsParams(hosts, hosts_per_locality,
+                        std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
+      {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.update_out_of_merge_window").value());
+
+  // The second update will not be applied, as we make it inside the default mergeable window of
+  // 3 seconds.
   time_system_.advanceTimeWait(std::chrono::seconds(2));
   cluster.prioritySet().updateHosts(
       0,
       updateHostsParams(hosts, hosts_per_locality,
                         std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
       {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
-  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
-  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_out_of_merge_window").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.update_out_of_merge_window").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 }
 

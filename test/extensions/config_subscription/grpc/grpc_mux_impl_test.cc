@@ -901,7 +901,7 @@ TEST_P(GrpcMuxImplTest, TooManyRequestsWithEmptyRateLimitSettings) {
   EXPECT_EQ(0, control_plane_connected_state_.value());
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  time_system_.setMonotonicTime(std::chrono::seconds(30));
+  time_system_.setMonotonicTime(time_system_.monotonicTime() + std::chrono::seconds(30));
   retry_timer->invokeCallback();
   EXPECT_EQ(0, control_plane_pending_requests_.value());
   // One more message on the way out when the watch is destroyed.
@@ -954,7 +954,7 @@ TEST_P(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
   EXPECT_EQ(11, control_plane_pending_requests_.value());
 
   // Validate that drain requests call when there are multiple requests in queue.
-  time_system_.setMonotonicTime(std::chrono::seconds(10));
+  time_system_.setMonotonicTime(time_system_.monotonicTime() + std::chrono::seconds(10));
   drain_request_timer->invokeCallback();
 
   // Check that the pending_requests stat is updated with the queue drain.

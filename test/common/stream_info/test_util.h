@@ -31,9 +31,6 @@ public:
     setUpstreamInfo(std::make_shared<Envoy::StreamInfo::UpstreamInfoImpl>());
   }
 
-  SystemTime startTime() const override { return start_time_; }
-  MonotonicTime startTimeMonotonic() const override { return start_time_monotonic_; }
-
   const Network::ConnectionInfoSetter& downstreamAddressProvider() const override {
     return *downstream_connection_info_provider_;
   }
@@ -66,8 +63,7 @@ public:
   Event::TimeSystem& timeSystem() { return test_time_.timeSystem(); }
 
   Random::RandomGeneratorImpl random_;
-  SystemTime start_time_;
-  MonotonicTime start_time_monotonic_;
+
   absl::optional<MonotonicTime> end_time_;
   absl::optional<std::string> virtual_cluster_name_;
   Network::ConnectionInfoSetterSharedPtr downstream_connection_info_provider_{

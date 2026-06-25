@@ -659,9 +659,9 @@ TEST_P(XdsFailoverAdsIntegrationTest, PrimaryUseAfterFailoverResponseAndDisconne
   // The failover disconnected, so the next step is trying to connect to the
   // primary. First ensure that the failover isn't being attempted, and then let
   // the connection to the primary succeed.
-  EXPECT_FALSE(failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_,
-                                                             std::chrono::seconds(5)));
   EXPECT_TRUE(xds_upstream_->waitForHttpConnection(*dispatcher_, xds_connection_));
+  EXPECT_FALSE(failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_,
+                                                             std::chrono::milliseconds(500)));
 
   // Allow receiving config from the primary.
   result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
@@ -1014,10 +1014,14 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoPrimaryUseAfterFailoverResponse) {
   // Ensure that Envoy still attempts to connect to the failover,
   // and keep disconnecting a few times and validate that the primary
   // connection isn't attempted.
+  test_server_->waitForCounter("cluster_manager.cds.update_failure", Ge(4));
+  uint64_t cds_failures = test_server_->counter("cluster_manager.cds.update_failure")->value();
+  RELEASE_ASSERT(cds_failures == 4, fmt::format("cds_failures is {}, expected 4", cds_failures));
+
   for (int i = 1; i < 5; ++i) {
     ASSERT_TRUE(failover_xds_connection_->waitForDisconnect());
     // Wait longer due to the fixed 5 seconds failover .
-    waitForPrimaryXdsRetryTimer(i, 6);
+    waitForPrimaryXdsRetryTimer(3 + i, 1);
     // EnvoyGrpc will disconnect if the gRPC stream is immediately closed (as
     // done above).
     result = failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
@@ -1034,7 +1038,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoPrimaryUseAfterFailoverResponse) {
 
   ASSERT_TRUE(failover_xds_connection_->waitForDisconnect());
   // Wait longer due to the fixed 5 seconds failover .
-  waitForPrimaryXdsRetryTimer(5, 6);
+  waitForPrimaryXdsRetryTimer(8, 1);
 
   // Allow a connection to the failover.
   // Expect a connection to the failover when using EnvoyGrpc.

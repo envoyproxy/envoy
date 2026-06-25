@@ -10,6 +10,8 @@
 
 #include "test/integration/ads_integration.h"
 #include "test/integration/integration.h"
+#include "test/integration/utility.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 using testing::Ge;
 using testing::Return;
@@ -153,6 +155,7 @@ public:
     setUpstreamCount(num_upstreams_);
     setDeterministicValue();
     config_helper_.renameListener("redis_proxy");
+    mock_os_sys_calls_.setIpVersion(version_);
 
     // Change the port for each of the discovery host in cluster_0.
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -281,7 +284,7 @@ protected:
     std::string proxied_cluster_slot_request;
 
     FakeRawConnectionPtr fake_upstream_connection_;
-    EXPECT_TRUE(fake_upstreams_[stream_index]->waitForRawConnection(fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstreams_[stream_index]->waitForRawConnection(fake_upstream_connection_));
     if (auth_password.empty()) {
       EXPECT_TRUE(fake_upstream_connection_->waitForData(cluster_slot_request.size(),
                                                          &proxied_cluster_slot_request));
@@ -391,6 +394,8 @@ protected:
   const int num_upstreams_;
   const Network::Address::IpVersion version_;
   int random_index_;
+  OsSysCallsWithMockedDns mock_os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&mock_os_sys_calls_};
 };
 
 class RedisClusterWithAuthIntegrationTest : public RedisClusterIntegrationTest {

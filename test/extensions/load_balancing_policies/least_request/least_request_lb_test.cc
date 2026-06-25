@@ -369,6 +369,8 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
 
 TEST_P(LeastRequestLoadBalancerTest, SlowStartWithDefaultParams) {
   envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
+  const auto start_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+      simTime().monotonicTime().time_since_epoch());
   LeastRequestLoadBalancer lb_2{priority_set_, nullptr, stats_,       runtime_,
                                 random_,       50,      lr_lb_config, simTime()};
   const auto slow_start_window =
@@ -376,7 +378,7 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWithDefaultParams) {
   EXPECT_EQ(std::chrono::milliseconds(0), slow_start_window);
   const auto latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(lb_2));
-  EXPECT_EQ(std::chrono::milliseconds(0), latest_host_added_time);
+  EXPECT_EQ(start_time, latest_host_added_time);
   const auto slow_start_min_weight_percent =
       EdfLoadBalancerBasePeer::slowStartMinWeightPercent(static_cast<EdfLoadBalancerBase&>(lb_2));
   EXPECT_DOUBLE_EQ(slow_start_min_weight_percent, 0.1);
@@ -387,6 +389,8 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartNoWait) {
   lr_lb_config.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(60);
   lr_lb_config.mutable_active_request_bias()->set_runtime_key("ar_bias");
   lr_lb_config.mutable_active_request_bias()->set_default_value(1.0);
+  const auto start_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+      simTime().monotonicTime().time_since_epoch());
   LeastRequestLoadBalancer lb_2{priority_set_, nullptr, stats_,       runtime_,
                                 random_,       50,      lr_lb_config, simTime()};
   simTime().advanceTimeWait(std::chrono::seconds(1));
@@ -400,7 +404,7 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartNoWait) {
 
   auto latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(lb_2));
-  EXPECT_EQ(std::chrono::milliseconds(1000), latest_host_added_time);
+  EXPECT_EQ(start_time + std::chrono::milliseconds(1000), latest_host_added_time);
 
   // Advance time, so that host is no longer in slow start.
   simTime().advanceTimeWait(std::chrono::seconds(56));
@@ -415,7 +419,7 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartNoWait) {
 
   latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(lb_2));
-  EXPECT_EQ(std::chrono::milliseconds(62000), latest_host_added_time);
+  EXPECT_EQ(start_time + std::chrono::milliseconds(62000), latest_host_added_time);
 
   // host2 is 10 secs in slow start, the weight is scaled with time factor max(10/60, 0.1) = 0.16.
   simTime().advanceTimeWait(std::chrono::seconds(10));
@@ -456,6 +460,8 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWithActiveHC) {
   lr_lb_config.mutable_active_request_bias()->set_runtime_key("ar_bias");
   lr_lb_config.mutable_active_request_bias()->set_default_value(0.9);
 
+  const auto start_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+      simTime().monotonicTime().time_since_epoch());
   LeastRequestLoadBalancer lb_2{priority_set_, nullptr, stats_,       runtime_,
                                 random_,       50,      lr_lb_config, simTime()};
 
@@ -469,7 +475,7 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWithActiveHC) {
   hostSet().runCallbacks(hosts_added, {});
   auto latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(lb_2));
-  EXPECT_EQ(std::chrono::milliseconds(0), latest_host_added_time);
+  EXPECT_EQ(start_time, latest_host_added_time);
   simTime().advanceTimeWait(std::chrono::seconds(5));
 
   hosts_added.clear();
@@ -481,7 +487,7 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWithActiveHC) {
   hostSet().runCallbacks(hosts_added, {});
   latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(lb_2));
-  EXPECT_EQ(std::chrono::milliseconds(7000), latest_host_added_time);
+  EXPECT_EQ(start_time + std::chrono::milliseconds(7000), latest_host_added_time);
 
   simTime().advanceTimeWait(std::chrono::seconds(1));
   host1->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);

@@ -85,6 +85,7 @@ public:
   NiceMock<MockFaultManager> fault_manager_;
 
   Event::SimulatedTimeSystem time_system_;
+  const MonotonicTime test_start_time_{time_system_.monotonicTime()};
   absl::flat_hash_set<std::string> custom_commands_;
   InstanceImpl splitter_{std::make_unique<NiceMock<MockRouter>>(route_),
                          *store_.rootScope(),
@@ -275,7 +276,7 @@ TEST_P(RedisSingleServerRequestTest, Success) {
   makeRequest("hello", std::move(request));
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name,
                                    fmt::format("redis.foo.command.{}.latency", lower_command)),
@@ -299,7 +300,7 @@ TEST_P(RedisSingleServerRequestTest, Mirrored) {
   makeRequest("hello", std::move(request), true);
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name,
                                    fmt::format("redis.foo.command.{}.latency", lower_command)),
@@ -324,7 +325,7 @@ TEST_P(RedisSingleServerRequestTest, MirroredFailed) {
   makeRequest("hello", std::move(request), true);
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name,
                                    fmt::format("redis.foo.command.{}.latency", lower_command)),
@@ -348,7 +349,7 @@ TEST_P(RedisSingleServerRequestTest, SuccessMultipleArgs) {
 
   std::string lower_command = absl::AsciiStrToLower(GetParam());
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name,
                                    fmt::format("redis.foo.command.{}.latency", lower_command)),
@@ -370,7 +371,7 @@ TEST_P(RedisSingleServerRequestTest, Fail) {
 
   std::string lower_command = absl::AsciiStrToLower(GetParam());
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(5));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(5));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name,
                                    fmt::format("redis.foo.command.{}.latency", lower_command)),
@@ -502,7 +503,7 @@ TEST_F(RedisSingleServerRequestTest, EvalSuccess) {
 
   std::string lower_command = absl::AsciiStrToLower("eval");
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name,
                                    fmt::format("redis.foo.command.{}.latency", lower_command)),
@@ -524,7 +525,7 @@ TEST_F(RedisSingleServerRequestTest, EvalShaSuccess) {
 
   std::string lower_command = absl::AsciiStrToLower("evalsha");
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name,
                                    fmt::format("redis.foo.command.{}.latency", lower_command)),
@@ -591,7 +592,7 @@ TEST_F(RedisSingleServerRequestTest, ObjectEncodingSuccess) {
 
   std::string lower_command = absl::AsciiStrToLower("object");
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name,
                                    fmt::format("redis.foo.command.{}.latency", lower_command)),
@@ -614,7 +615,7 @@ TEST_F(RedisSingleServerRequestTest, ObjectRefcountSuccess) {
 
   std::string lower_command = absl::AsciiStrToLower("object");
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name,
                                    fmt::format("redis.foo.command.{}.latency", lower_command)),
@@ -897,7 +898,7 @@ TEST_F(RedisMGETCommandHandlerTest, Normal) {
 
   pool_callbacks_[1]->onResponse(response("5"));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.mget.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
@@ -926,7 +927,7 @@ TEST_F(RedisMGETCommandHandlerTest, Mirrored) {
   pool_callbacks_[1]->onResponse(response("5"));
   mirror_pool_callbacks_[1]->onResponse(response("5"));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.mget.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
@@ -1014,7 +1015,7 @@ TEST_F(RedisMGETCommandHandlerTest, Failure) {
 
   pool_callbacks_[1]->onFailure();
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(5));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(5));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.mget.latency"), 5));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
@@ -1043,7 +1044,7 @@ TEST_F(RedisMGETCommandHandlerTest, InvalidUpstreamResponse) {
   Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
   response1->type(Common::Redis::RespType::Integer);
   response1->asInteger() = 5;
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.mget.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
@@ -1101,7 +1102,7 @@ TEST_F(RedisMSETCommandHandlerTest, Normal) {
 
   pool_callbacks_[1]->onResponse(okResponse());
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.mset.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
@@ -1125,7 +1126,7 @@ TEST_F(RedisMSETCommandHandlerTest, Mirrored) {
   pool_callbacks_[1]->onResponse(okResponse());
   mirror_pool_callbacks_[1]->onResponse(okResponse());
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.mset.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
@@ -1228,7 +1229,7 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, Normal) {
 
   pool_callbacks_[1]->onResponse(response(1));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(
       store_,
       deliverHistogramToSinks(
@@ -1254,7 +1255,7 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, Mirrored) {
   pool_callbacks_[1]->onResponse(response(1));
   mirror_pool_callbacks_[1]->onResponse(response(1));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(
       store_,
       deliverHistogramToSinks(
@@ -1319,7 +1320,7 @@ TEST_P(RedisSingleServerRequestWithLatencyMicrosTest, Success) {
   makeRequest("hello", std::move(request));
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name,
                                    fmt::format("redis.foo.command.{}.latency", lower_command)),
@@ -1406,7 +1407,7 @@ TEST_P(RedisSingleServerRequestWithErrorWithDelayFaultTest, Fault) {
 
   handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_NE(nullptr, handle_);
-  time_system_.setMonotonicTime(std::chrono::milliseconds(delay_ms_));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(delay_ms_));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name,
                                    fmt::format("redis.foo.command.{}.latency", lower_command)),
@@ -1462,7 +1463,7 @@ TEST_P(RedisSingleServerRequestWithDelayFaultTest, Fault) {
                           delay_ms_));
   respond();
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(delay_ms_));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(delay_ms_));
   timer_cb_();
 
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
@@ -1500,7 +1501,7 @@ TEST_P(ScanHandlerTest, Normal) {
   Common::Redis::RespValue expected_response;
   expected_response.type(Common::Redis::RespType::Array);
   pool_callbacks_[1]->onResponse(response());
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(
       store_,
       deliverHistogramToSinks(
@@ -1524,7 +1525,7 @@ TEST_P(ScanHandlerTest, Mirrored) {
   pool_callbacks_[1]->onResponse(response());
   mirror_pool_callbacks_[1]->onResponse(response());
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(
       store_,
       deliverHistogramToSinks(
@@ -1641,7 +1642,7 @@ TEST_P(InfoShardHandlerTest, Normal) {
   expected_response.type(Common::Redis::RespType::BulkString);
   expected_response.asString() = "# Server\r\nredis_version:6.2.6\r\n";
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(
       store_,
       deliverHistogramToSinks(
@@ -1902,7 +1903,7 @@ TEST_F(ClusterScopeRoleTest, RoleNormal) {
   expected_response.asArray().swap(elements);
 
   pool_callbacks_[0]->onResponse(masterResponse());
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.role.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
@@ -1942,7 +1943,7 @@ TEST_F(ClusterScopeRoleTest, RoleMirrored) {
   pool_callbacks_[0]->onResponse(masterResponse());
   mirror_pool_callbacks_[0]->onResponse(masterResponse());
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.role.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
@@ -1970,7 +1971,7 @@ TEST_F(ClusterScopeRoleTest, RoleNoUpstreamHostForOne) {
   setup(2, {0});
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.role.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(_));
@@ -1986,7 +1987,7 @@ TEST_F(ClusterScopeRoleTest, RoleUpstreamFailure) {
 
   pool_callbacks_[1]->onFailure();
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(5));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(5));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.role.latency"), 5));
   EXPECT_CALL(callbacks_, onResponse_(_));
@@ -2006,7 +2007,7 @@ TEST_F(ClusterScopeRoleTest, RoleInvalidUpstreamResponse) {
   invalid_response->type(Common::Redis::RespType::Integer);
   invalid_response->asInteger() = 123;
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.role.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(_));
@@ -2022,7 +2023,7 @@ TEST_F(ClusterScopeRoleTest, RoleErrorResponse) {
 
   pool_callbacks_[0]->onResponse(masterResponse());
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.role.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(_));
@@ -2041,7 +2042,7 @@ TEST_F(ClusterScopeRoleTest, RoleNullResponse) {
 
   Common::Redis::RespValuePtr null_resp;
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.role.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(_));
@@ -2089,7 +2090,7 @@ TEST_F(RandomShardRequestTest, RandomKey) {
   setup({"randomkey"});
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_,
               deliverHistogramToSinks(
                   Property(&Stats::Metric::name, "redis.foo.command.randomkey.latency"), 10));
@@ -2106,7 +2107,7 @@ TEST_F(RandomShardRequestTest, ClusterNodes) {
   setup({"cluster", "nodes"});
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.cluster.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(_));
@@ -2163,7 +2164,7 @@ TEST_F(RandomShardRequestTest, ErrorResponse) {
   setup({"randomkey"});
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(15));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(15));
   EXPECT_CALL(store_,
               deliverHistogramToSinks(
                   Property(&Stats::Metric::name, "redis.foo.command.randomkey.latency"), 15));
@@ -2261,7 +2262,7 @@ TEST_F(HelloRequestTest, HelloWithProtocolVersion) {
   setup({"hello", "2"}, {}, false, 1);
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.hello.latency"), 10));
 
@@ -2294,7 +2295,7 @@ TEST_F(HelloRequestTest, HelloErrorResponse) {
   setup({"hello", "2"}, {}, false, 1);
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(20));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(20));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.hello.latency"), 20));
   EXPECT_CALL(callbacks_, onResponse_(_));
@@ -2312,7 +2313,7 @@ TEST_F(HelloRequestTest, HelloResponseWithoutIdField) {
   setup({"hello", "2"}, {}, false, 1);
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(12));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(12));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.hello.latency"), 12));
 
@@ -2357,7 +2358,7 @@ TEST_F(HelloRequestTest, HelloProtocolVersionMismatch) {
   setup({"hello", "2"});
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
 
   // Second shard returns proto:3 (mismatch!)
   Common::Redis::RespValuePtr mismatched_response = std::make_unique<Common::Redis::RespValue>();
@@ -2415,7 +2416,7 @@ TEST_F(HelloRequestTest, HelloFieldValueMismatch) {
   setup({"hello", "2"});
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
 
   // Second shard returns mode:cluster (different but not proto, so just warn)
   Common::Redis::RespValuePtr different_mode = std::make_unique<Common::Redis::RespValue>();
@@ -2470,7 +2471,7 @@ TEST_F(HelloRequestTest, HelloMixedArrayAndNonArrayResponses) {
   setup({"hello", "2"});
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
 
   // Second shard returns simple string (non-array)
   Common::Redis::RespValuePtr non_array = std::make_unique<Common::Redis::RespValue>();
@@ -2499,7 +2500,7 @@ TEST_F(HelloRequestTest, HelloKeyMismatchBetweenShards) {
   setup({"hello", "2"});
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
 
   // Second shard has extra key not in first response
   Common::Redis::RespValuePtr extra_key_response = std::make_unique<Common::Redis::RespValue>();
@@ -2554,7 +2555,7 @@ TEST_F(HelloRequestTest, HelloMultipleShardsConsistentResponse) {
   setup({"hello", "2"});
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
 
   // First shard responds
   pool_callbacks_[0]->onResponse(helloResponse());
@@ -2586,7 +2587,7 @@ TEST_F(HelloRequestTest, HelloNonBulkStringKeyType) {
   setup({"hello", "2"});
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
 
   // Second shard has integer key (invalid but should be skipped)
   Common::Redis::RespValuePtr invalid_key_response = std::make_unique<Common::Redis::RespValue>();
@@ -2653,7 +2654,7 @@ TEST_F(HelloRequestTest, HelloFirstResponseNullSecondValid) {
   setup({"hello", "2"});
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
 
   // First shard returns null (simulating connection failure or timeout)
   Common::Redis::RespValuePtr null_response = nullptr;
@@ -2686,7 +2687,7 @@ TEST_F(HelloRequestTest, HelloAllResponsesNull) {
   setup({"hello", "2"});
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
 
   // First shard returns null
   Common::Redis::RespValuePtr null_response1 = nullptr;
@@ -2715,7 +2716,7 @@ TEST_F(HelloRequestTest, HelloFirstResponseEmptyArraySecondValid) {
   setup({"hello", "2"});
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
 
   // First shard returns empty array
   Common::Redis::RespValuePtr empty_array = std::make_unique<Common::Redis::RespValue>();
@@ -2749,7 +2750,7 @@ TEST_F(HelloRequestTest, HelloAllResponsesNonArray) {
   setup({"hello", "2"});
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
 
   // First shard returns simple string
   Common::Redis::RespValuePtr simple1 = std::make_unique<Common::Redis::RespValue>();
@@ -2782,7 +2783,7 @@ TEST_F(HelloRequestTest, HelloAllResponsesEmptyArray) {
   setup({"hello", "2"});
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
 
   // First shard returns empty array
   Common::Redis::RespValuePtr empty1 = std::make_unique<Common::Redis::RespValue>();
@@ -2844,7 +2845,7 @@ TEST_F(ClusterScopeConfigTest, ConfigSetAllShardsReturnSame) {
   pool_callbacks_[0]->onResponse(okResponse());
   pool_callbacks_[1]->onResponse(okResponse());
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
@@ -2870,7 +2871,7 @@ TEST_F(ClusterScopeConfigTest, ConfigSetDifferentResponses) {
   different_response->type(Common::Redis::RespType::SimpleString);
   different_response->asString() = "DIFFERENT";
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(5));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(5));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 5));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_error)));
@@ -2887,7 +2888,7 @@ TEST_F(ClusterScopeConfigTest, ConfigSetOneShardError) {
 
   pool_callbacks_[0]->onResponse(okResponse());
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(8));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(8));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 8));
   EXPECT_CALL(callbacks_, onResponse_(_)); // Should return the error
@@ -2904,7 +2905,7 @@ TEST_F(ClusterScopeConfigTest, ConfigSetShardFailure) {
 
   pool_callbacks_[0]->onResponse(okResponse());
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(12));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(12));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 12));
   EXPECT_CALL(callbacks_, onResponse_(_)); // Should return failure error
@@ -2950,7 +2951,7 @@ TEST_F(ClusterScopeConfigTest, ConfigSetNoUpstreamForSome) {
   setup(2, {0});
   EXPECT_NE(nullptr, handle_);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(6));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(6));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 6));
   EXPECT_CALL(callbacks_, onResponse_(_));
@@ -2983,7 +2984,7 @@ TEST_F(ClusterScopeConfigTest, ConfigSetMirrored) {
   pool_callbacks_[0]->onResponse(okResponse());
   mirror_pool_callbacks_[0]->onResponse(okResponse());
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(7));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(7));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 7));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
@@ -3050,7 +3051,7 @@ TEST_F(ClusterScopeConfigTest, ConfigSetNullResponseFromShard) {
   // Send null response from second shard (simulating connection failure, timeout, etc.)
   Common::Redis::RespValuePtr null_resp;
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(9));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(9));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 9));
   EXPECT_CALL(callbacks_, onResponse_(_)); // Should get "all responses not same" error
@@ -3073,7 +3074,7 @@ TEST_F(ClusterScopeConfigTest, ConfigSetFirstResponseNull) {
   expected_error.type(Common::Redis::RespType::Error);
   expected_error.asString() = "all responses not same";
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(9));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(9));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 9));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_error)));
@@ -3142,7 +3143,7 @@ TEST_F(ClusterScopeSlowLogLenTest, SlowLogLenIntegerSum) {
   pool_callbacks_[0]->onResponse(integerResponse(50));
   pool_callbacks_[1]->onResponse(integerResponse(75));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(15));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(15));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.slowlog.latency"), 15));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
@@ -3163,7 +3164,7 @@ TEST_F(ClusterScopeSlowLogLenTest, SlowLogLenWithNegativeValues) {
 
   pool_callbacks_[0]->onResponse(integerResponse(50));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(6));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(6));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.slowlog.latency"), 6));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_error)));
@@ -3180,7 +3181,7 @@ TEST_F(ClusterScopeSlowLogLenTest, SlowLogLenNonIntegerResponse) {
 
   pool_callbacks_[0]->onResponse(integerResponse(50));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(9));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(9));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.slowlog.latency"), 9));
   EXPECT_CALL(callbacks_, onResponse_(_)); // Should get error response
@@ -3220,7 +3221,7 @@ TEST_F(ClusterScopeSlowLogLenTest, SlowLogLenNullResponse) {
   // Send nullptr response
   Common::Redis::RespValuePtr null_resp;
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.slowlog.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(_)); // Should get "null response" error
@@ -3240,7 +3241,7 @@ TEST_F(ClusterScopeSlowLogLenTest, SlowLogLenWithErrorResponse) {
   // Send an error response from second shard
   Common::Redis::RespValuePtr error_resp = Common::Redis::Utility::makeError("ERR shard error");
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.slowlog.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(_)); // Should get the error
@@ -3301,7 +3302,7 @@ TEST_F(ClusterScopeSlowLogGetTest, SlowLogGetArrayMerge) {
 
   pool_callbacks_[0]->onResponse(arrayResponse({"entry1", "entry2"}));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(20));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(20));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.slowlog.latency"), 20));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
@@ -3335,7 +3336,7 @@ TEST_F(ClusterScopeSlowLogGetTest, SlowLogGetNonArrayResponse) {
 
   pool_callbacks_[0]->onResponse(arrayResponse({"entry1"}));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(13));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(13));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.slowlog.latency"), 13));
   EXPECT_CALL(callbacks_, onResponse_(_));              // Should get error response
@@ -3355,7 +3356,7 @@ TEST_F(ClusterScopeSlowLogGetTest, SlowLogGetNullResponse) {
   // Send nullptr response
   Common::Redis::RespValuePtr null_resp;
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(12));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(12));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.slowlog.latency"), 12));
   EXPECT_CALL(callbacks_, onResponse_(_)); // Should get error
@@ -3375,7 +3376,7 @@ TEST_F(ClusterScopeSlowLogGetTest, SlowLogGetWithErrorResponse) {
   // Send an error response from second shard
   Common::Redis::RespValuePtr error_resp = Common::Redis::Utility::makeError("ERR shard error");
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(12));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(12));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.slowlog.latency"), 12));
   EXPECT_CALL(callbacks_, onResponse_(_));
@@ -3795,7 +3796,7 @@ TEST_F(ClusterScopeInfoTest, InfoAggregationAllTypes) {
   pool_callbacks_[0]->onResponse(infoResponse(shard1_response));
   pool_callbacks_[1]->onResponse(infoResponse(shard2_response));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.info.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(_));
@@ -3873,7 +3874,7 @@ TEST_F(ClusterScopeInfoTest, InfoNonBulkStringResponse) {
   invalid_response->type(Common::Redis::RespType::Integer);
   invalid_response->asInteger() = 123;
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(8));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(8));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.info.latency"), 8));
   EXPECT_CALL(callbacks_, onResponse_(_));
@@ -3894,7 +3895,7 @@ TEST_F(ClusterScopeInfoTest, InfoNullResponse) {
 
   Common::Redis::RespValuePtr null_resp;
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.info.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(_));
@@ -3912,7 +3913,7 @@ TEST_F(ClusterScopeInfoTest, InfoErrorResponse) {
   std::string shard1_response = "# Server\r\nredis_version:7.0.0\r\n";
   pool_callbacks_[0]->onResponse(infoResponse(shard1_response));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(12));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(12));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.info.latency"), 12));
   EXPECT_CALL(callbacks_, onResponse_(_));
@@ -3930,7 +3931,7 @@ TEST_F(ClusterScopeInfoTest, InfoShardFailure) {
   std::string shard1_response = "# Server\r\nredis_version:7.0.0\r\n";
   pool_callbacks_[0]->onResponse(infoResponse(shard1_response));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(15));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(15));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.info.latency"), 15));
   EXPECT_CALL(callbacks_, onResponse_(_));
@@ -3998,7 +3999,7 @@ TEST_F(ClusterScopeInfoTest, InfoBytesToHumanAllSizes) {
 
   pool_callbacks_[0]->onResponse(infoResponse(shard1_response));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  time_system_.setMonotonicTime(test_start_time_ + std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.info.latency"), 10));
   // Verify the response contains correctly formatted human-readable values

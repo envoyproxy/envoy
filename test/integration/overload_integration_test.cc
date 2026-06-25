@@ -396,7 +396,8 @@ protected:
   }
 };
 
-class OverloadScaledTimerIntegrationTest : public OverloadIntegrationTest {
+class OverloadScaledTimerIntegrationTest : public Event::TestUsingSimulatedTime,
+                                           public OverloadIntegrationTest {
 protected:
   void initializeOverloadManager(
       const envoy::config::overload::v3::ScaleTimersOverloadActionConfig& config) {
@@ -1620,15 +1621,21 @@ TEST_P(OverloadIntegrationTest, WorkerWatchdogMegaMiss) {
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   // Verify that the worker-specific megamiss counter is incremented.
   test_server_->waitForCounter("server.worker_0.watchdog_mega_miss", Ge(1));
   // Verify that the global workers megamiss counter is incremented.
   test_server_->waitForCounter("workers.watchdog_mega_miss", Ge(1));
 
-  EXPECT_TRUE(response->waitForEndStream(std::chrono::seconds(20)));
+  // Wait for upstream request and respond.
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
   EXPECT_TRUE(response->complete());
+  cleanupUpstreamAndDownstream();
 }
 
 // Verifies that when the runtime guard is disabled, worker threads fallback to the main thread
@@ -1655,7 +1662,8 @@ TEST_P(OverloadIntegrationTest, WorkerWatchdogMegaMissDisabled) {
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   // Since workers are using the main thread watchdog config (60s timeout),
   // a 400ms block should NOT trigger a megamiss.
@@ -1665,8 +1673,13 @@ TEST_P(OverloadIntegrationTest, WorkerWatchdogMegaMissDisabled) {
   EXPECT_EQ(test_server_->counter("server.worker_0.watchdog_mega_miss")->value(), 0);
   EXPECT_EQ(test_server_->counter("workers.watchdog_mega_miss")->value(), 0);
 
-  EXPECT_TRUE(response->waitForEndStream(std::chrono::seconds(20)));
+  // Wait for upstream request and respond.
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
   EXPECT_TRUE(response->complete());
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace Envoy

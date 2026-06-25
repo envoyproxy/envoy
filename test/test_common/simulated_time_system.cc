@@ -57,7 +57,8 @@ public:
       : time_system_(time_system), cb_scheduler_(cb_scheduler),
         thread_factory_(Thread::threadFactoryForTest()),
         run_alarms_cb_(cb_scheduler.createSchedulableCallback([this] { runReadyAlarms(); })),
-        monotonic_time_(time_system_.monotonicTime()), system_time_(time_system_.systemTime()) {
+        monotonic_time_(time_system_.monotonicTime()), system_time_(time_system_.systemTime()),
+        creation_thread_id_(thread_factory_.currentThreadId()) {
     time_system_.registerScheduler(this);
   }
   ~SimulatedScheduler() override { time_system_.unregisterScheduler(this); }
@@ -103,13 +104,14 @@ public:
       }
     }
     if (inc_pending) {
-      time_system_.incPending();
+      time_system_.incPending(creation_thread_id_);
     }
 
     if (!run_alarms_cb_->enabled()) {
       run_alarms_cb_->scheduleCallbackNextIteration();
     }
   }
+  Thread::ThreadId creationThreadId() const { return creation_thread_id_; }
 
 private:
   void waitForNoRunningCallbacksLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
@@ -214,6 +216,7 @@ private:
   // failure reproducibility when running against a specific seed by minimizing cross scheduler
   // interactions.
   TestRandomGenerator random_source_ ABSL_GUARDED_BY(mutex_);
+  const Thread::ThreadId creation_thread_id_;
 };
 
 // Our simulated alarm inherits from TimerImpl so that the same dispatching
@@ -320,7 +323,7 @@ void SimulatedTimeSystemHelper::SimulatedScheduler::runReadyAlarms() {
     running_cbs_ = false;
   }
   if (dec_pending) {
-    time_system_.decPending();
+    time_system_.decPending(creation_thread_id_);
   }
 }
 
@@ -354,7 +357,7 @@ static int instance_count = 0;
 // the real current time. But thereafter, real-time will not be used, and time
 // will march forward only by calling advanceTimeAndRun() or advanceTimeWait().
 SimulatedTimeSystemHelper::SimulatedTimeSystemHelper()
-    : monotonic_time_(MonotonicTime(std::chrono::seconds(0))),
+    : monotonic_time_(MonotonicTime(std::chrono::seconds(10000))),
       system_time_(real_time_source_.systemTime()) {
   ++instance_count;
   ASSERT(instance_count <= 1);
@@ -391,11 +394,28 @@ void SimulatedTimeSystemHelper::advanceTimeWaitImpl(const Duration& duration) {
   waitForNoPendingLockHeld();
 }
 
+struct AwaitArgs {
+  const SimulatedTimeSystemHelper* helper;
+  Thread::ThreadId calling_thread_id;
+};
+
 void SimulatedTimeSystemHelper::waitForNoPendingLockHeld() const
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+  AwaitArgs args{this, Thread::threadFactoryForTest().currentThreadId()};
   mutex_.Await(absl::Condition(
-      +[](const uint32_t* pending_updates) -> bool { return *pending_updates == 0; },
-      &pending_updates_));
+      +[](AwaitArgs* a) ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool {
+        // We only wait for updates from threads OTHER than the calling thread.
+        // If the calling thread has pending updates, it must run its own dispatcher
+        // to clear them. If we blocked here waiting for the calling thread's updates,
+        // it would deadlock because the calling thread is blocked and cannot run its dispatcher.
+        for (const auto& [thread_id, count] : a->helper->pending_updates_by_thread_) {
+          if (thread_id != a->calling_thread_id && count > 0) {
+            return false;
+          }
+        }
+        return true;
+      },
+      &args));
 }
 
 SchedulerPtr SimulatedTimeSystemHelper::createScheduler(Scheduler& /*base_scheduler*/,

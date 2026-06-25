@@ -5,6 +5,8 @@
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/integration/http_protocol_integration.h"
+#include "test/integration/utility.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 namespace Envoy {
 namespace {
@@ -1728,6 +1730,7 @@ typed_config:
     TestUtility::loadFromYaml(cluster_type_config, *cluster_.mutable_cluster_type());
     // Load the CDS cluster and wait for it to initialize.
     cds_helper_.setCds({cluster_});
+    mock_os_sys_calls_.setIpVersion(GetParam());
     HttpIntegrationTest::initialize();
     test_server_->waitForCounter("cluster_manager.cluster_added", Eq(1));
     test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
@@ -1736,6 +1739,8 @@ typed_config:
   CdsHelper cds_helper_;
   envoy::config::cluster::v3::Cluster cluster_;
   bool write_cache_file_{};
+  OsSysCallsWithMockedDns mock_os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&mock_os_sys_calls_};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RbacDynamicForwardProxyIntegrationHelper,

@@ -1596,6 +1596,8 @@ TEST_F(HttpHealthCheckerImplTest, TlsOptions) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckSetsCorrectLastHcPassTime) {
+  const auto start_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+      simTime().monotonicTime().time_since_epoch());
   const std::string host = "fake_cluster";
   const std::string path = "/healthcheck";
   setupServiceValidationHC();
@@ -1660,7 +1662,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckSetsCorrectLastHcPassTime) 
           cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->lastHcPassTime().value())
           .time_since_epoch();
   // Last HC pass time is only updated when host transitions from unhealthy to healthy state.
-  EXPECT_EQ(std::chrono::milliseconds(13000), last_hc_pass_time_ms);
+  EXPECT_EQ(start_time + std::chrono::milliseconds(13000), last_hc_pass_time_ms);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   expectStreamCreate(0);
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
@@ -1675,7 +1677,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckSetsCorrectLastHcPassTime) 
           cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->lastHcPassTime().value())
           .time_since_epoch();
   // Last HC pass time is only updated when host transitions from unhealthy to healthy state.
-  EXPECT_EQ(std::chrono::milliseconds(13000), last_hc_pass_time_ms);
+  EXPECT_EQ(start_time + std::chrono::milliseconds(13000), last_hc_pass_time_ms);
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessServicePrefixPatternCheck) {

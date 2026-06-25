@@ -250,18 +250,48 @@ bool waitForWithDispatcherRun(Event::TestTimeSystem& time_system, absl::Mutex& l
                               const std::function<bool()>& condition,
                               Event::Dispatcher& client_dispatcher, milliseconds timeout)
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock) {
-  Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (bound.withinBound()) {
-    // Wake up periodically to run the client dispatcher.
-    if (time_system.waitFor(lock, absl::Condition(&condition), 5ms * TIMEOUT_FACTOR)) {
-      return true;
+  if (time_system.isSimulated()) {
+    // In simulated time, we cannot block waiting for the condition because simulated time
+    // only advances when we explicitly call advanceTime*. If we blocked, we would deadlock
+    // since time would never advance.
+    // Instead, we loop:
+    // 1. Check if the condition is already met (non-blocking).
+    // 2. Check if simulated timeout is reached.
+    // 3. Advance simulated time by 1ms.
+    // 4. Run the client dispatcher (non-blocking) to process any events (like timeouts or ACKs)
+    //    that were triggered by the time advancement.
+    auto start_time = time_system.monotonicTime();
+    while (true) {
+      if (lock.AwaitWithTimeout(absl::Condition(&condition), absl::ZeroDuration())) {
+        return true;
+      }
+      if (std::chrono::duration_cast<std::chrono::milliseconds>(time_system.monotonicTime() -
+                                                                start_time) >= timeout) {
+        break;
+      }
+      time_system.advanceTimeWait(std::chrono::milliseconds(1));
+      client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
     }
+    return false;
+  } else {
+    // In real time, we can block the test thread using AwaitWithTimeout (via time_system.waitFor).
+    // We wake up periodically (every 5ms * factor) to run the client dispatcher, which ensures
+    // that the client (on the test thread) continues to process network events (like window
+    // updates) while the fake upstream (on a background thread) is doing work.
+    Event::TestTimeSystem::RealTimeBound bound(timeout);
+    while (bound.withinBound()) {
+      // Wake up periodically to run the client dispatcher.
+      if (time_system.waitFor(lock, absl::Condition(&condition), 5ms * TIMEOUT_FACTOR)) {
+        return true;
+      }
 
-    // Run the client dispatcher since we may need to process window updates, etc.
-    client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+      // Run the client dispatcher since we may need to process window updates, etc.
+      client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+    }
+    return false;
   }
-  return false;
 }
+
 } // namespace
 
 AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher, uint64_t body_length,
@@ -833,6 +863,13 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
   }
   return runOnDispatcherThreadAndWait([&]() {
     absl::MutexLock lock(lock_);
+    if (new_connections_.empty()) {
+      return AssertionFailure() << "No connections available.";
+    }
+    if (!new_connections_.front()->connected()) {
+      consumeConnection(/*defer_read_enable=*/true);
+      return AssertionFailure() << "Connection disconnected before it could be consumed.";
+    }
     connection = std::make_unique<FakeHttpConnection>(
         *this, consumeConnection(/*defer_read_enable=*/true), http_type_, time_system_,
         config_.max_request_headers_kb_, config_.max_request_headers_count_,
@@ -870,8 +907,15 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
         }
       }
 
-      EXPECT_TRUE(upstream.runOnDispatcherThreadAndWait([&]() {
+      AssertionResult result = upstream.runOnDispatcherThreadAndWait([&]() {
         absl::MutexLock lock(upstream.lock_);
+        if (upstream.new_connections_.empty()) {
+          return AssertionFailure() << "No connections available.";
+        }
+        if (!upstream.new_connections_.front()->connected()) {
+          upstream.consumeConnection(/*defer_read_enable=*/true);
+          return AssertionFailure() << "Connection disconnected before it could be consumed.";
+        }
         connection = std::make_unique<FakeHttpConnection>(
             upstream, upstream.consumeConnection(/*defer_read_enable=*/true), upstream.http_type_,
             upstream.timeSystem(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
@@ -880,8 +924,11 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                 !upstream.disable_and_do_not_enable_);
         connection->initialize();
         return AssertionSuccess();
-      }));
-      return i;
+      });
+      EXPECT_TRUE(result);
+      if (result) {
+        return i;
+      }
     }
   }
   return absl::InternalError("Timed out waiting for HTTP connection.");
@@ -924,6 +971,13 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
 
   return runOnDispatcherThreadAndWait([&]() {
     absl::MutexLock lock(lock_);
+    if (new_connections_.empty()) {
+      return AssertionFailure() << "No connections available.";
+    }
+    if (!new_connections_.front()->connected()) {
+      consumeConnection(/*defer_read_enable=*/true);
+      return AssertionFailure() << "Connection disconnected before it could be consumed.";
+    }
     connection = makeRawConnection(consumeConnection(), timeSystem());
     connection->initialize();
     // Skip enableHalfClose if the connection is already disconnected.

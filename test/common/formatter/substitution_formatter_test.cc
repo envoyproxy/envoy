@@ -262,22 +262,22 @@ TEST(SubstitutionFormatterTest, plainNumberFormatter) {
 
 TEST(SubstitutionFormatterTest, inFlightDuration) {
   Event::SimulatedTimeSystem time_system;
-  time_system.setSystemTime(std::chrono::milliseconds(0));
   StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, time_system, nullptr,
                                          StreamInfo::FilterState::LifeSpan::FilterChain};
+  const auto start_time = stream_info.startTimeMonotonic();
 
   {
-    time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(100)));
+    time_system.setMonotonicTime(start_time + std::chrono::milliseconds(100));
     StreamInfoFormatter duration_format("DURATION");
     EXPECT_EQ("100", duration_format.format({}, stream_info));
   }
 
   {
-    time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(200)));
+    time_system.setMonotonicTime(start_time + std::chrono::milliseconds(200));
     StreamInfoFormatter duration_format("DURATION");
     EXPECT_EQ("200", duration_format.format({}, stream_info));
 
-    time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(300)));
+    time_system.setMonotonicTime(start_time + std::chrono::milliseconds(300));
     EXPECT_THAT(duration_format.formatValue({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(300.0)));
   }

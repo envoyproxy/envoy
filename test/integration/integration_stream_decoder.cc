@@ -12,6 +12,8 @@
 
 #include "source/common/common/assert.h"
 
+#include "test/test_common/test_time.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -22,7 +24,7 @@ using testing::AssertionSuccess;
 namespace Envoy {
 
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
-    : dispatcher_(dispatcher) {}
+    : dispatcher_(dispatcher), time_system_(Event::GlobalTimeSystem().timeSystem()) {}
 
 IntegrationStreamDecoder::~IntegrationStreamDecoder() {
   ENVOY_LOG_MISC(trace, "Destroying IntegrationStreamDecoder");
@@ -62,24 +64,45 @@ AssertionResult
 IntegrationStreamDecoder::waitForWithDispatcherRun(const std::function<bool()>& condition,
                                                    absl::string_view description,
                                                    std::chrono::milliseconds timeout) {
-  Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (!condition()) {
-    if (!bound.withinBound()) {
-      return AssertionFailure() << "Timed out (" << timeout.count() << "ms) waiting for "
-                                << description << debugState();
+  if (time_system_.isSimulated()) {
+    auto start_time = time_system_.monotonicTime();
+    while (!condition()) {
+      if (std::chrono::duration_cast<std::chrono::milliseconds>(time_system_.monotonicTime() -
+                                                                start_time) >= timeout) {
+        return AssertionFailure() << "Timed out (simulated) waiting for " << description
+                                  << debugState();
+      }
+      dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+      if (condition()) {
+        break;
+      }
+      if (isFinished()) {
+        return AssertionFailure() << "Stream finished while waiting for " << description
+                                  << debugState();
+      }
+      time_system_.advanceTimeWait(std::chrono::milliseconds(1));
     }
-    dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
-    if (condition()) {
-      break;
+    return AssertionSuccess();
+  } else {
+    Event::TestTimeSystem::RealTimeBound bound(timeout);
+    while (!condition()) {
+      if (!bound.withinBound()) {
+        return AssertionFailure() << "Timed out (" << timeout.count() << "ms) waiting for "
+                                  << description << debugState();
+      }
+      dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+      if (condition()) {
+        break;
+      }
+      if (isFinished()) {
+        return AssertionFailure() << "Stream finished while waiting for " << description
+                                  << debugState();
+      }
+      // Wait for a moment before running the dispatcher again to avoid spinning.
+      std::this_thread::yield();
     }
-    if (isFinished()) {
-      return AssertionFailure() << "Stream finished while waiting for " << description
-                                << debugState();
-    }
-    // Wait for a moment before running the dispatcher again to avoid spinning.
-    std::this_thread::yield();
+    return AssertionSuccess();
   }
-  return AssertionSuccess();
 }
 
 std::string IntegrationStreamDecoder::debugState() const {

@@ -71,6 +71,7 @@ private:
   std::shared_ptr<WaitForPayloadReader> payload_reader_;
   std::shared_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr connection_;
+  Event::TestTimeSystem& time_system_;
   bool disconnected_{};
   MockWatermarkBuffer* client_write_buffer_;
 };

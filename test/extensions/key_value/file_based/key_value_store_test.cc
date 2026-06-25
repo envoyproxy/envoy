@@ -152,6 +152,7 @@ TEST_F(KeyValueStoreTest, Persist) {
 
 TEST_F(KeyValueStoreTest, PersistWithTTL) {
   test_time_.setSystemTime(std::chrono::milliseconds(0));
+  const MonotonicTime start_monotonic_time = test_time_.monotonicTime();
   store_->addOrUpdate("foo", "bar", std::chrono::seconds(2));
   store_->addOrUpdate("ee", "ba", std::chrono::seconds(1));
   flush_timer_->invokeCallback(); // flush manually
@@ -161,7 +162,7 @@ TEST_F(KeyValueStoreTest, PersistWithTTL) {
   createStore();
   EXPECT_EQ("bar", store_->get("foo").value());
   EXPECT_EQ(absl::nullopt, store_->get("ee"));
-  test_time_.setMonotonicTime(std::chrono::milliseconds(2000));
+  test_time_.setMonotonicTime(start_monotonic_time + std::chrono::milliseconds(2000));
   ttl_timer_->invokeCallback();
   EXPECT_EQ(absl::nullopt, store_->get("foo"));
 }
