@@ -885,5 +885,51 @@ TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, UnimplementedLogsWarn)
   EXPECT_FALSE(ActiveQuicListenerFactoryPeer::kernelWorkerRouting(factory_.get()));
 }
 
+TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, PostsSocketOptions) {
+  const auto mock_option = std::make_shared<NiceMock<Network::MockSocketOption>>();
+  std::ignore = makeCidGeneratorContext(mock_option);
+
+  std::vector<Network::SocketSharedPtr> sockets;
+  for (uint32_t i = 0; i < concurrency_; ++i) {
+    sockets.push_back(std::make_shared<NiceMock<Network::MockListenSocket>>());
+  }
+  std::ignore = makeListenSocketFactory(sockets);
+
+  std::vector<Network::Socket*> setopt_sockets;
+  EXPECT_CALL(*mock_option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
+      .Times(2)
+      .WillRepeatedly(Invoke([&setopt_sockets](Network::Socket& socket,
+                                               envoy::config::core::v3::SocketOption::SocketState) {
+        setopt_sockets.push_back(&socket);
+        return true;
+      }));
+
+  EXPECT_OK(factory_->doFinalPreWorkerInit(socket_factories_));
+
+  ASSERT_EQ(setopt_sockets.size(), sockets.size());
+  for (size_t i = 0; i < sockets.size(); ++i) {
+    EXPECT_EQ(setopt_sockets[i], sockets[i].get());
+  }
+}
+
+TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, PostsSocketOptionsFailure) {
+  const auto mock_option = std::make_shared<NiceMock<Network::MockSocketOption>>();
+  std::ignore = makeCidGeneratorContext(mock_option);
+
+  std::vector<Network::SocketSharedPtr> sockets;
+  sockets.push_back(std::make_shared<NiceMock<Network::MockListenSocket>>());
+  std::ignore = makeListenSocketFactory(sockets);
+
+  EXPECT_CALL(*mock_option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
+      .WillOnce(Return(false));
+
+  const auto status = factory_->doFinalPreWorkerInit(socket_factories_);
+  EXPECT_THAT(status, StatusHelpers::HasStatusCode(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(status, StatusHelpers::HasStatusMessage(testing::HasSubstr(
+                          "cannot apply listener factory socket options on socket: ")));
+  EXPECT_THAT(status, StatusHelpers::HasStatusMessage(testing::HasSubstr(
+                          sockets.back()->connectionInfoProvider().localAddress()->asString())));
+}
+
 } // namespace Quic
 } // namespace Envoy
