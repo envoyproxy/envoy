@@ -276,7 +276,6 @@ envoy_cc_library(
         "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/synchronization",
-        "@abseil-cpp//absl/types:optional",
         "@brotli//:brotlidec",
         "@brotli//:brotlienc",
     ],
