@@ -401,9 +401,8 @@ absl::Status ContextImpl::setCompliancePolicy(enum ssl_compliance_policy_t polic
   for (auto& tls_context : tls_contexts_) {
     int rc = SSL_CTX_set_compliance_policy(tls_context.ssl_ctx_.get(), policy);
     if (rc != 1) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("Failed to apply compliance policy: ",
-                       Utility::getLastCryptoError().value_or("")));
+      return absl::InvalidArgumentError(absl::StrCat("Failed to apply compliance policy: ",
+                                                     Utility::getLastCryptoError().value_or("")));
     }
   }
 
