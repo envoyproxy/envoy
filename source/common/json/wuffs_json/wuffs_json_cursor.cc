@@ -191,6 +191,9 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
 
     if (status.repr == nullptr || wuffs_base__status__is_note(&status)) {
       wuffs_done_ = true;
+      if (closed && source_buf.meta.ri < effective_chunk.size()) {
+        return absl::InvalidArgumentError("wuffs json: trailing bytes after root value");
+      }
       break;
     }
     if (!wuffs_base__status__is_suspension(&status)) {

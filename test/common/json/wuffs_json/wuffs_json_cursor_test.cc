@@ -329,7 +329,6 @@ TEST(WuffsJsonCursorTest, GarbageInDifferentDataChunk) {
   EXPECT_TRUE(cursor.feed("random_garbage", /*closed=*/true).ok());
 }
 
-
 TEST(WuffsJsonCursorTest, DuplicateKeyRejected) {
   CapturingHandler h;
   EXPECT_FALSE(parse(R"({"model":"gpt-4","model":"gpt-4o"})", h).ok());
@@ -543,7 +542,7 @@ TEST(WuffsJsonCursorTest, CloseStringCaptureFiresWhenOpenReturnedFalse) {
 
     bool openStringCapture(absl::string_view, int, size_t ts) override {
       open_start = ts;
-      return false;
+      return false; 
     }
     bool onStringChunk(absl::string_view, int, absl::string_view) override { return true; }
     void closeStringCapture(absl::string_view, int, size_t te) override { close_end = te; }
