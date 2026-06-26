@@ -322,11 +322,11 @@ TEST(WuffsJsonCursorTest, TrailingGarbageInSameChunkRejected) {
   EXPECT_FALSE(cursor.feed(R"({"key":"val"}random_garbage)", /*closed=*/true).ok());
 }
 
-TEST(WuffsJsonCursorTest, GarbageInDifferentDataChunk) {
+TEST(WuffsJsonCursorTest, TrailingGarbageInDifferentDataChunk) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
   EXPECT_TRUE(cursor.feed(R"({"key":"val"})", /*closed=*/true).ok());
-  EXPECT_TRUE(cursor.feed("random_garbage", /*closed=*/true).ok());
+  EXPECT_FALSE(cursor.feed("random_garbage)", /*closed=*/true).ok());
 }
 
 TEST(WuffsJsonCursorTest, DuplicateKeyRejected) {
@@ -542,7 +542,7 @@ TEST(WuffsJsonCursorTest, CloseStringCaptureFiresWhenOpenReturnedFalse) {
 
     bool openStringCapture(absl::string_view, int, size_t ts) override {
       open_start = ts;
-      return false; 
+      return false;
     }
     bool onStringChunk(absl::string_view, int, absl::string_view) override { return true; }
     void closeStringCapture(absl::string_view, int, size_t te) override { close_end = te; }

@@ -105,7 +105,8 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
     return absl::InternalError("wuffs json: alloc failed");
   }
   if (wuffs_done_) {
-    return absl::OkStatus();
+    // TODO(tyxia) Revisit to see if it is right choice to return InvalidArgumentError.
+    return absl::InvalidArgumentError("wuffs json: feed() called after JSON document completed");
   }
 
   // If the previous call left unread bytes (a NUMBER or LITERAL that started
