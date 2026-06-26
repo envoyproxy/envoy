@@ -129,6 +129,7 @@ class FcdsFilterChainFactoryContextImpl : public Configuration::FilterChainFacto
 public:
   FcdsFilterChainFactoryContextImpl(Server::Configuration::ServerFactoryContext& server_context,
                                     const FilterChainProto& filter_chain);
+  void initialize(std::function<void()> completion);
 
   // DrainDecision
   bool drainClose(Network::DrainDirection) const override;
@@ -157,6 +158,7 @@ private:
   Stats::ScopeSharedPtr prefixed_scope_;
   Init::ManagerImpl init_manager_;
   std::atomic<bool> is_draining_{false};
+  std::unique_ptr<Init::WatcherImpl> init_watcher_;
 };
 
 } // namespace Server

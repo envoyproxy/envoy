@@ -469,20 +469,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
               cx_limit_runtime_key_, config.name());
   }
 
-  if (config.has_fcds_config()) {
-    fcds_shared_placeholder_ =
-        parent_.server_.serverFactoryContext()
-            .singletonManager()
-            .getTyped<FcdsSharedFilterChainManager>(
-                std::string(FcdsSharedFilterChainManagerName),
-                [this]() -> Singleton::InstanceSharedPtr {
-                  return std::make_shared<FcdsSharedFilterChainManager>(
-                      parent_.server_.serverFactoryContext(), *parent_.factory_);
-                });
-  }
-
   filter_chain_manager_ = std::make_unique<FilterChainManagerImpl>(
-      addresses_, listener_factory_context_->parentFactoryContext(), initManager()),
+      addresses_, listener_factory_context_->parentFactoryContext(), initManager(),
+      maybeCreateFilterChainManager(config)),
 
   buildAccessLog(config);
 
@@ -510,6 +499,21 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     // with their parent's initManager.
     parent_.server_.initManager().add(listener_init_target_);
   }
+}
+
+std::shared_ptr<FcdsSharedFilterChainManager>
+ListenerImpl::maybeCreateFilterChainManager(const envoy::config::listener::v3::Listener& config) {
+  if (config.has_fcds_config()) {
+    return parent_.server_.serverFactoryContext()
+        .singletonManager()
+        .getTyped<FcdsSharedFilterChainManager>(
+            std::string(FcdsSharedFilterChainManagerName),
+            [this]() -> Singleton::InstanceSharedPtr {
+              return std::make_shared<FcdsSharedFilterChainManager>(
+                  parent_.server_.serverFactoryContext(), *parent_.factory_);
+            });
+  }
+  return nullptr;
 }
 
 ListenerImpl::ListenerImpl(ListenerImpl& origin,
@@ -554,7 +558,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
           origin.listener_factory_context_->listener_factory_context_base_, *this)),
       filter_chain_manager_(std::make_unique<FilterChainManagerImpl>(
           addresses_, origin.listener_factory_context_->parentFactoryContext(), initManager(),
-          *origin.filter_chain_manager_)),
+          *origin.filter_chain_manager_, maybeCreateFilterChainManager(config))),
       reuse_port_(origin.reuse_port_),
       local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
                           [this] {
@@ -1017,15 +1021,8 @@ ListenerImpl::buildFilterChainSubscriptions(const envoy::config::listener::v3::L
     return absl::InvalidArgumentError(
         fmt::format("listener {}: FCDS does not support QUIC filter chains", name_));
   }
-  std::shared_ptr<FcdsSharedFilterChainManager> shared_manager =
-      parent_.server_.serverFactoryContext()
-          .singletonManager()
-          .getTyped<FcdsSharedFilterChainManager>(
-              std::string(FcdsSharedFilterChainManagerName),
-              [this]() -> Singleton::InstanceSharedPtr {
-                return std::make_shared<FcdsSharedFilterChainManager>(
-                    parent_.server_.serverFactoryContext(), *parent_.factory_);
-              });
+  auto shared_manager = filter_chain_manager_->fcdsManager();
+  ASSERT(shared_manager != nullptr);
   for (const auto& name : filter_chain_manager_->fcdsNames()) {
     auto handle_or_error =
         shared_manager->subscribe(config.fcds_config().config_source(), name, *this, initManager());

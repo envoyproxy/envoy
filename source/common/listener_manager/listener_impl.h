@@ -448,6 +448,8 @@ private:
     return config_maybe_partial_filter_chains_;
   }
   bool isQuic();
+  std::shared_ptr<FcdsSharedFilterChainManager>
+  maybeCreateFilterChainManager(const envoy::config::listener::v3::Listener& config);
 
   ListenerManagerImpl& parent_;
   std::vector<Network::Address::InstanceConstSharedPtr> addresses_;
@@ -508,7 +510,6 @@ private:
   const std::string cx_limit_runtime_key_;
   std::shared_ptr<BasicResourceLimitImpl> open_connections_;
 
-  std::shared_ptr<FcdsSharedFilterChainManager> fcds_shared_placeholder_;
   std::vector<FcdsSubscriptionHandlePtr> fcds_subscriptions_;
 
   // This init watcher, if workers_started_ is false, notifies the "parent" listener manager when

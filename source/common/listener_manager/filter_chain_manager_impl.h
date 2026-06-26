@@ -88,8 +88,11 @@ private:
   std::atomic<bool> is_draining_{false};
 };
 
+class FcdsSharedFilterChainManager;
+
 struct FilterChainActionFactoryContext {
   Configuration::ServerFactoryContext& server_;
+  std::shared_ptr<FcdsSharedFilterChainManager> shared_manager_;
   absl::flat_hash_set<std::string> names_;
 };
 
@@ -189,12 +192,15 @@ public:
                           Network::DrainableFilterChainSharedPtr, MessageUtil, MessageUtil>;
   FilterChainManagerImpl(const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
                          Configuration::FactoryContext& factory_context,
-                         Init::Manager& init_manager)
-      : addresses_(addresses), parent_context_(factory_context), init_manager_(init_manager) {}
+                         Init::Manager& init_manager,
+                         std::shared_ptr<FcdsSharedFilterChainManager> fcds_manager = nullptr)
+      : addresses_(addresses), parent_context_(factory_context), init_manager_(init_manager),
+        fcds_manager_(fcds_manager) {}
 
   FilterChainManagerImpl(const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
                          Configuration::FactoryContext& factory_context,
-                         Init::Manager& init_manager, const FilterChainManagerImpl& parent_manager);
+                         Init::Manager& init_manager, const FilterChainManagerImpl& parent_manager,
+                         std::shared_ptr<FcdsSharedFilterChainManager> fcds_manager = nullptr);
 
   // FilterChainFactoryContextCreator
   Configuration::FilterChainFactoryContextPtr createFilterChainFactoryContext(
@@ -229,6 +235,7 @@ public:
     return default_filter_chain_;
   }
   const absl::flat_hash_set<std::string>& fcdsNames() const { return fcds_names_; }
+  const std::shared_ptr<FcdsSharedFilterChainManager>& fcdsManager() const { return fcds_manager_; }
 
 private:
   absl::Status convertIPsToTries();
@@ -403,6 +410,8 @@ private:
 
   // Index filter chains by name, used by the matcher actions.
   FilterChainsByName filter_chains_by_name_;
+
+  std::shared_ptr<FcdsSharedFilterChainManager> fcds_manager_;
   absl::flat_hash_set<std::string> fcds_names_;
 
   // Used to hint listener which filter chains it should drain.
@@ -452,10 +461,25 @@ public:
   virtual void drainFilterChain(Network::DrainableFilterChainSharedPtr draining) PURE;
 };
 
+class FcdsContextCreator : public FilterChainFactoryContextCreator {
+public:
+  FcdsContextCreator(Server::Configuration::ServerFactoryContext& server_context,
+                     const ::envoy::config::listener::v3::FilterChain* const filter_chain);
+
+  // FilterChainFactoryContextCreator
+  Configuration::FilterChainFactoryContextPtr createFilterChainFactoryContext(
+      const ::envoy::config::listener::v3::FilterChain* const filter_chain) override;
+
+  void initialize(std::function<void()> completion);
+
+private:
+  std::unique_ptr<FcdsFilterChainFactoryContextImpl> context_;
+  FcdsFilterChainFactoryContextImpl* saved_context_;
+};
+
 class FcdsSharedFilterChainManager
     : public Singleton::Instance,
       public std::enable_shared_from_this<FcdsSharedFilterChainManager>,
-      public FilterChainFactoryContextCreator,
       public FilterChainUpdateCallbacks,
       public Logger::Loggable<Logger::Id::config> {
 public:
@@ -476,10 +500,6 @@ public:
   absl::Status onFilterChainUpdated(const FilterChainProto& proto) override;
   void onFilterChainRemoved(Network::DrainableFilterChainSharedPtr&& draining) override;
 
-  // FilterChainFactoryContextCreator
-  Configuration::FilterChainFactoryContextPtr createFilterChainFactoryContext(
-      const ::envoy::config::listener::v3::FilterChain* const filter_chain) override;
-
 private:
   struct ThreadLocalState : public ThreadLocal::ThreadLocalObject {
     absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr> filter_chains_;
@@ -495,10 +515,8 @@ private:
     Network::DrainableFilterChainSharedPtr warming_filter_chain_;
   };
   absl::flat_hash_map<std::string, std::unique_ptr<SubscriptionState>> subscriptions_;
-  FcdsFilterChainFactoryContextImpl* last_created_context_{nullptr};
 
-  void onFilterChainWarmed(const std::string& filter_chain_name,
-                           Network::DrainableFilterChainSharedPtr filter_chain);
+  void onFilterChainWarmed(Network::DrainableFilterChainSharedPtr filter_chain);
   void updateTlsState();
 };
 

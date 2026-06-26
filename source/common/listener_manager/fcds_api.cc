@@ -124,6 +124,12 @@ FcdsFilterChainFactoryContextImpl::FcdsFilterChainFactoryContextImpl(
           absl::StrCat("filter_chain.", filter_chain.name(), "."))),
       init_manager_(absl::StrCat("fcds_filter_chain ", filter_chain.name())) {}
 
+void FcdsFilterChainFactoryContextImpl::initialize(std::function<void()> completion) {
+  ASSERT(init_watcher_ == nullptr);
+  init_watcher_ = std::make_unique<Init::WatcherImpl>("fcds warming", std::move(completion));
+  init_manager_.initialize(*init_watcher_);
+}
+
 bool FcdsFilterChainFactoryContextImpl::drainClose(Network::DrainDirection scope) const {
   return is_draining_.load() || server_context_.drainManager().drainClose(scope);
 }

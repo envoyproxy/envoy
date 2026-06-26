@@ -176,7 +176,7 @@ public:
       response.set_version_info(version);
       response.set_type_url(Config::TestTypeUrl::get().Listener);
       for (const auto& listener : listeners) {
-        response.add_resources()->PackFrom(listener);
+        std::ignore = response.add_resources()->PackFrom(listener);
       }
       lds_stream_->sendGrpcMessage(response);
     }
@@ -203,9 +203,9 @@ public:
 
     auto* router = hcm.add_http_filters();
     router->set_name("envoy.filters.http.router");
-    router->mutable_typed_config()->PackFrom(
+    std::ignore = router->mutable_typed_config()->PackFrom(
         envoy::extensions::filters::http::router::v3::Router());
-    filter->mutable_typed_config()->PackFrom(hcm);
+    std::ignore = filter->mutable_typed_config()->PackFrom(hcm);
     return filter_chain;
   }
 
@@ -221,7 +221,7 @@ public:
       response.set_version_info(version);
       response.set_type_url(Config::TestTypeUrl::get().FilterChain);
       for (const auto& filter_chain : added_or_updated) {
-        response.add_resources()->PackFrom(filter_chain);
+        std::ignore = response.add_resources()->PackFrom(filter_chain);
       }
       fcds_stream_->sendGrpcMessage(response);
     }

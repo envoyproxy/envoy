@@ -48,10 +48,6 @@ public:
   MockFcdsSharedFilterChainManager(Server::Configuration::ServerFactoryContext& server_context,
                                    ListenerComponentFactory& listener_component_factory)
       : FcdsSharedFilterChainManager(server_context, listener_component_factory) {}
-
-  MOCK_METHOD(absl::StatusOr<Network::DrainableFilterChainSharedPtr>,
-              createOrUpdateSharedFilterChain,
-              (const envoy::config::listener::v3::FilterChain& config), (override));
 };
 
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
