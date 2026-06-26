@@ -123,23 +123,19 @@ public:
 
 class ActiveQuicListenerFactoryPeer {
 public:
-  static envoy::config::core::v3::RuntimeFeatureFlag&
-  runtimeEnabled(ActiveQuicListenerFactory* factory) {
-    return factory->enabled_;
-  }
   static EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef
-  debugVisitorFactory(ActiveQuicListenerFactory* factory) {
-    return makeOptRefFromPtr(factory->connection_debug_visitor_factory_.get());
+  debugVisitorFactory(ActiveQuicListenerFactory& factory) {
+    return makeOptRefFromPtr(factory.connection_debug_visitor_factory_.get());
   }
   static EnvoyQuicConnectionIdGeneratorContext*
-  cidGeneratorContext(ActiveQuicListenerFactory* factory) {
-    return factory->quic_cid_generator_context_.get();
+  cidGeneratorContext(ActiveQuicListenerFactory& factory) {
+    return factory.quic_cid_generator_context_.get();
   }
-  static bool kernelWorkerRouting(ActiveQuicListenerFactory* factory) {
-    return factory->kernel_worker_routing_;
+  static bool kernelWorkerRouting(ActiveQuicListenerFactory& factory) {
+    return factory.kernel_worker_routing_;
   }
-  static const QuicConnectionIdWorkerSelector& workerSelector(ActiveQuicListenerFactory* factory) {
-    return factory->worker_selector_;
+  static const QuicConnectionIdWorkerSelector& workerSelector(ActiveQuicListenerFactory& factory) {
+    return factory.worker_selector_;
   }
 };
 
@@ -775,7 +771,7 @@ protected:
 TEST_F(ActiveQuicListenerFactoryTest, NoDebugVisitorConfigured) {
   envoy::config::listener::v3::QuicProtocolOptions options;
   auto factory = createQuicListenerFactory(options);
-  EXPECT_EQ(ActiveQuicListenerFactoryPeer::debugVisitorFactory(factory.get()), std::nullopt);
+  EXPECT_EQ(ActiveQuicListenerFactoryPeer::debugVisitorFactory(*factory), std::nullopt);
 }
 
 TEST_F(ActiveQuicListenerFactoryTest, DebugVisitorConfigured) {
@@ -786,7 +782,7 @@ TEST_F(ActiveQuicListenerFactoryTest, DebugVisitorConfigured) {
       test::common::config::DummyConfig());
   auto listener_factory = createQuicListenerFactory(quic_config);
   auto debug_visitor_factory =
-      ActiveQuicListenerFactoryPeer::debugVisitorFactory(listener_factory.get());
+      ActiveQuicListenerFactoryPeer::debugVisitorFactory(*listener_factory);
   EXPECT_TRUE(debug_visitor_factory.has_value());
 }
 
@@ -856,7 +852,7 @@ protected:
 
 TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, ContextCreatedPreWorker) {
 
-  EXPECT_EQ(ActiveQuicListenerFactoryPeer::cidGeneratorContext(factory_.get()), nullptr);
+  EXPECT_EQ(ActiveQuicListenerFactoryPeer::cidGeneratorContext(*factory_), nullptr);
 
   const auto mock_option = std::make_shared<NiceMock<Network::MockSocketOption>>();
   auto context = makeCidGeneratorContext(mock_option);
@@ -864,14 +860,14 @@ TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, ContextCreatedPreWorke
   EXPECT_LOG_NOT_CONTAINS("warn", "Efficient routing of QUIC packets",
                           { ASSERT_OK(factory_->doFinalPreWorkerInit(socket_factories_)); });
 
-  EXPECT_EQ(ActiveQuicListenerFactoryPeer::cidGeneratorContext(factory_.get()), context);
+  EXPECT_EQ(ActiveQuicListenerFactoryPeer::cidGeneratorContext(*factory_), context);
   const auto& options = factory_->socketOptions();
   ASSERT_EQ(options->size(), 1u);
   EXPECT_EQ((*options)[0].get(), mock_option.get());
-  EXPECT_TRUE(ActiveQuicListenerFactoryPeer::kernelWorkerRouting(factory_.get()));
+  EXPECT_TRUE(ActiveQuicListenerFactoryPeer::kernelWorkerRouting(*factory_));
 
   Buffer::OwnedImpl buffer;
-  EXPECT_EQ(ActiveQuicListenerFactoryPeer::workerSelector(factory_.get())(buffer, 0),
+  EXPECT_EQ(ActiveQuicListenerFactoryPeer::workerSelector(*factory_)(buffer, 0),
             default_cid_worker_selector_(buffer, 0));
 }
 
@@ -882,7 +878,7 @@ TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, UnimplementedLogsWarn)
                       { ASSERT_OK(factory_->doFinalPreWorkerInit(socket_factories_)); });
 
   EXPECT_TRUE(factory_->socketOptions()->empty());
-  EXPECT_FALSE(ActiveQuicListenerFactoryPeer::kernelWorkerRouting(factory_.get()));
+  EXPECT_FALSE(ActiveQuicListenerFactoryPeer::kernelWorkerRouting(*factory_));
 }
 
 TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, PostsSocketOptions) {
