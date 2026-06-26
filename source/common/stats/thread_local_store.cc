@@ -675,7 +675,7 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromTaggedName(
-    StatName base_name, absl::optional<StatNameTagSpan> stat_name_tags, StatName tagged_name) {
+    StatName base_name, std::optional<StatNameTagSpan> stat_name_tags, StatName tagged_name) {
   if (scopeRejectsAll()) {
     return parent_.null_counter_;
   }
@@ -921,7 +921,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::getOrCreateHistogramBase(
 }
 
 TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromTaggedName(
-    StatName base_name, absl::optional<StatNameTagSpan> stat_name_tags, StatName tagged_name) {
+    StatName base_name, std::optional<StatNameTagSpan> stat_name_tags, StatName tagged_name) {
   if (scopeRejectsAll()) {
     return parent_.null_text_readout_;
   }
