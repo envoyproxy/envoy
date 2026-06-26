@@ -3,23 +3,13 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/http/codec.h"
+#include "envoy/network/connection.h"
+#include "envoy/network/transport_socket.h"
+#include "envoy/upstream/upstream.h"
 
 namespace Envoy {
-
-namespace Network {
-class Connection;
-class TransportSocketOptions;
-} // namespace Network
-
-namespace Random {
-class RandomGenerator;
-} // namespace Random
-
-namespace Upstream {
-class ClusterInfo;
-} // namespace Upstream
-
 namespace Http {
 
 /**

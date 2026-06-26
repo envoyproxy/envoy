@@ -70,6 +70,10 @@ envoy_cc_library(
     hdrs = ["client_codec_factory.h"],
     deps = [
         ":codec_interface",
+        "//envoy/common:random_generator_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:transport_socket_interface",
+        "//envoy/upstream:upstream_interface",
     ],
 )
 
