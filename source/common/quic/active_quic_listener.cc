@@ -106,11 +106,11 @@ ActiveQuicListener::ActiveQuicListener(
   absl::AnyInvocable<void() &&> on_can_write_cb = [&]() { quic_dispatcher_->OnCanWrite(); };
 
   // Create quic_packet_writer
-  QuicPacketWriterFactory* quic_factory =
+  QuicPacketWriterFactory* quic_packet_writer_factory =
       listener_config.udpListenerConfig()->quicPacketWriterFactory();
 
-  if (quic_factory != nullptr) {
-    QuicPacketWriterPtr quic_writer = quic_factory->createQuicPacketWriter(
+  if (quic_packet_writer_factory != nullptr) {
+    QuicPacketWriterPtr quic_writer = quic_packet_writer_factory->createQuicPacketWriter(
         listen_socket_.ioHandle(), listener_config.listenerScope(), dispatcher,
         std::move(on_can_write_cb));
     quic_packet_writer_ = quic_writer.get();

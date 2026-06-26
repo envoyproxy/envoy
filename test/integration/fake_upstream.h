@@ -1044,9 +1044,6 @@ private:
   bool disable_and_do_not_enable_{};
   const bool enable_half_close_;
   testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-#ifdef ENVOY_ENABLE_QUIC
-  Quic::QuicStatNames quic_stat_names_ = Quic::QuicStatNames(stats_store_.symbolTable());
-#endif
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;
   std::list<Network::UdpRecvData> received_datagrams_ ABSL_GUARDED_BY(lock_);
@@ -1054,6 +1051,10 @@ private:
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
+#ifdef ENVOY_ENABLE_QUIC
+  Quic::QuicStatNames quic_stat_names_ = Quic::QuicStatNames(stats_store_.symbolTable());
+#endif
+
   bool initialized_ = false;
 };
 

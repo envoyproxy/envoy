@@ -718,12 +718,12 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
         validation_visitor_, *listener_factory_context_);
 
     if (config.udp_listener_config().has_udp_packet_packet_writer_config()) {
-      auto* quic_factory_factory =
+      auto* quic_packet_writer_factory_factory =
           Config::Utility::getFactory<Quic::QuicPacketWriterFactoryFactory>(
               config.udp_listener_config().udp_packet_packet_writer_config());
-      if (quic_factory_factory != nullptr) {
+      if (quic_packet_writer_factory_factory != nullptr) {
         udp_listener_config_->quic_writer_factory_ =
-            quic_factory_factory->createQuicPacketWriterFactory(
+            quic_packet_writer_factory_factory->createQuicPacketWriterFactory(
                 config.udp_listener_config().udp_packet_packet_writer_config(),
                 *listener_factory_context_);
       }
