@@ -3,6 +3,7 @@
 #include <bitset>
 #include <functional>
 #include <list>
+#include <optional>
 #include <regex>
 #include <string>
 #include <vector>
@@ -18,7 +19,6 @@
 #include "source/common/json/json_streamer.h"
 #include "source/common/json/json_utility.h"
 
-#include "absl/types/optional.h"
 #include "re2/re2.h"
 
 namespace Envoy {
@@ -33,7 +33,7 @@ public:
   PlainStringFormatter(absl::string_view str) { str_.set_string_value(str); }
 
   // FormatterProvider
-  absl::optional<std::string> format(const Context&, const StreamInfo::StreamInfo&) const override {
+  std::optional<std::string> format(const Context&, const StreamInfo::StreamInfo&) const override {
     return str_.string_value();
   }
   Protobuf::Value formatValue(const Context&, const StreamInfo::StreamInfo&) const override {
@@ -52,7 +52,7 @@ public:
   PlainNumberFormatter(double num) { num_.set_number_value(num); }
 
   // FormatterProvider
-  absl::optional<std::string> format(const Context&, const StreamInfo::StreamInfo&) const override {
+  std::optional<std::string> format(const Context&, const StreamInfo::StreamInfo&) const override {
     std::string str = absl::StrFormat("%g", num_.number_value());
     return str;
   }

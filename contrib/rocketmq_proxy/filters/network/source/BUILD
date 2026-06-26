@@ -141,6 +141,5 @@ envoy_cc_library(
     hdrs = ["metadata.h"],
     deps = [
         "//source/common/http:header_map_lib",
-        "@abseil-cpp//absl/types:optional",
     ],
 )

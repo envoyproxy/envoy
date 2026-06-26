@@ -94,7 +94,7 @@ public:
       }
       if (failure_details != UhvResponseCodeDetail::get().InvalidUnderscore) {
         sendLocalReply(Http::Code::BadRequest, Http::CodeUtility::toString(Http::Code::BadRequest),
-                       nullptr, absl::nullopt, failure_details);
+                       nullptr, std::nullopt, failure_details);
       }
       response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
       // These tests assume that connection is not closed on protocol errors
@@ -301,7 +301,7 @@ public:
   }
 
   void http2OptionsFromTuple(envoy::config::core::v3::Http2ProtocolOptions& options,
-                             const absl::optional<const Http2SettingsTuple>& tp) {
+                             const std::optional<const Http2SettingsTuple>& tp) {
     options.mutable_hpack_table_size()->set_value(
         (tp.has_value()) ? ::testing::get<SettingsTupleIndex::HpackTableSize>(*tp)
                          : CommonUtility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE);
@@ -435,8 +435,8 @@ public:
 
   NiceMock<Runtime::MockLoader> runtime_;
   TestScopedRuntime scoped_runtime_;
-  absl::optional<const Http2SettingsTuple> client_settings_;
-  absl::optional<const Http2SettingsTuple> server_settings_;
+  std::optional<const Http2SettingsTuple> client_settings_;
+  std::optional<const Http2SettingsTuple> server_settings_;
   Http2Impl http2_implementation_ = Http2Impl::Nghttp2;
   bool allow_metadata_ = false;
   bool stream_error_on_invalid_http_messaging_ = false;
@@ -697,7 +697,7 @@ TEST_P(Http2CodecImplTest, ClientUnexpectedHeaders) {
 
 TEST_P(Http2CodecImplTest, ShutdownNotice) {
   initialize();
-  EXPECT_EQ(absl::nullopt, request_encoder_->http1StreamEncoderOptions());
+  EXPECT_EQ(std::nullopt, request_encoder_->http1StreamEncoderOptions());
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
@@ -742,7 +742,7 @@ TEST_P(Http2CodecImplTest, ProtocolStreamId) {
 
 TEST_P(Http2CodecImplTest, ProtocolErrorForTest) {
   initialize();
-  EXPECT_EQ(absl::nullopt, request_encoder_->http1StreamEncoderOptions());
+  EXPECT_EQ(std::nullopt, request_encoder_->http1StreamEncoderOptions());
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);

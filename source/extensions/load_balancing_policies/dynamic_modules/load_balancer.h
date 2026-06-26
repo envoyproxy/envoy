@@ -26,7 +26,7 @@ public:
   Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
   Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext* context) override;
   OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override;
-  absl::optional<Upstream::SelectedPoolAndConnection>
+  std::optional<Upstream::SelectedPoolAndConnection>
   selectExistingConnection(Upstream::LoadBalancerContext* context, const Upstream::Host& host,
                            std::vector<uint8_t>& hash_key) override;
 

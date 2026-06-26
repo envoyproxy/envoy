@@ -41,7 +41,7 @@ public:
 
   // Http::StreamEncoder
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   // Http::RequestEncoder
@@ -52,7 +52,7 @@ public:
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
   void setFlushTimeout(std::chrono::milliseconds) override {}
-  absl::optional<uint32_t> codecStreamId() const override { return id(); }
+  std::optional<uint32_t> codecStreamId() const override { return id(); }
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   // Exposes this stream's WebTransport session (created by QUICHE for a negotiated WebTransport
   // CONNECT) through the codec Stream interface, mirroring EnvoyQuicServerStream. Lets tests reach
@@ -107,7 +107,7 @@ protected:
   // Http::MultiplexedStreamImplBase
   bool hasPendingData() override;
 
-  void onStreamError(absl::optional<bool> should_close_connection,
+  void onStreamError(std::optional<bool> should_close_connection,
                      quic::QuicRstStreamErrorCode rst_code) override;
 
 private:

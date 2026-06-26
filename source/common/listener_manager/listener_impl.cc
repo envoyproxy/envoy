@@ -458,7 +458,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     }
   }
 
-  const absl::optional<std::string> runtime_val =
+  const std::optional<std::string> runtime_val =
       listener_factory_context_->serverFactoryContext().runtime().snapshot().get(
           cx_limit_runtime_key_);
   if (runtime_val && runtime_val->empty()) {

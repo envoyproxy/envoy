@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/common/wasm/wasm.h"
@@ -8,7 +10,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest-param-test.h"
 #include "gtest/gtest.h"

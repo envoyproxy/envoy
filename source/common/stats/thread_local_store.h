@@ -37,7 +37,7 @@ class ThreadLocalHistogramImpl : public HistogramImplHelper {
 public:
   ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit, StatName tag_extracted_name,
                            StatNameTagSpan stat_name_tags, SymbolTable& symbol_table,
-                           absl::optional<uint32_t> bins);
+                           std::optional<uint32_t> bins);
   ~ThreadLocalHistogramImpl() override;
 
   void merge(histogram_t* target);
@@ -87,7 +87,7 @@ class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
   ParentHistogramImpl(StatName name, Histogram::Unit unit, ThreadLocalStoreImpl& parent,
                       StatName tag_extracted_name, StatNameTagSpan stat_name_tags,
-                      ConstSupportedBuckets& supported_buckets, absl::optional<uint32_t> bins,
+                      ConstSupportedBuckets& supported_buckets, std::optional<uint32_t> bins,
                       uint64_t id);
   ~ParentHistogramImpl() override;
 
@@ -133,7 +133,7 @@ public:
   // Indicates that the ThreadLocalStore is shutting down, so no need to clear its histogram_set_.
   void setShuttingDown(bool shutting_down) { shutting_down_ = shutting_down; }
   bool shuttingDown() const { return shutting_down_; }
-  absl::optional<uint32_t> bins() const { return bins_; }
+  std::optional<uint32_t> bins() const { return bins_; }
 
 private:
   bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
@@ -141,7 +141,7 @@ private:
   detailedlBucketsHelper(const histogram_t& histogram) const;
 
   const Histogram::Unit unit_;
-  const absl::optional<uint32_t> bins_;
+  const std::optional<uint32_t> bins_;
   ThreadLocalStoreImpl& thread_local_store_;
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;
@@ -318,15 +318,14 @@ private:
     // Stats::Scope
     // The legacy scope ignores name_tags/tagged_name: it joins parent's prefix + base_name as
     // before.
-    Counter& counterFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+    Counter& counterFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
                                    StatName tagged_name) override;
-    Gauge& gaugeFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+    Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
                                StatName tagged_name, Gauge::ImportMode import_mode) override;
-    Histogram& histogramFromTaggedName(StatName base_name,
-                                       absl::optional<StatNameTagSpan> name_tags,
+    Histogram& histogramFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
                                        StatName tagged_name, Histogram::Unit unit) override;
     TextReadout& textReadoutFromTaggedName(StatName base_name,
-                                           absl::optional<StatNameTagSpan> name_tags,
+                                           std::optional<StatNameTagSpan> name_tags,
                                            StatName tagged_name) override;
     ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name,
                                              TagStringViewSpan name_tags,
@@ -438,7 +437,7 @@ private:
      */
     template <class StatType>
     StatType& safeMakeStat(StatName full_stat_name, StatName name_no_tags,
-                           absl::optional<StatNameTagSpan> stat_name_tags,
+                           std::optional<StatNameTagSpan> stat_name_tags,
                            StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
                            StatsMatcher::FastResult fast_reject_result,
                            StatNameStorageSet& central_rejected_stats,
@@ -446,7 +445,7 @@ private:
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
 
     template <class StatType>
-    using StatTypeOptConstRef = absl::optional<std::reference_wrapper<const StatType>>;
+    using StatTypeOptConstRef = std::optional<std::reference_wrapper<const StatType>>;
 
     /**
      * Looks up an existing stat, populating the local cache if necessary. Does
@@ -463,7 +462,7 @@ private:
                      StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const {
       auto iter = central_cache_map.find(name);
       if (iter == central_cache_map.end()) {
-        return absl::nullopt;
+        return std::nullopt;
       }
 
       return std::cref(*iter->second);

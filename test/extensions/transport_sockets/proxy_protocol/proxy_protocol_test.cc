@@ -273,7 +273,7 @@ TEST_F(ProxyProtocolTest, V1IPV4DownstreamAddresses) {
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolData>(
+          std::optional<Network::ProxyProtocolData>(
               Network::ProxyProtocolData{src_addr, dst_addr}));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(*Network::Utility::resolveUrl("tcp://174.2.2.222:50000"));
@@ -307,7 +307,7 @@ TEST_F(ProxyProtocolTest, V1IPV6DownstreamAddresses) {
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolData>(
+          std::optional<Network::ProxyProtocolData>(
               Network::ProxyProtocolData{src_addr, dst_addr}));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(*Network::Utility::resolveUrl("tcp://[a:b:c:d::]:50000"));
@@ -391,7 +391,7 @@ TEST_F(ProxyProtocolTest, V2IPV4DownstreamAddresses) {
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolData>(
+          std::optional<Network::ProxyProtocolData>(
               Network::ProxyProtocolData{src_addr, dst_addr}));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(*Network::Utility::resolveUrl("tcp://0.1.1.2:50000"));
@@ -425,7 +425,7 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddresses) {
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolData>(
+          std::optional<Network::ProxyProtocolData>(
               Network::ProxyProtocolData{src_addr, dst_addr}));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(*Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000"));
@@ -460,7 +460,7 @@ TEST_F(ProxyProtocolTest, OnConnectedCallsInnerOnConnected) {
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolData>(
+          std::optional<Network::ProxyProtocolData>(
               Network::ProxyProtocolData{src_addr, dst_addr}));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(*Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000"));
@@ -487,7 +487,7 @@ TEST_F(ProxyProtocolTest, V2IPV4DownstreamAddressesAndTLVs) {
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+          std::optional<Network::ProxyProtocolData>(proxy_proto_data));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(*Network::Utility::resolveUrl("tcp://0.1.1.2:50000"));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
@@ -526,7 +526,7 @@ TEST_F(ProxyProtocolTest, V2IPV4PassSpecificTLVs) {
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+          std::optional<Network::ProxyProtocolData>(proxy_proto_data));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(*Network::Utility::resolveUrl("tcp://0.1.1.2:50000"));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
@@ -567,7 +567,7 @@ TEST_F(ProxyProtocolTest, V2IPV4PassEmptyTLVs) {
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+          std::optional<Network::ProxyProtocolData>(proxy_proto_data));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(*Network::Utility::resolveUrl("tcp://0.1.1.2:50000"));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
@@ -608,7 +608,7 @@ TEST_F(ProxyProtocolTest, V2IPV4TLVsExceedLengthLimit) {
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+          std::optional<Network::ProxyProtocolData>(proxy_proto_data));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(*Network::Utility::resolveUrl("tcp://0.1.1.2:50000"));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
@@ -645,7 +645,7 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddressesAndTLVs) {
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+          std::optional<Network::ProxyProtocolData>(proxy_proto_data));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(*Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000"));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
@@ -684,7 +684,7 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddressesAndTLVsWithoutPassConfig) {
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+          std::optional<Network::ProxyProtocolData>(proxy_proto_data));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(*Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000"));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
@@ -721,7 +721,7 @@ TEST_F(ProxyProtocolTest, V2CustomTLVsFromConfig) {
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+          std::optional<Network::ProxyProtocolData>(proxy_proto_data));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(*Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000"));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
@@ -766,7 +766,7 @@ TEST_F(ProxyProtocolTest, V2CustomTLVsFromHostMetadata) {
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+          std::optional<Network::ProxyProtocolData>(proxy_proto_data));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(*Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000"));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
@@ -829,7 +829,7 @@ TEST_F(ProxyProtocolTest, V2CombinedPrecedenceHostConfigPassthrough) {
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+          std::optional<Network::ProxyProtocolData>(proxy_proto_data));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(*Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000"));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
@@ -916,7 +916,7 @@ TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperly) {
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+          std::optional<Network::ProxyProtocolData>(proxy_proto_data));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(*Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000"));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
@@ -1091,7 +1091,7 @@ TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperlyNoDup
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+          std::optional<Network::ProxyProtocolData>(proxy_proto_data));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(*Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000"));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
@@ -1167,7 +1167,7 @@ TEST_F(ProxyProtocolTest, V2CustomTLVMetadataInvalidFormat) {
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+          std::optional<Network::ProxyProtocolData>(proxy_proto_data));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(*Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000"));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
@@ -1223,7 +1223,7 @@ TEST_F(ProxyProtocolTest, V2CustomTLVHostMetadataMissing) {
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+          std::optional<Network::ProxyProtocolData>(proxy_proto_data));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(*Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000"));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_

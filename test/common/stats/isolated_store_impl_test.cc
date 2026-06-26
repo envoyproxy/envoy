@@ -128,9 +128,9 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(2UL, store_->gauges().size());
 
   StatNameManagedStorage nonexistent_name("nonexistent", store_->symbolTable());
-  EXPECT_EQ(scope_->findCounter(nonexistent_name.statName()), absl::nullopt);
-  EXPECT_EQ(scope_->findGauge(nonexistent_name.statName()), absl::nullopt);
-  EXPECT_EQ(scope_->findHistogram(nonexistent_name.statName()), absl::nullopt);
+  EXPECT_EQ(scope_->findCounter(nonexistent_name.statName()), std::nullopt);
+  EXPECT_EQ(scope_->findGauge(nonexistent_name.statName()), std::nullopt);
+  EXPECT_EQ(scope_->findHistogram(nonexistent_name.statName()), std::nullopt);
 }
 
 TEST_F(StatsIsolatedStoreImplTest, CleanupCallback) {

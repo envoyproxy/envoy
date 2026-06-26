@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "envoy/http/filter.h"
 #include "envoy/http/filter_factory.h"
 #include "envoy/server/lifecycle_notifier.h"
@@ -22,7 +24,6 @@
 #include "test/test_common/utility.h"
 #include "test/test_common/wasm_base.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "openssl/bytestring.h"
@@ -1346,7 +1347,7 @@ TEST_P(WasmCommonContextTest, ProcessInvalidGRPCStatusCodeAsEmptyInLocalReply) {
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
       .WillOnce([this](Http::ResponseHeaderMap&, bool) { context().onResponseHeaders(0, false); });
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _,
-                                                 testing::Eq(absl::nullopt), testing::Eq("ok")));
+                                                 testing::Eq(std::nullopt), testing::Eq("ok")));
 
   // Create in-VM context.
   context().onCreate();

@@ -88,8 +88,8 @@ public:
   ~DynamicModuleFormatterProvider() override;
 
   // Formatter::FormatterProvider
-  absl::optional<std::string> format(const ::Envoy::Formatter::Context& context,
-                                     const StreamInfo::StreamInfo& stream_info) const override;
+  std::optional<std::string> format(const ::Envoy::Formatter::Context& context,
+                                    const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const ::Envoy::Formatter::Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
 
@@ -109,7 +109,7 @@ public:
   // Formatter::CommandParser
   absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
   parse(absl::string_view command, absl::string_view command_arg,
-        absl::optional<size_t> max_length) const override;
+        std::optional<size_t> max_length) const override;
 
 private:
   const DynamicModuleFormatterConfigSharedPtr config_;

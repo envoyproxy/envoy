@@ -170,7 +170,7 @@ void LogicalDnsCluster::startResolve() {
             const uint32_t priority = locality_lb_endpoint.priority();
             priority_state_manager.updateClusterPrioritySet(
                 priority, std::move(priority_state_manager.priorityState()[priority].first),
-                absl::nullopt, absl::nullopt, absl::nullopt, absl::nullopt, absl::nullopt);
+                std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt);
           }
 
           if (!current_resolved_address_ ||

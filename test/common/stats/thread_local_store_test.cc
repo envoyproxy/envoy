@@ -2772,7 +2772,7 @@ TEST_F(ThreadLocalStoreExplicitTagsTest, ScopeTagsPropagate) {
   EXPECT_EQ("cluster_name", c.tags()[0].name_);
   EXPECT_EQ("foo", c.tags()[0].value_);
 
-  Gauge& g = cluster_scope->gaugeFromTaggedName(makeStatName("active"), absl::nullopt, StatName(),
+  Gauge& g = cluster_scope->gaugeFromTaggedName(makeStatName("active"), std::nullopt, StatName(),
                                                 Gauge::ImportMode::Accumulate);
   EXPECT_EQ("cluster.foo.active", g.name());
   EXPECT_EQ("cluster.active", g.tagExtractedName());
@@ -2811,7 +2811,7 @@ TEST_F(ThreadLocalStoreExplicitTagsTest, HistogramAndTextReadoutTagsPropagate) {
   ScopeSharedPtr cluster_scope = scope_.scopeFromTaggedName(
       makeStatName("cluster"), StatNameTagSpan(name_tags), makeStatName("cluster.foo"));
 
-  Histogram& h = cluster_scope->histogramFromTaggedName(makeStatName("rq_time"), absl::nullopt,
+  Histogram& h = cluster_scope->histogramFromTaggedName(makeStatName("rq_time"), std::nullopt,
                                                         StatName(), Histogram::Unit::Unspecified);
   EXPECT_EQ("cluster.foo.rq_time", h.name());
   EXPECT_EQ("cluster.rq_time", h.tagExtractedName());
@@ -2819,7 +2819,7 @@ TEST_F(ThreadLocalStoreExplicitTagsTest, HistogramAndTextReadoutTagsPropagate) {
   EXPECT_EQ("foo", h.tags()[0].value_);
 
   TextReadout& t =
-      cluster_scope->textReadoutFromTaggedName(makeStatName("version"), absl::nullopt, StatName());
+      cluster_scope->textReadoutFromTaggedName(makeStatName("version"), std::nullopt, StatName());
   EXPECT_EQ("cluster.foo.version", t.name());
   EXPECT_EQ("cluster.version", t.tagExtractedName());
   ASSERT_EQ(1, t.tags().size());
@@ -2887,7 +2887,7 @@ TEST_F(StatsThreadLocalStoreTest, LegacyStatCreationMatrix) {
 
   // No name_tags, no tagged_name. The flat name is parent_prefix + name; tag extraction runs on
   // the flat name (no well-known match here, so tagExtractedName == name).
-  Counter& c1 = child->counterFromTaggedName(pool.add("rq"), absl::nullopt, StatName());
+  Counter& c1 = child->counterFromTaggedName(pool.add("rq"), std::nullopt, StatName());
   EXPECT_EQ("svc.rq", c1.name());
   EXPECT_EQ("svc.rq", c1.tagExtractedName());
   EXPECT_EQ(0, c1.tags().size());
@@ -2905,7 +2905,7 @@ TEST_F(StatsThreadLocalStoreTest, LegacyStatCreationMatrix) {
   // No name_tags, with tagged_name. The legacy backward-compat shim treats tagged_name as both
   // canonical and flat; tag extraction then runs on the flat name.
   Counter& c3 =
-      child->counterFromTaggedName(pool.add("rx"), absl::nullopt, pool.add("rx.with.dots"));
+      child->counterFromTaggedName(pool.add("rx"), std::nullopt, pool.add("rx.with.dots"));
   EXPECT_EQ("svc.rx.with.dots", c3.name());
   EXPECT_EQ("svc.rx.with.dots", c3.tagExtractedName());
   EXPECT_EQ(0, c3.tags().size());
@@ -2953,7 +2953,7 @@ TEST_F(StatsThreadLocalStoreTest, LegacyScopeCreationMatrix) {
 // name_tags are empty, tagged_name is ignored and `name` is used.
 TEST_F(ThreadLocalStoreExplicitTagsTest, TagStatCreationMatrixOnPlainScope) {
   // No name_tags, no tagged_name.
-  Counter& c1 = scope_.counterFromTaggedName(makeStatName("rq"), absl::nullopt, StatName());
+  Counter& c1 = scope_.counterFromTaggedName(makeStatName("rq"), std::nullopt, StatName());
   EXPECT_EQ("rq", c1.name());
   EXPECT_EQ("rq", c1.tagExtractedName());
   EXPECT_EQ(0, c1.tags().size());
@@ -2970,7 +2970,7 @@ TEST_F(ThreadLocalStoreExplicitTagsTest, TagStatCreationMatrixOnPlainScope) {
 
   // No name_tags, with tagged_name -> tagged_name is ignored when there are no tags.
   Counter& c3 =
-      scope_.counterFromTaggedName(makeStatName("rx"), absl::nullopt, makeStatName("rx.ignored"));
+      scope_.counterFromTaggedName(makeStatName("rx"), std::nullopt, makeStatName("rx.ignored"));
   EXPECT_EQ("rx", c3.name());
   EXPECT_EQ("rx", c3.tagExtractedName());
   EXPECT_EQ(0, c3.tags().size());
@@ -3033,7 +3033,7 @@ TEST_F(ThreadLocalStoreExplicitTagsTest, TagStatCreationMatrixOnTaggedScope) {
       makeStatName("cluster"), StatNameTagSpan(prefix_tags), makeStatName("cluster.foo"));
 
   // No name_tags, no tagged_name. Inherited tag still propagates; flat name reuses tagged prefix.
-  Counter& c1 = cluster->counterFromTaggedName(makeStatName("rq"), absl::nullopt, StatName());
+  Counter& c1 = cluster->counterFromTaggedName(makeStatName("rq"), std::nullopt, StatName());
   EXPECT_EQ("cluster.foo.rq", c1.name());
   EXPECT_EQ("cluster.rq", c1.tagExtractedName());
   ASSERT_EQ(1, c1.tags().size());
@@ -3042,7 +3042,7 @@ TEST_F(ThreadLocalStoreExplicitTagsTest, TagStatCreationMatrixOnTaggedScope) {
   // No name_tags, with tagged_name. tagged_name is ignored when there are no own tags; inherited
   // tag still propagates.
   Counter& c2 =
-      cluster->counterFromTaggedName(makeStatName("rx"), absl::nullopt, makeStatName("rx.ignored"));
+      cluster->counterFromTaggedName(makeStatName("rx"), std::nullopt, makeStatName("rx.ignored"));
   EXPECT_EQ("cluster.foo.rx", c2.name());
   EXPECT_EQ("cluster.rx", c2.tagExtractedName());
   ASSERT_EQ(1, c2.tags().size());

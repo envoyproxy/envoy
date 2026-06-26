@@ -480,7 +480,7 @@ bool DynamicModuleCluster::addHosts(
 
   priority_set_.updateHosts(
       priority, Upstream::HostSetImpl::partitionHosts(all_hosts, std::move(hosts_per_locality)), {},
-      added_hosts, {}, absl::nullopt, absl::nullopt);
+      added_hosts, {}, std::nullopt, std::nullopt);
 
   ENVOY_LOG(debug, "Added {} hosts to dynamic module cluster at priority {}.", result_hosts.size(),
             priority);
@@ -519,7 +519,7 @@ bool DynamicModuleCluster::updateHostHealth(Upstream::HostSharedPtr host,
         auto hosts_per_locality = buildHostsPerLocality(*all_hosts);
         priority_set_.updateHosts(
             p, Upstream::HostSetImpl::partitionHosts(all_hosts, std::move(hosts_per_locality)), {},
-            {}, {}, absl::nullopt, absl::nullopt);
+            {}, {}, std::nullopt, std::nullopt);
         ENVOY_LOG(debug, "Updated health status for host to {} at priority {}.",
                   static_cast<int>(health_status), p);
         return true;
@@ -597,7 +597,7 @@ size_t DynamicModuleCluster::removeHosts(const std::vector<Upstream::HostSharedP
 
   priority_set_.updateHosts(
       0, Upstream::HostSetImpl::partitionHosts(remaining_hosts, std::move(hosts_per_locality)), {},
-      {}, removed_hosts, absl::nullopt, absl::nullopt);
+      {}, removed_hosts, std::nullopt, std::nullopt);
 
   ENVOY_LOG(debug, "Removed {} hosts from dynamic module cluster.", removed_hosts.size());
   return removed_hosts.size();

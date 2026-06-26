@@ -226,7 +226,7 @@ bool DefaultCertValidator::verifyCertAndUpdateStatus(
                         match_san_override.value_or(subject_alt_name_matchers_),
                         validation_context.callbacks != nullptr
                             ? makeOptRef(validation_context.callbacks->connection().streamInfo())
-                            : absl::nullopt,
+                            : std::nullopt,
                         error_details, out_alert);
 
   if (detailed_status == Envoy::Ssl::ClientValidationStatus::NotValidated ||
@@ -320,7 +320,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
     const char* error = "verify cert failed: empty cert chain";
     ENVOY_LOG(debug, error);
     return {ValidationResults::ValidationStatus::Failed,
-            Envoy::Ssl::ClientValidationStatus::NoClientCertificate, absl::nullopt, error};
+            Envoy::Ssl::ClientValidationStatus::NoClientCertificate, std::nullopt, error};
   }
   Envoy::Ssl::ClientValidationStatus detailed_status =
       Envoy::Ssl::ClientValidationStatus::NotValidated;
@@ -344,7 +344,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
       stats_.fail_verify_error_.inc();
       ENVOY_LOG(debug, error);
       return {ValidationResults::ValidationStatus::Failed,
-              Envoy::Ssl::ClientValidationStatus::Failed, absl::nullopt, error};
+              Envoy::Ssl::ClientValidationStatus::Failed, std::nullopt, error};
     }
     const bool verify_succeeded = (X509_verify_cert(ctx.get()) == 1);
 
@@ -355,8 +355,8 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
       ENVOY_LOG(debug, error);
       if (allow_untrusted_certificate_) {
         return ValidationResults{ValidationResults::ValidationStatus::Successful,
-                                 Envoy::Ssl::ClientValidationStatus::Failed, absl::nullopt,
-                                 absl::nullopt};
+                                 Envoy::Ssl::ClientValidationStatus::Failed, std::nullopt,
+                                 std::nullopt};
       }
       return {ValidationResults::ValidationStatus::Failed,
               Envoy::Ssl::ClientValidationStatus::Failed,
@@ -378,7 +378,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
                                 detailed_status, &error_details, &tls_alert);
   return succeeded
              ? ValidationResults{ValidationResults::ValidationStatus::Successful, detailed_status,
-                                 absl::nullopt, absl::nullopt, std::move(validated_chain)}
+                                 std::nullopt, std::nullopt, std::move(validated_chain)}
              : ValidationResults{ValidationResults::ValidationStatus::Failed, detailed_status,
                                  tls_alert, error_details};
 }
@@ -629,7 +629,7 @@ void DefaultCertValidator::initializeCertExpirationStats(Stats::Scope& scope) {
   expiration_gauge.set(Utility::getExpirationUnixTime(ca_cert_.get()).count());
 }
 
-absl::optional<uint32_t> DefaultCertValidator::daysUntilFirstCertExpires() const {
+std::optional<uint32_t> DefaultCertValidator::daysUntilFirstCertExpires() const {
   return Utility::getDaysUntilExpiration(ca_cert_.get(), context_.timeSource());
 }
 

@@ -107,7 +107,7 @@ public:
                                const std::string& client_zone = "");
 
   // Upstream::LoadBalancerContextBase
-  absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
+  std::optional<uint64_t> computeHashKey() override { return hash_key_; }
 
   bool isReadCommand() const override { return is_read_; }
 
@@ -122,7 +122,7 @@ private:
 
   static bool isReadRequest(const NetworkFilters::Common::Redis::RespValue& request);
 
-  const absl::optional<uint64_t> hash_key_;
+  const std::optional<uint64_t> hash_key_;
   const bool is_read_;
   const NetworkFilters::Common::Redis::Client::ReadPolicy read_policy_;
   const std::string client_zone_;
@@ -144,10 +144,10 @@ public:
                                const std::string& client_zone = "");
 
   // Upstream::LoadBalancerContextBase
-  absl::optional<uint64_t> computeHashKey() override { return shard_index_; }
+  std::optional<uint64_t> computeHashKey() override { return shard_index_; }
 
 private:
-  const absl::optional<uint64_t> shard_index_;
+  const std::optional<uint64_t> shard_index_;
 };
 
 class ClusterSlotUpdateCallBack {
@@ -218,7 +218,7 @@ private:
       }
       // Convert each zone's hosts to HostSetImpl
       for (auto& [zone, hosts] : zone_hosts) {
-        auto host_set = std::make_unique<Upstream::HostSetImpl>(0, absl::nullopt, absl::nullopt);
+        auto host_set = std::make_unique<Upstream::HostSetImpl>(0, std::nullopt, std::nullopt);
         auto hosts_ptr = std::make_shared<Upstream::HostVector>(std::move(hosts));
         host_set->updateHosts(Upstream::HostSetImpl::partitionHosts(
                                   std::move(hosts_ptr), Upstream::HostsPerLocalityImpl::empty()),
@@ -245,8 +245,8 @@ private:
 
   private:
     const Upstream::HostConstSharedPtr primary_;
-    Upstream::HostSetImpl replicas_{0, absl::nullopt, absl::nullopt};
-    Upstream::HostSetImpl all_hosts_{0, absl::nullopt, absl::nullopt};
+    Upstream::HostSetImpl replicas_{0, std::nullopt, std::nullopt};
+    Upstream::HostSetImpl all_hosts_{0, std::nullopt, std::nullopt};
     std::string primary_zone_;
     absl::flat_hash_map<std::string, std::unique_ptr<Upstream::HostSetImpl>> replicas_by_zone_;
   };
@@ -279,11 +279,11 @@ private:
       return nullptr;
     }
     // Pool selection not implemented.
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                              const Upstream::Host& /*host*/,
                              std::vector<uint8_t>& /*hash_key*/) override {
-      return absl::nullopt;
+      return std::nullopt;
     }
     // Lifetime tracking not implemented.
     OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {

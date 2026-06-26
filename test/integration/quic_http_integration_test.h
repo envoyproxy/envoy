@@ -288,9 +288,9 @@ public:
 
   IntegrationCodecClientPtr makeRawHttpConnection(
       Network::ClientConnectionPtr&& conn,
-      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
-      absl::optional<envoy::config::core::v3::HttpProtocolOptions> common_http_options =
-          absl::nullopt,
+      std::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+      std::optional<envoy::config::core::v3::HttpProtocolOptions> common_http_options =
+          std::nullopt,
       bool wait_till_connected = true) override {
     ENVOY_LOG(debug, "Creating a new client {}",
               conn->connectionInfoProvider().localAddress()->asStringView());
@@ -299,10 +299,10 @@ public:
   }
 
   // Create Http3 codec client with the option not to wait for 1-RTT key establishment.
-  IntegrationCodecClientPtr makeRawHttp3Connection(
-      Network::ClientConnectionPtr&& conn,
-      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
-      bool wait_for_1rtt_key, absl::optional<bool> disable_qpack = absl::nullopt) {
+  IntegrationCodecClientPtr
+  makeRawHttp3Connection(Network::ClientConnectionPtr&& conn,
+                         std::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+                         bool wait_for_1rtt_key, std::optional<bool> disable_qpack = std::nullopt) {
     std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
     cluster->max_response_headers_count_ = 200;
     if (http2_options.has_value()) {

@@ -212,8 +212,7 @@ public:
   // Return the current view of filter chains, keyed by filter chain message. Used by the owning
   // listener to calculate the intersection of filter chains with another listener.
   const FcContextMap& filterChainsByMessage() const { return fc_contexts_; }
-  const absl::optional<envoy::config::listener::v3::FilterChain>&
-  defaultFilterChainMessage() const {
+  const std::optional<envoy::config::listener::v3::FilterChain>& defaultFilterChainMessage() const {
     return default_filter_chain_message_;
   }
   const Network::DrainableFilterChainSharedPtr& defaultFilterChain() const {
@@ -366,7 +365,7 @@ private:
   // detect the filter chains in the intersection of existing listener and new listener.
   FcContextMap fc_contexts_;
 
-  absl::optional<envoy::config::listener::v3::FilterChain> default_filter_chain_message_;
+  std::optional<envoy::config::listener::v3::FilterChain> default_filter_chain_message_;
   // The optional fallback filter chain if destination_ports_map_ does not find a matched filter
   // chain.
   Network::DrainableFilterChainSharedPtr default_filter_chain_;
@@ -382,7 +381,7 @@ private:
 
   // Reference to the previous generation of filter chain manager to share the filter chains.
   // Caution: only during warm up could the optional have value.
-  absl::optional<const FilterChainManagerImpl*> origin_{nullptr};
+  std::optional<const FilterChainManagerImpl*> origin_{nullptr};
 
   // For FilterChainFactoryContextCreator
   // init manager owned by the corresponding listener. The reference is valid when building the

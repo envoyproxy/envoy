@@ -28,14 +28,14 @@ class GenericSecretFormatterProvider : public Envoy::Formatter::FormatterProvide
 public:
   GenericSecretFormatterProvider(
       std::shared_ptr<Secret::ThreadLocalGenericSecretProvider> secret_provider,
-      absl::optional<size_t> max_length)
+      std::optional<size_t> max_length)
       : secret_provider_(std::move(secret_provider)), max_length_(max_length) {}
 
-  absl::optional<std::string> format(const Envoy::Formatter::Context&,
-                                     const StreamInfo::StreamInfo&) const override {
+  std::optional<std::string> format(const Envoy::Formatter::Context&,
+                                    const StreamInfo::StreamInfo&) const override {
     const std::string& value = secret_provider_->secret();
     if (value.empty()) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     std::string result = value;
     Envoy::Formatter::SubstitutionFormatUtils::truncate(result, max_length_);
@@ -54,7 +54,7 @@ public:
 
 private:
   std::shared_ptr<Secret::ThreadLocalGenericSecretProvider> secret_provider_;
-  const absl::optional<size_t> max_length_;
+  const std::optional<size_t> max_length_;
 };
 
 /**
@@ -70,7 +70,7 @@ public:
 
   absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
   parse(absl::string_view command, absl::string_view subcommand,
-        absl::optional<size_t> max_length) const override {
+        std::optional<size_t> max_length) const override {
     if (command != SecretCommand) {
       return nullptr;
     }

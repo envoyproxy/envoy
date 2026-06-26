@@ -46,7 +46,7 @@ CommonCredentialsProviderChain::customCredentialsProviderChain(
 }
 CredentialsProviderChainSharedPtr CommonCredentialsProviderChain::defaultCredentialsProviderChain(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region) {
-  auto chain = std::make_shared<CommonCredentialsProviderChain>(context, region, absl::nullopt);
+  auto chain = std::make_shared<CommonCredentialsProviderChain>(context, region, std::nullopt);
   chain->setupSubscriptions();
   return chain;
 }
@@ -280,7 +280,7 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createAssumeRoleCre
   } else {
     credentials_provider_chain =
         std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(context, region,
-                                                                                  absl::nullopt);
+                                                                                  std::nullopt);
   }
 
   credentials_provider_chain->setupSubscriptions();
@@ -435,7 +435,7 @@ CommonCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
           context, iam_roles_anywhere_config.certificate(), iam_roles_anywhere_config.private_key(),
           iam_roles_anywhere_config.has_certificate_chain()
               ? makeOptRef(iam_roles_anywhere_config.certificate_chain())
-              : absl::nullopt);
+              : std::nullopt);
   status = roles_anywhere_certificate_provider->initialize();
   if (!status.ok()) {
     ENVOY_LOG(error, "Failed to initialize IAM Roles Anywhere X509 Credentials Provider, disabling "

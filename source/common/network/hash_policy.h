@@ -16,12 +16,12 @@ public:
   explicit HashPolicyImpl(const absl::Span<const envoy::type::v3::HashPolicy* const>& hash_policy);
 
   // Network::HashPolicy
-  absl::optional<uint64_t> generateHash(const Network::Connection& connection) const override;
+  std::optional<uint64_t> generateHash(const Network::Connection& connection) const override;
 
   class HashMethod {
   public:
     virtual ~HashMethod() = default;
-    virtual absl::optional<uint64_t> evaluate(const Network::Connection& connection) const PURE;
+    virtual std::optional<uint64_t> evaluate(const Network::Connection& connection) const PURE;
   };
 
   using HashMethodPtr = std::unique_ptr<HashMethod>;

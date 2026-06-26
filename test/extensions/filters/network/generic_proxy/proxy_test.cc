@@ -38,7 +38,7 @@ public:
   MockRouteConfigProvider() { ON_CALL(*this, config()).WillByDefault(Return(route_config_)); }
 
   MOCK_METHOD(Rds::ConfigConstSharedPtr, config, (), (const));
-  MOCK_METHOD(const absl::optional<Rds::RouteConfigProvider::ConfigInfo>&, configInfo, (), (const));
+  MOCK_METHOD(const std::optional<Rds::RouteConfigProvider::ConfigInfo>&, configInfo, (), (const));
   MOCK_METHOD(SystemTime, lastUpdated, (), (const));
   MOCK_METHOD(absl::Status, onConfigUpdate, ());
 

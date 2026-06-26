@@ -317,7 +317,7 @@ std::string encodeMetadataOnly(absl::string_view baggage, absl::string_view iden
       Istio::Common::convertBaggageToWorkloadMetadata(baggage, identity);
   Protobuf::Struct data = ::Istio::Common::convertWorkloadMetadataToStruct(*metadata);
   Protobuf::Any wrapped;
-  wrapped.PackFrom(data);
+  std::ignore = wrapped.PackFrom(data);
   return wrapped.SerializeAsString();
 }
 

@@ -148,7 +148,7 @@ RedisClusterLoadBalancerFactory::RedisClusterLoadBalancer::chooseHost(
   if (!slot_array_) {
     return {nullptr};
   }
-  absl::optional<uint64_t> hash;
+  std::optional<uint64_t> hash;
   if (context) {
     hash = context->computeHashKey();
   }

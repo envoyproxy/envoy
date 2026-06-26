@@ -77,13 +77,13 @@ DynamicModuleFormatterProvider::~DynamicModuleFormatterProvider() {
   config_->on_provider_destroy_(provider_);
 }
 
-absl::optional<std::string>
+std::optional<std::string>
 DynamicModuleFormatterProvider::format(const ::Envoy::Formatter::Context& context,
                                        const StreamInfo::StreamInfo& stream_info) const {
   FormatterContext formatter_context{&context, &stream_info};
   envoy_dynamic_module_type_module_buffer result{nullptr, 0};
   if (!config_->on_format_(provider_, static_cast<void*>(&formatter_context), &result)) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   if (result.length == 0) {
     return std::string();
@@ -94,7 +94,7 @@ DynamicModuleFormatterProvider::format(const ::Envoy::Formatter::Context& contex
 Protobuf::Value
 DynamicModuleFormatterProvider::formatValue(const ::Envoy::Formatter::Context& context,
                                             const StreamInfo::StreamInfo& stream_info) const {
-  const absl::optional<std::string> value = format(context, stream_info);
+  const std::optional<std::string> value = format(context, stream_info);
   if (!value.has_value()) {
     return ValueUtil::nullValue();
   }
@@ -106,7 +106,7 @@ DynamicModuleCommandParser::DynamicModuleCommandParser(DynamicModuleFormatterCon
 
 absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
 DynamicModuleCommandParser::parse(absl::string_view command, absl::string_view command_arg,
-                                  absl::optional<size_t> max_length) const {
+                                  std::optional<size_t> max_length) const {
   envoy_dynamic_module_type_envoy_buffer command_buf = {.ptr = command.data(),
                                                         .length = command.size()};
   envoy_dynamic_module_type_envoy_buffer command_arg_buf = {.ptr = command_arg.data(),

@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -27,7 +28,6 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -103,11 +103,11 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
     : traffic_mode_(proto_config.traffic_mode()),
       clear_route_cache_(proto_config.clear_route_cache()),
       propagate_trace_context_(proto_config.has_propagate_trace_context()
-                                   ? absl::make_optional(proto_config.propagate_trace_context())
-                                   : absl::nullopt),
+                                   ? std::make_optional(proto_config.propagate_trace_context())
+                                   : std::nullopt),
       propagate_baggage_(proto_config.has_propagate_baggage()
-                             ? absl::make_optional(proto_config.propagate_baggage())
-                             : absl::nullopt),
+                             ? std::make_optional(proto_config.propagate_baggage())
+                             : std::nullopt),
       max_request_body_size_(proto_config.has_max_request_body_size()
                                  ? proto_config.max_request_body_size().value()
                                  : 8192), // Default: 8KB
@@ -264,7 +264,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
     ENVOY_LOG(debug, "rejecting non-MCP traffic");
     config_->stats().requests_rejected_.inc();
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "Only MCP traffic is allowed",
-                                       nullptr, absl::nullopt, "mcp_filter_reject_no_mcp");
+                                       nullptr, std::nullopt, "mcp_filter_reject_no_mcp");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -307,7 +307,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
       if (!status.ok()) {
         config_->stats().invalid_json_.inc();
         decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "not a valid JSON", nullptr,
-                                           absl::nullopt, "mcp_filter_not_jsonrpc");
+                                           std::nullopt, "mcp_filter_not_jsonrpc");
         return Http::FilterDataStatus::StopIterationNoBuffer;
       }
 
@@ -355,7 +355,7 @@ void McpFilter::handleParseError(absl::string_view error_msg) {
 
   is_mcp_request_ = false;
 
-  decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, error_msg, nullptr, absl::nullopt,
+  decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, error_msg, nullptr, std::nullopt,
                                      "mcp_filter_parse_error");
 }
 
@@ -370,14 +370,14 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     ENVOY_LOG(warn, "rejecting request with duplicate JSON keys");
     config_->stats().duplicate_keys_rejected_.inc();
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "duplicate JSON keys detected",
-                                       nullptr, absl::nullopt, "mcp_filter_duplicate_keys");
+                                       nullptr, std::nullopt, "mcp_filter_duplicate_keys");
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
   if (!is_mcp_request_ && shouldRejectRequest()) {
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
                                        "request must be a valid JSON-RPC 2.0 message for MCP",
-                                       nullptr, absl::nullopt, "mcp_filter_not_jsonrpc");
+                                       nullptr, std::nullopt, "mcp_filter_not_jsonrpc");
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 

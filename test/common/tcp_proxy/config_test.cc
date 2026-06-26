@@ -272,7 +272,7 @@ TEST(ConfigTest, CalculateActualMaxDownstreamConnectionDuration) {
     Protobuf::Duration* max_downstream_connection_duration;
     envoy::type::v3::Percent* max_downstream_connection_duration_jitter_percentage;
     uint64_t random_value;
-    absl::optional<std::chrono::milliseconds> expected_actual_max_downstream_connection_duration;
+    std::optional<std::chrono::milliseconds> expected_actual_max_downstream_connection_duration;
   };
 
   const auto seconds = [](uint64_t seconds) {
@@ -322,7 +322,7 @@ TEST(ConfigTest, CalculateActualMaxDownstreamConnectionDuration) {
        /* max_downstream_connection_duration */ nullptr,
        /* max_downstream_connection_duration_jitter_percentage */ percent(50),
        /* random_value */ 5000,
-       /* expected_actual_max_downstream_connection_duration */ absl::nullopt},
+       /* expected_actual_max_downstream_connection_duration */ std::nullopt},
   };
 
   for (const auto& test_case : test_cases) {
@@ -863,7 +863,7 @@ TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
               tcpConnPool(_, _, _))
-      .WillOnce(Return(absl::nullopt));
+      .WillOnce(Return(std::nullopt));
   Upstream::ClusterInfoConstSharedPtr cluster_info;
   EXPECT_CALL(connection_.stream_info_, setUpstreamClusterInfo(_))
       .WillOnce(
@@ -918,7 +918,7 @@ public:
 
   class HashableObj : public StreamInfo::FilterState::Object, public Hashable {
   public:
-    absl::optional<uint64_t> hash() const override { return 31337; }
+    std::optional<uint64_t> hash() const override { return 31337; }
   };
 };
 
@@ -951,7 +951,7 @@ TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
         .WillOnce(Invoke([](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
                             Upstream::LoadBalancerContext* context) {
           EXPECT_FALSE(context->computeHashKey().has_value());
-          return absl::nullopt;
+          return std::nullopt;
         }));
     filter_->onNewConnection();
   }
@@ -966,7 +966,7 @@ TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
         .WillOnce(Invoke([](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
                             Upstream::LoadBalancerContext* context) {
           EXPECT_TRUE(context->computeHashKey().has_value());
-          return absl::nullopt;
+          return std::nullopt;
         }));
     filter_->onNewConnection();
   }
@@ -994,7 +994,7 @@ TEST_F(TcpProxyHashingTest, HashWithFilterState) {
         .WillOnce(Invoke([](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
                             Upstream::LoadBalancerContext* context) {
           EXPECT_FALSE(context->computeHashKey().has_value());
-          return absl::nullopt;
+          return std::nullopt;
         }));
     filter_->onNewConnection();
   }
@@ -1009,7 +1009,7 @@ TEST_F(TcpProxyHashingTest, HashWithFilterState) {
         .WillOnce(Invoke([](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
                             Upstream::LoadBalancerContext* context) {
           EXPECT_EQ(31337, context->computeHashKey().value());
-          return absl::nullopt;
+          return std::nullopt;
         }));
     filter_->onNewConnection();
   }

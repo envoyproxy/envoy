@@ -414,7 +414,7 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundJwtSuccess) {
   });
 
   config_helper_.configureUpstreamTls(
-      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/absl::nullopt,
+      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/std::nullopt,
       [](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
         const std::string rundir = TestEnvironment::runfilesDirectory();
         auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -470,7 +470,7 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundJwtCacheHit) {
   });
 
   config_helper_.configureUpstreamTls(
-      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/absl::nullopt,
+      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/std::nullopt,
       [](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
         const std::string rundir = TestEnvironment::runfilesDirectory();
         auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -554,7 +554,7 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundAccessTokenSuccess) {
   });
 
   config_helper_.configureUpstreamTls(
-      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/absl::nullopt,
+      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/std::nullopt,
       [](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
         const std::string rundir = TestEnvironment::runfilesDirectory();
         auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -610,7 +610,7 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundAccessTokenCacheHit) {
   });
 
   config_helper_.configureUpstreamTls(
-      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/absl::nullopt,
+      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/std::nullopt,
       [](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
         const std::string rundir = TestEnvironment::runfilesDirectory();
         auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();

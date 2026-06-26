@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -25,7 +26,6 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
-#include "absl/types/optional.h"
 
 #if defined(ENVOY_CONFIG_COVERAGE)
 #define DISABLE_UNDER_COVERAGE return
@@ -100,7 +100,7 @@ public:
 
   Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
-  absl::optional<uint64_t> waitForNextRawUpstreamConnection(
+  std::optional<uint64_t> waitForNextRawUpstreamConnection(
       const std::vector<uint64_t>& upstream_indices, FakeRawConnectionPtr& fake_upstream_connection,
       std::chrono::milliseconds connection_wait_timeout = TestUtility::DefaultTimeout);
 
@@ -161,7 +161,7 @@ public:
   std::vector<std::string>
   waitForAccessLogEntries(const std::string& filename,
                           Network::ClientConnection* client_connection = nullptr,
-                          absl::optional<uint32_t> min_entries = std::nullopt);
+                          std::optional<uint32_t> min_entries = std::nullopt);
 
   // Returns all log entries after the nth access log entry, defaulting to log entry 0.
   // By default will trigger an expect failure if more than one entry is returned.
@@ -199,7 +199,7 @@ public:
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "", FakeStream* stream = nullptr,
       OptRef<const absl::flat_hash_map<std::string, std::string>> initial_resource_versions =
-          absl::nullopt);
+          std::nullopt);
 
   template <class T>
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
@@ -251,7 +251,7 @@ public:
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "", bool expect_node = true,
       OptRef<const absl::flat_hash_map<std::string, std::string>> initial_resource_versions =
-          absl::nullopt);
+          std::nullopt);
 
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
@@ -515,7 +515,7 @@ public:
     FakeUpstreamConfig config = upstream_config_;
     config.upstream_protocol_ = type;
     if (type != Http::CodecType::HTTP3) {
-      config.udp_fake_upstream_ = absl::nullopt;
+      config.udp_fake_upstream_ = std::nullopt;
     }
     return config;
   }
@@ -554,7 +554,7 @@ protected:
                                              bool use_lds);
   static envoy::config::bootstrap::v3::Bootstrap configToBootstrap(const std::string& config);
 
-  void setUdpFakeUpstream(absl::optional<FakeUpstreamConfig::UdpConfig> config) {
+  void setUdpFakeUpstream(std::optional<FakeUpstreamConfig::UdpConfig> config) {
     upstream_config_.udp_fake_upstream_ = config;
   }
   bool initialized() const { return initialized_; }
@@ -606,7 +606,7 @@ protected:
   // The config for envoy start-up.
   ConfigHelper config_helper_;
   // The ProcessObject to use when constructing the envoy server.
-  ProcessObjectOptRef process_object_{absl::nullopt};
+  ProcessObjectOptRef process_object_{std::nullopt};
 
   // Steps that should be done before the envoy server starting.
   std::function<void(IntegrationTestServer&)> on_server_ready_function_;
@@ -672,7 +672,7 @@ protected:
 
   // If this member is not empty, the test will use a fixed RNG value specified
   // by it.
-  absl::optional<uint64_t> deterministic_value_;
+  std::optional<uint64_t> deterministic_value_;
 
   // Set true when your test will itself take care of ensuring listeners are up, and registering
   // them in the port_map_.

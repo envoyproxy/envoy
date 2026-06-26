@@ -48,7 +48,7 @@ public:
     return trust_chain_verification_;
   }
 
-  const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
+  const std::optional<envoy::config::core::v3::TypedExtensionConfig>&
   customValidatorConfig() const override {
     return custom_validator_config_;
   }
@@ -57,7 +57,7 @@ public:
 
   bool onlyVerifyLeafCertificateCrl() const override { return only_verify_leaf_cert_crl_; }
 
-  absl::optional<uint32_t> maxVerifyDepth() const override { return max_verify_depth_; }
+  std::optional<uint32_t> maxVerifyDepth() const override { return max_verify_depth_; }
 
   bool autoSniSanMatch() const override { return auto_sni_san_match_; }
 
@@ -85,10 +85,10 @@ private:
   const bool allow_expired_certificate_;
   const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
       TrustChainVerification trust_chain_verification_;
-  const absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_;
+  const std::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_;
   Api::Api& api_;
   const bool only_verify_leaf_cert_crl_;
-  absl::optional<uint32_t> max_verify_depth_;
+  std::optional<uint32_t> max_verify_depth_;
   const bool auto_sni_san_match_;
   const bool suppress_client_ca_list_;
 };

@@ -352,7 +352,7 @@ TEST(PosixThreadTest, PThreadId) {
   ThreadId thread_id;
   auto thread =
       thread_factory->createThread([&]() { thread_id = thread_factory->currentPthreadId(); },
-                                   /* options= */ absl::nullopt, /* crash_on_failure= */ false);
+                                   /* options= */ std::nullopt, /* crash_on_failure= */ false);
   auto threadId = thread->pthreadId();
   thread->join();
 
@@ -362,7 +362,7 @@ TEST(PosixThreadTest, PThreadId) {
 
 TEST(PosixThreadTest, Joinable) {
   auto thread_factory = PosixThreadFactory::create();
-  auto thread = thread_factory->createThread([&]() {}, /* options= */ absl::nullopt,
+  auto thread = thread_factory->createThread([&]() {}, /* options= */ std::nullopt,
                                              /* crash_on_failure= */ true);
 
   EXPECT_TRUE(thread->joinable());
@@ -403,7 +403,7 @@ protected:
 
 TEST(PosixThreadTest, FailCreate) {
   PosixThreadFactoryFailCreate thread_factory;
-  EXPECT_ENVOY_BUG(thread_factory.createThread([&]() {}, /* options= */ absl::nullopt,
+  EXPECT_ENVOY_BUG(thread_factory.createThread([&]() {}, /* options= */ std::nullopt,
                                                /* crash_on_failure= */ false),
                    "Unable to create a thread with return code: 1");
 }

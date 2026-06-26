@@ -1889,7 +1889,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListPerRouteConfig) {
       .WillOnce(
           testing::Invoke([](Http::Code, absl::string_view body,
                              std::function<void(Http::ResponseHeaderMap&)> modify_headers,
-                             const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+                             const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
             auto parsed_response = nlohmann::json::parse(body);
 
             EXPECT_EQ(parsed_response["jsonrpc"], "2.0");
@@ -1944,7 +1944,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListLocalEmpty) {
       .WillOnce(
           testing::Invoke([](Http::Code, absl::string_view body,
                              std::function<void(Http::ResponseHeaderMap&)> modify_headers,
-                             const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+                             const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
             auto parsed_response = nlohmann::json::parse(body);
 
             EXPECT_EQ(parsed_response["jsonrpc"], "2.0");
@@ -2115,7 +2115,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListLocalPerRouteConfig) {
       .WillOnce(
           testing::Invoke([](Http::Code, absl::string_view body,
                              std::function<void(Http::ResponseHeaderMap&)> modify_headers,
-                             const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+                             const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
             auto parsed_response = nlohmann::json::parse(body);
 
             EXPECT_EQ(parsed_response["jsonrpc"], "2.0");

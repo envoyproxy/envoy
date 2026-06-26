@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -7,7 +8,6 @@
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 
 namespace Envoy {
@@ -31,8 +31,7 @@ using TagVector = std::vector<Tag>;
 
 using StatNameTag = std::pair<StatName, StatName>;
 using StatNameTagVector = std::vector<StatNameTag>;
-using StatNameTagVectorOptConstRef =
-    absl::optional<std::reference_wrapper<const StatNameTagVector>>;
+using StatNameTagVectorOptConstRef = std::optional<std::reference_wrapper<const StatNameTagVector>>;
 
 using StatNameTagSpan = absl::Span<const StatNameTag>;
 using StatNameTagVec = absl::InlinedVector<StatNameTag, 6>;

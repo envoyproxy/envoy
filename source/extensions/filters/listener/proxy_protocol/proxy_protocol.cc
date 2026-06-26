@@ -78,7 +78,7 @@ public:
     return s;
   }
 
-  absl::optional<std::string> serializeAsString() const override {
+  std::optional<std::string> serializeAsString() const override {
     Protobuf::Struct struct_proto;
     for (const auto& [key, value] : tlv_values_) {
       (*struct_proto.mutable_fields())[key] = ValueUtil::stringValue(value);
@@ -87,7 +87,7 @@ public:
     if (json_or_error.ok()) {
       return json_or_error.value();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   bool hasFieldSupport() const override { return true; }
@@ -309,7 +309,7 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
           std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolDataWithVersion{
               {socket.connectionInfoProvider().remoteAddress(),
                socket.connectionInfoProvider().localAddress(), parsed_tlvs_},
-              absl::make_optional(header_version_)}),
+              std::make_optional(header_version_)}),
           StreamInfo::FilterState::LifeSpan::Connection);
     } else {
       ENVOY_LOG(
@@ -326,7 +326,7 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
           std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolDataWithVersion{
               {proxy_protocol_header_.value().remote_address_,
                proxy_protocol_header_.value().local_address_, parsed_tlvs_},
-              absl::make_optional(header_version_)}),
+              std::make_optional(header_version_)}),
           StreamInfo::FilterState::LifeSpan::Connection);
     }
   }
@@ -367,7 +367,7 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
   return ReadOrParseState::Done;
 }
 
-absl::optional<size_t> Filter::lenV2Address(const char* buf) {
+std::optional<size_t> Filter::lenV2Address(const char* buf) {
   const uint8_t proto_family = buf[PROXY_PROTO_V2_SIGNATURE_LEN + 1];
   const int ver_cmd = buf[PROXY_PROTO_V2_SIGNATURE_LEN];
   size_t len;
@@ -386,7 +386,7 @@ absl::optional<size_t> Filter::lenV2Address(const char* buf) {
     break;
   default:
     ENVOY_LOG(debug, "Unsupported V2 proxy protocol address family");
-    return absl::nullopt;
+    return std::nullopt;
   }
   return len;
 }
@@ -751,7 +751,7 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
       ENVOY_LOG(debug, "Unsupported V2 proxy protocol version");
       return ReadOrParseState::Error;
     }
-    absl::optional<ssize_t> addr_len_opt = lenV2Address(buf);
+    std::optional<ssize_t> addr_len_opt = lenV2Address(buf);
     if (!addr_len_opt.has_value()) {
       return ReadOrParseState::Error;
     }

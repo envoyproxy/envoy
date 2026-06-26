@@ -173,7 +173,7 @@ public:
 
 LookupResult makeLookupResult(const LookupRequest& lookup_request,
                               const Http::TestResponseHeaderMapImpl& response_headers,
-                              absl::optional<uint64_t> content_length = absl::nullopt) {
+                              std::optional<uint64_t> content_length = std::nullopt) {
   // For the purpose of the test, set the response_time to the date header value.
   ResponseMetadata metadata = {CacheHeadersUtils::httpTime(response_headers.Date())};
   return lookup_request.makeLookupResult(

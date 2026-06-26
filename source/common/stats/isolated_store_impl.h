@@ -150,7 +150,7 @@ private:
         const TagUtility::TagStatNameJoiner& joiner, Histogram::Unit)>;
     using TextReadoutAllocator = std::function<RefcountPtr<Base>(
         const TagUtility::TagStatNameJoiner& joiner, TextReadout::Type)>;
-    using BaseOptConstRef = absl::optional<std::reference_wrapper<const Base>>;
+    using BaseOptConstRef = std::optional<std::reference_wrapper<const Base>>;
 
     IsolatedStatsCache(CounterAllocator alloc) : counter_alloc_(alloc) {}
     IsolatedStatsCache(GaugeAllocator alloc) : gauge_alloc_(alloc) {}
@@ -265,7 +265,7 @@ private:
     BaseOptConstRef find(StatName name) const {
       auto stat = stats_.find(name);
       if (stat == stats_.end()) {
-        return absl::nullopt;
+        return std::nullopt;
       }
       return std::cref(*stat->second);
     }
@@ -330,7 +330,7 @@ public:
   // Stats::Scope
   SymbolTable& symbolTable() override { return store_.symbolTable(); }
   const SymbolTable& constSymbolTable() const override { return store_.symbolTable(); }
-  Counter& counterFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+  Counter& counterFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
                                  StatName tagged_name) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
     const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(),
@@ -338,7 +338,7 @@ public:
                                                tagged_name, symbolTable());
     return store_.counters_.get(joiner, matcher).value_or(store_.null_counter_);
   }
-  Gauge& gaugeFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+  Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
                              StatName tagged_name, Gauge::ImportMode import_mode) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
     const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(),
@@ -351,7 +351,7 @@ public:
     gauge->mergeImportMode(import_mode);
     return *gauge;
   }
-  Histogram& histogramFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+  Histogram& histogramFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
                                      StatName tagged_name, Histogram::Unit unit) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
     const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(),
@@ -360,7 +360,7 @@ public:
     return store_.histograms_.get(joiner, unit, matcher).value_or(store_.null_histogram_);
   }
   TextReadout& textReadoutFromTaggedName(StatName base_name,
-                                         absl::optional<StatNameTagSpan> name_tags,
+                                         std::optional<StatNameTagSpan> name_tags,
                                          StatName tagged_name) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
     const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(),

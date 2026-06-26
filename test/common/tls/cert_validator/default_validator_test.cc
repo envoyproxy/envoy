@@ -706,11 +706,11 @@ public:
   MOCK_METHOD(envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
                   TrustChainVerification,
               trustChainVerification, (), (const override));
-  MOCK_METHOD(const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&,
+  MOCK_METHOD(const std::optional<envoy::config::core::v3::TypedExtensionConfig>&,
               customValidatorConfig, (), (const override));
   MOCK_METHOD(Api::Api&, api, (), (const override));
   bool onlyVerifyLeafCertificateCrl() const override { return false; }
-  absl::optional<uint32_t> maxVerifyDepth() const override { return absl::nullopt; }
+  std::optional<uint32_t> maxVerifyDepth() const override { return std::nullopt; }
   bool autoSniSanMatch() const override { return false; }
   bool suppressClientCaList() const override { return false; }
 
@@ -781,13 +781,13 @@ public:
     return envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
         ACCEPT_UNTRUSTED;
   }
-  const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
+  const std::optional<envoy::config::core::v3::TypedExtensionConfig>&
   customValidatorConfig() const override {
     return custom_config_;
   }
   Api::Api& api() const override { return *api_; }
   bool onlyVerifyLeafCertificateCrl() const override { return false; }
-  absl::optional<uint32_t> maxVerifyDepth() const override { return absl::nullopt; }
+  std::optional<uint32_t> maxVerifyDepth() const override { return std::nullopt; }
   bool autoSniSanMatch() const override { return false; }
   bool suppressClientCaList() const override { return false; }
 
@@ -796,7 +796,7 @@ private:
   std::string empty_;
   std::vector<std::string> empty_strs_;
   std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> empty_matchers_;
-  absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_config_;
+  std::optional<envoy::config::core::v3::TypedExtensionConfig> custom_config_;
   Api::ApiPtr api_ = Api::createApiForTest();
 };
 
@@ -901,7 +901,7 @@ TestCertificateValidationContextConfigPtr makeSuppressConfig(const std::string& 
   std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers{};
   return std::make_unique<TestCertificateValidationContextConfig>(
       typed_conf, /*allow_expired_certificate=*/false, san_matchers, ca_cert,
-      /*verify_depth=*/absl::nullopt, suppress);
+      /*verify_depth=*/std::nullopt, suppress);
 }
 
 // Runs updateDigestForSessionId against the validator and returns the resulting

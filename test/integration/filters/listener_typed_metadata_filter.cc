@@ -56,7 +56,7 @@ public:
     EXPECT_NE(value, nullptr);
     EXPECT_EQ(value->item_, kExpectedMetadataValue);
 
-    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "", nullptr, absl::nullopt,
+    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "", nullptr, std::nullopt,
                                        "successfully_handled_request");
     return Http::FilterHeadersStatus::Continue;
   }

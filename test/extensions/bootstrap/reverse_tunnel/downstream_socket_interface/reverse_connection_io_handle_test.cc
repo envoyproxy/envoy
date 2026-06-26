@@ -1704,7 +1704,7 @@ TEST_F(ReverseConnectionIOHandleTest, ReadMethod) {
   Buffer::OwnedImpl buffer;
 
   // Call read() - should delegate to base class implementation.
-  auto result = io_handle_->read(buffer, absl::optional<uint64_t>(100));
+  auto result = io_handle_->read(buffer, std::optional<uint64_t>(100));
 
   // Should return a valid result.
   EXPECT_NE(result.err_, nullptr);
@@ -2601,7 +2601,7 @@ TEST_F(ReverseConnectionIOHandleTest, ReadWriteConnectCoverage) {
   Buffer::OwnedImpl buf("hello");
   (void)io_handle_->write(buf);
   Buffer::OwnedImpl rbuf;
-  (void)io_handle_->read(rbuf, absl::optional<uint64_t>(64));
+  (void)io_handle_->read(rbuf, std::optional<uint64_t>(64));
 
   auto addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0);
   (void)io_handle_->connect(addr);

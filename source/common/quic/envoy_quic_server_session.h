@@ -179,7 +179,7 @@ private:
       headers_with_underscores_action_;
 
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
-  absl::optional<ConnectionMapPosition> position_;
+  std::optional<ConnectionMapPosition> position_;
   QuicConnectionStats& connection_stats_;
   quic::HttpDatagramSupport http_datagram_support_ = quic::HttpDatagramSupport::kNone;
   std::unique_ptr<quic::QuicConnectionDebugVisitor> debug_visitor_;
