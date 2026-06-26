@@ -64,7 +64,7 @@ public:
       EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
       std::unique_ptr<StreamInfo::StreamInfo>&& stream_info, QuicConnectionStats& connection_stats,
       EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
-      Http::SessionIdleListInterface* session_idle_list);
+      Http::SessionIdleListInterface* session_idle_list, bool should_enable_reset_ssl = false);
 
   ~EnvoyQuicServerSession() override;
 

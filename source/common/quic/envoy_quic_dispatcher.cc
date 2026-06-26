@@ -15,6 +15,7 @@
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_server_transport_socket_factory.h"
 
 #include "quiche/quic/core/crypto/quic_crypto_server_config.h"
 #include "quiche/quic/core/quic_dispatcher.h"
@@ -136,12 +137,21 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
       quic::ParsedQuicVersionVector{version}, std::move(connection_socket), connection_id_generator,
       std::move(listener_filter_manager));
 
+  bool enable_reset_ssl = false;
+  if (filter_chain != nullptr) {
+    const auto& factory = filter_chain->transportSocketFactory();
+    const auto* quic_factory = dynamic_cast<const QuicServerTransportSocketFactory*>(&factory);
+    if (quic_factory != nullptr) {
+      enable_reset_ssl = quic_factory->resetSslEnabled();
+    }
+  }
+
   auto quic_session = std::make_unique<EnvoyQuicServerSession>(
       quic_config, quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
       listener_config_->perConnectionBufferLimitBytes(), quic_stat_names_,
       listener_config_->listenerScope(), crypto_server_stream_factory_, std::move(stream_info),
-      connection_stats_, debug_visitor_factory_, session_idle_list_.get());
+      connection_stats_, debug_visitor_factory_, session_idle_list_.get(), enable_reset_ssl);
   if (filter_chain != nullptr) {
     // Setup filter chain before Initialize().
     const bool has_filter_initialized =

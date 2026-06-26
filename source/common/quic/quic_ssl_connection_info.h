@@ -23,6 +23,57 @@ public:
     return session_.GetCryptoStream()->GetSsl();
   }
 
+  uint16_t ciphersuiteId() const override {
+    auto* crypto_stream = session_.GetCryptoStream();
+    QUICHE_DCHECK(crypto_stream != nullptr);
+    return crypto_stream->CiphersuiteId();
+  }
+
+  std::string ciphersuiteString() const override {
+    auto* crypto_stream = session_.GetCryptoStream();
+    QUICHE_DCHECK(crypto_stream != nullptr);
+    return std::string(crypto_stream->CiphersuiteString());
+  }
+
+  uint16_t tlsGroupId() const override {
+    auto* crypto_stream = session_.GetCryptoStream();
+    QUICHE_DCHECK(crypto_stream != nullptr);
+    return crypto_stream->TlsGroupId();
+  }
+
+  absl::string_view tlsGroupString() const override {
+    auto* crypto_stream = session_.GetCryptoStream();
+    QUICHE_DCHECK(crypto_stream != nullptr);
+    return crypto_stream->TlsGroupString();
+  }
+
+  const std::string& tlsVersion() const override {
+    if (!tls_version_.has_value()) {
+      auto* crypto_stream = session_.GetCryptoStream();
+      QUICHE_DCHECK(crypto_stream != nullptr);
+      tls_version_ = std::string(crypto_stream->TlsVersion());
+    }
+    return *tls_version_;
+  }
+
+  const std::string& alpn() const override {
+    if (!alpn_.has_value()) {
+      auto* crypto_stream = session_.GetCryptoStream();
+      QUICHE_DCHECK(crypto_stream != nullptr);
+      alpn_ = std::string(crypto_stream->Alpn());
+    }
+    return *alpn_;
+  }
+
+  const std::string& sni() const override {
+    if (!sni_.has_value()) {
+      auto* crypto_stream = session_.GetCryptoStream();
+      QUICHE_DCHECK(crypto_stream != nullptr);
+      sni_ = std::string(crypto_stream->Sni());
+    }
+    return *sni_;
+  }
+
   // Extensions::TransportSockets::Tls::ConnectionInfoImplBase
   // TODO(#23809) populate those field once we support mutual TLS.
   bool peerCertificatePresented() const override { return false; }
@@ -57,6 +108,9 @@ public:
 private:
   quic::QuicSession& session_;
   bool cert_validated_{false};
+  mutable absl::optional<std::string> alpn_;
+  mutable absl::optional<std::string> sni_;
+  mutable absl::optional<std::string> tls_version_;
 };
 
 } // namespace Quic

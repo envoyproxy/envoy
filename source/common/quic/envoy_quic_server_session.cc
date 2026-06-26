@@ -53,7 +53,7 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     std::unique_ptr<StreamInfo::StreamInfo>&& stream_info, QuicConnectionStats& connection_stats,
     EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
-    Http::SessionIdleListInterface* session_idle_list)
+    Http::SessionIdleListInterface* session_idle_list, bool should_enable_reset_ssl)
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
       QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
@@ -63,6 +63,9 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
       quic_connection_(std::move(connection)),
       crypto_server_stream_factory_(crypto_server_stream_factory),
       connection_stats_(connection_stats), session_idle_list_(session_idle_list) {
+  if (should_enable_reset_ssl) {
+    enable_reset_ssl_after_handshake();
+  }
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   http_datagram_support_ = quic::HttpDatagramSupport::kRfc;
 #endif

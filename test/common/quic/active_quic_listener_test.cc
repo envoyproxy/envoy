@@ -168,7 +168,7 @@ protected:
     ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _, _, _))
         .WillByDefault(
             Invoke([&](Network::IoHandle& io_handle, Stats::Scope& scope, Envoy::Event::Dispatcher&,
-                       absl::AnyInvocable<void()&&>) -> Network::UdpPacketWriterPtr {
+                       absl::AnyInvocable<void() &&>) -> Network::UdpPacketWriterPtr {
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
               return std::make_unique<Quic::UdpGsoBatchWriter>(io_handle, scope);
 #else
@@ -255,7 +255,6 @@ protected:
           .InSequence(seq)
           .WillOnce(ReturnRef(filter_factories_.back()));
       EXPECT_CALL(*filter_chain_, transportSocketFactory())
-          .InSequence(seq)
           .WillRepeatedly(ReturnRef(*transport_socket_factory_));
     }
   }
