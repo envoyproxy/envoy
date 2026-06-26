@@ -101,6 +101,8 @@ def _cc_deps():
     external_http_archive(
         "proto-field-extraction",
         location_name = "proto_field_extraction",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:proto-field-extraction-protobuf-v35.patch"],
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
             "@ocp": "@ocp-diag-core",
@@ -565,7 +567,10 @@ def _cel_cpp():
         name = "cel-cpp",
         location_name = "cel_cpp",
         patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:cel-cpp.patch"],
+        patches = [
+            "@envoy//bazel/foreign_cc:cel-cpp.patch",
+            "@envoy//bazel/foreign_cc:cel-cpp-protobuf-v35.patch",
+        ],
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
             "@com_google_cel_spec": "@cel-spec",
@@ -897,6 +902,7 @@ def _proxy_wasm_cpp_sdk():
         patch_args = ["-p1"],
         patches = [
             "@envoy//bazel:proxy_wasm_cpp_sdk.patch",
+            "@envoy//bazel:proxy_wasm_cpp_sdk-protobuf-v35.patch",
         ],
         repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
