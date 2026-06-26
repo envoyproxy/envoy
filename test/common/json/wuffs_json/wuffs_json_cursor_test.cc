@@ -246,7 +246,7 @@ TEST(WuffsJsonCursorTest, ScalarFields) {
   EXPECT_EQ(h.fields[3].raw_val, "null");
 }
 
-// Wuffs emits \n, \t, and \uXXXX as UNICODE_CODE_POINT tokens (VBC=3),
+// Wuffs emits \n, \t as UNICODE_CODE_POINT tokens (VBC=3),
 // not STRING tokens. This test verifies the cursor handles them correctly.
 TEST(WuffsJsonCursorTest, StringEscapes) {
   CapturingHandler h;
@@ -257,7 +257,7 @@ TEST(WuffsJsonCursorTest, StringEscapes) {
   EXPECT_EQ(h.fields[2].str_val, "A"); // U+0041
 }
 
-// \uXXXX escapes for code points above U+007F arrive as UNICODE_CODE_POINT tokens
+// ``\uXXXX`` escapes for code points above U+007F arrive as UNICODE_CODE_POINT tokens
 // and must be encoded to multi-byte UTF-8 by appendCodePoint.
 // É (U+00C9) -> 2 UTF-8 bytes C3 89.
 // 中 (U+4E2D) -> 3 UTF-8 bytes E4 B8 AD.
@@ -270,7 +270,7 @@ TEST(WuffsJsonCursorTest, UnicodeEscapeMultiByteUtf8) {
 }
 
 // Supplementary characters (> U+FFFF) are written in JSON as surrogate pairs
-// (\uHHHH\uLLLL). Wuffs combines them into a single UNICODE_CODE_POINT token
+// (``\uHHHH\uLLLL``). Wuffs combines them into a single UNICODE_CODE_POINT token
 // with the full code point value; appendCodePoint encodes it as 4-byte UTF-8.
 // 😀 -> U+1F600 -> F0 9F 98 80.
 TEST(WuffsJsonCursorTest, UnicodeSurrogatePairDecodedToUtf8) {
@@ -308,6 +308,27 @@ TEST(WuffsJsonCursorTest, InvalidJsonReturnsError) {
   CapturingHandler h;
   EXPECT_FALSE(parse("not json", h).ok());
 }
+
+TEST(WuffsJsonCursorTest, FeedAfterCompleteReturnsError) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  EXPECT_TRUE(cursor.feed("{}", /*closed=*/true).ok());
+  EXPECT_FALSE(cursor.feed("{}", /*closed=*/true).ok());
+}
+
+TEST(WuffsJsonCursorTest, TrailingGarbageInSameChunkRejected) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  EXPECT_FALSE(cursor.feed(R"({"key":"val"}random_garbage)", /*closed=*/true).ok());
+}
+
+TEST(WuffsJsonCursorTest, GarbageInDifferentDataChunk) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  EXPECT_TRUE(cursor.feed(R"({"key":"val"})", /*closed=*/true).ok());
+  EXPECT_TRUE(cursor.feed("random_garbage", /*closed=*/true).ok());
+}
+
 
 TEST(WuffsJsonCursorTest, DuplicateKeyRejected) {
   CapturingHandler h;
@@ -563,7 +584,7 @@ TEST(WuffsJsonCursorTest, ByteRangeKeyValueFieldString) {
 // 8 levels of nesting must be accepted (boundary value for default max_depth=8).
 TEST(WuffsJsonCursorTest, MaxDepthAccepted) {
   CapturingHandler h;
-  // 8 nested dicts, scalar at the innermost level.
+  // 8 nested objects, scalar at the innermost level.
   EXPECT_TRUE(parse(R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}})", h).ok());
 }
 
@@ -678,7 +699,7 @@ TEST(WuffsJsonCursorTest, NumberSplitThreeChunksCorrectValue) {
   EXPECT_EQ(h.fields[0].raw_val, "123456");
 }
 
-// \uXXXX escape straddling a chunk boundary within a string value.
+// ``\uXXXX`` escape straddling a chunk boundary within a string value.
 // Wuffs handles mid-escape suspension via coroutine state (no pending_bytes_
 // involved, unlike NUMBER/LITERAL splits): the decoder consumes all available
 // bytes including the \u prefix and resumes on the next chunk from the hex

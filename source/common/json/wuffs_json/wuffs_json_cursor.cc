@@ -292,8 +292,8 @@ absl::Status WuffsJsonCursor::handleStringToken(absl::string_view raw, uint64_t 
   if (!in_string_chain_) {
     if (string_is_key_) {
       // TODO(tyxia): duplicate-key rejection is unconditional. There are 3 popular options
-      // here: reject / last-wins / frist-wins
-      // Addiing a configuration option here to enable different options.
+      // here: reject / last-wins / first-wins
+      // Adding a configuration option here to enable different options.
       if (depth_ < kMaxTrackedDepth && !seen_keys_[depth_].insert(key_buffer_).second) {
         return absl::InvalidArgumentError(
             absl::StrCat("wuffs json: duplicate key \"", key_buffer_, "\""));
@@ -330,7 +330,7 @@ absl::Status WuffsJsonCursor::handleStringToken(absl::string_view raw, uint64_t 
 // comparison routing, logging purposes. This requires re-escape in the re-encode phase.
 // Investigate later to see if escape and re-escape are needed.
 absl::Status WuffsJsonCursor::handleUnicodeCodePointToken(uint64_t token_detail) {
-  // Backslash escapes (\n, \t, \uXXXX, …) arrive with VBD = decoded code point.
+  // Backslash escapes (\n, \t, …) arrive with VBD = decoded code point.
   // in_string_chain_ is managed by surrounding STRING tokens, not updated here.
   const uint32_t code_point = static_cast<uint32_t>(token_detail);
   const size_t utf8_len = (code_point < 0x80u)      ? 1u

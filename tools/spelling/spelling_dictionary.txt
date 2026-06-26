@@ -593,6 +593,7 @@ WS
 WSA
 WSABUF
 WSS
+WUFFS
 Welford's
 Wi
 XDS
@@ -628,6 +629,7 @@ alls
 alphanumerics
 amongst
 anno
+Anthropic
 anonymization
 anonymizing
 anys
@@ -1013,6 +1015,7 @@ iov
 iovcnt
 iovec
 iovecs
+iop
 ips
 iptables
 ish
@@ -1181,6 +1184,7 @@ oob
 opcode
 openid
 openssl
+OpenAI
 opentracing
 optimizations
 optname
@@ -1551,6 +1555,7 @@ tmpfs
 token
 tokenize
 tokenized
+tokenizer
 tokenizes
 tokenizing
 tokio
@@ -1622,6 +1627,8 @@ variadic
 varint
 vec
 vectorize
+VBC
+VBD
 ver
 verifier
 verifiers

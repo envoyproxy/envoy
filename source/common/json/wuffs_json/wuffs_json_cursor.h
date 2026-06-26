@@ -100,7 +100,6 @@ public:
   //
   //   onNumber(key, raw, depth)
   //     Called for JSON number literals (integer or floating-point).
-  //     `raw` is the source bytes; parse with absl::SimpleAtoi / SimpleAtod.
   //     Return a non-OK Status to abort parsing.
   //
   //   onBoolean(key, value, depth)
@@ -139,7 +138,7 @@ public:
     // Called for each decoded UTF-8 content chunk of a non-key string value.
     // Only called when openStringCapture returned true for this string.
     //
-    // Chunks deliver fully decoded UTF-8: backslash escapes (\n, \uXXXX, etc.)
+    // Chunks deliver fully decoded UTF-8: backslash escapes (e.g., \n, \t, etc.)
     // are converted by the cursor before this call (e.g. \n -> 0x0A).
     // `chunk` is valid only for the duration of this call — do not retain it.
     //
@@ -166,7 +165,6 @@ public:
     virtual absl::Status onKey(absl::string_view key, int depth, size_t token_start) = 0;
 
     // Called for JSON number literals (integer or floating-point).
-    // `raw` is the source bytes; parse with absl::SimpleAtoi / SimpleAtod.
     // `token_start` / `token_end` delimit the scalar value token in the body stream.
     // Together with the token_start from the preceding onKey call they cover the
     // complete "key":value field byte range.
