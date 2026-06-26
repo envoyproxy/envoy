@@ -159,7 +159,7 @@ message OAuth2TokenForwarding {
 
 // OAuth config
 //
-// [#next-free-field: 32]
+// [#next-free-field: 33]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -379,7 +379,7 @@ message OAuth2Config {
   //
   // If the margin is greater than or equal to a token lifetime, the cookie lifetime is set to
   // ``0s``.
-  google.protobuf.Duration cookie_expiration_margin = 31 [(validate.rules).duration = {gte {}}];
+  google.protobuf.Duration cookie_expiration_margin = 32 [(validate.rules).duration = {gte {}}];
 }
 
 // Per-route OAuth2 config.
