@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
 
@@ -32,7 +34,7 @@ public:
 
 protected:
   IoHandlePtr makeSocket(int socket_fd, bool socket_v6only, Socket::Type socket_type,
-                         absl::optional<int> domain,
+                         std::optional<int> domain,
                          const SocketCreationOptions& options) const override;
 
   // Builds the datapath from the parsed config. Tests override this to observe the config and
@@ -47,9 +49,9 @@ protected:
 class SockmapSocketInterfaceExtension : public SocketInterfaceExtension {
 public:
   SockmapSocketInterfaceExtension(SockmapSocketInterface& sock_interface,
-                                  BpfDatapathSharedPtr datapath, bool register_local_sockets)
+                                  BpfDatapathSharedPtr datapath, bool register_user_space_sockets)
       : SocketInterfaceExtension(sock_interface), datapath_(std::move(datapath)),
-        register_local_sockets_(register_local_sockets) {
+        register_user_space_sockets_(register_user_space_sockets) {
     // The interface is a process wide singleton, so only one extension may own its back pointer.
     ASSERT(sock_interface.extension_ == nullptr);
     sock_interface.extension_ = this;
@@ -64,11 +66,11 @@ public:
   }
 
   const BpfDatapathSharedPtr& datapath() const { return datapath_; }
-  bool registerLocalSockets() const { return register_local_sockets_; }
+  bool registerUserSpaceSockets() const { return register_user_space_sockets_; }
 
 private:
   const BpfDatapathSharedPtr datapath_;
-  const bool register_local_sockets_;
+  const bool register_user_space_sockets_;
 };
 
 DECLARE_FACTORY(SockmapSocketInterface);

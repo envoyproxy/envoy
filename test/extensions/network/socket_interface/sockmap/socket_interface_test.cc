@@ -29,9 +29,9 @@ public:
   using SockmapSocketInterface::makeSocket;
   // Installs an extension carrying the given datapath and policy, mirroring what
   // createBootstrapExtension does at startup so makeSocket sees the state.
-  void installExtension(BpfDatapathSharedPtr datapath, bool register_local_sockets) {
+  void installExtension(BpfDatapathSharedPtr datapath, bool register_user_space_sockets) {
     extension_holder_ = std::make_unique<SockmapSocketInterfaceExtension>(
-        *this, std::move(datapath), register_local_sockets);
+        *this, std::move(datapath), register_user_space_sockets);
   }
   const BpfDatapathConfig& lastConfig() const { return last_config_; }
 
@@ -73,7 +73,7 @@ TEST(SockmapSocketInterface, CreateBootstrapExtensionAppliesDefaults) {
   auto* sockmap_extension = dynamic_cast<SockmapSocketInterfaceExtension*>(extension.get());
   ASSERT_NE(sockmap_extension, nullptr);
 
-  EXPECT_TRUE(sockmap_extension->registerLocalSockets());
+  EXPECT_TRUE(sockmap_extension->registerUserSpaceSockets());
   EXPECT_EQ(interface.lastConfig().sockhash_max_entries, 65536U);
   EXPECT_EQ(interface.lastConfig().bpf_program_path, "");
   EXPECT_EQ(interface.lastConfig().cgroup_path, "");
@@ -88,7 +88,7 @@ TEST(SockmapSocketInterface, CreateBootstrapExtensionParsesExplicitValues) {
   config.set_bpf_program_path("/tmp/sockmap.o");
   config.set_cgroup_path("/sys/fs/cgroup/envoy");
   config.mutable_sockhash_max_entries()->set_value(1024);
-  config.mutable_register_local_sockets()->set_value(true);
+  config.mutable_register_user_space_sockets()->set_value(true);
 
   Server::BootstrapExtensionPtr extension = interface.createBootstrapExtension(config, context);
   ASSERT_NE(extension, nullptr);
@@ -98,7 +98,7 @@ TEST(SockmapSocketInterface, CreateBootstrapExtensionParsesExplicitValues) {
   EXPECT_EQ(interface.lastConfig().bpf_program_path, "/tmp/sockmap.o");
   EXPECT_EQ(interface.lastConfig().cgroup_path, "/sys/fs/cgroup/envoy");
   EXPECT_EQ(interface.lastConfig().sockhash_max_entries, 1024U);
-  EXPECT_TRUE(sockmap_extension->registerLocalSockets());
+  EXPECT_TRUE(sockmap_extension->registerUserSpaceSockets());
 
   // With a datapath loaded and registration enabled, IPv4 stream sockets use the accelerated
   // handle. The returned extension stays alive, so the interface back pointer is valid here.
@@ -122,13 +122,13 @@ TEST(SockmapSocketInterface, CreateBootstrapExtensionDisablesRegistration) {
   interface.injected_datapath_ = std::make_shared<NoopDatapath>();
 
   envoy::extensions::network::socket_interface::sockmap::v3::Sockmap config;
-  config.mutable_register_local_sockets()->set_value(false);
+  config.mutable_register_user_space_sockets()->set_value(false);
 
   Server::BootstrapExtensionPtr extension = interface.createBootstrapExtension(config, context);
   ASSERT_NE(extension, nullptr);
   auto* sockmap_extension = dynamic_cast<SockmapSocketInterfaceExtension*>(extension.get());
   ASSERT_NE(sockmap_extension, nullptr);
-  EXPECT_FALSE(sockmap_extension->registerLocalSockets());
+  EXPECT_FALSE(sockmap_extension->registerUserSpaceSockets());
 
   // Even with a datapath loaded, disabling registration keeps IPv4 stream sockets on the standard
   // handle.

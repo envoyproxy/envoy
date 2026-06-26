@@ -27,8 +27,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // falls back to the standard datapath, so traffic is never interrupted.
 message Sockmap {
   // Filesystem path to the compiled eBPF object that holds the ``sock_ops`` and ``sk_msg``
-  // programs and the ``sockhash`` map. If not specified, acceleration is disabled and all sockets
-  // use the standard datapath.
+  // programs and the ``sockhash`` map. Envoy does not ship this object and there is no well-known
+  // program to reuse: the program source is part of this extension at
+  // :repo:`sockmap_kern.c <source/extensions/network/socket_interface/sockmap/bpf/sockmap_kern.c>`
+  // and Envoy provides a build rule that compiles it into ``sockmap_kern.o``. Point this field at
+  // the result, or at a custom build that exports the ``envoy_sockops`` and ``envoy_sk_msg``
+  // programs and the ``envoy_sockhash`` map under those names with a matching key layout. If not
+  // specified, acceleration is disabled and all sockets use the standard datapath.
   string bpf_program_path = 1;
 
   // Path to the cgroup v2 directory the ``sock_ops`` program is attached to. While attached, every
@@ -45,5 +50,5 @@ message Sockmap {
   // Whether sockets accepted or connected by Envoy are registered into the ``sockhash`` from user
   // space. This is independent of ``cgroup_path`` and lets proxy-to-proxy hops be accelerated
   // without attaching the ``sock_ops`` program. If not specified, defaults to true.
-  google.protobuf.BoolValue register_local_sockets = 4;
+  google.protobuf.BoolValue register_user_space_sockets = 4;
 }

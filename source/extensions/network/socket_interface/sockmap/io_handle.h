@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "source/common/common/assert.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/extensions/network/socket_interface/sockmap/bpf_datapath.h"
@@ -14,7 +16,7 @@ namespace Network {
 class SockmapIoSocketHandle : public IoSocketHandleImpl {
 public:
   SockmapIoSocketHandle(BpfDatapathSharedPtr datapath, os_fd_t fd, bool socket_v6only = false,
-                        absl::optional<int> domain = absl::nullopt,
+                        std::optional<int> domain = std::nullopt,
                         size_t address_cache_max_capacity = 0)
       : IoSocketHandleImpl(fd, socket_v6only, domain, address_cache_max_capacity),
         datapath_(std::move(datapath)) {

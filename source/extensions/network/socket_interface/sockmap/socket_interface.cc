@@ -12,13 +12,13 @@ namespace Envoy {
 namespace Network {
 
 IoHandlePtr SockmapSocketInterface::makeSocket(int socket_fd, bool socket_v6only,
-                                               Socket::Type socket_type, absl::optional<int> domain,
+                                               Socket::Type socket_type, std::optional<int> domain,
                                                const SocketCreationOptions& options) const {
   // Only IPv4 stream sockets are accelerated, matching the eBPF datapath. Other sockets, including
   // IPv6 and AF_UNIX, use the standard datapath unchanged. The datapath lives on the bootstrap
   // extension, so an interface that was never configured has no extension and falls through.
   if (socket_type == Socket::Type::Stream && domain == AF_INET && extension_ != nullptr &&
-      extension_->registerLocalSockets() && extension_->datapath() != nullptr) {
+      extension_->registerUserSpaceSockets() && extension_->datapath() != nullptr) {
     return std::make_unique<SockmapIoSocketHandle>(extension_->datapath(), socket_fd, socket_v6only,
                                                    domain, options.max_addresses_cache_size_);
   }
@@ -36,12 +36,12 @@ Server::BootstrapExtensionPtr SockmapSocketInterface::createBootstrapExtension(
   datapath_config.cgroup_path = message.cgroup_path();
   datapath_config.sockhash_max_entries =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, sockhash_max_entries, 65536);
-  const bool register_local_sockets =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, register_local_sockets, true);
+  const bool register_user_space_sockets =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, register_user_space_sockets, true);
   BpfDatapathSharedPtr datapath = createDatapath(datapath_config);
 
   return std::make_unique<SockmapSocketInterfaceExtension>(*this, std::move(datapath),
-                                                           register_local_sockets);
+                                                           register_user_space_sockets);
 }
 
 BpfDatapathSharedPtr SockmapSocketInterface::createDatapath(const BpfDatapathConfig& config) {
