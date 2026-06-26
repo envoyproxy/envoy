@@ -176,45 +176,143 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
                                                              DEFAULT_MAX_REQUEST_BODY_SIZE)),
       max_response_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_response_body_size,
                                                               DEFAULT_MAX_RESPONSE_BODY_SIZE)) {
-  for (const auto& tool : proto_config.tool_config().tools()) {
-    tool_entries_[tool.name()] = {tool.http_rule(), tool.text_content_streaming_enabled()};
+  const auto& tool_config = proto_config_.tool_config();
+  EndpointKey key{tool_config.default_server_info().host(),
+                  tool_config.default_server_info().path()};
+  auto& endpoint_config = endpoint_configs_[key];
+  for (const auto& tool : tool_config.tools()) {
+    if (endpoint_config.tool_entries
+            .try_emplace(tool.name(),
+                         ToolEntry{tool.http_rule(), tool.text_content_streaming_enabled(), &tool})
+            .second) {
+      endpoint_config.tools.push_back(&tool);
+    }
   }
+  if (tool_config.has_tool_list_http_rule()) {
+    endpoint_config.tool_list_http_rule = tool_config.tool_list_http_rule();
+  }
+  endpoint_config.tool_list_local = tool_config.has_tool_list_local();
+
   ENVOY_LOG(debug, "Received MCP JSON REST Bridge config: {}", proto_config_.DebugString());
 }
 
 absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-McpJsonRestBridgeFilterConfig::getHttpRule(absl::string_view tool_name) const {
-  auto it = tool_entries_.find(tool_name);
-  if (it == tool_entries_.end()) {
-    return absl::InvalidArgumentError(
-        fmt::format("Failed to find http rule for tool_name: {}", tool_name));
+McpJsonRestBridgeFilterConfig::getHttpRule(absl::string_view tool_name, absl::string_view host,
+                                           absl::string_view path) const {
+  const EndpointKey keys[] = {{std::string(host), std::string(path)},
+                              {std::string(host), ""},
+                              {"", std::string(path)},
+                              {"", ""}};
+  for (const auto& key : keys) {
+    auto it = endpoint_configs_.find(key);
+    if (it != endpoint_configs_.end()) {
+      auto tool_it = it->second.tool_entries.find(tool_name);
+      if (tool_it != it->second.tool_entries.end()) {
+        return tool_it->second.http_rule;
+      }
+    }
   }
-  return it->second.http_rule;
+  return absl::InvalidArgumentError(
+      fmt::format("Failed to find http rule for tool_name: {}", tool_name));
 }
 
-bool McpJsonRestBridgeFilterConfig::textContentStreamingEnabled(absl::string_view tool_name) const {
-  auto it = tool_entries_.find(tool_name);
-  if (it == tool_entries_.end()) {
-    return false;
+bool McpJsonRestBridgeFilterConfig::textContentStreamingEnabled(absl::string_view tool_name,
+                                                                absl::string_view host,
+                                                                absl::string_view path) const {
+  const EndpointKey keys[] = {{std::string(host), std::string(path)},
+                              {std::string(host), ""},
+                              {"", std::string(path)},
+                              {"", ""}};
+  for (const auto& key : keys) {
+    auto it = endpoint_configs_.find(key);
+    if (it != endpoint_configs_.end()) {
+      auto tool_it = it->second.tool_entries.find(tool_name);
+      if (tool_it != it->second.tool_entries.end()) {
+        return tool_it->second.text_content_streaming_enabled;
+      }
+    }
   }
-  return it->second.text_content_streaming_enabled;
+  return false;
 }
 
 absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-McpJsonRestBridgeFilterConfig::getToolsListHttpRule() const {
-  if (!proto_config_.tool_config().has_tool_list_http_rule()) {
-    return absl::NotFoundError("tools_list_http_rule is not configured.");
+McpJsonRestBridgeFilterConfig::getToolsListHttpRule(absl::string_view host,
+                                                    absl::string_view path) const {
+  const EndpointKey keys[] = {{std::string(host), std::string(path)},
+                              {std::string(host), ""},
+                              {"", std::string(path)},
+                              {"", ""}};
+  for (const auto& key : keys) {
+    auto it = endpoint_configs_.find(key);
+    if (it != endpoint_configs_.end()) {
+      if (it->second.tool_list_http_rule.has_value()) {
+        return *it->second.tool_list_http_rule;
+      }
+    }
   }
-  return proto_config_.tool_config().tool_list_http_rule();
+  return absl::NotFoundError("tools_list_http_rule is not configured.");
+}
+
+std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
+McpJsonRestBridgeFilterConfig::toolListLocalTools(absl::string_view host,
+                                                  absl::string_view path) const {
+  std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*> tools;
+  const EndpointKey keys[] = {{std::string(host), std::string(path)},
+                              {std::string(host), ""},
+                              {"", std::string(path)},
+                              {"", ""}};
+  absl::flat_hash_set<absl::string_view> added_tools;
+  for (const auto& key : keys) {
+    auto it = endpoint_configs_.find(key);
+    if (it != endpoint_configs_.end() && it->second.tool_list_local) {
+      for (const auto* tool : it->second.tools) {
+        if (added_tools.insert(tool->name()).second) {
+          tools.push_back(tool);
+        }
+      }
+    }
+  }
+  return tools;
+}
+
+bool McpJsonRestBridgeFilterConfig::toolListLocal(absl::string_view host,
+                                                  absl::string_view path) const {
+  const EndpointKey keys[] = {{std::string(host), std::string(path)},
+                              {std::string(host), ""},
+                              {"", std::string(path)},
+                              {"", ""}};
+  for (const auto& key : keys) {
+    auto it = endpoint_configs_.find(key);
+    if (it != endpoint_configs_.end()) {
+      if (it->second.tool_list_local) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 McpJsonRestBridgePerRouteConfig::McpJsonRestBridgePerRouteConfig(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
         proto_config)
     : proto_config_(proto_config) {
-  for (const auto& tool_config : proto_config.tool_config()) {
+  for (const auto& tool_config : proto_config_.tool_config()) {
+    EndpointKey key{tool_config.default_server_info().host(),
+                    tool_config.default_server_info().path()};
+    auto& endpoint_config = endpoint_configs_[key];
     for (const auto& tool : tool_config.tools()) {
-      tool_entries_[tool.name()] = {tool.http_rule(), tool.text_content_streaming_enabled()};
+      if (endpoint_config.tool_entries
+              .try_emplace(tool.name(), ToolEntry{tool.http_rule(),
+                                                  tool.text_content_streaming_enabled(), &tool})
+              .second) {
+        endpoint_config.tools.push_back(&tool);
+      }
+    }
+    if (!endpoint_config.tool_list_http_rule.has_value() && tool_config.has_tool_list_http_rule()) {
+      endpoint_config.tool_list_http_rule = tool_config.tool_list_http_rule();
+    }
+    if (tool_config.has_tool_list_local()) {
+      endpoint_config.tool_list_local = true;
     }
   }
   ENVOY_LOG(debug, "Received MCP JSON REST Bridge per-route config: {}",
@@ -222,32 +320,99 @@ McpJsonRestBridgePerRouteConfig::McpJsonRestBridgePerRouteConfig(
 }
 
 absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-McpJsonRestBridgePerRouteConfig::getHttpRule(absl::string_view tool_name) const {
-  auto it = tool_entries_.find(tool_name);
-  if (it == tool_entries_.end()) {
-    return absl::InvalidArgumentError(
-        fmt::format("Failed to find http rule for tool_name: {}", tool_name));
+McpJsonRestBridgePerRouteConfig::getHttpRule(absl::string_view tool_name, absl::string_view host,
+                                             absl::string_view path) const {
+  const EndpointKey keys[] = {{std::string(host), std::string(path)},
+                              {std::string(host), ""},
+                              {"", std::string(path)},
+                              {"", ""}};
+  for (const auto& key : keys) {
+    auto it = endpoint_configs_.find(key);
+    if (it != endpoint_configs_.end()) {
+      auto tool_it = it->second.tool_entries.find(tool_name);
+      if (tool_it != it->second.tool_entries.end()) {
+        return tool_it->second.http_rule;
+      }
+    }
   }
-  return it->second.http_rule;
+  return absl::InvalidArgumentError(
+      fmt::format("Failed to find http rule for tool_name: {}", tool_name));
 }
 
-bool McpJsonRestBridgePerRouteConfig::textContentStreamingEnabled(
-    absl::string_view tool_name) const {
-  auto it = tool_entries_.find(tool_name);
-  if (it == tool_entries_.end()) {
-    return false;
+bool McpJsonRestBridgePerRouteConfig::textContentStreamingEnabled(absl::string_view tool_name,
+                                                                  absl::string_view host,
+                                                                  absl::string_view path) const {
+  const EndpointKey keys[] = {{std::string(host), std::string(path)},
+                              {std::string(host), ""},
+                              {"", std::string(path)},
+                              {"", ""}};
+  for (const auto& key : keys) {
+    auto it = endpoint_configs_.find(key);
+    if (it != endpoint_configs_.end()) {
+      auto tool_it = it->second.tool_entries.find(tool_name);
+      if (tool_it != it->second.tool_entries.end()) {
+        return tool_it->second.text_content_streaming_enabled;
+      }
+    }
   }
-  return it->second.text_content_streaming_enabled;
+  return false;
 }
 
 absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-McpJsonRestBridgePerRouteConfig::getToolsListHttpRule() const {
-  for (const auto& tool_config : proto_config_.tool_config()) {
-    if (tool_config.has_tool_list_http_rule()) {
-      return tool_config.tool_list_http_rule();
+McpJsonRestBridgePerRouteConfig::getToolsListHttpRule(absl::string_view host,
+                                                      absl::string_view path) const {
+  const EndpointKey keys[] = {{std::string(host), std::string(path)},
+                              {std::string(host), ""},
+                              {"", std::string(path)},
+                              {"", ""}};
+  for (const auto& key : keys) {
+    auto it = endpoint_configs_.find(key);
+    if (it != endpoint_configs_.end()) {
+      if (it->second.tool_list_http_rule.has_value()) {
+        return *it->second.tool_list_http_rule;
+      }
     }
   }
   return absl::NotFoundError("tools_list_http_rule is not configured.");
+}
+
+std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
+McpJsonRestBridgePerRouteConfig::toolListLocalTools(absl::string_view host,
+                                                    absl::string_view path) const {
+  std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*> tools;
+  const EndpointKey keys[] = {{std::string(host), std::string(path)},
+                              {std::string(host), ""},
+                              {"", std::string(path)},
+                              {"", ""}};
+  absl::flat_hash_set<absl::string_view> added_tools;
+  for (const auto& key : keys) {
+    auto it = endpoint_configs_.find(key);
+    if (it != endpoint_configs_.end() && it->second.tool_list_local) {
+      for (const auto* tool : it->second.tools) {
+        if (added_tools.insert(tool->name()).second) {
+          tools.push_back(tool);
+        }
+      }
+    }
+  }
+  return tools;
+}
+
+bool McpJsonRestBridgePerRouteConfig::toolListLocal(absl::string_view host,
+                                                    absl::string_view path) const {
+  const EndpointKey keys[] = {{std::string(host), std::string(path)},
+                              {std::string(host), ""},
+                              {"", std::string(path)},
+                              {"", ""}};
+  for (const auto& key : keys) {
+    auto it = endpoint_configs_.find(key);
+    if (it != endpoint_configs_.end()) {
+      if (it->second.tool_list_local) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 Http::FilterHeadersStatus
@@ -263,6 +428,7 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
     return Http::FilterHeadersStatus::Continue;
   }
 
+  path_ = std::string(path);
   mcp_operation_ = McpOperation::Undecided;
   // TODO(guoyilin42): Strip port number from server_name_.
   server_name_ = std::string(request_headers.getHostValue());
@@ -495,8 +661,8 @@ void McpJsonRestBridgeFilter::buildStreamingPrefixAndSuffix(bool is_error) {
 // building a JSON object, to minimize copying.
 void McpJsonRestBridgeFilter::serveToolsListLocal(
     const nlohmann::json& json_rpc,
-    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig&
-        tool_config) {
+    const std::vector<
+        const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>& tools) {
   std::string request_id_json = "null";
   if (json_rpc.contains("id")) {
     request_id_json = json_rpc["id"].dump();
@@ -504,13 +670,10 @@ void McpJsonRestBridgeFilter::serveToolsListLocal(
     ASSERT(false, "serveToolsListLocal requires an RPC ID");
   }
 
-  const auto& tools = tool_config.tools();
-
   size_t reserve_size = sizeof("{\"jsonrpc\":\"2.0\",\"id\":") - 1 + request_id_json.size() +
                         sizeof(",\"result\":{\"tools\":[") - 1 + sizeof("]}}") - 1;
 
-  for (const auto& tool_proto : tools) {
-    const auto* tool = &tool_proto;
+  for (const auto* tool : tools) {
     reserve_size += sizeof("{\"name\":") - 1 + nlohmann::json(tool->name()).dump().size();
 
     if (!tool->tool_list_config().title().empty()) {
@@ -536,8 +699,7 @@ void McpJsonRestBridgeFilter::serveToolsListLocal(
                   ",\"result\":{\"tools\":[");
 
   bool first_tool = true;
-  for (const auto& tool_proto : tools) {
-    const auto* tool = &tool_proto;
+  for (const auto* tool : tools) {
     if (!first_tool) {
       absl::StrAppend(&response_data, ",");
     }
@@ -596,13 +758,13 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
   }
 
   if (method == McpConstants::Methods::TOOLS_LIST) {
-    OptRef<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig>
-        tool_list_local_config =
-            (per_route_config == nullptr) ? config_->toolListLocalConfig()
-                                          : per_route_config->toolListLocalConfig();
+    std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
+        tool_list_local_tools = (per_route_config == nullptr)
+                                    ? config_->toolListLocalTools(server_name_, path_)
+                                    : per_route_config->toolListLocalTools(server_name_, path_);
     absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
-        (per_route_config == nullptr) ? config_->getToolsListHttpRule()
-                                      : per_route_config->getToolsListHttpRule();
+        (per_route_config == nullptr) ? config_->getToolsListHttpRule(server_name_, path_)
+                                      : per_route_config->getToolsListHttpRule(server_name_, path_);
     if (http_rule.ok() && !http_rule->get().empty()) {
       mcp_operation_ = McpOperation::ToolsList;
       // We don't support pagination for the tools/list request for now.
@@ -621,10 +783,15 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
         decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
       }
       return;
-    } else if (tool_list_local_config.has_value()) {
-      mcp_operation_ = McpOperation::ToolsListLocal;
-      serveToolsListLocal(json_rpc, *tool_list_local_config);
-      return;
+    } else {
+      bool tool_list_local = (per_route_config == nullptr)
+                                 ? config_->toolListLocal(server_name_, path_)
+                                 : per_route_config->toolListLocal(server_name_, path_);
+      if (tool_list_local) {
+        mcp_operation_ = McpOperation::ToolsListLocal;
+        serveToolsListLocal(json_rpc, tool_list_local_tools);
+        return;
+      }
     }
 
     // TODO(guoyilin42): Handle this more elegantly to avoid an unnecessary copy here. This can
@@ -787,8 +954,8 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
   const auto& tool_name = name_it->get<std::string>();
 
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
-      (per_route_config == nullptr) ? config_->getHttpRule(tool_name)
-                                    : per_route_config->getHttpRule(tool_name);
+      (per_route_config == nullptr) ? config_->getHttpRule(tool_name, server_name_, path_)
+                                    : per_route_config->getHttpRule(tool_name, server_name_, path_);
 
   if (!http_rule.ok()) {
     ENVOY_STREAM_LOG(error, "Failed to get http rule for method: {}", *decoder_callbacks_,
@@ -799,9 +966,10 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
   }
 
   // Set the per-request streaming flag based on the tool's config.
-  text_content_streaming_enabled_ = (per_route_config == nullptr)
-                                        ? config_->textContentStreamingEnabled(tool_name)
-                                        : per_route_config->textContentStreamingEnabled(tool_name);
+  text_content_streaming_enabled_ =
+      (per_route_config == nullptr)
+          ? config_->textContentStreamingEnabled(tool_name, server_name_, path_)
+          : per_route_config->textContentStreamingEnabled(tool_name, server_name_, path_);
 
   const auto arguments_it = params.find(McpConstants::ARGUMENTS_FIELD);
   if (arguments_it != params.end() && !arguments_it->is_object()) {
