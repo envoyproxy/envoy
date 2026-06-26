@@ -469,18 +469,17 @@ TEST(WuffsJsonCursorTest, OnStringChunkFalseStopsDeliveryOnEscape) {
 
 // Post-completion feed test
 
-// Calling feed() after the document is fully consumed must return OK immediately
+// Calling feed() after the document is fully consumed must return InvalidArgumentError
 // via the wuffs_done_ guard without re-processing.
 TEST(WuffsJsonCursorTest, FeedAfterCompletion) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
   EXPECT_TRUE(cursor.feed("{}", true).ok());
-  EXPECT_TRUE(cursor.feed("extra", true).ok());
+  EXPECT_FALSE(cursor.feed("extra", true).ok());
   EXPECT_TRUE(h.fields.empty());
 }
 
 // nextSourcePosition test
-
 TEST(WuffsJsonCursorTest, NextSourcePositionAfterParse) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
@@ -584,13 +583,13 @@ TEST(WuffsJsonCursorTest, ByteRangeKeyValueFieldString) {
 TEST(WuffsJsonCursorTest, MaxDepthAccepted) {
   CapturingHandler h;
   // 8 nested objects, scalar at the innermost level.
-  EXPECT_TRUE(parse(R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}})", h).ok());
+  EXPECT_TRUE(parse(R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}})", h).ok());
 }
 
 // 9 levels of nesting must be rejected (fail-closed).
 TEST(WuffsJsonCursorTest, ExceedMaxDepthRejected) {
   CapturingHandler h;
-  EXPECT_FALSE(parse(R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}}})", h).ok());
+  EXPECT_FALSE(parse(R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}})", h).ok());
 }
 
 // Path-tracking tests
