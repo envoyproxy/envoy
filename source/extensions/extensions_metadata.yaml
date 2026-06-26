@@ -314,6 +314,13 @@ envoy.filters.http.admission_control:
   status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.admission_control.v3.AdmissionControl
+envoy.filters.http.ai_protocol_manager:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
 envoy.filters.http.alternate_protocols_cache:
   categories:
   - envoy.filters.http
