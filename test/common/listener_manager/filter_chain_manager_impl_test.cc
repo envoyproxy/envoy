@@ -25,7 +25,6 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/drain_manager.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/listener_component_factory.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/server/utility.h"
 #include "test/test_common/environment.h"
@@ -43,18 +42,11 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Server {
 
-class MockFcdsSharedFilterChainManager : public FcdsSharedFilterChainManager {
-public:
-  MockFcdsSharedFilterChainManager(Server::Configuration::ServerFactoryContext& server_context,
-                                   ListenerComponentFactory& listener_component_factory)
-      : FcdsSharedFilterChainManager(server_context, listener_component_factory) {}
-};
-
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 public:
   MockFilterChainFactoryBuilder() {
     ON_CALL(*this, buildFilterChain(_, _, _))
-        .WillByDefault(Return(std::make_shared<NiceMock<Network::MockFilterChain>>()));
+        .WillByDefault(Return(std::make_shared<Network::MockFilterChain>()));
   }
 
   MOCK_METHOD(absl::StatusOr<Network::DrainableFilterChainSharedPtr>, buildFilterChain,
@@ -67,13 +59,6 @@ class FilterChainManagerImplTest : public testing::TestWithParam<bool> {
 public:
   void SetUp() override {
     addresses_.emplace_back(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
-    shared_filter_chain_manager_ = std::make_shared<NiceMock<MockFcdsSharedFilterChainManager>>(
-        parent_context_.server_factory_context_, listener_component_factory_);
-    parent_context_.server_factory_context_.singleton_manager_
-        ->getTyped<FcdsSharedFilterChainManager>(
-            std::string(FcdsSharedFilterChainManagerName),
-            [this]() -> Singleton::InstanceSharedPtr { return shared_filter_chain_manager_; });
-
     filter_chain_manager_ =
         std::make_unique<FilterChainManagerImpl>(addresses_, parent_context_, init_manager_);
     local_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234);
@@ -167,17 +152,15 @@ public:
   envoy::config::listener::v3::FilterChain filter_chain_template_;
   xds::type::matcher::v3::Matcher matcher_;
   std::shared_ptr<Network::MockFilterChain> build_out_filter_chain_{
-      std::make_shared<NiceMock<Network::MockFilterChain>>()};
+      std::make_shared<Network::MockFilterChain>()};
   envoy::config::listener::v3::FilterChain fallback_filter_chain_;
   std::shared_ptr<Network::MockFilterChain> build_out_fallback_filter_chain_{
-      std::make_shared<NiceMock<Network::MockFilterChain>>()};
+      std::make_shared<Network::MockFilterChain>()};
 
   NiceMock<MockFilterChainFactoryBuilder> filter_chain_factory_builder_;
   NiceMock<Server::Configuration::MockFactoryContext> parent_context_;
   std::vector<Network::Address::InstanceConstSharedPtr> addresses_;
   // Test target.
-  NiceMock<MockListenerComponentFactory> listener_component_factory_;
-  std::shared_ptr<NiceMock<MockFcdsSharedFilterChainManager>> shared_filter_chain_manager_;
   std::unique_ptr<FilterChainManagerImpl> filter_chain_manager_;
 };
 
@@ -217,7 +200,7 @@ TEST_P(FilterChainManagerImplTest, FilterChainUseFallbackIfNoFilterChainMatches)
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
       .WillOnce(Return(build_out_fallback_filter_chain_));
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
-      .WillOnce(Return(std::make_shared<NiceMock<Network::MockFilterChain>>()))
+      .WillOnce(Return(std::make_shared<Network::MockFilterChain>()))
       .RetiresOnSaturation();
   addSingleFilterChainHelper(filter_chain_template_, &fallback_filter_chain_);
 
@@ -289,7 +272,7 @@ TEST_P(FilterChainManagerImplTest, UpdateFilterChainsBetweenVersions) {
     filter_chain_messages.push_back(std::move(new_filter_chain));
   }
 
-  auto filter_chain = std::make_shared<NiceMock<Network::MockFilterChain>>();
+  auto filter_chain = std::make_shared<Network::MockFilterChain>();
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
       .WillOnce(Return(filter_chain));
   EXPECT_TRUE(filter_chain_manager_
