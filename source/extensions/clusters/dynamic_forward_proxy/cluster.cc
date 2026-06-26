@@ -189,7 +189,7 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
   if (sub_cluster_dns_config_.has_value()) {
     // Use the DnsCluster extension for full DNS configuration.
     config.mutable_cluster_type()->set_name("envoy.cluster.dns");
-    config.mutable_cluster_type()->mutable_typed_config()->PackFrom(
+    std::ignore = config.mutable_cluster_type()->mutable_typed_config()->PackFrom(
         sub_cluster_dns_config_.value());
   } else {
     config.set_type(
