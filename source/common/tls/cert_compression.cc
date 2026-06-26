@@ -214,7 +214,7 @@ std::optional<std::string> doZlibCompress(const uint8_t* in, size_t in_len) {
     IS_ENVOY_BUG(fmt::format(
         "Cert compression failure in deflate: {}, z.total_out {}, in_len {}, z.avail_in {}", rv,
         z.avail_in, in_len, z.avail_in));
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   compressed.resize(z.total_out);
