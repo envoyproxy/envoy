@@ -40,6 +40,17 @@ TEST(AlternateProtocolsCacheFilterConfigTest, AlternateProtocolsCacheFilterWithS
   cb(filter_callback);
 }
 
+TEST(AlternateProtocolsCacheFilterConfigTest, AlternateProtocolsCacheFilterLogging) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  AlternateProtocolsCacheFilterFactory factory;
+  envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
+  proto_config.mutable_alternate_protocols_cache_options()->set_name("foo");
+  EXPECT_LOG_CONTAINS("warn",
+                      "Using deprecated and ignored alternate_protocols_cache_options in "
+                      "alternate_protocols_cache config.",
+                      (void)factory.createFilterFactoryFromProto(proto_config, "stats", context));
+}
+
 } // namespace
 } // namespace AlternateProtocolsCache
 } // namespace HttpFilters
