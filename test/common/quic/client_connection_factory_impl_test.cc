@@ -140,8 +140,8 @@ TEST_P(QuicNetworkConnectionTest, BufferLimits) {
   EXPECT_TRUE(client_connection->connecting());
   ASSERT(session != nullptr);
   EXPECT_EQ(highWatermark(session), 45);
-  EXPECT_EQ(absl::nullopt, session->unixSocketPeerCredentials());
-  EXPECT_NE(absl::nullopt, session->lastRoundTripTime());
+  EXPECT_EQ(std::nullopt, session->unixSocketPeerCredentials());
+  EXPECT_NE(std::nullopt, session->lastRoundTripTime());
   EXPECT_THAT(session->GetAlpnsToOffer(), testing::ElementsAre("h3"));
   EXPECT_FALSE(session->GetConnectionMigrationConfig().migrate_session_on_network_change);
   client_connection->close(Network::ConnectionCloseType::NoFlush);

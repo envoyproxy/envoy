@@ -61,7 +61,6 @@ envoy_cc_library(
         "@abseil-cpp//absl/algorithm",
         "@abseil-cpp//absl/cleanup",
         "@abseil-cpp//absl/container:inlined_vector",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@quiche//:http2_adapter",
     ] + envoy_select_nghttp2([envoy_external_dep_path("nghttp2")]),

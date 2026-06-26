@@ -36,7 +36,7 @@ public:
     matcher_ = std::make_unique<Matcher>(runtime_, runtime_fraction, seed);
   }
 
-  uint64_t matchAndReturnHash(absl::optional<absl::string_view> value, bool result) {
+  uint64_t matchAndReturnHash(std::optional<absl::string_view> value, bool result) {
     uint64_t called_random_value = 0;
     EXPECT_CALL(
         runtime_.snapshot_,

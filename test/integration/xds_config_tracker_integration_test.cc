@@ -146,7 +146,7 @@ public:
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* tracer_extension = bootstrap.mutable_xds_config_tracker_extension();
       tracer_extension->set_name("envoy.config.xds.test_xds_tracer");
-      tracer_extension->mutable_typed_config()->PackFrom(
+      std::ignore = tracer_extension->mutable_typed_config()->PackFrom(
           test::envoy::config::xds::TestXdsConfigTracker());
     });
   }
@@ -224,7 +224,7 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCountWithWrapper)
   // Add a typed metadata to the Resource wrapper.
   test::envoy::config::xds::TestTrackerMetadata test_metadata;
   Protobuf::Any packed_value;
-  packed_value.PackFrom(test_metadata);
+  std::ignore = packed_value.PackFrom(test_metadata);
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TestTypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_, cluster2_}, {}, "1",
       {{kTestKey, packed_value}});

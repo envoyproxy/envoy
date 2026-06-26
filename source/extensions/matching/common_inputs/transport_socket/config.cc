@@ -25,11 +25,11 @@ namespace {
  * @param path The path segments for nested metadata extraction.
  * @return Optional string value extracted from metadata, nullopt if not found or empty.
  */
-absl::optional<std::string> extractMetadataValue(const envoy::config::core::v3::Metadata* metadata,
-                                                 const std::string& filter,
-                                                 const std::vector<std::string>& path) {
+std::optional<std::string> extractMetadataValue(const envoy::config::core::v3::Metadata* metadata,
+                                                const std::string& filter,
+                                                const std::vector<std::string>& path) {
   if (!metadata) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   // Use metadata extraction with filter and path support.
@@ -44,7 +44,7 @@ absl::optional<std::string> extractMetadataValue(const envoy::config::core::v3::
   }
 
   if (result.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return result;
@@ -93,12 +93,12 @@ TransportSocketInputBase::get(const Upstream::TransportSocketMatchingData& data)
   return Matcher::DataInputGetResult::NoData();
 }
 
-absl::optional<std::string>
+std::optional<std::string>
 EndpointMetadataInput::getValue(const Upstream::TransportSocketMatchingData& data) const {
   return extractMetadataValue(data.endpoint_metadata_, filter_, path_);
 }
 
-absl::optional<std::string>
+std::optional<std::string>
 LocalityMetadataInput::getValue(const Upstream::TransportSocketMatchingData& data) const {
   return extractMetadataValue(data.locality_metadata_, filter_, path_);
 }
@@ -133,22 +133,22 @@ ProtobufTypes::MessagePtr LocalityMetadataInputFactory::createEmptyConfigProto()
       envoy::extensions::matching::common_inputs::transport_socket::v3::LocalityMetadataInput>();
 }
 
-absl::optional<std::string>
+std::optional<std::string>
 FilterStateInput::getValue(const Upstream::TransportSocketMatchingData& data) const {
   if (!data.filter_state_) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   // Try to get the filter state object by key.
   const auto* object = data.filter_state_->getDataReadOnly<StreamInfo::FilterState::Object>(key_);
   if (!object) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   // Try to serialize the object to a string.
   const auto serialized = object->serializeAsString();
   if (!serialized.has_value() || serialized->empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return serialized.value();

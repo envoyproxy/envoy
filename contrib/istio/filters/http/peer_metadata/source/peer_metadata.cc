@@ -22,7 +22,7 @@ class XDSMethod : public DiscoveryMethod {
 public:
   XDSMethod(bool downstream, Server::Configuration::ServerFactoryContext& factory_context)
       : downstream_(downstream),
-        metadata_provider_(Extensions::Common::WorkloadDiscovery::getProvider(factory_context)),
+        metadata_provider_(Extensions::Common::WorkloadDiscovery::GetProvider(factory_context)),
         local_info_(factory_context.localInfo()) {}
   std::optional<PeerInfo> derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&,
                                          Context&) const override;
@@ -100,7 +100,7 @@ std::optional<PeerInfo> XDSMethod::derivePeerInfo(const StreamInfo::StreamInfo& 
     return {};
   }
   ENVOY_LOG_MISC(debug, "Peer address: {}", peer_address->asString());
-  return metadata_provider_->getMetadata(peer_address);
+  return metadata_provider_->GetMetadata(peer_address);
 }
 
 MXMethod::MXMethod(bool downstream, const absl::flat_hash_set<std::string> additional_labels,
@@ -146,7 +146,7 @@ std::optional<PeerInfo> MXMethod::lookup(absl::string_view id, absl::string_view
     }
   }
   const auto bytes = Base64::decodeWithoutPadding(value);
-  Protobuf::Struct metadata;
+  Envoy::Protobuf::Struct metadata;
   if (!metadata.ParseFromString(bytes)) {
     return {};
   }
@@ -159,25 +159,6 @@ std::optional<PeerInfo> MXMethod::lookup(absl::string_view id, absl::string_view
     cache.emplace(id, *out);
   }
   return *out;
-}
-
-MXPropagationMethod::MXPropagationMethod(
-    bool downstream, Server::Configuration::ServerFactoryContext& factory_context,
-    const absl::flat_hash_set<std::string>& additional_labels,
-    const io::istio::http::peer_metadata::Config_IstioHeaders& istio_headers)
-    : downstream_(downstream), id_(factory_context.localInfo().node().id()),
-      value_(computeValue(additional_labels, factory_context)),
-      skip_external_clusters_(istio_headers.skip_external_clusters()) {}
-
-std::string MXPropagationMethod::computeValue(
-    const absl::flat_hash_set<std::string>& additional_labels,
-    Server::Configuration::ServerFactoryContext& factory_context) const {
-  const auto obj = Istio::Common::convertStructToWorkloadMetadata(
-      factory_context.localInfo().node().metadata(), additional_labels,
-      factory_context.localInfo().node().locality());
-  const Protobuf::Struct metadata = Istio::Common::convertWorkloadMetadataToStruct(*obj);
-  const std::string metadata_bytes = Istio::Common::serializeToStringDeterministic(metadata);
-  return Base64::encode(metadata_bytes.data(), metadata_bytes.size());
 }
 
 class UpstreamFilterStateMethod : public DiscoveryMethod {
@@ -212,17 +193,49 @@ UpstreamFilterStateMethod::derivePeerInfo(const StreamInfo::StreamInfo& info, Ht
     return {};
   }
 
-  Protobuf::Struct obj;
+  Envoy::Protobuf::Struct obj;
   if (!obj.ParseFromString(absl::string_view(cel_state->value()))) {
     return {};
   }
 
-  std::unique_ptr<PeerInfo> peer_info = Istio::Common::convertStructToWorkloadMetadata(obj);
+  std::unique_ptr<PeerInfo> peer_info = ::Istio::Common::convertStructToWorkloadMetadata(obj);
   if (!peer_info) {
     return {};
   }
 
   return *peer_info;
+}
+
+MXPropagationMethod::MXPropagationMethod(
+    bool downstream, Server::Configuration::ServerFactoryContext& factory_context,
+    const absl::flat_hash_set<std::string>& additional_labels,
+    const io::istio::http::peer_metadata::Config_IstioHeaders& istio_headers)
+    : downstream_(downstream), id_(factory_context.localInfo().node().id()),
+      value_(computeValue(additional_labels, factory_context)),
+      skip_external_clusters_(istio_headers.skip_external_clusters()) {}
+
+std::string MXPropagationMethod::computeValue(
+    const absl::flat_hash_set<std::string>& additional_labels,
+    Server::Configuration::ServerFactoryContext& factory_context) const {
+  const auto obj = Istio::Common::convertStructToWorkloadMetadata(
+      factory_context.localInfo().node().metadata(), additional_labels,
+      factory_context.localInfo().node().locality());
+  const Envoy::Protobuf::Struct metadata = Istio::Common::convertWorkloadMetadataToStruct(*obj);
+  const std::string metadata_bytes = Istio::Common::serializeToStringDeterministic(metadata);
+  return Base64::encode(metadata_bytes.data(), metadata_bytes.size());
+}
+
+void MXPropagationMethod::inject(const StreamInfo::StreamInfo& info, Http::HeaderMap& headers,
+                                 Context& ctx) const {
+  if (skipMXHeaders(skip_external_clusters_, info)) {
+    return;
+  }
+  if (!downstream_ || ctx.request_peer_id_received_) {
+    headers.setReference(Headers::get().ExchangeMetadataHeaderId, id_);
+  }
+  if (!downstream_ || ctx.request_peer_received_) {
+    headers.setReference(Headers::get().ExchangeMetadataHeader, value_);
+  }
 }
 
 BaggagePropagationMethod::BaggagePropagationMethod(
@@ -258,19 +271,6 @@ std::optional<PeerInfo> BaggageDiscoveryMethod::derivePeerInfo(const StreamInfo:
     return *workload;
   }
   return {};
-}
-
-void MXPropagationMethod::inject(const StreamInfo::StreamInfo& info, Http::HeaderMap& headers,
-                                 Context& ctx) const {
-  if (skipMXHeaders(skip_external_clusters_, info)) {
-    return;
-  }
-  if (!downstream_ || ctx.request_peer_id_received_) {
-    headers.setReference(Headers::get().ExchangeMetadataHeaderId, id_);
-  }
-  if (!downstream_ || ctx.request_peer_received_) {
-    headers.setReference(Headers::get().ExchangeMetadataHeader, value_);
-  }
 }
 
 FilterConfig::FilterConfig(const io::istio::http::peer_metadata::Config& config,

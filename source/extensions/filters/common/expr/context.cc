@@ -19,14 +19,14 @@ namespace Expr {
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     referer_handle(Http::CustomHeaders::get().Referer);
 
-absl::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header) {
+std::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header) {
   if (header == nullptr) {
     return {};
   }
   return CelValue::CreateStringView(header->value().getStringView());
 }
 
-absl::optional<CelValue>
+std::optional<CelValue>
 convertHeaderEntry(Protobuf::Arena& arena,
                    Http::HeaderUtility::GetAllOfHeaderAsStringResult&& result) {
   if (!result.result().has_value()) {
@@ -45,53 +45,53 @@ const SslExtractorsValues& SslExtractorsValues::get() {
       SslExtractorsValues,
       absl::flat_hash_map<absl::string_view, SslExtractor>{
           {TLSVersion,
-           [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+           [](const Ssl::ConnectionInfo& info) -> std::optional<CelValue> {
              return CelValue::CreateString(&info.tlsVersion());
            }},
           {SubjectLocalCertificate,
-           [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+           [](const Ssl::ConnectionInfo& info) -> std::optional<CelValue> {
              return CelValue::CreateString(&info.subjectLocalCertificate());
            }},
           {SubjectPeerCertificate,
-           [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+           [](const Ssl::ConnectionInfo& info) -> std::optional<CelValue> {
              return CelValue::CreateString(&info.subjectPeerCertificate());
            }},
           {URISanLocalCertificate,
-           [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+           [](const Ssl::ConnectionInfo& info) -> std::optional<CelValue> {
              if (info.uriSanLocalCertificate().empty()) {
                return {};
              }
              return CelValue::CreateString(&info.uriSanLocalCertificate()[0]);
            }},
           {URISanPeerCertificate,
-           [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+           [](const Ssl::ConnectionInfo& info) -> std::optional<CelValue> {
              if (info.uriSanPeerCertificate().empty()) {
                return {};
              }
              return CelValue::CreateString(&info.uriSanPeerCertificate()[0]);
            }},
           {DNSSanLocalCertificate,
-           [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+           [](const Ssl::ConnectionInfo& info) -> std::optional<CelValue> {
              if (info.dnsSansLocalCertificate().empty()) {
                return {};
              }
              return CelValue::CreateString(&info.dnsSansLocalCertificate()[0]);
            }},
           {DNSSanPeerCertificate,
-           [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+           [](const Ssl::ConnectionInfo& info) -> std::optional<CelValue> {
              if (info.dnsSansPeerCertificate().empty()) {
                return {};
              }
              return CelValue::CreateString(&info.dnsSansPeerCertificate()[0]);
            }},
           {SHA256PeerCertificateDigest,
-           [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+           [](const Ssl::ConnectionInfo& info) -> std::optional<CelValue> {
              if (info.sha256PeerCertificateDigest().empty()) {
                return {};
              }
              return CelValue::CreateString(&info.sha256PeerCertificateDigest());
            }},
-          {PeerCertificate, [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+          {PeerCertificate, [](const Ssl::ConnectionInfo& info) -> std::optional<CelValue> {
              if (info.pemEncodedPeerCertificate().empty()) {
                return {};
              }
@@ -100,8 +100,8 @@ const SslExtractorsValues& SslExtractorsValues::get() {
 }
 
 namespace {
-absl::optional<CelValue> extractSslInfo(const Ssl::ConnectionInfo& ssl_info,
-                                        absl::string_view value) {
+std::optional<CelValue> extractSslInfo(const Ssl::ConnectionInfo& ssl_info,
+                                       absl::string_view value) {
   const auto& extractors = SslExtractorsValues::get().extractors_;
   auto it = extractors.find(value);
   if (it != extractors.end()) {
@@ -117,22 +117,22 @@ const RequestLookupValues& RequestLookupValues::get() {
       RequestLookupValues,
       absl::flat_hash_map<absl::string_view, CelValueExtractor>{
           {Headers,
-           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const RequestWrapper& wrapper) -> std::optional<CelValue> {
              return CelValue::CreateMap(&wrapper.headers_);
            }},
           {HeadersBytes,
-           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const RequestWrapper& wrapper) -> std::optional<CelValue> {
              if (wrapper.headers_.value_ != nullptr) {
                return CelValue::CreateInt64(wrapper.headers_.value_->byteSize());
              }
              return CelValue::CreateInt64(0);
            }},
           {Time,
-           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const RequestWrapper& wrapper) -> std::optional<CelValue> {
              return CelValue::CreateTimestamp(absl::FromChrono(wrapper.info_.startTime()));
            }},
           {Size,
-           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const RequestWrapper& wrapper) -> std::optional<CelValue> {
              if (wrapper.headers_.value_ != nullptr &&
                  wrapper.headers_.value_->ContentLength() != nullptr) {
                int64_t length;
@@ -145,13 +145,13 @@ const RequestLookupValues& RequestLookupValues::get() {
              return CelValue::CreateInt64(wrapper.info_.bytesReceived());
            }},
           {TotalSize,
-           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const RequestWrapper& wrapper) -> std::optional<CelValue> {
              return CelValue::CreateInt64(
                  wrapper.info_.bytesReceived() +
                  (wrapper.headers_.value_ ? wrapper.headers_.value_->byteSize() : 0));
            }},
           {Duration,
-           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const RequestWrapper& wrapper) -> std::optional<CelValue> {
              auto duration = wrapper.info_.requestComplete();
              if (duration.has_value()) {
                return CelValue::CreateDuration(absl::FromChrono(duration.value()));
@@ -159,7 +159,7 @@ const RequestLookupValues& RequestLookupValues::get() {
              return {};
            }},
           {Protocol,
-           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const RequestWrapper& wrapper) -> std::optional<CelValue> {
              if (wrapper.info_.protocol().has_value()) {
                return CelValue::CreateString(
                    &Http::Utility::getProtocolString(wrapper.info_.protocol().value()));
@@ -167,12 +167,12 @@ const RequestLookupValues& RequestLookupValues::get() {
              return {};
            }},
           {Path,
-           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const RequestWrapper& wrapper) -> std::optional<CelValue> {
              return wrapper.headers_.value_ ? convertHeaderEntry(wrapper.headers_.value_->Path())
-                                            : absl::optional<CelValue>{};
+                                            : std::optional<CelValue>{};
            }},
           {UrlPath,
-           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const RequestWrapper& wrapper) -> std::optional<CelValue> {
              if (!wrapper.headers_.value_) {
                return {};
              }
@@ -184,39 +184,39 @@ const RequestLookupValues& RequestLookupValues::get() {
              return CelValue::CreateStringView(path.substr(0, query_offset));
            }},
           {Host,
-           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const RequestWrapper& wrapper) -> std::optional<CelValue> {
              return wrapper.headers_.value_ ? convertHeaderEntry(wrapper.headers_.value_->Host())
-                                            : absl::optional<CelValue>{};
+                                            : std::optional<CelValue>{};
            }},
           {Scheme,
-           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const RequestWrapper& wrapper) -> std::optional<CelValue> {
              return wrapper.headers_.value_ ? convertHeaderEntry(wrapper.headers_.value_->Scheme())
-                                            : absl::optional<CelValue>{};
+                                            : std::optional<CelValue>{};
            }},
           {Method,
-           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const RequestWrapper& wrapper) -> std::optional<CelValue> {
              return wrapper.headers_.value_ ? convertHeaderEntry(wrapper.headers_.value_->Method())
-                                            : absl::optional<CelValue>{};
+                                            : std::optional<CelValue>{};
            }},
           {Referer,
-           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const RequestWrapper& wrapper) -> std::optional<CelValue> {
              return wrapper.headers_.value_ ? convertHeaderEntry(wrapper.headers_.value_->getInline(
                                                   referer_handle.handle()))
-                                            : absl::optional<CelValue>{};
+                                            : std::optional<CelValue>{};
            }},
           {ID,
-           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const RequestWrapper& wrapper) -> std::optional<CelValue> {
              return wrapper.headers_.value_
                         ? convertHeaderEntry(wrapper.headers_.value_->RequestId())
-                        : absl::optional<CelValue>{};
+                        : std::optional<CelValue>{};
            }},
           {UserAgent,
-           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const RequestWrapper& wrapper) -> std::optional<CelValue> {
              return wrapper.headers_.value_
                         ? convertHeaderEntry(wrapper.headers_.value_->UserAgent())
-                        : absl::optional<CelValue>{};
+                        : std::optional<CelValue>{};
            }},
-          {Query, [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+          {Query, [](const RequestWrapper& wrapper) -> std::optional<CelValue> {
              if (!wrapper.headers_.value_) {
                return {};
              }
@@ -237,36 +237,36 @@ const ResponseLookupValues& ResponseLookupValues::get() {
       ResponseLookupValues,
       absl::flat_hash_map<absl::string_view, ResponseValueExtractor>{
           {Code,
-           [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const ResponseWrapper& wrapper) -> std::optional<CelValue> {
              auto code = wrapper.info_.responseCode();
              return code.has_value() ? CelValue::CreateInt64(code.value())
-                                     : absl::optional<CelValue>{};
+                                     : std::optional<CelValue>{};
            }},
           {Size,
-           [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const ResponseWrapper& wrapper) -> std::optional<CelValue> {
              return CelValue::CreateInt64(wrapper.info_.bytesSent());
            }},
           {Headers,
-           [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const ResponseWrapper& wrapper) -> std::optional<CelValue> {
              return CelValue::CreateMap(&wrapper.headers_);
            }},
           {HeadersBytes,
-           [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const ResponseWrapper& wrapper) -> std::optional<CelValue> {
              if (wrapper.headers_.value_ != nullptr) {
                return CelValue::CreateInt64(wrapper.headers_.value_->byteSize());
              }
              return CelValue::CreateInt64(0);
            }},
           {Trailers,
-           [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const ResponseWrapper& wrapper) -> std::optional<CelValue> {
              return CelValue::CreateMap(&wrapper.trailers_);
            }},
           {Flags,
-           [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const ResponseWrapper& wrapper) -> std::optional<CelValue> {
              return CelValue::CreateInt64(wrapper.info_.legacyResponseFlags());
            }},
           {GrpcStatus,
-           [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const ResponseWrapper& wrapper) -> std::optional<CelValue> {
              auto const& optional_status = Grpc::Common::getGrpcStatus(
                  wrapper.trailers_.value_ ? *wrapper.trailers_.value_
                                           : *Http::StaticEmptyHeaders::get().response_trailers,
@@ -274,22 +274,22 @@ const ResponseLookupValues& ResponseLookupValues::get() {
                                          : *Http::StaticEmptyHeaders::get().response_headers,
                  wrapper.info_);
              return optional_status.has_value() ? CelValue::CreateInt64(optional_status.value())
-                                                : absl::optional<CelValue>{};
+                                                : std::optional<CelValue>{};
            }},
           {TotalSize,
-           [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const ResponseWrapper& wrapper) -> std::optional<CelValue> {
              return CelValue::CreateInt64(
                  wrapper.info_.bytesSent() +
                  (wrapper.headers_.value_ ? wrapper.headers_.value_->byteSize() : 0) +
                  (wrapper.trailers_.value_ ? wrapper.trailers_.value_->byteSize() : 0));
            }},
           {CodeDetails,
-           [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
-             const absl::optional<std::string>& details = wrapper.info_.responseCodeDetails();
+           [](const ResponseWrapper& wrapper) -> std::optional<CelValue> {
+             const std::optional<std::string>& details = wrapper.info_.responseCodeDetails();
              return details.has_value() ? CelValue::CreateString(&details.value())
-                                        : absl::optional<CelValue>{};
+                                        : std::optional<CelValue>{};
            }},
-          {BackendLatency, [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+          {BackendLatency, [](const ResponseWrapper& wrapper) -> std::optional<CelValue> {
              Envoy::StreamInfo::TimingUtility timing(wrapper.info_);
              const auto last_upstream_rx_byte_received = timing.lastUpstreamRxByteReceived();
              const auto first_upstream_tx_byte_sent = timing.firstUpstreamTxByteSent();
@@ -308,7 +308,7 @@ const ConnectionLookupValues& ConnectionLookupValues::get() {
       ConnectionLookupValues,
       absl::flat_hash_map<absl::string_view, ConnectionValueExtractor>{
           {MTLS,
-           [](const ConnectionWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const ConnectionWrapper& wrapper) -> std::optional<CelValue> {
              return CelValue::CreateBool(
                  wrapper.info_.downstreamAddressProvider().sslConnection() != nullptr &&
                  wrapper.info_.downstreamAddressProvider()
@@ -316,25 +316,24 @@ const ConnectionLookupValues& ConnectionLookupValues::get() {
                      ->peerCertificatePresented());
            }},
           {RequestedServerName,
-           [](const ConnectionWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const ConnectionWrapper& wrapper) -> std::optional<CelValue> {
              return CelValue::CreateStringView(
                  wrapper.info_.downstreamAddressProvider().requestedServerName());
            }},
           {ID,
-           [](const ConnectionWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const ConnectionWrapper& wrapper) -> std::optional<CelValue> {
              auto id = wrapper.info_.downstreamAddressProvider().connectionID();
-             return id.has_value() ? CelValue::CreateUint64(id.value())
-                                   : absl::optional<CelValue>{};
+             return id.has_value() ? CelValue::CreateUint64(id.value()) : std::optional<CelValue>{};
            }},
           {ConnectionTerminationDetails,
-           [](const ConnectionWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const ConnectionWrapper& wrapper) -> std::optional<CelValue> {
              if (wrapper.info_.connectionTerminationDetails().has_value()) {
                return CelValue::CreateString(&wrapper.info_.connectionTerminationDetails().value());
              }
              return {};
            }},
           {DownstreamTransportFailureReason,
-           [](const ConnectionWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const ConnectionWrapper& wrapper) -> std::optional<CelValue> {
              if (!wrapper.info_.downstreamTransportFailureReason().empty()) {
                return CelValue::CreateStringView(wrapper.info_.downstreamTransportFailureReason());
              }
@@ -348,7 +347,7 @@ const UpstreamLookupValues& UpstreamLookupValues::get() {
       UpstreamLookupValues,
       absl::flat_hash_map<absl::string_view, UpstreamValueExtractor>{
           {Address,
-           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const UpstreamWrapper& wrapper) -> std::optional<CelValue> {
              if (!wrapper.info_.upstreamInfo().has_value()) {
                return {};
              }
@@ -359,7 +358,7 @@ const UpstreamLookupValues& UpstreamLookupValues::get() {
              return {};
            }},
           {Port,
-           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const UpstreamWrapper& wrapper) -> std::optional<CelValue> {
              if (!wrapper.info_.upstreamInfo().has_value()) {
                return {};
              }
@@ -371,7 +370,7 @@ const UpstreamLookupValues& UpstreamLookupValues::get() {
              return {};
            }},
           {UpstreamLocalAddress,
-           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const UpstreamWrapper& wrapper) -> std::optional<CelValue> {
              if (!wrapper.info_.upstreamInfo().has_value()) {
                return {};
              }
@@ -383,7 +382,7 @@ const UpstreamLookupValues& UpstreamLookupValues::get() {
              return {};
            }},
           {UpstreamLocality,
-           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const UpstreamWrapper& wrapper) -> std::optional<CelValue> {
              if (!wrapper.info_.upstreamInfo().has_value()) {
                return {};
              }
@@ -396,7 +395,7 @@ const UpstreamLookupValues& UpstreamLookupValues::get() {
                                                    &wrapper.arena_);
            }},
           {UpstreamTransportFailureReason,
-           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const UpstreamWrapper& wrapper) -> std::optional<CelValue> {
              if (!wrapper.info_.upstreamInfo().has_value()) {
                return {};
              }
@@ -404,13 +403,13 @@ const UpstreamLookupValues& UpstreamLookupValues::get() {
                  wrapper.info_.upstreamInfo().value().get().upstreamTransportFailureReason());
            }},
           {UpstreamConnectionPoolReadyDuration,
-           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const UpstreamWrapper& wrapper) -> std::optional<CelValue> {
              if (!wrapper.info_.upstreamInfo().has_value()) {
                return {};
              }
 
              const StreamInfo::UpstreamInfo& upstream_info = wrapper.info_.upstreamInfo().value();
-             const absl::optional<std::chrono::nanoseconds> connection_pool_callback_latency =
+             const std::optional<std::chrono::nanoseconds> connection_pool_callback_latency =
                  upstream_info.upstreamTiming().connectionPoolCallbackLatency();
              if (connection_pool_callback_latency.has_value()) {
                return CelValue::CreateDuration(
@@ -419,18 +418,18 @@ const UpstreamLookupValues& UpstreamLookupValues::get() {
              return {};
            }},
           {UpstreamRequestAttemptCount,
-           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const UpstreamWrapper& wrapper) -> std::optional<CelValue> {
              return CelValue::CreateUint64(wrapper.info_.attemptCount().value_or(0));
            }},
           {UpstreamNumEndpoints,
-           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const UpstreamWrapper& wrapper) -> std::optional<CelValue> {
              if (const auto cluster_info = wrapper.info_.upstreamClusterInfo()) {
                return CelValue::CreateUint64(
                    cluster_info->endpointStats().membership_total_.value());
              }
              return {};
            }},
-          {UpstreamServerName, [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+          {UpstreamServerName, [](const UpstreamWrapper& wrapper) -> std::optional<CelValue> {
              if (wrapper.info_.upstreamInfo().has_value()) {
                auto ssl_info = wrapper.info_.upstreamInfo().value().get().upstreamSslConnection();
                if (ssl_info != nullptr && !ssl_info->sni().empty()) {
@@ -447,14 +446,14 @@ const XDSLookupValues& XDSLookupValues::get() {
       XDSLookupValues,
       absl::flat_hash_map<absl::string_view, XDSValueExtractor>{
           {Node,
-           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const XDSWrapper& wrapper) -> std::optional<CelValue> {
              if (wrapper.local_info_) {
                return CelProtoWrapper::CreateMessage(&wrapper.local_info_->node(), &wrapper.arena_);
              }
              return {};
            }},
           {ClusterName,
-           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const XDSWrapper& wrapper) -> std::optional<CelValue> {
              if (wrapper.info_ == nullptr) {
                return {};
              }
@@ -465,7 +464,7 @@ const XDSLookupValues& XDSLookupValues::get() {
              return {};
            }},
           {ClusterMetadata,
-           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const XDSWrapper& wrapper) -> std::optional<CelValue> {
              if (wrapper.info_ == nullptr) {
                return {};
              }
@@ -476,14 +475,14 @@ const XDSLookupValues& XDSLookupValues::get() {
              return {};
            }},
           {RouteName,
-           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const XDSWrapper& wrapper) -> std::optional<CelValue> {
              if (wrapper.info_ == nullptr || !wrapper.info_->route()) {
                return {};
              }
              return CelValue::CreateString(&wrapper.info_->route()->routeName());
            }},
           {RouteMetadata,
-           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const XDSWrapper& wrapper) -> std::optional<CelValue> {
              if (wrapper.info_ == nullptr || !wrapper.info_->route()) {
                return {};
              }
@@ -491,7 +490,7 @@ const XDSLookupValues& XDSLookupValues::get() {
                                                    &wrapper.arena_);
            }},
           {VirtualHostName,
-           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const XDSWrapper& wrapper) -> std::optional<CelValue> {
              if (wrapper.info_ == nullptr) {
                return {};
              }
@@ -502,7 +501,7 @@ const XDSLookupValues& XDSLookupValues::get() {
              return CelValue::CreateString(&vhost->name());
            }},
           {VirtualHostMetadata,
-           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const XDSWrapper& wrapper) -> std::optional<CelValue> {
              if (wrapper.info_ == nullptr) {
                return {};
              }
@@ -513,7 +512,7 @@ const XDSLookupValues& XDSLookupValues::get() {
              return CelProtoWrapper::CreateMessage(&vhost->metadata(), &wrapper.arena_);
            }},
           {UpstreamHostMetadata,
-           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const XDSWrapper& wrapper) -> std::optional<CelValue> {
              if (wrapper.info_ == nullptr) {
                return {};
              }
@@ -525,7 +524,7 @@ const XDSLookupValues& XDSLookupValues::get() {
              return {};
            }},
           {UpstreamHostLocalityMetadata,
-           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const XDSWrapper& wrapper) -> std::optional<CelValue> {
              if (wrapper.info_ == nullptr) {
                return {};
              }
@@ -537,7 +536,7 @@ const XDSLookupValues& XDSLookupValues::get() {
              return {};
            }},
           {FilterChainName,
-           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const XDSWrapper& wrapper) -> std::optional<CelValue> {
              if (wrapper.info_ == nullptr) {
                return {};
              }
@@ -548,7 +547,7 @@ const XDSLookupValues& XDSLookupValues::get() {
              return CelValue::CreateStringView(filter_chain_name);
            }},
           {ListenerMetadata,
-           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const XDSWrapper& wrapper) -> std::optional<CelValue> {
              if (wrapper.info_ == nullptr) {
                return {};
              }
@@ -558,7 +557,7 @@ const XDSLookupValues& XDSLookupValues::get() {
              }
              return {};
            }},
-          {ListenerDirection, [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+          {ListenerDirection, [](const XDSWrapper& wrapper) -> std::optional<CelValue> {
              if (wrapper.info_ == nullptr) {
                return {};
              }
@@ -571,7 +570,7 @@ const XDSLookupValues& XDSLookupValues::get() {
 }
 
 // Wrapper implementations
-absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
+std::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
   if (!key.IsString()) {
     return {};
   }
@@ -585,7 +584,7 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
   return {};
 }
 
-absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
+std::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
   if (!key.IsString()) {
     return {};
   }
@@ -599,7 +598,7 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
   return {};
 }
 
-absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
+std::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
   if (!key.IsString()) {
     return {};
   }
@@ -619,7 +618,7 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
   return {};
 }
 
-absl::optional<CelValue> UpstreamWrapper::operator[](CelValue key) const {
+std::optional<CelValue> UpstreamWrapper::operator[](CelValue key) const {
   if (!key.IsString()) {
     return {};
   }
@@ -642,7 +641,7 @@ absl::optional<CelValue> UpstreamWrapper::operator[](CelValue key) const {
 }
 
 // PeerWrapper implementation
-absl::optional<CelValue> PeerWrapper::operator[](CelValue key) const {
+std::optional<CelValue> PeerWrapper::operator[](CelValue key) const {
   if (!key.IsString()) {
     return {};
   }
@@ -676,7 +675,7 @@ class FilterStateObjectWrapper : public google::api::expr::runtime::CelMap {
 public:
   FilterStateObjectWrapper(const StreamInfo::FilterState::Object* object) : object_(object) {}
 
-  absl::optional<CelValue> operator[](CelValue key) const override {
+  std::optional<CelValue> operator[](CelValue key) const override {
     if (object_ == nullptr || !key.IsString()) {
       return {};
     }
@@ -693,17 +692,17 @@ public:
 
 private:
   struct Visitor {
-    absl::optional<CelValue> operator()(int64_t val) { return CelValue::CreateInt64(val); }
-    absl::optional<CelValue> operator()(absl::string_view val) {
+    std::optional<CelValue> operator()(int64_t val) { return CelValue::CreateInt64(val); }
+    std::optional<CelValue> operator()(absl::string_view val) {
       return CelValue::CreateStringView(val);
     }
-    absl::optional<CelValue> operator()(absl::monostate) { return {}; }
+    std::optional<CelValue> operator()(absl::monostate) { return {}; }
   };
   const StreamInfo::FilterState::Object* object_;
 };
 
 // FilterStateWrapper implementation
-absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
+std::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
   if (!key.IsString()) {
     return {};
   }
@@ -721,7 +720,7 @@ absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
         return CelValue::CreateMap(
             Protobuf::Arena::Create<FilterStateObjectWrapper>(&arena_, object));
       }
-      absl::optional<std::string> serialized = object->serializeAsString();
+      std::optional<std::string> serialized = object->serializeAsString();
       if (serialized.has_value()) {
         std::string* out = Protobuf::Arena::Create<std::string>(&arena_, serialized.value());
         return CelValue::CreateBytes(out);
@@ -732,7 +731,7 @@ absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
 }
 
 // XDSWrapper implementation
-absl::optional<CelValue> XDSWrapper::operator[](CelValue key) const {
+std::optional<CelValue> XDSWrapper::operator[](CelValue key) const {
   if (!key.IsString()) {
     return {};
   }

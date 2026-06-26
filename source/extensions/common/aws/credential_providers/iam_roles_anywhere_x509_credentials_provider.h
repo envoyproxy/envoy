@@ -93,9 +93,9 @@ private:
   DataSourceOptRef certificate_chain_data_source_;
   Config::DataSource::DataSourceProviderPtr<std::string> certificate_data_source_provider_;
   Config::DataSource::DataSourceProviderPtr<std::string> private_key_data_source_provider_;
-  absl::optional<Config::DataSource::DataSourceProviderPtr<std::string>>
+  std::optional<Config::DataSource::DataSourceProviderPtr<std::string>>
       certificate_chain_data_source_provider_;
-  absl::optional<SystemTime> expiration_time_;
+  std::optional<SystemTime> expiration_time_;
   std::chrono::seconds cache_duration_;
 
   bool needsRefresh() override;

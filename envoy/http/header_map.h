@@ -646,14 +646,14 @@ public:
    * Fetch the handle for a registered inline header. May only be called after finalized().
    */
   template <Type type>
-  static absl::optional<Handle<type>> getInlineHeader(const LowerCaseString& header_name) {
+  static std::optional<Handle<type>> getInlineHeader(const LowerCaseString& header_name) {
     ASSERT(mutableFinalized<type>());
     auto& map = mutableRegistrationMap<type>();
     auto entry = map.find(header_name);
     if (entry != map.end()) {
       return Handle<type>(entry);
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   /**

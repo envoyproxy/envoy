@@ -138,7 +138,7 @@ public:
   /*
    * @returns the dynamic max stream duraration for this stream, if set.
    */
-  virtual absl::optional<std::chrono::milliseconds> dynamicMaxStreamDuration() const PURE;
+  virtual std::optional<std::chrono::milliseconds> dynamicMaxStreamDuration() const PURE;
 
   /*
    * @returns the request headers for the stream.

@@ -1,22 +1,15 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
-    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
-    "envoy_extension_cc_mock",
     "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
-
-envoy_proto_library(
-    name = "dummy",
-    srcs = ["dummy.proto"],
-)
 
 envoy_extension_cc_test(
     name = "config_test",
@@ -26,9 +19,9 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
-        ":geoip_mocks",
         "//source/common/http:message_lib",
         "//source/extensions/filters/http/geoip:config",
+        "//test/mocks/geoip:geoip_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
@@ -44,11 +37,10 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
-        ":dummy_cc_proto",
-        ":geoip_mocks",
         "//source/extensions/filters/http/geoip:config",
         "//source/extensions/filters/http/geoip:geoip_filter_lib",
         "//test/common/http:common_lib",
+        "//test/mocks/geoip:geoip_mocks",
         "//test/mocks/http:http_mocks",
         "//test/test_common:registry_lib",
         "@envoy_api//envoy/extensions/filters/http/geoip/v3:pkg_cc_proto",
@@ -68,6 +60,7 @@ envoy_extension_cc_test(
     ],
     extension_names = [
         "envoy.filters.http.geoip",
+        "envoy.geoip_providers.maxmind",
     ],
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
@@ -80,16 +73,5 @@ envoy_extension_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/geoip/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_extension_cc_mock(
-    name = "geoip_mocks",
-    hdrs = ["mocks.h"],
-    extension_names = ["envoy.filters.http.geoip"],
-    tags = ["skip_on_windows"],
-    deps = [
-        ":dummy_cc_proto",
-        "//envoy/geoip:geoip_provider_driver_interface",
     ],
 )

@@ -457,7 +457,7 @@ public:
                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
                Api::Api& api, Stats::Scope& scope, const std::string& stat_prefix);
 
-  PerLuaCodeSetup* perLuaCodeSetup(absl::optional<absl::string_view> name = absl::nullopt) const {
+  PerLuaCodeSetup* perLuaCodeSetup(std::optional<absl::string_view> name = std::nullopt) const {
     if (!name.has_value()) {
       return default_lua_code_setup_.get();
     }

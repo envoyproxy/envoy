@@ -27,7 +27,7 @@ public:
 
   TimeSource& timeSource() override { return impl_.timeSource(); }
 
-  void initializeStats(Stats::Scope& scope, const absl::optional<std::string>& prefix) override {
+  void initializeStats(Stats::Scope& scope, const std::optional<std::string>& prefix) override {
     impl_.initializeStats(scope, prefix);
   }
 

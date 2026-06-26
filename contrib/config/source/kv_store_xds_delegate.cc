@@ -86,7 +86,7 @@ KeyValueStoreXdsDelegate::getAllResources(const XdsSourceId& source_id) const {
           // The source id is a prefix of the key, so it should be included in the list of returned
           // resources.
           envoy::service::discovery::v3::Resource r;
-          r.ParseFromString(value);
+          std::ignore = r.ParseFromString(value);
           resources.push_back(std::move(r));
         }
         return KeyValueStore::Iterate::Continue;
@@ -103,7 +103,7 @@ void KeyValueStoreXdsDelegate::onConfigUpdated(
       // TODO(abeyad): Support dynamic parameter constraints.
       r.set_name(decoded_resource.name());
       r.set_version(decoded_resource.version());
-      r.mutable_resource()->PackFrom(decoded_resource.resource());
+      std::ignore = r.mutable_resource()->PackFrom(decoded_resource.resource());
       std::optional<std::chrono::seconds> ttl = std::nullopt;
       if (decoded_resource.ttl().has_value()) {
         r.mutable_ttl()->CopyFrom(

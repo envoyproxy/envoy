@@ -1402,7 +1402,7 @@ void Filter::populateSliceWithMetadata(const std::string& filter_name, uint64_t*
   const auto& metadata = streamInfo().dynamicMetadata().filter_metadata();
   const auto filter_it = metadata.find(filter_name);
   if (filter_it != metadata.end()) {
-    filter_it->second.SerializeToString(&req_->strValue);
+    std::ignore = filter_it->second.SerializeToString(&req_->strValue);
     *buf_data = reinterpret_cast<uint64_t>(req_->strValue.data());
     *buf_len = req_->strValue.length();
   }
@@ -1440,7 +1440,7 @@ void Filter::setDynamicMetadataInternal(std::string filter_name, std::string key
                                         const absl::string_view& buf) {
   Protobuf::Struct value;
   Protobuf::Value v;
-  v.ParseFromArray(buf.data(), buf.length());
+  std::ignore = v.ParseFromArray(buf.data(), buf.length());
 
   (*value.mutable_fields())[key] = v;
 

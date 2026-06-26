@@ -65,7 +65,7 @@ public:
       GrpcStreamCallbacks<ResponseType>* stream_callbacks)>;
 
   GrpcMuxFailover(GrpcStreamCreator primary_stream_creator,
-                  absl::optional<GrpcStreamCreator> failover_stream_creator,
+                  std::optional<GrpcStreamCreator> failover_stream_creator,
                   GrpcStreamCallbacks<ResponseType>& grpc_mux_callbacks,
                   Event::Dispatcher& dispatcher)
       : grpc_mux_callbacks_(grpc_mux_callbacks), primary_callbacks_(*this),
@@ -179,7 +179,7 @@ public:
   }
 
   // Returns the close status for testing purposes only.
-  absl::optional<Grpc::Status::GrpcStatus> getCloseStatusForTest() {
+  std::optional<Grpc::Status::GrpcStatus> getCloseStatusForTest() {
     if (connectingToOrConnectedToFailover()) {
       return failover_grpc_stream_->getCloseStatusForTest();
     }

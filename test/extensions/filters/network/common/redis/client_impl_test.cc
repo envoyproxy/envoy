@@ -81,7 +81,7 @@ public:
 
     client_ = ClientImpl::create(host_, dispatcher_, Common::Redis::EncoderPtr{encoder_}, *this,
                                  config_, redis_command_stats_, *stats_.rootScope(), false, "pass",
-                                 absl::nullopt, absl::nullopt);
+                                 std::nullopt, std::nullopt);
     EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_total_.value());
     EXPECT_EQ(1UL, host_->stats_.cx_total_.value());
     EXPECT_EQ(false, client_->active());
@@ -1232,7 +1232,7 @@ TEST(RedisClientFactoryImplTest, Basic) {
   const std::string auth_password;
   ClientPtr client =
       factory.create(host, dispatcher, config, redis_command_stats, *stats_.rootScope(),
-                     auth_username, auth_password, false, absl::nullopt, absl::nullopt);
+                     auth_username, auth_password, false, std::nullopt, std::nullopt);
   client->close();
 }
 } // namespace Client

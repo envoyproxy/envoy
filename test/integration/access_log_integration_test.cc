@@ -155,7 +155,8 @@ TEST_P(AccessLogIntegrationTest, ShouldReplaceInvalidUtf8) {
         v.set_string_value("%REQ(X-FORWARDED-FOR)%");
         auto fields = json->mutable_fields();
         (*fields)["x_forwarded_for"] = v;
-        access_log_config_to_clobber->mutable_typed_config()->PackFrom(access_log_config);
+        std::ignore =
+            access_log_config_to_clobber->mutable_typed_config()->PackFrom(access_log_config);
       });
   testRouterDownstreamDisconnectBeforeRequestComplete();
   const std::string log = waitForAccessLog(access_log_name_);

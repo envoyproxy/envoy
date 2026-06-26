@@ -145,14 +145,12 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//source/common/common:macros",
         "//source/common/http:header_map_lib",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
 envoy_cc_library(
     name = "tracing_interface",
     hdrs = ["tracing.h"],
-    deps = ["@abseil-cpp//absl/types:optional"],
 )
 
 envoy_cc_library(
@@ -185,7 +183,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
         "//source/common/singleton:const_singleton",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -238,7 +235,6 @@ envoy_cc_library(
         ":protocol_interface",
         "//source/common/common:macros",
         "//source/common/runtime:runtime_features_lib",
-        "@abseil-cpp//absl/types:optional",
     ],
     alwayslink = 1,
 )
@@ -283,7 +279,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
         "//source/common/singleton:const_singleton",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 

@@ -1630,7 +1630,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteFound) {
 TEST_F(HttpConnectionManagerImplTest, NewConnection) {
   setup(SetupOpts().setUseSrds(true));
 
-  filter_callbacks_.connection_.stream_info_.protocol_ = absl::nullopt;
+  filter_callbacks_.connection_.stream_info_.protocol_ = std::nullopt;
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol());
   EXPECT_EQ(Network::FilterStatus::Continue, conn_manager_->onNewConnection());
   EXPECT_EQ(0U, stats_.named_.downstream_cx_http3_total_.value());
@@ -2693,8 +2693,8 @@ TEST_F(HttpConnectionManagerImplTest, CommonDurationDownstreamConnectionTimePoin
   const MonotonicTime connection_begin(std::chrono::milliseconds(5));
   filter_callbacks_.connection_.stream_info_.start_time_monotonic_ = connection_begin;
 
-  absl::optional<MonotonicTime> logged_connection_begin;
-  absl::optional<MonotonicTime> logged_connection_end;
+  std::optional<MonotonicTime> logged_connection_begin;
+  std::optional<MonotonicTime> logged_connection_end;
   EXPECT_CALL(*handler, log(_, _))
       .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         auto timing = stream_info.downstreamTiming();
@@ -2745,7 +2745,7 @@ TEST_F(HttpConnectionManagerImplTest, CommonDurationDownstreamConnectionTimePoin
   const MonotonicTime connection_begin(std::chrono::milliseconds(5));
   filter_callbacks_.connection_.stream_info_.start_time_monotonic_ = connection_begin;
 
-  std::vector<absl::optional<MonotonicTime>> logged_connection_ends;
+  std::vector<std::optional<MonotonicTime>> logged_connection_ends;
   EXPECT_CALL(*handler, log(_, _))
       .Times(2)
       .WillRepeatedly(

@@ -47,9 +47,8 @@ class AuthenticatorImpl : public Logger::Loggable<Logger::Id::jwt>,
                           public Authenticator,
                           public Common::JwksFetcher::JwksReceiver {
 public:
-  AuthenticatorImpl(const CheckAudience* check_audience,
-                    const absl::optional<std::string>& provider, bool allow_failed,
-                    bool allow_missing, JwksCache& jwks_cache,
+  AuthenticatorImpl(const CheckAudience* check_audience, const std::optional<std::string>& provider,
+                    bool allow_failed, bool allow_missing, JwksCache& jwks_cache,
                     Upstream::ClusterManager& cluster_manager,
                     CreateJwksFetcherCb create_jwks_fetcher_cb, TimeSource& time_source)
       : jwks_cache_(jwks_cache), cm_(cluster_manager),
@@ -125,7 +124,7 @@ private:
   // check audience object.
   const CheckAudience* check_audience_;
   // specific provider or not when it is allow missing or failed.
-  const absl::optional<std::string> provider_;
+  const std::optional<std::string> provider_;
   const bool is_allow_failed_;
   const bool is_allow_missing_;
   TimeSource& time_source_;
@@ -249,7 +248,7 @@ void AuthenticatorImpl::startVerify() {
     return;
   }
 
-  absl::optional<absl::Time> exp;
+  std::optional<absl::Time> exp;
   if (jwt_->exp_) {
     exp = absl::FromUnixSeconds(jwt_->exp_);
   }
@@ -510,7 +509,7 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
 } // namespace
 
 AuthenticatorPtr Authenticator::create(const CheckAudience* check_audience,
-                                       const absl::optional<std::string>& provider,
+                                       const std::optional<std::string>& provider,
                                        bool allow_failed, bool allow_missing, JwksCache& jwks_cache,
                                        Upstream::ClusterManager& cluster_manager,
                                        CreateJwksFetcherCb create_jwks_fetcher_cb,

@@ -62,14 +62,14 @@ public:
   }
 
   // Upstream::LoadBalancerContext.
-  absl::optional<uint64_t> computeHashKey() override { return 0; }
+  std::optional<uint64_t> computeHashKey() override { return 0; }
   const Network::Connection* downstreamConnection() const override { return connection_; }
   StreamInfo::StreamInfo* requestStreamInfo() const override { return request_stream_info_; }
   const Http::RequestHeaderMap* downstreamHeaders() const override {
     return downstream_headers_.get();
   }
 
-  absl::optional<uint64_t> hash_key_;
+  std::optional<uint64_t> hash_key_;
   const Network::Connection* connection_;
   StreamInfo::StreamInfo* request_stream_info_;
   Http::RequestHeaderMapPtr downstream_headers_;
@@ -98,7 +98,7 @@ public:
     // Both options_.config_proto_ and bootstrap_ are populated since validation may use either.
     auto* bootstrap_extension = server_context_.options_.config_proto_.add_bootstrap_extensions();
     bootstrap_extension->set_name("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
-    bootstrap_extension->mutable_typed_config()->PackFrom(config_);
+    std::ignore = bootstrap_extension->mutable_typed_config()->PackFrom(config_);
     *server_context_.bootstrap_.add_bootstrap_extensions() = *bootstrap_extension;
   }
 
@@ -1777,7 +1777,7 @@ public:
     auto& bootstrap = server_context_.bootstrap_;
     for (auto& extension : *bootstrap.mutable_bootstrap_extensions()) {
       if (extension.name() == "envoy.bootstrap.reverse_tunnel.upstream_socket_interface") {
-        extension.mutable_typed_config()->PackFrom(config_);
+        std::ignore = extension.mutable_typed_config()->PackFrom(config_);
         break;
       }
     }
