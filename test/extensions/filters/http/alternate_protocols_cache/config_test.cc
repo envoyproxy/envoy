@@ -40,7 +40,9 @@ TEST(AlternateProtocolsCacheFilterConfigTest, AlternateProtocolsCacheFilterWithS
   cb(filter_callback);
 }
 
-TEST(AlternateProtocolsCacheFilterConfigTest, AlternateProtocolsCacheFilterLogging) {
+// This test is only for coverage of the deprecated feature check.
+TEST(AlternateProtocolsCacheFilterConfigTest,
+     DEPRECATED_FEATURE_TEST(AlternateProtocolsCacheFilterLogging)) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   AlternateProtocolsCacheFilterFactory factory;
   envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
