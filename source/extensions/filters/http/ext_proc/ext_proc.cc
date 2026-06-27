@@ -1643,8 +1643,7 @@ void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const Processor
       if (auto metadata_it = std::find(receiving_namespaces.begin(), receiving_namespaces.end(),
                                        context_key.first);
           metadata_it != receiving_namespaces.end()) {
-        cb->streamInfo().setDynamicMetadata(context_key.first,
-                                            context_key.second.struct_value());
+        cb->streamInfo().setDynamicMetadata(context_key.first, context_key.second.struct_value());
         found_allowed_namespace = true;
       }
       if (!found_allowed_namespace) {
