@@ -224,6 +224,9 @@ message ProcessingResponse {
   // Optional typed metadata that will be emitted as dynamic metadata to be consumed by
   // following filters. This metadata will be placed in the namespace(s) specified by the
   // keys of the map.
+  //
+  // Typed dynamic metadata should be preferred over untyped dynamic metadata (``dynamic_metadata``)
+  // because it is more efficient and more type-safe.
   map<string, google.protobuf.Any> typed_dynamic_metadata = 13;
 
   // Override how parts of the HTTP request and response are processed for the duration of this
