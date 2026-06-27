@@ -43,6 +43,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
         .expect("failed to define histogram vec"),
     })),
     "header_callbacks" => Some(Box::new(HeaderCallbacksFilterConfig {})),
+    "stop_on_request_headers" => Some(Box::new(StopOnRequestHeadersFilterConfig {})),
     "local_reply_callbacks" => Some(Box::new(LocalReplyCallbacksFilterConfig {})),
     "reset_stream" => Some(Box::new(ResetStreamFilterConfig {})),
     "send_go_away_and_close" => Some(Box::new(SendGoAwayAndCloseFilterConfig {})),
@@ -463,6 +464,29 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseFilter {
       Some(b"Hello, World!"),
       None,
     );
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  }
+}
+
+/// A filter that stops iteration on request headers without producing a response, leaving the
+/// decode direction paused while the encode direction can still continue. Used to exercise the
+/// per-direction continue state.
+struct StopOnRequestHeadersFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StopOnRequestHeadersFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(StopOnRequestHeadersFilter {})
+  }
+}
+
+struct StopOnRequestHeadersFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StopOnRequestHeadersFilter {
+  fn on_request_headers(
+    &mut self,
+    _envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
 }

@@ -28,6 +28,9 @@ void DynamicModuleHttpFilter::maybeRegisterDownstreamWatermarkCallbacks() {
 }
 
 void DynamicModuleHttpFilter::onStreamComplete() {
+  if (!decode_started_) { // See the comment on the flag.
+    return;
+  }
   config_->on_http_filter_stream_complete_(thisAsVoidPtr(), in_module_filter_);
 }
 
@@ -82,6 +85,7 @@ void DynamicModuleHttpFilter::destroy() {
 }
 
 FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap&, bool end_of_stream) {
+  decode_started_ = true;
   const envoy_dynamic_module_type_on_http_filter_request_headers_status status =
       config_->on_http_filter_request_headers_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
   decode_in_continue_ =
@@ -90,6 +94,7 @@ FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap&, bo
 };
 
 FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance& chunk, bool end_of_stream) {
+  decode_started_ = true;
   current_request_body_ = &chunk;
   const envoy_dynamic_module_type_on_http_filter_request_body_status status =
       config_->on_http_filter_request_body_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
@@ -100,6 +105,7 @@ FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance& chunk, bo
 };
 
 FilterTrailersStatus DynamicModuleHttpFilter::decodeTrailers(RequestTrailerMap&) {
+  decode_started_ = true;
   const envoy_dynamic_module_type_on_http_filter_request_trailers_status status =
       config_->on_http_filter_request_trailers_(thisAsVoidPtr(), in_module_filter_);
   decode_in_continue_ =
@@ -120,7 +126,7 @@ Filter1xxHeadersStatus DynamicModuleHttpFilter::encode1xxHeaders(ResponseHeaderM
 }
 
 FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap&, bool end_of_stream) {
-  if (sent_local_reply_) { // See the comment on the flag.
+  if (sent_local_reply_ || !decode_started_) { // See the comments on these flags.
     return FilterHeadersStatus::Continue;
   }
   const envoy_dynamic_module_type_on_http_filter_response_headers_status status =
@@ -131,7 +137,7 @@ FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap&, b
 };
 
 FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance& chunk, bool end_of_stream) {
-  if (sent_local_reply_) { // See the comment on the flag.
+  if (sent_local_reply_ || !decode_started_) { // See the comments on these flags.
     return FilterDataStatus::Continue;
   }
   current_response_body_ = &chunk;
@@ -144,7 +150,7 @@ FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance& chunk, bo
 };
 
 FilterTrailersStatus DynamicModuleHttpFilter::encodeTrailers(ResponseTrailerMap&) {
-  if (sent_local_reply_) { // See the comment on the flag.
+  if (sent_local_reply_ || !decode_started_) { // See the comments on these flags.
     return FilterTrailersStatus::Continue;
   }
   const envoy_dynamic_module_type_on_http_filter_response_trailers_status status =
