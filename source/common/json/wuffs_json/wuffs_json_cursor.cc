@@ -210,7 +210,7 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
         // LITERAL is always 4–5 bytes (null/true/false) — completely bounded.
         // NUMBER, in real-world, its values is also bounded: a 64-bit integer is at most 20 digits;
         // a float with sign, decimal, and exponent at most ~25 chars.
-        // TODO(tyxia): cap pending_bytes_ for milicious inputs that send arbitrarily large NUMBER
+        // TODO(tyxia): cap pending_bytes_ for malicious inputs that send arbitrarily large NUMBER
         // tokens one byte at a time.
         pending_bytes_.assign(effective_chunk.data() + source_buf.meta.ri,
                               effective_chunk.size() - source_buf.meta.ri);
