@@ -24,7 +24,9 @@
 #include "source/common/config/metadata.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/reuse_port_bpf_cpu_steering_option_impl.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
@@ -8842,6 +8844,198 @@ TEST_P(ListenerManagerImplTest, WorkerCpuAffinityDisabledByDefault) {
   EXPECT_EQ(0, server_.stats_store_
                    .gauge("listener_manager.workers_pinned", Stats::Gauge::ImportMode::NeverImport)
                    .value());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, CpuLocalityBalanceUsesNopBalancerWhenSupported) {
+// CPU locality steering requires Linux reuse port BPF support and worker CPU affinity.
+#if defined(__linux__)
+  server_.bootstrap_.set_enable_worker_cpu_affinity(true);
+  auto listener = createIPv4Listener("TCPListener");
+  listener.mutable_enable_reuse_port()->set_value(true);
+  listener.mutable_connection_balance_config()->mutable_cpu_locality_balance();
+  EXPECT_CALL(os_sys_calls_, supportsReusePortBpfCpuSteering()).WillRepeatedly(Return(true));
+
+  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                                             /*hash=*/static_cast<uint64_t>(0));
+  auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
+  Network::Address::InstanceConstSharedPtr address(
+      new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
+  EXPECT_CALL(*socket_factory, localAddress()).WillRepeatedly(ReturnRef(address));
+  // Steering is active, so no fallback warning is logged.
+  EXPECT_LOG_NOT_CONTAINS(
+      "warn", "reuse port BPF CPU steering is not active",
+      EXPECT_TRUE(listener_impl->addSocketFactory(std::move(socket_factory)).ok()));
+  EXPECT_NE(dynamic_cast<Network::NopConnectionBalancerImpl*>(
+                &listener_impl->connectionBalancer(*address)),
+            nullptr);
+#endif
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       CpuLocalityBalanceUsesNopBalancerWhenKernelUnsupported) {
+// CPU locality steering requires Linux reuse port BPF support and worker CPU affinity.
+#if defined(__linux__)
+  server_.bootstrap_.set_enable_worker_cpu_affinity(true);
+  // Ensure the host has CPUs so the unsupported-kernel branch is taken, not the empty-assignment
+  // branch.
+  ASSERT_FALSE(Thread::workerCpuAssignment(1).empty());
+  auto listener = createIPv4Listener("TCPListener");
+  listener.mutable_enable_reuse_port()->set_value(true);
+  listener.mutable_connection_balance_config()->mutable_cpu_locality_balance();
+  EXPECT_CALL(os_sys_calls_, supportsReusePortBpfCpuSteering()).WillRepeatedly(Return(false));
+
+  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                                             /*hash=*/static_cast<uint64_t>(0));
+  auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
+  Network::Address::InstanceConstSharedPtr address(
+      new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
+  EXPECT_CALL(*socket_factory, localAddress()).WillRepeatedly(ReturnRef(address));
+  EXPECT_LOG_CONTAINS("warn", "reuse port BPF CPU steering is not active",
+                      EXPECT_TRUE(listener_impl->addSocketFactory(std::move(socket_factory)).ok()));
+  EXPECT_NE(dynamic_cast<Network::NopConnectionBalancerImpl*>(
+                &listener_impl->connectionBalancer(*address)),
+            nullptr);
+#endif
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       CpuLocalityBalanceUsesNopBalancerWhenReusePortDisabled) {
+// CPU locality steering requires Linux reuse port BPF support and worker CPU affinity.
+#if defined(__linux__)
+  server_.bootstrap_.set_enable_worker_cpu_affinity(true);
+  auto listener = createIPv4Listener("TCPListener");
+  listener.mutable_enable_reuse_port()->set_value(false);
+  listener.mutable_connection_balance_config()->mutable_cpu_locality_balance();
+  EXPECT_CALL(os_sys_calls_, supportsReusePortBpfCpuSteering()).WillRepeatedly(Return(true));
+
+  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                                             /*hash=*/static_cast<uint64_t>(0));
+  auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
+  Network::Address::InstanceConstSharedPtr address(
+      new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
+  EXPECT_CALL(*socket_factory, localAddress()).WillRepeatedly(ReturnRef(address));
+  EXPECT_LOG_CONTAINS("warn", "reuse port BPF CPU steering is not active",
+                      EXPECT_TRUE(listener_impl->addSocketFactory(std::move(socket_factory)).ok()));
+  EXPECT_NE(dynamic_cast<Network::NopConnectionBalancerImpl*>(
+                &listener_impl->connectionBalancer(*address)),
+            nullptr);
+#endif
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       CpuLocalityBalanceUsesNopBalancerWhenAffinityDisabled) {
+// CPU locality steering requires Linux reuse port BPF support and worker CPU affinity.
+#if defined(__linux__)
+  auto listener = createIPv4Listener("TCPListener");
+  listener.mutable_enable_reuse_port()->set_value(true);
+  listener.mutable_connection_balance_config()->mutable_cpu_locality_balance();
+  EXPECT_CALL(os_sys_calls_, supportsReusePortBpfCpuSteering()).WillRepeatedly(Return(true));
+
+  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                                             /*hash=*/static_cast<uint64_t>(0));
+  auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
+  Network::Address::InstanceConstSharedPtr address(
+      new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
+  EXPECT_CALL(*socket_factory, localAddress()).WillRepeatedly(ReturnRef(address));
+  EXPECT_LOG_CONTAINS("warn", "reuse port BPF CPU steering is not active",
+                      EXPECT_TRUE(listener_impl->addSocketFactory(std::move(socket_factory)).ok()));
+  EXPECT_NE(dynamic_cast<Network::NopConnectionBalancerImpl*>(
+                &listener_impl->connectionBalancer(*address)),
+            nullptr);
+#endif
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, CpuLocalityBalanceInstallsSteeringOption) {
+// CPU locality steering requires Linux reuse port BPF support and worker CPU affinity.
+#if defined(__linux__)
+  server_.bootstrap_.set_enable_worker_cpu_affinity(true);
+  EXPECT_CALL(os_sys_calls_, supportsReusePortBpfCpuSteering()).WillRepeatedly(Return(true));
+  const std::string yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+connection_balance_config:
+  cpu_locality_balance: {}
+filter_chains:
+- name: foo
+  filters: []
+  )EOF";
+  Network::Socket::OptionsSharedPtr captured_options;
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, Network::Socket::Type::Stream, _,
+                                 ListenerComponentFactory::BindType::ReusePort, _, 0))
+      .WillOnce(Invoke([this, &captured_options](const Network::Address::InstanceConstSharedPtr&,
+                                                 Network::Socket::Type,
+                                                 const Network::Socket::OptionsSharedPtr& options,
+                                                 ListenerComponentFactory::BindType,
+                                                 const Network::SocketCreationOptions&, uint32_t) {
+        captured_options = options;
+        return listener_factory_.socket_;
+      }));
+  EXPECT_CALL(*listener_factory_.socket_, setSocketOption(_, _, _, _))
+      .Times(testing::AnyNumber())
+      .WillRepeatedly(Return(Api::SysCallIntResult{0, 0}));
+  EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  EXPECT_EQ(1u, manager_->listeners().size());
+  // The steering program was added to the listen socket options.
+  ASSERT_NE(captured_options, nullptr);
+  EXPECT_TRUE(
+      std::any_of(captured_options->begin(), captured_options->end(), [](const auto& option) {
+        return dynamic_cast<const Network::ReusePortBpfCpuSteeringOptionImpl*>(option.get()) !=
+               nullptr;
+      }));
+#endif
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       CpuLocalityBalanceDoesNotInstallSteeringOptionWhenUnsupported) {
+// CPU locality steering requires Linux reuse port BPF support and worker CPU affinity.
+#if defined(__linux__)
+  server_.bootstrap_.set_enable_worker_cpu_affinity(true);
+  EXPECT_CALL(os_sys_calls_, supportsReusePortBpfCpuSteering()).WillRepeatedly(Return(false));
+  const std::string yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+connection_balance_config:
+  cpu_locality_balance: {}
+filter_chains:
+- name: foo
+  filters: []
+  )EOF";
+  Network::Socket::OptionsSharedPtr captured_options;
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, Network::Socket::Type::Stream, _,
+                                 ListenerComponentFactory::BindType::ReusePort, _, 0))
+      .WillOnce(Invoke([this, &captured_options](const Network::Address::InstanceConstSharedPtr&,
+                                                 Network::Socket::Type,
+                                                 const Network::Socket::OptionsSharedPtr& options,
+                                                 ListenerComponentFactory::BindType,
+                                                 const Network::SocketCreationOptions&, uint32_t) {
+        captured_options = options;
+        return listener_factory_.socket_;
+      }));
+  EXPECT_CALL(*listener_factory_.socket_, setSocketOption(_, _, _, _))
+      .Times(testing::AnyNumber())
+      .WillRepeatedly(Return(Api::SysCallIntResult{0, 0}));
+  EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  EXPECT_EQ(1u, manager_->listeners().size());
+  // No steering program is installed when reuse port BPF CPU steering is unsupported.
+  ASSERT_NE(captured_options, nullptr);
+  EXPECT_FALSE(
+      std::any_of(captured_options->begin(), captured_options->end(), [](const auto& option) {
+        return dynamic_cast<const Network::ReusePortBpfCpuSteeringOptionImpl*>(option.get()) !=
+               nullptr;
+      }));
+#endif
 }
 
 // Test mock socket interface for custom address testing.
