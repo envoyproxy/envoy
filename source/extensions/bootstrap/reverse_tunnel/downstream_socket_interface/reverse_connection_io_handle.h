@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 #include <queue>
 #include <string>
@@ -27,6 +28,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/synchronization/mutex.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -233,8 +235,11 @@ public:
    * @param error error message if the handshake failed, empty string if successful.
    * @param wrapper pointer to the connection wrapper that wraps over the established connection.
    * @param closed whether the connection was closed during handshake.
+   * @param retry_after optional server-provided cool-off hint (from a ``Retry-After`` header on a
+   * 429 handshake response) to use as the per-host backoff; ignored when unset.
    */
-  void onConnectionDone(const std::string& error, RCConnectionWrapper* wrapper, bool closed);
+  void onConnectionDone(const std::string& error, RCConnectionWrapper* wrapper, bool closed,
+                        absl::optional<std::chrono::milliseconds> retry_after = absl::nullopt);
 
   // Backoff logic for connection failures.
   /**
@@ -250,8 +255,11 @@ public:
    * Track a connection failure for a specific host and cluster and trigger backoff logic.
    * @param host_address the address of the host that failed.
    * @param cluster_name the name of the cluster the host belongs to.
+   * @param retry_after optional server-provided cool-off hint.
    */
-  void trackConnectionFailure(const std::string& host_address, const std::string& cluster_name);
+  void
+  trackConnectionFailure(const std::string& host_address, const std::string& cluster_name,
+                         absl::optional<std::chrono::milliseconds> retry_after = absl::nullopt);
 
   /**
    * Reset backoff state for a specific host. Called when a connection is established successfully.

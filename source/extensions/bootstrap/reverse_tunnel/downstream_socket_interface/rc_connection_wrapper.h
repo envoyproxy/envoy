@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 #include <optional>
 #include <string>
@@ -185,8 +186,21 @@ public:
   /**
    * Handle handshake failure.
    * @param reason the failure reason with type and context
+   * @param retry_after optional server cool-off hint parsed from a ``Retry-After`` header on a 429
+   *        response; forwarded to the parent to drive the per-host backoff.
    */
-  void onHandshakeFailure(const HandshakeFailureReason& reason);
+  void onHandshakeFailure(const HandshakeFailureReason& reason,
+                          absl::optional<std::chrono::milliseconds> retry_after = absl::nullopt);
+
+  /**
+   * Parse an HTTP ``Retry-After`` header into a cool-off duration. Only the RFC 7231 delta-seconds
+   * form is supported (the form rate limiters emit); the HTTP-date form, a zero value, and
+   * malformed/absent values return ``nullopt`` so the caller falls back to its computed backoff.
+   * @param headers the response headers to inspect.
+   * @return the parsed cool-off duration, or ``nullopt`` if not present/parseable/zero.
+   */
+  static absl::optional<std::chrono::milliseconds>
+  parseRetryAfter(const Http::ResponseHeaderMap& headers);
 
   /**
    * Perform graceful shutdown of the connection.
