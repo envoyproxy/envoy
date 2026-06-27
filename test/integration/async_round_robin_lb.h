@@ -36,7 +36,8 @@ public:
 
   absl::StatusOr<LoadBalancerConfigPtr> loadConfig(Server::Configuration::ServerFactoryContext&,
                                                    const Protobuf::Message& config) override {
-    const auto& typed_config = dynamic_cast<const test::integration::lb::AsyncRoundRobin&>(config);
+    const auto& typed_config =
+        Envoy::Protobuf::DynamicCastMessage<test::integration::lb::AsyncRoundRobin>(config);
     return Upstream::LoadBalancerConfigPtr{new TypedAsyncRoundRobinLbConfig(typed_config)};
   }
 };

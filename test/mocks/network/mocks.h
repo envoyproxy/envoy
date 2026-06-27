@@ -130,7 +130,7 @@ public:
   MOCK_METHOD(const IoHandle&, ioHandle, (), (const));
   MOCK_METHOD(Socket::Type, socketType, (), (const));
   MOCK_METHOD(Address::Type, addressType, (), (const));
-  MOCK_METHOD(absl::optional<Address::IpVersion>, ipVersion, (), (const));
+  MOCK_METHOD(std::optional<Address::IpVersion>, ipVersion, (), (const));
   MOCK_METHOD(void, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, Address::Type, Address::IpVersion), (const));
@@ -144,8 +144,8 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, ioctl,
               (unsigned long, void*, unsigned long, void*, unsigned long, unsigned long*));
   MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool));
-  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, ());
-  MOCK_METHOD(absl::optional<uint64_t>, congestionWindowInBytes, (), (const));
+  MOCK_METHOD(std::optional<std::chrono::milliseconds>, lastRoundTripTime, ());
+  MOCK_METHOD(std::optional<uint64_t>, congestionWindowInBytes, (), (const));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
   IoHandlePtr io_handle_;
@@ -401,7 +401,7 @@ public:
   MOCK_METHOD(const IoHandle&, ioHandle, (), (const));
   MOCK_METHOD(Socket::Type, socketType, (), (const));
   MOCK_METHOD(Address::Type, addressType, (), (const));
-  MOCK_METHOD(absl::optional<Address::IpVersion>, ipVersion, (), (const));
+  MOCK_METHOD(std::optional<Address::IpVersion>, ipVersion, (), (const));
   MOCK_METHOD(void, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(void, addOption_, (const Socket::OptionConstSharedPtr& option));
@@ -433,7 +433,7 @@ public:
   MOCK_METHOD(bool, setOption, (Socket&, envoy::config::core::v3::SocketOption::SocketState state),
               (const));
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&), (const));
-  MOCK_METHOD(absl::optional<Socket::Option::Details>, getOptionDetails,
+  MOCK_METHOD(std::optional<Socket::Option::Details>, getOptionDetails,
               (const Socket&, envoy::config::core::v3::SocketOption::SocketState state), (const));
   MOCK_METHOD(bool, isSupported, (), (const));
 };
@@ -569,7 +569,7 @@ public:
   MOCK_METHOD(void, incNumConnections, ());
   MOCK_METHOD(void, decNumConnections, ());
   MOCK_METHOD(void, addListener,
-              (absl::optional<uint64_t> overridden_listener, ListenerConfig& config,
+              (std::optional<uint64_t> overridden_listener, ListenerConfig& config,
                Runtime::Loader& runtime, Random::RandomGenerator& random));
   MOCK_METHOD(void, removeListeners, (uint64_t listener_tag));
   MOCK_METHOD(void, removeFilterChains,
@@ -637,7 +637,7 @@ public:
   MOCK_METHOD(const sockaddr*, sockAddr, (), (const));
   MOCK_METHOD(socklen_t, sockAddrLen, (), (const));
   MOCK_METHOD(absl::string_view, addressType, (), (const));
-  MOCK_METHOD(absl::optional<std::string>, networkNamespace, (), (const));
+  MOCK_METHOD(std::optional<std::string>, networkNamespace, (), (const));
   MOCK_METHOD(Address::InstanceConstSharedPtr, withNetworkNamespace, (absl::string_view), (const));
 
   const std::string& asString() const override { return physical_; }
@@ -791,12 +791,12 @@ public:
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const, override));
   MOCK_METHOD(const std::vector<std::string>&, requestedApplicationProtocols, (),
               (const, override));
-  MOCK_METHOD(absl::optional<uint64_t>, connectionID, (), (const, override));
-  MOCK_METHOD(absl::optional<absl::string_view>, interfaceName, (), (const, override));
+  MOCK_METHOD(std::optional<uint64_t>, connectionID, (), (const, override));
+  MOCK_METHOD(std::optional<absl::string_view>, interfaceName, (), (const, override));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const, override));
   MOCK_METHOD(Envoy::Ssl::ConnectionInfoConstSharedPtr, sslConnection, (), (const, override));
   MOCK_METHOD(absl::string_view, ja3Hash, (), (const, override));
-  MOCK_METHOD(const absl::optional<std::chrono::milliseconds>&, roundTripTime, (),
+  MOCK_METHOD(const std::optional<std::chrono::milliseconds>&, roundTripTime, (),
               (const, override));
   MOCK_METHOD(Envoy::OptRef<const Envoy::Network::FilterChainInfo>, filterChainInfo, (),
               (const, override));

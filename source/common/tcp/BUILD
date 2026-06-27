@@ -32,7 +32,6 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/upstream:upstream_lib",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 

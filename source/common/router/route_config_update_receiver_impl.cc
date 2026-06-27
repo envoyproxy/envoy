@@ -43,7 +43,7 @@ Rds::ConfigConstSharedPtr
 ConfigTraitsImpl::createConfig(const Protobuf::Message& rc,
                                Server::Configuration::ServerFactoryContext& factory_context,
                                bool validate_clusters_default) const {
-  ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(&rc));
+  ASSERT(Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::RouteConfiguration>(&rc));
   return THROW_OR_RETURN_VALUE(
       ConfigImpl::create(static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc),
                          factory_context, validator_, validate_clusters_default),

@@ -1,13 +1,13 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/listen_socket.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/network/socket_option_impl.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Network {
@@ -41,7 +41,7 @@ public:
     ipv4_option_->hashKey(hash_key);
     ipv6_option_->hashKey(hash_key);
   }
-  absl::optional<Details>
+  std::optional<Details>
   getOptionDetails(const Socket& socket,
                    envoy::config::core::v3::SocketOption::SocketState state) const override;
   bool isSupported() const override { return true; }

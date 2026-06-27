@@ -1129,6 +1129,85 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetAndGetDynamicMetadataString
   EXPECT_EQ(value, std::string(result.ptr, result.length));
 }
 
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetDynamicMetadataMergesInPlace) {
+  const std::string ns = "test.ns";
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(connection_.stream_info_, dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+
+  // Sequential single sets accumulate under one namespace rather than replacing it.
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"k1", 2}, {"v1", 2});
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"k2", 2}, 7.0);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"k1", 2}, &result));
+  EXPECT_EQ("v1", std::string(result.ptr, result.length));
+  double number = 0.0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"k2", 2}, &number));
+  EXPECT_DOUBLE_EQ(7.0, number);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetDynamicMetadataStringBatch) {
+  const std::string ns = "test.ns";
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(connection_.stream_info_, dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+
+  envoy_dynamic_module_type_envoy_buffer result;
+
+  // An empty batch is a no-op and must not create the namespace.
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, nullptr, 0);
+  EXPECT_TRUE(metadata.filter_metadata().empty());
+
+  // A batch creates the namespace once and sets every entry.
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> entries = {
+      {"k1", 2, "v1", 2},
+      {"k2", 2, "v2", 2},
+  };
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, entries.data(), entries.size());
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"k1", 2}, &result));
+  EXPECT_EQ("v1", std::string(result.ptr, result.length));
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"k2", 2}, &result));
+  EXPECT_EQ("v2", std::string(result.ptr, result.length));
+
+  // A later batch overwrites an existing key and merges new keys while leaving untouched keys
+  // intact, proving the in place merge does not drop existing fields.
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> merge = {
+      {"k1", 2, "new", 3},
+      {"k3", 2, "v3", 2},
+  };
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, merge.data(), merge.size());
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"k1", 2}, &result));
+  EXPECT_EQ("new", std::string(result.ptr, result.length));
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"k2", 2}, &result));
+  EXPECT_EQ("v2", std::string(result.ptr, result.length));
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"k3", 2}, &result));
+  EXPECT_EQ("v3", std::string(result.ptr, result.length));
+
+  // Within a single batch, a later entry with a duplicate key wins.
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> dup = {
+      {"dup", 3, "first", 5},
+      {"dup", 3, "last", 4},
+  };
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, dup.data(), dup.size());
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"dup", 3}, &result));
+  EXPECT_EQ("last", std::string(result.ptr, result.length));
+}
+
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetAndGetDynamicMetadataNumber) {
   const std::string ns = "test.ns";
   const std::string key = "number.key";

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/event/dispatcher.h"
@@ -18,7 +19,6 @@
 #include "source/extensions/access_loggers/common/grpc_access_logger_utils.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -105,7 +105,7 @@ public:
   GrpcAccessLogger(
       const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
       Event::Dispatcher& dispatcher, Stats::Scope& scope,
-      absl::optional<std::string> access_log_prefix,
+      std::optional<std::string> access_log_prefix,
       std::unique_ptr<GrpcAccessLogClient<LogRequest, LogResponse>> client)
       : client_(std::move(client)), buffer_flush_interval_msec_(PROTOBUF_GET_MS_OR_DEFAULT(
                                         config, buffer_flush_interval, 1000)),

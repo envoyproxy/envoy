@@ -2,6 +2,7 @@
 #include "envoy/config/overload/v3/overload.pb.h"
 
 #include "test/integration/integration.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
 
 using testing::Eq;

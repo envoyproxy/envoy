@@ -19,7 +19,7 @@ public:
             testing::Invoke([](Buffer::Instance& buffer) { buffer.drain(buffer.length()); }));
   }
 
-  MOCK_METHOD(void, onDecodingSuccess, (RequestHeaderFramePtr, absl::optional<StartTime>));
+  MOCK_METHOD(void, onDecodingSuccess, (RequestHeaderFramePtr, std::optional<StartTime>));
   MOCK_METHOD(void, onDecodingSuccess, (RequestCommonFramePtr));
   MOCK_METHOD(void, onDecodingFailure, (absl::string_view));
   MOCK_METHOD(void, writeToConnection, (Buffer::Instance&));
@@ -35,7 +35,7 @@ public:
             testing::Invoke([](Buffer::Instance& buffer) { buffer.drain(buffer.length()); }));
   }
 
-  MOCK_METHOD(void, onDecodingSuccess, (ResponseHeaderFramePtr, absl::optional<StartTime>));
+  MOCK_METHOD(void, onDecodingSuccess, (ResponseHeaderFramePtr, std::optional<StartTime>));
   MOCK_METHOD(void, onDecodingSuccess, (ResponseCommonFramePtr));
   MOCK_METHOD(void, onDecodingFailure, (absl::string_view));
   MOCK_METHOD(void, writeToConnection, (Buffer::Instance & buffer));

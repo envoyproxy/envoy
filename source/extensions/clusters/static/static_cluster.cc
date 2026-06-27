@@ -61,8 +61,8 @@ void StaticClusterImpl::startPreInit() {
   // then fire update callbacks to start the health checking process.
   const auto& health_checker_flag =
       health_checker_ != nullptr
-          ? absl::optional<Upstream::Host::HealthFlag>(Host::HealthFlag::FAILED_ACTIVE_HC)
-          : absl::nullopt;
+          ? std::optional<Upstream::Host::HealthFlag>(Host::HealthFlag::FAILED_ACTIVE_HC)
+          : std::nullopt;
 
   auto& priority_state = priority_state_manager_->priorityState();
   for (size_t i = 0; i < priority_state.size(); ++i) {
@@ -70,7 +70,7 @@ void StaticClusterImpl::startPreInit() {
       priority_state[i].first = std::make_unique<HostVector>();
     }
     priority_state_manager_->updateClusterPrioritySet(
-        i, std::move(priority_state[i].first), absl::nullopt, absl::nullopt, health_checker_flag,
+        i, std::move(priority_state[i].first), std::nullopt, std::nullopt, health_checker_flag,
         weighted_priority_health_, overprovisioning_factor_);
   }
   priority_state_manager_.reset();

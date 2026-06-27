@@ -97,7 +97,7 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildNetworkNamespaceMatch) {
   // Create an address with a network namespace set.
   Network::Address::InstanceConstSharedPtr address =
       std::make_shared<Network::Address::Ipv4Instance>(
-          "0.0.0.0", 80, nullptr, absl::optional<std::string>("/var/run/netns/ns1"));
+          "0.0.0.0", 80, nullptr, std::optional<std::string>("/var/run/netns/ns1"));
   EXPECT_CALL(
       *static_cast<Network::MockListenSocketFactory*>(listener_config.socket_factories_[0].get()),
       localAddress())
@@ -136,7 +136,7 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildNetworkNamespaceMismatch
   // Create an address with a network namespace set.
   Network::Address::InstanceConstSharedPtr address =
       std::make_shared<Network::Address::Ipv4Instance>(
-          "0.0.0.0", 80, nullptr, absl::optional<std::string>("/var/run/netns/ns1"));
+          "0.0.0.0", 80, nullptr, std::optional<std::string>("/var/run/netns/ns1"));
   EXPECT_CALL(
       *static_cast<Network::MockListenSocketFactory*>(listener_config.socket_factories_[0].get()),
       localAddress())

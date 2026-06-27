@@ -18,6 +18,7 @@
 #include "test/mocks/upstream/cluster_update_callbacks_handle.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"

@@ -127,7 +127,7 @@ Api::SysCallIntResult SocketImpl::setBlockingForTest(bool blocking) {
   return io_handle_->setBlocking(blocking);
 }
 
-absl::optional<Address::IpVersion> SocketImpl::ipVersion() const {
+std::optional<Address::IpVersion> SocketImpl::ipVersion() const {
   if (addr_type_ == Address::Type::Ip) {
     // Always hit after socket is initialized, i.e., accepted or connected
     if (connection_info_provider_->localAddress() != nullptr) {
@@ -135,18 +135,18 @@ absl::optional<Address::IpVersion> SocketImpl::ipVersion() const {
     } else {
       auto domain = io_handle_->domain();
       if (!domain.has_value()) {
-        return absl::nullopt;
+        return std::nullopt;
       }
       if (*domain == AF_INET) {
         return Address::IpVersion::v4;
       } else if (*domain == AF_INET6) {
         return Address::IpVersion::v6;
       } else {
-        return absl::nullopt;
+        return std::nullopt;
       }
     }
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 } // namespace Network

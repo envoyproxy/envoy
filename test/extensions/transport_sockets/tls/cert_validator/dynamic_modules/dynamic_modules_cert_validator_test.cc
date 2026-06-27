@@ -490,7 +490,7 @@ TEST_F(DynamicModuleCertValidatorTest, FactoryCreateCertValidatorInvalidValidato
 
   envoy::config::core::v3::TypedExtensionConfig typed_conf;
   typed_conf.set_name("envoy.tls.cert_validator.dynamic_modules");
-  typed_conf.mutable_typed_config()->PackFrom(dm_config);
+  std::ignore = typed_conf.mutable_typed_config()->PackFrom(dm_config);
   TestCertificateValidationContextConfig validation_config(typed_conf);
 
   DynamicModuleCertValidatorFactory factory;

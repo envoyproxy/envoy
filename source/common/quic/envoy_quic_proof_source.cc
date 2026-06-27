@@ -84,7 +84,7 @@ EnvoyQuicProofSource::getTlsCertAndFilterChain(const TransportSocketFactoryWithF
   return {std::move(cert), std::move(key), data.filter_chain_};
 }
 
-absl::optional<EnvoyQuicProofSource::TransportSocketFactoryWithFilterChain>
+std::optional<EnvoyQuicProofSource::TransportSocketFactoryWithFilterChain>
 EnvoyQuicProofSource::getTransportSocketAndFilterChain(
     const quic::QuicSocketAddress& server_address, const quic::QuicSocketAddress& client_address,
     const std::string& hostname) {

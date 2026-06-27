@@ -22,7 +22,7 @@ using google::api::expr::runtime::CelValue;
 
 class TestContext : public Context {
 public:
-  TestContext(absl::optional<proxy_wasm::AbiVersion> mock_abi_version = {}) {
+  TestContext(std::optional<proxy_wasm::AbiVersion> mock_abi_version = {}) {
     if (mock_abi_version.has_value()) {
       abi_version_ = mock_abi_version.value();
     }
@@ -57,10 +57,10 @@ public:
 
 class MockCelMap : public CelMap {
 public:
-  absl::optional<CelValue> operator[](CelValue index) const override {
+  std::optional<CelValue> operator[](CelValue index) const override {
     return MockIndexOperator(index);
   }
-  MOCK_METHOD(absl::optional<CelValue>, MockIndexOperator, (CelValue), (const));
+  MOCK_METHOD(std::optional<CelValue>, MockIndexOperator, (CelValue), (const));
   using CelMap::ListKeys;
   MOCK_METHOD(absl::StatusOr<const CelList*>, ListKeys, (), (const, override));
   MOCK_METHOD(int, size, (), (const, override));
@@ -303,7 +303,7 @@ TEST_F(ContextTest, ClearRouteCacheDoesNothingInUpstreamConfiguration) {
 
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
   EXPECT_CALL(decoder_callbacks, downstreamCallbacks())
-      .WillRepeatedly(testing::Return(absl::nullopt));
+      .WillRepeatedly(testing::Return(std::nullopt));
   test_ctx.setDecoderFilterCallbacksPtr(&decoder_callbacks);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/123"}};

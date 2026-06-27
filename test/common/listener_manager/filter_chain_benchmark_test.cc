@@ -102,7 +102,7 @@ public:
   Network::Address::Type addressType() const override {
     return connection_info_provider_->localAddress()->type();
   }
-  absl::optional<Network::Address::IpVersion> ipVersion() const override {
+  std::optional<Network::Address::IpVersion> ipVersion() const override {
     return Network::Address::IpVersion::v4;
   }
   Network::SocketPtr duplicate() override { return nullptr; }
@@ -130,8 +130,8 @@ public:
     return {0, 0};
   }
   Api::SysCallIntResult setBlockingForTest(bool) override { return {0, 0}; }
-  absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return {}; }
-  absl::optional<uint64_t> congestionWindowInBytes() const override { return {}; }
+  std::optional<std::chrono::milliseconds> lastRoundTripTime() override { return {}; }
+  std::optional<uint64_t> congestionWindowInBytes() const override { return {}; }
   void dumpState(std::ostream&, int) const override {}
 
 private:

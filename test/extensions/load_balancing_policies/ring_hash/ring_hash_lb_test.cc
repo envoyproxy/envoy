@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -22,7 +23,6 @@
 #include "test/test_common/test_runtime.h"
 
 #include "absl/container/node_hash_map.h"
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -45,13 +45,13 @@ public:
         should_select_another_host_(should_select_another_host) {}
 
   // Upstream::LoadBalancerContext
-  absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
+  std::optional<uint64_t> computeHashKey() override { return hash_key_; }
   uint32_t hostSelectionRetryCount() const override { return retry_count_; };
   bool shouldSelectAnotherHost(const Host& host) override {
     return should_select_another_host_(host);
   }
 
-  absl::optional<uint64_t> hash_key_;
+  std::optional<uint64_t> hash_key_;
   uint32_t retry_count_;
   HostPredicate should_select_another_host_;
 };
@@ -1200,7 +1200,7 @@ public:
         updateHostsParams(hosts_p0, hosts_per_locality_p0,
                           std::make_shared<const HealthyHostVector>(*hosts_p0),
                           hosts_per_locality_p0),
-        {}, *hosts_p0, {}, absl::nullopt, absl::nullopt);
+        {}, *hosts_p0, {}, std::nullopt, std::nullopt);
 
     // Grow hostSetsPerPriority() to include P1 before initialize() is called.
     HostVectorSharedPtr hosts_p1 = std::make_shared<HostVector>();
@@ -1211,7 +1211,7 @@ public:
         updateHostsParams(hosts_p1, hosts_per_locality_p1,
                           std::make_shared<const HealthyHostVector>(*hosts_p1),
                           hosts_per_locality_p1),
-        {}, *hosts_p1, {}, absl::nullopt, absl::nullopt);
+        {}, *hosts_p1, {}, std::nullopt, std::nullopt);
 
     EXPECT_TRUE(lb_.initialize().ok());
   }

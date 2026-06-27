@@ -4,6 +4,8 @@
  * Run with:
  * `bazel run --config=libc++ -c opt //test/extensions/bootstrap/wasm:wasm_speed_test`
  */
+#include <optional>
+
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/common/wasm/wasm.h"
@@ -13,7 +15,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "benchmark/benchmark.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -54,7 +55,7 @@ static void bmWasmSimpleCallSpeedTest(benchmark::State& state, std::string test,
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(test);
   plugin_config.mutable_vm_config()->set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
-      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info);
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       plugin->wasmConfig(), "vm_key", scope, *api, cluster_manager, *dispatcher);
   std::string code;

@@ -17,7 +17,7 @@ static const std::string DefaultUnspecifiedValueString = "-";
 absl::Status CommandSyntaxChecker::verifySyntax(CommandSyntaxChecker::CommandSyntaxFlags flags,
                                                 absl::string_view command,
                                                 absl::string_view subcommand,
-                                                absl::optional<size_t> length) {
+                                                std::optional<size_t> length) {
   if ((flags == COMMAND_ONLY) && ((!subcommand.empty()) || length.has_value())) {
     return absl::InvalidArgumentError(
         fmt::format("{} does not take any parameters or length", command));
@@ -34,23 +34,23 @@ absl::Status CommandSyntaxChecker::verifySyntax(CommandSyntaxChecker::CommandSyn
   return absl::OkStatus();
 }
 
-const absl::optional<std::reference_wrapper<const std::string>>
-SubstitutionFormatUtils::protocolToString(const absl::optional<Http::Protocol>& protocol) {
+const std::optional<std::reference_wrapper<const std::string>>
+SubstitutionFormatUtils::protocolToString(const std::optional<Http::Protocol>& protocol) {
   if (protocol) {
     return Http::Utility::getProtocolString(protocol.value());
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 const std::string&
-SubstitutionFormatUtils::protocolToStringOrDefault(const absl::optional<Http::Protocol>& protocol) {
+SubstitutionFormatUtils::protocolToStringOrDefault(const std::optional<Http::Protocol>& protocol) {
   if (protocol) {
     return Http::Utility::getProtocolString(protocol.value());
   }
   return DefaultUnspecifiedValueString;
 }
 
-const absl::optional<std::string> SubstitutionFormatUtils::getHostname() {
+const std::optional<std::string> SubstitutionFormatUtils::getHostname() {
 #ifdef HOST_NAME_MAX
   const size_t len = HOST_NAME_MAX;
 #else
@@ -61,7 +61,7 @@ const absl::optional<std::string> SubstitutionFormatUtils::getHostname() {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   const Api::SysCallIntResult result = os_sys_calls.gethostname(name, len);
 
-  absl::optional<std::string> hostname;
+  std::optional<std::string> hostname;
   if (result.return_value_ == 0) {
     hostname = name;
   }
@@ -73,7 +73,7 @@ const Protobuf::Value& SubstitutionFormatUtils::unspecifiedValue() {
   return ValueUtil::nullValue();
 }
 
-bool SubstitutionFormatUtils::truncate(std::string& str, absl::optional<size_t> max_length) {
+bool SubstitutionFormatUtils::truncate(std::string& str, std::optional<size_t> max_length) {
   if (!max_length) {
     return false;
   }
@@ -87,7 +87,7 @@ bool SubstitutionFormatUtils::truncate(std::string& str, absl::optional<size_t> 
 }
 
 absl::string_view SubstitutionFormatUtils::truncateStringView(absl::string_view str,
-                                                              absl::optional<size_t> max_length) {
+                                                              std::optional<size_t> max_length) {
   if (!max_length) {
     return str;
   }

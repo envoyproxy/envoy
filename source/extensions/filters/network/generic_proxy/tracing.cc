@@ -10,7 +10,7 @@ absl::string_view TraceContextBridge::host() const { return request_.host(); }
 absl::string_view TraceContextBridge::path() const { return request_.path(); }
 absl::string_view TraceContextBridge::method() const { return request_.method(); }
 void TraceContextBridge::forEach(IterateCallback callback) const { request_.forEach(callback); }
-absl::optional<absl::string_view> TraceContextBridge::get(absl::string_view key) const {
+std::optional<absl::string_view> TraceContextBridge::get(absl::string_view key) const {
   return request_.get(key);
 }
 void TraceContextBridge::set(absl::string_view key, absl::string_view val) {

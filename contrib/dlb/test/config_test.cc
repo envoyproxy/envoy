@@ -20,7 +20,7 @@ protected:
   static void makeDlbConnectionBalanceConfig(
       envoy::config::core::v3::TypedExtensionConfig& typed_config,
       envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb& dlb) {
-    typed_config.mutable_typed_config()->PackFrom(dlb);
+    std::ignore = typed_config.mutable_typed_config()->PackFrom(dlb);
     typed_config.set_name("envoy.network.connection_balance.dlb");
   }
 

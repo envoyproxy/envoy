@@ -67,7 +67,7 @@ public:
                                              StringReturningActionFactoryContext&,
                                              ProtobufMessage::ValidationVisitor&) override {
     // validate function doesn't exist for StringValue, so just cast.
-    const auto& config = dynamic_cast<const Protobuf::StringValue&>(proto_config);
+    const auto& config = Envoy::Protobuf::DynamicCastMessage<Protobuf::StringValue>(proto_config);
     return std::make_shared<StringReturningDirectActionImpl>(config);
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

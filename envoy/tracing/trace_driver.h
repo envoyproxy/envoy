@@ -141,6 +141,14 @@ public:
   virtual bool useLocalDecision() const PURE;
 
   /**
+   * Stop using the Envoy local tracing decision for this span. After this is called the connection
+   * manager will not re-derive the sampling decision on a later route refresh, so a decision set
+   * via setSampled is kept. The default implementation is a no-op and is overridden by tracers that
+   * support this.
+   */
+  virtual void disableLocalDecision() {}
+
+  /**
    * Retrieve a key's value from the span's baggage.
    * This baggage data could've been set by this span or any parent spans.
    * @param key baggage key

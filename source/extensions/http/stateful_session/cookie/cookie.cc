@@ -23,7 +23,7 @@ bool CookieBasedSessionStateFactory::SessionStateImpl::onUpdate(
       cookie.set_expires(expiry_time.count());
     }
     std::string proto_string;
-    cookie.SerializeToString(&proto_string);
+    std::ignore = cookie.SerializeToString(&proto_string);
 
     const std::string encoded_address =
         Envoy::Base64::encode(proto_string.data(), proto_string.length());

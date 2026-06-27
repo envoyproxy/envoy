@@ -161,7 +161,7 @@ public:
       typed_dns_resolver_config->set_name("envoy.network.dns_resolver.getaddrinfo");
       envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
           config;
-      typed_dns_resolver_config->mutable_typed_config()->PackFrom(config);
+      std::ignore = typed_dns_resolver_config->mutable_typed_config()->PackFrom(config);
 
       uint32_t upstream_idx = 0;
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
