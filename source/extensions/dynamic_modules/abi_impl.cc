@@ -3277,6 +3277,249 @@ envoy_dynamic_module_callback_udp_listener_filter_set_gauge(
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
+// ---------------------- UDP Session filter callbacks ------------------------
+// These are weak symbols that provide default stub implementations. The actual implementations
+// are provided in the UDP session filter abi_impl.cc when the UDP session filter extension is used.
+
+__attribute__((weak)) size_t
+envoy_dynamic_module_callback_udp_session_filter_get_datagram_data_chunks_size(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_get_datagram_data_chunks_size: "
+               "not implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_udp_session_filter_get_datagram_data_chunks(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_get_datagram_data_chunks: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) size_t
+envoy_dynamic_module_callback_udp_session_filter_get_datagram_data_size(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_get_datagram_data_size: not "
+               "implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_udp_session_filter_set_datagram_data(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_set_datagram_data: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_udp_session_filter_get_peer_address(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*,
+    uint32_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_get_peer_address: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_udp_session_filter_get_local_address(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*,
+    uint32_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_get_local_address: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) uint64_t envoy_dynamic_module_callback_udp_session_filter_get_session_id(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_get_session_id: not implemented "
+               "in this context");
+  return 0;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_udp_session_filter_inject_read_datagram(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, uint32_t, envoy_dynamic_module_type_module_buffer,
+    uint32_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_inject_read_datagram: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_udp_session_filter_inject_write_datagram(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, uint32_t, envoy_dynamic_module_type_module_buffer,
+    uint32_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_inject_write_datagram: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_udp_session_filter_continue_filter_chain(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_continue_filter_chain: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) void
+envoy_dynamic_module_callback_udp_session_filter_set_dynamic_metadata_string(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_set_dynamic_metadata_string: not "
+               "implemented in this context");
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_udp_session_filter_get_dynamic_metadata_string(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_get_dynamic_metadata_string: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) void
+envoy_dynamic_module_callback_udp_session_filter_set_dynamic_metadata_number(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, double) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_set_dynamic_metadata_number: not "
+               "implemented in this context");
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_udp_session_filter_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, double*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_get_dynamic_metadata_number: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) void
+envoy_dynamic_module_callback_udp_session_filter_set_dynamic_metadata_bool(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, bool) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_set_dynamic_metadata_bool: not "
+               "implemented in this context");
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_udp_session_filter_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, bool*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_get_dynamic_metadata_bool: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_config_define_counter(
+    envoy_dynamic_module_type_udp_session_filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_config_define_counter: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_increment_counter(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_increment_counter: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_config_define_gauge(
+    envoy_dynamic_module_type_udp_session_filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_config_define_gauge: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_set_gauge(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_set_gauge: not implemented in "
+               "this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_increment_gauge(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_increment_gauge: not implemented "
+               "in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_decrement_gauge(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_decrement_gauge: not implemented "
+               "in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_config_define_histogram(
+    envoy_dynamic_module_type_udp_session_filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_config_define_histogram: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_record_histogram_value(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_record_histogram_value: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_config_increment_counter(
+    envoy_dynamic_module_type_udp_session_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_config_increment_counter: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_config_increment_gauge(
+    envoy_dynamic_module_type_udp_session_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_config_increment_gauge: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_config_decrement_gauge(
+    envoy_dynamic_module_type_udp_session_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_config_decrement_gauge: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_config_set_gauge(
+    envoy_dynamic_module_type_udp_session_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_config_set_gauge: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_config_record_histogram_value(
+    envoy_dynamic_module_type_udp_session_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_session_filter_config_record_histogram_value: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
 // ---------------------- Upstream HTTP TCP Bridge callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the upstream bridge abi_impl.cc when the upstream bridge extension is used.

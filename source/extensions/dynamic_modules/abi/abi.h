@@ -6448,6 +6448,595 @@ uint32_t envoy_dynamic_module_callback_udp_listener_filter_get_worker_index(
     envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr);
 
 // =============================================================================
+// =========================== UDP Session Filter ==============================
+// =============================================================================
+
+// =============================================================================
+// UDP Session Filter Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_udp_session_filter_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleUdpSessionFilterConfig class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_udp_session_filter_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_udp_session_filter_config_module_ptr is a pointer to an in-module UDP
+ * session filter configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_udp_session_filter_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_udp_session_filter_envoy_ptr is a raw pointer to the
+ * DynamicModuleUdpSessionFilter class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_udp_session_filter_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_udp_session_filter_module_ptr is a pointer to an in-module UDP session
+ * filter.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_udp_session_filter_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_on_udp_session_read_filter_status represents the status of a UDP
+ * session read filter execution (on_new_session and on_data). It corresponds to Envoy's
+ * Network::UdpSessionReadFilterStatus.
+ */
+typedef enum envoy_dynamic_module_type_on_udp_session_read_filter_status {
+  envoy_dynamic_module_type_on_udp_session_read_filter_status_Continue,
+  envoy_dynamic_module_type_on_udp_session_read_filter_status_StopIteration,
+} envoy_dynamic_module_type_on_udp_session_read_filter_status;
+
+/**
+ * envoy_dynamic_module_type_on_udp_session_write_filter_status represents the status of a UDP
+ * session write filter execution (on_write). It corresponds to Envoy's
+ * Network::UdpSessionWriteFilterStatus.
+ */
+typedef enum envoy_dynamic_module_type_on_udp_session_write_filter_status {
+  envoy_dynamic_module_type_on_udp_session_write_filter_status_Continue,
+  envoy_dynamic_module_type_on_udp_session_write_filter_status_StopIteration,
+} envoy_dynamic_module_type_on_udp_session_write_filter_status;
+
+// =============================================================================
+// UDP Session Filter Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_udp_session_filter_config_new is called when a new UDP session filter
+ * configuration is created.
+ */
+envoy_dynamic_module_type_udp_session_filter_config_module_ptr
+envoy_dynamic_module_on_udp_session_filter_config_new(
+    envoy_dynamic_module_type_udp_session_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_udp_session_filter_config_destroy is called when the UDP session filter
+ * configuration is destroyed.
+ */
+void envoy_dynamic_module_on_udp_session_filter_config_destroy(
+    envoy_dynamic_module_type_udp_session_filter_config_module_ptr filter_config_ptr);
+
+/**
+ * envoy_dynamic_module_on_udp_session_filter_new is called when a new UDP session filter is created
+ * for a newly established proxied UDP session.
+ */
+envoy_dynamic_module_type_udp_session_filter_module_ptr
+envoy_dynamic_module_on_udp_session_filter_new(
+    envoy_dynamic_module_type_udp_session_filter_config_module_ptr filter_config_ptr,
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_udp_session_filter_on_new_session is called once when a new UDP session
+ * is established, before the first datagram is processed.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param filter_module_ptr is the in-module filter pointer returned by
+ * envoy_dynamic_module_on_udp_session_filter_new.
+ * @return the read filter status used to manage further filter iteration.
+ */
+envoy_dynamic_module_type_on_udp_session_read_filter_status
+envoy_dynamic_module_on_udp_session_filter_on_new_session(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_udp_session_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_udp_session_filter_on_data is called when a downstream datagram is read
+ * on the session (the read path). The datagram is accessed via the
+ * envoy_dynamic_module_callback_udp_session_filter_get_datagram_* callbacks.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param filter_module_ptr is the in-module filter pointer.
+ * @return the read filter status used to manage further filter iteration.
+ */
+envoy_dynamic_module_type_on_udp_session_read_filter_status
+envoy_dynamic_module_on_udp_session_filter_on_data(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_udp_session_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_udp_session_filter_on_write is called when an upstream datagram is to be
+ * written downstream on the session (the write path). The datagram is accessed via the
+ * envoy_dynamic_module_callback_udp_session_filter_get_datagram_* callbacks.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param filter_module_ptr is the in-module filter pointer.
+ * @return the write filter status used to manage further filter iteration.
+ */
+envoy_dynamic_module_type_on_udp_session_write_filter_status
+envoy_dynamic_module_on_udp_session_filter_on_write(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_udp_session_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_udp_session_filter_on_session_complete is called when the UDP session is
+ * complete, before the session access logs are written, so the module can enrich the stream info.
+ * This hook is optional; if the module does not export it, it is not called.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param filter_module_ptr is the in-module filter pointer.
+ */
+void envoy_dynamic_module_on_udp_session_filter_on_session_complete(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_udp_session_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_udp_session_filter_destroy is called when the UDP session filter is
+ * destroyed.
+ */
+void envoy_dynamic_module_on_udp_session_filter_destroy(
+    envoy_dynamic_module_type_udp_session_filter_module_ptr filter_module_ptr);
+
+// =============================================================================
+// UDP Session Filter Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_get_datagram_data_chunks_size is called by the
+ * module to get the number of chunks in the current datagram. This is only valid during the
+ * envoy_dynamic_module_on_udp_session_filter_on_data or
+ * envoy_dynamic_module_on_udp_session_filter_on_write callbacks.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @return the number of chunks in the datagram.
+ */
+size_t envoy_dynamic_module_callback_udp_session_filter_get_datagram_data_chunks_size(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_get_datagram_data_chunks is called by the module
+ * to get the current datagram as chunks. The module must ensure the provided buffer array has
+ * enough capacity to store all chunks, which can be obtained via
+ * envoy_dynamic_module_callback_udp_session_filter_get_datagram_data_chunks_size. This is only
+ * valid during the on_data or on_write callbacks.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param chunks_out is the output pointer to the array of buffer chunks owned by Envoy.
+ * @return true if the datagram is available and chunks_out is populated, false otherwise.
+ */
+bool envoy_dynamic_module_callback_udp_session_filter_get_datagram_data_chunks(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* chunks_out);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_get_datagram_data_size is called by the module
+ * to get the total length in bytes of the current datagram. This is only valid during the on_data
+ * or on_write callbacks.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @return the total length in bytes of the datagram.
+ */
+size_t envoy_dynamic_module_callback_udp_session_filter_get_datagram_data_size(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_set_datagram_data is called by the module to
+ * replace the current datagram payload. This is only valid during the on_data or on_write
+ * callbacks.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param data is the new datagram payload owned by the module.
+ * @return true if the datagram was replaced, false otherwise.
+ */
+bool envoy_dynamic_module_callback_udp_session_filter_set_datagram_data(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_get_peer_address is called by the module to get
+ * the peer (source) address of the current datagram. This is only valid during the on_data or
+ * on_write callbacks.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param address_out is the output buffer where the address string owned by Envoy will be stored.
+ * @param port_out is the output pointer where the port will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_udp_session_filter_get_peer_address(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_get_local_address is called by the module to get
+ * the local (destination) address of the current datagram. This is only valid during the on_data or
+ * on_write callbacks.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param address_out is the output buffer where the address string owned by Envoy will be stored.
+ * @param port_out is the output pointer where the port will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_udp_session_filter_get_local_address(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+// --------------------- UDP Session Filter Callbacks - Session ----------------
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_get_session_id is called by the module to get
+ * the ID of the originating UDP session.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @return the session ID.
+ */
+uint64_t envoy_dynamic_module_callback_udp_session_filter_get_session_id(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_inject_read_datagram is called by the module to
+ * inject a datagram into the read filter chain after the current filter. This is typically used to
+ * resume processing of datagrams buffered by the module after an asynchronous operation completes.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param data is the datagram payload owned by the module.
+ * @param peer_address is the peer (source) address string owned by the module.
+ * @param peer_port is the peer (source) port.
+ * @param local_address is the local (destination) address string owned by the module.
+ * @param local_port is the local (destination) port.
+ * @return true if the datagram was injected, false otherwise.
+ */
+bool envoy_dynamic_module_callback_udp_session_filter_inject_read_datagram(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data,
+    envoy_dynamic_module_type_module_buffer peer_address, uint32_t peer_port,
+    envoy_dynamic_module_type_module_buffer local_address, uint32_t local_port);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_inject_write_datagram is called by the module to
+ * inject a datagram into the write filter chain after the current filter.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param data is the datagram payload owned by the module.
+ * @param peer_address is the peer (source) address string owned by the module.
+ * @param peer_port is the peer (source) port.
+ * @param local_address is the local (destination) address string owned by the module.
+ * @param local_port is the local (destination) port.
+ * @return true if the datagram was injected, false otherwise.
+ */
+bool envoy_dynamic_module_callback_udp_session_filter_inject_write_datagram(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data,
+    envoy_dynamic_module_type_module_buffer peer_address, uint32_t peer_port,
+    envoy_dynamic_module_type_module_buffer local_address, uint32_t local_port);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_continue_filter_chain is called by the module to
+ * resume the read filter chain after a read filter previously returned StopIteration.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @return false if the session was removed and is no longer valid, true otherwise.
+ */
+bool envoy_dynamic_module_callback_udp_session_filter_continue_filter_chain(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr);
+
+// --------------------- UDP Session Filter Callbacks - Dynamic Metadata -------
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_set_dynamic_metadata_string is called by the
+ * module to set the string value of the dynamic metadata with the given namespace and key on the
+ * session stream info. If the metadata is existing, it will be overwritten.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param key is the key owned by the module.
+ * @param value is the string value owned by the module.
+ */
+void envoy_dynamic_module_callback_udp_session_filter_set_dynamic_metadata_string(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_get_dynamic_metadata_string is called by the
+ * module to get the string value of the dynamic metadata with the given namespace and key. If the
+ * namespace does not exist, the key does not exist, or the value is not a string, this returns
+ * false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param key is the key owned by the module.
+ * @param value_out is the output buffer where the value owned by Envoy will be stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note that the buffer pointed by the pointer stored in value_out is owned by Envoy, and it is
+ * guaranteed to be valid until the end of the current event hook unless the setter callback is
+ * called.
+ */
+bool envoy_dynamic_module_callback_udp_session_filter_get_dynamic_metadata_string(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_set_dynamic_metadata_number is called by the
+ * module to set the number value of the dynamic metadata with the given namespace and key. If the
+ * metadata is existing, it will be overwritten.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param key is the key owned by the module.
+ * @param value is the number value of the dynamic metadata to be set.
+ */
+void envoy_dynamic_module_callback_udp_session_filter_set_dynamic_metadata_number(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, double value);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_get_dynamic_metadata_number is called by the
+ * module to get the number value of the dynamic metadata with the given namespace and key. If the
+ * namespace does not exist, the key does not exist, or the value is not a number, this returns
+ * false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param key is the key owned by the module.
+ * @param result is the output pointer to the number value of the dynamic metadata.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_udp_session_filter_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, double* result);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_set_dynamic_metadata_bool is called by the
+ * module to set the bool value of the dynamic metadata with the given namespace and key. If the
+ * metadata is existing, it will be overwritten.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param key is the key owned by the module.
+ * @param value is the bool value of the dynamic metadata to be set.
+ */
+void envoy_dynamic_module_callback_udp_session_filter_set_dynamic_metadata_bool(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, bool value);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_get_dynamic_metadata_bool is called by the
+ * module to get the bool value of the dynamic metadata with the given namespace and key. If the
+ * namespace does not exist, the key does not exist, or the value is not a bool, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param key is the key owned by the module.
+ * @param result is the output pointer to the bool value of the dynamic metadata.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_udp_session_filter_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, bool* result);
+
+// --------------------- UDP Session Filter Callbacks - Metrics ----------------
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_config_define_counter is called by the module
+ * during initialization to create a new Stats::Counter with the given name.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilterConfig in which the
+ * counter will be defined.
+ * @param name is the name of the counter to be defined.
+ * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_udp_session_filter_increment_counter together with
+ * filter_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_config_define_counter(
+    envoy_dynamic_module_type_udp_session_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* counter_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_increment_counter is called by the module to
+ * increment a previously defined counter.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param id is the ID of the counter previously defined using the config.
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_increment_counter(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_config_define_gauge is called by the module
+ * during initialization to create a new Stats::Gauge with the given name.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilterConfig in which the
+ * gauge will be defined.
+ * @param name is the name of the gauge to be defined.
+ * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_config_define_gauge(
+    envoy_dynamic_module_type_udp_session_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_set_gauge is called by the module to set the
+ * value of a previously defined gauge.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_udp_session_filter_set_gauge(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_increment_gauge is called by the module to
+ * increase the value of a previously defined gauge.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_increment_gauge(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_decrement_gauge is called by the module to
+ * decrease the value of a previously defined gauge.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_decrement_gauge(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_config_define_histogram is called by the module
+ * during initialization to create a new Stats::Histogram with the given name.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilterConfig in which the
+ * histogram will be defined.
+ * @param name is the name of the histogram to be defined.
+ * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_config_define_histogram(
+    envoy_dynamic_module_type_udp_session_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* histogram_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_record_histogram_value is called by the module
+ * to record a value in a previously defined histogram.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilter object.
+ * @param id is the ID of the histogram previously defined using the config.
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_record_histogram_value(
+    envoy_dynamic_module_type_udp_session_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_config_increment_counter is called by the module
+ * to increment a previously defined counter from the filter config context. Unlike
+ * envoy_dynamic_module_callback_udp_session_filter_increment_counter, this does not require a
+ * per-session filter and can be called outside of the session lifecycle, e.g. from a scheduled
+ * background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilterConfig that defined
+ * the counter.
+ * @param id is the ID of the counter previously defined using config_envoy_ptr.
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_config_increment_counter(
+    envoy_dynamic_module_type_udp_session_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_config_increment_gauge is called by the module
+ * to increase the value of a previously defined gauge from the filter config context.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilterConfig that defined
+ * the gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_config_increment_gauge(
+    envoy_dynamic_module_type_udp_session_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_config_decrement_gauge is called by the module
+ * to decrease the value of a previously defined gauge from the filter config context.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilterConfig that defined
+ * the gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_config_decrement_gauge(
+    envoy_dynamic_module_type_udp_session_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_config_set_gauge is called by the module to set
+ * the value of a previously defined gauge from the filter config context.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilterConfig that defined
+ * the gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_config_set_gauge(
+    envoy_dynamic_module_type_udp_session_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_session_filter_config_record_histogram_value is called by the
+ * module to record a value in a previously defined histogram from the filter config context.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpSessionFilterConfig that defined
+ * the histogram.
+ * @param id is the ID of the histogram previously defined using config_envoy_ptr.
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_session_filter_config_record_histogram_value(
+    envoy_dynamic_module_type_udp_session_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+// =============================================================================
 // ============================== Access Logger ================================
 // =============================================================================
 

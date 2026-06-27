@@ -12,6 +12,7 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules/network:__pkg__",
     "//test/extensions/dynamic_modules/stat_sink:__pkg__",
     "//test/extensions/dynamic_modules/udp:__pkg__",
+    "//test/extensions/filters/udp/udp_proxy/session_filters/dynamic_modules:__pkg__",
     "//test/extensions/formatter/dynamic_modules:__pkg__",
     "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
@@ -95,6 +96,8 @@ test_program(name = "udp_no_filter_new")
 test_program(name = "udp_no_on_data")
 
 test_program(name = "udp_no_filter_destroy")
+
+test_program(name = "udp_session_no_op")
 
 test_program(name = "bootstrap_no_op")
 
