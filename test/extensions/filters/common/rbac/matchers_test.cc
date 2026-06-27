@@ -792,7 +792,7 @@ TEST(PathMatcher, ValidPathInHeader) {
 
 class TestObject : public StreamInfo::FilterState::Object {
 public:
-  absl::optional<std::string> serializeAsString() const override { return "test.value"; }
+  std::optional<std::string> serializeAsString() const override { return "test.value"; }
 };
 
 TEST(FilterStateMatcher, FilterStateMatcher) {

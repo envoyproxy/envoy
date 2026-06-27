@@ -51,7 +51,6 @@ envoy_cc_test_library(
         "//test/mocks:common_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:overload_manager_mocks",
-        "@abseil-cpp//absl/types:optional",
         "@quiche//:http2_adapter",
     ],
 )

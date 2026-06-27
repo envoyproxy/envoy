@@ -458,7 +458,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     }
   }
 
-  const absl::optional<std::string> runtime_val =
+  const std::optional<std::string> runtime_val =
       listener_factory_context_->serverFactoryContext().runtime().snapshot().get(
           cx_limit_runtime_key_);
   if (runtime_val && runtime_val->empty()) {
@@ -867,7 +867,11 @@ ListenerImpl::validateFilterChains(const envoy::config::listener::v3::Listener& 
 
 absl::Status ListenerImpl::buildFilterChains(const envoy::config::listener::v3::Listener& config) {
   transport_factory_context_->setInitManager(*dynamic_init_manager_);
-  ListenerFilterChainFactoryBuilder builder(*this, *transport_factory_context_);
+  // The only connection oriented UDP transport protocol right now is QUIC.
+  const bool is_quic = udpListenerConfig().has_value() &&
+                       !udpListenerConfig()->listenerFactory().isTransportConnectionless();
+  ListenerFilterChainFactoryBuilder builder(is_quic, validation_visitor_, *parent_.factory_,
+                                            *transport_factory_context_);
   return filter_chain_manager_->addFilterChains(
       config.has_filter_chain_matcher() ? &config.filter_chain_matcher() : nullptr,
       config.filter_chains(),
@@ -1004,6 +1008,18 @@ ProtobufMessage::ValidationVisitor& PerListenerFactoryContextImpl::messageValida
 }
 Configuration::ServerFactoryContext& PerListenerFactoryContextImpl::serverFactoryContext() {
   return listener_factory_context_base_->serverFactoryContext();
+}
+envoy::config::core::v3::TrafficDirection PerListenerFactoryContextImpl::direction() const {
+  return listener_factory_context_base_->listenerInfo().direction();
+}
+bool PerListenerFactoryContextImpl::isQuic() const {
+  return listener_factory_context_base_->listenerInfo().isQuic();
+}
+bool PerListenerFactoryContextImpl::shouldBypassOverloadManager() const {
+  return listener_factory_context_base_->listenerInfo().shouldBypassOverloadManager();
+}
+Stats::Scope& PerListenerFactoryContextImpl::prefixedScope() {
+  return listener_factory_context_base_->listenerScope();
 }
 Stats::Scope& PerListenerFactoryContextImpl::listenerScope() {
   return listener_factory_context_base_->listenerScope();

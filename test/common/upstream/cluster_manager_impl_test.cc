@@ -696,7 +696,7 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
 
   create(parseBootstrapFromV3Yaml(yaml));
   const auto& cluster = cluster_manager_->clusters().getCluster("cluster_1");
-  EXPECT_NE(cluster, absl::nullopt);
+  EXPECT_NE(cluster, std::nullopt);
   EXPECT_TRUE(cluster->get().info()->loadBalancerConfig().has_value());
 }
 
@@ -1505,12 +1505,12 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
   EXPECT_FALSE(all_clusters.active_clusters_.at("cluster_1").get().info()->addedViaApi());
 
   // Test for no hosts returning the correct values before we have hosts.
-  EXPECT_EQ(absl::nullopt,
+  EXPECT_EQ(std::nullopt,
             cluster_manager_->getThreadLocalCluster("cluster_1")
                 ->httpConnPool(
                     cluster_manager_->getThreadLocalCluster("cluster_1")->chooseHost(nullptr).host,
                     ResourcePriority::Default, Http::Protocol::Http11, nullptr));
-  EXPECT_EQ(absl::nullopt,
+  EXPECT_EQ(std::nullopt,
             cluster_manager_->getThreadLocalCluster("cluster_1")
                 ->tcpConnPool(
                     cluster_manager_->getThreadLocalCluster("cluster_1")->chooseHost(nullptr).host,
@@ -1544,9 +1544,9 @@ TEST_F(ClusterManagerImplTest, GetActiveOrWarmingCluster) {
   create(parseBootstrapFromV3Yaml(bootstrap_yaml));
 
   // Static cluster should be active.
-  EXPECT_NE(absl::nullopt, cluster_manager_->getActiveCluster("static_cluster"));
-  EXPECT_NE(absl::nullopt, cluster_manager_->getActiveOrWarmingCluster("static_cluster"));
-  EXPECT_EQ(absl::nullopt, cluster_manager_->getActiveOrWarmingCluster("non_existent_cluster"));
+  EXPECT_NE(std::nullopt, cluster_manager_->getActiveCluster("static_cluster"));
+  EXPECT_NE(std::nullopt, cluster_manager_->getActiveOrWarmingCluster("static_cluster"));
+  EXPECT_EQ(std::nullopt, cluster_manager_->getActiveOrWarmingCluster("non_existent_cluster"));
 
   // Now, add a dynamic cluster. It will start in warming state.
   const std::string warming_cluster_yaml = R"EOF(
@@ -1576,9 +1576,9 @@ TEST_F(ClusterManagerImplTest, GetActiveOrWarmingCluster) {
   EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(warming_cluster_config, "version1"));
 
   // The cluster should be in warming, not active.
-  EXPECT_EQ(absl::nullopt, cluster_manager_->getActiveCluster("warming_cluster"));
+  EXPECT_EQ(std::nullopt, cluster_manager_->getActiveCluster("warming_cluster"));
   OptRef<const Cluster> cluster = cluster_manager_->getActiveOrWarmingCluster("warming_cluster");
-  EXPECT_NE(absl::nullopt, cluster);
+  EXPECT_NE(std::nullopt, cluster);
   EXPECT_EQ("warming_cluster", cluster->info()->name());
 
   // Finish initialization. This should move it to active.
@@ -1586,10 +1586,10 @@ TEST_F(ClusterManagerImplTest, GetActiveOrWarmingCluster) {
 
   // Now the cluster should be active.
   cluster = cluster_manager_->getActiveCluster("warming_cluster");
-  EXPECT_NE(absl::nullopt, cluster);
+  EXPECT_NE(std::nullopt, cluster);
   EXPECT_EQ("warming_cluster", cluster->info()->name());
   cluster = cluster_manager_->getActiveOrWarmingCluster("warming_cluster");
-  EXPECT_NE(absl::nullopt, cluster);
+  EXPECT_NE(std::nullopt, cluster);
   EXPECT_EQ("warming_cluster", cluster->info()->name());
 }
 

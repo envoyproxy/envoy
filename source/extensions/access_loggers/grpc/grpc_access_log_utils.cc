@@ -236,7 +236,7 @@ void Utility::extractCommonAccessLogProperties(
               stream_info.startTime().time_since_epoch())
               .count()));
 
-  absl::optional<std::chrono::nanoseconds> dur = stream_info.requestComplete();
+  std::optional<std::chrono::nanoseconds> dur = stream_info.requestComplete();
   if (dur) {
     common_access_log.mutable_duration()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));

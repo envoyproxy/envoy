@@ -45,7 +45,7 @@ StreamInfo::CoreResponseFlag flagFromDownstreamReasonReason(DownstreamStreamRese
 } // namespace
 
 ActiveStream::ActiveStream(Filter& parent, RequestHeaderFramePtr request,
-                           absl::optional<StartTime> start_time)
+                           std::optional<StartTime> start_time)
     : parent_(parent), request_header_frame_(std::move(request)),
       stream_info_(parent_.time_source_,
                    parent_.callbacks_->connection().connectionInfoProviderSharedPtr(),
@@ -609,7 +609,7 @@ void ActiveStream::deferredDelete() {
   }
 }
 
-void ActiveStream::completeStream(absl::optional<DownstreamStreamResetReason> reason) {
+void ActiveStream::completeStream(std::optional<DownstreamStreamResetReason> reason) {
   if (stream_reset_or_complete_) {
     return;
   }
@@ -673,7 +673,7 @@ Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool 
 }
 
 void Filter::onDecodingSuccess(RequestHeaderFramePtr request_header_frame,
-                               absl::optional<StartTime> start_time) {
+                               std::optional<StartTime> start_time) {
   if (request_header_frame == nullptr) {
     ENVOY_LOG(error, "generic proxy: request header frame from codec is null");
     onDecodingFailure();
@@ -742,7 +742,7 @@ void Filter::registerFrameHandler(uint64_t stream_id, ActiveStream* raw_stream) 
 
 void Filter::unregisterFrameHandler(uint64_t stream_id) { frame_handlers_.erase(stream_id); }
 
-void Filter::newDownstreamRequest(StreamRequestPtr request, absl::optional<StartTime> start_time) {
+void Filter::newDownstreamRequest(StreamRequestPtr request, std::optional<StartTime> start_time) {
   auto stream = std::make_unique<ActiveStream>(*this, std::move(request), start_time);
   auto raw_stream = stream.get();
   LinkedList::moveIntoList(std::move(stream), active_streams_);

@@ -1500,7 +1500,7 @@ TEST(UnifiedSotwGrpcMuxFactoryTest, InvalidRateLimit) {
       std::numeric_limits<double>::quiet_NaN());
   EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), nullptr, dispatcher,
                                random, scope, ads_config, local_info, nullptr, nullptr,
-                               absl::nullopt, absl::nullopt, nullptr),
+                               std::nullopt, std::nullopt, nullptr),
                EnvoyException);
 }
 
@@ -1518,7 +1518,7 @@ TEST(UnifiedDeltaGrpcMuxFactoryTest, InvalidRateLimit) {
       std::numeric_limits<double>::quiet_NaN());
   EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), nullptr, dispatcher,
                                random, scope, ads_config, local_info, nullptr, nullptr,
-                               absl::nullopt, absl::nullopt, nullptr),
+                               std::nullopt, std::nullopt, nullptr),
                EnvoyException);
 }
 

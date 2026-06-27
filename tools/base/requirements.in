@@ -17,7 +17,7 @@ orjson>=3.10.15
 pep8-naming
 # Upgrading beyond 4.21.x doesnt currently work. 4.23+ might work when the following is resolved
 # `MessageFactory class is deprecated. Please use GetMessageClass() instead of MessageFactory.GetPrototype`
-protobuf<7.35.0
+protobuf<7.36.0
 ply
 pygithub
 pyjwt[crypto]==2.13.0

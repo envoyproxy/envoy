@@ -1,6 +1,7 @@
 // Usage: bazel run //test/common/upstream:load_balancer_benchmark
 
 #include <memory>
+#include <optional>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/load_balancing_policies/random/v3/random.pb.h"
@@ -20,7 +21,6 @@
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/test_common/simulated_time_system.h"
 
-#include "absl/types/optional.h"
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
@@ -69,10 +69,10 @@ public:
   void update() {
     priority_set_.updateHosts(
         0, Upstream::HostSetImpl::partitionHosts(smaller_hosts_, smaller_locality_hosts_), nullptr,
-        {}, host_moved_, absl::nullopt);
+        {}, host_moved_, std::nullopt);
     priority_set_.updateHosts(
         0, Upstream::HostSetImpl::partitionHosts(orig_hosts_, orig_locality_hosts_), nullptr,
-        host_moved_, {}, absl::nullopt);
+        host_moved_, {}, std::nullopt);
   }
 
   std::unique_ptr<Upstream::SubsetLoadBalancerConfig> subset_config_;

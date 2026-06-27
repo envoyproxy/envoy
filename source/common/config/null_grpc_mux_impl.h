@@ -34,7 +34,7 @@ public:
     return absl::UnimplementedError("");
   }
 
-  EdsResourcesCacheOptRef edsResourcesCache() override { return absl::nullopt; }
+  EdsResourcesCacheOptRef edsResourcesCache() override { return std::nullopt; }
 
   Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
   Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }

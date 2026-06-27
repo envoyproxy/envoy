@@ -151,9 +151,9 @@ bool cookieNameMatchesBase(absl::string_view cookie_name, absl::string_view base
   return cookie_name.starts_with(absl::StrCat(base_name, CookieSuffixDelimiter));
 }
 
-absl::optional<std::string> readCookieValueWithSuffix(const Http::RequestHeaderMap& headers,
-                                                      absl::string_view base_name,
-                                                      absl::string_view suffix) {
+std::optional<std::string> readCookieValueWithSuffix(const Http::RequestHeaderMap& headers,
+                                                     absl::string_view base_name,
+                                                     absl::string_view suffix) {
   const std::string suffixed_name = cookieNameWithSuffix(base_name, suffix);
   std::string value = Http::Utility::parseCookieValue(headers, suffixed_name);
   if (!value.empty()) {
@@ -167,7 +167,7 @@ absl::optional<std::string> readCookieValueWithSuffix(const Http::RequestHeaderM
   if (!value.empty()) {
     return value;
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 std::string findValue(const absl::flat_hash_map<std::string, std::string>& map,
@@ -682,6 +682,9 @@ FilterConfig::FilterConfig(
       disable_token_encryption_(proto_config.disable_token_encryption()),
       use_access_token_expiry_for_id_token_cookie_(
           proto_config.use_access_token_expiry_for_id_token_cookie()),
+      forward_id_token_header_(proto_config.has_forward_id_token()
+                                   ? Http::LowerCaseString(proto_config.forward_id_token().header())
+                                   : Http::LowerCaseString("")),
       bearer_token_cookie_settings_(
           (proto_config.has_cookie_configs() &&
            proto_config.cookie_configs().has_bearer_token_cookie_config())
@@ -872,6 +875,13 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     return Http::FilterHeadersStatus::Continue;
   }
 
+  // Strip the configured forward_id_token header before any upstream-bound path (including the
+  // pass-through bypass below) so a client can never spoof it; Envoy re-sets it from a validated
+  // cookie later. The Authorization-header case is handled by the sanitization further down.
+  if (config_->forwardIdToken() && !config_->forwardIdTokenOnAuthorizationHeader()) {
+    headers.remove(config_->forwardIdTokenHeader());
+  }
+
   // Skip Filter and continue chain if a Passthrough header is matching.
   // Only increment counters here; do not modify request headers, as there may be
   // other instances of this filter configured that still need to process the request.
@@ -1026,7 +1036,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
   const auto redirect_uri = formatter->format({&headers}, decoder_callbacks_->streamInfo());
 
-  absl::optional<std::string> encrypted_code_verifier =
+  std::optional<std::string> encrypted_code_verifier =
       readCookieValueWithSuffix(headers, config_->cookieNames().code_verifier_, result.flow_id_);
   if (!encrypted_code_verifier.has_value()) {
     sendUnauthorizedResponse("Code verifier cookie is missing in the request");
@@ -1078,6 +1088,9 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
     if (config_->forwardBearerToken() && !validator_->token().empty()) {
       setBearerToken(headers, validator_->token());
     }
+    if (config_->forwardIdToken() && !validator_->idToken().empty()) {
+      forwardIdToken(headers, validator_->idToken());
+    }
     ENVOY_STREAM_LOG(debug, "skipping oauth flow due to valid hmac cookie", *decoder_callbacks_);
     return true;
   }
@@ -1119,6 +1132,17 @@ void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& hea
       !encrypted_refresh_token.empty()) {
     std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
     headers.setReferenceKey(Http::Headers::get().Cookie, new_cookies);
+  }
+}
+
+void OAuth2Filter::forwardIdToken(Http::RequestHeaderMap& headers,
+                                  const std::string& id_token) const {
+  if (config_->forwardIdTokenOnAuthorizationHeader()) {
+    // Forward on the Authorization header using the standard Bearer scheme.
+    setBearerToken(headers, id_token);
+  } else {
+    // Forward the raw token value on the configured custom header.
+    headers.setCopy(config_->forwardIdTokenHeader(), id_token);
   }
 }
 
@@ -1553,6 +1577,9 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   if (config_->forwardBearerToken() && !access_token_.empty()) {
     setBearerToken(*request_headers_, access_token_);
   }
+  if (config_->forwardIdToken() && !id_token_.empty()) {
+    forwardIdToken(*request_headers_, id_token_);
+  }
 
   was_refresh_token_flow_ = true;
 
@@ -1693,7 +1720,7 @@ void OAuth2Filter::sendUnauthorizedResponse(const std::string& details) {
           addFlowCookieDeletionHeaders(headers, flow_id_);
         }
       },
-      absl::nullopt, details);
+      std::nullopt, details);
 }
 
 void OAuth2Filter::sendSecretsNotReadyResponse(const std::string& details) {
@@ -1701,7 +1728,7 @@ void OAuth2Filter::sendSecretsNotReadyResponse(const std::string& details) {
                    details);
   config_->stats().oauth_failure_.inc();
   decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, ServiceUnavailableBodyMessage,
-                                     nullptr, absl::nullopt, details);
+                                     nullptr, std::nullopt, details);
 }
 
 bool OAuth2Filter::shouldAllowFailed(const Http::RequestHeaderMap& headers) const {
@@ -1853,7 +1880,7 @@ CallbackValidationResult OAuth2Filter::validateState(const Http::RequestHeaderMa
 bool OAuth2Filter::validateCsrfToken(const Http::RequestHeaderMap& headers,
                                      const std::string& csrf_token,
                                      absl::string_view flow_id) const {
-  absl::optional<std::string> cookie_value =
+  std::optional<std::string> cookie_value =
       readCookieValueWithSuffix(headers, config_->cookieNames().oauth_nonce_, flow_id);
   if (!cookie_value.has_value()) {
     return false;

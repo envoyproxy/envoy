@@ -145,7 +145,7 @@ public:
   };
 
   void initializeProvider(const std::string& yaml,
-                          absl::optional<ConditionalInitializer>& conditional) {
+                          std::optional<ConditionalInitializer>& conditional) {
     EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*scope_));
     EXPECT_CALL(context_, serverFactoryContext())
         .WillRepeatedly(ReturnRef(server_factory_context_));
@@ -214,7 +214,7 @@ public:
   absl::flat_hash_map<std::string, std::string> captured_lookup_response_;
   absl::Mutex mutex_;
   std::vector<Filesystem::Watcher::OnChangedCb> on_changed_cbs_ ABSL_GUARDED_BY(mutex_);
-  absl::optional<ConditionalInitializer> cb_added_nullopt = absl::nullopt;
+  std::optional<ConditionalInitializer> cb_added_nullopt = std::nullopt;
   DriverSharedPtr provider_;
 };
 
@@ -695,7 +695,7 @@ TEST_F(GeoipProviderTest, DbReloadedOnMmdbFileUpdate) {
       "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test-Updated.mmdb");
   const std::string formatted_config =
       fmt::format(config_yaml, TestEnvironment::substitute(city_db_path));
-  auto cb_added_opt = absl::make_optional<ConditionalInitializer>();
+  auto cb_added_opt = std::make_optional<ConditionalInitializer>();
   initializeProvider(formatted_config, cb_added_opt);
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddressNoThrow("81.2.69.144");
@@ -746,7 +746,7 @@ TEST_F(GeoipProviderTest, DbEpochGaugeUpdatesWhenReloadedOnMmdbFileUpdate) {
       "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test-Updated.mmdb");
   const std::string formatted_config =
       fmt::format(config_yaml, TestEnvironment::substitute(city_db_path));
-  auto cb_added_opt = absl::make_optional<ConditionalInitializer>();
+  auto cb_added_opt = std::make_optional<ConditionalInitializer>();
   initializeProvider(formatted_config, cb_added_opt);
   expectStats("city_db", 0, 0, 0, 1671567063);
   TestEnvironment::renameFile(city_db_path, city_db_path + "1");
@@ -1038,7 +1038,7 @@ class MmdbReloadImplTest : public ::testing::TestWithParam<MmdbReloadTestCase>,
 
 TEST_P(MmdbReloadImplTest, MmdbReloaded) {
   MmdbReloadTestCase test_case = GetParam();
-  auto cb_added_opt = absl::make_optional<ConditionalInitializer>();
+  auto cb_added_opt = std::make_optional<ConditionalInitializer>();
   initializeProvider(test_case.yaml_config_, cb_added_opt);
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddressNoThrow(test_case.ip_);
@@ -1076,7 +1076,7 @@ TEST_P(MmdbReloadImplTest, MmdbReloaded) {
 
 TEST_P(MmdbReloadImplTest, MmdbReloadedInFlightReadsNotAffected) {
   MmdbReloadTestCase test_case = GetParam();
-  auto cb_added_opt = absl::make_optional<ConditionalInitializer>();
+  auto cb_added_opt = std::make_optional<ConditionalInitializer>();
   initializeProvider(test_case.yaml_config_, cb_added_opt);
   GeoipProviderPeer::synchronizer(provider_).enable();
   const auto lookup_sync_point_name = test_case.db_type_.append("_lookup_pre_complete");
@@ -1166,7 +1166,7 @@ class MmdbReloadErrorImplTest : public ::testing::TestWithParam<MmdbReloadErrorT
 
 TEST_P(MmdbReloadErrorImplTest, MmdbReloadErrorUsesPreviousDb) {
   MmdbReloadErrorTestCase test_case = GetParam();
-  auto cb_added_opt = absl::make_optional<ConditionalInitializer>();
+  auto cb_added_opt = std::make_optional<ConditionalInitializer>();
   initializeProvider(test_case.yaml_config_, cb_added_opt);
   std::string source_db_file_path = TestEnvironment::substitute(test_case.source_db_file_path_);
   std::string invalid_db_file_path = TestEnvironment::substitute(invalid_db_path);

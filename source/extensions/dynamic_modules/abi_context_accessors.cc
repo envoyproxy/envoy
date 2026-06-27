@@ -286,7 +286,7 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
         stream_info,
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->dnsSansLocalCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->dnsSansLocalCertificate().front();
         },
@@ -296,7 +296,7 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
         stream_info,
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->dnsSansPeerCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->dnsSansPeerCertificate().front();
         },
@@ -306,7 +306,7 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
         stream_info,
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->uriSanLocalCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->uriSanLocalCertificate().front();
         },
@@ -316,7 +316,7 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
         stream_info,
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->uriSanPeerCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->uriSanPeerCertificate().front();
         },
@@ -354,7 +354,7 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
         stream_info,
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->dnsSansLocalCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->dnsSansLocalCertificate().front();
         },
@@ -364,7 +364,7 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
         stream_info,
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->dnsSansPeerCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->dnsSansPeerCertificate().front();
         },
@@ -374,7 +374,7 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
         stream_info,
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->uriSanLocalCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->uriSanLocalCertificate().front();
         },
@@ -384,7 +384,7 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
         stream_info,
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->uriSanPeerCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->uriSanPeerCertificate().front();
         },

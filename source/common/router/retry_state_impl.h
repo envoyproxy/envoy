@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -18,7 +19,6 @@
 #include "source/common/http/header_utility.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -62,7 +62,7 @@ public:
 
   // Router::RetryState
   bool enabled() override { return retry_on_ != 0; }
-  absl::optional<std::chrono::milliseconds>
+  std::optional<std::chrono::milliseconds>
   parseResetInterval(const Http::ResponseHeaderMap& response_headers) const override;
   RetryStatus shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
                                  const Http::RequestHeaderMap& original_request,

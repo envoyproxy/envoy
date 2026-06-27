@@ -120,19 +120,19 @@ public:
                          Extensions::Filters::Common::ProcessingEffect::Effect processing_effect);
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
   void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
-  void setClusterInfo(absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info) {
+  void setClusterInfo(std::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info) {
     if (cluster_info) {
       cluster_info_ = cluster_info.value();
     }
   }
-  void setUpstreamHost(absl::optional<Upstream::HostDescriptionConstSharedPtr> upstream_host) {
+  void setUpstreamHost(std::optional<Upstream::HostDescriptionConstSharedPtr> upstream_host) {
     if (upstream_host) {
       upstream_host_ = upstream_host.value();
     }
   }
 
   // Only sets if not-null.
-  void setHttpResponseCodeDetails(const absl::optional<std::string>& http_response_code_details) {
+  void setHttpResponseCodeDetails(const std::optional<std::string>& http_response_code_details) {
     if (http_response_code_details) {
       http_response_code_details_ = http_response_code_details.value();
     }
@@ -156,7 +156,7 @@ public:
 
   ProtobufTypes::MessagePtr serializeAsProto() const override;
 
-  absl::optional<std::string> serializeAsString() const override;
+  std::optional<std::string> serializeAsString() const override;
 
   bool hasFieldSupport() const override { return true; }
 
@@ -327,7 +327,7 @@ public:
     return thread_local_stream_manager_slot_->getTyped<ThreadLocalStreamManager>();
   }
 
-  const absl::optional<const envoy::config::core::v3::GrpcService> grpcService() const {
+  const std::optional<const envoy::config::core::v3::GrpcService> grpcService() const {
     return grpc_service_;
   }
 
@@ -380,7 +380,7 @@ private:
 
   const AllowedOverrideModesSet allowed_override_modes_;
 
-  const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
+  const std::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
   const Filters::Common::MutationRules::Checker mutation_checker_;
   const Protobuf::Struct filter_metadata_;
   const ExpressionManager expression_manager_;
@@ -431,36 +431,35 @@ public:
                        const FilterConfigPerRoute& more_specific);
 
   bool disabled() const { return disabled_; }
-  const absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>&
+  const std::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>&
   processingMode() const {
     return processing_mode_;
   }
-  const absl::optional<const envoy::config::core::v3::GrpcService>& grpcService() const {
+  const std::optional<const envoy::config::core::v3::GrpcService>& grpcService() const {
     return grpc_service_;
   }
   const std::vector<envoy::config::core::v3::HeaderValue>& grpcInitialMetadata() const {
     return grpc_initial_metadata_;
   }
 
-  const absl::optional<const std::vector<std::string>>&
-  untypedForwardingMetadataNamespaces() const {
+  const std::optional<const std::vector<std::string>>& untypedForwardingMetadataNamespaces() const {
     return untyped_forwarding_namespaces_;
   }
-  const absl::optional<const std::vector<std::string>>& typedForwardingMetadataNamespaces() const {
+  const std::optional<const std::vector<std::string>>& typedForwardingMetadataNamespaces() const {
     return typed_forwarding_namespaces_;
   }
-  const absl::optional<const std::vector<std::string>>& untypedReceivingMetadataNamespaces() const {
+  const std::optional<const std::vector<std::string>>& untypedReceivingMetadataNamespaces() const {
     return untyped_receiving_namespaces_;
   }
-  const absl::optional<const std::vector<std::string>>&
+  const std::optional<const std::vector<std::string>>&
   untypedClusterMetadataForwardingNamespaces() const {
     return untyped_cluster_metadata_forwarding_namespaces_;
   }
-  const absl::optional<const std::vector<std::string>>&
+  const std::optional<const std::vector<std::string>>&
   typedClusterMetadataForwardingNamespaces() const {
     return typed_cluster_metadata_forwarding_namespaces_;
   }
-  const absl::optional<bool>& failureModeAllow() const { return failure_mode_allow_; }
+  const std::optional<bool>& failureModeAllow() const { return failure_mode_allow_; }
 
   bool hasProcessingRequestModifierConfig() const {
     return processing_request_modifier_factory_cb_ != nullptr;
@@ -475,19 +474,18 @@ public:
 
 private:
   const bool disabled_;
-  const absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
+  const std::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
       processing_mode_;
-  const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
+  const std::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
   std::vector<envoy::config::core::v3::HeaderValue> grpc_initial_metadata_;
 
-  const absl::optional<const std::vector<std::string>> untyped_forwarding_namespaces_;
-  const absl::optional<const std::vector<std::string>> typed_forwarding_namespaces_;
-  const absl::optional<const std::vector<std::string>> untyped_receiving_namespaces_;
-  const absl::optional<const std::vector<std::string>>
+  const std::optional<const std::vector<std::string>> untyped_forwarding_namespaces_;
+  const std::optional<const std::vector<std::string>> typed_forwarding_namespaces_;
+  const std::optional<const std::vector<std::string>> untyped_receiving_namespaces_;
+  const std::optional<const std::vector<std::string>>
       untyped_cluster_metadata_forwarding_namespaces_;
-  const absl::optional<const std::vector<std::string>>
-      typed_cluster_metadata_forwarding_namespaces_;
-  const absl::optional<bool> failure_mode_allow_;
+  const std::optional<const std::vector<std::string>> typed_cluster_metadata_forwarding_namespaces_;
+  const std::optional<bool> failure_mode_allow_;
 
   const std::function<std::unique_ptr<ProcessingRequestModifier>()>
       processing_request_modifier_factory_cb_;
@@ -662,7 +660,7 @@ private:
   bool failureModeAllow() const;
 
   std::unique_ptr<ProcessingRequestModifier> createProcessingRequestModifier(
-      const absl::optional<envoy::config::core::v3::TypedExtensionConfig>& config,
+      const std::optional<envoy::config::core::v3::TypedExtensionConfig>& config,
       Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
       Server::Configuration::CommonFactoryContext& context);
 

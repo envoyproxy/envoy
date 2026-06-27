@@ -46,14 +46,14 @@ namespace {
 // www.lyft.com -> fake test upstream.
 class TestKeyValueStore : public Envoy::Platform::KeyValueStore {
 public:
-  absl::optional<std::string> read(const std::string&) override {
+  std::optional<std::string> read(const std::string&) override {
     ASSERT(!value_.empty());
     return value_;
   }
   void save(std::string, std::string) override {}
   void remove(const std::string&) override {}
-  void addOrUpdate(absl::string_view, absl::string_view, absl::optional<std::chrono::seconds>) {}
-  absl::optional<absl::string_view> get(absl::string_view) { return {}; }
+  void addOrUpdate(absl::string_view, absl::string_view, std::optional<std::chrono::seconds>) {}
+  std::optional<absl::string_view> get(absl::string_view) { return {}; }
   void flush() {}
   void iterate(::Envoy::KeyValueStore::ConstIterateCb) const {}
   void setValue(std::string value) { value_ = value; }
@@ -2179,6 +2179,107 @@ TEST_P(ClientIntegrationTest, SconeValuePropagationMultipleUpdates) {
   upstream_request_->encodeData(0, true);
 
   terminal_callback_.waitReady();
+}
+
+TEST_P(ClientIntegrationTest, DrainConnectionsBySocketTag) {
+  autonomous_upstream_ = false;
+  builder_.enableSocketTagging(true);
+  builder_.enableStatsCollection(true);
+  initialize();
+
+  Platform::EngineSharedPtr engine;
+  {
+    absl::MutexLock l(engine_lock_);
+    engine = engine_;
+  }
+
+  auto send_request_with_tag = [&](int tag_value, ConditionalInitializer& terminal,
+                                   std::string& status) {
+    Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+    Http::TestRequestHeaderMapImpl request_headers = default_request_headers_;
+    request_headers.addCopy(Http::LowerCaseString("x-envoy-mobile-socket-tag"),
+                            absl::StrCat("0,", tag_value));
+
+    EnvoyStreamCallbacks callbacks;
+    callbacks.on_headers_ = [&](const Http::ResponseHeaderMap& headers, bool, envoy_stream_intel) {
+      status = absl::StrCat(headers.getStatusValue());
+    };
+    callbacks.on_data_ = [](const Buffer::Instance&, uint64_t, bool, envoy_stream_intel) {};
+    callbacks.on_complete_ = [&terminal](envoy_stream_intel, envoy_final_stream_intel) {
+      terminal.setReady();
+    };
+    callbacks.on_error_ = [&terminal](const EnvoyError&, envoy_stream_intel,
+                                      envoy_final_stream_intel) { terminal.setReady(); };
+    callbacks.on_cancel_ = [&terminal](envoy_stream_intel, envoy_final_stream_intel) {
+      terminal.setReady();
+    };
+
+    Platform::StreamSharedPtr stream = createNewStream(std::move(callbacks));
+    stream->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(request_headers), false);
+    stream->sendData(std::make_unique<Buffer::OwnedImpl>(std::move(request_data)));
+    stream->close(Http::Utility::createRequestTrailerMapPtr());
+    return stream;
+  };
+
+  // 1. First request to establish a connection with socket tag 12345
+  ConditionalInitializer terminal1;
+  std::string status1;
+  auto s1 = send_request_with_tag(12345, terminal1, status1);
+
+  FakeHttpConnectionPtr fake_upstream_connection1;
+  FakeStreamPtr fake_stream1;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        fake_upstream_connection1));
+  ASSERT_TRUE(
+      fake_upstream_connection1->waitForNewStream(*BaseIntegrationTest::dispatcher_, fake_stream1));
+  ASSERT_TRUE(fake_stream1->waitForEndStream(*BaseIntegrationTest::dispatcher_));
+  fake_stream1->encodeHeaders(Http::TestResponseHeaderMapImpl({{":status", "200"}}), false);
+  fake_stream1->encodeData(100, true);
+  terminal1.waitReady();
+  ASSERT_EQ(status1, "200");
+
+  // 2. Second request to the same host with a different socket tag 67890
+  ConditionalInitializer terminal2;
+  std::string status2;
+  auto s2 = send_request_with_tag(67890, terminal2, status2);
+
+  FakeHttpConnectionPtr fake_upstream_connection2;
+  FakeStreamPtr fake_stream2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        fake_upstream_connection2));
+  ASSERT_TRUE(
+      fake_upstream_connection2->waitForNewStream(*BaseIntegrationTest::dispatcher_, fake_stream2));
+  ASSERT_TRUE(fake_stream2->waitForEndStream(*BaseIntegrationTest::dispatcher_));
+  fake_stream2->encodeHeaders(Http::TestResponseHeaderMapImpl({{":status", "200"}}), false);
+  fake_stream2->encodeData(100, true);
+  terminal2.waitReady();
+  ASSERT_EQ(status2, "200");
+
+  // 3. Drain only the connections matching the first socket tag 12345
+  engine->drainConnectionsBySocketTag(12345);
+  // Directly verify server-side connection 1 disconnects
+  ASSERT_TRUE(fake_upstream_connection1->waitForDisconnect());
+  // Verify server-side connection 2 remains fully open and connected
+  EXPECT_TRUE(fake_upstream_connection2->connected());
+
+  // 4. Third request to the same host with the second socket tag 67890
+  ConditionalInitializer terminal3;
+  std::string status3;
+  auto s3 = send_request_with_tag(67890, terminal3, status3);
+
+  FakeStreamPtr fake_stream3;
+  ASSERT_TRUE(
+      fake_upstream_connection2->waitForNewStream(*BaseIntegrationTest::dispatcher_, fake_stream3));
+  ASSERT_TRUE(fake_stream3->waitForEndStream(*BaseIntegrationTest::dispatcher_));
+  fake_stream3->encodeHeaders(Http::TestResponseHeaderMapImpl({{":status", "200"}}), false);
+  fake_stream3->encodeData(100, true);
+  terminal3.waitReady();
+
+  ASSERT_EQ(status3, "200");
+  if (fake_upstream_connection2 != nullptr) {
+    ASSERT_TRUE(fake_upstream_connection2->close());
+    ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
+  }
 }
 } // namespace
 } // namespace Envoy

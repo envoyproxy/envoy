@@ -161,7 +161,7 @@ protected:
   std::unique_ptr<MockValidator> mock_validator_;
   Thread::ThreadId main_thread_id_;
   std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
-  absl::optional<envoy::config::core::v3::TypedExtensionConfig> platform_bridge_config_;
+  std::optional<envoy::config::core::v3::TypedExtensionConfig> platform_bridge_config_;
 };
 
 INSTANTIATE_TEST_SUITE_P(TrustMode, PlatformBridgeCertValidatorTest,

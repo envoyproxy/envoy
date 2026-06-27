@@ -240,7 +240,7 @@ typed_config:
       envoy::extensions::bootstrap::internal_listener::v3::InternalListener il;
       auto* be = bootstrap.add_bootstrap_extensions();
       be->set_name("envoy.bootstrap.internal_listener");
-      be->mutable_typed_config()->PackFrom(il);
+      std::ignore = be->mutable_typed_config()->PackFrom(il);
 
       // outbound listener → [istio.stats(network, source), tcp_proxy → "encap"].
       auto* outbound = sr->mutable_listeners(0);
@@ -260,7 +260,7 @@ typed_config:
       out_tcp.set_cluster("encap");
       auto* of = ofc->add_filters();
       of->set_name("envoy.filters.network.tcp_proxy");
-      of->mutable_typed_config()->PackFrom(out_tcp);
+      std::ignore = of->mutable_typed_config()->PackFrom(out_tcp);
 
       // "connect_originate" internal listener: downstream peer_metadata computes the
       // local (client) baggage into filter state, which the tunneling tcp_proxy adds
@@ -384,7 +384,7 @@ typed_config:
           envoy::extensions::bootstrap::internal_listener::v3::InternalListener il;
           auto* be = bootstrap.add_bootstrap_extensions();
           be->set_name("envoy.bootstrap.internal_listener");
-          be->mutable_typed_config()->PackFrom(il);
+          std::ignore = be->mutable_typed_config()->PackFrom(il);
 
           // "connect_originate" internal listener: a tunneling tcp_proxy that wraps the
           // HCM's upstream HTTP bytes in an HTTP/2 CONNECT to the SERVER.
@@ -518,7 +518,7 @@ typed_config:
       envoy::extensions::bootstrap::internal_listener::v3::InternalListener il;
       auto* be = bootstrap.add_bootstrap_extensions();
       be->set_name("envoy.bootstrap.internal_listener");
-      be->mutable_typed_config()->PackFrom(il);
+      std::ignore = be->mutable_typed_config()->PackFrom(il);
 
       auto* listener = sr->mutable_listeners(0);
       listener->set_name("inbound");

@@ -196,7 +196,7 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   // If there is no hash in the context, just choose a random value (this effectively becomes
   // the random LB but it won't crash if someone configures it this way).
   // computeHashKey() may be computed on demand, so get it only once.
-  absl::optional<uint64_t> hash;
+  std::optional<uint64_t> hash;
   if (context) {
     // If there is a hash policy, use the hash policy in the load balancer first.
     if (hash_policy_ != nullptr) {

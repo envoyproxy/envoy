@@ -76,7 +76,7 @@ public:
   MOCK_METHOD(ConnectionInfoSetter&, connectionInfoSetter, ());                                    \
   MOCK_METHOD(const ConnectionInfoProvider&, connectionInfoProvider, (), (const));                 \
   MOCK_METHOD(ConnectionInfoProviderSharedPtr, connectionInfoProviderSharedPtr, (), (const));      \
-  MOCK_METHOD(absl::optional<Connection::UnixDomainSocketPeerCredentials>,                         \
+  MOCK_METHOD(std::optional<Connection::UnixDomainSocketPeerCredentials>,                          \
               unixSocketPeerCredentials, (), (const));                                             \
   MOCK_METHOD(void, setConnectionStats, (const ConnectionStats& stats));                           \
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));                                \
@@ -98,10 +98,10 @@ public:
   MOCK_METHOD(absl::string_view, transportFailureReason, (), (const));                             \
   MOCK_METHOD(absl::string_view, localCloseReason, (), (const));                                   \
   MOCK_METHOD(bool, startSecureTransport, ());                                                     \
-  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, (), (const));          \
+  MOCK_METHOD(std::optional<std::chrono::milliseconds>, lastRoundTripTime, (), (const));           \
   MOCK_METHOD(void, configureInitialCongestionWindow,                                              \
               (uint64_t bandwidth_bits_per_sec, std::chrono::microseconds rtt), ());               \
-  MOCK_METHOD(absl::optional<uint64_t>, congestionWindowInBytes, (), (const));                     \
+  MOCK_METHOD(std::optional<uint64_t>, congestionWindowInBytes, (), (const));                      \
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));                                     \
   MOCK_METHOD(bool, setSocketOption, (Network::SocketOptionName, absl::Span<uint8_t>), ());        \
   MOCK_METHOD(OptRef<const StreamInfo::StreamInfo>, trackedStream, (), (const));

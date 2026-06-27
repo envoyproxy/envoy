@@ -2,6 +2,7 @@
 
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <type_traits>
 #include <utility>
 
@@ -18,7 +19,6 @@
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
-#include "absl/types/optional.h"
 #include "quiche/quic/core/quic_config.h"
 #include "quiche/quic/core/quic_error_codes.h"
 #include "quiche/quic/core/quic_stream.h"
@@ -40,7 +40,7 @@ private:
 
   const ScopeTrackedObject* object_;
   Event::ScopeTracker& tracker_;
-  absl::optional<ScopeTrackerScopeState> state_;
+  std::optional<ScopeTrackerScopeState> state_;
 };
 } // namespace
 

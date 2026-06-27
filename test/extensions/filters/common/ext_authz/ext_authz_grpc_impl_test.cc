@@ -53,7 +53,7 @@ public:
   }
 
   Grpc::MockAsyncClient* async_client_;
-  absl::optional<std::chrono::milliseconds> timeout_;
+  std::optional<std::chrono::milliseconds> timeout_;
   Grpc::MockAsyncRequest async_request_;
   GrpcClientImplPtr client_;
   MockRequestCallbacks request_callbacks_;

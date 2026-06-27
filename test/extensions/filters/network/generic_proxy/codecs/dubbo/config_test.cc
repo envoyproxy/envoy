@@ -42,7 +42,7 @@ MessageMetadataSharedPtr createDubboRequst(bool one_way_request) {
 }
 
 MessageMetadataSharedPtr createDubboResponse(DubboRequest& request, ResponseStatus status,
-                                             absl::optional<RpcResponseType> type) {
+                                             std::optional<RpcResponseType> type) {
   return DirectResponseUtil::localResponse(*request.inner_metadata_, status, type, "anything");
 }
 
@@ -162,46 +162,43 @@ TEST(DubboResponseTest, DubboResponseTest) {
   }
   {
     DubboResponse response(
-        createDubboResponse(request, ResponseStatus::ClientTimeout, absl::nullopt));
+        createDubboResponse(request, ResponseStatus::ClientTimeout, std::nullopt));
     EXPECT_EQ(30, response.status().code());
   }
   {
     DubboResponse response(
-        createDubboResponse(request, ResponseStatus::ServerTimeout, absl::nullopt));
+        createDubboResponse(request, ResponseStatus::ServerTimeout, std::nullopt));
     EXPECT_EQ(31, response.status().code());
   }
   {
-    DubboResponse response(createDubboResponse(request, ResponseStatus::BadRequest, absl::nullopt));
+    DubboResponse response(createDubboResponse(request, ResponseStatus::BadRequest, std::nullopt));
     EXPECT_EQ(40, response.status().code());
   }
   {
-    DubboResponse response(
-        createDubboResponse(request, ResponseStatus::BadResponse, absl::nullopt));
+    DubboResponse response(createDubboResponse(request, ResponseStatus::BadResponse, std::nullopt));
     EXPECT_EQ(50, response.status().code());
   }
   {
     DubboResponse response(
-        createDubboResponse(request, ResponseStatus::ServiceNotFound, absl::nullopt));
+        createDubboResponse(request, ResponseStatus::ServiceNotFound, std::nullopt));
     EXPECT_EQ(60, response.status().code());
   }
   {
     DubboResponse response(
-        createDubboResponse(request, ResponseStatus::ServiceError, absl::nullopt));
+        createDubboResponse(request, ResponseStatus::ServiceError, std::nullopt));
     EXPECT_EQ(70, response.status().code());
   }
   {
-    DubboResponse response(
-        createDubboResponse(request, ResponseStatus::ServerError, absl::nullopt));
+    DubboResponse response(createDubboResponse(request, ResponseStatus::ServerError, std::nullopt));
     EXPECT_EQ(80, response.status().code());
   }
   {
-    DubboResponse response(
-        createDubboResponse(request, ResponseStatus::ClientError, absl::nullopt));
+    DubboResponse response(createDubboResponse(request, ResponseStatus::ClientError, std::nullopt));
     EXPECT_EQ(90, response.status().code());
   }
   {
-    DubboResponse response(createDubboResponse(
-        request, ResponseStatus::ServerThreadpoolExhaustedError, absl::nullopt));
+    DubboResponse response(
+        createDubboResponse(request, ResponseStatus::ServerThreadpoolExhaustedError, std::nullopt));
     EXPECT_EQ(100, response.status().code());
   }
 

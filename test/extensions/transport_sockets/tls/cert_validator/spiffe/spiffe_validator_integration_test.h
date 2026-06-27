@@ -26,7 +26,7 @@ public:
 
   virtual Network::ClientConnectionPtr
   makeSslClientConnection(const ClientSslTransportOptions& options, bool use_expired,
-                          absl::optional<std::string> workload_trust_domain);
+                          std::optional<std::string> workload_trust_domain);
   void checkVerifyErrorCouter(uint64_t value);
 
   static std::string ipClientVersionTestParamsToString(

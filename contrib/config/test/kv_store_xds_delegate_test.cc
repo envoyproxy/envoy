@@ -295,14 +295,14 @@ TEST_F(KeyValueStoreXdsDelegateTest, ResourcesWithTTL) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
   auto* resource = resources.Add();
   resource->set_name("some_resource_1");
-  resource->mutable_resource()->PackFrom(runtime_resource_1);
+  std::ignore = resource->mutable_resource()->PackFrom(runtime_resource_1);
   resource = resources.Add();
   resource->set_name("some_resource_2");
-  resource->mutable_resource()->PackFrom(runtime_resource_2);
+  std::ignore = resource->mutable_resource()->PackFrom(runtime_resource_2);
   resource->mutable_ttl()->set_seconds(30);
   resource = resources.Add();
   resource->set_name("some_resource_3");
-  resource->mutable_resource()->PackFrom(runtime_resource_3);
+  std::ignore = resource->mutable_resource()->PackFrom(runtime_resource_3);
   resource->mutable_ttl()->set_seconds(60);
 
   auto decoded_resources = TestUtility::decodeResources<envoy::service::runtime::v3::Runtime>(

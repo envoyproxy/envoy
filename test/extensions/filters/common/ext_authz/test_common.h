@@ -53,7 +53,7 @@ public:
                     const std::string& body = std::string{},
                     const HeaderValueOptionVector& headers = HeaderValueOptionVector{},
                     const HeaderValueOptionVector& downstream_headers = HeaderValueOptionVector{},
-                    const absl::optional<Grpc::Status::GrpcStatus>& grpc_status = absl::nullopt);
+                    const std::optional<Grpc::Status::GrpcStatus>& grpc_status = std::nullopt);
 
   static HeaderValueOptionVector makeHeaderValueOption(KeyValueOptionVector&& headers);
 
