@@ -28,14 +28,14 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServ
       proto_config.has_cache()
           ? &Config::Utility::getAndCheckFactory<AuthCacheFactory>(proto_config.cache())
           : nullptr;
-  const std::shared_ptr<Protobuf::Message> shared_cache_config =
+  ProtobufTypes::MessagePtr cache_config =
       cache_factory != nullptr
           ? Config::Utility::translateAnyToFactoryConfig(proto_config.cache().typed_config(),
                                                          server_context.messageValidationVisitor(),
                                                          *cache_factory)
           : nullptr;
   AuthCachePtr cache = cache_factory != nullptr
-                           ? cache_factory->createAuthCache(*shared_cache_config, server_context)
+                           ? cache_factory->createAuthCache(*cache_config, server_context)
                            : nullptr;
 
   const auto filter_config = std::make_shared<FilterConfig>(

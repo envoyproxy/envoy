@@ -38,6 +38,7 @@ public:
 
   /**
    * Looks for a matching request/response pair in the cache.
+   * Can be called at most 1 time per session.
    * If lookup fails or misses, the callback should be invoked with nullptr.
    * Lifetimes of the arguments passed to it must last until cb or LookupRequest::cancel is called.
    * @param decoder_callbacks The stream decoder filter callbacks.
@@ -52,6 +53,8 @@ public:
 
   /**
    * Inserts a response into the cache.
+   * Can be called at most 1 time per session. Will only be called if `lookup`
+   * does not find an entry (i.e., on cache miss). Uses the key created in `lookup`.
    * @param response The Response received from the authz service.
    */
   virtual void insert(const Filters::Common::ExtAuthz::Response& response) PURE;

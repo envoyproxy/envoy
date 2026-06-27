@@ -344,9 +344,9 @@ RequestAttributes Filter::collectAttributes(const Http::RequestHeaderMap& header
 void Filter::callAuthzService() {
   // Check if we need to use a per-route service override (gRPC or HTTP).
   Filters::Common::ExtAuthz::Client* client_to_use = client_.get();
-  if (maybe_merged_per_route_config) {
-    if (maybe_merged_per_route_config->grpcService().has_value()) {
-      const auto& grpc_service = maybe_merged_per_route_config->grpcService().value();
+  if (merged_per_route_config_) {
+    if (merged_per_route_config_->grpcService().has_value()) {
+      const auto& grpc_service = merged_per_route_config_->grpcService().value();
       ENVOY_STREAM_LOG(debug, "ext_authz filter: using per-route gRPC service configuration.",
                        *decoder_callbacks_);
 
@@ -406,28 +406,29 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
 
   if (cache_session_ != nullptr) {
     ENVOY_STREAM_LOG(trace, "ext_authz filter performing cache lookup.", *decoder_callbacks_);
-    initiating_lookup_ = true;
+    state_ = State::CacheLookup;
+    initiating_cache_lookup_ = true;
     filter_return_ = FilterReturn::StopDecoding;
 
-    active_lookup_ =
-        cache_session_->lookup(*decoder_callbacks_, *request_attributes_,
-                               [this](Filters::Common::ExtAuthz::ResponsePtr&& response) {
-                                 active_lookup_ = nullptr;
-                                 onCacheLookupComplete(std::move(response));
-                               });
-    initiating_lookup_ = false;
+    bool cb_called = false;
+    active_lookup_ = cache_session_->lookup(
+        *decoder_callbacks_, *request_attributes_,
+        [this, &cb_called](Filters::Common::ExtAuthz::ResponsePtr&& response) {
+          cb_called = true;
+          active_lookup_ = nullptr;
+          onCacheLookupComplete(std::move(response));
+        });
+    if (cb_called) {
+      ENVOY_BUG(
+          active_lookup_ == nullptr,
+          "AuthCacheSession::lookup returned a handle even though it called cb synchronously");
+      active_lookup_ = nullptr;
+    }
+    initiating_cache_lookup_ = false;
     return;
   }
 
-  Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
-      decoder_callbacks_, request_attributes_->headers_,
-      std::move(request_attributes_->context_extensions_),
-      std::move(request_attributes_->metadata_context_),
-      std::move(request_attributes_->route_metadata_context_), check_request_, max_request_bytes_,
-      config_->packAsBytes(), config_->headersAsBytes(), config_->includePeerCertificate(),
-      config_->includeTLSSession(), config_->destinationLabels(), config_->allowedHeadersMatcher(),
-      config_->disallowedHeadersMatcher());
-  callAuthzService();
+  onCacheLookupComplete(nullptr);
 }
 
 void Filter::onCacheLookupComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
@@ -691,10 +692,12 @@ void Filter::onDestroy() {
       active_client_->cancel();
       active_client_ = nullptr;
     }
-  }
-  if (active_lookup_ != nullptr) {
-    active_lookup_->cancel();
-    active_lookup_ = nullptr;
+  } else if (state_ == State::CacheLookup) {
+    state_ = State::Complete;
+    if (active_lookup_ != nullptr) {
+      active_lookup_->cancel();
+      active_lookup_ = nullptr;
+    }
   }
 }
 
@@ -710,7 +713,7 @@ CheckResult Filter::validateAndCheckDecoderHeaderMutation(
 }
 
 void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
-  const bool from_cache = (state_ != State::Calling);
+  const bool from_cache = (state_ == State::CacheLookup);
   state_ = State::Complete;
   using Filters::Common::ExtAuthz::CheckStatus;
   Stats::StatName empty_stat_name;
@@ -1248,7 +1251,7 @@ void Filter::continueDecoding() {
   buffer_data_ = false;
 
   filter_return_ = FilterReturn::ContinueDecoding;
-  if (!initiating_call_ && !initiating_lookup_) {
+  if (!initiating_call_ && !initiating_cache_lookup_) {
     decoder_callbacks_->continueDecoding();
   }
 }

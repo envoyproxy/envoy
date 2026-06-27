@@ -555,9 +555,9 @@ private:
   PerRouteFlags getPerRouteFlags(OptRef<const Router::Route> route) const;
 
   // State of this filter's communication with the external authorization service.
-  // The filter has either not started calling the external service, in the middle of calling
-  // it or has completed.
-  enum class State { NotStarted, Calling, Complete };
+  // The filter has either not started calling the external service, is performing a cache lookup,
+  // is in the middle of calling the service, or has completed.
+  enum class State { NotStarted, CacheLookup, Calling, Complete };
 
   // FilterReturn is used to capture what the return code should be to the filter chain.
   // if this filter is either in the middle of calling the service or the result is denied then
@@ -597,11 +597,15 @@ private:
   bool initiating_call_{};
   // Used to identify if the callback to onCacheLookupComplete() is synchronous (on the stack) or
   // asynchronous.
-  bool initiating_lookup_{};
+  bool initiating_cache_lookup_{};
   bool buffer_data_{};
   bool skip_check_{false};
   envoy::service::auth::v3::CheckRequest check_request_;
+  // Cached request attributes collected during initiateCall(), used as authorization context
+  // inputs for cache lookups and CheckRequest construction.
   absl::optional<RequestAttributes> request_attributes_;
+  // Cached consolidated per-route configuration merged across route specific filter configs,
+  // used to override default authorization services and provide context extensions.
   absl::optional<FilterConfigPerRoute> merged_per_route_config_;
 };
 
