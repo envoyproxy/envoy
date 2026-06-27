@@ -316,7 +316,7 @@ const ConnectionLookupValues& ConnectionLookupValues::get() {
                      ->peerCertificatePresented());
            }},
           {PeerCertificateValid,
-           [](const ConnectionWrapper& wrapper) -> absl::optional<CelValue> {
+           [](const ConnectionWrapper& wrapper) -> std::optional<CelValue> {
              return CelValue::CreateBool(
                  wrapper.info_.downstreamAddressProvider().sslConnection() != nullptr &&
                  wrapper.info_.downstreamAddressProvider()
