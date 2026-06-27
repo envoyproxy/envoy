@@ -25,9 +25,9 @@ class ReverseBridgeIntegrationTest : public testing::TestWithParam<Network::Addr
 public:
   ReverseBridgeIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {}
 
-  void initialize() override { initialize(absl::nullopt); }
+  void initialize() override { initialize(std::nullopt); }
 
-  void initialize(const absl::optional<std::string> response_size_header) {
+  void initialize(const std::optional<std::string> response_size_header) {
     setUpstreamProtocol(Http::CodecType::HTTP2);
 
     const std::string filter = fmt::format(
@@ -207,7 +207,7 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRouteBadContentType) {
 TEST_P(ReverseBridgeIntegrationTest, EnabledRouteStreamResponse) {
   upstream_protocol_ = FakeHttpConnection::Type::HTTP1;
 
-  initialize(absl::make_optional("custom-response-size-header"));
+  initialize(std::make_optional("custom-response-size-header"));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -276,7 +276,7 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRouteStreamResponse) {
 TEST_P(ReverseBridgeIntegrationTest, EnabledRouteStreamWithholdResponse) {
   upstream_protocol_ = FakeHttpConnection::Type::HTTP1;
 
-  initialize(absl::make_optional("custom-response-size-header"));
+  initialize(std::make_optional("custom-response-size-header"));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 

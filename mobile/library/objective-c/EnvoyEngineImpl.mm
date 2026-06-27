@@ -578,6 +578,10 @@ static envoy_data ios_get_string(const void *context) {
   return @(status.c_str());
 }
 
+- (void)drainConnectionsBySocketTag:(uint32_t)tag {
+  _engine->drainConnectionsBySocketTag(tag);
+}
+
 - (void)terminate {
   _engine->terminate();
 }

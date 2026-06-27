@@ -108,12 +108,12 @@ protected:
 
   // Changes to apply to a matcher's OnMatch and its underlying RateLimitQuotaBucketSettings.
   struct Manipulations {
-    absl::optional<BlanketRule> no_assignment_blanket_rule = std::nullopt;
+    std::optional<BlanketRule> no_assignment_blanket_rule = std::nullopt;
     bool unsupported_no_assignment_strategy = false;
-    absl::optional<BucketId> custom_bucket_id = std::nullopt;
-    absl::optional<RateLimitStrategy> fallback_rate_limit_strategy = std::nullopt;
+    std::optional<BucketId> custom_bucket_id = std::nullopt;
+    std::optional<RateLimitStrategy> fallback_rate_limit_strategy = std::nullopt;
     int fallback_ttl_sec = kFallbackTtlSecDefault;
-    absl::optional<DenyResponseSettings> deny_response_settings = std::nullopt;
+    std::optional<DenyResponseSettings> deny_response_settings = std::nullopt;
   };
 
   void manipulateOnMatch(const Manipulations& config_option, OnMatch* mutable_on_match) {

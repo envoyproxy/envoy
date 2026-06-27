@@ -134,11 +134,11 @@ public:
     return received_custom_transport_parameters_;
   }
   // NOLINTNEXTLINE(readability-identifier-naming)
-  const absl::optional<quic::QuicSocketAddress>& received_ipv6_alternate_server_address() {
+  const std::optional<quic::QuicSocketAddress>& received_ipv6_alternate_server_address() {
     return received_ipv6_alternate_server_address_;
   }
   // NOLINTNEXTLINE(readability-identifier-naming)
-  const absl::optional<quic::QuicSocketAddress>& received_ipv4_alternate_server_address() {
+  const std::optional<quic::QuicSocketAddress>& received_ipv4_alternate_server_address() {
     return received_ipv4_alternate_server_address_;
   }
 
@@ -187,8 +187,8 @@ private:
   QuicNetworkConnectivityObserverPtr network_connectivity_observer_;
   OptRef<EnvoyQuicNetworkObserverRegistry> registry_;
   quic::TransportParameters::ParameterMap received_custom_transport_parameters_;
-  absl::optional<quic::QuicSocketAddress> received_ipv6_alternate_server_address_;
-  absl::optional<quic::QuicSocketAddress> received_ipv4_alternate_server_address_;
+  std::optional<quic::QuicSocketAddress> received_ipv6_alternate_server_address_;
+  std::optional<quic::QuicSocketAddress> received_ipv4_alternate_server_address_;
 };
 
 } // namespace Quic

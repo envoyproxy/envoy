@@ -30,12 +30,12 @@ class BaseEngineBuilderTest : public testing::TestWithParam<TestServerType> {
 protected:
   BaseEngineBuilderTest() : server_type_(GetParam()) {}
 
-  void
-  SetUpEngineAndServer(absl::optional<envoymobile::extensions::filters::http::assertion::Assertion>
-                           assertion_config = std::nullopt,
-                       const absl::flat_hash_map<std::string, std::string>& headers = {},
-                       absl::string_view body = "",
-                       const absl::flat_hash_map<std::string, std::string>& trailers = {}) {
+  void SetUpEngineAndServer(
+      std::optional<envoymobile::extensions::filters::http::assertion::Assertion> assertion_config =
+          std::nullopt,
+      const absl::flat_hash_map<std::string, std::string>& headers = {},
+      absl::string_view body = "",
+      const absl::flat_hash_map<std::string, std::string>& trailers = {}) {
     absl::Notification engine_running;
     Platform::TestEngineBuilder engine_builder;
 

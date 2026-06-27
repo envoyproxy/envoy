@@ -1,6 +1,7 @@
 #include "source/extensions/stat_sinks/dog_statsd/config.h"
 
 #include <memory>
+#include <optional>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/config/metrics/v3/stats.pb.validate.h"
@@ -8,8 +9,6 @@
 
 #include "source/common/network/resolver_impl.h"
 #include "source/extensions/stat_sinks/common/statsd/statsd.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,7 +25,7 @@ DogStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
   RETURN_IF_NOT_OK_REF(address_or_error.status());
   Network::Address::InstanceConstSharedPtr address = address_or_error.value();
   ENVOY_LOG(debug, "dog_statsd UDP ip address: {}", address->asString());
-  absl::optional<uint64_t> max_bytes;
+  std::optional<uint64_t> max_bytes;
   if (sink_config.has_max_bytes_per_datagram()) {
     max_bytes = sink_config.max_bytes_per_datagram().value();
   }

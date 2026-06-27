@@ -35,7 +35,7 @@ const Tracing::TraceContextHandler& traceStateHeader() {
 }
 
 void callSampler(SamplerSharedPtr sampler, const StreamInfo::StreamInfo& stream_info,
-                 const absl::optional<SpanContext> span_context, Span& new_span,
+                 const std::optional<SpanContext> span_context, Span& new_span,
                  const std::string& operation_name,
                  OptRef<const Tracing::TraceContext> trace_context) {
   if (!sampler) {
@@ -298,7 +298,7 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
   uint64_t span_id = random_.random();
   new_span->setId(Hex::uint64ToHex(span_id));
   if (sampler_) {
-    callSampler(sampler_, stream_info, absl::nullopt, *new_span, operation_name, trace_context);
+    callSampler(sampler_, stream_info, std::nullopt, *new_span, operation_name, trace_context);
   } else {
     new_span->setSampled(tracing_decision.traced);
   }

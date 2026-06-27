@@ -266,8 +266,8 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeHttpConnection(uint32_t port)
 
 IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
     Network::ClientConnectionPtr&& conn,
-    absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
-    absl::optional<envoy::config::core::v3::HttpProtocolOptions> common_http_options,
+    std::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+    std::optional<envoy::config::core::v3::HttpProtocolOptions> common_http_options,
     bool wait_till_connected) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   cluster->max_response_headers_count_ = 200;
@@ -317,7 +317,7 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
 
 IntegrationCodecClientPtr
 HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
-  auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  auto codec = makeRawHttpConnection(std::move(conn), std::nullopt);
   EXPECT_TRUE(codec->connected()) << codec->connection()->transportFailureReason();
   return codec;
 }
@@ -477,7 +477,7 @@ HttpIntegrationTest::Result HttpIntegrationTest::sendRequestAndWaitForResponse(
   } else {
     response = codec_client_->makeHeaderOnlyRequest(request_headers);
   }
-  absl::optional<uint64_t> index = waitForNextUpstreamRequest(upstream_indices, timeout);
+  std::optional<uint64_t> index = waitForNextUpstreamRequest(upstream_indices, timeout);
   // Send response headers, and end_stream if there is no response body.
   upstream_request_->encodeHeaders(response_headers, response_body_size == 0);
   // Send any response data, with end_stream true.
@@ -521,7 +521,7 @@ void HttpIntegrationTest::sendRequestAndVerifyResponse(
     const Http::TestRequestHeaderMapImpl& request_headers, const int request_size,
     const Http::TestResponseHeaderMapImpl& response_headers, const int response_size,
     const int backend_idx,
-    absl::optional<const Http::TestResponseHeaderMapImpl> expected_response_headers) {
+    std::optional<const Http::TestResponseHeaderMapImpl> expected_response_headers) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
                                                 response_size, backend_idx);
@@ -553,7 +553,7 @@ void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoderPtr response,
   EXPECT_EQ(response->body(), expected_body);
 }
 
-absl::optional<uint64_t> HttpIntegrationTest::waitForNextUpstreamConnection(
+std::optional<uint64_t> HttpIntegrationTest::waitForNextUpstreamConnection(
     const std::vector<uint64_t>& upstream_indices,
     std::chrono::milliseconds connection_wait_timeout,
     FakeHttpConnectionPtr& fake_upstream_connection) {
@@ -577,10 +577,10 @@ absl::optional<uint64_t> HttpIntegrationTest::waitForNextUpstreamConnection(
   return {};
 }
 
-absl::optional<uint64_t>
+std::optional<uint64_t>
 HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& upstream_indices,
                                                 std::chrono::milliseconds connection_wait_timeout) {
-  absl::optional<uint64_t> upstream_with_request;
+  std::optional<uint64_t> upstream_with_request;
   // If there is no upstream connection, wait for it to be established.
   if (!fake_upstream_connection_) {
     upstream_with_request = waitForNextUpstreamConnection(upstream_indices, connection_wait_timeout,
@@ -1506,7 +1506,7 @@ void HttpIntegrationTest::testLargeResponseHeaders(uint32_t size, uint32_t count
   }
 
   initialize();
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt,
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt,
                                         client_protocol_options);
   reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
       ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(big_headers));

@@ -88,6 +88,7 @@ class MockOAuth2CookieValidator : public CookieValidator {
 public:
   MOCK_METHOD(std::string&, username, (), (const));
   MOCK_METHOD(std::string&, token, (), (const));
+  MOCK_METHOD(std::string&, idToken, (), (const));
   MOCK_METHOD(std::string&, refreshToken, (), (const));
 
   MOCK_METHOD(bool, canUpdateTokenByRefreshToken, (), (const));
@@ -320,6 +321,47 @@ public:
         p, factory_context_.server_factory_context_, secret_reader, scope_, "test.");
 
     return c;
+  }
+
+  // Builds a minimal valid config that forwards the ID token on the given header. When
+  // `forward_bearer_token` is true the access token is also forwarded on the Authorization header.
+  FilterConfigSharedPtr getConfigWithIdTokenForwarding(const std::string& id_token_header,
+                                                       bool forward_bearer_token = false) {
+    envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+    auto* endpoint = p.mutable_token_endpoint();
+    endpoint->set_cluster("auth.example.com");
+    endpoint->set_uri("auth.example.com/_oauth");
+    endpoint->mutable_timeout()->set_seconds(1);
+    p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+    p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+    p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+    p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+    p.set_stat_prefix("my_prefix");
+    p.set_forward_bearer_token(forward_bearer_token);
+    p.mutable_forward_id_token()->set_header(id_token_header);
+    // Disable refresh so the OAuth-failure path is exercised directly without a refresh attempt.
+    p.mutable_use_refresh_token()->set_value(false);
+
+    // Allow requests under /allowfailed to continue upstream as unauthenticated when OAuth fails.
+    auto* allow_failed_matcher = p.add_allow_failed_matcher();
+    allow_failed_matcher->set_name(":path");
+    allow_failed_matcher->mutable_string_match()->set_prefix("/allowfailed");
+
+    // OPTIONS requests bypass OAuth entirely via pass-through.
+    auto* pass_through_matcher = p.add_pass_through_matcher();
+    pass_through_matcher->set_name(":method");
+    pass_through_matcher->mutable_string_match()->set_exact("OPTIONS");
+
+    auto credentials = p.mutable_credentials();
+    credentials->set_client_id(TEST_CLIENT_ID);
+    credentials->mutable_token_secret()->set_name("secret");
+    credentials->mutable_hmac_secret()->set_name("hmac");
+
+    MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+
+    auto secret_reader = std::make_shared<MockSecretReader>();
+    return std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
+                                          secret_reader, scope_, "test.");
   }
 
   // Test helpers exposing private OAuth2Filter methods. OAuth2Filter declares
@@ -1145,6 +1187,189 @@ TEST_F(OAuth2Test, OAuthOkPass) {
 
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 0);
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 1);
+}
+
+/**
+ * Scenario: forward_id_token is configured with the Authorization header and the request carries
+ * valid OAuth cookies.
+ *
+ * Expected behavior: the ID token is forwarded on the Authorization header using the Bearer prefix,
+ * replacing any client-supplied Authorization value.
+ */
+TEST_F(OAuth2Test, ForwardIdTokenOnAuthorizationHeader) {
+  init(getConfigWithIdTokenForwarding("Authorization"));
+
+  Http::TestRequestHeaderMapImpl mock_request_headers{
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::CustomHeaders::get().Authorization.get(), "Bearer injected_malice!"},
+  };
+
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::CustomHeaders::get().Authorization.get(), "Bearer legit_id_token"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+
+  std::string legit_id_token{"legit_id_token"};
+  EXPECT_CALL(*validator_, idToken()).WillRepeatedly(ReturnRef(legit_id_token));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(mock_request_headers, false));
+
+  EXPECT_EQ(mock_request_headers, expected_headers);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 1);
+}
+
+/**
+ * Scenario: forward_id_token is configured with a custom header alongside forward_bearer_token, and
+ * the request carries valid OAuth cookies.
+ *
+ * Expected behavior: the access token is forwarded on the Authorization header with the Bearer
+ * prefix, and the raw ID token value is forwarded on the configured custom header.
+ */
+TEST_F(OAuth2Test, ForwardIdTokenOnCustomHeader) {
+  init(getConfigWithIdTokenForwarding("x-id-token", true /* forward_bearer_token */));
+
+  Http::TestRequestHeaderMapImpl mock_request_headers{
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::CustomHeaders::get().Authorization.get(), "Bearer legit_access_token"},
+      {"x-id-token", "legit_id_token"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+
+  std::string legit_access_token{"legit_access_token"};
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_access_token));
+  std::string legit_id_token{"legit_id_token"};
+  EXPECT_CALL(*validator_, idToken()).WillRepeatedly(ReturnRef(legit_id_token));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(mock_request_headers, false));
+
+  EXPECT_EQ(mock_request_headers, expected_headers);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 1);
+}
+
+/**
+ * Scenario: forward_id_token is configured on a custom header and OAuth fails, but the path matches
+ * allow_failed_matcher so the request is forwarded upstream as unauthenticated. The client supplies
+ * a spoofed value on the configured ID-token header.
+ *
+ * Expected behavior: the client-supplied ID-token header is stripped early, so the upstream never
+ * receives a spoofed identity token on a request Envoy marked as OAuth failed.
+ */
+TEST_F(OAuth2Test, ForwardIdTokenCustomHeaderSanitizedOnAllowFailed) {
+  init(getConfigWithIdTokenForwarding("x-id-token"));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/allowfailed/api"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {"x-id-token", "spoofed-id-token"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  // OAuth failed, but allow_failed_matcher lets the request continue unauthenticated.
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  // The spoofed ID-token header must have been removed before forwarding upstream.
+  EXPECT_TRUE(request_headers.get(Http::LowerCaseString("x-id-token")).empty());
+  EXPECT_EQ(request_headers.get(OAuth2Headers::get().OAuthStatus)[0]->value().getStringView(),
+            "failed");
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_allow_failed_passthrough").value(), 1);
+}
+
+/**
+ * Scenario: forward_id_token is configured on a custom header and the client supplies a spoofed
+ * value on that header on a request with valid OAuth cookies.
+ *
+ * Expected behavior: the spoofed value is replaced with the ID token from the validated cookie.
+ */
+TEST_F(OAuth2Test, ForwardIdTokenCustomHeaderOverwritesSpoofedValue) {
+  init(getConfigWithIdTokenForwarding("x-id-token"));
+
+  Http::TestRequestHeaderMapImpl mock_request_headers{
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {"x-id-token", "spoofed-id-token"},
+  };
+
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {"x-id-token", "legit_id_token"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+
+  std::string legit_id_token{"legit_id_token"};
+  EXPECT_CALL(*validator_, idToken()).WillRepeatedly(ReturnRef(legit_id_token));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(mock_request_headers, false));
+
+  EXPECT_EQ(mock_request_headers, expected_headers);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 1);
+}
+
+/**
+ * Scenario: forward_id_token is configured on a custom header and a request matches
+ * pass_through_matcher (so OAuth is bypassed). The client supplies a spoofed value on the
+ * configured ID-token header.
+ *
+ * Expected behavior: the configured header is stripped before the pass-through bypass, so the
+ * upstream never receives a client-supplied ID token even though OAuth processing is skipped.
+ */
+TEST_F(OAuth2Test, ForwardIdTokenCustomHeaderSanitizedOnPassThrough) {
+  init(getConfigWithIdTokenForwarding("x-id-token"));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Options},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {"x-id-token", "spoofed-id-token"},
+  };
+
+  // Pass-through bypasses OAuth: the validator is never consulted.
+  EXPECT_CALL(*validator_, setParams(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  // The spoofed ID-token header must have been removed even though OAuth was bypassed.
+  EXPECT_TRUE(request_headers.get(Http::LowerCaseString("x-id-token")).empty());
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_passthrough").value(), 1);
 }
 
 /**

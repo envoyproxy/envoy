@@ -54,7 +54,7 @@ public:
   HttpInspectorTest()
       : cfg_(std::make_shared<Config>(*store_.rootScope())),
         io_handle_(
-            Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, absl::nullopt, {})),
+            Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, std::nullopt, {})),
         parser_impl_(GetParam()) {}
 
   void init() {

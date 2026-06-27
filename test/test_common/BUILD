@@ -30,7 +30,6 @@ envoy_cc_test_library(
         "//source/common/network:utility_lib",
         "//source/server:options_base",
         "@abseil-cpp//absl/debugging:symbolize",
-        "@abseil-cpp//absl/types:optional",
     ] + envoy_select_signal_trace(["//source/common/signal:sigaction_lib"]) + envoy_select_enable_exceptions([
         "//source/server:options_lib",
     ]),

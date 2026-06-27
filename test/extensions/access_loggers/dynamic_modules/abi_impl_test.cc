@@ -18,8 +18,8 @@ namespace {
 
 class MockStreamIdProvider : public StreamInfo::StreamIdProvider {
 public:
-  MOCK_METHOD(absl::optional<absl::string_view>, toStringView, (), (const));
-  MOCK_METHOD(absl::optional<uint64_t>, toInteger, (), (const));
+  MOCK_METHOD(std::optional<absl::string_view>, toStringView, (), (const));
+  MOCK_METHOD(std::optional<uint64_t>, toInteger, (), (const));
 };
 
 class DynamicModuleAccessLogAbiTest : public testing::Test {
@@ -211,7 +211,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCode) {
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCodeNotSet) {
-  stream_info_.response_code_ = absl::nullopt;
+  stream_info_.response_code_ = std::nullopt;
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
@@ -230,7 +230,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCodeDetails) {
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCodeDetailsNotSet) {
-  stream_info_.response_code_details_ = absl::nullopt;
+  stream_info_.response_code_details_ = std::nullopt;
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
@@ -259,7 +259,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetProtocolHttp2) {
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetProtocolNotSet) {
-  stream_info_.protocol_ = absl::nullopt;
+  stream_info_.protocol_ = std::nullopt;
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
@@ -342,7 +342,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetVirtualClusterNameEmpty) {
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetVirtualClusterNameNotSet) {
-  stream_info_.virtual_cluster_name_ = absl::nullopt;
+  stream_info_.virtual_cluster_name_ = std::nullopt;
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
@@ -360,7 +360,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttemptCount) {
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttemptCountNotSet) {
-  stream_info_.attempt_count_ = absl::nullopt;
+  stream_info_.attempt_count_ = std::nullopt;
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
@@ -389,7 +389,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetConnectionTerminationDetailsEmpty) {
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetConnectionTerminationDetailsNotSet) {
-  stream_info_.connection_termination_details_ = absl::nullopt;
+  stream_info_.connection_termination_details_ = std::nullopt;
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
@@ -1261,8 +1261,8 @@ TEST_F(DynamicModuleAccessLogAbiTest, DownstreamPeerCertValidity) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, DownstreamPeerCertValidityMissing) {
   auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  ON_CALL(*ssl_info, validFromPeerCertificate()).WillByDefault(testing::Return(absl::nullopt));
-  ON_CALL(*ssl_info, expirationPeerCertificate()).WillByDefault(testing::Return(absl::nullopt));
+  ON_CALL(*ssl_info, validFromPeerCertificate()).WillByDefault(testing::Return(std::nullopt));
+  ON_CALL(*ssl_info, expirationPeerCertificate()).WillByDefault(testing::Return(std::nullopt));
   stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
@@ -1502,8 +1502,8 @@ TEST_F(DynamicModuleAccessLogAbiTest, UpstreamPeerCertValidityMissing) {
 TEST_F(DynamicModuleAccessLogAbiTest, UpstreamPeerCertValidityNullopt) {
   // SSL connection exists but validity times are not set.
   auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  ON_CALL(*ssl_info, validFromPeerCertificate()).WillByDefault(testing::Return(absl::nullopt));
-  ON_CALL(*ssl_info, expirationPeerCertificate()).WillByDefault(testing::Return(absl::nullopt));
+  ON_CALL(*ssl_info, validFromPeerCertificate()).WillByDefault(testing::Return(std::nullopt));
+  ON_CALL(*ssl_info, expirationPeerCertificate()).WillByDefault(testing::Return(std::nullopt));
 
   stream_info_.upstream_info_->setUpstreamSslConnection(ssl_info);
 
@@ -1827,7 +1827,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadataNonBoolValue) {
 TEST_F(DynamicModuleAccessLogAbiTest, GetRequestId) {
   auto provider = std::make_shared<NiceMock<MockStreamIdProvider>>();
   ON_CALL(*provider, toStringView())
-      .WillByDefault(testing::Return(absl::optional<absl::string_view>("req-id")));
+      .WillByDefault(testing::Return(std::optional<absl::string_view>("req-id")));
 
   ON_CALL(stream_info_, getStreamIdProvider())
       .WillByDefault(testing::Return(makeOptRef<const StreamInfo::StreamIdProvider>(*provider)));
@@ -2130,7 +2130,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringProtocol) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringProtocolNotAvailable) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  stream_info_.protocol_ = absl::nullopt;
+  stream_info_.protocol_ = std::nullopt;
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result{};
@@ -2175,7 +2175,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringRouteNameEmpty) {
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringRequestId) {
   auto provider = std::make_shared<NiceMock<MockStreamIdProvider>>();
   ON_CALL(*provider, toStringView())
-      .WillByDefault(testing::Return(absl::optional<absl::string_view>("stream-id-123")));
+      .WillByDefault(testing::Return(std::optional<absl::string_view>("stream-id-123")));
   ON_CALL(stream_info_, getStreamIdProvider())
       .WillByDefault(testing::Return(makeOptRef<const StreamInfo::StreamIdProvider>(*provider)));
 
@@ -2368,8 +2368,8 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeBoolHealthCheckFalse) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringResponseCodeDetailsNotSet) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  // response_code_details_ defaults to absl::nullopt.
-  stream_info_.response_code_details_ = absl::nullopt;
+  // response_code_details_ defaults to std::nullopt.
+  stream_info_.response_code_details_ = std::nullopt;
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result{};
@@ -2379,7 +2379,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringResponseCodeDetailsNotSe
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringVirtualHostName) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  absl::optional<std::string> vhost = "my_vhost";
+  std::optional<std::string> vhost = "my_vhost";
   ON_CALL(stream_info_, virtualClusterName()).WillByDefault(testing::ReturnRef(vhost));
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
@@ -2391,7 +2391,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringVirtualHostName) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringVirtualHostNameEmpty) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  absl::optional<std::string> vhost = "";
+  std::optional<std::string> vhost = "";
   ON_CALL(stream_info_, virtualClusterName()).WillByDefault(testing::ReturnRef(vhost));
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
@@ -2402,7 +2402,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringVirtualHostNameEmpty) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringVirtualHostNameNotSet) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  absl::optional<std::string> vhost = absl::nullopt;
+  std::optional<std::string> vhost = std::nullopt;
   ON_CALL(stream_info_, virtualClusterName()).WillByDefault(testing::ReturnRef(vhost));
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
@@ -2413,7 +2413,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringVirtualHostNameNotSet) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringConnectionTerminationDetails) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  absl::optional<std::string> details = "connection_timeout";
+  std::optional<std::string> details = "connection_timeout";
   ON_CALL(stream_info_, connectionTerminationDetails()).WillByDefault(testing::ReturnRef(details));
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
@@ -2919,7 +2919,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntUpstreamPortMissing) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntResponseCodeNotSet) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  stream_info_.response_code_ = absl::nullopt;
+  stream_info_.response_code_ = std::nullopt;
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   uint64_t result = 0;

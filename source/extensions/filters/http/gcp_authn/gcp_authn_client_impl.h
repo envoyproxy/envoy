@@ -52,8 +52,7 @@ private:
   void onError(absl::string_view error_msg);
   void makeTokenRequest(TokenType token_type,
                         const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-                        const std::string& final_url,
-                        const absl::optional<std::string>& fingerprint,
+                        const std::string& final_url, const std::optional<std::string>& fingerprint,
                         GcpAuthnClient::Callbacks& callbacks);
   const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config_;
   Server::Configuration::FactoryContext& context_;
@@ -61,7 +60,7 @@ private:
   GcpAuthnClient::Callbacks* callbacks_{};
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience_;
   TokenType token_type_{TokenType::Jwt};
-  absl::optional<std::string> fingerprint_;
+  std::optional<std::string> fingerprint_;
 };
 
 } // namespace GcpAuthn

@@ -801,7 +801,7 @@ TEST_F(TestUpstreamSocketManager, OnPingResponseValidResponse) {
 
   const std::string ping_response = "RPING";
   EXPECT_CALL(*mock_io_handle, read(_, _))
-      .WillOnce([&](Buffer::Instance& buffer, absl::optional<uint64_t>) -> Api::IoCallUint64Result {
+      .WillOnce([&](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
         buffer.add(ping_response);
         return Api::IoCallUint64Result{ping_response.size(), Api::IoError::none()};
       });
@@ -866,7 +866,7 @@ TEST_F(TestUpstreamSocketManager, OnPingResponseInvalidData) {
 
   const std::string invalid_response = "INVALID_DATA";
   EXPECT_CALL(*mock_io_handle, read(_, _))
-      .WillOnce([&](Buffer::Instance& buffer, absl::optional<uint64_t>) -> Api::IoCallUint64Result {
+      .WillOnce([&](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
         buffer.add(invalid_response);
         return Api::IoCallUint64Result{invalid_response.size(), Api::IoError::none()};
       });
@@ -1721,7 +1721,7 @@ TEST_F(TestUpstreamSocketManager, PingAckEmitsIdlePingAckEvent) {
 
   const std::string ping_response = "RPING";
   EXPECT_CALL(*mock_io_handle, read(_, _))
-      .WillOnce([&](Buffer::Instance& buffer, absl::optional<uint64_t>) -> Api::IoCallUint64Result {
+      .WillOnce([&](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
         buffer.add(ping_response);
         return Api::IoCallUint64Result{ping_response.size(), Api::IoError::none()};
       });

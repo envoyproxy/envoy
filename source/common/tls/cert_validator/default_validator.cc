@@ -226,7 +226,7 @@ bool DefaultCertValidator::verifyCertAndUpdateStatus(
                         match_san_override.value_or(subject_alt_name_matchers_),
                         validation_context.callbacks != nullptr
                             ? makeOptRef(validation_context.callbacks->connection().streamInfo())
-                            : absl::nullopt,
+                            : std::nullopt,
                         error_details, out_alert);
 
   if (detailed_status == Envoy::Ssl::ClientValidationStatus::NotValidated ||
@@ -320,7 +320,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
     const char* error = "verify cert failed: empty cert chain";
     ENVOY_LOG(debug, error);
     return {ValidationResults::ValidationStatus::Failed,
-            Envoy::Ssl::ClientValidationStatus::NoClientCertificate, absl::nullopt, error};
+            Envoy::Ssl::ClientValidationStatus::NoClientCertificate, std::nullopt, error};
   }
   Envoy::Ssl::ClientValidationStatus detailed_status =
       Envoy::Ssl::ClientValidationStatus::NotValidated;
@@ -344,7 +344,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
       stats_.fail_verify_error_.inc();
       ENVOY_LOG(debug, error);
       return {ValidationResults::ValidationStatus::Failed,
-              Envoy::Ssl::ClientValidationStatus::Failed, absl::nullopt, error};
+              Envoy::Ssl::ClientValidationStatus::Failed, std::nullopt, error};
     }
     const bool verify_succeeded = (X509_verify_cert(ctx.get()) == 1);
 
@@ -355,8 +355,8 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
       ENVOY_LOG(debug, error);
       if (allow_untrusted_certificate_) {
         return ValidationResults{ValidationResults::ValidationStatus::Successful,
-                                 Envoy::Ssl::ClientValidationStatus::Failed, absl::nullopt,
-                                 absl::nullopt};
+                                 Envoy::Ssl::ClientValidationStatus::Failed, std::nullopt,
+                                 std::nullopt};
       }
       return {ValidationResults::ValidationStatus::Failed,
               Envoy::Ssl::ClientValidationStatus::Failed,
@@ -378,7 +378,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
                                 detailed_status, &error_details, &tls_alert);
   return succeeded
              ? ValidationResults{ValidationResults::ValidationStatus::Successful, detailed_status,
-                                 absl::nullopt, absl::nullopt, std::move(validated_chain)}
+                                 std::nullopt, std::nullopt, std::move(validated_chain)}
              : ValidationResults{ValidationResults::ValidationStatus::Failed, detailed_status,
                                  tls_alert, error_details};
 }
@@ -534,6 +534,14 @@ void DefaultCertValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
     bool auto_sni_san_match = config_->autoSniSanMatch();
     rc = EVP_DigestUpdate(md.get(), &auto_sni_san_match, sizeof(auto_sni_san_match));
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+
+    // Only hash when the flag is enabled, so session IDs for existing deployments
+    // (where the flag defaults to false) stay byte-identical to pre-feature behavior.
+    if (config_->suppressClientCaList()) {
+      bool suppress = true;
+      rc = EVP_DigestUpdate(md.get(), &suppress, sizeof(suppress));
+      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    }
   }
 }
 
@@ -543,46 +551,50 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
     return absl::OkStatus();
   }
 
-  bssl::UniquePtr<BIO> bio(
-      BIO_new_mem_buf(const_cast<char*>(config_->caCert().data()), config_->caCert().size()));
-  RELEASE_ASSERT(bio != nullptr, "");
-  // Based on BoringSSL's SSL_add_file_cert_subjects_to_stack().
-  // Use a generic lambda to be compatible with BoringSSL before and after
-  // https://boringssl-review.googlesource.com/c/boringssl/+/56190
-  bssl::UniquePtr<STACK_OF(X509_NAME)> list(
-      sk_X509_NAME_new([](auto* a, auto* b) -> int { return X509_NAME_cmp(*a, *b); }));
-  RELEASE_ASSERT(list != nullptr, "");
-  for (;;) {
-    bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
-    if (cert == nullptr) {
-      break;
+  // When the CA list is not suppressed, parse the trust bundle and advertise
+  // the CA names in the TLS CertificateRequest message.
+  if (!config_->suppressClientCaList()) {
+    bssl::UniquePtr<BIO> bio(
+        BIO_new_mem_buf(const_cast<char*>(config_->caCert().data()), config_->caCert().size()));
+    RELEASE_ASSERT(bio != nullptr, "");
+    // Based on BoringSSL's SSL_add_file_cert_subjects_to_stack().
+    // Use a generic lambda to be compatible with BoringSSL before and after
+    // https://boringssl-review.googlesource.com/c/boringssl/+/56190
+    bssl::UniquePtr<STACK_OF(X509_NAME)> list(
+        sk_X509_NAME_new([](auto* a, auto* b) -> int { return X509_NAME_cmp(*a, *b); }));
+    RELEASE_ASSERT(list != nullptr, "");
+    for (;;) {
+      bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+      if (cert == nullptr) {
+        break;
+      }
+      const X509_NAME* name = X509_get_subject_name(cert.get());
+      if (name == nullptr) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Failed to load trusted client CA certificates from ", config_->caCertPath()));
+      }
+      // Check for duplicates.
+      if (sk_X509_NAME_find(list.get(), nullptr, name)) {
+        continue;
+      }
+
+      bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
+      if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Failed to load trusted client CA certificates from ", config_->caCertPath()));
+      }
     }
-    const X509_NAME* name = X509_get_subject_name(cert.get());
-    if (name == nullptr) {
+
+    // Check for EOF.
+    const uint32_t err = ERR_peek_last_error();
+    if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
+      ERR_clear_error();
+    } else {
       return absl::InvalidArgumentError(absl::StrCat(
           "Failed to load trusted client CA certificates from ", config_->caCertPath()));
     }
-    // Check for duplicates.
-    if (sk_X509_NAME_find(list.get(), nullptr, name)) {
-      continue;
-    }
-
-    bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
-    if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
-      return absl::InvalidArgumentError(absl::StrCat(
-          "Failed to load trusted client CA certificates from ", config_->caCertPath()));
-    }
+    SSL_CTX_set_client_CA_list(ctx, list.release());
   }
-
-  // Check for EOF.
-  const uint32_t err = ERR_peek_last_error();
-  if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
-    ERR_clear_error();
-  } else {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Failed to load trusted client CA certificates from ", config_->caCertPath()));
-  }
-  SSL_CTX_set_client_CA_list(ctx, list.release());
 
   if (require_client_cert) {
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
@@ -617,7 +629,7 @@ void DefaultCertValidator::initializeCertExpirationStats(Stats::Scope& scope) {
   expiration_gauge.set(Utility::getExpirationUnixTime(ca_cert_.get()).count());
 }
 
-absl::optional<uint32_t> DefaultCertValidator::daysUntilFirstCertExpires() const {
+std::optional<uint32_t> DefaultCertValidator::daysUntilFirstCertExpires() const {
   return Utility::getDaysUntilExpiration(ca_cert_.get(), context_.timeSource());
 }
 

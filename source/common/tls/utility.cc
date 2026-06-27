@@ -449,19 +449,18 @@ std::chrono::seconds Utility::getExpirationUnixTime(const X509* cert) {
   return std::chrono::duration_cast<std::chrono::seconds>(expiration_time.time_since_epoch());
 }
 
-absl::optional<uint32_t> Utility::getDaysUntilExpiration(const X509* cert,
-                                                         TimeSource& time_source) {
+std::optional<uint32_t> Utility::getDaysUntilExpiration(const X509* cert, TimeSource& time_source) {
   if (cert == nullptr) {
-    return absl::make_optional(std::numeric_limits<uint32_t>::max());
+    return std::make_optional(std::numeric_limits<uint32_t>::max());
   }
   int days, seconds;
   if (ASN1_TIME_diff(&days, &seconds, currentASN1Time(time_source).get(),
                      X509_get0_notAfter(cert))) {
     if (days >= 0 && seconds >= 0) {
-      return absl::make_optional(days);
+      return std::make_optional(days);
     }
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 std::vector<std::string> Utility::getCertificateExtensionOids(X509& cert) {
@@ -530,7 +529,7 @@ SystemTime Utility::getExpirationTime(const X509& cert) {
   return std::chrono::system_clock::from_time_t(static_cast<time_t>(days) * 24 * 60 * 60 + seconds);
 }
 
-absl::optional<std::string> Utility::getLastCryptoError() {
+std::optional<std::string> Utility::getLastCryptoError() {
   auto err = ERR_get_error();
 
   if (err != 0) {
@@ -540,7 +539,7 @@ absl::optional<std::string> Utility::getLastCryptoError() {
     return std::string(errbuf);
   }
 
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 absl::string_view Utility::getErrorDescription(int err) {

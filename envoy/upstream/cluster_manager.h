@@ -322,7 +322,7 @@ public:
       if (warming_cluster != warming_clusters_.cend()) {
         return warming_cluster->second;
       }
-      return absl::nullopt;
+      return std::nullopt;
     }
 
     ClusterInfoMap active_clusters_;
@@ -433,7 +433,7 @@ public:
   /**
    * @return cluster manager wide bind configuration for new upstream connections.
    */
-  virtual const absl::optional<envoy::config::core::v3::BindConfig>& bindConfig() const PURE;
+  virtual const std::optional<envoy::config::core::v3::BindConfig>& bindConfig() const PURE;
 
   /**
    * Returns a shared_ptr to the singleton xDS-over-gRPC provider for upstream control plane muxing
@@ -453,10 +453,10 @@ public:
   /**
    * Return the local cluster name, if it was configured.
    *
-   * @return absl::optional<std::string> the local cluster name, or empty if no local cluster was
+   * @return std::optional<std::string> the local cluster name, or empty if no local cluster was
    * configured.
    */
-  virtual const absl::optional<std::string>& localClusterName() const PURE;
+  virtual const std::optional<std::string>& localClusterName() const PURE;
 
   /**
    * This method allows to register callbacks for cluster lifecycle events in the ClusterManager.
@@ -636,7 +636,7 @@ public:
   virtual Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                    ResourcePriority priority, std::vector<Http::Protocol>& protocol,
-                   const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+                   const std::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
                        alternate_protocol_options,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
@@ -654,7 +654,7 @@ public:
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
                       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                       ClusterConnectivityState& state,
-                      absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) PURE;
+                      std::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) PURE;
 
   /**
    * Allocate a cluster from configuration proto.

@@ -724,11 +724,11 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
   ASSERT_EQ(config.admin().socketOptions()->size(), 2);
   auto detail = config.admin().socketOptions()->at(0)->getOptionDetails(
       socket_mock, envoy::config::core::v3::SocketOption::STATE_PREBIND);
-  ASSERT_NE(detail, absl::nullopt);
+  ASSERT_NE(detail, std::nullopt);
   EXPECT_EQ(detail->name_, Envoy::Network::SocketOptionName(1, 2, "1/2"));
   detail = config.admin().socketOptions()->at(1)->getOptionDetails(
       socket_mock, envoy::config::core::v3::SocketOption::STATE_BOUND);
-  ASSERT_NE(detail, absl::nullopt);
+  ASSERT_NE(detail, std::nullopt);
   EXPECT_EQ(detail->name_, Envoy::Network::SocketOptionName(4, 5, "4/5"));
 }
 

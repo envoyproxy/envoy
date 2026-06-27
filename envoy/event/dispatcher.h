@@ -176,7 +176,7 @@ public:
    *               identified by its name.
    */
   virtual void initializeStats(Stats::Scope& scope,
-                               const absl::optional<std::string>& prefix = absl::nullopt) PURE;
+                               const std::optional<std::string>& prefix = std::nullopt) PURE;
 
   /**
    * Clears any items in the deferred deletion queue.

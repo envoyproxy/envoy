@@ -1639,6 +1639,7 @@ envoy_cc_test(
         ":http_integration_lib",
         ":integration_test_lib",
         "//envoy/registry",
+        "//source/common/common:cpu_affinity_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",

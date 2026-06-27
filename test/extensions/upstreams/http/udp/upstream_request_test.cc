@@ -265,7 +265,7 @@ TEST_F(UdpConnPoolTest, ConnectionInfoProviderHasRemoteAddress) {
       [&remote_address](std::unique_ptr<Envoy::Router::GenericUpstream>&&,
                         Upstream::HostDescriptionConstSharedPtr,
                         const Network::ConnectionInfoProvider& connection_info_provider,
-                        StreamInfo::StreamInfo&, absl::optional<Envoy::Http::Protocol>) {
+                        StreamInfo::StreamInfo&, std::optional<Envoy::Http::Protocol>) {
         if (connection_info_provider.remoteAddress() != nullptr) {
           remote_address = connection_info_provider.remoteAddress()->asStringView();
         }

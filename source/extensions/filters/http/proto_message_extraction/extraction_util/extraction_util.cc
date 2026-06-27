@@ -91,7 +91,7 @@ const absl::flat_hash_map<std::string, ExtractedMessageDirective>& StringToDirec
   return *string_to_directive_map;
 }
 
-absl::optional<ExtractedMessageDirective>
+std::optional<ExtractedMessageDirective>
 ExtractedMessageDirectiveFromString(absl::string_view directive) {
   if (StringToDirectiveMap().contains(directive)) {
     return StringToDirectiveMap().at(directive);

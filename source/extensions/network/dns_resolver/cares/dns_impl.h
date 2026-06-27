@@ -46,12 +46,12 @@ class DnsResolverImplPeer;
  */
 class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::dns> {
 public:
-  static absl::StatusOr<absl::optional<std::string>>
+  static absl::StatusOr<std::optional<std::string>>
   maybeBuildResolversCsv(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
 
   DnsResolverImpl(
       const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& config,
-      Event::Dispatcher& dispatcher, absl::optional<std::string> resolvers_csv,
+      Event::Dispatcher& dispatcher, std::optional<std::string> resolvers_csv,
       Stats::Scope& root_scope);
   ~DnsResolverImpl() override;
 
@@ -207,7 +207,7 @@ private:
   const uint32_t edns0_max_payload_size_;
   const std::chrono::milliseconds max_udp_channel_duration_;
   const bool reinit_channel_on_timeout_;
-  const absl::optional<std::string> resolvers_csv_;
+  const std::optional<std::string> resolvers_csv_;
   const bool filter_unroutable_families_;
   Stats::ScopeSharedPtr scope_;
   CaresDnsResolverStats stats_;

@@ -102,7 +102,7 @@ public:
 };
 
 using Http1StreamEncoderOptionsOptRef =
-    absl::optional<std::reference_wrapper<Http1StreamEncoderOptions>>;
+    std::optional<std::reference_wrapper<Http1StreamEncoderOptions>>;
 
 /**
  * Encodes an HTTP stream. This interface contains methods common to both the request and response
@@ -134,7 +134,7 @@ public:
 
   /**
    * Return the HTTP/1 stream encoder options if applicable. If the stream is not HTTP/1 returns
-   * absl::nullopt.
+   * std::nullopt.
    */
   virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 };
@@ -295,7 +295,7 @@ public:
    */
   virtual void sendLocalReply(Code code, absl::string_view body,
                               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
 
   /**
@@ -502,14 +502,14 @@ public:
   virtual const StreamInfo::BytesMeterSharedPtr& bytesMeter() PURE;
 
   /**
-   * @return absl::optional<uint32_t> the codec level stream ID if available
+   * @return std::optional<uint32_t> the codec level stream ID if available
    * or nullopt if not applicable or not yet assigned.
    *
    * HTTP/1 streams return nullopt.
    * HTTP/2 streams return the HTTP/2 stream ID or nullopt if not available.
    * HTTP/3 streams return the HTTP/3 stream ID or nullopt if not available.
    */
-  virtual absl::optional<uint32_t> codecStreamId() const PURE;
+  virtual std::optional<uint32_t> codecStreamId() const PURE;
 
   /**
    * @return the WebTransport session this stream carries, if it is a negotiated WebTransport
@@ -527,9 +527,9 @@ public:
   virtual ~ReceivedSettings() = default;
 
   /**
-   * @return value of SETTINGS_MAX_CONCURRENT_STREAMS, or absl::nullopt if it was not present.
+   * @return value of SETTINGS_MAX_CONCURRENT_STREAMS, or std::nullopt if it was not present.
    */
-  virtual const absl::optional<uint32_t>& maxConcurrentStreams() const PURE;
+  virtual const std::optional<uint32_t>& maxConcurrentStreams() const PURE;
 };
 
 /**

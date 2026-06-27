@@ -65,7 +65,7 @@ class MockFetchMetadata {
 public:
   virtual ~MockFetchMetadata() = default;
 
-  MOCK_METHOD(absl::optional<std::string>, fetch, (Http::RequestMessage&), (const));
+  MOCK_METHOD(std::optional<std::string>, fetch, (Http::RequestMessage&), (const));
 };
 
 class MockAwsClusterManager : public AwsClusterManager {

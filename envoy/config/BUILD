@@ -15,7 +15,6 @@ envoy_cc_library(
         "//envoy/common:time_interface",
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -132,7 +131,6 @@ envoy_cc_library(
         ":typed_config_interface",
         "//envoy/api:api_interface",
         "//envoy/protobuf:message_validator_interface",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )

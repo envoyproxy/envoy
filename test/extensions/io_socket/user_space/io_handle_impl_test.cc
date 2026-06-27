@@ -158,7 +158,7 @@ TEST_F(IoHandleImplTest, ReadEmpty) {
 // Read allows max_length value 0 and returns no error.
 TEST_F(IoHandleImplTest, ReadWhileProvidingNoCapacity) {
   Buffer::OwnedImpl buf;
-  absl::optional<uint64_t> max_length_opt{0};
+  std::optional<uint64_t> max_length_opt{0};
   auto result = io_handle_->read(buf, max_length_opt);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(0, result.return_value_);
@@ -211,7 +211,7 @@ TEST_F(IoHandleImplTest, ReadThrottling) {
   Buffer::OwnedImpl unlimited_buf;
   {
     // Read at most 8 * FRAGMENT_SIZE to unlimited buffer.
-    auto result0 = io_handle_->read(unlimited_buf, absl::nullopt);
+    auto result0 = io_handle_->read(unlimited_buf, std::nullopt);
     EXPECT_TRUE(result0.ok());
     EXPECT_EQ(result0.return_value_, 8 * FRAGMENT_SIZE);
     EXPECT_EQ(unlimited_buf.length(), 8 * FRAGMENT_SIZE);
@@ -425,7 +425,7 @@ TEST_F(IoHandleImplTest, WriteBufferFragement) {
   auto result = io_handle_->write(buf);
   EXPECT_FALSE(released);
   EXPECT_EQ(0, buf.length());
-  io_handle_peer_->read(buf, absl::nullopt);
+  io_handle_peer_->read(buf, std::nullopt);
   buf.drain(buf.length());
   EXPECT_TRUE(released);
 }
@@ -1157,7 +1157,7 @@ TEST_F(IoHandleImplTest, NotImplementAccept) {
 }
 
 TEST_F(IoHandleImplTest, LastRoundtripTimeNullOpt) {
-  ASSERT_EQ(absl::nullopt, io_handle_->lastRoundTripTime());
+  ASSERT_EQ(std::nullopt, io_handle_->lastRoundTripTime());
 }
 
 // IoHandleImpl can support EmulatedEdge trigger type but not level trigger type.

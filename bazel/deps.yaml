@@ -296,7 +296,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-06-18"
+  release_date: "2026-06-25"
   use_category:
   - controlplane
   - dataplane_core
@@ -318,7 +318,7 @@ com_github_grpc_grpc:
   project_name: "gRPC"
   project_desc: "gRPC C core library"
   project_url: "https://grpc.io"
-  release_date: "2025-10-20"
+  release_date: "2026-06-08"
   use_category:
   - dataplane_core
   - controlplane
@@ -639,7 +639,7 @@ com_google_protobuf:
   project_name: "Protocol Buffers"
   project_desc: "Language-neutral, platform-neutral extensible mechanism for serializing structured data"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-06-11"
   use_category:
   - dataplane_core
   - controlplane
@@ -659,7 +659,7 @@ com_google_protobuf_protoc_linux_aarch_64:
   project_name: "Protocol Buffers (protoc) linux_aarch_64"
   project_desc: "Protoc compiler for protobuf (linux_aarch_64)"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-06-11"
   use_category:
   - build
 
@@ -667,7 +667,7 @@ com_google_protobuf_protoc_linux_ppcle_64:
   project_name: "Protocol Buffers (protoc) linux_ppcle_64"
   project_desc: "Protoc compiler for protobuf (linux_ppcle_64)"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-06-11"
   use_category:
   - build
 
@@ -675,7 +675,7 @@ com_google_protobuf_protoc_linux_x86_64:
   project_name: "Protocol Buffers (protoc) linux_x86_64"
   project_desc: "Protoc compiler for protobuf (linux_x86_64)"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-06-11"
   use_category:
   - build
 
@@ -683,7 +683,7 @@ com_google_protobuf_protoc_osx_aarch_64:
   project_name: "Protocol Buffers (protoc) osx_aarch_64"
   project_desc: "Protoc compiler for protobuf (osx_aarch_64)"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-06-11"
   use_category:
   - build
 
@@ -691,7 +691,7 @@ com_google_protobuf_protoc_osx_x86_64:
   project_name: "Protocol Buffers (protoc) osx_x86_64"
   project_desc: "Protoc compiler for protobuf (osx_x86_64)"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-06-11"
   use_category:
   - build
 
@@ -699,7 +699,7 @@ com_google_protobuf_protoc_win64:
   project_name: "Protocol Buffers (protoc) win64"
   project_desc: "Protoc compiler for protobuf (win64)"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-06-11"
   use_category:
   - build
 
