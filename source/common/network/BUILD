@@ -503,7 +503,7 @@ envoy_cc_library(
         "//envoy/network:address_interface",
         "//envoy/network:listen_socket_interface",
         "//source/common/common:logger_lib",
-        "@com_google_absl//absl/types:span",
+        "@abseil-cpp//absl/types:span",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
