@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "envoy/extensions/filters/http/filter_chain/v3/filter_chain.pb.h"
@@ -21,16 +22,14 @@ using FilterChainConfigProto =
 using FilterChainConfigProtoPerRoute =
     envoy::extensions::filters::http::filter_chain::v3::FilterChainConfigPerRoute;
 
-#define COMMON_FILTER_CHAIN_STATS(COUNTER)                                                         \
-  COUNTER(no_route)                                                                                \
-  COUNTER(no_route_filter_config)                                                                  \
-  COUNTER(use_route_filter_chain)                                                                  \
-  COUNTER(use_default_filter_chain)                                                                \
-  COUNTER(pass_through)
+#define COMMON_FILTER_CHAIN_STATS(COUNTER) COUNTER(pass_through)
 
 struct FilterChainStats {
   COMMON_FILTER_CHAIN_STATS(GENERATE_COUNTER_STRUCT)
 };
+
+using FilterFactory = Filter::FilterConfigProviderPtr<Filter::HttpFilterFactoryCb>;
+using FilterFactoriesVector = std::vector<FilterFactory>;
 
 /**
  * Configuration for a single filter chain.
@@ -43,12 +42,12 @@ public:
   FilterChain(const envoy::extensions::filters::http::filter_chain::v3::FilterChain& proto_config,
               Server::Configuration::FactoryContext& context, const std::string& stats_prefix);
 
-  const Http::FilterChainUtility::FilterFactoriesList& filterFactories() const {
-    return filter_factories_;
-  }
+  absl::Span<const FilterFactory> filterFactories() const { return filter_factories_; }
+  bool hasFilter(absl::string_view filter_name) const { return filters_.contains(filter_name); }
 
 private:
-  Http::FilterChainUtility::FilterFactoriesList filter_factories_;
+  FilterFactoriesVector filter_factories_;
+  absl::flat_hash_set<std::string> filters_;
 };
 
 using FilterChainConstSharedPtr = std::shared_ptr<const FilterChain>;
