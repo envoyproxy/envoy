@@ -74,10 +74,10 @@ void ReusePortBpfCpuSteeringOptionImpl::hashKey(std::vector<uint8_t>& hash_key) 
   }
 }
 
-absl::optional<Socket::Option::Details> ReusePortBpfCpuSteeringOptionImpl::getOptionDetails(
+std::optional<Socket::Option::Details> ReusePortBpfCpuSteeringOptionImpl::getOptionDetails(
     const Socket&, envoy::config::core::v3::SocketOption::SocketState) const {
   // No details for this option.
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 bool ReusePortBpfCpuSteeringOptionImpl::isSupported() const {

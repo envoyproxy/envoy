@@ -1,12 +1,12 @@
 #include <atomic>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "source/common/common/assert.h"
 #include "source/common/network/connection_balancer_impl.h"
 
-#include "absl/types/optional.h"
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
@@ -24,7 +24,7 @@ public:
   void postIncNumConnections() override {}
   void post(ConnectionSocketPtr&&) override { PANIC("not implemented"); }
   void onAcceptWorker(ConnectionSocketPtr&&, bool, bool,
-                      const absl::optional<std::string>&) override {
+                      const std::optional<std::string>&) override {
     PANIC("not implemented");
   }
 
