@@ -414,9 +414,6 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
                        *encoder_callbacks_, len, escaped_chunk.size());
     }
     data.add(escaped_chunk);
-    // TODO(guoyilin42): There will be a case that end_stream is not set in the encodeData call.
-    // This is body + trailer case where encodeTrailer call represents the end of response body.
-    // In that case, we should add the streaming_json_suffix at encodeTrailer call.
     if (end_stream) {
       ENVOY_STREAM_LOG(debug, "Streaming: appending suffix, stream complete.", *encoder_callbacks_);
       data.add(streaming_json_suffix_);
@@ -457,11 +454,26 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
 }
 
 Http::FilterTrailersStatus McpJsonRestBridgeFilter::encodeTrailers(Http::ResponseTrailerMap&) {
-  // TODO(guoyilin42): Add support for transcoding upstream responses that include HTTP trailers.
-  // Currently, if a response contains trailers (i.e., end_stream is false when the body arrives),
-  // the encodeJsonRpcData logic will not execute and transcoding will fail. While rare for
-  // standard REST/JSON APIs, trailers are a native part of the HTTP spec and need to be
-  // handled properly.
+  if (mcp_operation_ != McpOperation::ToolsList && mcp_operation_ != McpOperation::ToolsCall) {
+    return Http::FilterTrailersStatus::Continue;
+  }
+
+  if (!streaming_json_prefix_.empty()) {
+    ENVOY_STREAM_LOG(debug, "Streaming: appending suffix in encodeTrailers.", *encoder_callbacks_);
+    Buffer::OwnedImpl data;
+    if (is_first_streaming_chunk_) {
+      data.add(streaming_json_prefix_);
+      is_first_streaming_chunk_ = false;
+    }
+    data.add(streaming_json_suffix_);
+    encoder_callbacks_->addEncodedData(data, false);
+  } else {
+    encodeJsonRpcData(encoder_callbacks_->responseHeaders());
+    Buffer::OwnedImpl data(response_body_str_);
+    response_body_str_.clear();
+    encoder_callbacks_->addEncodedData(data, false);
+  }
+
   return Http::FilterTrailersStatus::Continue;
 }
 
