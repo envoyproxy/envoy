@@ -30,6 +30,7 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/synchronization/blocking_counter.h"
+#include "absl/types/span.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
 #include "source/common/quic/quic_server_transport_socket_factory.h"
@@ -1036,7 +1037,7 @@ bool ListenerManagerImpl::removeListenerInternal(const std::string& name,
   return true;
 }
 
-const std::vector<uint32_t>& ListenerManagerImpl::workerCpus() {
+absl::Span<const uint32_t> ListenerManagerImpl::workerCpus() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   // Pin each worker thread to a CPU when worker CPU affinity is enabled so each worker keeps its
   // cache and `NUMA` locality. The assignment depends only on the worker count and the process
@@ -1102,7 +1103,7 @@ absl::Status ListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog,
                           });
     }
   }
-  const std::vector<uint32_t>& worker_cpus = workerCpus();
+  const absl::Span<const uint32_t> worker_cpus = workerCpus();
   if (server_.bootstrap().enable_worker_cpu_affinity()) {
     // The gauge counts workers assigned a CPU. Each assigned CPU is in the process mask so the
     // per-worker pin normally succeeds, and a rare failure to set affinity is logged by

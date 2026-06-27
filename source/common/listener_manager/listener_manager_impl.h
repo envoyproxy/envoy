@@ -30,6 +30,8 @@
 #include "source/common/quic/quic_stat_names.h"
 #include "source/server/listener_manager_factory.h"
 
+#include "absl/types/span.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -251,7 +253,7 @@ public:
   // Returns the per-worker CPU assignment used to pin worker threads, mapping worker i to entry i.
   // The result is computed once and cached. It is empty when worker CPU affinity is disabled or the
   // worker count exceeds the available CPUs, in which case no worker is pinned.
-  const std::vector<uint32_t>& workerCpus();
+  absl::Span<const uint32_t> workerCpus();
 
   // Returns true when reuse port BPF CPU steering can be used, that is every worker is pinned to a
   // CPU and the kernel supports the steering program. The result is computed once and cached.

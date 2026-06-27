@@ -175,9 +175,10 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildReusePortOptions() {
 }
 
 std::unique_ptr<Socket::Options>
-SocketOptionFactory::buildReusePortBpfCpuSteeringOptions(std::vector<uint32_t> worker_cpus) {
+SocketOptionFactory::buildReusePortBpfCpuSteeringOptions(absl::Span<const uint32_t> worker_cpus) {
   std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
-  options->push_back(std::make_shared<ReusePortBpfCpuSteeringOptionImpl>(std::move(worker_cpus)));
+  options->push_back(std::make_shared<ReusePortBpfCpuSteeringOptionImpl>(
+      std::vector<uint32_t>(worker_cpus.begin(), worker_cpus.end())));
   return options;
 }
 

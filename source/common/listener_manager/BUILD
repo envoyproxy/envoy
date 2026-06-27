@@ -65,6 +65,7 @@ envoy_cc_library(
         "//source/server:factory_context_lib",
         "//source/server:listener_manager_factory_lib",
         "//source/server:transport_socket_config_lib",
+        "@com_google_absl//absl/types:span",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
