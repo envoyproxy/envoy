@@ -200,7 +200,8 @@ TEST_P(IntegrationTest, WorkerCpuAffinity) {
 
 // Verify that a listener configured with the CPU locality connection balancer and worker CPU
 // affinity starts and serves traffic. On kernels that support reuse port BPF steering this
-// exercises the BPF fast path, otherwise it falls back to the exact connection balancer.
+// exercises the BPF fast path, otherwise the kernel distributes connections with its default
+// reuse port hashing.
 TEST_P(IntegrationTest, CpuLocalityConnectionBalancer) {
   concurrency_ = 2;
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {

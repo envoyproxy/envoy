@@ -119,9 +119,9 @@ message Listener {
     // is pinned to the CPU the program steers to it, :ref:`enable_reuse_port
     // <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>`, a kernel that supports
     // reuse port BPF steering, and a worker count no greater than the number of CPUs in the process
-    // affinity mask. When any of these is not met the listener falls back to the exact connection
-    // balancer. If the kernel rejects the steering program at runtime the listener keeps serving with
-    // default reuse port hashing and without CPU locality.
+    // affinity mask. When any of these is not met, or if the kernel rejects the steering program at
+    // runtime, the listener keeps serving with the kernel default reuse port hashing and without CPU
+    // locality.
     //
     // Worker affinity is fixed when the worker threads start, so a listener added dynamically via LDS
     // steers with the same mapping. During a hot restart new connections may be steered to the

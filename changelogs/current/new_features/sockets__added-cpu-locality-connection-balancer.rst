@@ -6,5 +6,5 @@ accept and keeps each connection on a single worker for cache and ``NUMA`` local
 :ref:`enable_worker_cpu_affinity
 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_worker_cpu_affinity>`, reuse port, a kernel
 that supports reuse port BPF steering, and a worker count no greater than the number of CPUs in the
-process affinity mask. When any requirement is not met the listener falls back to the exact
-connection balancer. It is available on Linux only.
+process affinity mask. When any requirement is not met the listener keeps serving with the kernel
+default reuse port hashing and without CPU locality. It is available on Linux only.
