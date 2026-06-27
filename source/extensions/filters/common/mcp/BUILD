@@ -21,7 +21,6 @@ envoy_cc_library(
         "//envoy/json:json_object_interface",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/json:json_loader_lib",
-        "//source/common/json/wuffs_json:wuffs_json_cursor_lib",
         "//source/common/protobuf",
         "//source/common/runtime:runtime_features_lib",
     ],
