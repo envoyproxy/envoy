@@ -113,15 +113,15 @@ public:
   std::string path_prefix_ = TestEnvironment::temporaryPath("ssl_trace");
   envoy::config::tap::v3::OutputSink::Format format_{
       envoy::config::tap::v3::OutputSink::PROTO_BINARY};
-  absl::optional<uint64_t> max_rx_bytes_;
-  absl::optional<uint64_t> max_tx_bytes_;
+  std::optional<uint64_t> max_rx_bytes_;
+  std::optional<uint64_t> max_tx_bytes_;
   bool upstream_tap_{};
   bool streaming_tap_{};
   bool set_connection_per_event_{false};
   bool pegging_counter_{false};
   bool sending_streamed_msg_on_configured_size_{false};
   unsigned int min_streamed_sent_bytes_{9};
-  absl::optional<uint32_t> tap_enabled_numerator_;
+  std::optional<uint32_t> tap_enabled_numerator_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SslTapIntegrationTest,

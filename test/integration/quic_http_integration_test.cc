@@ -79,7 +79,7 @@ TEST_P(QuicHttpIntegrationTest, GetPeerAndLocalCertsInfo) {
 TEST_P(QuicHttpIntegrationTest, Draft29NotSupportedByDefault) {
   supported_versions_ = {quic::ParsedQuicVersion::Draft29()};
   initialize();
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
   EXPECT_TRUE(codec_client_->disconnected());
   EXPECT_EQ(quic::QUIC_INVALID_VERSION,
             static_cast<EnvoyQuicClientSession*>(codec_client_->connection())->error());
@@ -92,7 +92,7 @@ TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
       "false");
   initialize();
 
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
   EXPECT_EQ(transport_socket_factory_->clientContextConfig()->serverNameIndication(),
             codec_client_->connection()->requestedServerName());
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -135,7 +135,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   codec_client_->close();
 
   // Start a second connection.
-  codec_client_ = makeRawHttp3Connection(makeClientConnection((lookupPort("http"))), absl::nullopt,
+  codec_client_ = makeRawHttp3Connection(makeClientConnection((lookupPort("http"))), std::nullopt,
                                          /*wait_for_1rtt_key*/ false);
   // Send a complete request on the second connection.
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -167,7 +167,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   test_server_->waitForCounter("http3.quic_version_rfc_v1", Eq(2u));
 
   // Start the third connection.
-  codec_client_ = makeRawHttp3Connection(makeClientConnection((lookupPort("http"))), absl::nullopt,
+  codec_client_ = makeRawHttp3Connection(makeClientConnection((lookupPort("http"))), std::nullopt,
                                          /*wait_for_1rtt_key*/ false);
   auto response3 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
@@ -180,7 +180,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   codec_client_->close();
 
   // Start the fourth connection.
-  codec_client_ = makeRawHttp3Connection(makeClientConnection((lookupPort("http"))), absl::nullopt,
+  codec_client_ = makeRawHttp3Connection(makeClientConnection((lookupPort("http"))), std::nullopt,
                                          /*wait_for_1rtt_key*/ false);
   Http::TestRequestHeaderMapImpl request{{":method", "GET"},
                                          {":path", "/test/long/url"},
@@ -533,7 +533,7 @@ TEST_P(QuicHttpIntegrationTest, AdminDrainDrainsListeners) {
 TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {
   san_to_match_ = "www.random_domain.com";
   initialize();
-  codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))), std::nullopt);
   EXPECT_FALSE(codec_client_->connected());
   std::string failure_reason = "QUIC_TLS_CERTIFICATE_UNKNOWN with details: TLS handshake failure "
                                "(ENCRYPTION_HANDSHAKE) 46: "
@@ -711,7 +711,7 @@ TEST_P(QuicHttpIntegrationTest, NoStreams) {
   initialize();
 
   // Create the client connection and send a request.
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
   IntegrationStreamDecoderPtr response =
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
@@ -732,7 +732,7 @@ typed_config:
                             *custom_validator_config);
   ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config.get());
   initialize();
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
   EXPECT_TRUE(codec_client_->connected());
 }
 
@@ -766,7 +766,7 @@ typed_config:
   auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
   persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
   persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
   EXPECT_TRUE(codec_client_->disconnected());
 
   Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx = transport_socket_factory_->sslCtx();
@@ -805,7 +805,7 @@ typed_config:
   auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
   persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
   persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
   EXPECT_TRUE(codec_client_->disconnected());
 
   Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx = transport_socket_factory_->sslCtx();
@@ -1210,7 +1210,7 @@ TEST_P(QuicHttpIntegrationTest, InvalidTrailer) {
 TEST_P(QuicHttpIntegrationTest, AlpnProtocolMismatch) {
   client_alpn_ = "h3-special";
   initialize();
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
   EXPECT_TRUE(codec_client_->disconnected());
   EXPECT_EQ(quic::QUIC_HANDSHAKE_FAILED,
             static_cast<EnvoyQuicClientSession*>(codec_client_->connection())->error());
@@ -1237,7 +1237,7 @@ TEST_P(QuicHttpIntegrationTest, ConfigureAlpnProtocols) {
     std::ignore = ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
   });
   initialize();
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
   EXPECT_EQ(transport_socket_factory_->clientContextConfig()->serverNameIndication(),
             codec_client_->connection()->requestedServerName());
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -1250,7 +1250,7 @@ TEST_P(QuicHttpIntegrationTest, ConfigureAlpnProtocols) {
 TEST_P(QuicHttpIntegrationTest, DisableQpack) {
   initialize();
 
-  codec_client_ = makeRawHttp3Connection(makeClientConnection(lookupPort("http")), absl::nullopt,
+  codec_client_ = makeRawHttp3Connection(makeClientConnection(lookupPort("http")), std::nullopt,
                                          /*wait_for_1rtt_key*/ true, /*disable_qpack*/ true);
   auto headers = default_request_headers_;
   headers.addCopy("cookie", "x;y");
@@ -1446,7 +1446,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
   inplaceInitialize(/*add_default_filter_chain=*/false);
 
   auto codec_client_0 = makeRawHttp3Connection(
-      makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"), absl::nullopt,
+      makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"), std::nullopt,
       /*wait_for_1rtt_key*/ true);
   makeRequestAndWaitForResponse(*codec_client_0);
   codec_client_0->close();
@@ -1464,7 +1464,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
   // The 2nd connection should try to do 0-RTT but get rejected and QUICHE will transparently retry
   // the request after handshake completes.
   auto codec_client_2 = makeRawHttp3Connection(
-      makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"), absl::nullopt,
+      makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"), std::nullopt,
       /*wait_for_1rtt_key*/ false);
   makeRequestAndWaitForResponse(*codec_client_2);
 
@@ -1479,7 +1479,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableResumption) {
   inplaceInitialize(/*add_default_filter_chain=*/false);
 
   auto codec_client_0 = makeRawHttp3Connection(
-      makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"), absl::nullopt,
+      makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"), std::nullopt,
       /*wait_for_1rtt_key*/ true);
   makeRequestAndWaitForResponse(*codec_client_0);
   codec_client_0->close();
@@ -1496,7 +1496,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableResumption) {
   test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
 
   auto codec_client_2 = makeRawHttp3Connection(
-      makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"), absl::nullopt,
+      makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"), std::nullopt,
       /*wait_for_1rtt_key*/ true);
   EnvoyQuicClientSession* quic_session =
       static_cast<EnvoyQuicClientSession*>(codec_client_2->connection());
@@ -1522,7 +1522,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, StatelessResetOldConnection) {
 
   // This new connection would be reset.
   auto codec_client1 =
-      makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+      makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
   EXPECT_TRUE(codec_client1->disconnected());
 
   quic::QuicErrorCode error =
@@ -1943,7 +1943,7 @@ TEST_P(QuicHttpIntegrationTest, RejectTraffic) {
   });
 
   initialize();
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
   EXPECT_TRUE(codec_client_->disconnected());
   EXPECT_EQ(quic::QUIC_INVALID_VERSION,
             static_cast<EnvoyQuicClientSession*>(codec_client_->connection())->error());

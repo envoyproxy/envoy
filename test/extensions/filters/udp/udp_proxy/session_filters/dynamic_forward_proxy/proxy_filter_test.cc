@@ -55,7 +55,7 @@ public:
     return dns_cache_manager_;
   }
 
-  void setup(absl::optional<FilterConfig> proto_config = absl::nullopt) {
+  void setup(std::optional<FilterConfig> proto_config = std::nullopt) {
     FilterConfig config;
     if (proto_config.has_value()) {
       config = proto_config.value();
@@ -171,7 +171,7 @@ TEST_F(DynamicProxyFilterTest, StopIterationOnCacheLoadOverflow) {
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("host"), 50, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Overflow, nullptr, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Overflow, nullptr, std::nullopt}));
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
 }
@@ -185,7 +185,7 @@ TEST_F(DynamicProxyFilterTest, PassesThroughImmediatelyWhenDnsAlreadyInCache) {
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("host"), 50, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, std::nullopt}));
   EXPECT_EQ(ReadFilterStatus::Continue, filter_->onNewSession());
   EXPECT_EQ(ReadFilterStatus::Continue, filter_->onData(recv_data_stub1_));
 }
@@ -202,7 +202,7 @@ TEST_F(DynamicProxyFilterTest,
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("host"), 50, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
 
@@ -231,7 +231,7 @@ TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithDefaultBufferConfig) {
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("host"), 50, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
   // Two datagrams will be buffered.
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
@@ -268,7 +268,7 @@ TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithBufferSizeOverflow) {
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("host"), 50, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
   // Buffer size is 1, first datagram will be buffered, second will drop.
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
@@ -305,7 +305,7 @@ TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithBufferBytesOverflow) {
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("host"), 50, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
   // Buffer bytes size is 13, first datagram will be buffered, second will drop.
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
@@ -341,7 +341,7 @@ TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithContinueFilterChainFailure) 
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("host"), 50, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
 

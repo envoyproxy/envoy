@@ -111,9 +111,9 @@ std::string FilterConfig::getTenantName(const StreamInfo::StreamInfo& stream_inf
 
 FilterConfig::FilterConfig(Server::Configuration::ServerFactoryContext& context,
                            std::shared_ptr<TokenBucketSingleton> bucket_singleton,
-                           absl::optional<absl::string_view> request_bucket_id,
-                           absl::optional<absl::string_view> response_bucket_id,
-                           absl::optional<absl::string_view> response_trailer_prefix,
+                           std::optional<absl::string_view> request_bucket_id,
+                           std::optional<absl::string_view> response_bucket_id,
+                           std::optional<absl::string_view> response_trailer_prefix,
                            HttpMatchTreePtr tenant_name_selector,
                            absl::flat_hash_map<std::string, TenantConfig>&& tenant_configs,
                            TenantConfig default_tenant_config)
@@ -121,8 +121,8 @@ FilterConfig::FilterConfig(Server::Configuration::ServerFactoryContext& context,
       request_bucket_id_(std::move(request_bucket_id)),
       response_bucket_id_(std::move(response_bucket_id)),
       response_trailers_(response_trailer_prefix
-                             ? absl::optional<ResponseTrailers>(response_trailer_prefix.value())
-                             : absl::nullopt),
+                             ? std::optional<ResponseTrailers>(response_trailer_prefix.value())
+                             : std::nullopt),
       tenant_name_selector_(std::move(tenant_name_selector)),
       tenant_configs_(std::move(tenant_configs)),
       default_tenant_config_(std::move(default_tenant_config)),
@@ -136,7 +136,7 @@ FilterConfig::FilterConfig(Server::Configuration::ServerFactoryContext& context,
                                           : nullptr) {}
 
 std::shared_ptr<FairTokenBucket::Client>
-FilterConfig::getBucketById(const absl::optional<std::string>& id, absl::string_view tenant) const {
+FilterConfig::getBucketById(const std::optional<std::string>& id, absl::string_view tenant) const {
   if (!id) {
     return nullptr;
   }

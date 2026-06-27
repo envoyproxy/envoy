@@ -1,6 +1,6 @@
 # This should match the schema defined in external_deps.bzl.
 
-PROTOBUF_VERSION = "33.2"
+PROTOBUF_VERSION = "35.1"
 
 # These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
 # and both must match the names from the protobuf releases (see
@@ -8,12 +8,12 @@ PROTOBUF_VERSION = "33.2"
 # The names change in upcoming versions.
 # The shas are calculated from the downloads on the releases page.
 PROTOC_VERSIONS = dict(
-    linux_aarch_64 = "706662a332683aa2fffe1c4ea61588279d31679cd42d91c7d60a69651768edb8",
-    linux_x86_64 = "b24b53f87c151bfd48b112fe4c3a6e6574e5198874f38036aff41df3456b8caf",
-    linux_ppcle_64 = "16b4a36c07daab458bc040523b1f333ddd37e1440fa71634f297a458c7fef4c4",
-    osx_aarch_64 = "5be1427127788c9f7dd7d606c3e69843dd3587327dea993917ffcb77e7234b44",
-    osx_x86_64 = "dba51cfcc85076d56e7de01a647865c5a7f995c3dce427d5215b53e50b7be43f",
-    win64 = "376770cd4073beb63db56fdd339260edb9957b3c4472e05a75f5f9ec8f98d8f5",
+    linux_aarch_64 = "01bf9d08808c7f96678b63f4bd8efa559bb4f83d5a7a270d5edaf507f9d5d9cf",
+    linux_x86_64 = "6930ebf62bd4ea607b98fff052596c6ee564b9835b4ce172c75a3f53ae9d91b7",
+    linux_ppcle_64 = "92da6d454ca3c30b0acf9bd3613dde973a179855742b1ca2859f30a4555cd6e5",
+    osx_aarch_64 = "193289af0470c6a1aada357d4fba0bbf8d78bfaac8b5e42ca30af2ef75583de2",
+    osx_x86_64 = "537d73604a344ded6fc94e98e07e529d4fe3e4a0b09e59905353950fafc2a1f7",
+    win64 = "5d3ff218d7d91eea95f7569bcb5a98f3030f8996d44151279d9772edcff76082",
 )
 
 REPOSITORY_LOCATIONS_SPEC = dict(
@@ -188,8 +188,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/jemalloc/jemalloc/releases/download/{version}/jemalloc-{version}.tar.bz2"],
     ),
     com_github_grpc_grpc = dict(
-        version = "1.76.0",
-        sha256 = "0af37b800953130b47c075b56683ee60bdc3eda3c37fc6004193f5b569758204",
+        version = "1.81.1",
+        sha256 = "48ae0d05f87206112d9e9144a923191ee1e482141a70686ec58dc86d0b40fddc",
         strip_prefix = "grpc-{version}",
         urls = ["https://github.com/grpc/grpc/archive/v{version}.tar.gz"],
     ),
@@ -415,7 +415,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
         # test/common/json/json_sanitizer_test_util.cc.
-        sha256 = "6b6599b54c88d75904b7471f5ca34a725fa0af92e134dd1a32d5b395aa4b4ca8",
+        sha256 = "f0b6838e7522a8da96126d487068c959bc624926368f3024ac8fd03abd0a1ac4",
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-{version}.tar.gz"],
     ),
@@ -553,8 +553,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "846ced76db5e1b6297408cc11a8bfe1fc1c0e49f",
-        sha256 = "0e11aec4ebd778fcd3c2775e3693cccbd966af4928e9fa7573c2e2975ccd9c50",
+        version = "4729ceb221725bb52c6f4d48229d9c3ba059c36e",
+        sha256 = "4262624d5b23dd3dc5e75bcf6a4f70fe91f7e5a0cbcf994067d5e0897d8f5e0f",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),

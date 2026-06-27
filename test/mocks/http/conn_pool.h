@@ -19,7 +19,7 @@ class MockCallbacks : public Callbacks {
                Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(void, onPoolReady,
               (RequestEncoder & encoder, Upstream::HostDescriptionConstSharedPtr host,
-               StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol));
+               StreamInfo::StreamInfo& info, std::optional<Http::Protocol> protocol));
 };
 
 class MockInstance : public Instance {

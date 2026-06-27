@@ -79,7 +79,7 @@ public:
   // Set to default so that the default client connection factory is used to initiate connections
   // to. the address.
   absl::string_view addressType() const override { return "default"; }
-  absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+  std::optional<std::string> networkNamespace() const override { return std::nullopt; }
   Network::Address::InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override {
     return nullptr;
   }
@@ -160,11 +160,11 @@ public:
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                              const Upstream::Host& /*host*/,
                              std::vector<uint8_t>& /*hash_key*/) override {
-      return absl::nullopt;
+      return std::nullopt;
     }
 
     // Lifetime tracking not implemented.

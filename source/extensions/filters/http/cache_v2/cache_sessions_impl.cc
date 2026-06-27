@@ -86,7 +86,7 @@ static Http::ResponseHeaderMapPtr notSatisfiableHeaders() {
 }
 
 void ActiveLookupContext::getHeaders(GetHeadersCallback&& cb) {
-  absl::optional<std::vector<RawByteRange>> ranges = lookup().parseRange();
+  std::optional<std::vector<RawByteRange>> ranges = lookup().parseRange();
   if (ranges) {
     // If it's a range request, inject the appropriate modified content-range and
     // content-length headers into the response once we have the response headers.

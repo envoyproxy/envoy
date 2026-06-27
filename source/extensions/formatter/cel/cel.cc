@@ -18,7 +18,7 @@ namespace Expr = Filters::Common::Expr;
 
 CELFormatter::CELFormatter(const ::Envoy::LocalInfo::LocalInfo& local_info,
                            Expr::BuilderInstanceSharedConstPtr expr_builder,
-                           const cel::expr::Expr& input_expr, absl::optional<size_t>& max_length,
+                           const cel::expr::Expr& input_expr, std::optional<size_t>& max_length,
                            bool typed)
     : local_info_(local_info), max_length_(max_length), compiled_expr_([&]() {
         auto compiled_expr = Expr::CompiledExpression::Create(expr_builder, input_expr);
@@ -30,14 +30,14 @@ CELFormatter::CELFormatter(const ::Envoy::LocalInfo::LocalInfo& local_info,
       }()),
       typed_(typed) {}
 
-absl::optional<std::string> CELFormatter::format(const Envoy::Formatter::Context& context,
-                                                 const StreamInfo::StreamInfo& stream_info) const {
+std::optional<std::string> CELFormatter::format(const Envoy::Formatter::Context& context,
+                                                const StreamInfo::StreamInfo& stream_info) const {
   Protobuf::Arena arena;
   auto eval_status =
       compiled_expr_.evaluate(arena, &local_info_, stream_info, context.requestHeaders().ptr(),
                               context.responseHeaders().ptr(), context.responseTrailers().ptr());
   if (!eval_status.has_value() || eval_status.value().IsError()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const auto result = Expr::print(eval_status.value());
   if (max_length_) {
@@ -78,7 +78,7 @@ Protobuf::Value CELFormatter::formatValue(const Envoy::Formatter::Context& conte
 
 absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
 CELFormatterCommandParser::parse(absl::string_view command, absl::string_view subcommand,
-                                 absl::optional<size_t> max_length) const {
+                                 std::optional<size_t> max_length) const {
 #if defined(USE_CEL_PARSER)
   if (command == "CEL" || command == "TYPED_CEL") {
     auto parse_status = google::api::expr::parser::Parse(subcommand);

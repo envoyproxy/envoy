@@ -799,7 +799,7 @@ TEST_F(CombinedUpstreamTest, RouterFilterInterface) {
   EXPECT_NO_THROW(this->upstream_->onPerTryTimeout(*mock_upst.get()));
   EXPECT_NO_THROW(this->upstream_->onPerTryIdleTimeout(*mock_upst.get()));
   EXPECT_NO_THROW(this->upstream_->onStreamMaxDurationReached(*mock_upst.get()));
-  EXPECT_EQ(this->upstream_->dynamicMaxStreamDuration(), absl::nullopt);
+  EXPECT_EQ(this->upstream_->dynamicMaxStreamDuration(), std::nullopt);
   EXPECT_EQ(this->upstream_->downstreamTrailers(), nullptr);
   EXPECT_EQ(this->upstream_->downstreamResponseStarted(), false);
   EXPECT_EQ(this->upstream_->downstreamEndStream(), false);

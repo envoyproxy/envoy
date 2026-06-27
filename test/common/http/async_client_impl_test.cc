@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -27,7 +28,6 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -745,7 +745,7 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpanKeepParentSampling) {
   AsyncClient::RequestOptions options = AsyncClient::RequestOptions()
                                             .setParentSpan(parent_span_)
                                             .setChildSpanName(child_span_name_)
-                                            .setSampled(absl::nullopt);
+                                            .setSampled(std::nullopt);
   EXPECT_CALL(*child_span, setSampled(_)).Times(0);
   EXPECT_CALL(*child_span, injectContext(_, _));
 
@@ -833,7 +833,7 @@ TEST_F(AsyncClientImplTest, WithoutMetadata) {
 
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
       .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
+                           std::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
@@ -877,7 +877,7 @@ TEST_F(AsyncClientImplTest, WithMetadata) {
 
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
       .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
+                           std::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_NE(context->metadataMatchCriteria(), nullptr);
         EXPECT_EQ(context->metadataMatchCriteria()->metadataMatchCriteria().at(0)->name(),
                   "fake_test_key");
@@ -934,7 +934,7 @@ TEST_F(AsyncClientImplTest, WithFilterState) {
 
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
       .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
+                           std::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         StreamInfo::FilterStateSharedPtr filter_state = context->requestStreamInfo()->filterState();
         const TestStateObject* state =
             filter_state->getDataReadOnly<TestStateObject>("test-filter");
@@ -2487,7 +2487,7 @@ public:
     EXPECT_TRUE(retry_policy_.get());
 
     route_impl_ = *NullRouteImpl::create(
-        client_.cluster_->name(), retry_policy_, regex_engine_, absl::nullopt,
+        client_.cluster_->name(), retry_policy_, regex_engine_, std::nullopt,
         Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>());
   }
 
@@ -2545,8 +2545,8 @@ TEST_F(AsyncClientImplUnitTest, NullRouteImplInitTest) {
   EXPECT_EQ(nullptr, route_entry.metadataMatchCriteria());
   EXPECT_TRUE(route_entry.rateLimitPolicy().empty());
   EXPECT_TRUE(route_entry.rateLimitPolicy().getApplicableRateLimit(0).empty());
-  EXPECT_EQ(absl::nullopt, route_entry.idleTimeout());
-  EXPECT_EQ(absl::nullopt, route_entry.grpcTimeoutOffset());
+  EXPECT_EQ(std::nullopt, route_entry.idleTimeout());
+  EXPECT_EQ(std::nullopt, route_entry.grpcTimeoutOffset());
   EXPECT_TRUE(route_entry.opaqueConfig().empty());
   EXPECT_TRUE(route_entry.includeVirtualHostRateLimits());
   EXPECT_EQ(nullptr, route_impl_->typedMetadata().get<Config::TypedMetadata::Object>("bar"));
@@ -2637,7 +2637,7 @@ TEST_F(AsyncClientImplTest, UpstreamOverrideHost) {
 
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
       .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
+                           std::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         // Verify that the upstream override host is passed through the load balancer context
         auto retrieved_override = context->overrideHostToSelect();
         EXPECT_TRUE(retrieved_override.has_value());
@@ -2693,7 +2693,7 @@ TEST_F(AsyncClientImplTest, UpstreamOverrideHostNotStrict) {
 
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
       .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
+                           std::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         // Verify that the non-strict upstream override host is passed correctly
         auto retrieved_override = context->overrideHostToSelect();
         EXPECT_TRUE(retrieved_override.has_value());
@@ -2748,7 +2748,7 @@ TEST_F(AsyncClientImplTest, NoUpstreamOverrideHost) {
 
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
       .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
+                           std::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         // Verify that no upstream override host is set when not specified
         auto retrieved_override = context->overrideHostToSelect();
         EXPECT_FALSE(retrieved_override.has_value());

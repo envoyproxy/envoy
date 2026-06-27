@@ -168,7 +168,7 @@ public:
   MOCK_METHOD(void, markUnused, ());
   MOCK_METHOD(bool, hidden, (), (const));
   MOCK_METHOD(uint64_t, value, (), (const));
-  MOCK_METHOD(absl::optional<bool>, cachedShouldImport, (), (const));
+  MOCK_METHOD(std::optional<bool>, cachedShouldImport, (), (const));
   MOCK_METHOD(ImportMode, importMode, (), (const));
 
   bool used_;
@@ -322,16 +322,16 @@ public:
   // back to the old string-based mechanisms still on the MockStore object
   // to allow tests to inject EXPECT_CALL hooks for those. The optional pre-built tagged_name is
   // ignored.
-  MOCK_METHOD(Counter&, counterFromTaggedName,
-              (StatName, absl::optional<StatNameTagSpan>, StatName), (override));
+  MOCK_METHOD(Counter&, counterFromTaggedName, (StatName, std::optional<StatNameTagSpan>, StatName),
+              (override));
   // NOLINTNEXTLINE(readability-identifier-naming)
-  Counter& counterFromTaggedName_(StatName base_name, absl::optional<StatNameTagSpan>, StatName);
+  Counter& counterFromTaggedName_(StatName base_name, std::optional<StatNameTagSpan>, StatName);
 
-  Gauge& gaugeFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan>, StatName,
+  Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan>, StatName,
                              Gauge::ImportMode import_mode) override;
-  Histogram& histogramFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan>, StatName,
+  Histogram& histogramFromTaggedName(StatName base_name, std::optional<StatNameTagSpan>, StatName,
                                      Histogram::Unit unit) override;
-  TextReadout& textReadoutFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan>,
+  TextReadout& textReadoutFromTaggedName(StatName base_name, std::optional<StatNameTagSpan>,
                                          StatName) override;
 
   MockStore& mock_store_;

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -19,8 +20,6 @@
 #include "source/common/network/cidr_range.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_utility.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -329,7 +328,7 @@ private:
   const std::string disable_key_;
   const uint64_t stage_;
   std::vector<RateLimit::DescriptorProducerPtr> actions_;
-  absl::optional<RateLimitOverrideActionPtr> limit_override_ = absl::nullopt;
+  std::optional<RateLimitOverrideActionPtr> limit_override_ = std::nullopt;
   const bool apply_on_stream_done_ = false;
   const RateLimit::XRateLimitOption x_ratelimit_option_{};
 };

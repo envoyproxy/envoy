@@ -19,7 +19,7 @@ public:
 
   absl::StatusOr<Upstream::UpstreamLocalAddressSelectorConstSharedPtr>
   createLocalAddressSelector(std::vector<Upstream::UpstreamLocalAddress> upstream_local_addresses,
-                             absl::optional<std::string> cluster_name) const override;
+                             std::optional<std::string> cluster_name) const override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<

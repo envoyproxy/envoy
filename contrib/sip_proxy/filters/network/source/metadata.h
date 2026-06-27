@@ -90,7 +90,7 @@ private:
 
 /**
  * MessageMetadata encapsulates metadata about Sip messages. The various fields are considered
- * optional. Unless otherwise noted, accessor methods throw absl::bad_optional_access if the
+ * optional. Unless otherwise noted, accessor methods throw std::bad_optional_access if the
  * corresponding value has not been set.
  */
 class MessageMetadata : public Logger::Loggable<Logger::Id::filter> {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fstream>
+#include <optional>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/tap/v3/common.pb.h"
@@ -10,8 +11,6 @@
 
 #include "source/extensions/common/matcher/matcher.h"
 #include "source/extensions/common/tap/tap.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -131,7 +130,7 @@ private:
   static constexpr uint32_t DefaultMinStreamedSentBytes = 9;
   uint32_t min_streamed_sent_bytes_{0};
   Runtime::Loader& runtime_;
-  const absl::optional<envoy::config::core::v3::RuntimeFractionalPercent> tap_enabled_;
+  const std::optional<envoy::config::core::v3::RuntimeFractionalPercent> tap_enabled_;
 };
 
 /**

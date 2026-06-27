@@ -78,7 +78,7 @@ public:
                          Upstream::HostDescriptionConstSharedPtr host) override;
       void onPoolReady(RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
                        StreamInfo::StreamInfo& info,
-                       absl::optional<Http::Protocol> protocol) override;
+                       std::optional<Http::Protocol> protocol) override;
 
       ConnectionPool::Instance& pool() { return pool_; }
 
@@ -103,7 +103,7 @@ public:
     // Called on pool failure or timeout to kick off another connection attempt.
     // Returns the StreamCreationResult if there is a failover pool and a
     // connection has been attempted, an empty optional otherwise.
-    absl::optional<StreamCreationResult> tryAnotherConnection();
+    std::optional<StreamCreationResult> tryAnotherConnection();
 
     // This timer is registered when an initial HTTP/3 attempt is started.
     // The timeout for TCP failover and HTTP/3 happy eyeballs are the same, so
@@ -121,7 +121,7 @@ public:
     void onConnectionAttemptReady(ConnectionAttemptCallbacks* attempt, RequestEncoder& encoder,
                                   Upstream::HostDescriptionConstSharedPtr host,
                                   StreamInfo::StreamInfo& info,
-                                  absl::optional<Http::Protocol> protocol);
+                                  std::optional<Http::Protocol> protocol);
 
     // Called by onConnectionAttemptFailed and on grid deletion destruction to let wrapper
     // callback subscribers know the connect attempt failed.
@@ -176,7 +176,7 @@ public:
     bool tcp_attempt_succeeded_{};
     // Latch the passed-in stream options.
     const Instance::StreamOptions stream_options_{};
-    absl::optional<ConnectionPool::PoolFailureReason> prev_pool_failure_reason_;
+    std::optional<ConnectionPool::PoolFailureReason> prev_pool_failure_reason_;
     std::string prev_pool_transport_failure_reason_;
     bool delete_started_ = false;
   };

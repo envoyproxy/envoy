@@ -47,7 +47,7 @@ private:
 
 // A DataInput that returns the configured value every time.
 struct TestInput : public DataInput<TestData> {
-  TestInput(absl::optional<std::string> input,
+  TestInput(std::optional<std::string> input,
             DataAvailability availability = DataAvailability::AllDataAvailable)
       : data_(input), availability_(availability) {}
 
@@ -55,7 +55,7 @@ struct TestInput : public DataInput<TestData> {
     return data_ ? DataInputGetResult::CreateStringView(*data_, availability_)
                  : DataInputGetResult::NoData(availability_);
   }
-  const absl::optional<std::string> data_;
+  const std::optional<std::string> data_;
   const DataAvailability availability_;
 };
 
@@ -67,11 +67,11 @@ struct TestFloatInput : public DataInput<TestData> {
 // Self-injecting factory for TestInput.
 class TestDataInputStringFactory : public DataInputFactory<TestData> {
 public:
-  TestDataInputStringFactory(absl::optional<std::string> data,
+  TestDataInputStringFactory(std::optional<std::string> data,
                              DataAvailability availability = DataAvailability::AllDataAvailable)
       : availability_(availability), data_(data), injection_(*this) {}
   TestDataInputStringFactory(DataAvailability availability)
-      : TestDataInputStringFactory(absl::nullopt, availability) {}
+      : TestDataInputStringFactory(std::nullopt, availability) {}
   DataInputFactoryCb<TestData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
     return [&]() { return std::make_unique<TestInput>(data_, availability_); };
@@ -84,18 +84,18 @@ public:
 
 private:
   const DataAvailability availability_;
-  const absl::optional<std::string> data_;
+  const std::optional<std::string> data_;
   Registry::InjectFactory<DataInputFactory<TestData>> injection_;
 };
 
 // Secondary data input to avoid duplicate type registration.
 class TestDataInputBoolFactory : public DataInputFactory<TestData> {
 public:
-  TestDataInputBoolFactory(absl::optional<std::string> data,
+  TestDataInputBoolFactory(std::optional<std::string> data,
                            DataAvailability availability = DataAvailability::AllDataAvailable)
       : availability_(availability), data_(data), injection_(*this) {}
   TestDataInputBoolFactory(DataAvailability availability)
-      : TestDataInputBoolFactory(absl::nullopt, availability) {}
+      : TestDataInputBoolFactory(std::nullopt, availability) {}
   DataInputFactoryCb<TestData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
     // Note, here is using `TestInput` same as `TestDataInputStringFactory`.
@@ -109,7 +109,7 @@ public:
 
 private:
   const DataAvailability availability_;
-  const absl::optional<std::string> data_;
+  const std::optional<std::string> data_;
   Registry::InjectFactory<DataInputFactory<TestData>> injection_;
 };
 
@@ -144,7 +144,7 @@ struct BoolMatcher : public InputMatcher {
 
 // An InputMatcher that evaluates the input against a provided callback.
 struct TestMatcher : public InputMatcher {
-  explicit TestMatcher(std::function<bool(absl::optional<absl::string_view>)> predicate)
+  explicit TestMatcher(std::function<bool(std::optional<absl::string_view>)> predicate)
       : predicate_(predicate) {}
 
   MatchResult match(const DataInputGetResult& input) override {
@@ -155,7 +155,7 @@ struct TestMatcher : public InputMatcher {
     return MatchResult::NoMatch;
   }
 
-  std::function<bool(absl::optional<absl::string_view>)> predicate_;
+  std::function<bool(std::optional<absl::string_view>)> predicate_;
 };
 
 // An action that evaluates to a proto StringValue.
@@ -256,8 +256,8 @@ public:
  * @param availability the data availability to use for the input.
  */
 SingleFieldMatcherPtr<TestData>
-createSingleMatcher(absl::optional<std::string> input,
-                    std::function<bool(absl::optional<absl::string_view>)> predicate,
+createSingleMatcher(std::optional<std::string> input,
+                    std::function<bool(std::optional<absl::string_view>)> predicate,
                     DataAvailability availability = DataAvailability::AllDataAvailable) {
   return SingleFieldMatcher<TestData>::create(std::make_unique<TestInput>(input, availability),
                                               std::make_unique<TestMatcher>(predicate))

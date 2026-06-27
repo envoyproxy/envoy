@@ -24,7 +24,7 @@ using ::testing::Return;
 class SubstitutionFormatStringUtilsTest : public ::testing::Test {
 public:
   SubstitutionFormatStringUtilsTest() {
-    absl::optional<uint32_t> response_code{200};
+    std::optional<uint32_t> response_code{200};
     EXPECT_CALL(stream_info_, responseCode()).WillRepeatedly(Return(response_code));
 
     formatter_context_.setRequestHeaders(request_headers_);
@@ -255,7 +255,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestParseFormattersWithSingleExtension
   auto commands = *SubstitutionFormatStringUtils::parseFormatters(config, context_);
   ASSERT_EQ(1, commands.size());
 
-  absl::optional<size_t> max_length = {};
+  std::optional<size_t> max_length = {};
   ASSERT_TRUE(commands[0] != nullptr);
   auto status_or_provider = commands[0]->parse("COMMAND_EXTENSION", "", max_length);
   ASSERT_THAT(status_or_provider, IsOkAndHolds(NotNull()));
@@ -294,7 +294,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestParseFormattersWithMultipleExtensi
   auto commands = *SubstitutionFormatStringUtils::parseFormatters(config, context_);
   ASSERT_EQ(2, commands.size());
 
-  absl::optional<size_t> max_length = {};
+  std::optional<size_t> max_length = {};
   ASSERT_TRUE(commands[0] != nullptr);
   auto test_command_provider_or_status = commands[0]->parse("COMMAND_EXTENSION", "", max_length);
   ASSERT_THAT(test_command_provider_or_status, IsOkAndHolds(NotNull()));

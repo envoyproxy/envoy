@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -8,7 +9,6 @@
 
 #include "absl/container/btree_map.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {
@@ -26,7 +26,7 @@ public:
   void overwrite(absl::string_view key, absl::string_view value);
   std::string toString() const;
   std::string replaceQueryString(const HeaderString& path) const;
-  absl::optional<std::string> getFirstValue(absl::string_view key) const;
+  std::optional<std::string> getFirstValue(absl::string_view key) const;
 
   const absl::btree_map<std::string, std::vector<std::string>>& data() const { return data_; }
 

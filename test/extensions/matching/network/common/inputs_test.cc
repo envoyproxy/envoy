@@ -36,7 +36,7 @@ TEST(MatchingData, DestinationIPInput) {
         *Network::Address::PipeInstance::create("/pipe/path"));
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
@@ -119,7 +119,7 @@ TEST(MatchingData, DestinationPortInput) {
         *Network::Address::PipeInstance::create("/pipe/path"));
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
@@ -143,7 +143,7 @@ TEST(MatchingData, SourceIPInput) {
         *Network::Address::PipeInstance::create("/pipe/path"));
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
@@ -167,7 +167,7 @@ TEST(MatchingData, SourcePortInput) {
         *Network::Address::PipeInstance::create("/pipe/path"));
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
@@ -191,7 +191,7 @@ TEST(MatchingData, DirectSourceIPInput) {
         *Network::Address::PipeInstance::create("/pipe/path"));
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
@@ -215,7 +215,7 @@ TEST(MatchingData, SourceTypeInput) {
         std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
@@ -229,7 +229,7 @@ TEST(MatchingData, ServerNameInput) {
   {
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 
   {
@@ -252,7 +252,7 @@ TEST(MatchingData, TransportProtocolInput) {
     EXPECT_CALL(socket, detectedTransportProtocol).WillOnce(testing::Return(""));
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 
   {
@@ -276,7 +276,7 @@ TEST(MatchingData, ApplicationProtocolInput) {
     EXPECT_CALL(socket, requestedApplicationProtocols).WillOnce(testing::ReturnRef(protocols));
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 
   {
@@ -308,7 +308,7 @@ TEST(MatchingData, FilterStateInput) {
   {
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 
   filter_state.setData("unknown_key", std::make_shared<Router::StringAccessorImpl>("some_value"),
@@ -317,7 +317,7 @@ TEST(MatchingData, FilterStateInput) {
   {
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 
   std::string value = "filter_state_value";
@@ -347,7 +347,7 @@ public:
     return absl::monostate{};
   }
 
-  absl::optional<std::string> serializeAsString() const override {
+  std::optional<std::string> serializeAsString() const override {
     return "serialized_whole_object";
   }
 
@@ -369,7 +369,7 @@ TEST(MatchingData, FilterStateInputWithField) {
   {
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 
   // Set a filter state object with field support.
@@ -399,7 +399,7 @@ TEST(MatchingData, FilterStateInputWithField) {
     FilterStateInput<MatchingData> missing_input(key, "nonexistent");
     const auto result = missing_input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
@@ -468,7 +468,7 @@ TEST(UdpMatchingData, UdpDestinationIPInput) {
     UdpMatchingDataImpl data(*pipe, ip);
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
@@ -488,7 +488,7 @@ TEST(UdpMatchingData, UdpDestinationPortInput) {
     UdpMatchingDataImpl data(*pipe, ip);
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
@@ -508,7 +508,7 @@ TEST(UdpMatchingData, UdpSourceIPInput) {
     UdpMatchingDataImpl data(ip, *pipe);
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
@@ -528,7 +528,7 @@ TEST(UdpMatchingData, UdpSourcePortInput) {
     UdpMatchingDataImpl data(ip, *pipe);
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
@@ -545,14 +545,14 @@ TEST(MatchingData, NetworkNamespaceInput) {
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 
   // Test with network namespace.
   {
     socket.connection_info_provider_->setLocalAddress(
         std::make_shared<Network::Address::Ipv4Instance>(
-            "127.0.0.1", 8080, nullptr, absl::make_optional(std::string("/var/run/netns/ns1"))));
+            "127.0.0.1", 8080, nullptr, std::make_optional(std::string("/var/run/netns/ns1"))));
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.stringData().value(), "/var/run/netns/ns1");
@@ -562,17 +562,17 @@ TEST(MatchingData, NetworkNamespaceInput) {
   {
     socket.connection_info_provider_->setLocalAddress(
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080, nullptr,
-                                                         absl::make_optional(std::string(""))));
+                                                         std::make_optional(std::string(""))));
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 
   // Test with IPv6 address and network namespace.
   {
     socket.connection_info_provider_->setLocalAddress(
         std::make_shared<Network::Address::Ipv6Instance>(
-            "::1", 8080, nullptr, true, absl::make_optional(std::string("/var/run/netns/ns2"))));
+            "::1", 8080, nullptr, true, std::make_optional(std::string("/var/run/netns/ns2"))));
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.stringData().value(), "/var/run/netns/ns2");
@@ -584,14 +584,14 @@ TEST(MatchingData, NetworkNamespaceInput) {
         *Network::Address::PipeInstance::create("/pipe/path"));
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
 TEST(MatchingData, HttpNetworkNamespaceInput) {
   auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
       std::make_shared<Address::Ipv4Instance>(
-          "127.0.0.1", 8080, nullptr, absl::make_optional(std::string("/var/run/netns/http_ns"))),
+          "127.0.0.1", 8080, nullptr, std::make_optional(std::string("/var/run/netns/http_ns"))),
       std::make_shared<Address::Ipv4Instance>("10.0.0.1", 9090));
 
   StreamInfo::StreamInfoImpl stream_info(
@@ -611,7 +611,7 @@ TEST(UdpMatchingData, UdpNetworkNamespaceInput) {
   // Test with network namespace.
   {
     const Address::Ipv4Instance local_ip("127.0.0.1", 8080, nullptr,
-                                         absl::make_optional(std::string("/var/run/netns/udp_ns")));
+                                         std::make_optional(std::string("/var/run/netns/udp_ns")));
     const Address::Ipv4Instance remote_ip("10.0.0.1", 9090);
     UdpMatchingDataImpl data(local_ip, remote_ip);
 
@@ -628,7 +628,7 @@ TEST(UdpMatchingData, UdpNetworkNamespaceInput) {
 
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 

@@ -74,7 +74,7 @@ public:
                                    absl::AnyInvocable<void()> above_overflow_watermark) override;
   BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler& reset_handler) override;
   void unregisterAccount(const BufferMemoryAccountSharedPtr& account,
-                         absl::optional<uint32_t> current_class) override;
+                         std::optional<uint32_t> current_class) override;
 
   // Number of buffers created.
   uint64_t numBuffersCreated() const;
@@ -184,7 +184,7 @@ private:
   // The expected balances for the accounts. If set, when a buffer updates its
   // size, it also checks whether the expected_balances has been satisfied, and
   // notifies waiters of expected_balances_met_.
-  absl::optional<AccountBalanceExpectations> expected_balances_ ABSL_GUARDED_BY(mutex_);
+  std::optional<AccountBalanceExpectations> expected_balances_ ABSL_GUARDED_BY(mutex_);
   absl::Notification expected_balances_met_;
   // Map from accounts to buffers bound to that account.
   AccountToBoundBuffersMap account_infos_ ABSL_GUARDED_BY(mutex_);

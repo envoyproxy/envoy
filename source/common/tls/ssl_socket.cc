@@ -99,7 +99,7 @@ SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
       remaining -= rc;
       result.bytes_read_ += rc;
     } else {
-      result.error_ = absl::make_optional<int>(rc);
+      result.error_ = std::make_optional<int>(rc);
       break;
     }
   }

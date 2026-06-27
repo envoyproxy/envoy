@@ -45,7 +45,7 @@ public:
 
   void createAuthenticator(
       JwtVerify::CheckAudience* check_audience = nullptr,
-      const absl::optional<std::string>& provider = absl::make_optional<std::string>(ProviderName),
+      const std::optional<std::string>& provider = std::make_optional<std::string>(ProviderName),
       bool allow_failed = false, bool allow_missing = false) {
     filter_config_ = std::make_unique<FilterConfigImpl>(proto_config_, "", mock_factory_ctx_);
     raw_fetcher_ = new MockJwksFetcher;
@@ -423,7 +423,7 @@ TEST_F(AuthenticatorTest, TestSetInvalidJwtInvalidAudienceToGetStatus) {
   // Config provider and failed status in metadata
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.set_failed_status_in_metadata("jwt-failure-reason");
-  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+  createAuthenticator(nullptr, std::make_optional<std::string>(ProviderName),
                       /*allow_failed=*/true, /*allow_missing=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
 
@@ -457,7 +457,7 @@ TEST_F(AuthenticatorTest, TestSetMissingJwtToGetStatus) {
   // Config provider and failed status in metadata
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.set_failed_status_in_metadata("jwt-failure-reason");
-  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+  createAuthenticator(nullptr, std::make_optional<std::string>(ProviderName),
                       /*allow_failed=*/true, /*allow_missing=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
 
@@ -492,7 +492,7 @@ TEST_F(AuthenticatorTest, TestSetInvalidAndValidJwtToGetStatus) {
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.set_failed_status_in_metadata("jwt-failure-reason");
 
-  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+  createAuthenticator(nullptr, std::make_optional<std::string>(ProviderName),
                       /*allow_failed=*/true, /*allow_missing=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
@@ -533,7 +533,7 @@ TEST_F(AuthenticatorTest, TestSetTwoInvalidJwtToGetStatus) {
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.set_failed_status_in_metadata("jwt-failure-reason");
 
-  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+  createAuthenticator(nullptr, std::make_optional<std::string>(ProviderName),
                       /*allow_failed=*/true, /*allow_missing=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
 
@@ -571,7 +571,7 @@ TEST_F(AuthenticatorTest, TestSetTwoProvidersJwtMissing) {
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.set_failed_status_in_metadata("jwt-failure-reason");
 
-  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+  createAuthenticator(nullptr, std::make_optional<std::string>(ProviderName),
                       /*allow_failed=*/true, /*allow_missing=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
 
@@ -672,7 +672,7 @@ TEST_F(AuthenticatorTest, TestWrongIssuerOKWithoutProvider) {
   provider.clear_issuer();
   provider.clear_audiences();
   // use authenticator without a valid provider
-  createAuthenticator(nullptr, absl::nullopt);
+  createAuthenticator(nullptr, std::nullopt);
 
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
@@ -701,7 +701,7 @@ TEST_F(AuthenticatorTest, TestJwtWithoutIssWithValidProvider) {
 // The verification fails with JwtUnknownIssuer.
 // When "allow_missing" or "allow_failed" is used, authenticator doesn't have a valid provider.
 TEST_F(AuthenticatorTest, TestJwtWithoutIssWithoutValidProvider) {
-  createAuthenticator(nullptr, absl::nullopt);
+  createAuthenticator(nullptr, std::nullopt);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
 
   Http::TestRequestHeaderMapImpl headers{
@@ -736,7 +736,7 @@ TEST_F(AuthenticatorTest, TestJwtWithoutIssWithValidProviderNotIssuer) {
 TEST_F(AuthenticatorTest, TestJwtWithoutIssWithoutValidProviderNotIssuer) {
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.clear_issuer();
-  createAuthenticator(nullptr, absl::nullopt);
+  createAuthenticator(nullptr, std::nullopt);
 
   jwks_ = Jwks::createFrom(ES256PublicKey, Jwks::JWKS);
   EXPECT_TRUE(jwks_->getStatus() == Status::Ok);
@@ -802,7 +802,7 @@ TEST_F(AuthenticatorTest, TestMultipleJWTAllGood) {
 
 // Test multiple tokens; one of them is bad and allow_failed, verification is ok.
 TEST_F(AuthenticatorTest, TestMultipleJWTOneBadAllowFails) {
-  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+  createAuthenticator(nullptr, std::make_optional<std::string>(ProviderName),
                       /*allow_failed=*/true, /*all_missing=*/false);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _));
 
@@ -817,7 +817,7 @@ TEST_F(AuthenticatorTest, TestMultipleJWTOneBadAllowFails) {
 
 // Test empty header and allow_missing, verification is ok.
 TEST_F(AuthenticatorTest, TestAllowMissingWithEmptyHeader) {
-  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+  createAuthenticator(nullptr, std::make_optional<std::string>(ProviderName),
                       /*allow_failed=*/false, /*all_missing=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
 
@@ -987,7 +987,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleTokens) {
     header->set_value_prefix("Bearer ");
   }
 
-  createAuthenticator(nullptr, absl::nullopt, /*allow_failed=*/true);
+  createAuthenticator(nullptr, std::nullopt, /*allow_failed=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
         receiver.onJwksSuccess(std::move(jwks_));
@@ -1033,7 +1033,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleIssuers) {
   header->set_name("other-auth");
   header->set_value_prefix("Bearer ");
 
-  createAuthenticator(nullptr, absl::nullopt, /*allow_failed=*/true);
+  createAuthenticator(nullptr, std::nullopt, /*allow_failed=*/true);
   EXPECT_CALL(*raw_fetcher_, cancel());
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .Times(2)
@@ -1096,7 +1096,7 @@ public:
     EXPECT_CALL(mock_fetcher_, Call(_, _, _)).Times(0);
   }
 
-  void createAuthenticator(const absl::optional<std::string>& provider) {
+  void createAuthenticator(const std::optional<std::string>& provider) {
     auth_ = Authenticator::create(nullptr, provider, false, false, jwks_cache_, cm_,
                                   mock_fetcher_.AsStdFunction(), time_system_);
   }
@@ -1130,7 +1130,7 @@ public:
 };
 
 TEST_F(AuthenticatorJwtCacheTest, TestNonProvider) {
-  createAuthenticator(absl::nullopt);
+  createAuthenticator(std::nullopt);
 
   // For invalid provider, jwt_cache is not called.
   EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, lookup(_)).Times(0);

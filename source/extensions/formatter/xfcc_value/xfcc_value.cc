@@ -50,14 +50,14 @@ size_t countBackslashes(absl::string_view str) {
 // So scan the header left-to-right.
 
 // Handles a single key/value pair within an XFCC element.
-absl::optional<std::string> parseKeyValuePair(absl::string_view pair, absl::string_view target) {
+std::optional<std::string> parseKeyValuePair(absl::string_view pair, absl::string_view target) {
   // Find '=' not in quotes. Because key will always be the first part and won't be double
   // quoted or contain `=`, we can safely use `absl::StrSplit`.
   std::pair<absl::string_view, absl::string_view> key_value =
       absl::StrSplit(pair, absl::MaxSplits('=', 1));
   absl::string_view raw_key = absl::StripAsciiWhitespace(key_value.first);
   if (!absl::EqualsIgnoreCase(raw_key, target)) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   absl::string_view raw_value = absl::StripAsciiWhitespace(key_value.second);
@@ -101,8 +101,7 @@ absl::optional<std::string> parseKeyValuePair(absl::string_view pair, absl::stri
 }
 
 // Handles a single XFCC element (semicolon-separated key/value pairs).
-absl::optional<std::string> parseElementForKey(absl::string_view element,
-                                               absl::string_view target) {
+std::optional<std::string> parseElementForKey(absl::string_view element, absl::string_view target) {
 
   // Scan key-value pairs in this element (by semicolon not in quotes).
   bool in_quotes = false;
@@ -134,7 +133,7 @@ absl::optional<std::string> parseElementForKey(absl::string_view element,
   // an unmatched quote, it should be handled in the parseValueFromXfccByKey()
   // and will not enter this function.
   ASSERT(!in_quotes);
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 // Extracts the key from the XFCC header.
@@ -185,24 +184,24 @@ class XfccValueFormatterProvider : public ::Envoy::Formatter::FormatterProvider,
 public:
   XfccValueFormatterProvider(Http::LowerCaseString&& key) : key_(key) {}
 
-  absl::optional<std::string> format(const Envoy::Formatter::Context& context,
-                                     const StreamInfo::StreamInfo&) const override {
+  std::optional<std::string> format(const Envoy::Formatter::Context& context,
+                                    const StreamInfo::StreamInfo&) const override {
     const auto headers = context.requestHeaders();
     if (!headers.has_value()) {
-      return absl::nullopt;
+      return std::nullopt;
     }
 
     auto status_or = parseValueFromXfccByKey(*headers, key_);
     if (!status_or.ok()) {
       ENVOY_LOG(debug, "XFCC value extraction failure: {}", status_or.status().message());
-      return absl::nullopt;
+      return std::nullopt;
     }
     return std::move(status_or.value());
   }
 
   Protobuf::Value formatValue(const Envoy::Formatter::Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override {
-    absl::optional<std::string> value = format(context, stream_info);
+    std::optional<std::string> value = format(context, stream_info);
     if (!value.has_value()) {
       return ValueUtil::nullValue();
     }
@@ -217,7 +216,7 @@ private:
 
 absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
 XfccValueFormatterCommandParser::parse(absl::string_view command, absl::string_view subcommand,
-                                       absl::optional<size_t>) const {
+                                       std::optional<size_t>) const {
   // Implementation for parsing the XFCC_VALUE() command.
   if (command != "XFCC_VALUE") {
     return nullptr;

@@ -879,7 +879,7 @@ TEST_F(DynamicModuleClusterTest, LbHostInformationWithMetadataAndLocality) {
   // Update the cluster's priority set directly with locality data.
   cluster->prioritySet().updateHosts(
       0, Upstream::HostSetImpl::partitionHosts(all_hosts, hosts_per_locality), locality_weights,
-      {host_a1, host_a2, host_b1}, {}, absl::nullopt, absl::nullopt);
+      {host_a1, host_a2, host_b1}, {}, std::nullopt, std::nullopt);
 
   // Create the LB.
   auto& talb = result->second;
@@ -1030,7 +1030,7 @@ TEST_F(DynamicModuleClusterTest, LbHostInformationWithMetadataAndLocality) {
       Upstream::HostVector{degraded_host, unhealthy_host});
   cluster->prioritySet().updateHosts(
       1, Upstream::HostSetImpl::partitionHosts(p1_hosts, p1_hosts_per_locality), nullptr,
-      {degraded_host, unhealthy_host}, {}, absl::nullopt, absl::nullopt);
+      {degraded_host, unhealthy_host}, {}, std::nullopt, std::nullopt);
 
   EXPECT_EQ(envoy_dynamic_module_type_host_health_Degraded,
             envoy_dynamic_module_callback_cluster_lb_get_host_health(dm_lb, 1, 0));
@@ -1950,7 +1950,7 @@ TEST_F(DynamicModuleClusterTest, MetricsVecNotFoundWithLabels) {
 // Test compute_hash_key with a valid hash.
 TEST_F(DynamicModuleClusterTest, LbContextComputeHashKey) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
-  ON_CALL(context, computeHashKey()).WillByDefault(Return(absl::optional<uint64_t>(12345)));
+  ON_CALL(context, computeHashKey()).WillByDefault(Return(std::optional<uint64_t>(12345)));
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   uint64_t hash = 0;
@@ -1962,7 +1962,7 @@ TEST_F(DynamicModuleClusterTest, LbContextComputeHashKey) {
 // Test compute_hash_key when no hash is available.
 TEST_F(DynamicModuleClusterTest, LbContextComputeHashKeyNoHash) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
-  ON_CALL(context, computeHashKey()).WillByDefault(Return(absl::nullopt));
+  ON_CALL(context, computeHashKey()).WillByDefault(Return(std::nullopt));
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   uint64_t hash = 0;
@@ -3854,13 +3854,13 @@ TEST_F(DynamicModuleClusterTest, LbRepeatedConstructTeardownWithUpdates) {
     worker_priority_set.updateHosts(
         0,
         Upstream::HostSetImpl::partitionHosts(all_hosts, Upstream::HostsPerLocalityImpl::empty()),
-        {}, {hosts[0]}, {}, absl::nullopt, absl::nullopt);
+        {}, {hosts[0]}, {}, std::nullopt, std::nullopt);
 
     all_hosts = std::make_shared<Upstream::HostVector>(Upstream::HostVector{hosts[0], hosts[1]});
     worker_priority_set.updateHosts(
         0,
         Upstream::HostSetImpl::partitionHosts(all_hosts, Upstream::HostsPerLocalityImpl::empty()),
-        {}, {hosts[1]}, {}, absl::nullopt, absl::nullopt);
+        {}, {hosts[1]}, {}, std::nullopt, std::nullopt);
   }
 }
 

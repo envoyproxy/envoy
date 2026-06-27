@@ -89,18 +89,17 @@ void setThreadAffinity(const uint32_t cpu) {
 // so we need to truncate the string_view to 15 bytes.
 #define PTHREAD_MAX_THREADNAME_LEN_INCLUDING_NULL_BYTE 16
 
-ThreadHandle::ThreadHandle(std::function<void()> thread_routine,
-                           absl::optional<int> thread_priority,
-                           absl::optional<uint32_t> thread_cpu_affinity)
+ThreadHandle::ThreadHandle(std::function<void()> thread_routine, std::optional<int> thread_priority,
+                           std::optional<uint32_t> thread_cpu_affinity)
     : thread_routine_(thread_routine), thread_priority_(thread_priority),
       thread_cpu_affinity_(thread_cpu_affinity) {}
 
 /** Returns the thread routine. */
 std::function<void()>& ThreadHandle::routine() { return thread_routine_; }
 
-absl::optional<int> ThreadHandle::priority() const { return thread_priority_; }
+std::optional<int> ThreadHandle::priority() const { return thread_priority_; }
 
-absl::optional<uint32_t> ThreadHandle::cpuAffinity() const { return thread_cpu_affinity_; }
+std::optional<uint32_t> ThreadHandle::cpuAffinity() const { return thread_cpu_affinity_; }
 
 /** Returns the thread handle. */
 pthread_t& ThreadHandle::handle() { return thread_handle_; }
@@ -210,9 +209,8 @@ int PosixThreadFactory::createPthread(ThreadHandle* thread_handle) {
 
 PosixThreadPtr PosixThreadFactory::createThread(std::function<void()> thread_routine,
                                                 OptionsOptConstRef options, bool crash_on_failure) {
-  auto thread_handle =
-      new ThreadHandle(thread_routine, options ? options->priority_ : absl::nullopt,
-                       options ? options->cpu_affinity_ : absl::nullopt);
+  auto thread_handle = new ThreadHandle(thread_routine, options ? options->priority_ : std::nullopt,
+                                        options ? options->cpu_affinity_ : std::nullopt);
   const int rc = createPthread(thread_handle);
   if (rc != 0) {
     delete thread_handle;

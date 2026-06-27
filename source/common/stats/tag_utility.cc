@@ -10,7 +10,7 @@ namespace Stats {
 namespace TagUtility {
 
 TagStatNameJoiner::TagStatNameJoiner(StatName prefix, StatName stat_name,
-                                     absl::optional<StatNameTagSpan> stat_name_tags,
+                                     std::optional<StatNameTagSpan> stat_name_tags,
                                      SymbolTable& symbol_table)
     : stat_name_tags_(stat_name_tags) {
   prefix_storage_ = symbol_table.join({prefix, stat_name});

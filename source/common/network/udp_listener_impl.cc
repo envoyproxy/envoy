@@ -60,7 +60,7 @@ UdpListenerImpl::UdpListenerImpl(Event::Dispatcher& dispatcher, SocketSharedPtr 
 
 void UdpListenerImpl::unpause() {
   // Remove the paused state so enable will actually start listening to events.
-  parent_drained_callback_registrar_ = absl::nullopt;
+  parent_drained_callback_registrar_ = std::nullopt;
   if (events_when_unpaused_ != 0) {
     // Start listening to events.
     enable();

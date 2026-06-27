@@ -160,7 +160,7 @@ public:
   }
 
   static OnDemandCdsConfig
-  createOnDemandCdsConfig(absl::optional<envoy::config::core::v3::ConfigSource> config_source,
+  createOnDemandCdsConfig(std::optional<envoy::config::core::v3::ConfigSource> config_source,
                           int timeout_millis) {
     OnDemandCdsConfig config;
     if (config_source.has_value()) {
@@ -172,7 +172,7 @@ public:
 
   template <typename OnDemandConfigType>
   static OnDemandConfigType
-  createConfig(absl::optional<envoy::config::core::v3::ConfigSource> config_source,
+  createConfig(std::optional<envoy::config::core::v3::ConfigSource> config_source,
                int timeout_millis) {
     OnDemandConfigType on_demand;
     *on_demand.mutable_odcds() = createOnDemandCdsConfig(std::move(config_source), timeout_millis);
@@ -180,13 +180,13 @@ public:
   }
 
   static OnDemandConfig
-  createOnDemandConfig(absl::optional<envoy::config::core::v3::ConfigSource> config_source,
+  createOnDemandConfig(std::optional<envoy::config::core::v3::ConfigSource> config_source,
                        int timeout_millis) {
     return createConfig<OnDemandConfig>(std::move(config_source), timeout_millis);
   }
 
   static PerRouteConfig
-  createPerRouteConfig(absl::optional<envoy::config::core::v3::ConfigSource> config_source,
+  createPerRouteConfig(std::optional<envoy::config::core::v3::ConfigSource> config_source,
                        int timeout_millis) {
     return createConfig<PerRouteConfig>(std::move(config_source), timeout_millis);
   }
@@ -212,7 +212,7 @@ public:
         }
       }
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   static void clearOnDemandConfig(ConfigHelper::HttpConnectionManager& hcm) {
@@ -411,7 +411,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryFetchesClusterInfo) {
     test_filter->set_name("odcds-test-filter");
 
     test::common::config::DummyConfig test_filter_config;
-    test_filter->mutable_typed_config()->PackFrom(test_filter_config);
+    std::ignore = test_filter->mutable_typed_config()->PackFrom(test_filter_config);
   });
 
   initialize();
@@ -1778,7 +1778,7 @@ public:
 
   envoy::config::listener::v3::Listener buildListener() {
     OdCdsListenerBuilder builder(Network::Test::getLoopbackAddressString(ipVersion()));
-    auto per_route_config = OdCdsIntegrationHelper::createPerRouteConfig(absl::nullopt, 2500);
+    auto per_route_config = OdCdsIntegrationHelper::createPerRouteConfig(std::nullopt, 2500);
     OdCdsIntegrationHelper::addPerRouteConfig(builder.hcm(), std::move(per_route_config),
                                               "integration", {});
     return builder.listener();
@@ -2059,7 +2059,7 @@ public:
 
   envoy::config::listener::v3::Listener buildListener() {
     OdCdsListenerBuilder builder(Network::Test::getLoopbackAddressString(ipVersion()));
-    auto per_route_config = OdCdsIntegrationHelper::createPerRouteConfig(absl::nullopt, 2500);
+    auto per_route_config = OdCdsIntegrationHelper::createPerRouteConfig(std::nullopt, 2500);
     OdCdsIntegrationHelper::addPerRouteConfig(builder.hcm(), std::move(per_route_config),
                                               "integration", {});
     return builder.listener();

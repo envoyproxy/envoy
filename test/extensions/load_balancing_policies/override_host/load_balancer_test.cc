@@ -866,7 +866,7 @@ private:
     OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
       return {};
     }
-    absl::optional<Envoy::Upstream::SelectedPoolAndConnection>
+    std::optional<Envoy::Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Envoy::Upstream::LoadBalancerContext*, const Envoy::Upstream::Host&,
                              std::vector<uint8_t>&) override {
       return std::nullopt;

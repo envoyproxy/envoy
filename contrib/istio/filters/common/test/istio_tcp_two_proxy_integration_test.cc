@@ -81,7 +81,7 @@ typed_config:
 
     envoy::config::listener::v3::Filter filter;
     filter.set_name(name);
-    filter.mutable_typed_config()->PackFrom(config);
+    std::ignore = filter.mutable_typed_config()->PackFrom(config);
     return MessageUtil::getJsonStringFromMessageOrError(filter);
   }
 

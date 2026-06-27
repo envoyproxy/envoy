@@ -169,7 +169,7 @@ public:
   }
 
   Network::Address::InstanceConstSharedPtr addr_;
-  absl::optional<Http::Protocol> protocol_;
+  std::optional<Http::Protocol> protocol_;
   CheckRequestUtils check_request_generator_;
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Envoy::Network::MockReadFilterCallbacks> net_callbacks_;

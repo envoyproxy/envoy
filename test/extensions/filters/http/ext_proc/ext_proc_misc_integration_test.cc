@@ -59,7 +59,7 @@ protected:
   }
 
   IntegrationStreamDecoderPtr sendDownstreamRequest(
-      absl::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers) {
+      std::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestRequestHeaderMapImpl headers;
@@ -95,7 +95,7 @@ TEST_P(ExtProcStatusOnErrorIntegrationTest, GrpcStreamErrorCustomStatus) {
 
   initializeConfig(503); // Use 503 Service Unavailable.
   HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
+  auto response = sendDownstreamRequest(std::nullopt);
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
@@ -140,7 +140,7 @@ TEST_P(ExtProcStatusOnErrorIntegrationTest, GrpcStreamErrorDefaultStatus) {
   setDownstreamProtocol(Http::CodecType::HTTP1);
 
   HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
+  auto response = sendDownstreamRequest(std::nullopt);
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
@@ -167,7 +167,7 @@ TEST_P(ExtProcStatusOnErrorIntegrationTest, MessageTimeoutReturnsGatewayTimeout)
   proto_config_.mutable_message_timeout()->set_nanos(100000000); // 100ms timeout.
 
   HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
+  auto response = sendDownstreamRequest(std::nullopt);
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
@@ -193,7 +193,7 @@ TEST_P(ExtProcStatusOnErrorIntegrationTest, ProcessingErrorCustomStatus) {
   proto_config_.mutable_mutation_rules()->mutable_disallow_system()->set_value(true);
 
   HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
+  auto response = sendDownstreamRequest(std::nullopt);
 
   // Process the request and send back invalid system header mutation.
   ProcessingRequest request_headers_msg;

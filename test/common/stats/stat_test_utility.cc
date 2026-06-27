@@ -157,7 +157,7 @@ Histogram& TestScope::histogramFromString(const std::string& leaf_name, Histogra
 }
 
 std::string TestScope::statNameWithTags(StatName base_name,
-                                        absl::optional<StatNameTagSpan> name_tags,
+                                        std::optional<StatNameTagSpan> name_tags,
                                         StatName tagged_name) {
   // Use the same joiner construction as IsolatedScopeImpl so the map key here matches the flat
   // name IsolatedScopeImpl actually creates -- including when the caller supplies a non-empty
@@ -169,7 +169,7 @@ std::string TestScope::statNameWithTags(StatName base_name,
 }
 
 void TestScope::verifyConsistency(StatName ref_stat_name, StatName base_name,
-                                  absl::optional<StatNameTagSpan> name_tags, StatName tagged_name) {
+                                  std::optional<StatNameTagSpan> name_tags, StatName tagged_name) {
   // Ensures StatNames with the same string representation are specified
   // consistently using symbolic/dynamic components on every access.
   TagUtility::TagStatNameJoiner joiner(prefix(), {}, prefix(), base_name,
@@ -183,7 +183,7 @@ void TestScope::verifyConsistency(StatName ref_stat_name, StatName base_name,
 }
 
 Counter& TestScope::counterFromTaggedName(StatName base_name,
-                                          absl::optional<StatNameTagSpan> name_tags,
+                                          std::optional<StatNameTagSpan> name_tags,
                                           StatName tagged_name) {
   std::string flat_name = statNameWithTags(base_name, name_tags, tagged_name);
   Counter*& counter_ref = store_.counter_map_[flat_name];
@@ -195,7 +195,7 @@ Counter& TestScope::counterFromTaggedName(StatName base_name,
   return *counter_ref;
 }
 
-Gauge& TestScope::gaugeFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+Gauge& TestScope::gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
                                       StatName tagged_name, Gauge::ImportMode import_mode) {
   std::string flat_name = statNameWithTags(base_name, name_tags, tagged_name);
   Gauge*& gauge_ref = store_.gauge_map_[flat_name];
@@ -209,7 +209,7 @@ Gauge& TestScope::gaugeFromTaggedName(StatName base_name, absl::optional<StatNam
 }
 
 Histogram& TestScope::histogramFromTaggedName(StatName base_name,
-                                              absl::optional<StatNameTagSpan> name_tags,
+                                              std::optional<StatNameTagSpan> name_tags,
                                               StatName tagged_name, Histogram::Unit unit) {
   std::string flat_name = statNameWithTags(base_name, name_tags, tagged_name);
   Histogram*& histogram_ref = store_.histogram_map_[flat_name];
@@ -231,7 +231,7 @@ TestStore::TestStore() : IsolatedStoreImpl(*global_symbol_table_) {}
 TestStore::TestStore(SymbolTable& symbol_table) : IsolatedStoreImpl(symbol_table) {}
 
 template <class StatType>
-using StatTypeOptConstRef = absl::optional<std::reference_wrapper<const StatType>>;
+using StatTypeOptConstRef = std::optional<std::reference_wrapper<const StatType>>;
 
 template <class StatType>
 static StatTypeOptConstRef<StatType>

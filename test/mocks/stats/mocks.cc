@@ -84,28 +84,28 @@ MockSinkPredicates::~MockSinkPredicates() = default;
 MockScope::MockScope(StatName prefix, MockStore& store)
     : TestUtil::TestScope(prefix, store), mock_store_(store) {
   ON_CALL(*this, counterFromTaggedName(_, _, _))
-      .WillByDefault(Invoke([this](StatName base_name, absl::optional<StatNameTagSpan> name_tags,
+      .WillByDefault(Invoke([this](StatName base_name, std::optional<StatNameTagSpan> name_tags,
                                    StatName tagged_name) -> Counter& {
         return counterFromTaggedName_(base_name, name_tags, tagged_name);
       }));
 }
 
-Counter& MockScope::counterFromTaggedName_(StatName base_name, absl::optional<StatNameTagSpan>,
+Counter& MockScope::counterFromTaggedName_(StatName base_name, std::optional<StatNameTagSpan>,
                                            StatName) {
   // We always just respond with the mocked counter, so the tags don't matter.
   return mock_store_.counter(symbolTable().toString(base_name));
 }
-Gauge& MockScope::gaugeFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan>, StatName,
+Gauge& MockScope::gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan>, StatName,
                                       Gauge::ImportMode import_mode) {
   // We always just respond with the mocked gauge, so the tags don't matter.
   return mock_store_.gauge(symbolTable().toString(base_name), import_mode);
 }
-Histogram& MockScope::histogramFromTaggedName(StatName base_name, absl::optional<StatNameTagSpan>,
+Histogram& MockScope::histogramFromTaggedName(StatName base_name, std::optional<StatNameTagSpan>,
                                               StatName, Histogram::Unit unit) {
   return mock_store_.histogram(symbolTable().toString(base_name), unit);
 }
 TextReadout& MockScope::textReadoutFromTaggedName(StatName base_name,
-                                                  absl::optional<StatNameTagSpan>, StatName) {
+                                                  std::optional<StatNameTagSpan>, StatName) {
   // We always just respond with the mocked counter, so the tags don't matter.
   return mock_store_.textReadout(symbolTable().toString(base_name));
 }

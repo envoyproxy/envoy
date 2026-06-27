@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -25,7 +26,6 @@
 #include "source/common/http/status.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {
@@ -296,9 +296,9 @@ uint64_t getResponseStatus(const ResponseHeaderMap& headers);
 /**
  * Get the response status from the response headers.
  * @param headers supplies the headers to get the status from.
- * @return absl::optional<uint64_t> the response code or absl::nullopt if the headers are invalid.
+ * @return std::optional<uint64_t> the response code or std::nullopt if the headers are invalid.
  */
-absl::optional<uint64_t> getResponseStatusOrNullopt(const ResponseHeaderMap& headers);
+std::optional<uint64_t> getResponseStatusOrNullopt(const ResponseHeaderMap& headers);
 
 /**
  * Determine whether these headers are a valid Upgrade request or response.
@@ -361,7 +361,7 @@ struct LocalReplyData {
   // Supplies the optional body text which is returned.
   absl::string_view body_text_;
   // gRPC status code to override the httpToGrpcStatus mapping with.
-  const absl::optional<Grpc::Status::GrpcStatus> grpc_status_;
+  const std::optional<Grpc::Status::GrpcStatus> grpc_status_;
   // Tells if this is a response to a HEAD request.
   bool is_head_request_ = false;
 };
@@ -470,7 +470,7 @@ const std::string& getProtocolString(const Protocol p);
  * @param length to truncate the constructed URI's path
  */
 std::string buildOriginalUri(const Http::RequestHeaderMap& request_headers,
-                             absl::optional<uint32_t> max_path_length);
+                             std::optional<uint32_t> max_path_length);
 
 /**
  * Extract scheme, host and path from a URI. The host may contain a port.
@@ -642,7 +642,7 @@ struct AuthorityAttributes {
   absl::string_view host_;
 
   // If parsed authority has port, that is stored here.
-  absl::optional<uint16_t> port_;
+  std::optional<uint16_t> port_;
 };
 
 /**

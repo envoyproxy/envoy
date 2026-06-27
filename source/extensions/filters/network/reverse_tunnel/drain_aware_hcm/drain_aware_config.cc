@@ -51,14 +51,14 @@ DrainAwareHttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto
 
   return [singletons, filter_config, &context](Network::FilterManager& filter_manager) -> void {
     auto& server_context = context.serverFactoryContext();
-    Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager()
+    Server::OverloadManager& overload_manager = context.shouldBypassOverloadManager()
                                                     ? server_context.nullOverloadManager()
                                                     : server_context.overloadManager();
     auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
         filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
         server_context.clusterManager(), overload_manager,
-        server_context.mainThreadDispatcher().timeSource(), context.listenerInfo().direction());
+        server_context.mainThreadDispatcher().timeSource(), context.direction());
     filter_manager.addReadFilter(std::move(hcm));
   };
 }
