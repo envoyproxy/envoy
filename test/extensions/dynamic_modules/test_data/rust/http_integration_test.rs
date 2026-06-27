@@ -40,11 +40,6 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
       cluster_name: String::from_utf8(config.to_owned()).unwrap(),
     })),
     "send_response" => Some(Box::new(SendResponseHttpFilterConfig::new(config))),
-    "response_without_decode" => Some(Box::new(ResponseWithoutDecodeFilterConfig {
-      stream_complete_without_decode_total: envoy_filter_config
-        .define_counter("response_without_decode_stream_complete_total")
-        .unwrap(),
-    })),
     "http_filter_scheduler" => Some(Box::new(HttpFilterSchedulerConfig {})),
     "early_response_during_upload" => Some(Box::new(EarlyResponseDuringUploadConfig {
       response_pause_total: envoy_filter_config
@@ -880,88 +875,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
       return envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration;
     }
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
-  }
-}
-
-// Mirrors a module whose response and stream-complete hooks depend on per-stream state created
-// during request decode. When the stream was never decoded the state is missing, so those hooks
-// fall back to an error response or a no-state counter. Envoy must not invoke them for a stream
-// this filter never decoded, for example a local reply for a request that errored ahead of it.
-struct ResponseWithoutDecodeFilterConfig {
-  stream_complete_without_decode_total: EnvoyCounterId,
-}
-
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for ResponseWithoutDecodeFilterConfig {
-  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
-    Box::new(ResponseWithoutDecodeFilter {
-      request_decoded: false,
-      stream_complete_without_decode_total: self.stream_complete_without_decode_total,
-    })
-  }
-}
-
-struct ResponseWithoutDecodeFilter {
-  request_decoded: bool,
-  stream_complete_without_decode_total: EnvoyCounterId,
-}
-
-impl ResponseWithoutDecodeFilter {
-  fn send_no_state_response<EHF: EnvoyHttpFilter>(&self, envoy_filter: &mut EHF) {
-    envoy_filter.send_response(500, &[("x-no-request-state", b"true")], None, None);
-  }
-}
-
-impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ResponseWithoutDecodeFilter {
-  fn on_request_headers(
-    &mut self,
-    _envoy_filter: &mut EHF,
-    _end_of_stream: bool,
-  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
-    self.request_decoded = true;
-    envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
-  }
-
-  fn on_response_headers(
-    &mut self,
-    envoy_filter: &mut EHF,
-    _end_of_stream: bool,
-  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
-    if !self.request_decoded {
-      self.send_no_state_response(envoy_filter);
-      return envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration;
-    }
-    envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
-  }
-
-  fn on_response_body(
-    &mut self,
-    envoy_filter: &mut EHF,
-    _end_of_stream: bool,
-  ) -> envoy_dynamic_module_type_on_http_filter_response_body_status {
-    if !self.request_decoded {
-      self.send_no_state_response(envoy_filter);
-      return envoy_dynamic_module_type_on_http_filter_response_body_status::StopIterationAndBuffer;
-    }
-    envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
-  }
-
-  fn on_response_trailers(
-    &mut self,
-    envoy_filter: &mut EHF,
-  ) -> envoy_dynamic_module_type_on_http_filter_response_trailers_status {
-    if !self.request_decoded {
-      self.send_no_state_response(envoy_filter);
-      return envoy_dynamic_module_type_on_http_filter_response_trailers_status::StopIteration;
-    }
-    envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
-  }
-
-  fn on_stream_complete(&mut self, envoy_filter: &mut EHF) {
-    if !self.request_decoded {
-      envoy_filter
-        .increment_counter(self.stream_complete_without_decode_total, 1)
-        .unwrap();
-    }
   }
 }
 

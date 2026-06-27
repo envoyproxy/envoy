@@ -22,8 +22,7 @@ public:
   initializeFilter(const std::string& filter_name, const std::string& config = "",
                    const std::string& per_route_config = "",
                    const std::string& type_url = "type.googleapis.com/google.protobuf.StringValue",
-                   bool upstream_filter = false, const std::string& per_route_type_url = "",
-                   bool prepend_local_reply_filter = false) {
+                   bool upstream_filter = false, const std::string& per_route_type_url = "") {
     std::string module_name = "http_integration_test";
     if (GetParam() != "rust_static") {
       TestEnvironment::setEnvVar(
@@ -84,14 +83,6 @@ filter_config:
     config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
     config_helper_.prependFilter(
         fmt::format(filter_config, module_name, filter_name, type_url, config), !upstream_filter);
-    // Prepended last so it sits in front of the main filter and emits a local reply from
-    // decodeHeaders, exercising the encode chain for a stream the main filter never decoded.
-    if (prepend_local_reply_filter) {
-      constexpr auto string_value_type = "type.googleapis.com/google.protobuf.StringValue";
-      config_helper_.prependFilter(fmt::format(filter_config, module_name, "send_response",
-                                               string_value_type, "on_request_headers"),
-                                   !upstream_filter);
-    }
     initialize();
   }
   void runHeaderCallbacksTest(bool upstream_filter) {
@@ -522,41 +513,6 @@ TEST_P(DynamicModulesIntegrationTest, ReentrantStreamCompleteRunsUnderCatchUnwin
   // which re-enters the CatchUnwind-wrapped filter synchronously.
   test_server_->waitForCounter("dynamicmodulescustom.reentrant_stream_complete_total",
                                testing::Eq(1));
-}
-
-// Regression test for the crash where an Envoy-generated local reply runs the encode chain and
-// stream completion for a stream the filter never decoded. A send_response filter in front emits
-// the reply from decodeHeaders, so the module hooks behind it are skipped and its response is
-// returned unchanged while the worker stays healthy.
-TEST_P(DynamicModulesIntegrationTest, EncodeHooksSkippedWhenStreamNeverDecoded) {
-  if (GetParam() != "rust" && GetParam() != "rust_static") {
-    GTEST_SKIP() << "the response_without_decode filter is only in the rust test module";
-  }
-  initializeFilter("response_without_decode", "", "",
-                   "type.googleapis.com/google.protobuf.StringValue", false, "",
-                   /*prepend_local_reply_filter=*/true);
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-
-  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, true);
-  auto response = std::move(encoder_decoder.second);
-  ASSERT_TRUE(response->waitForEndStream());
-
-  EXPECT_TRUE(response->complete());
-  // The front filter's local reply is returned untouched. The module's response hooks never ran,
-  // so they could not turn it into the no-state error response.
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-  EXPECT_EQ("local_response_body_from_on_request_headers", response->body());
-  EXPECT_TRUE(response->headers().get(Http::LowerCaseString("x-no-request-state")).empty());
-  // The stream-complete hook is skipped too, so the module's no-state counter never increments.
-  const auto stream_complete_counter =
-      test_server_->counter("dynamicmodulescustom.response_without_decode_stream_complete_total");
-  EXPECT_TRUE(stream_complete_counter == nullptr || stream_complete_counter->value() == 0);
-
-  // A follow-up request still completes, proving the worker thread did not crash during teardown.
-  auto second_response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  ASSERT_TRUE(second_response->waitForEndStream());
-  EXPECT_TRUE(second_response->complete());
-  EXPECT_EQ("200", second_response->headers().Status()->value().getStringView());
 }
 
 TEST_P(DynamicModulesIntegrationTest, HttpCalloutsNonExistentCluster) {

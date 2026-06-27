@@ -286,13 +286,6 @@ private:
   // streaming-response ABI (sendResponseHeaders and friends) sets it for the same reason.
   bool sent_local_reply_ = false;
 
-  // True once the module received a request hook (headers, data, or trailers) for this stream.
-  // Envoy can still drive the encode chain and stream completion for a stream this filter never
-  // decoded, for example an HCM-generated local reply for a request that error-ed before reaching
-  // this filter. The module holds no per-stream state for such a stream, so its encode and
-  // stream-complete hooks are skipped while this is false, mirroring sent_local_reply_.
-  bool decode_started_ = false;
-
   const DynamicModuleHttpFilterConfigSharedPtr config_ = nullptr;
   envoy_dynamic_module_type_http_filter_module_ptr in_module_filter_ = nullptr;
   Stats::StatNameDynamicPool stat_name_pool_;

@@ -2951,20 +2951,18 @@ TEST(DynamicModulesTest, PerDirectionContinueDecodeDoesNotBlockEncode) {
   filter->onDestroy();
 }
 
-// The symmetric case. Request headers stop iteration so the decode direction stays paused while
-// the stream is still decoded by this filter. A response body that returns Continue then marks
-// only the encode direction as continued, so the paused decode phase can still be resumed via
-// continueDecoding(). The stop_on_request_headers filter lives in the rust test module.
+// The symmetric case. A response body that returns Continue marks only the encode direction as
+// continued, so a paused decode phase can still be resumed via continueDecoding().
 TEST(DynamicModulesTest, PerDirectionContinueEncodeDoesNotBlockDecode) {
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok());
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          "stop_on_request_headers", "", DefaultMetricsNamespace, false,
-          std::move(dynamic_module.value()), *stats_scope, context);
+          "filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+          *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -2974,11 +2972,6 @@ TEST(DynamicModulesTest, PerDirectionContinueEncodeDoesNotBlockDecode) {
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
   filter->setDecoderFilterCallbacks(decoder_callbacks);
   filter->setEncoderFilterCallbacks(encoder_callbacks);
-
-  // Request headers stop iteration, so the filter has decoded the stream but the decode direction
-  // is left paused.
-  TestRequestHeaderMapImpl request_headers{{}};
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, false));
 
   // A response body chunk returns Continue, marking only the encode direction as continued.
   Buffer::OwnedImpl data;
@@ -2990,57 +2983,6 @@ TEST(DynamicModulesTest, PerDirectionContinueEncodeDoesNotBlockDecode) {
   EXPECT_CALL(decoder_callbacks, continueDecoding());
   filter->continueEncoding();
   filter->continueDecoding();
-
-  filter->onDestroy();
-}
-
-// Envoy can drive the encode chain and stream completion for a stream this filter never decoded,
-// for example an HCM-generated local reply for a request that error-ed before reaching it. The
-// response_without_decode filter sends a no-state local reply from any response hook and bumps a
-// counter from stream complete, so neither happening confirms those hooks are skipped. The filter
-// lives in the rust test module.
-TEST(DynamicModulesTest, EncodeHooksSkippedWhenStreamNeverDecoded) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  NiceMock<Server::MockOptions> options;
-  ON_CALL(options, concurrency()).WillByDefault(testing::Return(1));
-  ON_CALL(context, options()).WillByDefault(testing::ReturnRef(options));
-  ScopedThreadLocalServerContextSetter setter(context);
-
-  auto dynamic_module =
-      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
-  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
-  Stats::TestUtil::TestStore stats_store;
-  Stats::TestUtil::TestScope stats_scope{"", stats_store};
-  auto filter_config_or_status =
-      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          "response_without_decode", "", DefaultMetricsNamespace, false,
-          std::move(dynamic_module.value()), stats_scope, context);
-  ASSERT_TRUE(filter_config_or_status.ok());
-
-  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope.symbolTable(), 0);
-  filter->initializeInModuleFilter();
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
-  filter->setDecoderFilterCallbacks(decoder_callbacks);
-  filter->setEncoderFilterCallbacks(encoder_callbacks);
-
-  // No decode hook ran, so none of the response hooks may run. If any did it would send the
-  // no-state local reply.
-  EXPECT_CALL(decoder_callbacks, sendLocalReply(_, _, _, _, _)).Times(0);
-
-  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
-  Buffer::OwnedImpl data;
-  EXPECT_EQ(FilterDataStatus::Continue, filter->encodeData(data, false));
-  TestResponseTrailerMapImpl response_trailers;
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter->encodeTrailers(response_trailers));
-
-  // The stream-complete hook is skipped as well, so the module's no-state counter never increments.
-  filter->onStreamComplete();
-  Stats::CounterOptConstRef stream_complete_counter = stats_store.findCounterByString(
-      "dynamicmodulescustom.response_without_decode_stream_complete_total");
-  EXPECT_TRUE(!stream_complete_counter.has_value() || stream_complete_counter->get().value() == 0);
 
   filter->onDestroy();
 }
