@@ -902,7 +902,7 @@ TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, PostsSocketOptions) {
 
   EXPECT_OK(factory_->doFinalPreWorkerInit(socket_factories_));
 
-  ASSERT_EQ(setopt_sockets.size(), sockets.size());
+  EXPECT_EQ(setopt_sockets.size(), sockets.size());
   for (size_t i = 0; i < sockets.size(); ++i) {
     EXPECT_EQ(setopt_sockets[i], sockets[i].get());
   }
