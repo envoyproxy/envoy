@@ -415,8 +415,44 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
     }
   }
 
+  // Per-node connection-count gauge keyed by the tenant-scoped node id (the reverse-connection host
+  // key), so admin endpoints can enumerate reachable nodes by scanning these gauges.
+  if (!node_id.empty()) {
+    const std::string tunnel_stat_name = fmt::format("{}.tunnels.{}", stat_prefix_, node_id);
+    adjust_gauge(tunnel_stat_name, increment, Stats::Gauge::ImportMode::HiddenAccumulate);
+  }
+
   // Also update per-worker stats for debugging.
   updatePerWorkerConnectionStats(node_id, cluster_id, increment, tenant_isolation_enabled);
+}
+
+std::vector<ReverseTunnelAcceptorExtension::ReachableTunnel>
+ReverseTunnelAcceptorExtension::reachableTunnels() const {
+  std::vector<ReachableTunnel> result;
+  // Detailed stats are required for the per-node gauges to exist.
+  if (!enable_detailed_stats_) {
+    return result;
+  }
+
+  const std::string prefix = stat_prefix_ + ".tunnels.";
+  Stats::IterateFn<Stats::Gauge> gauge_callback =
+      [&result, &prefix](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
+    if (!gauge->used() || gauge->value() == 0) {
+      return true;
+    }
+    const std::string& name = gauge->name();
+    const size_t start = name.find(prefix);
+    if (start == std::string::npos) {
+      return true;
+    }
+    // Everything after the prefix is the (tenant-scoped) node id.
+    result.push_back({name.substr(start + prefix.size()), gauge->value()});
+    return true;
+  };
+  getStatsScope().iterate(gauge_callback);
+
+  ENVOY_LOG(debug, "reverse_tunnel: reachableTunnels found {} endpoints", result.size());
+  return result;
 }
 
 void ReverseTunnelAcceptorExtension::updatePerWorkerAggregateMetrics(const std::string& node_id,

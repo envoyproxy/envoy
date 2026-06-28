@@ -143,6 +143,23 @@ public:
   absl::flat_hash_map<std::string, uint64_t> getCrossWorkerStatMap();
 
   /**
+   * A currently-reachable reverse-tunnel node and its connection count. node_id is the
+   * tenant-scoped identifier (the same value the reverse-connection cluster uses as its host key).
+   */
+  struct ReachableTunnel {
+    std::string node_id;
+    uint64_t connection_count{0};
+  };
+
+  /**
+   * Enumerate currently-reachable reverse-tunnel nodes across all workers by scanning the
+   * "<stat_prefix>.tunnels.<node_id>" gauges and keeping those with a positive count. Main-thread
+   * safe (reads the process-wide stats store) and eventually consistent. Returns empty unless
+   * detailed stats are enabled.
+   */
+  std::vector<ReachableTunnel> reachableTunnels() const;
+
+  /**
    * Update the cross-thread aggregated stats for the connection.
    * @param node_id the node identifier for the connection.
    * @param cluster_id the cluster identifier for the connection.
