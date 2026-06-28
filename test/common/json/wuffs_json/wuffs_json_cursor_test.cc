@@ -479,6 +479,20 @@ TEST(WuffsJsonCursorTest, FeedAfterCompletion) {
   EXPECT_TRUE(h.fields.empty());
 }
 
+// Trailing whitespace tests
+
+TEST(WuffsJsonCursorTest, TrailingNewlineAccepted) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  EXPECT_TRUE(cursor.feed("{}\n", true).ok());
+}
+
+TEST(WuffsJsonCursorTest, TrailingSpacesAccepted) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  EXPECT_TRUE(cursor.feed("[]  \n", true).ok());
+}
+
 // nextSourcePosition test
 TEST(WuffsJsonCursorTest, NextSourcePositionAfterParse) {
   CapturingHandler h;

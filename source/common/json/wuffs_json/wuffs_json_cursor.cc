@@ -61,6 +61,8 @@ WuffsJsonCursor::WuffsJsonCursor(Handler& handler, bool track_paths)
   decoder_ = wuffs_json__decoder::alloc();
   token_buf_ =
       wuffs_base__slice_token__writer(wuffs_base__make_slice_token(token_data_, kTokenBufLen));
+  // RFC 8259: JSON-text = ws value ws — trailing whitespace is valid.
+  decoder_->set_quirk(WUFFS_JSON__QUIRK_ALLOW_TRAILING_FILLER, 1);
 }
 
 // Feeds one body chunk into the Wuffs JSON tokenizer and dispatches tokens
@@ -108,6 +110,7 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
     // TODO(tyxia) Revisit to see if it is right choice to return InvalidArgumentError.
     return absl::InvalidArgumentError("wuffs json: feed() called after JSON document completed");
   }
+
 
   // If the previous call left unread bytes (a NUMBER or LITERAL that started
   // near the end of the prior chunk), prepend them so Wuffs sees the full

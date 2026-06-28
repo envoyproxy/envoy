@@ -205,6 +205,11 @@ public:
 
   explicit WuffsJsonCursor(Handler& handler, bool track_paths = false);
 
+  WuffsJsonCursor(const WuffsJsonCursor&) = delete;
+  WuffsJsonCursor& operator=(const WuffsJsonCursor&) = delete;
+  WuffsJsonCursor(WuffsJsonCursor&&) = delete;
+  WuffsJsonCursor& operator=(WuffsJsonCursor&&) = delete;
+
   // Feed one body chunk. Set closed=true on the final chunk (signals EOF to Wuffs).
   // Returns non-OK on malformed JSON or internal allocation failure.
   absl::Status feed(absl::string_view chunk, bool closed);
