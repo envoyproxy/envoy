@@ -557,6 +557,16 @@ wasmtime:
   license: "Apache-2.0"
   license_url: "https://github.com/bytecodealliance/wasmtime/blob/v{version}/LICENSE"
 
+wuffs:
+  project_name: "Wuffs"
+  project_desc: "Memory-safe, high-performance JSON (and other format) parser written in a memory-safe subset of C"
+  project_url: "https://github.com/google/wuffs-mirror-release-c"
+  release_date: "2024-09-14"
+  use_category:
+  - dataplane_ext
+  license: "Apache-2.0"
+  license_url: "https://github.com/google/wuffs-mirror-release-c/blob/v{version}/LICENSE"
+
 abseil_cpp:
   project_name: "Abseil"
   project_desc: "Open source collection of C++ libraries drawn from the most fundamental pieces of Google’s internal codebase"

@@ -242,6 +242,7 @@ def envoy_dependencies(skip_targets = []):
 
     _libmaxminddb()
     _thrift()
+    _wuffs()
 
     external_http_archive("rules_license")
     external_http_archive("rules_pkg")
@@ -1071,4 +1072,22 @@ def _libmaxminddb():
     external_http_archive(
         name = "libmaxminddb",
         build_file_content = LIBMAXMINDDB_BUILD_CONTENT,
+    )
+
+def _wuffs():
+    external_http_archive(
+        name = "wuffs",
+        build_file_content = """
+cc_library(
+    name = "wuffs",
+    # Wuffs uses an amalgamated single-file distribution: wuffs-v0.4.c acts as
+    # a header (declarations only) when included without WUFFS_IMPLEMENTATION,
+    # and as a full implementation when WUFFS_IMPLEMENTATION is defined (done
+    # in exactly one TU: wuffs_impl.c).  Listed as hdrs so dependent targets
+    # may include it.
+    textual_hdrs = ["release/c/wuffs-v0.4.c"],
+    visibility = ["//visibility:public"],
+    copts = ["-Wno-unused-function"],
+)
+""",
     )
