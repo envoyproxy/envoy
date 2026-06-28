@@ -4,6 +4,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
+#include <optional>
 
 #include "envoy/event/timer.h"
 #include "envoy/network/address.h"
@@ -680,7 +681,7 @@ bool ReverseConnectionIOHandle::shouldAttemptConnectionToHost(const std::string&
 
 void ReverseConnectionIOHandle::trackConnectionFailure(
     const std::string& host_address, const std::string& cluster_name,
-    absl::optional<std::chrono::milliseconds> retry_after) {
+    std::optional<std::chrono::milliseconds> retry_after) {
   auto host_it = host_to_conn_info_map_.find(host_address);
   if (host_it == host_to_conn_info_map_.end()) {
     ENVOY_LOG(debug, "Host {} not found in host_to_conn_info_map_, skipping failure tracking",
@@ -1085,7 +1086,7 @@ bool ReverseConnectionIOHandle::isTriggerPipeReady() const {
 
 void ReverseConnectionIOHandle::onConnectionDone(
     const std::string& error, RCConnectionWrapper* wrapper, bool closed,
-    absl::optional<std::chrono::milliseconds> retry_after) {
+    std::optional<std::chrono::milliseconds> retry_after) {
   ENVOY_LOG(info,
             "reverse_tunnel: Connection wrapper done - error: '{}', closed: {}, for node_id: {}",
             error, closed, config_.src_node_id);

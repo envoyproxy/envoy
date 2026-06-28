@@ -1,6 +1,7 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.h"
 
 #include <algorithm>
+#include <optional>
 
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
@@ -220,21 +221,21 @@ void RCConnectionWrapper::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bo
   ENVOY_LOG(error, "Received unexpected HTTP response: {} (expected {})", status, expected);
   // A 429 may carry a Retry-After cool-off hint; forward it so the parent can honor it as the
   // per-host backoff before the next attempt.
-  absl::optional<std::chrono::milliseconds> retry_after;
+  std::optional<std::chrono::milliseconds> retry_after;
   if (status == 429) {
     retry_after = parseRetryAfter(*headers);
   }
   onHandshakeFailure(HandshakeFailureReason::httpStatusError(absl::StrCat(status)), retry_after);
 }
 
-absl::optional<std::chrono::milliseconds>
+std::optional<std::chrono::milliseconds>
 RCConnectionWrapper::parseRetryAfter(const Http::ResponseHeaderMap& headers) {
   // ``Retry-After`` is not a registered inline header, so look it up by name. The key is a
   // function-local static to avoid reconstructing the LowerCaseString on every handshake response.
   static const Http::LowerCaseString retry_after_header{"retry-after"};
   const auto result = headers.get(retry_after_header);
   if (result.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const absl::string_view value = result[0]->value().getStringView();
   // RFC 7231 allows delta-seconds or an HTTP-date. Rate limiters emit delta-seconds; honor that
@@ -242,7 +243,7 @@ RCConnectionWrapper::parseRetryAfter(const Http::ResponseHeaderMap& headers) {
   // unparseable) value is treated as absent so it cannot short-circuit the backoff.
   uint64_t seconds = 0;
   if (!absl::SimpleAtoi(value, &seconds) || seconds == 0) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   // Clamp purely to avoid overflow when widening seconds to milliseconds; this is NOT the backoff
   // policy cap. The effective ceiling (the configured ``max_reconnect_backoff``) is applied by the
@@ -278,8 +279,8 @@ void RCConnectionWrapper::onHandshakeSuccess() {
   parent_.onConnectionDone(message, this, false);
 }
 
-void RCConnectionWrapper::onHandshakeFailure(
-    const HandshakeFailureReason& reason, absl::optional<std::chrono::milliseconds> retry_after) {
+void RCConnectionWrapper::onHandshakeFailure(const HandshakeFailureReason& reason,
+                                             std::optional<std::chrono::milliseconds> retry_after) {
   const std::string error_message = reason.getDetailedName();
   const std::string stats_failure_reason = reason.getNameForStats();
 
