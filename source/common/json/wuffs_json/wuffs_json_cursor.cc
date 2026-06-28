@@ -111,7 +111,6 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
     return absl::InvalidArgumentError("wuffs json: feed() called after JSON document completed");
   }
 
-
   // If the previous call left unread bytes (a NUMBER or LITERAL that started
   // near the end of the prior chunk), prepend them so Wuffs sees the full
   // token in one contiguous buffer. STRING tokens are not affected: Wuffs
