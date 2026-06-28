@@ -68,12 +68,12 @@ public:
             Upstream::ResourcePriority::Default, dispatcher, nullptr, nullptr, random_generator,
             state_,
             [](HttpConnPoolImplBase* pool) {
-              return std::make_unique<ActiveClient>(*pool, absl::nullopt);
+              return std::make_unique<ActiveClient>(*pool, std::nullopt);
             },
             [](Upstream::Host::CreateConnectionData&, HttpConnPoolImplBase*) {
               return nullptr; // Not used: createCodecClient overloaded.
             },
-            std::vector<Protocol>{Protocol::Http11}, overload_manager, absl::nullopt, nullptr),
+            std::vector<Protocol>{Protocol::Http11}, overload_manager, std::nullopt, nullptr),
         api_(Api::createApiForTest()), mock_dispatcher_(dispatcher),
         mock_upstream_ready_cb_(upstream_ready_cb) {}
 

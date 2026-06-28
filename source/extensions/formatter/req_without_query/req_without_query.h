@@ -15,10 +15,10 @@ namespace Formatter {
 class ReqWithoutQuery : public ::Envoy::Formatter::FormatterProvider {
 public:
   ReqWithoutQuery(absl::string_view main_header, absl::string_view alternative_header,
-                  absl::optional<size_t> max_length);
+                  std::optional<size_t> max_length);
 
-  absl::optional<std::string> format(const Envoy::Formatter::Context& context,
-                                     const StreamInfo::StreamInfo&) const override;
+  std::optional<std::string> format(const Envoy::Formatter::Context& context,
+                                    const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const Envoy::Formatter::Context& context,
                               const StreamInfo::StreamInfo&) const override;
 
@@ -27,15 +27,15 @@ private:
 
   const Http::LowerCaseString main_header_;
   const Http::LowerCaseString alternative_header_;
-  const absl::optional<size_t> max_length_;
+  const std::optional<size_t> max_length_;
 };
 
 class ReqWithoutQueryCommandParser : public ::Envoy::Formatter::CommandParser {
 public:
   ReqWithoutQueryCommandParser() = default;
-  ::Envoy::Formatter::FormatterProviderPtr parse(absl::string_view command,
-                                                 absl::string_view subcommand,
-                                                 absl::optional<size_t> max_length) const override;
+  absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
+  parse(absl::string_view command, absl::string_view subcommand,
+        std::optional<size_t> max_length) const override;
 };
 
 } // namespace Formatter

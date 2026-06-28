@@ -93,11 +93,11 @@ std::chrono::milliseconds DelegatingRouteEntry::timeout() const {
   return base_route_entry_->timeout();
 }
 
-absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::idleTimeout() const {
+std::optional<std::chrono::milliseconds> DelegatingRouteEntry::idleTimeout() const {
   return base_route_entry_->idleTimeout();
 }
 
-absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::flushTimeout() const {
+std::optional<std::chrono::milliseconds> DelegatingRouteEntry::flushTimeout() const {
   return base_route_entry_->flushTimeout();
 }
 
@@ -105,23 +105,23 @@ bool DelegatingRouteEntry::usingNewTimeouts() const {
   return base_route_entry_->usingNewTimeouts();
 }
 
-absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::maxStreamDuration() const {
+std::optional<std::chrono::milliseconds> DelegatingRouteEntry::maxStreamDuration() const {
   return base_route_entry_->maxStreamDuration();
 }
 
-absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::grpcTimeoutHeaderMax() const {
+std::optional<std::chrono::milliseconds> DelegatingRouteEntry::grpcTimeoutHeaderMax() const {
   return base_route_entry_->grpcTimeoutHeaderMax();
 }
 
-absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::grpcTimeoutHeaderOffset() const {
+std::optional<std::chrono::milliseconds> DelegatingRouteEntry::grpcTimeoutHeaderOffset() const {
   return base_route_entry_->grpcTimeoutHeaderOffset();
 }
 
-absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::maxGrpcTimeout() const {
+std::optional<std::chrono::milliseconds> DelegatingRouteEntry::maxGrpcTimeout() const {
   return base_route_entry_->maxGrpcTimeout();
 }
 
-absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::grpcTimeoutOffset() const {
+std::optional<std::chrono::milliseconds> DelegatingRouteEntry::grpcTimeoutOffset() const {
   return base_route_entry_->grpcTimeoutOffset();
 }
 

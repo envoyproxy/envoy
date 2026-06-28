@@ -200,7 +200,7 @@ private:
   // any). First, prioritizes ACKs over non-ACK subscription interest updates. Then, prioritizes
   // non-ACK updates in the order the various types of subscriptions were activated (as tracked by
   // subscription_ordering_).
-  absl::optional<std::string> whoWantsToSendDiscoveryRequest();
+  std::optional<std::string> whoWantsToSendDiscoveryRequest();
 
   // Invoked when dynamic context parameters change for a resource type.
   void onDynamicContextUpdate(absl::string_view resource_type_url);

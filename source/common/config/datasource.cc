@@ -81,10 +81,10 @@ absl::StatusOr<std::string> read(const envoy::config::core::v3::DataSource& sour
   return data;
 }
 
-absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& source) {
+std::optional<std::string> getPath(const envoy::config::core::v3::DataSource& source) {
   return source.specifier_case() == envoy::config::core::v3::DataSource::SpecifierCase::kFilename
-             ? absl::make_optional(source.filename())
-             : absl::nullopt;
+             ? std::make_optional(source.filename())
+             : std::nullopt;
 }
 
 bool usesFileWatching(const ProtoDataSource& source, const ProviderOptions& options) {

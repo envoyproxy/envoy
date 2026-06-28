@@ -243,7 +243,7 @@ void OrcaOobManager::OobSession::connectAndStream() {
 
   auto headers_message =
       Grpc::Common::prepareHeaders(authority(), std::string(kOrcaOobServiceFullName),
-                                   std::string(kStreamCoreMetricsMethod), absl::nullopt);
+                                   std::string(kStreamCoreMetricsMethod), std::nullopt);
   headers_message->headers().setReferenceScheme(
       host_->transportSocketFactory().implementsSecureTransport()
           ? Http::Headers::get().SchemeValues.Https

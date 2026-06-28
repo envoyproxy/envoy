@@ -3,6 +3,7 @@
 #include "envoy/network/address.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
@@ -175,6 +176,89 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallTranscoding) {
   Buffer::OwnedImpl response_data;
   response_data.add(R"({"displayName":"bar","createTime":"1970-01-01T00:00:22Z"})");
   upstream_request_->encodeData(response_data, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
+  EXPECT_THAT(response->headers().getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response->headers().getContentLengthValue(),
+              StrEq(std::to_string(response->body().size())));
+  const std::string expected_rpc_response = R"({
+    "jsonrpc": "2.0",
+    "id": 321,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"displayName\":\"bar\",\"createTime\":\"1970-01-01T00:00:22Z\"}"
+        }
+      ],
+      "isError": false
+    }
+  })";
+  EXPECT_EQ(nlohmann::json::parse(response->body()), nlohmann::json::parse(expected_rpc_response));
+}
+
+TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallWithTrailersTranscoding) {
+  const std::string config = R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+      tool_config:
+        tools:
+          - name: "create_api_key"
+            http_rule:
+              post: "/v1/{parent=projects/*}/keys"
+              body: "key"
+  )EOF";
+
+  initializeFilter(config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "id": 321,
+    "method": "tools/call",
+    "params": {
+      "name": "create_api_key",
+      "arguments": {
+        "parent": "projects/foo",
+        "key": {
+          "displayName": "bar"
+        }
+      }
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  waitForNextUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers().getMethodValue(), StrEq("POST"));
+  EXPECT_THAT(upstream_request_->headers().getPathValue(), StrEq("/v1/projects/foo/keys"));
+  EXPECT_THAT(upstream_request_->body().toString(), StrEq(R"({"displayName":"bar"})"));
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  response_headers.setStatus(200);
+  response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+
+  // Send headers without end_stream.
+  upstream_request_->encodeHeaders(response_headers, false);
+
+  // Send body without end_stream.
+  Buffer::OwnedImpl response_data;
+  response_data.add(R"({"displayName":"bar","createTime":"1970-01-01T00:00:22Z"})");
+  upstream_request_->encodeData(response_data, false);
+
+  // Send trailers to end stream.
+  Http::TestResponseTrailerMapImpl response_trailers;
+  upstream_request_->encodeTrailers(response_trailers);
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
@@ -631,7 +715,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallStreamingTranscoding) {
   EXPECT_EQ(nlohmann::json::parse(response->body()), nlohmann::json::parse(expected_rpc_response));
 }
 
-TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallStreamingErrorResponse) {
+TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallStreamingWithTrailers) {
   const std::string config = R"EOF(
     name: envoy.filters.http.mcp_json_rest_bridge
     typed_config:
@@ -651,7 +735,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallStreamingErrorResponse) {
 
   const std::string request_body = R"({
     "jsonrpc": "2.0",
-    "id": 42,
+    "id": 321,
     "method": "tools/call",
     "params": {
       "name": "create_api_key",
@@ -673,34 +757,109 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallStreamingErrorResponse) {
       request_body);
 
   waitForNextUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers().getMethodValue(), StrEq("POST"));
+  EXPECT_THAT(upstream_request_->headers().getPathValue(), StrEq("/v1/projects/foo/keys"));
 
   Http::TestResponseHeaderMapImpl response_headers;
-  response_headers.setStatus(500);
+  response_headers.setStatus(200);
   response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
   upstream_request_->encodeHeaders(response_headers, false);
 
-  Buffer::OwnedImpl response_data;
-  response_data.add("Internal Server Error");
-  upstream_request_->encodeData(response_data, true);
+  Buffer::OwnedImpl chunk1;
+  chunk1.add(R"({"displayName":)");
+  upstream_request_->encodeData(chunk1, false);
+
+  Buffer::OwnedImpl chunk2;
+  chunk2.add(R"("bar"})");
+  upstream_request_->encodeData(chunk2, false);
+
+  Http::TestResponseTrailerMapImpl response_trailers;
+  upstream_request_->encodeTrailers(response_trailers);
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
 
-  EXPECT_THAT(response->headers().getStatusValue(), StrEq("500"));
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
   EXPECT_THAT(response->headers().getContentTypeValue(), StrEq("application/json"));
   EXPECT_THAT(response->headers().getContentLengthValue(), IsEmpty());
 
   const std::string expected_rpc_response = R"({
     "jsonrpc": "2.0",
-    "id": 42,
+    "id": 321,
     "result": {
       "content": [
         {
           "type": "text",
-          "text": "Internal Server Error"
+          "text": "{\"displayName\":\"bar\"}"
         }
       ],
-      "isError": true
+      "isError": false
+    }
+  })";
+  EXPECT_EQ(nlohmann::json::parse(response->body()), nlohmann::json::parse(expected_rpc_response));
+}
+
+TEST_P(McpJsonRestBridgeIntegrationTest, ToolsListLocalResponse) {
+  const std::string config = R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+  )EOF";
+
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) {
+    auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute per_route;
+    auto* tool_config = per_route.add_tool_config();
+    tool_config->mutable_tool_list_local();
+    auto* tool = tool_config->add_tools();
+    tool->set_name("my_local_tool");
+    tool->mutable_tool_list_config()->set_title("My Local Tool");
+    tool->mutable_tool_list_config()->set_description("Does a local thing.");
+    tool->mutable_tool_list_config()->set_input_schema(R"({"type":"object"})");
+
+    Protobuf::Any per_route_any;
+    MessageUtil::packFrom(per_route_any, per_route);
+    route->mutable_typed_per_filter_config()->insert(
+        {"envoy.filters.http.mcp_json_rest_bridge", per_route_any});
+  });
+
+  initializeFilter(config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "id": 123,
+    "method": "tools/list"
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
+  EXPECT_THAT(response->headers().getContentTypeValue(), StrEq("application/json"));
+
+  const std::string expected_rpc_response = R"({
+    "jsonrpc": "2.0",
+    "id": 123,
+    "result": {
+      "tools": [
+        {
+          "name": "my_local_tool",
+          "title": "My Local Tool",
+          "description": "Does a local thing.",
+          "inputSchema": {
+            "type": "object"
+          }
+        }
+      ]
     }
   })";
   EXPECT_EQ(nlohmann::json::parse(response->body()), nlohmann::json::parse(expected_rpc_response));
@@ -723,13 +882,14 @@ TEST_P(McpJsonRestBridgeIntegrationTest, PerRouteConfigOverridesHttpRule) {
                                           v3::HttpConnectionManager& hcm) {
     auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute per_route;
-    auto* tool = per_route.mutable_tool_config()->add_tools();
+    auto* tool = per_route.add_tool_config()->add_tools();
     tool->set_name("create_api_key");
     tool->mutable_http_rule()->set_post("/v1/{parent=projects/*}/keys_override");
     tool->mutable_http_rule()->set_body("key");
 
-    (*route->mutable_typed_per_filter_config())["envoy.filters.http.mcp_json_rest_bridge"].PackFrom(
-        per_route);
+    std::ignore =
+        (*route->mutable_typed_per_filter_config())["envoy.filters.http.mcp_json_rest_bridge"]
+            .PackFrom(per_route);
   });
 
   initializeFilter(config);
@@ -958,6 +1118,81 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallTraceContextExtractionDisabled
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
+}
+
+TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallStreamingErrorResponse) {
+  const std::string config = R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+      tool_config:
+        tools:
+          - name: "create_api_key"
+            http_rule:
+              post: "/v1/{parent=projects/*}/keys"
+              body: "key"
+            text_content_streaming_enabled: true
+  )EOF";
+
+  initializeFilter(config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "id": 42,
+    "method": "tools/call",
+    "params": {
+      "name": "create_api_key",
+      "arguments": {
+        "parent": "projects/foo",
+        "key": {
+          "displayName": "bar"
+        }
+      }
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  waitForNextUpstreamRequest();
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  response_headers.setStatus(500);
+  response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+  upstream_request_->encodeHeaders(response_headers, false);
+
+  Buffer::OwnedImpl response_data;
+  response_data.add("Internal Server Error");
+  upstream_request_->encodeData(response_data, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("500"));
+  EXPECT_THAT(response->headers().getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response->headers().getContentLengthValue(), IsEmpty());
+
+  const std::string expected_rpc_response = R"({
+    "jsonrpc": "2.0",
+    "id": 42,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Internal Server Error"
+        }
+      ],
+      "isError": true
+    }
+  })";
+  EXPECT_EQ(nlohmann::json::parse(response->body()), nlohmann::json::parse(expected_rpc_response));
 }
 
 } // namespace

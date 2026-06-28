@@ -37,7 +37,7 @@ public:
   virtual std::vector<absl::string_view> registeredNames() const PURE;
   // Return all registered factory names, including disabled factories.
   virtual std::vector<absl::string_view> allRegisteredNames() const PURE;
-  virtual absl::optional<envoy::config::core::v3::BuildVersion>
+  virtual std::optional<envoy::config::core::v3::BuildVersion>
   getFactoryVersion(absl::string_view name) const PURE;
   virtual bool disableFactory(absl::string_view) PURE;
   virtual bool isFactoryDisabled(absl::string_view) const PURE;
@@ -57,7 +57,7 @@ public:
     return FactoryRegistry::registeredNames(true);
   }
 
-  absl::optional<envoy::config::core::v3::BuildVersion>
+  std::optional<envoy::config::core::v3::BuildVersion>
   getFactoryVersion(absl::string_view name) const override {
     return FactoryRegistry::getFactoryVersion(name);
   }
@@ -328,11 +328,11 @@ public:
   /**
    * @return vendor specific version of a factory.
    */
-  static absl::optional<envoy::config::core::v3::BuildVersion>
+  static std::optional<envoy::config::core::v3::BuildVersion>
   getFactoryVersion(absl::string_view name) {
     auto it = versionedFactories().find(name);
     if (it == versionedFactories().end()) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     return it->second;
   }

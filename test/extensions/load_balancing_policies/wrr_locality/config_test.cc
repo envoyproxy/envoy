@@ -25,7 +25,7 @@ TEST(WrrLocalityConfigTest, ValidateSuccess) {
       ClientSideWeightedRoundRobin cswrr_config_msg;
   envoy::config::core::v3::TypedExtensionConfig cswrr_config;
   cswrr_config.set_name("envoy.load_balancing_policies.client_side_weighted_round_robin");
-  cswrr_config.mutable_typed_config()->PackFrom(cswrr_config_msg);
+  std::ignore = cswrr_config.mutable_typed_config()->PackFrom(cswrr_config_msg);
 
   // WrrLocality policy with ClientSideWeightedRoundRobin policy for endpoint
   // picking.
@@ -36,7 +36,7 @@ TEST(WrrLocalityConfigTest, ValidateSuccess) {
 
   envoy::config::core::v3::TypedExtensionConfig wrr_locality_config;
   wrr_locality_config.set_name("envoy.load_balancing_policies.wrr_locality");
-  wrr_locality_config.mutable_typed_config()->PackFrom(wrr_locality_config_msg);
+  std::ignore = wrr_locality_config.mutable_typed_config()->PackFrom(wrr_locality_config_msg);
 
   auto& factory =
       Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(wrr_locality_config);
@@ -65,7 +65,7 @@ TEST(WrrLocalityConfigTest, ValidateFailureWithoutEndpointPickingPolicy) {
   envoy::extensions::load_balancing_policies::wrr_locality::v3::WrrLocality wrr_locality_config_msg;
   envoy::config::core::v3::TypedExtensionConfig wrr_locality_config;
   wrr_locality_config.set_name("envoy.load_balancing_policies.wrr_locality");
-  wrr_locality_config.mutable_typed_config()->PackFrom(wrr_locality_config_msg);
+  std::ignore = wrr_locality_config.mutable_typed_config()->PackFrom(wrr_locality_config_msg);
 
   auto& factory =
       Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(wrr_locality_config);
@@ -85,7 +85,7 @@ TEST(WrrLocalityConfigTest, ValidateFailureUnsupportedEndpointPickingPolicy) {
   envoy::config::core::v3::TypedExtensionConfig epp_config;
 
   epp_config.set_name("envoy.load_balancing_policies.random");
-  epp_config.mutable_typed_config()->PackFrom(epp_config_msg);
+  std::ignore = epp_config.mutable_typed_config()->PackFrom(epp_config_msg);
 
   // WrrLocality policy with Random policy for endpoint picking.
   envoy::extensions::load_balancing_policies::wrr_locality::v3::WrrLocality wrr_locality_config_msg;
@@ -95,7 +95,7 @@ TEST(WrrLocalityConfigTest, ValidateFailureUnsupportedEndpointPickingPolicy) {
 
   envoy::config::core::v3::TypedExtensionConfig wrr_locality_config;
   wrr_locality_config.set_name("envoy.load_balancing_policies.wrr_locality");
-  wrr_locality_config.mutable_typed_config()->PackFrom(wrr_locality_config_msg);
+  std::ignore = wrr_locality_config.mutable_typed_config()->PackFrom(wrr_locality_config_msg);
 
   auto& factory =
       Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(wrr_locality_config);

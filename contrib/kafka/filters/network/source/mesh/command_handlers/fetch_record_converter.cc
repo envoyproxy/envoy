@@ -1,5 +1,7 @@
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/fetch_record_converter.h"
 
+#include <optional>
+
 #include "contrib/kafka/filters/network/source/serialization.h"
 
 namespace Envoy {
@@ -34,7 +36,7 @@ FetchRecordConverterImpl::convert(const InboundRecordsMap& arg) const {
     const int16_t error_code = 0;
     const int64_t high_watermark = 0;
     const auto frrpd = FetchResponseResponsePartitionData{partition, error_code, high_watermark,
-                                                          absl::make_optional(record_batch.second)};
+                                                          std::make_optional(record_batch.second)};
 
     frrpds.push_back(frrpd);
   }

@@ -23,26 +23,27 @@ public:
              const envoy::config::route::v3::RouteConfiguration* route_config = nullptr) {
     setUpstreamProtocol(Http::CodecType::HTTP1);
 
-    config_helper_.addConfigModifier(
-        [override_auto_sni_header](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          auto& cluster_config = bootstrap.mutable_static_resources()->mutable_clusters()->at(0);
-          ConfigHelper::HttpProtocolOptions protocol_options;
-          protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
-          if (!override_auto_sni_header.empty()) {
-            protocol_options.mutable_upstream_http_protocol_options()->set_override_auto_sni_header(
-                override_auto_sni_header);
-          }
-          ConfigHelper::setProtocolOptions(
-              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
+    config_helper_.addConfigModifier([override_auto_sni_header](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto& cluster_config = bootstrap.mutable_static_resources()->mutable_clusters()->at(0);
+      ConfigHelper::HttpProtocolOptions protocol_options;
+      protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+      if (!override_auto_sni_header.empty()) {
+        protocol_options.mutable_upstream_http_protocol_options()->set_override_auto_sni_header(
+            override_auto_sni_header);
+      }
+      ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                       protocol_options);
 
-          envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
-          auto* validation_context =
-              tls_context.mutable_common_tls_context()->mutable_validation_context();
-          validation_context->mutable_trusted_ca()->set_filename(
-              TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-          cluster_config.mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+      envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+      auto* validation_context =
+          tls_context.mutable_common_tls_context()->mutable_validation_context();
+      validation_context->mutable_trusted_ca()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+      cluster_config.mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+      std::ignore =
           cluster_config.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
-        });
+    });
     if (route_config != nullptr) {
       config_helper_.addConfigModifier(
           [route_config](envoy::extensions::filters::network::http_connection_manager::v3::

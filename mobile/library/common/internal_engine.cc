@@ -14,6 +14,7 @@
 #include "library/common/mobile_process_wide.h"
 #include "library/common/network/network_types.h"
 #include "library/common/network/proxy_api.h"
+#include "library/common/network/socket_tag_socket_option_impl.h"
 #include "library/common/stats/utility.h"
 #include "library/common/types/c_types.h"
 #include "source/common/api/os_sys_calls_impl.h"
@@ -89,8 +90,8 @@ static std::atomic<envoy_stream_t> current_stream_handle_{0};
 InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                std::unique_ptr<EnvoyLogger> logger,
                                std::unique_ptr<EnvoyEventTracker> event_tracker,
-                               absl::optional<int> thread_priority,
-                               absl::optional<size_t> high_watermark,
+                               std::optional<int> thread_priority,
+                               std::optional<size_t> high_watermark,
                                Thread::PosixThreadFactoryPtr thread_factory, bool enable_logger,
                                bool use_worker_thread)
     : thread_factory_(std::move(thread_factory)), callbacks_(std::move(callbacks)),
@@ -107,8 +108,8 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
 InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                std::unique_ptr<EnvoyLogger> logger,
                                std::unique_ptr<EnvoyEventTracker> event_tracker,
-                               absl::optional<int> thread_priority,
-                               absl::optional<size_t> high_watermark, bool enable_logger,
+                               std::optional<int> thread_priority,
+                               std::optional<size_t> high_watermark, bool enable_logger,
                                bool use_worker_thread)
     : InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
                      thread_priority, high_watermark, Thread::PosixThreadFactory::create(),
@@ -538,7 +539,7 @@ void InternalEngine::resetHttpPropertiesAndDrainHosts(bool has_ipv6_connectivity
     if (!has_ipv6_connectivity) {
       connectivity_manager_->dnsCache()->setIpVersionToRemove({Network::Address::IpVersion::v6});
     } else {
-      connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
+      connectivity_manager_->dnsCache()->setIpVersionToRemove(std::nullopt);
     }
   }
   Http::HttpServerPropertiesCacheManager& cache_manager =
@@ -638,6 +639,36 @@ std::string InternalEngine::dumpStats() {
     return stats;
   }
   return stats;
+}
+
+void InternalEngine::drainConnectionsBySocketTag(uint32_t tag) {
+  if (!main_thread_->joinable() || terminated_) {
+    return;
+  }
+  std::vector<uint8_t> target_hash;
+  uid_t uid = 0;
+  Network::SocketTagSocketOptionImpl::generateHashKey(uid, tag, target_hash);
+
+  main_dispatcher_->post([this, target_hash]() {
+    auto& cluster_manager = getClusterManager();
+    cluster_manager.drainOrCloseConnPools(
+        [target_hash](ConnectionPool::Instance& pool) {
+          const auto& options = pool.socketOptions();
+          if (!options)
+            return false;
+          for (const auto& option : *options) {
+            std::vector<uint8_t> option_hash;
+            option->hashKey(option_hash);
+            if (option_hash == target_hash) {
+              ASSERT(dynamic_cast<const Network::SocketTagSocketOptionImpl*>(option.get()) !=
+                     nullptr);
+              return true;
+            }
+          }
+          return false;
+        },
+        ConnectionPool::DrainBehavior::DrainAndDelete);
+  });
 }
 
 Upstream::ClusterManager& InternalEngine::getClusterManager() {

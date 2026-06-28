@@ -69,7 +69,7 @@ public:
   const envoy::config::core::v3::Metadata* metadata(const CustomTagContext& ctx) const;
 
 protected:
-  absl::optional<std::string>
+  std::optional<std::string>
   metadataToString(const envoy::config::core::v3::Metadata* metadata) const;
 
   const envoy::type::metadata::v3::MetadataKind::KindCase kind_;

@@ -16,6 +16,7 @@
 #include "test/mocks/server/options.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_time.h"
@@ -190,7 +191,7 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
                             Filesystem::fileSystemForTest());
 
   // Execute dummy methods.
-  server.drainListeners(absl::nullopt);
+  server.drainListeners(std::nullopt);
   server.failHealthcheck(true);
   server.lifecycleNotifier();
   server.secretManager();

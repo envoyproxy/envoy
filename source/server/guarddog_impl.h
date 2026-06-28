@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <optional>
 #include <vector>
 
 #include "envoy/api/api.h"
@@ -18,8 +19,6 @@
 #include "source/common/common/thread.h"
 #include "source/common/event/libevent.h"
 #include "source/server/watchdog_impl.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {
@@ -118,7 +117,7 @@ private:
 
     const WatchDogImplSharedPtr dog_;
     MonotonicTime last_checkin_;
-    absl::optional<MonotonicTime> last_alert_time_;
+    std::optional<MonotonicTime> last_alert_time_;
     bool miss_alerted_{};
     bool megamiss_alerted_{};
     Stats::Counter& miss_counter_;

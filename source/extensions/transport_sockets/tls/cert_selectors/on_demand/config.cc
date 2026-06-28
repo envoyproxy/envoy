@@ -214,7 +214,7 @@ void SecretManager::setContext(absl::string_view secret_name, AsyncContextConstS
       [stats_scope = stats_scope_, stats = stats_] { stats->cert_updated_.inc(); });
 }
 
-absl::optional<AsyncContextConstSharedPtr>
+std::optional<AsyncContextConstSharedPtr>
 SecretManager::getContext(absl::string_view secret_name) const {
   OptRef<ThreadLocalCerts> current = cert_contexts_.get();
   if (current) {

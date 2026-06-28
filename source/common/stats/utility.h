@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "envoy/stats/scope.h"
@@ -10,7 +11,6 @@
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Stats {
@@ -79,7 +79,7 @@ std::string sanitizeStatsName(absl::string_view name);
  * @param find_tag_name The name of the tag to search for.
  * @return The value of the tag, if found.
  */
-absl::optional<StatName> findTag(const Metric& metric, StatName find_tag_name);
+std::optional<StatName> findTag(const Metric& metric, StatName find_tag_name);
 
 /**
  * Creates a nested scope from a vector of StatNames which are used to create the
@@ -110,7 +110,7 @@ ScopeSharedPtr scopeFromStatNames(Scope& scope, const StatNameVec& names);
  * @return A counter named using the joined elements.
  */
 Counter& counterFromElements(Scope& scope, const ElementVec& elements,
-                             StatNameTagVectorOptConstRef tags = absl::nullopt);
+                             StatNameTagVectorOptConstRef tags = std::nullopt);
 
 /**
  * Creates a counter from a vector of tokens which are used to create the
@@ -125,7 +125,7 @@ Counter& counterFromElements(Scope& scope, const ElementVec& elements,
  * @return A counter named using the joined elements.
  */
 Counter& counterFromStatNames(Scope& scope, const StatNameVec& names,
-                              StatNameTagVectorOptConstRef tags = absl::nullopt);
+                              StatNameTagVectorOptConstRef tags = std::nullopt);
 
 /**
  * Creates a gauge from a vector of tokens which are used to create the
@@ -144,7 +144,7 @@ Counter& counterFromStatNames(Scope& scope, const StatNameVec& names,
  * @return A gauge named using the joined elements.
  */
 Gauge& gaugeFromElements(Scope& scope, const ElementVec& elements, Gauge::ImportMode import_mode,
-                         StatNameTagVectorOptConstRef tags = absl::nullopt);
+                         StatNameTagVectorOptConstRef tags = std::nullopt);
 
 /**
  * Creates a gauge from a vector of tokens which are used to create the
@@ -160,7 +160,7 @@ Gauge& gaugeFromElements(Scope& scope, const ElementVec& elements, Gauge::Import
  * @return A gauge named using the joined elements.
  */
 Gauge& gaugeFromStatNames(Scope& scope, const StatNameVec& elements, Gauge::ImportMode import_mode,
-                          StatNameTagVectorOptConstRef tags = absl::nullopt);
+                          StatNameTagVectorOptConstRef tags = std::nullopt);
 
 /**
  * Creates a histogram from a vector of tokens which are used to create the
@@ -179,7 +179,7 @@ Gauge& gaugeFromStatNames(Scope& scope, const StatNameVec& elements, Gauge::Impo
  * @return A histogram named using the joined elements.
  */
 Histogram& histogramFromElements(Scope& scope, const ElementVec& elements, Histogram::Unit unit,
-                                 StatNameTagVectorOptConstRef tags = absl::nullopt);
+                                 StatNameTagVectorOptConstRef tags = std::nullopt);
 
 /**
  * Creates a histogram from a vector of tokens which are used to create the
@@ -195,7 +195,7 @@ Histogram& histogramFromElements(Scope& scope, const ElementVec& elements, Histo
  * @return A histogram named using the joined elements.
  */
 Histogram& histogramFromStatNames(Scope& scope, const StatNameVec& elements, Histogram::Unit unit,
-                                  StatNameTagVectorOptConstRef tags = absl::nullopt);
+                                  StatNameTagVectorOptConstRef tags = std::nullopt);
 
 /**
  * Creates a TextReadout from a vector of tokens which are used to create the
@@ -214,7 +214,7 @@ Histogram& histogramFromStatNames(Scope& scope, const StatNameVec& elements, His
  * @return A TextReadout named using the joined elements.
  */
 TextReadout& textReadoutFromElements(Scope& scope, const ElementVec& elements,
-                                     StatNameTagVectorOptConstRef tags = absl::nullopt);
+                                     StatNameTagVectorOptConstRef tags = std::nullopt);
 
 /**
  * Creates a TextReadout from a vector of tokens which are used to create the
@@ -230,14 +230,14 @@ TextReadout& textReadoutFromElements(Scope& scope, const ElementVec& elements,
  * @return A TextReadout named using the joined elements.
  */
 TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
-                                      StatNameTagVectorOptConstRef tags = absl::nullopt);
+                                      StatNameTagVectorOptConstRef tags = std::nullopt);
 
 } // namespace Utility
 
 /**
  * Holds a reference to a stat by name. Note that the stat may not be created
  * yet at the time CachedReference is created. Calling get() then does a lazy
- * lookup, potentially returning absl::nullopt if the stat doesn't exist yet.
+ * lookup, potentially returning std::nullopt if the stat doesn't exist yet.
  * StatReference works whether the name was constructed symbolically, or with
  * StatNameDynamicStorage.
  *
@@ -258,7 +258,7 @@ public:
   /**
    * Finds the named stat, if it exists, returning it as an optional.
    */
-  absl::optional<std::reference_wrapper<StatType>> get() {
+  std::optional<std::reference_wrapper<StatType>> get() {
     StatType* stat = stat_.get([this]() -> StatType* {
       StatType* stat = nullptr;
       IterateFn<StatType> check_stat = [this,
@@ -273,7 +273,7 @@ public:
       return stat;
     });
     if (stat == nullptr) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     return *stat;
   }
