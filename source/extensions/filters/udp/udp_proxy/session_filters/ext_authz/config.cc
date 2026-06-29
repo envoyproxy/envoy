@@ -12,8 +12,7 @@ namespace UdpProxy {
 namespace SessionFilters {
 namespace ExtAuthz {
 
-ExtAuthzFilterConfigFactory::ExtAuthzFilterConfigFactory()
-    : FactoryBase("envoy.filters.udp.session.ext_authz") {}
+ExtAuthzFilterConfigFactory::ExtAuthzFilterConfigFactory() : FactoryBase(std::string(FilterName)) {}
 
 FilterFactoryCb ExtAuthzFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const FilterConfig& proto_config, Server::Configuration::FactoryContext& context) {

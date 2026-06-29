@@ -118,6 +118,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     break;
   }
 
+  if (!response->dynamic_metadata.fields().empty()) {
+    read_callbacks_->streamInfo().setDynamicMetadata(std::string(FilterName),
+                                                     response->dynamic_metadata);
+  }
+
   if (!allowed_) {
     read_callbacks_->streamInfo().setResponseFlag(
         StreamInfo::CoreResponseFlag::UnauthorizedExternalService);

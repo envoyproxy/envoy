@@ -17,6 +17,8 @@
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
@@ -31,6 +33,8 @@ using ReadFilter = Network::UdpSessionReadFilter;
 using ReadFilterStatus = Network::UdpSessionReadFilterStatus;
 using ReadFilterCallbacks = Network::UdpSessionReadFilterCallbacks;
 using BufferedDatagramPtr = std::unique_ptr<Network::UdpRecvData>;
+
+inline constexpr absl::string_view FilterName = "envoy.filters.udp.session.ext_authz";
 
 /**
  * All UDP session external authorization stats. @see stats_macros.h

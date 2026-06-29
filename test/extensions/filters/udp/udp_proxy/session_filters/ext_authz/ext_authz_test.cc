@@ -82,6 +82,13 @@ public:
     return response;
   }
 
+  Filters::Common::ExtAuthz::ResponsePtr makeResponse(CheckStatus status,
+                                                      const Protobuf::Struct& dynamic_metadata) {
+    auto response = makeResponse(status);
+    response->dynamic_metadata = dynamic_metadata;
+    return response;
+  }
+
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   ConfigSharedPtr config_;
   NiceMock<Filters::Common::ExtAuthz::MockClient>* client_{};
@@ -135,6 +142,40 @@ TEST_F(ExtAuthzFilterTest, DeniedDropsSession) {
 
   auto d2 = makeDatagram("two");
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(d2));
+}
+
+// Dynamic metadata returned by the authz service is published to the session on allow.
+TEST_F(ExtAuthzFilterTest, AllowedPublishesDynamicMetadata) {
+  setup();
+
+  EXPECT_CALL(*client_, check(_, _, _, _));
+  EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
+
+  Protobuf::Struct metadata;
+  (*metadata.mutable_fields())["foo"].set_string_value("bar");
+
+  EXPECT_CALL(stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& value) {
+        EXPECT_EQ("envoy.filters.udp.session.ext_authz", ns);
+        EXPECT_EQ("bar", value.fields().at("foo").string_value());
+      }));
+  EXPECT_CALL(callbacks_, continueFilterChain()).WillOnce(Return(true));
+  request_callbacks_->onComplete(makeResponse(CheckStatus::OK, metadata));
+}
+
+// Dynamic metadata is published even when the session is denied (set before the deny return).
+TEST_F(ExtAuthzFilterTest, DeniedPublishesDynamicMetadata) {
+  setup();
+
+  EXPECT_CALL(*client_, check(_, _, _, _));
+  EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
+
+  Protobuf::Struct metadata;
+  (*metadata.mutable_fields())["foo"].set_string_value("bar");
+
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.filters.udp.session.ext_authz", _));
+  EXPECT_CALL(callbacks_, continueFilterChain()).Times(0);
+  request_callbacks_->onComplete(makeResponse(CheckStatus::Denied, metadata));
 }
 
 // On an authz service error, the session is dropped unless failure_mode_allow is set.
