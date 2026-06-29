@@ -94,7 +94,8 @@ private:
   COUNTER(oauth_success)                                                                           \
   COUNTER(oauth_refreshtoken_success)                                                              \
   COUNTER(oauth_refreshtoken_failure)                                                              \
-  COUNTER(oauth_allow_failed_passthrough)
+  COUNTER(oauth_allow_failed_passthrough)                                                          \
+  COUNTER(oauth_legacy_cbc_decrypt)
 
 /**
  * Wrapper struct filter stats. @see stats_macros.h
@@ -158,6 +159,15 @@ public:
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
   bool preserveAuthorizationHeader() const { return preserve_authorization_header_; }
+  // Whether the OIDC ID token should be forwarded upstream.
+  bool forwardIdToken() const { return !forward_id_token_header_.get().empty(); }
+  // The upstream header that carries the forwarded ID token (empty when forwarding is disabled).
+  const Http::LowerCaseString& forwardIdTokenHeader() const { return forward_id_token_header_; }
+  // Whether the ID token is forwarded on the ``Authorization`` header (using the ``Bearer ``
+  // prefix) rather than a custom header carrying the raw token value.
+  bool forwardIdTokenOnAuthorizationHeader() const {
+    return forward_id_token_header_ == Http::CustomHeaders::get().Authorization;
+  }
   const std::vector<Http::HeaderUtility::HeaderDataPtr>& passThroughMatchers() const {
     return pass_through_header_matchers_;
   }
@@ -174,6 +184,10 @@ public:
     return authorization_query_params_;
   }
   const std::string& redirectUri() const { return redirect_uri_; }
+  const std::vector<std::string>& allowedRedirectDomains() const {
+    return allowed_redirect_domains_;
+  }
+  const std::string& originalRequestUri() const { return original_request_uri_; }
   const Matchers::PathMatcher& redirectPathMatcher() const { return redirect_matcher_; }
   const Matchers::PathMatcher& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
@@ -201,6 +215,9 @@ public:
   bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
   bool disableAccessTokenSetCookie() const { return disable_access_token_set_cookie_; }
   bool disableRefreshTokenSetCookie() const { return disable_refresh_token_set_cookie_; }
+  bool useAccessTokenExpiryForIdTokenCookie() const {
+    return use_access_token_expiry_for_id_token_cookie_;
+  }
   const Router::RetryPolicyConstSharedPtr& retryPolicy() const { return retry_policy_; }
   bool shouldUseRefreshToken(
       const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) const;
@@ -245,6 +262,8 @@ private:
   const Http::Utility::QueryParamsMulti authorization_query_params_;
   const std::string client_id_;
   const std::string redirect_uri_;
+  const std::vector<std::string> allowed_redirect_domains_;
+  const std::string original_request_uri_;
   const Matchers::PathMatcher redirect_matcher_;
   const Matchers::PathMatcher signout_path_;
   std::shared_ptr<SecretReader> secret_reader_;
@@ -268,6 +287,10 @@ private:
   const bool disable_access_token_set_cookie_ : 1;
   const bool disable_refresh_token_set_cookie_ : 1;
   const bool disable_token_encryption_ : 1;
+  const bool use_access_token_expiry_for_id_token_cookie_ : 1;
+  // The upstream header used to forward the OIDC ID token. Empty when ID token forwarding is
+  // disabled.
+  const Http::LowerCaseString forward_id_token_header_;
   Router::RetryPolicyConstSharedPtr retry_policy_;
   const CookieSettings bearer_token_cookie_settings_;
   const CookieSettings hmac_cookie_settings_;
@@ -295,6 +318,7 @@ class CookieValidator {
 public:
   virtual ~CookieValidator() = default;
   virtual const std::string& token() const PURE;
+  virtual const std::string& idToken() const PURE;
   virtual const std::string& refreshToken() const PURE;
   virtual void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) PURE;
   virtual bool isValid() const PURE;
@@ -308,6 +332,7 @@ public:
       : time_source_(time_source), cookie_names_(cookie_names), cookie_domain_(cookie_domain) {}
 
   const std::string& token() const override { return access_token_; }
+  const std::string& idToken() const override { return id_token_; }
   const std::string& refreshToken() const override { return refresh_token_; }
 
   void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) override;
@@ -357,6 +382,7 @@ public:
   // Http::PassThroughFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override;
+  void onDestroy() override;
 
   // FilterCallbacks
   void onGetAccessTokenSuccess(const std::string& access_code, const std::string& id_token,
@@ -378,6 +404,11 @@ public:
 
   void finishGetAccessTokenFlow();
   void finishRefreshAccessTokenFlow();
+
+  // Forwards the OIDC ID token upstream on the configured header, if ID token forwarding is
+  // enabled and the token is non-empty. When the configured header is ``Authorization`` the token
+  // is forwarded with the ``Bearer `` prefix; otherwise the raw token value is set on the header.
+  void forwardIdToken(Http::RequestHeaderMap& headers, const std::string& id_token) const;
   void updateTokens(const std::string& access_token, const std::string& id_token,
                     const std::string& refresh_token, std::chrono::seconds expires_in);
 
@@ -447,6 +478,40 @@ private:
   void sendUnauthorizedResponse(const std::string& details);
   void sendSecretsNotReadyResponse(const std::string& details);
 };
+
+struct DecryptResult {
+  std::string plaintext;
+  std::optional<std::string> error;
+  // Whether the decrypted token was encrypted with GCM (true) or CBC (false).
+  bool is_gcm = false;
+};
+
+/**
+ * Decrypt an OAuth2 cookie ciphertext.
+ *
+ * Cookies carrying the ``gcm.`` algorithm marker are decrypted with AES-256-GCM. Cookies
+ * without the marker are treated as legacy AES-256-CBC ciphertexts. The CBC fallback is only
+ * attempted when the runtime flag ``envoy.reloadable_features.oauth2_legacy_cbc_decrypt_compat``
+ * is true (the default during the migration window), and emits an info-level log on success so
+ * operators can observe legacy usage. Once the flag is set to false the CBC fallback is bypassed
+ * and legacy cookies are rejected; this is the post-migration state that fully closes
+ * CVE-2026-47775. Both the flag and the CBC fallback are scheduled for removal.
+ */
+DecryptResult decrypt(absl::string_view encrypted, absl::string_view secret);
+
+/**
+ * Encrypt an OAuth2 cookie plaintext.
+ *
+ * Dispatches on the runtime flag ``envoy.reloadable_features.oauth2_use_gcm_encryption``:
+ * when true the ciphertext is produced with AES-256-GCM and carries a ``gcm.`` marker, and
+ * when false (the default during the migration window) the ciphertext is produced with the
+ * legacy AES-256-CBC format with no marker. The default exists so that newly upgraded
+ * instances stay wire-compatible with older instances during a rolling upgrade; operators
+ * must flip this flag to true cluster-wide to be protected against CVE-2026-47775. The flag
+ * and the CBC encrypt path are scheduled for removal.
+ */
+std::string encrypt(absl::string_view plaintext, absl::string_view secret,
+                    Random::RandomGenerator& random);
 
 } // namespace Oauth2
 } // namespace HttpFilters

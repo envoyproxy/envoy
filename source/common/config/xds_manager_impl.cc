@@ -232,9 +232,8 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
 
       std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> lrs_factory =
           [&, primary_client]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
-        auto reporter = std::make_unique<Upstream::LoadStatsReporterImpl>(
+        return std::make_unique<Upstream::LoadStatsReporterImpl>(
             local_info_, *cm_, *stats_.rootScope(), primary_client, main_thread_dispatcher_);
-        return reporter;
       };
 
       ads_mux_ = factory->create(std::move(primary_client), std::move(failover_client),
@@ -265,9 +264,8 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
 
       std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> lrs_factory =
           [&, primary_client]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
-        auto reporter = std::make_unique<Upstream::LoadStatsReporterImpl>(
+        return std::make_unique<Upstream::LoadStatsReporterImpl>(
             local_info_, *cm_, *stats_.rootScope(), primary_client, main_thread_dispatcher_);
-        return reporter;
       };
 
       OptRef<XdsResourcesDelegate> xds_resources_delegate =
@@ -468,9 +466,8 @@ XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& con
                                        failover_client));
     std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> lrs_factory =
         [&, primary_client]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
-      auto reporter = std::make_unique<Upstream::LoadStatsReporterImpl>(
+      return std::make_unique<Upstream::LoadStatsReporterImpl>(
           local_info_, *cm_, *stats_.rootScope(), primary_client, main_thread_dispatcher_);
-      return reporter;
     };
 
     authority_mux = factory->create(
@@ -504,9 +501,8 @@ XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& con
 
     std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> lrs_factory =
         [&, primary_client]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
-      auto reporter = std::make_unique<Upstream::LoadStatsReporterImpl>(
+      return std::make_unique<Upstream::LoadStatsReporterImpl>(
           local_info_, *cm_, *stats_.rootScope(), primary_client, main_thread_dispatcher_);
-      return reporter;
     };
 
     authority_mux = factory->create(
@@ -591,9 +587,16 @@ XdsManagerImpl::replaceAdsMux(const envoy::config::core::v3::ApiConfigSource& ad
   // The failover_client may be null (no failover defined).
   ASSERT(primary_client != nullptr);
 
+  std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> lrs_factory =
+      [&, primary_client]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+    return std::make_unique<Upstream::LoadStatsReporterImpl>(
+        local_info_, *cm_, *stats_.rootScope(), primary_client, main_thread_dispatcher_);
+  };
+
   // This will cause a disconnect from the current sources, and replacement of the clients.
   status = ads_mux_->updateMuxSource(std::move(primary_client), std::move(failover_client),
-                                     *stats_.rootScope(), std::move(backoff_strategy), ads_config);
+                                     *stats_.rootScope(), std::move(backoff_strategy), ads_config,
+                                     lrs_factory);
   return status;
 }
 

@@ -2218,3 +2218,14 @@ index a98793b..f00ad3a 100644
 -#include "google/protobuf/util/converter/port_undef.inc"
 -
  #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_UTILITY_H_
+diff --git a/build_defs/cpp_opts.bzl b/build_defs/cpp_opts.bzl
+--- a/build_defs/cpp_opts.bzl
++++ b/build_defs/cpp_opts.bzl
+@@ -33,6 +33,7 @@
+     "//conditions:default": [
+         "-DHAVE_ZLIB",
+         "-Woverloaded-virtual",
++        "-Wno-unused-result",
+         "-Wno-sign-compare",
+         "-Wno-nonnull",
+         "-Werror",

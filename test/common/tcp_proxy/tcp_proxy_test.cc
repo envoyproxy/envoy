@@ -161,7 +161,7 @@ public:
       }
       EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
                   tcpConnPool(_, _, _))
-          .WillRepeatedly(Return(absl::nullopt));
+          .WillRepeatedly(Return(std::nullopt));
     }
 
     {
@@ -206,7 +206,7 @@ public:
                                                    ? Network::FilterStatus::Continue
                                                    : Network::FilterStatus::StopIteration;
       EXPECT_EQ(expected_status_on_new_connection, filter_->onNewConnection());
-      EXPECT_EQ(absl::optional<uint64_t>(), filter_->computeHashKey());
+      EXPECT_EQ(std::optional<uint64_t>(), filter_->computeHashKey());
       EXPECT_EQ(&filter_callbacks_.connection_, filter_->downstreamConnection());
       EXPECT_EQ(nullptr, filter_->metadataMatchCriteria());
     }
@@ -336,7 +336,7 @@ TEST_P(TcpProxyTest, ExplicitFactory) {
                    .cluster_.info_;
   info->upstream_config_ = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   envoy::extensions::upstreams::tcp::generic::v3::GenericConnectionPoolProto generic_config;
-  info->upstream_config_->mutable_typed_config()->PackFrom(generic_config);
+  std::ignore = info->upstream_config_->mutable_typed_config()->PackFrom(generic_config);
   setup(1);
 
   raiseEventUpstreamConnected(0);
@@ -360,7 +360,7 @@ TEST_P(TcpProxyTest, BadFactory) {
   info->upstream_config_ = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   // The HTTP Generic connection pool is not a valid type for TCP upstreams.
   envoy::extensions::upstreams::http::generic::v3::GenericConnectionPoolProto generic_config;
-  info->upstream_config_->mutable_typed_config()->PackFrom(generic_config);
+  std::ignore = info->upstream_config_->mutable_typed_config()->PackFrom(generic_config);
 
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
 
@@ -416,7 +416,7 @@ TEST_P(TcpProxyTest, UpstreamRemoteDisconnect) {
   timeSystem().advanceTimeWait(std::chrono::microseconds(20));
   raiseEventUpstreamConnected(0);
 
-  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+  const std::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
       filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
   ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
   EXPECT_EQ(std::chrono::microseconds(20), upstream_connection_establishment_latency.value());
@@ -508,7 +508,7 @@ TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailNoBackoffOptions) {
                     .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
                     .value());
   EXPECT_EQ(2U, filter_->getStreamInfo().attemptCount().value());
-  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+  const std::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
       filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
   ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
   EXPECT_EQ(std::chrono::microseconds(50), upstream_connection_establishment_latency.value());
@@ -541,7 +541,7 @@ TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailWithBackoffOptions) {
                     .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
                     .value());
   EXPECT_EQ(2U, filter_->getStreamInfo().attemptCount().value());
-  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+  const std::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
       filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
   ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
   EXPECT_EQ(std::chrono::microseconds(50), upstream_connection_establishment_latency.value());
@@ -753,7 +753,7 @@ TEST_P(TcpProxyTest, ConnectAttemptsLimitNoBackoffOptions) {
   timeSystem().advanceTimeWait(std::chrono::microseconds(15));
   raiseEventUpstreamConnectFailed(2, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
-  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+  const std::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
       filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
   ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
   EXPECT_EQ(std::chrono::microseconds(25), upstream_connection_establishment_latency.value());
@@ -802,7 +802,7 @@ TEST_P(TcpProxyTest, ConnectAttemptsLimitWithBackoffOptions) {
   timeSystem().advanceTimeWait(std::chrono::microseconds(15));
   raiseEventUpstreamConnectFailed(2, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
-  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+  const std::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
       filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
   ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
   EXPECT_EQ(std::chrono::microseconds(25), upstream_connection_establishment_latency.value());
@@ -1244,7 +1244,7 @@ TEST_P(TcpProxyTest, WeightedClusterWithMetadataMatch) {
         .WillOnce(Return(0));
     EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
                 tcpConnPool(_, _, _))
-        .WillOnce(DoAll(SaveArg<2>(&context), Return(absl::nullopt)));
+        .WillOnce(DoAll(SaveArg<2>(&context), Return(std::nullopt)));
     EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
     EXPECT_NE(nullptr, context);
@@ -1275,7 +1275,7 @@ TEST_P(TcpProxyTest, WeightedClusterWithMetadataMatch) {
         .WillOnce(Return(2));
     EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
                 tcpConnPool(_, _, _))
-        .WillOnce(DoAll(SaveArg<2>(&context), Return(absl::nullopt)));
+        .WillOnce(DoAll(SaveArg<2>(&context), Return(std::nullopt)));
     EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
     EXPECT_NE(nullptr, context);
@@ -1316,7 +1316,7 @@ TEST_P(TcpProxyTest, StreamInfoDynamicMetadata) {
 
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
               tcpConnPool(_, _, _))
-      .WillOnce(DoAll(SaveArg<2>(&context), Return(absl::nullopt)));
+      .WillOnce(DoAll(SaveArg<2>(&context), Return(std::nullopt)));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   EXPECT_NE(nullptr, context);
@@ -1373,7 +1373,7 @@ TEST_P(TcpProxyTest, StreamInfoDynamicMetadataAndConfigMerged) {
 
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
               tcpConnPool(_, _, _))
-      .WillOnce(DoAll(SaveArg<2>(&context), Return(absl::nullopt)));
+      .WillOnce(DoAll(SaveArg<2>(&context), Return(std::nullopt)));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   EXPECT_NE(nullptr, context);
@@ -1426,7 +1426,7 @@ TEST_P(TcpProxyTest, UpstreamConnectFailure) {
   timeSystem().advanceTimeWait(std::chrono::microseconds(20));
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
-  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+  const std::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
       filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
   ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
   EXPECT_EQ(std::chrono::microseconds(20), upstream_connection_establishment_latency.value());
@@ -1662,6 +1662,47 @@ TEST_P(TcpProxyTest, AccessLogUpstreamLocalAddress) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
   EXPECT_EQ(access_log_data_, "2.2.2.2:50000");
+}
+
+// Test that the COMMON_DURATION downstream and upstream connection time points are populated for
+// TCP connections, with the upstream connect timing plumbed back from the upstream connection.
+TEST_P(TcpProxyTest, AccessLogCommonDuration) {
+  // Put the downstream connection begin on the test clock so the DS_CX_* time points render
+  // deterministically.
+  filter_callbacks_.connection_.stream_info_.start_time_monotonic_ =
+      timeSystem().monotonicTime() - std::chrono::microseconds(10);
+
+  setup(1, accessLogConfig("%COMMON_DURATION(DS_CX_BEG:US_CX_BEG:us)% "
+                           "%COMMON_DURATION(US_CX_BEG:US_CX_END:us)% "
+                           "%COMMON_DURATION(DS_CX_BEG:DS_CX_END:us)%"));
+
+  // Record the real connect timing on the upstream connection so it is plumbed back to the
+  // downstream stream info, mirroring how the HTTP router records upstream connect timing.
+  auto& upstream_timing =
+      upstream_connections_.at(0)->stream_info_.upstreamInfo()->upstreamTiming();
+  upstream_timing.onUpstreamConnectStart(timeSystem());
+  timeSystem().advanceTimeWait(std::chrono::microseconds(40));
+  upstream_timing.onUpstreamConnectComplete(timeSystem());
+  raiseEventUpstreamConnected(0);
+
+  timeSystem().advanceTimeWait(std::chrono::microseconds(60));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+
+  EXPECT_EQ(access_log_data_, "10 40 110");
+}
+
+// Test that when the upstream connection is never established the US_CX time points stay unset and
+// render as "-", so a failed pool attempt is not logged as a real connect.
+TEST_P(TcpProxyTest, AccessLogCommonDurationUpstreamConnectFailure) {
+  setup(1, accessLogConfig("%COMMON_DURATION(DS_CX_BEG:US_CX_BEG:us)% "
+                           "%COMMON_DURATION(US_CX_BEG:US_CX_END:us)%"));
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
+
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "- -");
 }
 
 // Test that access log fields %DOWNSTREAM_PEER_URI_SAN% is correctly logged.
@@ -2275,7 +2316,7 @@ TEST_P(TcpProxyTest, OdcdsBasicDownstreamLocalClose) {
   timeSystem().advanceTimeWait(std::chrono::microseconds(10));
 
   raiseEventUpstreamConnected(0);
-  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+  const std::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
       filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
   ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
   // OdCds resolution time isn't included in time to connect to upstream.
@@ -2317,15 +2358,13 @@ TEST_P(TcpProxyTest, OdcdsClusterMissingCauseConnectionClose) {
   std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Missing);
 
   // No upstream connection was attempted, so no latency should be recorded.
-  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+  const std::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
       filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
   ASSERT_FALSE(upstream_connection_establishment_latency.has_value());
 }
 
 // Test that upstream transport failure message is reflected in access logs.
 TEST_P(TcpProxyTest, UpstreamConnectFailureStreamInfoAccessLog) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
-
   setup(1, accessLogConfig("%UPSTREAM_TRANSPORT_FAILURE_REASON%"));
 
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure,

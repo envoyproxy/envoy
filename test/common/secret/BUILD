@@ -62,6 +62,7 @@ envoy_cc_test(
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:file_system_for_test_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",

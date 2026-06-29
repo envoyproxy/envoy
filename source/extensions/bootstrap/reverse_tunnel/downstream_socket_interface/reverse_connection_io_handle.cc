@@ -1,8 +1,10 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 
+#include <algorithm>
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
+#include <optional>
 
 #include "envoy/event/timer.h"
 #include "envoy/network/address.h"
@@ -30,6 +32,22 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
+namespace {
+// Base interval of the deterministic exponential reconnect backoff schedule (1s, 2s, 4s, ...). The
+// cap on the schedule is configurable via ``max_reconnect_backoff`` and read from the extension.
+constexpr uint64_t kReconnectBaseBackoffMs = 1000;
+// Largest exponent applied to the base interval. Capped purely to keep the bit-shift well within
+// uint64 for pathological failure counts; the schedule is bounded by the configured max long before
+// this (e.g. base 1s reaches a 30s cap by the 5th failure), so this never affects a real backoff.
+constexpr uint32_t kMaxBackoffExponent = 32;
+// Upward jitter applied to every reconnect-related timer (the per-host backoff, a server
+// ``Retry-After`` cool-off, and the maintenance re-check) so agents that fail together
+// de-synchronize their next attempt.
+constexpr uint64_t kReconnectJitterPercent = 15;
+// Steady-state maintenance re-check interval.
+constexpr uint64_t kMaintainIntervalMs = 10000;
+} // namespace
+
 // ReverseConnectionIOHandle implementation
 ReverseConnectionIOHandle::ReverseConnectionIOHandle(os_fd_t fd,
                                                      const ReverseConnectionSocketConfig& config,
@@ -46,6 +64,19 @@ ReverseConnectionIOHandle::ReverseConnectionIOHandle(os_fd_t fd,
 ReverseConnectionIOHandle::~ReverseConnectionIOHandle() {
   ENVOY_LOG_MISC(debug, "Destroying ReverseConnectionIOHandle - performing cleanup.");
   cleanup();
+}
+
+void ReverseConnectionIOHandle::emitAccessLog(const std::string& event,
+                                              const std::string& host_address,
+                                              const std::string& cluster_name,
+                                              const std::string& connection_key,
+                                              const std::string& error_message) {
+  if (!extension_) {
+    return;
+  }
+  extension_->emitAccessLog(getTimeSource(), event, config_.src_node_id, config_.src_cluster_id,
+                            config_.src_tenant_id, cluster_name, host_address, connection_key,
+                            error_message);
 }
 
 void ReverseConnectionIOHandle::cleanup() {
@@ -258,8 +289,10 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
         auto io_handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
             std::move(duplicated_socket), this, connection_key);
 
-        ENVOY_LOG(debug, "reverse_tunnel: RAII IoHandle created with duplicated socket "
-                         "and protection enabled.");
+        ENVOY_LOG(info,
+                  "reverse_tunnel: RAII IoHandle created with duplicated socket for node_id: {}"
+                  "and protection enabled.",
+                  config_.src_node_id);
 
         // Reset file events on the original socket to prevent any pending operations. The socket
         // fd has been duplicated, so we have an independent fd. Closing the original connection
@@ -286,7 +319,7 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
 }
 
 Api::IoCallUint64Result ReverseConnectionIOHandle::read(Buffer::Instance& buffer,
-                                                        absl::optional<uint64_t> max_length) {
+                                                        std::optional<uint64_t> max_length) {
   ENVOY_LOG(trace, "Read operation - max_length: {}", max_length.value_or(0));
   auto result = IoSocketHandleImpl::read(buffer, max_length);
   return result;
@@ -552,10 +585,11 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
     uint32_t pending_connections = host_to_conn_info_map_[key].connecting_count;
 
     ENVOY_LOG(info,
-              "reverse_tunnel: Number of reverse connections to host {} of cluster {}: "
+              "reverse_tunnel: Number of reverse connections to host {} of cluster {} from source "
+              "node: {}: "
               "Current: {}, Pending: {}, Required: {}",
-              host_address, cluster_name, current_connections, pending_connections,
-              cluster_config.reverse_connection_count);
+              host_address, cluster_name, config_.src_node_id, current_connections,
+              pending_connections, cluster_config.reverse_connection_count);
     // Update with the pending connections also for checking against required.
     current_connections += pending_connections;
     if (current_connections >= cluster_config.reverse_connection_count) {
@@ -645,8 +679,9 @@ bool ReverseConnectionIOHandle::shouldAttemptConnectionToHost(const std::string&
   return true;
 }
 
-void ReverseConnectionIOHandle::trackConnectionFailure(const std::string& host_address,
-                                                       const std::string& cluster_name) {
+void ReverseConnectionIOHandle::trackConnectionFailure(
+    const std::string& host_address, const std::string& cluster_name,
+    std::optional<std::chrono::milliseconds> retry_after) {
   auto host_it = host_to_conn_info_map_.find(host_address);
   if (host_it == host_to_conn_info_map_.end()) {
     ENVOY_LOG(debug, "Host {} not found in host_to_conn_info_map_, skipping failure tracking",
@@ -656,12 +691,25 @@ void ReverseConnectionIOHandle::trackConnectionFailure(const std::string& host_a
   auto& host_info = host_it->second;
   host_info.failure_count++;
   host_info.last_failure_time = getTimeSource().monotonicTime();
-  // Calculate exponential backoff: base_delay * 2^(failure_count - 1)
-  const uint32_t base_delay_ms = 1000; // 1 second base delay
-  const uint32_t max_delay_ms = 30000; // 30 seconds max delay
 
-  uint32_t backoff_delay_ms = base_delay_ms * (1 << (host_info.failure_count - 1));
-  backoff_delay_ms = std::min(backoff_delay_ms, max_delay_ms);
+  const uint64_t max_backoff_ms = extension_->maxReconnectBackoffMs();
+
+  uint64_t backoff_delay_ms;
+  if (retry_after.has_value()) {
+    // Honor the server's explicit cool-off hint
+    backoff_delay_ms =
+        std::min<uint64_t>(static_cast<uint64_t>(retry_after->count()), max_backoff_ms);
+  } else {
+    // Deterministic exponential backoff: base * 2^(failure_count - 1), capped at the configured
+    // max.
+    const uint32_t exponent = std::min(host_info.failure_count - 1, kMaxBackoffExponent);
+    backoff_delay_ms = std::min<uint64_t>(kReconnectBaseBackoffMs << exponent, max_backoff_ms);
+  }
+  // Apply small upward jitter to whichever delay was chosen so hosts that fail together
+  // de-synchronize their next attempt.
+  backoff_delay_ms = ReverseConnectionUtility::addJitter(backoff_delay_ms, kReconnectJitterPercent,
+                                                         extension_->randomGenerator());
+
   // Update the backoff until time. This is used in shouldAttemptConnectionToHost() to check if we
   // should attempt to connect to the host.
   host_info.backoff_until =
@@ -802,6 +850,8 @@ void ReverseConnectionIOHandle::onDownstreamConnectionClosed(const std::string& 
   // Remove connection state tracking.
   removeConnectionState(host_address, cluster_name, connection_key);
 
+  emitAccessLog("connection_closed", host_address, cluster_name, connection_key, "");
+
   // The next call to maintainClusterConnections() will detect the missing connection
   // and re-initiate it automatically.
   ENVOY_LOG(debug,
@@ -871,12 +921,12 @@ void ReverseConnectionIOHandle::maintainReverseConnections() {
   }
   ENVOY_LOG(debug, "Completed reverse TCP connection maintenance for all clusters.");
 
-  // Enable the retry timer to periodically check for missing connections (like maintainConnCount)
+  // Enable the retry timer to periodically check for missing connections (like maintainConnCount).
   if (rev_conn_retry_timer_) {
-    // TODO(basundhara-c): Make the retry timeout configurable.
-    const std::chrono::milliseconds retry_timeout(10000); // 10 seconds
-    rev_conn_retry_timer_->enableTimer(retry_timeout);
-    ENVOY_LOG(debug, "Enabled retry timer for next connection check in 10 seconds.");
+    const uint64_t retry_timeout_ms = ReverseConnectionUtility::addJitter(
+        kMaintainIntervalMs, kReconnectJitterPercent, extension_->randomGenerator());
+    rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(retry_timeout_ms));
+    ENVOY_LOG(debug, "Enabled retry timer for next connection check in {}ms.", retry_timeout_ms);
   }
 }
 
@@ -982,7 +1032,7 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
     // Safely log address information without assuming IP is present (internal addresses possible).
     const auto& addr = host->address();
     std::string addr_str = addr ? addr->asString() : std::string("<unknown>");
-    absl::optional<uint16_t> port_opt;
+    std::optional<uint16_t> port_opt;
     if (addr && addr->ip() != nullptr) {
       port_opt = addr->ip()->port();
     }
@@ -1034,10 +1084,12 @@ bool ReverseConnectionIOHandle::isTriggerPipeReady() const {
   return trigger_pipe_read_fd_ != -1 && trigger_pipe_write_fd_ != -1;
 }
 
-void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
-                                                 RCConnectionWrapper* wrapper, bool closed) {
-  ENVOY_LOG(debug, "reverse_tunnel: Connection wrapper done - error: '{}', closed: {}", error,
-            closed);
+void ReverseConnectionIOHandle::onConnectionDone(
+    const std::string& error, RCConnectionWrapper* wrapper, bool closed,
+    std::optional<std::chrono::milliseconds> retry_after) {
+  ENVOY_LOG(info,
+            "reverse_tunnel: Connection wrapper done - error: '{}', closed: {}, for node_id: {}",
+            error, closed, config_.src_node_id);
 
   // Validate wrapper pointer before any access.
   if (!wrapper) {
@@ -1113,7 +1165,9 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
       connection->close(Network::ConnectionCloseType::NoFlush);
     }
 
-    trackConnectionFailure(host_address, cluster_name);
+    trackConnectionFailure(host_address, cluster_name, retry_after);
+
+    emitAccessLog("handshake_failure", host_address, cluster_name, connection_key, error);
 
   } else {
     // Handle connection success.
@@ -1122,6 +1176,8 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
     resetHostBackoff(host_address);
     updateConnectionState(host_address, cluster_name, connection_key,
                           ReverseConnectionState::Connected);
+
+    emitAccessLog("handshake_success", host_address, cluster_name, connection_key, "");
 
     // Only proceed if connection is still valid.
     if (!connection) {

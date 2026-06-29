@@ -16,7 +16,7 @@ namespace Http2 {
 
 uint32_t ActiveClient::calculateInitialStreamsLimit(
     Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache,
-    absl::optional<HttpServerPropertiesCache::Origin>& origin,
+    std::optional<HttpServerPropertiesCache::Origin>& origin,
     Upstream::HostDescriptionConstSharedPtr host) {
   uint32_t initial_streams =
       host->cluster().httpProtocolOptions().http2Options().max_concurrent_streams().value();
@@ -57,12 +57,12 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state,
                  Server::OverloadManager& overload_manager,
-                 absl::optional<HttpServerPropertiesCache::Origin> origin,
+                 std::optional<HttpServerPropertiesCache::Origin> origin,
                  Http::HttpServerPropertiesCacheSharedPtr cache) {
   return std::make_unique<FixedHttpConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
       [](HttpConnPoolImplBase* pool) {
-        return std::make_unique<ActiveClient>(*pool, absl::nullopt);
+        return std::make_unique<ActiveClient>(*pool, std::nullopt);
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
         CodecClientPtr codec{new CodecClientProd(

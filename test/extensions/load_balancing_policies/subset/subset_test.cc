@@ -2,6 +2,7 @@
 #include <initializer_list>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -28,7 +29,6 @@
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -309,7 +309,7 @@ public:
             std::map<std::string, Protobuf::Value>(metadata_matches))) {}
 
   // Upstream::LoadBalancerContext
-  absl::optional<uint64_t> computeHashKey() override { return {}; }
+  std::optional<uint64_t> computeHashKey() override { return {}; }
   const Network::Connection* downstreamConnection() const override { return nullptr; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return matches_.get(); }
   const Http::RequestHeaderMap* downstreamHeaders() const override { return nullptr; }
@@ -473,7 +473,7 @@ public:
             std::make_shared<HealthyHostVector>(*local_hosts_), local_hosts_per_locality_,
             std::make_shared<DegradedHostVector>(), HostsPerLocalityImpl::empty(),
             std::make_shared<ExcludedHostVector>(), HostsPerLocalityImpl::empty()),
-        {}, {}, {}, absl::nullopt);
+        {}, {}, {}, std::nullopt);
 
     initLbConfigAndLB(nullptr, true);
   }
@@ -553,7 +553,7 @@ public:
     return makeSelector(selector_keys, fallback_policy, {});
   }
 
-  void modifyHosts(HostVector add, HostVector remove, absl::optional<uint32_t> add_in_locality = {},
+  void modifyHosts(HostVector add, HostVector remove, std::optional<uint32_t> add_in_locality = {},
                    uint32_t priority = 0) {
     MockHostSet& host_set = *priority_set_.getMockHostSet(priority);
     for (const auto& host : remove) {
@@ -622,7 +622,7 @@ public:
           updateHostsParams(local_hosts_, local_hosts_per_locality_,
                             std::make_shared<HealthyHostVector>(*local_hosts_),
                             local_hosts_per_locality_),
-          {}, {}, remove, absl::nullopt);
+          {}, {}, remove, std::nullopt);
     }
 
     for (const auto& host : add) {
@@ -639,7 +639,7 @@ public:
             updateHostsParams(local_hosts_, local_hosts_per_locality_,
                               std::make_shared<HealthyHostVector>(*local_hosts_),
                               local_hosts_per_locality_),
-            {}, add, {}, absl::nullopt);
+            {}, add, {}, std::nullopt);
       }
     } else if (!add.empty() || !remove.empty()) {
       local_priority_set_.updateHosts(
@@ -647,7 +647,7 @@ public:
           updateHostsParams(local_hosts_, local_hosts_per_locality_,
                             std::make_shared<const HealthyHostVector>(*local_hosts_),
                             local_hosts_per_locality_),
-          {}, add, remove, absl::nullopt);
+          {}, add, remove, std::nullopt);
     }
   }
 
@@ -1818,7 +1818,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
 
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}}, local_locality)},
-              {host_set_.hosts_[0]}, absl::optional<uint32_t>(0));
+              {host_set_.hosts_[0]}, std::optional<uint32_t>(0));
 
   modifyLocalHosts({makeHost("tcp://127.0.0.1:9000", {{"version", "1.0"}}, local_locality)},
                    {local_hosts_->at(0)}, 0);
@@ -1953,7 +1953,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
 
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "default"}}, local_locality)},
-              {host_set_.hosts_[1]}, absl::optional<uint32_t>(0));
+              {host_set_.hosts_[1]}, std::optional<uint32_t>(0));
 
   modifyLocalHosts({local_hosts_->at(1)},
                    {makeHost("tcp://127.0.0.1:9001", {{"version", "default"}}, local_locality)}, 0);
@@ -2084,7 +2084,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
 
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "1.1"}}, local_locality)},
-              {host_set_.hosts_[1]}, absl::optional<uint32_t>(0));
+              {host_set_.hosts_[1]}, std::optional<uint32_t>(0));
 
   modifyLocalHosts({local_hosts_->at(1)},
                    {makeHost("tcp://127.0.0.1:9001", {{"version", "1.1"}}, local_locality)}, 0);
@@ -2243,7 +2243,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareComplicatedBalancesSubsetsAfterUpdate) {
 
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "1.1"}}, local_locality)}, {},
-              absl::optional<uint32_t>(0));
+              std::optional<uint32_t>(0));
 
   modifyLocalHosts({makeHost("tcp://127.0.0.1:9001", {{"version", "1.1"}}, locality_2)}, {}, 2);
 

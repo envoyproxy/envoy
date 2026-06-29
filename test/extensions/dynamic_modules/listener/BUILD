@@ -79,6 +79,7 @@ envoy_cc_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/cpp:listener_integration_test",
         "//test/extensions/dynamic_modules/test_data/go:listener_integration_test",
+        "//test/extensions/dynamic_modules/test_data/rust:listener_integration_test",
     ],
     env = {"GODEBUG": "cgocheck=0"},
     rbe_pool = "6gig",

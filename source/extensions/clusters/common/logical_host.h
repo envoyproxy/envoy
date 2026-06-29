@@ -132,7 +132,7 @@ public:
     // Should never be called since real hosts are used only for forwarding.
     return nullptr;
   }
-  absl::optional<MonotonicTime> lastHcPassTime() const override {
+  std::optional<MonotonicTime> lastHcPassTime() const override {
     return logical_host_->lastHcPassTime();
   }
   uint32_t priority() const override { return logical_host_->priority(); }

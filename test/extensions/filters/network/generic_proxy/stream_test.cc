@@ -67,7 +67,7 @@ TEST(StreamInterfaceTest, StreamInterfaceTest) {
   EXPECT_EQ(request_frame.method(), "");
   EXPECT_EQ(request_frame.host(), "");
   request_frame.set("key", "val");
-  EXPECT_EQ(absl::nullopt, request_frame.get("key"));
+  EXPECT_EQ(std::nullopt, request_frame.get("key"));
   request_frame.erase("key");
   request_frame.forEach(nullptr);
 
@@ -81,7 +81,7 @@ TEST(StreamInterfaceTest, StreamInterfaceTest) {
   EXPECT_EQ(response_frame.status().code(), 0);
   EXPECT_EQ(response_frame.status().ok(), true);
   response_frame.set("key", "val");
-  EXPECT_EQ(absl::nullopt, response_frame.get("key"));
+  EXPECT_EQ(std::nullopt, response_frame.get("key"));
   response_frame.erase("key");
   response_frame.forEach(nullptr);
 }

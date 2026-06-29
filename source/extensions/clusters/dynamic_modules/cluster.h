@@ -14,6 +14,7 @@
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
@@ -49,6 +50,9 @@ using OnClusterLbChooseHostType = decltype(&envoy_dynamic_module_on_cluster_lb_c
 using OnClusterLbCancelHostSelectionType =
     decltype(&envoy_dynamic_module_on_cluster_lb_cancel_host_selection);
 using OnClusterScheduledType = decltype(&envoy_dynamic_module_on_cluster_scheduled);
+using OnClusterWorkerEventType = decltype(&envoy_dynamic_module_on_cluster_worker_event);
+using OnClusterWorkerSlotDataDestroyType =
+    decltype(&envoy_dynamic_module_on_cluster_worker_slot_data_destroy);
 using OnClusterServerInitializedType =
     decltype(&envoy_dynamic_module_on_cluster_server_initialized);
 using OnClusterDrainStartedType = decltype(&envoy_dynamic_module_on_cluster_drain_started);
@@ -89,6 +93,8 @@ public:
   OnClusterLbChooseHostType on_cluster_lb_choose_host_ = nullptr;
   OnClusterLbCancelHostSelectionType on_cluster_lb_cancel_host_selection_ = nullptr;
   OnClusterScheduledType on_cluster_scheduled_ = nullptr;
+  OnClusterWorkerEventType on_cluster_worker_event_ = nullptr;
+  OnClusterWorkerSlotDataDestroyType on_cluster_worker_slot_data_destroy_ = nullptr;
   OnClusterServerInitializedType on_cluster_server_initialized_ = nullptr;
   OnClusterDrainStartedType on_cluster_drain_started_ = nullptr;
   OnClusterShutdownType on_cluster_shutdown_ = nullptr;
@@ -341,6 +347,25 @@ public:
   void onScheduled(uint64_t event_id);
 
   /**
+   * Posts the module's worker-event hook to every worker dispatcher registered with the server's
+   * thread-local engine. Main is excluded. Must be called from the main thread.
+   */
+  void runOnAllWorkers(uint64_t event_id);
+
+  /**
+   * Publishes an opaque module pointer to the cluster's worker thread-local slot. All registered
+   * threads observe the same pointer (single-pointer semantics). Any previously published pointer
+   * is released through the module's destroy hook. Must be called from the main thread.
+   */
+  void workerSlotSet(envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data_ptr);
+
+  /**
+   * Returns the opaque pointer most recently delivered to the calling thread's slot, or nullptr
+   * if the slot has not been populated on this thread.
+   */
+  envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr workerSlotGet();
+
+  /**
    * Sends an HTTP callout to the specified cluster with the given message.
    * This must be called on the main thread.
    *
@@ -356,6 +381,8 @@ public:
 
   // Accessors.
   const DynamicModuleClusterConfigSharedPtr& config() const { return config_; }
+  // The cluster's CDS name (ClusterInfo::name()).
+  const std::string& clusterName() const { return info()->name(); }
   envoy_dynamic_module_type_cluster_module_ptr inModuleCluster() const {
     return in_module_cluster_;
   }
@@ -403,6 +430,34 @@ private:
     const uint64_t callout_id_{};
   };
 
+  /**
+   * Wrapper for the module-owned opaque pointer stored in worker_slot_. Pins the config (and
+   * therefore the underlying DynamicModule .so that owns destroy_fn_) for as long as any wrapper
+   * has a live reference; the destructor invokes the destroy hook when the last shared_ptr
+   * reference drops.
+   */
+  class WorkerSlotData : public ThreadLocal::ThreadLocalObject {
+  public:
+    WorkerSlotData(envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data_ptr,
+                   OnClusterWorkerSlotDataDestroyType destroy_fn,
+                   DynamicModuleClusterConfigSharedPtr config)
+        : data_ptr_(data_ptr), destroy_fn_(destroy_fn), config_(std::move(config)) {}
+    ~WorkerSlotData() override {
+      if (destroy_fn_ != nullptr) {
+        destroy_fn_(data_ptr_);
+      }
+    }
+    envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data() const { return data_ptr_; }
+
+  private:
+    envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data_ptr_;
+    OnClusterWorkerSlotDataDestroyType destroy_fn_;
+    DynamicModuleClusterConfigSharedPtr config_;
+  };
+
+  // Allocates worker_slot_ and seeds a null payload.
+  void ensureWorkerSlot();
+
   uint64_t getNextCalloutId() { return next_callout_id_++; }
 
   DynamicModuleClusterConfigSharedPtr config_;
@@ -422,6 +477,9 @@ private:
 
   // Handle for the server initialized lifecycle callback registration.
   Server::ServerLifecycleNotifier::HandlePtr server_initialized_handle_;
+
+  // Thread-local slot backing both the worker fan-out and the worker_slot_set/get pattern.
+  ThreadLocal::TypedSlotPtr<WorkerSlotData> worker_slot_;
 
   // HTTP callout tracking.
   uint64_t next_callout_id_ = 1; // 0 is reserved as an invalid id.
@@ -506,16 +564,16 @@ public:
   Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
     return nullptr;
   }
-  absl::optional<Upstream::SelectedPoolAndConnection>
+  std::optional<Upstream::SelectedPoolAndConnection>
   selectExistingConnection(Upstream::LoadBalancerContext*, const Upstream::Host&,
                            std::vector<uint8_t>&) override {
-    return absl::nullopt;
+    return std::nullopt;
   }
   OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
     return {};
   }
 
-  // Access the priority set for lb callbacks.
+  // Worker local priority set used to answer host queries from the lb callbacks.
   const Upstream::PrioritySet& prioritySet() const;
 
   // Access the handle for async host selection completion.
@@ -559,7 +617,8 @@ public:
 
 private:
   const DynamicModuleClusterHandleSharedPtr handle_;
-  // Worker local priority set that backs the membership update subscription.
+  // Worker local priority set that backs the membership update subscription and answers host
+  // queries from the lb callbacks.
   const Upstream::PrioritySet& priority_set_;
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
 
@@ -579,6 +638,8 @@ private:
 
   // Membership update callback handle.
   Envoy::Common::CallbackHandlePtr member_update_cb_;
+
+  friend class DynamicModuleClusterTestPeer;
 };
 
 /**

@@ -64,7 +64,7 @@ public:
   }
 
 private:
-  absl::optional<Protobuf::RepeatedPtrField<std::string>> data_input_allowlist_;
+  std::optional<Protobuf::RepeatedPtrField<std::string>> data_input_allowlist_;
 };
 
 } // namespace Factory
@@ -251,7 +251,7 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
       .is_downstream_ = true,
       .stat_prefix_ = prefix,
       .factory_context_ = context,
-      .upstream_factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = std::nullopt,
       .server_factory_context_ = context.serverFactoryContext()};
   return createFilterFactory(proto_config, prefix, context.messageValidationVisitor(),
                              action_context, context, factory);
@@ -268,7 +268,7 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = false,
       .stat_prefix_ = prefix,
-      .factory_context_ = absl::nullopt,
+      .factory_context_ = std::nullopt,
       .upstream_factory_context_ = context,
       .server_factory_context_ = context.serverFactoryContext()};
   return createFilterFactory(proto_config, prefix,
@@ -293,7 +293,7 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
   Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,
                             Envoy::Http::Matching::HttpFilterActionContext>
       matcher_factory(action_context, context.serverFactoryContext(), validation_visitor);
-  absl::optional<Matcher::MatchTreeFactoryCb<Envoy::Http::HttpMatchingData>> factory_cb =
+  std::optional<Matcher::MatchTreeFactoryCb<Envoy::Http::HttpMatchingData>> factory_cb =
       std::nullopt;
   if (proto_config.has_xds_matcher()) {
     factory_cb = matcher_factory.create(proto_config.xds_matcher());
@@ -345,8 +345,8 @@ FilterConfigPerRoute::createFilterMatchTree(
       .is_downstream_ = true,
       .stat_prefix_ = fmt::format("http.{}.", server_context.scope().symbolTable().toString(
                                                   server_context.scope().prefix())),
-      .factory_context_ = absl::nullopt,
-      .upstream_factory_context_ = absl::nullopt,
+      .factory_context_ = std::nullopt,
+      .upstream_factory_context_ = std::nullopt,
       .server_factory_context_ = server_context};
 
   Factory::MatchTreeValidationVisitor validation_visitor(*requirements);

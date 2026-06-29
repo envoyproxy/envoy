@@ -1,5 +1,7 @@
 #include "source/common/config/utility.h"
 
+#include <optional>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
@@ -14,7 +16,6 @@
 #include "source/common/protobuf/utility.h"
 
 #include "absl/status/status.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Config {
@@ -177,7 +178,7 @@ absl::Status Utility::checkApiConfigSourceSubscriptionBackingCluster(
   return absl::OkStatus();
 }
 
-absl::optional<std::string>
+std::optional<std::string>
 Utility::getGrpcControlPlane(const envoy::config::core::v3::ApiConfigSource& api_config_source) {
   if (api_config_source.grpc_services_size() > 0) {
     std::string res = "";
@@ -198,7 +199,7 @@ Utility::getGrpcControlPlane(const envoy::config::core::v3::ApiConfigSource& api
     }
     return res;
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 std::chrono::milliseconds Utility::configSourceInitialFetchTimeout(
@@ -266,7 +267,7 @@ Utility::getGrpcConfigFromApiConfigSource(
 
   if (grpc_service_idx >= api_config_source.grpc_services_size()) {
     // No returned factory in case there's no entry.
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return Envoy::makeOptRef(api_config_source.grpc_services(grpc_service_idx));
@@ -350,11 +351,11 @@ absl::Status Utility::translateOpaqueConfig(const Protobuf::Any& typed_config,
 
 absl::StatusOr<JitteredExponentialBackOffStrategyPtr>
 Utility::buildJitteredExponentialBackOffStrategy(
-    absl::optional<const envoy::config::core::v3::BackoffStrategy> backoff,
+    std::optional<const envoy::config::core::v3::BackoffStrategy> backoff,
     Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
-    absl::optional<const uint32_t> default_max_interval_ms) {
+    std::optional<const uint32_t> default_max_interval_ms) {
   // BackoffStrategy config is specified
-  if (backoff != absl::nullopt) {
+  if (backoff != std::nullopt) {
     uint32_t base_interval_ms = PROTOBUF_GET_MS_REQUIRED(backoff.value(), base_interval);
     uint32_t max_interval_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(backoff.value(), max_interval, base_interval_ms * 10);
@@ -373,7 +374,7 @@ Utility::buildJitteredExponentialBackOffStrategy(
   }
 
   // default maximum interval is specified
-  if (default_max_interval_ms != absl::nullopt) {
+  if (default_max_interval_ms != std::nullopt) {
     if (default_max_interval_ms.value() < default_base_interval_ms) {
       return absl::InvalidArgumentError(
           "default_max_interval_ms must be greater than or equal to the default_base_interval_ms");

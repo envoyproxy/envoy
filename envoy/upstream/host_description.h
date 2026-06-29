@@ -45,7 +45,8 @@ using MetadataConstSharedPtr = std::shared_ptr<const envoy::config::core::v3::Me
   COUNTER(rq_timeout)                                                                              \
   COUNTER(rq_total)                                                                                \
   GAUGE(cx_active)                                                                                 \
-  GAUGE(rq_active)
+  GAUGE(rq_active)                                                                                 \
+  GAUGE(rq_pending_active)
 
 /**
  * All per host stats defined. @see stats_macros.h
@@ -292,7 +293,7 @@ public:
    * @return timestamp of when host has transitioned from unhealthy to
    *         healthy state via an active healthchecking.
    */
-  virtual absl::optional<MonotonicTime> lastHcPassTime() const PURE;
+  virtual std::optional<MonotonicTime> lastHcPassTime() const PURE;
 
   /**
    * Set the timestamp of when the host has transitioned from unhealthy to healthy state via an

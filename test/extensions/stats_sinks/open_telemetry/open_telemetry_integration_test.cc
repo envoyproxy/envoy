@@ -90,7 +90,7 @@ public:
       envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
       driver_.configureExporter(sink_config, fake_upstreams_.back()->localAddress());
       sink_config.set_prefix(stat_prefix_);
-      metrics_sink->mutable_typed_config()->PackFrom(sink_config);
+      std::ignore = metrics_sink->mutable_typed_config()->PackFrom(sink_config);
 
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(500));
@@ -333,7 +333,7 @@ public:
                      fake_upstreams_.back()->localAddress());
 
       // Add custom conversion rules.
-      Protobuf::TextFormat::ParseFromString(
+      std::ignore = Protobuf::TextFormat::ParseFromString(
           R"pb(matcher_list {
                      matchers {
                        predicate {
@@ -422,7 +422,7 @@ public:
                    })pb",
           sink_config.mutable_custom_metric_conversions());
 
-      metrics_sink->mutable_typed_config()->PackFrom(sink_config);
+      std::ignore = metrics_sink->mutable_typed_config()->PackFrom(sink_config);
 
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(500));
@@ -529,7 +529,7 @@ public:
       header->mutable_header()->set_key("x-custom-formatter");
       header->mutable_header()->set_value("%HOSTNAME%");
 
-      sink->mutable_typed_config()->PackFrom(config);
+      std::ignore = sink->mutable_typed_config()->PackFrom(config);
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(100));
     });

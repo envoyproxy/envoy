@@ -551,7 +551,7 @@ public:
   MOCK_METHOD(OptRef<ShadowRouterHandle>, submit,
               (const std::string&, MessageMetadataSharedPtr, TransportType, ProtocolType), ());
 
-  OptRef<ShadowRouterHandle> router_handle_{absl::nullopt};
+  OptRef<ShadowRouterHandle> router_handle_{std::nullopt};
 };
 
 } // namespace Router

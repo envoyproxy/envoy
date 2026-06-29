@@ -24,6 +24,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -367,7 +368,7 @@ TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddressGetifaddrsFailure) {
 TEST(NetworkUtility, GetOriginalDst) {
   testing::NiceMock<Network::MockConnectionSocket> socket;
 #ifdef SOL_IP
-  EXPECT_CALL(socket, ipVersion()).WillOnce(testing::Return(absl::nullopt));
+  EXPECT_CALL(socket, ipVersion()).WillOnce(testing::Return(std::nullopt));
 #endif
   EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
 

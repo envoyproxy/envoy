@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -10,6 +11,11 @@ load(
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_proto_library(
+    name = "preserve_case_filter_proto",
+    srcs = ["preserve_case_filter.proto"],
+)
 
 envoy_extension_cc_test(
     name = "preserve_case_formatter_test",
@@ -35,6 +41,7 @@ envoy_extension_cc_test(
     # Broken until bazel 5.0.0 fix to shorten resulting paths for SymInitialize() failure
     tags = ["skip_on_windows"],
     deps = [
+        ":preserve_case_filter_proto_cc_proto",
         "//source/extensions/http/header_formatters/preserve_case:config",
         "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
         "//test/integration:http_integration_lib",

@@ -231,7 +231,7 @@ RoleBasedAccessControlFilter::evaluateEnforcedEngine(Http::RequestHeaderMap& hea
   }
 
   ENVOY_LOG(debug, "enforced denied, matched policy {}", log_policy_id);
-  callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr, absl::nullopt,
+  callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr, std::nullopt,
                              Filters::Common::RBAC::responseDetail(log_policy_id));
   config_->stats().denied_.inc();
   if (!effective_policy_id.empty() && per_rule_stats_enabled) {

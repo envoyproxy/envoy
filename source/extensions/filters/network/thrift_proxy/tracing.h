@@ -1,9 +1,8 @@
 #pragma once
 
 #include <list>
+#include <optional>
 #include <string>
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,13 +28,13 @@ public:
  */
 class Annotation {
 public:
-  Annotation(int64_t timestamp, const std::string& value, absl::optional<Endpoint> host)
+  Annotation(int64_t timestamp, const std::string& value, std::optional<Endpoint> host)
       : timestamp_(timestamp), value_(value), host_(host) {}
   Annotation() = default;
 
   int64_t timestamp_{0};
   std::string value_;
-  absl::optional<Endpoint> host_;
+  std::optional<Endpoint> host_;
 };
 using AnnotationList = std::list<Annotation>;
 
@@ -58,14 +57,14 @@ enum class AnnotationType {
 class BinaryAnnotation {
 public:
   BinaryAnnotation(const std::string& key, const std::string& value, AnnotationType annotation_type,
-                   absl::optional<Endpoint> host)
+                   std::optional<Endpoint> host)
       : key_(key), value_(value), annotation_type_(annotation_type), host_(host) {}
   BinaryAnnotation() = default;
 
   std::string key_;
   std::string value_;
   AnnotationType annotation_type_{AnnotationType::Bool};
-  absl::optional<Endpoint> host_;
+  std::optional<Endpoint> host_;
 };
 using BinaryAnnotationList = std::list<BinaryAnnotation>;
 
@@ -75,7 +74,7 @@ using BinaryAnnotationList = std::list<BinaryAnnotation>;
 class Span {
 public:
   Span(int64_t trace_id, const std::string& name, int64_t span_id,
-       absl::optional<int64_t> parent_span_id, AnnotationList&& annotations,
+       std::optional<int64_t> parent_span_id, AnnotationList&& annotations,
        BinaryAnnotationList&& binary_annotations, bool debug)
       : trace_id_(trace_id), name_(name), span_id_(span_id), parent_span_id_(parent_span_id),
         annotations_(std::move(annotations)), binary_annotations_(std::move(binary_annotations)),
@@ -85,7 +84,7 @@ public:
   int64_t trace_id_{0};
   std::string name_;
   int64_t span_id_{0};
-  absl::optional<int64_t> parent_span_id_;
+  std::optional<int64_t> parent_span_id_;
   AnnotationList annotations_;
   BinaryAnnotationList binary_annotations_;
   bool debug_{false};

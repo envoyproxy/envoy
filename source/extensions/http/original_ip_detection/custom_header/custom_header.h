@@ -20,7 +20,7 @@ public:
           config);
   CustomHeaderIPDetection(
       const std::string& header_name,
-      absl::optional<Envoy::Http::OriginalIPRejectRequestOptions> reject_options = absl::nullopt);
+      std::optional<Envoy::Http::OriginalIPRejectRequestOptions> reject_options = std::nullopt);
 
   Envoy::Http::OriginalIPDetectionResult
   detect(Envoy::Http::OriginalIPDetectionParams& params) override;
@@ -37,7 +37,7 @@ private:
 
   Envoy::Http::LowerCaseString header_name_;
   bool allow_trusted_address_checks_{false};
-  absl::optional<Envoy::Http::OriginalIPRejectRequestOptions> reject_options_{absl::nullopt};
+  std::optional<Envoy::Http::OriginalIPRejectRequestOptions> reject_options_{std::nullopt};
 };
 
 } // namespace CustomHeader

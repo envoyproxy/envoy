@@ -378,7 +378,7 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
       // By default, do not enforce a sampling decision on this `httpCall`'s span.
       // Instead, reuse the parent span's sampling decision. Callers can override
       // this default with the `trace_sampled` flag in the table argument below.
-      .setSampled(absl::nullopt);
+      .setSampled(std::nullopt);
 
   // Check if the last argument is table of options. For example:
   // handle:httpCall(cluster, headers, body, {["timeout"] = 200, ...}).
@@ -1019,7 +1019,7 @@ void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buf
         });
   };
   callbacks_->sendLocalReply(static_cast<Envoy::Http::Code>(status), body ? body->toString() : "",
-                             modify_headers, absl::nullopt,
+                             modify_headers, std::nullopt,
                              HttpResponseCodeDetails::get().LuaResponse);
 }
 

@@ -93,7 +93,7 @@ public:
 
   virtual const std::string proxyHost(const StreamInfo::StreamInfo& stream_info) const PURE;
   virtual const std::string targetHost(const StreamInfo::StreamInfo& stream_info) const PURE;
-  virtual const absl::optional<uint32_t>& proxyPort() const PURE;
+  virtual const std::optional<uint32_t>& proxyPort() const PURE;
   virtual uint32_t defaultTargetPort() const PURE;
   virtual bool usePost() const PURE;
   virtual const std::string& postPath() const PURE;
@@ -138,7 +138,7 @@ public:
   virtual bool hasSessionFilters() const PURE;
   virtual const UdpTunnelingConfigPtr& tunnelingConfig() const PURE;
   virtual bool flushAccessLogOnTunnelConnected() const PURE;
-  virtual const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const PURE;
+  virtual const std::optional<std::chrono::milliseconds>& accessLogFlushInterval() const PURE;
   virtual Random::RandomGenerator& randomGenerator() const PURE;
 };
 
@@ -158,11 +158,11 @@ public:
     }
   }
 
-  absl::optional<uint64_t> computeHashKey() override { return hash_; }
+  std::optional<uint64_t> computeHashKey() override { return hash_; }
   StreamInfo::StreamInfo* requestStreamInfo() const override { return stream_info_; }
 
 private:
-  absl::optional<uint64_t> hash_;
+  std::optional<uint64_t> hash_;
   StreamInfo::StreamInfo* const stream_info_;
 };
 
@@ -375,7 +375,7 @@ private:
   UpstreamTunnelCallbacks& upstream_callbacks_;
   StreamInfo::StreamInfo& downstream_info_;
   const UdpTunnelingConfig& tunnel_config_;
-  absl::optional<std::reference_wrapper<TunnelCreationCallbacks>> tunnel_creation_callbacks_;
+  std::optional<std::reference_wrapper<TunnelCreationCallbacks>> tunnel_creation_callbacks_;
 };
 
 /**
@@ -441,10 +441,10 @@ public:
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(Http::RequestEncoder& request_encoder,
                    Upstream::HostDescriptionConstSharedPtr upstream_host,
-                   StreamInfo::StreamInfo& upstream_info, absl::optional<Http::Protocol>) override;
+                   StreamInfo::StreamInfo& upstream_info, std::optional<Http::Protocol>) override;
 
 private:
-  absl::optional<Upstream::HttpPoolData> conn_pool_data_;
+  std::optional<Upstream::HttpPoolData> conn_pool_data_;
   HttpStreamCallbacks* callbacks_{};
   UpstreamTunnelCallbacks& upstream_callbacks_;
   std::unique_ptr<HttpUpstreamImpl> upstream_;
@@ -493,7 +493,7 @@ class PerSessionCluster : public StreamInfo::FilterState::Object {
 public:
   PerSessionCluster(absl::string_view cluster) : cluster_(cluster) {}
   const std::string& value() const { return cluster_; }
-  absl::optional<std::string> serializeAsString() const override { return cluster_; }
+  std::optional<std::string> serializeAsString() const override { return cluster_; }
   static const std::string& key();
 
 private:
@@ -584,12 +584,12 @@ protected:
 
     const Network::UdpRecvData::LocalPeerAddresses& addresses() const { return addresses_; }
     ClusterInfo* cluster() const { return cluster_; }
-    absl::optional<std::reference_wrapper<const Upstream::Host>> host() const {
+    std::optional<std::reference_wrapper<const Upstream::Host>> host() const {
       if (host_) {
         return *host_;
       }
 
-      return absl::nullopt;
+      return std::nullopt;
     }
 
     bool onNewSession();
@@ -798,7 +798,7 @@ protected:
 
   struct LocalPeerHostAddresses {
     const Network::UdpRecvData::LocalPeerAddresses& local_peer_addresses_;
-    absl::optional<std::reference_wrapper<const Upstream::Host>> host_;
+    std::optional<std::reference_wrapper<const Upstream::Host>> host_;
   };
 
   struct HeterogeneousActiveSessionHash {
@@ -926,7 +926,7 @@ private:
   // Map for looking up cluster info with its name.
   absl::flat_hash_map<std::string, ClusterInfoPtr> cluster_infos_;
 
-  absl::optional<StreamInfo::StreamInfoImpl> udp_proxy_stats_;
+  std::optional<StreamInfo::StreamInfoImpl> udp_proxy_stats_;
 };
 
 /**

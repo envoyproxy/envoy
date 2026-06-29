@@ -1,11 +1,11 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/event/scaled_range_timer_manager_impl.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {
@@ -63,9 +63,9 @@ public:
     return true;
   }
   void stop() override {}
-  absl::optional<envoy::config::overload::v3::ShrinkHeapConfig>
+  std::optional<envoy::config::overload::v3::ShrinkHeapConfig>
   getShrinkHeapConfig() const override {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   ThreadLocal::SlotPtr tls_;

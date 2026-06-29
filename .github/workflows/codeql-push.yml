@@ -42,7 +42,7 @@ jobs:
             chown: "runner:runner"
 
     - name: Checkout repository
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
       with:
         fetch-depth: 2
 
@@ -101,7 +101,7 @@ jobs:
 
     - name: Initialize CodeQL
       if: env.CPP_CHANGED == 'true'
-      uses: github/codeql-action/init@95e58e9a2cdfd71adc6e0353d5c52f41a045d225  # codeql-bundle-v4.35.2
+      uses: github/codeql-action/init@87557b9c84dde89fdd9b10e88954ac2f4248e463  # codeql-bundle-v4.36.1
       with:
         languages: cpp
         trap-caching: false
@@ -112,7 +112,7 @@ jobs:
     # requires to award full SAST score.
     - name: Initialize CodeQL (noop)
       if: env.CPP_CHANGED != 'true'
-      uses: github/codeql-action/init@95e58e9a2cdfd71adc6e0353d5c52f41a045d225  # codeql-bundle-v4.35.2
+      uses: github/codeql-action/init@87557b9c84dde89fdd9b10e88954ac2f4248e463  # codeql-bundle-v4.36.1
       with:
         languages: javascript
         trap-caching: false
@@ -162,4 +162,4 @@ jobs:
         git clean -xdf
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@95e58e9a2cdfd71adc6e0353d5c52f41a045d225  # codeql-bundle-v4.35.2
+      uses: github/codeql-action/analyze@87557b9c84dde89fdd9b10e88954ac2f4248e463  # codeql-bundle-v4.36.1

@@ -2,6 +2,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 
@@ -84,12 +85,15 @@ public:
         ->mutable_private_key()
         ->set_filename(
             TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
-    tls_socket->mutable_typed_config()->PackFrom(tls_context);
+    std::ignore = tls_socket->mutable_typed_config()->PackFrom(tls_context);
 
     // Raw socket configuration.
     auto* raw_match = cluster.add_transport_socket_matches();
     raw_match->set_name("raw");
-    raw_match->mutable_transport_socket()->set_name("raw_buffer");
+    raw_match->mutable_transport_socket()->set_name("envoy.transport_sockets.raw_buffer");
+    envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer_config;
+    std::ignore =
+        raw_match->mutable_transport_socket()->mutable_typed_config()->PackFrom(raw_buffer_config);
   }
 
   void setupTransportSocketMatcher(envoy::config::cluster::v3::Cluster& cluster) {

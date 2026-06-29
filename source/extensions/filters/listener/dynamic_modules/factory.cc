@@ -4,6 +4,7 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter_config.h"
 
@@ -20,18 +21,24 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
   const auto& proto_config = MessageUtil::downcastAndValidate<const ListenerFilterConfig&>(
       message, context.messageValidationVisitor());
 
+  Server::Configuration::ServerFactoryContext& server_context = context.serverFactoryContext();
   const auto& module_config = proto_config.dynamic_module_config();
-  auto dynamic_module = Extensions::DynamicModules::newDynamicModuleByName(
-      module_config.name(), module_config.do_not_close(), module_config.load_globally());
-  if (!dynamic_module.ok()) {
-    throw EnvoyException("Failed to load dynamic module: " +
-                         std::string(dynamic_module.status().message()));
+  // Listener filters do not support remote module sources, so no init manager or async callback is
+  // passed; only the synchronous local-file and by-name paths can succeed here.
+  auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
+      module_config, proto_config.filter_name(), server_context);
+  if (!load_result.ok()) {
+    throw EnvoyException(std::string(load_result.status().message()));
   }
+  auto dynamic_module = std::move(load_result->loaded);
 
   std::string filter_config_str;
   if (proto_config.has_filter_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.filter_config());
     if (!config_or_error.ok()) {
+      Extensions::DynamicModules::incrementLoadFailure(
+          server_context, proto_config.filter_name(),
+          Extensions::DynamicModules::ConfigInitErrorStat);
       throw EnvoyException("Failed to parse filter config: " +
                            std::string(config_or_error.status().message()));
     }
@@ -47,10 +54,13 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
   auto filter_config =
       Extensions::DynamicModules::ListenerFilters::newDynamicModuleListenerFilterConfig(
           proto_config.filter_name(), filter_config_str, metrics_namespace,
-          std::move(dynamic_module.value()), context.serverFactoryContext().clusterManager(),
-          context.listenerScope(), context.serverFactoryContext().mainThreadDispatcher());
+          std::move(dynamic_module), server_context.clusterManager(), context.listenerScope(),
+          server_context.mainThreadDispatcher());
 
   if (!filter_config.ok()) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        server_context, proto_config.filter_name(),
+        Extensions::DynamicModules::ConfigInitErrorStat);
     throw EnvoyException("Failed to create filter config: " +
                          std::string(filter_config.status().message()));
   }
@@ -60,16 +70,20 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
   // is added. This is the legacy behavior for backward compatibility.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
-    context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
-        metrics_namespace);
+    server_context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
   }
 
   return [filter_cfg = filter_config.value(),
           listener_filter_matcher](Network::ListenerFilterManager& filter_manager) -> void {
+    // The manager owns filters as a unique_ptr, but the async callout and scheduler paths call
+    // shared_from_this. Hold the filter in a shared_ptr and hand the manager a forwarding adapter.
     auto filter =
-        std::make_unique<Extensions::DynamicModules::ListenerFilters::DynamicModuleListenerFilter>(
+        std::make_shared<Extensions::DynamicModules::ListenerFilters::DynamicModuleListenerFilter>(
             filter_cfg);
-    filter_manager.addAcceptFilter(listener_filter_matcher, std::move(filter));
+    filter_manager.addAcceptFilter(
+        listener_filter_matcher,
+        std::make_unique<Extensions::DynamicModules::ListenerFilters::SharedListenerFilterAdapter>(
+            std::move(filter)));
   };
 }
 

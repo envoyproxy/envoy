@@ -1,10 +1,13 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
+#include <optional>
 #include <queue>
 #include <string>
 #include <vector>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/io_handle.h"
 #include "envoy/network/socket.h"
@@ -35,6 +38,7 @@ namespace ReverseConnection {
 // Forward declarations.
 class ReverseTunnelInitiatorExtension;
 class ReverseConnectionIOHandle;
+struct HandshakeHeader;
 
 namespace {
 // HTTP protocol constants.
@@ -87,6 +91,7 @@ struct ReverseConnectionSocketConfig {
   std::vector<envoy::config::core::v3::HeaderValueOption>
       additional_headers;       // Additional headers for the handshake request.
   bool use_http_upgrade{false}; // Negotiate handshake as HTTP/1.1 Upgrade -> 101.
+  std::shared_ptr<const std::vector<HandshakeHeader>> handshake_headers;
   // TODO(basundhara-c): Add support for multiple remote clusters using the same
   // ReverseConnectionIOHandle. Currently, each ReverseConnectionIOHandle handles
   // reverse connections for a single upstream cluster since a different ReverseConnectionAddress
@@ -156,7 +161,7 @@ public:
    * @return IoCallUint64Result indicating the result of the read operation.
    */
   Api::IoCallUint64Result read(Buffer::Instance& buffer,
-                               absl::optional<uint64_t> max_length) override;
+                               std::optional<uint64_t> max_length) override;
 
   /**
    * Override of write method for reverse connections.
@@ -230,8 +235,11 @@ public:
    * @param error error message if the handshake failed, empty string if successful.
    * @param wrapper pointer to the connection wrapper that wraps over the established connection.
    * @param closed whether the connection was closed during handshake.
+   * @param retry_after optional server-provided cool-off hint (from a ``Retry-After`` header on a
+   * 429 handshake response) to use as the per-host backoff; ignored when unset.
    */
-  void onConnectionDone(const std::string& error, RCConnectionWrapper* wrapper, bool closed);
+  void onConnectionDone(const std::string& error, RCConnectionWrapper* wrapper, bool closed,
+                        std::optional<std::chrono::milliseconds> retry_after = std::nullopt);
 
   // Backoff logic for connection failures.
   /**
@@ -247,8 +255,10 @@ public:
    * Track a connection failure for a specific host and cluster and trigger backoff logic.
    * @param host_address the address of the host that failed.
    * @param cluster_name the name of the cluster the host belongs to.
+   * @param retry_after optional server-provided cool-off hint.
    */
-  void trackConnectionFailure(const std::string& host_address, const std::string& cluster_name);
+  void trackConnectionFailure(const std::string& host_address, const std::string& cluster_name,
+                              std::optional<std::chrono::milliseconds> retry_after = std::nullopt);
 
   /**
    * Reset backoff state for a specific host. Called when a connection is established successfully.
@@ -321,6 +331,13 @@ public:
    */
   bool useHttpUpgrade() const { return config_.use_http_upgrade; }
 
+  /**
+   * @return handshake headers (key + append action + value formatter), or nullptr if none.
+   */
+  const std::shared_ptr<const std::vector<HandshakeHeader>>& handshakeHeaders() const {
+    return config_.handshake_headers;
+  }
+
 private:
   /**
    * Get time source for consistent time operations.
@@ -369,6 +386,21 @@ private:
   bool initiateOneReverseConnection(const std::string& cluster_name,
                                     const std::string& host_address,
                                     Upstream::HostConstSharedPtr host);
+
+  /**
+   * Emit an access log entry for a reverse tunnel lifecycle event.
+   * Creates an ephemeral StreamInfo populated with dynamic metadata containing
+   * reverse tunnel identifiers and event details.
+   * @param event the lifecycle event name (e.g., "handshake_success", "handshake_failure",
+   *        "connection_closed")
+   * @param host_address the address of the remote host
+   * @param cluster_name the name of the upstream cluster
+   * @param connection_key the unique key identifying the connection
+   * @param error_message the error message (empty on success)
+   */
+  void emitAccessLog(const std::string& event, const std::string& host_address,
+                     const std::string& cluster_name, const std::string& connection_key,
+                     const std::string& error_message);
 
   /**
    * Clean up all reverse connection resources.

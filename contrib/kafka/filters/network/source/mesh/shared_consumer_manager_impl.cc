@@ -1,6 +1,7 @@
 #include "contrib/kafka/filters/network/source/mesh/shared_consumer_manager_impl.h"
 
 #include <functional>
+#include <optional>
 
 #include "source/common/common/fmt.h"
 
@@ -84,7 +85,7 @@ void SharedConsumerManagerImpl::registerNewConsumer(const std::string& topic) {
   ENVOY_LOG(debug, "Creating consumer for topic [{}]", topic);
 
   // Compute which upstream cluster corresponds to the topic.
-  const absl::optional<ClusterConfig> cluster_config =
+  const std::optional<ClusterConfig> cluster_config =
       configuration_.computeClusterConfigForTopic(topic);
   if (!cluster_config) {
     throw EnvoyException(
@@ -315,7 +316,7 @@ int32_t countForTest(const std::string& topic, const int32_t partition, Partitio
   if (map.end() != it) {
     return it->second.size();
   } else {
-    return -1; // Tests are simpler to type if we do this instead of absl::optional.
+    return -1; // Tests are simpler to type if we do this instead of std::optional.
   }
 }
 

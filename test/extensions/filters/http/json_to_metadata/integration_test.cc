@@ -295,7 +295,7 @@ response_rules:
     TestUtility::loadFromYaml(per_route_config, route_json_to_metadata);
 
     Protobuf::Any per_route_any;
-    per_route_any.PackFrom(route_json_to_metadata);
+    std::ignore = per_route_any.PackFrom(route_json_to_metadata);
     route->mutable_typed_per_filter_config()->insert(
         {"envoy.filters.http.json_to_metadata", per_route_any});
   });

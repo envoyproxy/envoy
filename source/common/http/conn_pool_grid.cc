@@ -136,6 +136,12 @@ bool ConnectivityGrid::WrapperCallbacks::shouldAttemptSecondHttp3Connection() {
 void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
     ConnectionAttemptCallbacks* attempt, ConnectionPool::PoolFailureReason reason,
     absl::string_view transport_failure_reason, Upstream::HostDescriptionConstSharedPtr host) {
+  if (delete_started_ && Runtime::runtimeFeatureEnabled(
+                             "envoy.reloadable_features.conn_pool_grid_early_return_on_teardown")) {
+    ENVOY_LOG(trace, "Uninteresting connection attempt to host {} failed.",
+              host != nullptr ? host->hostname() : "unknown");
+    return;
+  }
   ENVOY_LOG(trace, "{} pool failed to create connection to host '{}'.",
             describePool(attempt->pool()), host->hostname());
   grid_.dispatcher_.deferredDelete(attempt->removeFromList(connection_attempts_));
@@ -210,6 +216,11 @@ ConnectivityGrid::StreamCreationResult
 ConnectivityGrid::WrapperCallbacks::newStream(ConnectionPool::Instance& pool) {
   ENVOY_LOG(trace, "{} pool attempting to create a new stream to host '{}'.", describePool(pool),
             grid_.origin_.hostname_);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.connectivity_grid_prevent_double_h2_scheduled") &&
+      grid_.http2_pool_ != nullptr && &pool == grid_.http2_pool_.get()) {
+    has_attempted_http2_ = true;
+  }
   auto attempt = std::make_unique<ConnectionAttemptCallbacks>(*this, pool);
   LinkedList::moveIntoList(std::move(attempt), connection_attempts_);
   if (!next_attempt_timer_->enabled()) {
@@ -222,7 +233,7 @@ ConnectivityGrid::WrapperCallbacks::newStream(ConnectionPool::Instance& pool) {
 void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
     ConnectionAttemptCallbacks* attempt, RequestEncoder& encoder,
     Upstream::HostDescriptionConstSharedPtr host, StreamInfo::StreamInfo& info,
-    absl::optional<Http::Protocol> protocol) {
+    std::optional<Http::Protocol> protocol) {
   ENVOY_LOG(trace, "{} pool successfully connected to host '{}'.", describePool(attempt->pool()),
             host->hostname());
   if (!grid_.isPoolHttp3(attempt->pool())) {
@@ -258,7 +269,7 @@ void ConnectivityGrid::WrapperCallbacks::maybeMarkHttp3Broken() {
 
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolReady(
     RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
-    StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
+    StreamInfo::StreamInfo& info, std::optional<Http::Protocol> protocol) {
   cancellable_ = nullptr; // Attempt succeeded and can no longer be cancelled.
   parent_.onConnectionAttemptReady(this, encoder, host, info, protocol);
 }
@@ -294,7 +305,7 @@ void ConnectivityGrid::WrapperCallbacks::onNextAttemptTimer() {
     attemptSecondHttp3Connection();
   }
 }
-absl::optional<ConnectivityGrid::StreamCreationResult>
+std::optional<ConnectivityGrid::StreamCreationResult>
 ConnectivityGrid::WrapperCallbacks::tryAnotherConnection() {
   if (grid_.destroying_) {
     return {};

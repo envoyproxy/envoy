@@ -20,6 +20,7 @@
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/load_balancing_policies/round_robin/round_robin_lb.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/transport_socket_match.h"
@@ -69,7 +70,7 @@ public:
   MOCK_METHOD(absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr>,
               createLocalAddressSelector,
               (std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
-               absl::optional<std::string> cluster_name),
+               std::optional<std::string> cluster_name),
               (const));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -88,28 +89,29 @@ public:
                             uint64_t conn_pool, uint64_t conn_per_host = 100) {
     resource_manager_ = std::make_unique<ResourceManagerImpl>(
         runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, conn_per_host,
-        circuit_breakers_stats_, absl::nullopt, absl::nullopt);
+        circuit_breakers_stats_, std::nullopt, std::nullopt, std::nullopt, dispatcher_);
   }
 
   void resetResourceManagerWithRetryBudget(uint64_t cx, uint64_t rq_pending, uint64_t rq,
                                            uint64_t rq_retry, uint64_t conn_pool,
-                                           double budget_percent, uint32_t min_retry_concurrency,
+                                           double budget_percent, uint64_t budget_interval,
+                                           uint32_t min_retry_concurrency,
                                            uint64_t conn_per_host = 100) {
     resource_manager_ = std::make_unique<ResourceManagerImpl>(
         runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, conn_per_host,
-        circuit_breakers_stats_, budget_percent, min_retry_concurrency);
+        circuit_breakers_stats_, budget_percent, budget_interval, min_retry_concurrency,
+        dispatcher_);
   }
 
   // Upstream::ClusterInfo
   MOCK_METHOD(bool, addedViaApi, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, connectTimeout, (), (const));
-  MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
-  MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, tcpPoolIdleTimeout, (), (const));
-  MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, maxConnectionDuration, (), (const));
-  MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
-  MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, grpcTimeoutHeaderMax, (), (const));
-  MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, grpcTimeoutHeaderOffset, (),
-              (const));
+  MOCK_METHOD(const std::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
+  MOCK_METHOD(const std::optional<std::chrono::milliseconds>, tcpPoolIdleTimeout, (), (const));
+  MOCK_METHOD(const std::optional<std::chrono::milliseconds>, maxConnectionDuration, (), (const));
+  MOCK_METHOD(const std::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
+  MOCK_METHOD(const std::optional<std::chrono::milliseconds>, grpcTimeoutHeaderMax, (), (const));
+  MOCK_METHOD(const std::optional<std::chrono::milliseconds>, grpcTimeoutHeaderOffset, (), (const));
   MOCK_METHOD(float, perUpstreamPreconnectRatio, (), (const));
   MOCK_METHOD(float, peekaheadRatio, (), (const));
   MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
@@ -123,16 +125,17 @@ public:
   MOCK_METHOD(OptRef<const LoadBalancerConfig>, loadBalancerConfig, (), (const));
   MOCK_METHOD(TypedLoadBalancerFactory&, loadBalancerFactory, (), (const));
   MOCK_METHOD(const envoy::config::cluster::v3::Cluster::CommonLbConfig&, lbConfig, (), (const));
-  MOCK_METHOD(absl::optional<bool>, processHttpForOutlierDetection, (Http::ResponseHeaderMap&),
+  MOCK_METHOD(std::optional<bool>, processHttpForOutlierDetection, (Http::ResponseHeaderMap&),
               (const));
   MOCK_METHOD(envoy::config::cluster::v3::Cluster::DiscoveryType, type, (), (const));
   MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>, clusterType, (),
               (const));
+  MOCK_METHOD(OptRef<const Http::ClientCodecFactory>, upstreamHttpClientCodecFactory, (), (const));
   MOCK_METHOD(OptRef<const envoy::config::core::v3::TypedExtensionConfig>, upstreamConfig, (),
               (const));
   MOCK_METHOD(bool, maintenanceMode, (), (const));
   MOCK_METHOD(uint32_t, maxResponseHeadersCount, (), (const));
-  MOCK_METHOD(absl::optional<uint16_t>, maxResponseHeadersKb, (), (const));
+  MOCK_METHOD(std::optional<uint16_t>, maxResponseHeadersKb, (), (const));
   MOCK_METHOD(uint32_t, maxRequestsPerConnection, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(const std::string&, observabilityName, (), (const));
@@ -157,7 +160,7 @@ public:
   MOCK_METHOD(bool, setLocalInterfaceNameOnUpstreamConnections, (), (const));
   MOCK_METHOD(const std::string&, edsServiceName, (), (const));
   MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const));
-  MOCK_METHOD(std::vector<Http::Protocol>, upstreamHttpProtocol, (absl::optional<Http::Protocol>),
+  MOCK_METHOD(std::vector<Http::Protocol>, upstreamHttpProtocol, (std::optional<Http::Protocol>),
               (const));
 
   MOCK_METHOD(bool, createFilterChain, (Http::FilterChainFactoryCallbacks & callbacks),
@@ -179,7 +182,7 @@ public:
 
   std::string name_{"fake_cluster"};
   std::string observability_name_{"observability_name"};
-  absl::optional<std::string> eds_service_name_;
+  std::optional<std::string> eds_service_name_;
   class MockHttpProtocolOptionsConfig : public HttpProtocolOptionsConfig {
   public:
     explicit MockHttpProtocolOptionsConfig(const MockClusterInfo& parent) : parent_(parent) {}
@@ -194,11 +197,11 @@ public:
     const envoy::config::core::v3::HttpProtocolOptions& commonHttpProtocolOptions() const override {
       return parent_.common_http_protocol_options_;
     }
-    const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
+    const std::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
     upstreamHttpProtocolOptions() const override {
       return parent_.upstream_http_protocol_options_;
     }
-    const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+    const std::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
     alternateProtocolsCacheOptions() const override {
       return parent_.alternate_protocols_cache_options_;
     }
@@ -241,15 +244,16 @@ public:
   ClusterTimeoutBudgetStatsPtr timeout_budget_stats_;
   ClusterCircuitBreakersStats circuit_breakers_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
   Network::Address::InstanceConstSharedPtr source_address_;
   std::shared_ptr<MockUpstreamLocalAddressSelector> upstream_local_address_selector_;
   envoy::config::cluster::v3::Cluster::DiscoveryType type_{
       envoy::config::cluster::v3::Cluster::STRICT_DNS};
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
-  absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
+  std::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
       upstream_http_protocol_options_;
-  absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>
+  std::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>
       alternate_protocols_cache_options_;
   Upstream::TypedLoadBalancerFactory* lb_factory_ =
       Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(
@@ -262,13 +266,13 @@ public:
   envoy::config::cluster::v3::Cluster::CommonLbConfig lb_config_;
   envoy::config::core::v3::Metadata metadata_;
   std::unique_ptr<Envoy::Config::TypedMetadata> typed_metadata_;
-  absl::optional<std::chrono::milliseconds> max_stream_duration_;
+  std::optional<std::chrono::milliseconds> max_stream_duration_;
   Stats::ScopeSharedPtr stats_scope_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
   Http::HeaderValidatorFactoryPtr header_validator_factory_;
-  absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+  std::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
       happy_eyeballs_config_;
   const std::unique_ptr<Envoy::Orca::LrsReportMetricNames> lrs_report_metric_names_;
   std::vector<Router::ShadowPolicyPtr> shadow_policies_;
