@@ -31,13 +31,36 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "buffer_manager_lib",
+    srcs = ["buffer_manager.cc"],
+    hdrs = ["buffer_manager.h"],
+    deps = [
+        ":external_buffer_interface",
+        "//envoy/http:filter_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_chain_bridge_lib",
+    srcs = ["filter_chain_bridge.cc"],
+    hdrs = ["filter_chain_bridge.h"],
+    deps = [
+        ":buffer_manager_lib",
+        "//envoy/http:codes_interface",
+        "//envoy/http:filter_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
+        ":buffer_manager_lib",
         ":external_buffer_interface",
-        "//envoy/http:codes_interface",
-        "//source/common/buffer:buffer_lib",
+        ":filter_chain_bridge_lib",
         "//source/common/common:logger_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
