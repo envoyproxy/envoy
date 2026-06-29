@@ -11,6 +11,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/ups
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Reverse Tunnel Upstream Codec]
+// [#extension: envoy.upstreams.http.reverse_tunnel]
 // Per-cluster upstream (client) HTTP/2 codec options for reverse-tunnel clusters. When attached to
 // a cluster via :ref:`typed_extension_protocol_options
 // <envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`, the upstream
@@ -18,7 +19,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // draining, mirroring the server-side drain-aware HTTP Connection Manager.
 
 // Configuration for the drain-aware reverse-tunnel upstream codec.
-// [#extension: envoy.upstreams.http.reverse_tunnel]
 message ReverseTunnelUpstreamCodecOptions {
   // When true, the upstream HTTP/2 client codec emits a GOAWAY when the reverse tunnel begins
   // draining. Defaults to false, in which case the stock HTTP/2 client codec is used unchanged.
