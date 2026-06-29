@@ -6,6 +6,7 @@
 #include "envoy/server/admin.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/http2/codec_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/upstreams/http/reverse_tunnel/config.h"
@@ -162,6 +163,26 @@ TEST_F(ReverseTunnelUpstreamCodecTest, RegistryDrainsRegisteredCluster) {
   EXPECT_EQ(0, stats_.goaway_received_.value());
 }
 
+// An empty cluster key drains every registered codec (the "drain all" admin path).
+TEST_F(ReverseTunnelUpstreamCodecTest, RegistryDrainsAllClusters) {
+  auto registry = std::make_shared<UpstreamCodecDrainRegistry>(tls_);
+
+  auto inner = std::make_unique<NiceMock<Envoy::Http::MockClientConnection>>();
+  auto* inner_raw = inner.get();
+  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, stats_);
+  auto* drain_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  DrainAwareClientConnection codec(std::move(inner), std::move(callbacks), stats_, dispatcher_,
+                                   registry, "cluster_a");
+
+  // Empty key fans the drain out across all registered clusters.
+  EXPECT_CALL(*inner_raw, shutdownNotice());
+  registry->drainCluster("", std::chrono::milliseconds(1000));
+
+  EXPECT_CALL(*inner_raw, goAway());
+  EXPECT_CALL(callbacks_, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
+  drain_timer->invokeCallback();
+}
+
 // When disabled, the factory declines (returns nullptr) so CodecClientProd uses the stock codec.
 TEST_F(ReverseTunnelUpstreamCodecTest, PassThroughWhenDisabled) {
   ReverseTunnelUpstreamCodecOptions opts(makeProto(false), stats_, nullptr);
@@ -202,6 +223,38 @@ TEST_F(ReverseTunnelUpstreamCodecTest, CreatesDrainAwareCodecForReverseConnectio
   auto codec = opts.createClientCodec(makeContext(Envoy::Http::CodecType::HTTP2));
   ASSERT_NE(codec, nullptr);
   EXPECT_EQ(Envoy::Http::Protocol::Http2, codec->protocol());
+}
+
+// Scenario 3 end-to-end on a real HTTP/2 client codec: startGracefulDrain sends the graceful
+// first GOAWAY via the HTTP/2 subclass (sendGracefulGoAway) immediately, then the final GOAWAY and
+// a graceful pool drain after drain_time. Exercises the h2_codec_ != nullptr path that the
+// mock-inner tests cannot reach.
+TEST_F(ReverseTunnelUpstreamCodecTest, GracefulDrainTwoPhaseOnRealHttp2Codec) {
+  ON_CALL(cluster_, maxResponseHeadersCount()).WillByDefault(Return(100));
+
+  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, stats_);
+  auto& callbacks_ref = *callbacks;
+  auto h2 = std::make_unique<DrainAwareHttp2ClientConnection>(
+      connection_, callbacks_ref, cluster_.http2CodecStats(), random_,
+      cluster_.httpProtocolOptions().http2Options(),
+      cluster_.maxResponseHeadersKb().value_or(Envoy::Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
+      cluster_.maxResponseHeadersCount(), Envoy::Http::Http2::ProdNghttp2SessionFactory::get());
+  auto* h2_raw = h2.get();
+  // Registers with dispatcher_; the next createTimer() returns it.
+  auto* drain_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  DrainAwareClientConnection codec(std::move(h2), std::move(callbacks), stats_, dispatcher_,
+                                   /*registry=*/nullptr, /*cluster=*/"", h2_raw);
+
+  // Phase 1: graceful GOAWAY emitted now via the HTTP/2 subclass (counted as sent).
+  EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(5000), _));
+  codec.startGracefulDrain(std::chrono::milliseconds(5000));
+  EXPECT_EQ(1, stats_.goaway_sent_.value());
+
+  // Phase 2: timer fires -> final GOAWAY on the codec + graceful pool drain (onGoAway into the
+  // wrapped callbacks).
+  EXPECT_CALL(callbacks_, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
+  drain_timer->invokeCallback();
+  EXPECT_EQ(2, stats_.goaway_sent_.value());
 }
 
 // The DrainAwareClientCallbacks wrapper forwards the non-GOAWAY connection callbacks unchanged.

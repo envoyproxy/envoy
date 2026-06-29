@@ -15,6 +15,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:utility_lib",
+        "//source/common/http/http2:codec_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/upstreams/http/reverse_tunnel:config",
         "//test/mocks:common_lib",
