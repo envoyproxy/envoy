@@ -298,6 +298,11 @@ TEST_F(DrainAwareConfigTest, CreateCodecDrainEnabledReverseTunnelWiresRedial) {
   // A GOAWAY-observing wrapper is interposed, so the base codec sees the wrapper, not the raw
   // HCM callbacks.
   EXPECT_NE(&callbacks, config->last_callbacks_);
+
+  // Firing the local drain runs the re-dial closure, which asks the (real) initiator IOHandle to
+  // dial a replacement tunnel. With no tunnels tracked this is a safe no-op, but it exercises the
+  // wired closure.
+  codec->shutdownNotice();
 }
 
 } // namespace

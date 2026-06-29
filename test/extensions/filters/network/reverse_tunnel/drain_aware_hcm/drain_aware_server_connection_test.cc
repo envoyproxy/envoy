@@ -229,6 +229,14 @@ TEST_F(DrainAwareServerConnectionCallbacksTest, OnSettingsDelegates) {
   wrapper.onSettings(settings);
 }
 
+// onMaxStreamsChanged passes through to the inner callbacks unchanged. (onMaxStreamsChanged has a
+// default interface implementation, so it is not a gmock method; exercising the forwarding path is
+// enough for coverage.)
+TEST_F(DrainAwareServerConnectionCallbacksTest, OnMaxStreamsChangedDelegates) {
+  DrainAwareServerConnectionCallbacks wrapper(inner_callbacks_, nullptr);
+  wrapper.onMaxStreamsChanged(7);
+}
+
 } // namespace
 } // namespace ReverseTunnel
 } // namespace NetworkFilters
