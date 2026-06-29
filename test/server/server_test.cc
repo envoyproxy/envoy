@@ -565,23 +565,24 @@ TEST_P(ServerInstanceImplTest, ExplicitTagsEnabledByRuntimeGuard) {
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", true);
   Stats::SymbolTableImpl symbol_table;
   Stats::AllocatorImpl allocator(symbol_table);
-  Stats::ThreadLocalStoreImpl real_store(allocator);
+  auto real_store = std::make_unique<Stats::ThreadLocalStoreImpl>(allocator);
 
   options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
       "test/server/test_data/server/empty_bootstrap.yaml", {}, version_);
   thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
   init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
   server_ = std::make_unique<InstanceImpl>(
-      *init_manager_, options_, time_system_, hooks_, restart_, real_store, fakelock_,
+      *init_manager_, options_, time_system_, hooks_, restart_, *real_store, fakelock_,
       std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
       Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
   server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
                       component_factory_);
-  EXPECT_TRUE(real_store.useExplicitTags());
+  EXPECT_TRUE(real_store->useExplicitTags());
 
   // Tear down the server (which shuts down threading on real_store) before real_store is destroyed,
   // and restore the process-global runtime flag so it does not leak into other tests.
   server_.reset();
+  real_store.reset();
   thread_local_.reset();
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", false);
 }
@@ -591,21 +592,22 @@ TEST_P(ServerInstanceImplTest, ExplicitTagsDisabledByDefault) {
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", false);
   Stats::SymbolTableImpl symbol_table;
   Stats::AllocatorImpl allocator(symbol_table);
-  Stats::ThreadLocalStoreImpl real_store(allocator);
+  auto real_store = std::make_unique<Stats::ThreadLocalStoreImpl>(allocator);
 
   options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
       "test/server/test_data/server/empty_bootstrap.yaml", {}, version_);
   thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
   init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
   server_ = std::make_unique<InstanceImpl>(
-      *init_manager_, options_, time_system_, hooks_, restart_, real_store, fakelock_,
+      *init_manager_, options_, time_system_, hooks_, restart_, *real_store, fakelock_,
       std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
       Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
   server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
                       component_factory_);
-  EXPECT_FALSE(real_store.useExplicitTags());
+  EXPECT_FALSE(real_store->useExplicitTags());
 
   server_.reset();
+  real_store.reset();
   thread_local_.reset();
 }
 
