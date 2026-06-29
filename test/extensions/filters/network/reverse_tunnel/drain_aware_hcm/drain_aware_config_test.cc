@@ -157,6 +157,49 @@ TEST_F(DrainAwareConfigTest, CreateCodecReturnsNullptrWhenBaseReturnsNullptrDrai
   EXPECT_EQ(nullptr, codec);
 }
 
+// Exercises the real createBaseCodec (parent HCM codec construction) rather than a test override,
+// building an HTTP/1 server codec and wrapping it in the drain-aware connection.
+TEST_F(DrainAwareConfigTest, CreateCodecBuildsRealHttp1BaseCodec) {
+  constexpr absl::string_view kHttp1Config = R"EOF(
+hcm_config:
+  stat_prefix: test
+  codec_type: HTTP1
+  route_config:
+    virtual_hosts:
+    - name: local
+      domains: ["*"]
+      routes:
+      - match:
+          prefix: "/"
+        direct_response:
+          status: 200
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+)EOF";
+  auto proto_config = parseConfig(kHttp1Config);
+  const auto& hcm_config = proto_config.hcm_config();
+  auto singletons = HttpConnectionManager::Utility::createSingletons(context_);
+
+  absl::Status creation_status = absl::OkStatus();
+  auto config = std::make_shared<DrainAwareHttpConnectionManagerConfig>(
+      hcm_config, context_, *singletons.date_provider_, *singletons.route_config_provider_manager_,
+      singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
+      *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/false,
+      creation_status);
+  ASSERT_TRUE(creation_status.ok()) << creation_status.message();
+
+  NiceMock<Network::MockConnection> connection;
+  NiceMock<Http::MockServerConnectionCallbacks> callbacks;
+  NiceMock<Server::MockOverloadManager> overload_manager;
+  Buffer::OwnedImpl data;
+
+  auto codec = config->createCodec(connection, data, callbacks, overload_manager);
+  ASSERT_NE(nullptr, codec);
+  EXPECT_EQ(Http::Protocol::Http11, codec->protocol());
+}
+
 // Subclass that returns a real (mock) codec from createBaseCodec, so createCodec() exercises the
 // drain-aware wrapping path rather than the defensive nullptr branch.
 class FakeCodecDrainAwareConfig : public DrainAwareHttpConnectionManagerConfig {
