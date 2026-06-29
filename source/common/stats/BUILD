@@ -165,7 +165,7 @@ envoy_cc_library(
     hdrs = ["stat_merger.h"],
     deps = [
         ":symbol_table_lib",
-        "//envoy/stats:stats_interface",
+        "//envoy/stats:store_interface",
         "//source/common/protobuf",
     ],
 )
