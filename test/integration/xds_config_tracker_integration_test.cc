@@ -34,7 +34,8 @@ const int UpstreamIndex2 = 2;
 #define ALL_TEST_XDS_TRACKER_STATS(COUNTER)                                                        \
   COUNTER(on_config_accepted)                                                                      \
   COUNTER(on_config_rejected)                                                                      \
-  COUNTER(on_config_metadata_read)
+  COUNTER(on_config_metadata_read)                                                                 \
+  COUNTER(on_resource_unsubscribed)
 
 /**
  * Struct definition for stats. @see stats_macros.h
@@ -98,6 +99,12 @@ public:
   void onConfigRejected(const envoy::service::discovery::v3::DeltaDiscoveryResponse&,
                         const absl::string_view) override {
     stats_.on_config_rejected_.inc();
+  }
+  void onResourceUnsubscribed(const absl::string_view,
+                              const std::vector<absl::string_view>& resources) override {
+    for (const auto _ : resources) {
+      stats_.on_resource_unsubscribed_.inc();
+    }
   }
 
 private:

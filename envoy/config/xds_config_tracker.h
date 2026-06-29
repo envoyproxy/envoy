@@ -95,7 +95,7 @@ public:
    */
   virtual void onResourceUnsubscribed(
       const absl::string_view type_url,
-      const std::vector<absl::string_view>& resources) {}
+      const std::vector<absl::string_view>& resources) PURE;
 };
 
 using XdsConfigTrackerPtr = std::unique_ptr<XdsConfigTracker>;
