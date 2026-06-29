@@ -91,7 +91,7 @@ private:
     absl::flat_hash_map<std::string, ToolEntry> tool_entries;
     std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
         tools;
-    absl::optional<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+    std::optional<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
         tool_list_http_rule;
     bool tool_list_local = false;
   };
@@ -134,7 +134,7 @@ private:
     absl::flat_hash_map<std::string, ToolEntry> tool_entries;
     std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
         tools;
-    absl::optional<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+    std::optional<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
         tool_list_http_rule;
     bool tool_list_local = false;
   };
