@@ -183,6 +183,16 @@ TEST_F(ReverseTunnelUpstreamCodecTest, RegistryDrainsAllClusters) {
   drain_timer->invokeCallback();
 }
 
+// The factory produces empty protos for both the protocol-options and config message hooks.
+TEST_F(ReverseTunnelUpstreamCodecTest, FactoryCreatesEmptyProtos) {
+  ReverseTunnelUpstreamCodecFactory factory;
+  auto options_proto = factory.createEmptyProtocolOptionsProto();
+  ASSERT_NE(nullptr, options_proto);
+  EXPECT_EQ("envoy.extensions.upstreams.http.reverse_tunnel.v3.ReverseTunnelUpstreamCodecOptions",
+            options_proto->GetTypeName());
+  EXPECT_NE(nullptr, factory.createEmptyConfigProto());
+}
+
 // When disabled, the factory declines (returns nullptr) so CodecClientProd uses the stock codec.
 TEST_F(ReverseTunnelUpstreamCodecTest, PassThroughWhenDisabled) {
   ReverseTunnelUpstreamCodecOptions opts(makeProto(false), stats_, nullptr);
