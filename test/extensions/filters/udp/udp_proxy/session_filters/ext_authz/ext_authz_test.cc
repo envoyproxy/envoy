@@ -290,7 +290,7 @@ TEST_F(ExtAuthzFilterTest, BufferByteOverflowIsCountedAndDropped) {
 
   // Only the datagram under the byte limit is replayed on allow.
   EXPECT_CALL(callbacks_, continueFilterChain()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, injectDatagramToFilterChain(_)).Times(1);
+  EXPECT_CALL(callbacks_, injectDatagramToFilterChain(_));
   request_callbacks_->onComplete(makeResponse(CheckStatus::OK));
 }
 
