@@ -108,6 +108,22 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "liburing-liburing-{version}",
         urls = ["https://github.com/axboe/liburing/archive/liburing-{version}.tar.gz"],
     ),
+    # libelf, used by libbpf for the sockmap socket interface. Built only when sockmap is enabled
+    # with --define=sockmap=enabled. Never built for releases.
+    elfutils = dict(
+        version = "0.195",
+        sha256 = "37629fdf7f1f3dc2818e138fca2b8094177d6c2d0f701d3bb650a561218dc026",
+        strip_prefix = "elfutils-{version}",
+        urls = ["https://sourceware.org/elfutils/ftp/{version}/elfutils-{version}.tar.bz2"],
+    ),
+    # eBPF loader for the sockmap socket interface. Built only when sockmap is enabled with
+    # --define=sockmap=enabled. Never built for releases.
+    libbpf = dict(
+        version = "1.7.0",
+        sha256 = "7ab5feffbf78557f626f2e3e3204788528394494715a30fc2070fcddc2051b7b",
+        strip_prefix = "libbpf-{version}",
+        urls = ["https://github.com/libbpf/libbpf/archive/refs/tags/v{version}.tar.gz"],
+    ),
     # This dependency is built only when performance tracing is enabled with the
     # option --define=perf_tracing=enabled. It's never built for releases.
     perfetto = dict(

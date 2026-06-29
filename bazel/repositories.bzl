@@ -171,6 +171,8 @@ def envoy_dependencies(skip_targets = []):
 
     _aws_c_auth_testdata()
     _liburing()
+    _elfutils()
+    _libbpf()
     _com_github_bazel_buildtools()
     _c_ares()
     _com_github_openhistogram_libcircllhist()
@@ -361,6 +363,18 @@ def _liburing():
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:liburing.patch"],
+    )
+
+def _elfutils():
+    external_http_archive(
+        name = "elfutils",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
+def _libbpf():
+    external_http_archive(
+        name = "libbpf",
+        build_file_content = BUILD_ALL_CONTENT,
     )
 
 def _com_github_bazel_buildtools():
