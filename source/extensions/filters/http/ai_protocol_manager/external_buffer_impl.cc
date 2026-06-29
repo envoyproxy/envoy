@@ -1,0 +1,69 @@
+#include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
+
+#include <memory>
+#include <utility>
+
+#include "source/common/common/assert.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace AiProtocolManager {
+
+InMemoryExternalBuffer::InMemoryExternalBuffer(Event::Dispatcher& dispatcher)
+    : dispatcher_(dispatcher) {}
+
+InMemoryExternalBuffer::~InMemoryExternalBuffer() {
+  // Neutralize any completion callbacks that were posted but have not run yet.
+  *alive_ = false;
+}
+
+void InMemoryExternalBuffer::append(Buffer::Instance& data, AppendCallback cb) {
+  // Take ownership of the bytes now. They only become visible to length() /
+  // read() once the (asynchronous) completion callback below runs, modelling a
+  // write that is not durable until acknowledged.
+  auto staged = std::make_unique<Buffer::OwnedImpl>();
+  staged->move(data);
+
+  dispatcher_.post(
+      [this, alive = alive_, staged = std::move(staged), cb = std::move(cb)]() mutable {
+        if (!*alive) {
+          return;
+        }
+        data_.move(*staged);
+        cb(ExternalBufferStatus::Ok);
+      });
+}
+
+void InMemoryExternalBuffer::read(uint64_t offset, uint64_t length, ReadCallback cb) {
+  // Reading past the acknowledged length is a programming error in the caller.
+  ASSERT(offset + length <= data_.length());
+
+  auto out = std::make_unique<Buffer::OwnedImpl>();
+  // copyOut leaves the source buffer intact so the same bytes can be read
+  // again (the store is append-only, reads are non-destructive).
+  if (length > 0) {
+    auto slice = std::make_unique<uint8_t[]>(length);
+    data_.copyOut(offset, length, slice.get());
+    out->add(slice.get(), length);
+  }
+
+  dispatcher_.post([alive = alive_, out = std::move(out), cb = std::move(cb)]() mutable {
+    if (!*alive) {
+      return;
+    }
+    cb(ExternalBufferStatus::Ok, std::move(out));
+  });
+}
+
+void InMemoryExternalBuffer::setWatermarks(uint32_t high_watermark, uint32_t low_watermark,
+                                           ExternalBufferWatermarkCallbacks& callbacks) {
+  high_watermark_ = high_watermark;
+  low_watermark_ = low_watermark;
+  watermark_callbacks_ = &callbacks;
+}
+
+} // namespace AiProtocolManager
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy
