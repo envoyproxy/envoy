@@ -40,7 +40,14 @@ Http::FilterDataStatus BufferManager::onData(Buffer::Instance& data, bool end_st
   ++outstanding_appends_;
   ENVOY_LOG(trace, "ai_protocol_manager: offloading {} bytes (end_stream={})", data.length(),
             end_stream);
-  buffer_->append(data, [this](ExternalBufferStatus status) { onAppendComplete(status); });
+  // Take ownership of the bytes before append() returns, so the filter chain's
+  // buffer reference does not dangle across the asynchronous offload. This
+  // hand-off is storage-agnostic, so it lives here once rather than being
+  // repeated by every ExternalBuffer implementation.
+  auto owned = std::make_unique<Buffer::OwnedImpl>();
+  owned->move(data);
+  buffer_->append(std::move(owned),
+                  [this](ExternalBufferStatus status) { onAppendComplete(status); });
 
   // We own all buffering and continuation: hold the chain here and replay the
   // payload ourselves once it has been fully offloaded.

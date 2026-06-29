@@ -28,7 +28,7 @@ public:
   ~InMemoryExternalBuffer() override;
 
   // ExternalBuffer
-  void append(Buffer::Instance& data, AppendCallback cb) override;
+  void append(Buffer::InstancePtr data, AppendCallback cb) override;
   void read(uint64_t offset, uint64_t length, ReadCallback cb) override;
   uint64_t length() const override { return data_.length(); }
   void setWatermarks(uint32_t high_watermark, uint32_t low_watermark,

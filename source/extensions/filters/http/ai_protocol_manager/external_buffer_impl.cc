@@ -18,21 +18,17 @@ InMemoryExternalBuffer::~InMemoryExternalBuffer() {
   *alive_ = false;
 }
 
-void InMemoryExternalBuffer::append(Buffer::Instance& data, AppendCallback cb) {
-  // Take ownership of the bytes now. They only become visible to length() /
-  // read() once the (asynchronous) completion callback below runs, modelling a
-  // write that is not durable until acknowledged.
-  auto staged = std::make_unique<Buffer::OwnedImpl>();
-  staged->move(data);
-
-  dispatcher_.post(
-      [this, alive = alive_, staged = std::move(staged), cb = std::move(cb)]() mutable {
-        if (!*alive) {
-          return;
-        }
-        data_.move(*staged);
-        cb(ExternalBufferStatus::Ok);
-      });
+void InMemoryExternalBuffer::append(Buffer::InstancePtr data, AppendCallback cb) {
+  // The bytes only become visible to length() / read() once the (asynchronous)
+  // completion callback below runs, modelling a write that is not durable until
+  // acknowledged.
+  dispatcher_.post([this, alive = alive_, data = std::move(data), cb = std::move(cb)]() mutable {
+    if (!*alive) {
+      return;
+    }
+    data_.move(*data);
+    cb(ExternalBufferStatus::Ok);
+  });
 }
 
 void InMemoryExternalBuffer::read(uint64_t offset, uint64_t length, ReadCallback cb) {

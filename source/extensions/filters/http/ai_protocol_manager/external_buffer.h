@@ -72,11 +72,15 @@ class ExternalBuffer {
 public:
   virtual ~ExternalBuffer() = default;
 
-  // Appends `data` to the end of the buffer. `data` is fully drained (the bytes
-  // are transferred to the buffer). `cb` is invoked once the bytes are durable.
-  // Appends are ordered: completion callbacks fire in the order append() was
-  // called.
-  virtual void append(Buffer::Instance& data, AppendCallback cb) PURE;
+  // Appends an owned `data` buffer to the end of the store, taking ownership of
+  // it. `cb` is invoked once the bytes are durable. Appends are ordered:
+  // completion callbacks fire in the order append() was called.
+  //
+  // The caller transfers an already-owned buffer rather than a borrowed
+  // reference, so an implementation never has to grab the bytes synchronously to
+  // keep them alive across asynchronous I/O -- that ownership hand-off is
+  // storage-agnostic and is done once by the BufferManager.
+  virtual void append(Buffer::InstancePtr data, AppendCallback cb) PURE;
 
   // Reads `length` bytes starting at absolute byte offset `offset`. It is an
   // error to request a range that extends past the current length(). `cb`

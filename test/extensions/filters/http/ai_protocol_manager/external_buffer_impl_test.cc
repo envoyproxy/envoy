@@ -30,15 +30,14 @@ public:
 
 // Appends are asynchronous: nothing is durable until the event loop runs.
 TEST_F(InMemoryExternalBufferTest, AppendIsAsynchronous) {
-  Buffer::OwnedImpl data("hello");
   bool acked = false;
-  buffer_.append(data, [&acked](ExternalBufferStatus status) {
-    EXPECT_EQ(status, ExternalBufferStatus::Ok);
-    acked = true;
-  });
+  buffer_.append(std::make_unique<Buffer::OwnedImpl>("hello"),
+                 [&acked](ExternalBufferStatus status) {
+                   EXPECT_EQ(status, ExternalBufferStatus::Ok);
+                   acked = true;
+                 });
 
-  // Source buffer is drained immediately, but the write is not yet acknowledged.
-  EXPECT_EQ(data.length(), 0);
+  // The write is not durable until the event loop runs.
   EXPECT_FALSE(acked);
   EXPECT_EQ(buffer_.length(), 0);
 
@@ -51,9 +50,9 @@ TEST_F(InMemoryExternalBufferTest, AppendIsAsynchronous) {
 // Multiple appends accumulate in order and read-back returns the bytes verbatim.
 TEST_F(InMemoryExternalBufferTest, AppendThenReadRoundTrips) {
   for (absl::string_view chunk : {"abc", "def", "ghij"}) {
-    Buffer::OwnedImpl data(chunk);
-    buffer_.append(
-        data, [](ExternalBufferStatus status) { EXPECT_EQ(status, ExternalBufferStatus::Ok); });
+    buffer_.append(std::make_unique<Buffer::OwnedImpl>(chunk), [](ExternalBufferStatus status) {
+      EXPECT_EQ(status, ExternalBufferStatus::Ok);
+    });
   }
   drain();
   EXPECT_EQ(buffer_.length(), 10);
@@ -71,8 +70,7 @@ TEST_F(InMemoryExternalBufferTest, AppendThenReadRoundTrips) {
 
 // Reads honor arbitrary byte offsets and are non-destructive (repeatable).
 TEST_F(InMemoryExternalBufferTest, ReadAtOffsetIsRepeatable) {
-  Buffer::OwnedImpl data("0123456789");
-  buffer_.append(data, [](ExternalBufferStatus) {});
+  buffer_.append(std::make_unique<Buffer::OwnedImpl>("0123456789"), [](ExternalBufferStatus) {});
   drain();
 
   std::vector<std::string> results;
@@ -95,8 +93,8 @@ TEST_F(InMemoryExternalBufferTest, PendingCallbacksCancelledOnDestruction) {
   bool acked = false;
   {
     InMemoryExternalBuffer scoped(*dispatcher_);
-    Buffer::OwnedImpl data("data");
-    scoped.append(data, [&acked](ExternalBufferStatus) { acked = true; });
+    scoped.append(std::make_unique<Buffer::OwnedImpl>("data"),
+                  [&acked](ExternalBufferStatus) { acked = true; });
     // scoped goes out of scope before the dispatcher runs.
   }
   drain();
