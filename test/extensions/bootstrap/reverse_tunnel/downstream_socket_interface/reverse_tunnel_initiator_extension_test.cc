@@ -154,6 +154,23 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeRequestPathOverride) {
   EXPECT_EQ(custom_extension->handshakeRequestPath(), "/custom/handshake");
 }
 
+TEST_F(ReverseTunnelInitiatorExtensionTest, MaxReconnectBackoffDefaults) {
+  // Unset max_reconnect_backoff falls back to the historical 30s ceiling.
+  envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
+      DownstreamReverseConnectionSocketInterface empty_config;
+  auto extension_with_default =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, empty_config);
+  EXPECT_EQ(extension_with_default->maxReconnectBackoffMs(), 30000);
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, MaxReconnectBackoffOverride) {
+  auto custom_config = config_;
+  custom_config.mutable_max_reconnect_backoff()->set_seconds(5);
+  auto custom_extension =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
+  EXPECT_EQ(custom_extension->maxReconnectBackoffMs(), 5000);
+}
+
 TEST_F(ReverseTunnelInitiatorExtensionTest, AdditionalHeadersDefaults) {
   EXPECT_TRUE(extension_->handshakeAdditionalHeaders().empty());
 }

@@ -153,9 +153,9 @@ public:
                       upstream_hosts_.at(conn_index));
   }
 
-  void raiseEventUpstreamConnectFailed(
-      uint32_t conn_index, ConnectionPool::PoolFailureReason reason,
-      absl::optional<absl::string_view> failure_message = absl::nullopt) {
+  void
+  raiseEventUpstreamConnectFailed(uint32_t conn_index, ConnectionPool::PoolFailureReason reason,
+                                  std::optional<absl::string_view> failure_message = std::nullopt) {
     conn_pool_callbacks_.at(conn_index)
         ->onPoolFailure(reason, failure_message ? *failure_message : "",
                         upstream_hosts_.at(conn_index));

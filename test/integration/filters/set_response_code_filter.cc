@@ -65,8 +65,8 @@ public:
     }
 
     if (absl::StartsWith(headers.Path()->value().getStringView(), prefix)) {
-      decoder_callbacks_->sendLocalReply(static_cast<Http::Code>(code), body, nullptr,
-                                         absl::nullopt, "");
+      decoder_callbacks_->sendLocalReply(static_cast<Http::Code>(code), body, nullptr, std::nullopt,
+                                         "");
       return Http::FilterHeadersStatus::StopIteration;
     }
     return Http::FilterHeadersStatus::Continue;

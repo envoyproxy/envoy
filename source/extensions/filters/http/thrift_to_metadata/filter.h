@@ -52,7 +52,7 @@ using StructMap = absl::flat_hash_map<std::string, Protobuf::Struct>;
 using namespace Envoy::Extensions::NetworkFilters::ThriftProxy;
 
 class ThriftDecoderHandler;
-using ThriftMetadataToProtobufValue = std::function<absl::optional<Protobuf::Value>(
+using ThriftMetadataToProtobufValue = std::function<std::optional<Protobuf::Value>(
     MessageMetadataSharedPtr, const ThriftDecoderHandler&)>;
 
 class Rule {
@@ -64,8 +64,8 @@ public:
   bool matches(const MessageMetadata& metadata) const;
 
   bool shouldExtractMetadata() const { return static_cast<bool>(protobuf_value_extracter_); }
-  absl::optional<Protobuf::Value> extractValue(MessageMetadataSharedPtr metadata,
-                                               const ThriftDecoderHandler& handler) const {
+  std::optional<Protobuf::Value> extractValue(MessageMetadataSharedPtr metadata,
+                                              const ThriftDecoderHandler& handler) const {
     return protobuf_value_extracter_(metadata, handler);
   }
   ThriftMetadataToProtobufValue getValueExtractorFromField(

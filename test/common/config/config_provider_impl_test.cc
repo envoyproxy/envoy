@@ -97,12 +97,12 @@ public:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
                             const EnvoyException*) override {}
 
-  const absl::optional<test::common::config::DummyConfig>& configProto() const {
+  const std::optional<test::common::config::DummyConfig>& configProto() const {
     return config_proto_;
   }
 
 private:
-  absl::optional<test::common::config::DummyConfig> config_proto_;
+  std::optional<test::common::config::DummyConfig> config_proto_;
 };
 using DummyConfigSubscriptionSharedPtr = std::shared_ptr<DummyConfigSubscription>;
 
@@ -564,7 +564,7 @@ public:
     if (!status.ok()) {
       return status;
     }
-    setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));
+    setLastConfigInfo(std::optional<LastConfigInfo>({std::nullopt, version_info}));
     return absl::OkStatus();
   }
   absl::Status onConfigUpdate(const std::vector<DecodedResourceRef>&,

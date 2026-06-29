@@ -171,7 +171,7 @@ OAuth2Config::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::oauth2::v3::OAuth2PerRoute& proto,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
   auto config_or_error =
-      createFilterConfig(proto.config(), context, absl::nullopt, context.scope(), "");
+      createFilterConfig(proto.config(), context, std::nullopt, context.scope(), "");
   if (!config_or_error.ok()) {
     return config_or_error.status();
   }

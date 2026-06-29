@@ -766,7 +766,7 @@ TEST_F(DynamicModuleHttpFilterTest, SocketOptionDirectionDifferentiation) {
 TEST_F(DynamicModuleHttpFilterTest, DownstreamSocketOptionNoConnection) {
   // Test that setting downstream socket option fails when there is no connection.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_no_conn;
-  EXPECT_CALL(callbacks_no_conn, connection()).WillRepeatedly(testing::Return(absl::nullopt));
+  EXPECT_CALL(callbacks_no_conn, connection()).WillRepeatedly(testing::Return(std::nullopt));
   filter_->setDecoderFilterCallbacks(callbacks_no_conn);
 
   EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_int(
@@ -812,7 +812,7 @@ TEST_F(DynamicModuleHttpFilterTest, DownstreamSocketOptionSetFailure) {
 TEST_F(DynamicModuleHttpFilterTest, DownstreamSocketOptionBytesNoConnection) {
   // Test that setting downstream bytes socket option fails when there is no connection.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_no_conn;
-  EXPECT_CALL(callbacks_no_conn, connection()).WillRepeatedly(testing::Return(absl::nullopt));
+  EXPECT_CALL(callbacks_no_conn, connection()).WillRepeatedly(testing::Return(std::nullopt));
   filter_->setDecoderFilterCallbacks(callbacks_no_conn);
 
   const std::string value = "test-bytes";
@@ -2156,7 +2156,7 @@ TEST(ABIImpl, GetAttributes) {
   uint64_t result_number = 0;
 
   // envoy_dynamic_module_type_attribute_id_RequestPath with null headers map, should return false.
-  EXPECT_CALL(callbacks, requestHeaders()).WillOnce(testing::Return(absl::nullopt));
+  EXPECT_CALL(callbacks, requestHeaders()).WillOnce(testing::Return(std::nullopt));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
       &filter, envoy_dynamic_module_type_attribute_id_RequestPath, &result_buffer));
 
@@ -2275,7 +2275,7 @@ TEST(ABIImpl, GetAttributes) {
       &filter_without_callbacks, envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion,
       &result_buffer));
 
-  EXPECT_CALL(callbacks, connection()).WillRepeatedly(testing::Return(absl::nullopt));
+  EXPECT_CALL(callbacks, connection()).WillRepeatedly(testing::Return(std::nullopt));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
       &filter, envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificate,
       &result_buffer));

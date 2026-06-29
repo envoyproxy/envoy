@@ -24,7 +24,7 @@ namespace {
 class TestCustomCommandParser : public Formatter::CommandParser {
 public:
   absl::StatusOr<Formatter::FormatterProviderPtr>
-  parse(absl::string_view command, absl::string_view, absl::optional<size_t>) const override {
+  parse(absl::string_view command, absl::string_view, std::optional<size_t>) const override {
     if (command == "TEST_CUSTOM") {
       return std::make_unique<Formatter::PlainStringFormatter>("custom-value");
     }

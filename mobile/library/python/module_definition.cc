@@ -93,7 +93,7 @@ PYBIND11_MODULE(envoy_engine, m) {
           },
           [](Envoy::EnvoyError& e, py::object val) {
             if (val.is_none()) {
-              e.attempt_count_ = absl::nullopt;
+              e.attempt_count_ = std::nullopt;
             } else {
               e.attempt_count_ = val.cast<int>();
             }

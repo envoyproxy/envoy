@@ -323,7 +323,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   }
   mutateXfccRequestHeader(request_headers, stream_info, connection, config);
 
-  return {final_remote_address, absl::nullopt};
+  return {final_remote_address, std::nullopt};
 }
 
 void ConnectionManagerUtility::sanitizeTEHeader(RequestHeaderMap& request_headers) {
@@ -747,7 +747,7 @@ void ConnectionManagerUtility::setProxyStatusHeader(ResponseHeaderMap& response_
     // Writing the Proxy-Status header is gated on the existence of
     // |proxy_status_config|. The |details| field and other internals are generated in
     // fromStreamInfo().
-    if (absl::optional<StreamInfo::ProxyStatusError> proxy_status =
+    if (std::optional<StreamInfo::ProxyStatusError> proxy_status =
             StreamInfo::ProxyStatusUtils::fromStreamInfo(stream_info);
         proxy_status.has_value()) {
       response_headers.appendProxyStatus(
@@ -756,7 +756,7 @@ void ConnectionManagerUtility::setProxyStatusHeader(ResponseHeaderMap& response_
           ", ");
       // Apply the recommended response code, if configured and applicable.
       if (proxy_status_config->set_recommended_response_code()) {
-        if (absl::optional<Http::Code> response_code =
+        if (std::optional<Http::Code> response_code =
                 StreamInfo::ProxyStatusUtils::recommendedHttpStatusCode(*proxy_status);
             response_code.has_value()) {
           response_headers.setStatus(std::to_string(enumToInt(*response_code)));
@@ -818,18 +818,18 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
   return final_action;
 }
 
-absl::optional<uint32_t>
+std::optional<uint32_t>
 ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_headers,
                                              const ConnectionManagerConfig& config, uint32_t port) {
   if (config.shouldStripTrailingHostDot()) {
     HeaderUtility::stripTrailingHostDot(request_headers);
   }
   if (config.stripPortType() == Http::StripPortType::Any) {
-    return HeaderUtility::stripPortFromHost(request_headers, absl::nullopt);
+    return HeaderUtility::stripPortFromHost(request_headers, std::nullopt);
   } else if (config.stripPortType() == Http::StripPortType::MatchingHost) {
     return HeaderUtility::stripPortFromHost(request_headers, port);
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 } // namespace Http

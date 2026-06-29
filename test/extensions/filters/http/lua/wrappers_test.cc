@@ -330,7 +330,7 @@ public:
   }
 
 protected:
-  void expectToPrintCurrentProtocol(const absl::optional<Envoy::Http::Protocol>& protocol) {
+  void expectToPrintCurrentProtocol(const std::optional<Envoy::Http::Protocol>& protocol) {
     const std::string SCRIPT{R"EOF(
       function callMe(object)
         testPrint(string.format("'%s'", object:protocol()))
@@ -732,7 +732,7 @@ TEST_F(LuaStreamInfoWrapperTest, GetVirtualClusterName) {
   setup(SCRIPT);
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  const absl::optional<std::string> name = absl::make_optional<std::string>("test_virtual_cluster");
+  const std::optional<std::string> name = std::make_optional<std::string>("test_virtual_cluster");
   ON_CALL(stream_info, virtualClusterName()).WillByDefault(testing::ReturnRef(name));
 
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
@@ -753,7 +753,7 @@ TEST_F(LuaStreamInfoWrapperTest, GetEmptyVirtualClusterName) {
   setup(SCRIPT);
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  const absl::optional<std::string> name = absl::nullopt;
+  const std::optional<std::string> name = std::nullopt;
   ON_CALL(stream_info, virtualClusterName()).WillByDefault(testing::ReturnRef(name));
 
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
@@ -1197,7 +1197,7 @@ class TestFieldSupportingFilterState : public StreamInfo::FilterState::Object {
 public:
   TestFieldSupportingFilterState(std::string base_value) : base_value_(base_value) {}
 
-  absl::optional<std::string> serializeAsString() const override { return base_value_; }
+  std::optional<std::string> serializeAsString() const override { return base_value_; }
 
   bool hasFieldSupport() const override { return true; }
 

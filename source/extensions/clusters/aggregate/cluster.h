@@ -84,7 +84,7 @@ public:
   // Upstream::LoadBalancer
   Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
   Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override;
-  absl::optional<Upstream::SelectedPoolAndConnection>
+  std::optional<Upstream::SelectedPoolAndConnection>
   selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                            const Upstream::Host& /*host*/,
                            std::vector<uint8_t>& /*hash_key*/) override;
@@ -109,7 +109,7 @@ private:
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                              const Upstream::Host& /*host*/,
                              std::vector<uint8_t>& /*hash_key*/) override {
@@ -119,7 +119,7 @@ private:
       return {};
     }
 
-    absl::optional<uint32_t> hostToLinearizedPriority(const Upstream::HostDescription& host) const;
+    std::optional<uint32_t> hostToLinearizedPriority(const Upstream::HostDescription& host) const;
 
   private:
     const PriorityContext& priority_context_;

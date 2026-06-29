@@ -23,7 +23,7 @@ using ::testing::Optional;
 using ::testing::Property;
 
 MATCHER_P(OptRefWith, m, "") {
-  if (arg == absl::nullopt) {
+  if (arg == std::nullopt) {
     *result_listener << "is nullopt";
     return false;
   }
@@ -172,14 +172,14 @@ directory_behaviors:
   ASSERT_THAT(mapping, NotNull());
   EXPECT_THAT(config->applyPathMapping("/path1/banana", *mapping),
               Optional(std::filesystem::path{"/fs1/banana"}));
-  EXPECT_THAT(config->applyPathMapping("/path1//banana", *mapping), Eq(absl::nullopt));
-  EXPECT_THAT(config->applyPathMapping("/path1/./banana", *mapping), Eq(absl::nullopt));
-  EXPECT_THAT(config->applyPathMapping("/path1/../banana", *mapping), Eq(absl::nullopt));
+  EXPECT_THAT(config->applyPathMapping("/path1//banana", *mapping), Eq(std::nullopt));
+  EXPECT_THAT(config->applyPathMapping("/path1/./banana", *mapping), Eq(std::nullopt));
+  EXPECT_THAT(config->applyPathMapping("/path1/../banana", *mapping), Eq(std::nullopt));
   mapping = config->pathMapping("/path1/path2/banana");
   ASSERT_THAT(mapping, NotNull());
   EXPECT_THAT(config->applyPathMapping("/path1/path2/banana", *mapping),
               Optional(std::filesystem::path{"fs2/banana"}));
-  EXPECT_THAT(config->applyPathMapping("/path1/path2//banana", *mapping), Eq(absl::nullopt));
+  EXPECT_THAT(config->applyPathMapping("/path1/path2//banana", *mapping), Eq(std::nullopt));
   EXPECT_THAT(config->contentTypeForPath("/fs1/index.html"), Eq("text/html"));
   // Multiple dots in the filename uses the last one as suffix.
   EXPECT_THAT(config->contentTypeForPath("/fs1/index.banana.html"), Eq("text/html"));
@@ -199,7 +199,7 @@ directory_behaviors:
   EXPECT_THAT(config->directoryBehavior(2),
               OptRefWith(Property("has_list", &ProtoFileServerConfig::DirectoryBehavior::has_list,
                                   Eq(true))));
-  EXPECT_THAT(config->directoryBehavior(3), Eq(absl::nullopt));
+  EXPECT_THAT(config->directoryBehavior(3), Eq(std::nullopt));
 }
 
 TEST_F(FileServerConfigTest, DuplicateDirectoryFilesIsConfigErrorInRouteConfig) {

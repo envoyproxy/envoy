@@ -99,7 +99,7 @@ AwsRequestSigningFilterFactory::createSigner(
   if (region.empty()) {
     auto region_provider =
         std::make_shared<Extensions::Common::Aws::RegionProviderChain>(credential_file_config);
-    absl::optional<std::string> regionOpt;
+    std::optional<std::string> regionOpt;
     if (config.signing_algorithm() == AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A) {
       regionOpt = region_provider->getRegionSet();
     } else {

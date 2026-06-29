@@ -487,7 +487,7 @@ private:
 
 struct DecryptResult {
   std::string plaintext;
-  absl::optional<std::string> error;
+  std::optional<std::string> error;
   // Whether the decrypted token was encrypted with GCM (true) or CBC (false).
   bool is_gcm = false;
 };

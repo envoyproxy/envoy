@@ -532,8 +532,8 @@ TEST_P(DynamicModuleHttpLanguageTests, LocalReplyCallbacks) {
                                                           stats_store.symbolTable(), 0);
   filter->initializeInModuleFilter();
 
-  const Http::StreamFilterBase::LocalReplyData local_reply_data{
-      Http::Code::Unauthorized, absl::nullopt, "local-reply", false};
+  const Http::StreamFilterBase::LocalReplyData local_reply_data{Http::Code::Unauthorized,
+                                                                std::nullopt, "local-reply", false};
   EXPECT_EQ(Http::LocalErrorStatus::ContinueAndResetStream, filter->onLocalReply(local_reply_data));
 
   filter->onDestroy();
@@ -2185,25 +2185,25 @@ TEST(HttpFilter, HeaderMapGetter) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter(nullptr, symbol_table, 0);
 
-  EXPECT_EQ(absl::nullopt, filter.requestHeaders());
-  EXPECT_EQ(absl::nullopt, filter.requestTrailers());
-  EXPECT_EQ(absl::nullopt, filter.responseHeaders());
-  EXPECT_EQ(absl::nullopt, filter.responseTrailers());
+  EXPECT_EQ(std::nullopt, filter.requestHeaders());
+  EXPECT_EQ(std::nullopt, filter.requestTrailers());
+  EXPECT_EQ(std::nullopt, filter.responseHeaders());
+  EXPECT_EQ(std::nullopt, filter.responseTrailers());
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
   filter.setDecoderFilterCallbacks(decoder_callbacks);
   filter.setEncoderFilterCallbacks(encoder_callbacks);
 
-  EXPECT_CALL(decoder_callbacks, requestHeaders()).WillOnce(testing::Return(absl::nullopt));
-  EXPECT_CALL(decoder_callbacks, requestTrailers()).WillOnce(testing::Return(absl::nullopt));
-  EXPECT_CALL(encoder_callbacks, responseHeaders()).WillOnce(testing::Return(absl::nullopt));
-  EXPECT_CALL(encoder_callbacks, responseTrailers()).WillOnce(testing::Return(absl::nullopt));
+  EXPECT_CALL(decoder_callbacks, requestHeaders()).WillOnce(testing::Return(std::nullopt));
+  EXPECT_CALL(decoder_callbacks, requestTrailers()).WillOnce(testing::Return(std::nullopt));
+  EXPECT_CALL(encoder_callbacks, responseHeaders()).WillOnce(testing::Return(std::nullopt));
+  EXPECT_CALL(encoder_callbacks, responseTrailers()).WillOnce(testing::Return(std::nullopt));
 
-  EXPECT_EQ(absl::nullopt, filter.requestHeaders());
-  EXPECT_EQ(absl::nullopt, filter.requestTrailers());
-  EXPECT_EQ(absl::nullopt, filter.responseHeaders());
-  EXPECT_EQ(absl::nullopt, filter.responseTrailers());
+  EXPECT_EQ(std::nullopt, filter.requestHeaders());
+  EXPECT_EQ(std::nullopt, filter.requestTrailers());
+  EXPECT_EQ(std::nullopt, filter.responseHeaders());
+  EXPECT_EQ(std::nullopt, filter.responseTrailers());
 
   TestRequestHeaderMapImpl request_headers{{}};
   TestResponseHeaderMapImpl response_headers{{}};

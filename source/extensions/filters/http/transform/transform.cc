@@ -21,17 +21,17 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Transform {
 
-absl::optional<std::string> BodyFormatterProvider::format(const Formatter::Context& context,
-                                                          const StreamInfo::StreamInfo&) const {
+std::optional<std::string> BodyFormatterProvider::format(const Formatter::Context& context,
+                                                         const StreamInfo::StreamInfo&) const {
   const auto extension = context.typedExtension<BodyContextExtension>();
   if (!extension.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const auto& body = request_body_ ? extension->request_body : extension->response_body;
   const auto& value = Config::Metadata::structValue(body, path_);
   if (value.kind_case() == Protobuf::Value::kNullValue ||
       value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   if (value.kind_case() == Protobuf::Value::kStringValue) {
     return value.string_value();
@@ -60,7 +60,7 @@ public:
 
   absl::StatusOr<Formatter::FormatterProviderPtr> parse(absl::string_view command,
                                                         absl::string_view command_arg,
-                                                        absl::optional<size_t>) const override {
+                                                        std::optional<size_t>) const override {
 
     if (command == "REQUEST_BODY") {
       return std::make_unique<BodyFormatterProvider>(command_arg, true);

@@ -1264,6 +1264,55 @@ TEST_F(RCConnectionWrapperTest, DecodeHeadersUpgradeMode) {
   }
 }
 
+// parseRetryAfter honors the RFC 7231 delta-seconds form, clamps it (overflow guard) at one hour,
+// and returns nullopt for absent/zero/HTTP-date/malformed values so the caller falls back to its
+// computed backoff.
+TEST_F(RCConnectionWrapperTest, ParseRetryAfter) {
+  {
+    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+    headers->addCopy(Http::LowerCaseString("retry-after"), "7");
+    auto result = RCConnectionWrapper::parseRetryAfter(*headers);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->count(), 7000);
+  }
+  {
+    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+    EXPECT_FALSE(RCConnectionWrapper::parseRetryAfter(*headers).has_value());
+  }
+  {
+    // A zero cool-off must be treated as absent so it cannot short-circuit the backoff.
+    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+    headers->addCopy(Http::LowerCaseString("retry-after"), "0");
+    EXPECT_FALSE(RCConnectionWrapper::parseRetryAfter(*headers).has_value());
+  }
+  {
+    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+    headers->addCopy(Http::LowerCaseString("retry-after"), "Wed, 21 Oct 2026 07:28:00 GMT");
+    EXPECT_FALSE(RCConnectionWrapper::parseRetryAfter(*headers).has_value());
+  }
+  {
+    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+    headers->addCopy(Http::LowerCaseString("retry-after"), "100000"); // > 1h.
+    auto result = RCConnectionWrapper::parseRetryAfter(*headers);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->count(), 3600 * 1000);
+  }
+}
+
+// A 429 carrying Retry-After is handled by decodeHeaders via the failure/cool-off path.
+TEST_F(RCConnectionWrapperTest, DecodeHeadersRateLimited) {
+  auto mock_connection = setupMockConnection();
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+
+  Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+  headers->setStatus(429);
+  headers->addCopy(Http::LowerCaseString("retry-after"), "5");
+
+  wrapper.decodeHeaders(std::move(headers), true);
+}
+
 // In upgrade mode, connect() emits `Connection: Upgrade` + `Upgrade: reverse-tunnel`
 // in the handshake request. Verifies by capturing the bytes written by the encoder.
 TEST_F(RCConnectionWrapperTest, ConnectEmitsUpgradeHeaders) {

@@ -105,7 +105,7 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
   // TODO(dio): Add assertion in here.
   priority_state_manager.updateClusterPrioritySet(
       current_priority, std::move(priority_state_manager.priorityState()[current_priority].first),
-      hosts_added, hosts_removed, absl::nullopt, weighted_priority_health_,
+      hosts_added, hosts_removed, std::nullopt, weighted_priority_health_,
       overprovisioning_factor_);
 }
 

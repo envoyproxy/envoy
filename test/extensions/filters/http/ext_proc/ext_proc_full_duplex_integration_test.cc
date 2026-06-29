@@ -385,7 +385,7 @@ TEST_P(ExtProcIntegrationTest, ModeOverrideNoneToFullDuplex) {
 
   std::string body_str = std::string(10, 'a');
   std::string upstream_body_str = std::string(5, 'b');
-  auto response = sendDownstreamRequestWithBody(body_str, absl::nullopt);
+  auto response = sendDownstreamRequestWithBody(body_str, std::nullopt);
   // Process request header message.
   processGenericMessage(
       *grpc_upstreams_[0], true, [](const ProcessingRequest&, ProcessingResponse& resp) {
@@ -468,7 +468,7 @@ TEST_P(ExtProcIntegrationTest, ServerWaitforEnvoyHalfCloseThenCloseStream) {
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   initializeConfig();
   HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequestWithBody("foo", absl::nullopt);
+  auto response = sendDownstreamRequestWithBody("foo", std::nullopt);
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
                                [](const HttpHeaders& headers, HeadersResponse&) {

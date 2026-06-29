@@ -11,7 +11,7 @@ namespace Formatter {
 
 namespace {
 
-void truncate(std::string& str, absl::optional<size_t> max_length) {
+void truncate(std::string& str, std::optional<size_t> max_length) {
   if (!max_length) {
     return;
   }
@@ -23,14 +23,14 @@ void truncate(std::string& str, absl::optional<size_t> max_length) {
 
 ReqWithoutQuery::ReqWithoutQuery(absl::string_view main_header,
                                  absl::string_view alternative_header,
-                                 absl::optional<size_t> max_length)
+                                 std::optional<size_t> max_length)
     : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length) {}
 
-absl::optional<std::string> ReqWithoutQuery::format(const Envoy::Formatter::Context& context,
-                                                    const StreamInfo::StreamInfo&) const {
+std::optional<std::string> ReqWithoutQuery::format(const Envoy::Formatter::Context& context,
+                                                   const StreamInfo::StreamInfo&) const {
   const Http::HeaderEntry* header = findHeader(context.requestHeaders());
   if (!header) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   std::string val = Http::Utility::stripQueryString(header->value());
@@ -68,7 +68,7 @@ const Http::HeaderEntry* ReqWithoutQuery::findHeader(OptRef<const Http::HeaderMa
 
 absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
 ReqWithoutQueryCommandParser::parse(absl::string_view command, absl::string_view subcommand,
-                                    absl::optional<size_t> max_length) const {
+                                    std::optional<size_t> max_length) const {
   if (command == "REQ_WITHOUT_QUERY") {
     auto status_or = Envoy::Formatter::SubstitutionFormatUtils::parseSubcommandHeaders(subcommand);
     THROW_IF_NOT_OK_REF(status_or.status());

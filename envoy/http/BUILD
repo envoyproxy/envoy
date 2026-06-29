@@ -35,7 +35,6 @@ envoy_cc_library(
         "//envoy/tracing:tracer_interface",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -62,6 +61,18 @@ envoy_cc_library(
         "//envoy/network:address_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/http:status_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "client_codec_factory_interface",
+    hdrs = ["client_codec_factory.h"],
+    deps = [
+        ":codec_interface",
+        "//envoy/common:random_generator_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:transport_socket_interface",
+        "//envoy/upstream:upstream_interface",
     ],
 )
 
@@ -103,7 +114,6 @@ envoy_cc_library(
         ":header_map_interface",
         "//envoy/access_log:access_log_interface",
         "//envoy/grpc:status",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -126,7 +136,6 @@ envoy_cc_library(
         "//envoy/tracing:tracer_interface",
         "//envoy/upstream:load_balancer_interface",
         "//source/common/common:scope_tracked_object_stack",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 

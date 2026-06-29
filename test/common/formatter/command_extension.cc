@@ -5,8 +5,8 @@
 namespace Envoy {
 namespace Formatter {
 
-absl::optional<std::string> TestFormatter::format(const Context&,
-                                                  const StreamInfo::StreamInfo&) const {
+std::optional<std::string> TestFormatter::format(const Context&,
+                                                 const StreamInfo::StreamInfo&) const {
   return "TestFormatter";
 }
 
@@ -17,7 +17,7 @@ Protobuf::Value TestFormatter::formatValue(const Context& context,
 
 absl::StatusOr<FormatterProviderPtr> TestCommandParser::parse(absl::string_view command,
                                                               absl::string_view,
-                                                              absl::optional<size_t>) const {
+                                                              std::optional<size_t>) const {
   if (command == "COMMAND_EXTENSION") {
     return std::make_unique<TestFormatter>();
   }
@@ -42,8 +42,8 @@ ProtobufTypes::MessagePtr TestCommandFactory::createEmptyConfigProto() {
 
 std::string TestCommandFactory::name() const { return "envoy.formatter.TestFormatter"; }
 
-absl::optional<std::string> AdditionalFormatter::format(const Context&,
-                                                        const StreamInfo::StreamInfo&) const {
+std::optional<std::string> AdditionalFormatter::format(const Context&,
+                                                       const StreamInfo::StreamInfo&) const {
   return "AdditionalFormatter";
 }
 
@@ -54,7 +54,7 @@ Protobuf::Value AdditionalFormatter::formatValue(const Context& context,
 
 absl::StatusOr<FormatterProviderPtr> AdditionalCommandParser::parse(absl::string_view command,
                                                                     absl::string_view,
-                                                                    absl::optional<size_t>) const {
+                                                                    std::optional<size_t>) const {
   if (command == "ADDITIONAL_EXTENSION") {
     return std::make_unique<AdditionalFormatter>();
   }

@@ -51,7 +51,7 @@ public:
                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                     const std::string& version_info) override;
   uint64_t configHash() const override { return base_.configHash(); }
-  const absl::optional<Rds::RouteConfigProvider::ConfigInfo>& configInfo() const override {
+  const std::optional<Rds::RouteConfigProvider::ConfigInfo>& configInfo() const override {
     return base_.configInfo();
   }
   bool vhdsConfigurationChanged() const override { return vhds_configuration_changed_; }

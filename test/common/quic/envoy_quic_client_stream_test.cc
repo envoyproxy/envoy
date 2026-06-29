@@ -66,7 +66,7 @@ public:
     EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
         .WillRepeatedly(
             Invoke([](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
-                      quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
+                      quic::StreamSendingState state, bool, std::optional<quic::EncryptionLevel>) {
               return quic::QuicConsumedData{write_length, state != quic::NO_FIN};
             }));
     EXPECT_CALL(writer_, WritePacket(_, _, _, _, _, _))
@@ -268,7 +268,7 @@ TEST_F(EnvoyQuicClientStreamTest, GetRequestAndHeaderOnlyResponse) {
 }
 
 TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
-  EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
+  EXPECT_EQ(std::nullopt, quic_stream_->http1StreamEncoderOptions());
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
   EXPECT_TRUE(result.ok());
   quic_stream_->encodeData(request_body_, false);
@@ -295,7 +295,7 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
 }
 
 TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponseWithMemSliceReleasor) {
-  EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
+  EXPECT_EQ(std::nullopt, quic_stream_->http1StreamEncoderOptions());
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
   EXPECT_TRUE(result.ok());
   quic_stream_->encodeData(request_body_, false);
@@ -322,7 +322,7 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponseWithMemSliceReleasor) {
 }
 
 TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponseWithAccounting) {
-  EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
+  EXPECT_EQ(std::nullopt, quic_stream_->http1StreamEncoderOptions());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->wireBytesSent());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->headerBytesSent());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->decompressedHeaderBytesSent());
@@ -495,7 +495,7 @@ TEST_F(EnvoyQuicClientStreamTest, HeadersContributeToWatermark) {
   EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
       .WillOnce(
           Invoke([](quic::QuicStreamId, size_t /*write_length*/, quic::QuicStreamOffset,
-                    quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
+                    quic::StreamSendingState state, bool, std::optional<quic::EncryptionLevel>) {
             return quic::QuicConsumedData{0u, state != quic::NO_FIN};
           }));
   const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/false);
@@ -514,7 +514,7 @@ TEST_F(EnvoyQuicClientStreamTest, HeadersContributeToWatermark) {
   EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
       .WillOnce(
           Invoke([](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
-                    quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
+                    quic::StreamSendingState state, bool, std::optional<quic::EncryptionLevel>) {
             return quic::QuicConsumedData{write_length, state != quic::NO_FIN};
           }));
   EXPECT_CALL(stream_callbacks_, onBelowWriteBufferLowWatermark());
@@ -528,7 +528,7 @@ TEST_F(EnvoyQuicClientStreamTest, HeadersContributeToWatermark) {
   EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
       .WillOnce(
           Invoke([](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
-                    quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
+                    quic::StreamSendingState state, bool, std::optional<quic::EncryptionLevel>) {
             return quic::QuicConsumedData{write_length, state != quic::NO_FIN};
           }));
   quic_session_.OnCanWrite();
@@ -537,7 +537,7 @@ TEST_F(EnvoyQuicClientStreamTest, HeadersContributeToWatermark) {
   EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
       .WillOnce(
           Invoke([](quic::QuicStreamId, size_t, quic::QuicStreamOffset,
-                    quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
+                    quic::StreamSendingState state, bool, std::optional<quic::EncryptionLevel>) {
             return quic::QuicConsumedData{0u, state != quic::NO_FIN};
           }));
   // Send more data. If watermark bytes counting were not cleared in previous

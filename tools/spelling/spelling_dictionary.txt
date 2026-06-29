@@ -267,11 +267,20 @@ Grabbit
 HC
 HCM
 HDS
+HEXPIRE
+HEXPIREAT
+HEXPIRETIME
 HMAC
 HOL
 HPACK
+HPERSIST
+HPEXPIRE
+HPEXPIREAT
+HPEXPIRETIME
+HPTTL
 HTAB
 HTML
+HTTL
 HTTP
 HTTPS
 HV
@@ -584,6 +593,7 @@ WS
 WSA
 WSABUF
 WSS
+WUFFS
 Welford's
 Wi
 XDS
@@ -619,6 +629,7 @@ alls
 alphanumerics
 amongst
 anno
+Anthropic
 anonymization
 anonymizing
 anys
@@ -1004,6 +1015,7 @@ iov
 iovcnt
 iovec
 iovecs
+iop
 ips
 iptables
 ish
@@ -1159,6 +1171,7 @@ nulled
 nullopt
 nullptr
 num
+numfields
 numkeys
 oauth
 observability
@@ -1171,6 +1184,7 @@ oob
 opcode
 openid
 openssl
+OpenAI
 opentracing
 optimizations
 optname
@@ -1541,6 +1555,7 @@ tmpfs
 token
 tokenize
 tokenized
+tokenizer
 tokenizes
 tokenizing
 tokio
@@ -1612,6 +1627,8 @@ variadic
 varint
 vec
 vectorize
+VBC
+VBD
 ver
 verifier
 verifiers

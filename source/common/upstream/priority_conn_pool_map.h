@@ -24,7 +24,7 @@ public:
    * Returns an existing pool for the given priority and `key`, or creates a new one using
    * `factory`. Note that it is possible for this to fail if a limit on the number of pools allowed
    * is reached.
-   * @return The pool corresponding to `key`, or `absl::nullopt`.
+   * @return The pool corresponding to `key`, or `std::nullopt`.
    */
   PoolOptRef getPool(ResourcePriority priority, const KEY_TYPE& key, const PoolFactory& factory);
 

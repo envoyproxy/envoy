@@ -47,7 +47,7 @@ TEST_F(ForeignTest, ForeignFunctionEdgeCaseTest) {
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
-      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info);
   Wasm wasm(plugin->wasmConfig(), "", scope, *api, cluster_manager, *dispatcher);
   proxy_wasm::current_context_ = &ctx_;
 
@@ -75,7 +75,7 @@ TEST_F(ForeignTest, ForeignFunctionSetEnvoyFilterTest) {
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
-      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info);
   Wasm wasm(plugin->wasmConfig(), "", scope, *api, cluster_manager, *dispatcher);
   proxy_wasm::current_context_ = &ctx_;
 

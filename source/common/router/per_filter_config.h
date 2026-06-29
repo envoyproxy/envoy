@@ -24,9 +24,9 @@ public:
   /**
    * @return true if the filter is explicitly disabled for this route or virtual host, false
    * if the filter is explicitly enabled. If the filter is not explicitly enabled or disabled,
-   * returns absl::nullopt.
+   * returns std::nullopt.
    */
-  absl::optional<bool> disabled(absl::string_view name) const;
+  std::optional<bool> disabled(absl::string_view name) const;
 
 private:
   PerFilterConfigs(const Protobuf::Map<std::string, Protobuf::Any>& typed_configs,

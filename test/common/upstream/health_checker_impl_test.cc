@@ -732,7 +732,7 @@ public:
 
   void respond(size_t index, const std::string& code, bool conn_close, bool proxy_close = false,
                bool body = false, bool trailers = false,
-               const absl::optional<std::string>& service_cluster = absl::optional<std::string>(),
+               const std::optional<std::string>& service_cluster = std::optional<std::string>(),
                bool degraded = false, bool immediate_hc_fail = false) {
     std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers(
         new Http::TestResponseHeaderMapImpl{{":status", code}});
@@ -789,7 +789,7 @@ public:
   void expectClientCreate(size_t index) { expectClientCreate(index, health_checker_map_); }
 
   void expectSuccessStartFailedFailFirst(
-      const absl::optional<std::string>& health_checked_cluster = absl::optional<std::string>()) {
+      const std::optional<std::string>& health_checked_cluster = std::optional<std::string>()) {
     cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
         makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
     cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
@@ -1546,7 +1546,7 @@ TEST_F(HttpHealthCheckerImplTest, ZeroRetryInterval) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _)).WillOnce(Return(0));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(1), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  std::optional<std::string> health_checked_cluster("locations-production-iad");
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
@@ -1626,7 +1626,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckSetsCorrectLastHcPassTime) 
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  std::optional<std::string> health_checked_cluster("locations-production-iad");
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
@@ -1708,7 +1708,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServicePrefixPatternCheck) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  std::optional<std::string> health_checked_cluster("locations-production-iad");
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
@@ -1744,7 +1744,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceExactPatternCheck) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  std::optional<std::string> health_checked_cluster("locations-production-iad");
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
@@ -1780,7 +1780,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceRegexPatternCheck) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  std::optional<std::string> health_checked_cluster("locations-production-iad");
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
@@ -1823,7 +1823,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValueOnTheHos
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  std::optional<std::string> health_checked_cluster("locations-production-iad");
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
@@ -1870,7 +1870,7 @@ TEST_F(HttpHealthCheckerImplTest,
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  std::optional<std::string> health_checked_cluster("locations-production-iad");
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
@@ -1906,7 +1906,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  std::optional<std::string> health_checked_cluster("locations-production-iad");
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
@@ -1991,7 +1991,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  std::optional<std::string> health_checked_cluster("locations-production-iad");
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
@@ -2035,7 +2035,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithoutUserAgent) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  std::optional<std::string> health_checked_cluster("locations-production-iad");
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
@@ -2068,7 +2068,7 @@ TEST_F(HttpHealthCheckerImplTest, ServiceDoesNotMatchFail) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  absl::optional<std::string> health_checked_cluster("api-production-iad");
+  std::optional<std::string> health_checked_cluster("api-production-iad");
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
       Host::HealthFlag::FAILED_ACTIVE_HC));
@@ -2100,7 +2100,7 @@ TEST_F(HttpHealthCheckerImplTest, ServicePatternDoesNotMatchFail) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  absl::optional<std::string> health_checked_cluster("api-production-iad");
+  std::optional<std::string> health_checked_cluster("api-production-iad");
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
       Host::HealthFlag::FAILED_ACTIVE_HC));
@@ -2159,7 +2159,7 @@ TEST_F(HttpHealthCheckerImplTest, ServiceCheckRuntimeOff) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  absl::optional<std::string> health_checked_cluster("api-production-iad");
+  std::optional<std::string> health_checked_cluster("api-production-iad");
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
@@ -2186,7 +2186,7 @@ TEST_F(HttpHealthCheckerImplTest, ServiceCheckRuntimeOffWithStringPattern) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  absl::optional<std::string> health_checked_cluster("api-production-iad");
+  std::optional<std::string> health_checked_cluster("api-production-iad");
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
@@ -2196,7 +2196,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedFailFirstServiceCheck) {
   setupNoServiceValidationHC();
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillRepeatedly(Return(true));
-  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  std::optional<std::string> health_checked_cluster("locations-production-iad");
   expectSuccessStartFailedFailFirst(health_checked_cluster);
 }
 
@@ -2430,7 +2430,7 @@ TEST_F(HttpHealthCheckerImplTest, ImmediateFailure) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true, _));
-  respond(0, "503", false, false, true, false, absl::nullopt, false, true);
+  respond(0, "503", false, false, true, false, std::nullopt, false, true);
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
       Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
@@ -3183,7 +3183,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAltPort) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  std::optional<std::string> health_checked_cluster("locations-production-iad");
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
@@ -3257,7 +3257,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAltAddress) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  std::optional<std::string> health_checked_cluster("locations-production-iad");
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
@@ -3794,7 +3794,7 @@ TEST_F(HttpHealthCheckerImplTest, ServiceNameMatch) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  std::optional<std::string> health_checked_cluster("locations-production-iad");
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
@@ -3823,7 +3823,7 @@ TEST_F(HttpHealthCheckerImplTest, ServiceNameMismatch) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  absl::optional<std::string> health_checked_cluster("api-production-iad");
+  std::optional<std::string> health_checked_cluster("api-production-iad");
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
       Host::HealthFlag::FAILED_ACTIVE_HC));
@@ -5115,7 +5115,7 @@ public:
     addCompletionCallback();
   }
 
-  void setupServiceNameHC(const absl::optional<std::string>& authority) {
+  void setupServiceNameHC(const std::optional<std::string>& authority) {
     auto config = createGrpcHealthCheckConfig();
     config.mutable_grpc_health_check()->set_service_name("service");
     if (authority.has_value()) {
@@ -5302,7 +5302,7 @@ public:
     }
   }
 
-  void testSingleHostSuccess(const absl::optional<std::string>& authority) {
+  void testSingleHostSuccess(const std::optional<std::string>& authority) {
     std::string expected_host = cluster_->info_->name();
     if (authority.has_value()) {
       expected_host = authority.value();
@@ -5385,12 +5385,12 @@ void PrintTo(const GrpcHealthCheckerImplTestBase::ResponseSpec& spec, std::ostre
 class GrpcHealthCheckerImplTest : public testing::Test, public GrpcHealthCheckerImplTestBase {};
 
 // Test single host check success.
-TEST_F(GrpcHealthCheckerImplTest, Success) { testSingleHostSuccess(absl::nullopt); }
+TEST_F(GrpcHealthCheckerImplTest, Success) { testSingleHostSuccess(std::nullopt); }
 
 TEST_F(GrpcHealthCheckerImplTest, SuccessWithHostname) {
   std::string expected_host = "www.envoyproxy.io";
 
-  setupServiceNameHC(absl::nullopt);
+  setupServiceNameHC(std::nullopt);
 
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
   health_check_config.set_hostname(expected_host);
@@ -5546,7 +5546,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithAdditionalHeaders) {
 
 // Test host check success when gRPC response payload is split between several incoming data chunks.
 TEST_F(GrpcHealthCheckerImplTest, SuccessResponseSplitBetweenChunks) {
-  setupServiceNameHC(absl::nullopt);
+  setupServiceNameHC(std::nullopt);
   expectSingleHealthcheck(HealthTransition::Unchanged);
 
   auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(

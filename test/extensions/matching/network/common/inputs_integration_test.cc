@@ -252,7 +252,7 @@ public:
     return absl::monostate{};
   }
 
-  absl::optional<std::string> serializeAsString() const override {
+  std::optional<std::string> serializeAsString() const override {
     return "serialized_whole_object";
   }
 

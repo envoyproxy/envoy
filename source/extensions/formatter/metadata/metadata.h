@@ -18,7 +18,7 @@ public:
   MetadataFormatterCommandParser() = default;
   absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
   parse(absl::string_view command, absl::string_view subcommand,
-        absl::optional<size_t> max_length) const override;
+        std::optional<size_t> max_length) const override;
 };
 
 } // namespace Formatter

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdio>
+#include <optional>
 
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/server/lifecycle_notifier.h"
@@ -22,7 +23,6 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -81,8 +81,7 @@ public:
     vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
 
     plugin_ = std::make_shared<Extensions::Common::Wasm::Plugin>(
-        plugin_config, envoy::config::core::v3::TrafficDirection::INBOUND, local_info_,
-        &listener_metadata_);
+        plugin_config, envoy::config::core::v3::TrafficDirection::INBOUND, local_info_);
     plugin_->wasmConfig().allowedCapabilities() = allowed_capabilities_;
     // Passes ownership of root_context_.
     Extensions::Common::Wasm::createWasm(
@@ -116,7 +115,6 @@ public:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockServerLifecycleNotifier> lifecycle_notifier_;
-  envoy::config::core::v3::Metadata listener_metadata_;
   Context* root_context_ = nullptr; // Unowned.
   RemoteAsyncDataProviderPtr remote_data_provider_;
 
@@ -136,7 +134,7 @@ private:
   std::string root_id_ = "";
   std::string vm_configuration_ = "";
   bool fail_open_ = false;
-  absl::optional<bool> allow_on_headers_stop_iteration_ = absl::nullopt;
+  std::optional<bool> allow_on_headers_stop_iteration_ = std::nullopt;
   std::string plugin_configuration_ = "";
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_;
   envoy::extensions::wasm::v3::EnvironmentVariables envs_;
@@ -219,7 +217,7 @@ public:
              bool singleton = false) {
     plugin_config_ = std::make_shared<PluginConfig>(
         plugin_config, server_, server_.scope(), server_.initManager(),
-        envoy::config::core::v3::TrafficDirection::UNSPECIFIED, /*metadata=*/nullptr, singleton);
+        envoy::config::core::v3::TrafficDirection::UNSPECIFIED, singleton);
   }
 
   void createStreamContext() {

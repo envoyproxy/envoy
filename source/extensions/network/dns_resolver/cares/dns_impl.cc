@@ -41,7 +41,7 @@ constexpr uint32_t DEFAULT_QUERY_TRIES = 4;
 
 DnsResolverImpl::DnsResolverImpl(
     const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& config,
-    Event::Dispatcher& dispatcher, absl::optional<std::string> resolvers_csv,
+    Event::Dispatcher& dispatcher, std::optional<std::string> resolvers_csv,
     Stats::Scope& root_scope)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
@@ -86,10 +86,10 @@ CaresDnsResolverStats DnsResolverImpl::generateCaresDnsResolverStats(Stats::Scop
   return {ALL_CARES_DNS_RESOLVER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
 }
 
-absl::StatusOr<absl::optional<std::string>> DnsResolverImpl::maybeBuildResolversCsv(
+absl::StatusOr<std::optional<std::string>> DnsResolverImpl::maybeBuildResolversCsv(
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) {
   if (resolvers.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   std::vector<std::string> resolver_addrs;

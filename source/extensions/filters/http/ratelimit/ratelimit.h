@@ -59,27 +59,27 @@ public:
         disable_x_envoy_ratelimited_header_(config.disable_x_envoy_ratelimited_header()),
         rate_limited_grpc_status_(
             config.rate_limited_as_resource_exhausted()
-                ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
-                : absl::nullopt),
+                ? std::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
+                : std::nullopt),
         http_context_(context.httpContext()),
         stat_names_(scope.symbolTable(), config.stat_prefix()),
         rate_limited_status_(toErrorCode(config.rate_limited_status().code())),
         status_on_error_(toRatelimitServerErrorCode(config.status_on_error().code())),
         filter_enabled_(
             config.has_filter_enabled()
-                ? absl::optional<Envoy::Runtime::FractionalPercent>(
+                ? std::optional<Envoy::Runtime::FractionalPercent>(
                       Envoy::Runtime::FractionalPercent(config.filter_enabled(), runtime_))
-                : absl::nullopt),
+                : std::nullopt),
         filter_enforced_(
             config.has_filter_enforced()
-                ? absl::optional<Envoy::Runtime::FractionalPercent>(
+                ? std::optional<Envoy::Runtime::FractionalPercent>(
                       Envoy::Runtime::FractionalPercent(config.filter_enforced(), runtime_))
-                : absl::nullopt),
+                : std::nullopt),
         failure_mode_deny_percent_(config.has_failure_mode_deny_percent()
-                                       ? absl::optional<Envoy::Runtime::FractionalPercent>(
+                                       ? std::optional<Envoy::Runtime::FractionalPercent>(
                                              Envoy::Runtime::FractionalPercent(
                                                  config.failure_mode_deny_percent(), runtime_))
-                                       : absl::nullopt),
+                                       : std::nullopt),
         metadata_namespace_(config.metadata_namespace().empty() ? "envoy.filters.http.ratelimit"
                                                                 : config.metadata_namespace()) {
     absl::StatusOr<Router::HeaderParserPtr> response_headers_parser_or_ =
@@ -105,7 +105,7 @@ public:
   }
   bool enableXRateLimitHeaders() const { return enable_x_ratelimit_headers_; }
   bool enableXEnvoyRateLimitedHeader() const { return !disable_x_envoy_ratelimited_header_; }
-  const absl::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
+  const std::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
     return rate_limited_grpc_status_;
   }
   Http::Context& httpContext() { return http_context_; }
@@ -165,15 +165,15 @@ private:
   const bool failure_mode_deny_;
   const bool enable_x_ratelimit_headers_;
   const bool disable_x_envoy_ratelimited_header_;
-  const absl::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
+  const std::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
   Http::Context& http_context_;
   Filters::Common::RateLimit::StatNames stat_names_;
   const Http::Code rate_limited_status_;
   Router::HeaderParserPtr response_headers_parser_;
   const Http::Code status_on_error_;
-  const absl::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
-  const absl::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
-  const absl::optional<Envoy::Runtime::FractionalPercent> failure_mode_deny_percent_;
+  const std::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
+  const std::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
+  const std::optional<Envoy::Runtime::FractionalPercent> failure_mode_deny_percent_;
   std::unique_ptr<RateLimitConfig> rate_limit_config_;
   const std::string metadata_namespace_;
 };
