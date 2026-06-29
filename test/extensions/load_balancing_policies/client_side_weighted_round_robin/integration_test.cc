@@ -270,7 +270,7 @@ public:
             policy->mutable_policies(0)->mutable_typed_extension_config()->mutable_typed_config();
         auto cswrr = MessageUtil::anyConvert<ClientSideWeightedRoundRobinProto>(*typed_config);
         customize_policy(cswrr);
-        typed_config->PackFrom(cswrr);
+        std::ignore = typed_config->PackFrom(cswrr);
       }
     });
     HttpIntegrationTest::initialize();
