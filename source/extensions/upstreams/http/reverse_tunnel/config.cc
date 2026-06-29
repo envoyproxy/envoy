@@ -1,0 +1,128 @@
+#include "source/extensions/upstreams/http/reverse_tunnel/config.h"
+
+#include <chrono>
+#include <memory>
+#include <string>
+
+#include "envoy/http/codes.h"
+#include "envoy/server/admin.h"
+#include "envoy/singleton/manager.h"
+
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/upstreams/http/reverse_tunnel/drain_aware_client_connection.h"
+
+#include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Upstreams {
+namespace Http {
+namespace ReverseTunnel {
+
+namespace ReverseTunnelProto = envoy::extensions::upstreams::http::reverse_tunnel::v3;
+
+SINGLETON_MANAGER_REGISTRATION(reverse_tunnel_upstream_codec_drain);
+
+// Default grace period between the shutdown notice and the final GOAWAY when an operator triggers
+// a drain without specifying drain_time_ms.
+constexpr uint64_t DefaultDrainTimeMs = 5000;
+
+// The cluster type this drain-aware upstream codec applies to.
+constexpr absl::string_view ReverseConnectionClusterType = "envoy.clusters.reverse_connection";
+
+Envoy::Http::ClientConnectionPtr
+ReverseTunnelUpstreamCodecOptions::createClientCodec(const Context& context) const {
+  // Scope the drain-aware codec to HTTP/2 reverse-connection clusters. The core codec-factory seam
+  // is intentionally generic (it discovers any protocol-options object that exposes a
+  // ClientCodecFactory), so we enforce the cluster-type specificity here in the extension rather
+  // than coupling core to the reverse_connection cluster name. If these options are ever attached
+  // to a non-reverse-connection cluster, return nullptr so CodecClientProd uses the stock codec.
+  const auto custom_type = context.cluster.clusterType();
+  const bool is_reverse_connection =
+      custom_type.has_value() && custom_type->name() == ReverseConnectionClusterType;
+  if (!enable_drain_with_goaway_ || context.type != Envoy::Http::CodecType::HTTP2 ||
+      !is_reverse_connection) {
+    return nullptr;
+  }
+
+  // Build the HTTP/2 client codec with a callbacks wrapper so a received GOAWAY is observed. This
+  // mirrors the stock client codec construction, but injects the drain-aware callbacks instead of
+  // the bare CodecClient.
+  const Upstream::ClusterInfo& cluster = context.cluster;
+  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(context.callbacks, stats_);
+  auto inner = std::make_unique<DrainAwareHttp2ClientConnection>(
+      context.connection, *callbacks, cluster.http2CodecStats(), context.random,
+      cluster.httpProtocolOptions().http2Options(),
+      cluster.maxResponseHeadersKb().value_or(Envoy::Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
+      cluster.maxResponseHeadersCount(), Envoy::Http::Http2::ProdNghttp2SessionFactory::get());
+  auto* h2_codec = inner.get();
+  return std::make_unique<DrainAwareClientConnection>(std::move(inner), std::move(callbacks),
+                                                      stats_, context.connection.dispatcher(),
+                                                      registry_, cluster.name(), h2_codec);
+}
+
+absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr>
+ReverseTunnelUpstreamCodecFactory::createProtocolOptionsConfig(
+    const Protobuf::Message& config,
+    Server::Configuration::ProtocolOptionsFactoryContext& context) {
+  const auto& typed_config = MessageUtil::downcastAndValidate<
+      const ReverseTunnelProto::ReverseTunnelUpstreamCodecOptions&>(
+      config, context.messageValidationVisitor());
+
+  auto& server_context = context.serverFactoryContext();
+  auto registry = server_context.singletonManager().getTyped<UpstreamCodecDrainRegistry>(
+      SINGLETON_MANAGER_REGISTERED_NAME(reverse_tunnel_upstream_codec_drain), [&server_context] {
+        return std::make_shared<UpstreamCodecDrainRegistry>(server_context.threadLocal());
+      });
+
+  // Register the admin trigger once (subsequent clusters get addHandler() == false, which is fine).
+  // The captured registry shared_ptr keeps it alive for the handler's lifetime.
+  if (auto admin = server_context.admin(); admin.has_value()) {
+    admin->addHandler(
+        "/reverse_tunnel/drain_clusters",
+        "gracefully drain reverse-tunnel upstream client codecs; optional query params: "
+        "cluster=<name> (default: all), drain_time_ms=<n> (default 5000)",
+        [registry](Envoy::Http::ResponseHeaderMap&, Buffer::Instance& response,
+                   Server::AdminStream& admin_stream) -> Envoy::Http::Code {
+          const auto params = admin_stream.queryParams();
+          const std::string cluster = params.getFirstValue("cluster").value_or("");
+          uint64_t drain_time_ms = DefaultDrainTimeMs;
+          if (auto v = params.getFirstValue("drain_time_ms"); v.has_value()) {
+            uint64_t parsed = 0;
+            if (absl::SimpleAtoi(v.value(), &parsed)) {
+              drain_time_ms = parsed;
+            }
+          }
+          registry->drainCluster(cluster, std::chrono::milliseconds(drain_time_ms));
+          response.add(absl::StrCat("reverse_tunnel: draining upstream codecs (cluster='",
+                                    cluster.empty() ? "<all>" : cluster,
+                                    "', drain_time_ms=", drain_time_ms, ")\n"));
+          return Envoy::Http::Code::OK;
+        },
+        /*removable=*/false, /*mutates_server_state=*/true);
+  }
+
+  auto stats = ReverseTunnelUpstreamCodecStats::generate(server_context.scope());
+  return std::make_shared<ReverseTunnelUpstreamCodecOptions>(typed_config, stats,
+                                                             std::move(registry));
+}
+
+ProtobufTypes::MessagePtr ReverseTunnelUpstreamCodecFactory::createEmptyProtocolOptionsProto() {
+  return std::make_unique<ReverseTunnelProto::ReverseTunnelUpstreamCodecOptions>();
+}
+
+ProtobufTypes::MessagePtr ReverseTunnelUpstreamCodecFactory::createEmptyConfigProto() {
+  return std::make_unique<ReverseTunnelProto::ReverseTunnelUpstreamCodecOptions>();
+}
+
+REGISTER_FACTORY(ReverseTunnelUpstreamCodecFactory, Server::Configuration::ProtocolOptionsFactory);
+
+} // namespace ReverseTunnel
+} // namespace Http
+} // namespace Upstreams
+} // namespace Extensions
+} // namespace Envoy
