@@ -27,6 +27,25 @@ void AiProtocolManagerFilter::onDestroy() {
   }
 }
 
+Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHeaderMap&,
+                                                                 bool end_stream) {
+  // A headers-only request carries no payload to inspect, so there is nothing to
+  // hold the chain for: let the headers flow. (Pausing here would also deadlock,
+  // since no body would ever arrive to drive the replay that releases them.)
+  if (end_stream) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  // A body follows: pin the headers at this filter so routing and admission
+  // filters downstream do not act on them until the payload has been offloaded.
+  // decodeData() still fires on this filter while iteration is stopped here, so
+  // the BufferManager keeps offloading; the held headers are released when replay
+  // injects the first body frame (or, for an empty/trailer-only body, when the
+  // BufferManager continues iteration).
+  ENVOY_LOG(trace, "ai_protocol_manager: holding headers until payload is offloaded");
+  return Http::FilterHeadersStatus::StopIteration;
+}
+
 Http::FilterDataStatus AiProtocolManagerFilter::decodeData(Buffer::Instance& data,
                                                            bool end_stream) {
   return decode_manager_->onData(data, end_stream);

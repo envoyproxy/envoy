@@ -27,6 +27,15 @@ namespace AiProtocolManager {
 // path is wired; the encode path will construct a second BufferManager with the
 // encoder bridge.
 //
+// We must not let the rest of the filter chain act on the request headers before
+// the payload that drives routing and admission decisions has been parsed, so
+// decodeHeaders() pauses chain iteration (StopIteration) whenever a body
+// follows. The headers stay pinned at this filter while decodeData() keeps
+// offloading the body; they are released to the downstream filters only when
+// replay begins -- the first injectDecodedDataToFilterChain() call flushes the
+// held headers ahead of the replayed body, so downstream filters observe the
+// headers immediately followed by the (now fully buffered) payload.
+//
 // Current behavior is a straight offload-then-replay. Streaming JSON parsing and
 // admission control will be layered on top of this plumbing.
 class AiProtocolManagerFilter : public Http::PassThroughFilter,
@@ -40,6 +49,8 @@ public:
 
   // Http::StreamDecoderFilter
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
 

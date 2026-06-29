@@ -80,6 +80,35 @@ public:
   int continue_calls_{0};
 };
 
+// When a body follows the headers, iteration is paused so the rest of the chain
+// (routing/admission) does not see the headers until the payload is offloaded.
+TEST_F(AiProtocolManagerFilterTest, HoldsHeadersWhenBodyFollows) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/v1/chat"}};
+  EXPECT_EQ(filter_.decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+}
+
+// A headers-only request has no payload to inspect, so the headers flow
+// immediately; holding them would deadlock since no body drives the release.
+TEST_F(AiProtocolManagerFilterTest, PassesHeadersOnlyRequest) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/healthz"}};
+  EXPECT_EQ(filter_.decodeHeaders(headers, true), Http::FilterHeadersStatus::Continue);
+}
+
+// Headers held during decodeHeaders() are released when replay begins: the body
+// is offloaded while iteration is paused, then injected back to the chain.
+TEST_F(AiProtocolManagerFilterTest, ReleasesHeldHeadersOnReplay) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/v1/chat"}};
+  EXPECT_EQ(filter_.decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body("{\"messages\":[\"hi\"]}");
+  EXPECT_EQ(filter_.decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_GE(inject_calls_, 1);
+  EXPECT_TRUE(injected_end_stream_);
+  EXPECT_EQ(injected_.toString(), "{\"messages\":[\"hi\"]}");
+}
+
 // The body is offloaded chunk-by-chunk and replayed verbatim once end_stream is
 // seen, with end_stream propagated on the final injected frame.
 TEST_F(AiProtocolManagerFilterTest, OffloadsAndReplaysBody) {
