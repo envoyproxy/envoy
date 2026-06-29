@@ -3645,8 +3645,8 @@ TEST_F(LuaHttpFilterTest, Stats) {
   InSequence s;
   setup(REQUEST_RESPONSE_RUNTIME_ERROR_SCRIPT);
 
-  EXPECT_EQ(1, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate)
-                   .value());
+  EXPECT_EQ(
+      1, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
 
   // Request error
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
@@ -3709,8 +3709,8 @@ TEST_F(LuaHttpFilterTest, StatsWithPerFilterPrefix) {
 TEST_F(LuaHttpFilterTest, LuaVmCountGaugeInlineCode) {
   setup(HEADER_ONLY_SCRIPT);
   // One default_source_code PerLuaCodeSetup → 1 VM.
-  EXPECT_EQ(1, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate)
-                   .value());
+  EXPECT_EQ(
+      1, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 TEST_F(LuaHttpFilterTest, LuaVmCountGaugeWithSourceCodes) {
@@ -3738,15 +3738,15 @@ TEST_F(LuaHttpFilterTest, LuaVmCountGaugeWithSourceCodes) {
   setupFilter();
 
   // 1 default + 2 source_codes = 3 VMs.
-  EXPECT_EQ(3, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate)
-                   .value());
+  EXPECT_EQ(
+      3, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 TEST_F(LuaHttpFilterTest, LuaVmCountGaugeDecrementOnDestroy) {
   // Use the normal single-script setup so the fixture destructor is satisfied.
   setup(HEADER_ONLY_SCRIPT);
-  EXPECT_EQ(1, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate)
-                   .value());
+  EXPECT_EQ(
+      1, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
 
   // Create a second FilterConfig in a local scope. It shares the same stats scope,
   // so its VM contributes to the same gauge.
@@ -3758,12 +3758,13 @@ TEST_F(LuaHttpFilterTest, LuaVmCountGaugeDecrementOnDestroy) {
     auto extra_config = std::make_shared<FilterConfig>(extra_proto, tls_, cluster_manager_, api_,
                                                        *stats_store_.rootScope(), "test.");
     // 1 (setup) + 1 (extra_config source_codes) = 2
-    EXPECT_EQ(2, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate)
-                     .value());
+    EXPECT_EQ(
+        2,
+        stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
     // extra_config destroyed at end of scope → its LuaThreadLocal destructor fires.
   }
-  EXPECT_EQ(1, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate)
-                   .value());
+  EXPECT_EQ(
+      1, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 TEST_F(LuaHttpFilterTest, LuaVmCountGaugePerRouteInlineNotCounted) {
@@ -3779,8 +3780,8 @@ TEST_F(LuaHttpFilterTest, LuaVmCountGaugePerRouteInlineNotCounted) {
   setupFilter();
 
   // Only the global inline_code VM is counted; the per-route one is not.
-  EXPECT_EQ(1, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate)
-                   .value());
+  EXPECT_EQ(
+      1, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 // Test clear route cache.

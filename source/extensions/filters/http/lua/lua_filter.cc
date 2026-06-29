@@ -196,7 +196,7 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
 } // namespace
 
 PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
-                                  Stats::Gauge* vm_count)
+                                 Stats::Gauge* vm_count)
     : lua_state_(lua_code, tls, vm_count) {
   lua_state_.registerType<Filters::Common::Lua::BufferWrapper>();
   lua_state_.registerType<Filters::Common::Lua::MetadataMapWrapper>();
@@ -860,7 +860,8 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
   for (const auto& source : proto_config.source_codes()) {
     const std::string code =
         THROW_OR_RETURN_VALUE(Config::DataSource::read(source.second, true, api), std::string);
-    auto per_lua_code_setup_ptr = std::make_unique<PerLuaCodeSetup>(code, tls, &stats_.lua_vm_count_);
+    auto per_lua_code_setup_ptr =
+        std::make_unique<PerLuaCodeSetup>(code, tls, &stats_.lua_vm_count_);
     if (!per_lua_code_setup_ptr) {
       continue;
     }

@@ -21,8 +21,8 @@ namespace Lua {
  * All lua stats. @see stats_macros.h
  */
 #define ALL_LUA_FILTER_STATS(COUNTER, GAUGE)                                                       \
-  COUNTER(errors)                                                                                   \
-  COUNTER(executions)                                                                               \
+  COUNTER(errors)                                                                                  \
+  COUNTER(executions)                                                                              \
   GAUGE(lua_vm_count, Accumulate)
 
 /**
