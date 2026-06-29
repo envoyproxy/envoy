@@ -12,6 +12,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/http/client_codec_factory.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/address.h"
 #include "envoy/stats/scope.h"
@@ -5495,6 +5496,78 @@ public:
   TestFilterConfigFactoryBase& parent_;
 };
 struct TestFilterProtocolOptionsConfig : public Upstream::ProtocolOptionsConfig {};
+
+// A protocol options object that also exposes an upstream client codec factory via the
+// ProtocolOptionsConfig hook. Used to verify that configuring more than one such factory on a
+// single cluster is rejected.
+struct TestCodecFactoryProtocolOptions : public Upstream::ProtocolOptionsConfig,
+                                         public Http::ClientCodecFactory {
+  OptRef<const Http::ClientCodecFactory> upstreamHttpClientCodecFactory() const override {
+    return *this;
+  }
+  Http::ClientConnectionPtr createClientCodec(const Context&) const override { return nullptr; }
+};
+
+// A network filter config factory (registered under a configurable name) whose protocol options
+// object implements ClientCodecFactory.
+class TestCodecFactoryConfigFactory
+    : public Server::Configuration::NamedNetworkFilterConfigFactory {
+public:
+  explicit TestCodecFactoryConfigFactory(std::string name) : name_(std::move(name)) {}
+
+  absl::StatusOr<Network::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext&) override {
+    PANIC("not implemented");
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override { PANIC("not implemented"); }
+  ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+  absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr>
+  createProtocolOptionsConfig(const Protobuf::Message&,
+                              Server::Configuration::ProtocolOptionsFactoryContext&) override {
+    return std::make_shared<TestCodecFactoryProtocolOptions>();
+  }
+  std::string name() const override { return name_; }
+  std::set<std::string> configTypes() override { return {}; };
+
+  const std::string name_;
+};
+
+// Configuring two protocol options objects that both expose a ClientCodecFactory on the same
+// cluster is a misconfiguration and must be rejected deterministically.
+TEST_F(ClusterInfoImplTest, MultipleUpstreamClientCodecFactoriesRejected) {
+  TestCodecFactoryConfigFactory factory_a("envoy.test.codec_a");
+  TestCodecFactoryConfigFactory factory_b("envoy.test.codec_b");
+  Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry_a(
+      factory_a);
+  Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry_b(
+      factory_b);
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.test.codec_a: { "@type": type.googleapis.com/google.protobuf.Struct }
+      envoy.test.codec_b: { "@type": type.googleapis.com/google.protobuf.Struct }
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      makeCluster(yaml), EnvoyException,
+      "multiple upstream HTTP client codec factories configured on a single cluster via "
+      "typed_extension_protocol_options; at most one is allowed");
+}
 
 // Cluster extension protocol options fails validation when configured for filter that does not
 // support options.

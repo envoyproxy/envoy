@@ -290,6 +290,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/network/dns_resolver/apple @yanavlasov @mattklein123
 /*/extensions/network/dns_resolver/getaddrinfo @fredyw @mattklein123
 /*/extensions/network/dns_resolver/hickory @agrawroh @yanavlasov @wbpcode
+# sockmap socket interface
+/*/extensions/network/socket_interface/sockmap/ @agrawroh @wbpcode @yanavlasov
 # compression code
 /*/extensions/filters/http/decompressor @kbaichoo @mattklein123
 /*/extensions/filters/http/compressor @kbaichoo @mattklein123

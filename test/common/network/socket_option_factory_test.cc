@@ -1,18 +1,29 @@
+#include <cerrno>
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
 
 #include "source/common/network/address_impl.h"
+#include "source/common/network/reuse_port_bpf_cpu_steering_option_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/socket_option_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
 
+#if defined(__linux__)
+#include <linux/filter.h>
+#include <sched.h>
+#endif
+
 using testing::_;
+using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Network {
@@ -325,6 +336,114 @@ TEST_F(SocketOptionFactoryTest, TestBuildBindAddressNoPortOptions) {
   EXPECT_EQ(expected_option.option(), option_details->name_.option());
   EXPECT_EQ(expected_value, option_details->value_);
 }
+
+#if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
+TEST_F(SocketOptionFactoryTest, TestBuildReusePortBpfCpuSteeringOptions) {
+  // A non contiguous worker to CPU map proves the program steers by an explicit table, not a
+  // modulo. Worker i is pinned to worker_cpus[i].
+  const std::vector<uint32_t> worker_cpus = {0, 2, 4, 6};
+  std::shared_ptr<Socket::Options> options =
+      SocketOptionFactory::buildReusePortBpfCpuSteeringOptions(worker_cpus);
+
+  const auto expected_option = ENVOY_ATTACH_REUSEPORT_CBPF;
+  EXPECT_CALL(socket_mock_, setSocketOption(expected_option.level(), expected_option.option(), _,
+                                            sizeof(sock_fprog)))
+      .WillOnce(
+          Invoke([&worker_cpus](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
+            const sock_fprog* prog = static_cast<const sock_fprog*>(optval);
+            // LD cpu, then a `JEQ` and RET pair per worker, then a modulo fallback and a return.
+            EXPECT_EQ(2 * worker_cpus.size() + 3, static_cast<size_t>(prog->len));
+            EXPECT_EQ(static_cast<uint16_t>(BPF_LD | BPF_W | BPF_ABS), prog->filter[0].code);
+            EXPECT_EQ(static_cast<uint32_t>(SKF_AD_OFF + SKF_AD_CPU), prog->filter[0].k);
+            for (uint32_t i = 0; i < worker_cpus.size(); i++) {
+              const sock_filter& jeq = prog->filter[1 + 2 * i];
+              const sock_filter& ret = prog->filter[2 + 2 * i];
+              EXPECT_EQ(static_cast<uint16_t>(BPF_JMP | BPF_JEQ | BPF_K), jeq.code);
+              EXPECT_EQ(worker_cpus[i], jeq.k);
+              EXPECT_EQ(0, jeq.jt);
+              EXPECT_EQ(1, jeq.jf);
+              EXPECT_EQ(static_cast<uint16_t>(BPF_RET | BPF_K), ret.code);
+              EXPECT_EQ(i, ret.k);
+            }
+            const sock_filter& fallback = prog->filter[1 + 2 * worker_cpus.size()];
+            EXPECT_EQ(static_cast<uint16_t>(BPF_ALU | BPF_MOD | BPF_K), fallback.code);
+            EXPECT_EQ(static_cast<uint32_t>(worker_cpus.size()), fallback.k);
+            EXPECT_EQ(static_cast<uint16_t>(BPF_RET | BPF_A),
+                      prog->filter[2 + 2 * worker_cpus.size()].code);
+            return {0, 0};
+          }));
+
+  // The program is only attached once the socket is listening.
+  EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
+                                            envoy::config::core::v3::SocketOption::STATE_PREBIND));
+  EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
+                                            envoy::config::core::v3::SocketOption::STATE_BOUND));
+  EXPECT_TRUE(Network::Socket::applyOptions(
+      options, socket_mock_, envoy::config::core::v3::SocketOption::STATE_LISTENING));
+}
+
+TEST_F(SocketOptionFactoryTest, TestReusePortBpfCpuSteeringOptionDegradesOnAttachFailure) {
+  std::shared_ptr<Socket::Options> options =
+      SocketOptionFactory::buildReusePortBpfCpuSteeringOptions({0, 1});
+
+  const auto expected_option = ENVOY_ATTACH_REUSEPORT_CBPF;
+  EXPECT_CALL(socket_mock_, setSocketOption(expected_option.level(), expected_option.option(), _,
+                                            sizeof(sock_fprog)))
+      .WillOnce(Invoke(
+          [](int, int, const void*, socklen_t) -> Api::SysCallIntResult { return {-1, EINVAL}; }));
+
+  // A rejected program degrades to default reuse port hashing rather than failing the listener.
+  EXPECT_LOG_CONTAINS(
+      "warn", "reuse port BPF steering attach failed",
+      EXPECT_TRUE(Network::Socket::applyOptions(
+          options, socket_mock_, envoy::config::core::v3::SocketOption::STATE_LISTENING)));
+}
+
+TEST_F(SocketOptionFactoryTest, TestReusePortBpfCpuSteeringOptionEmptyAssignmentSkipsAttach) {
+  std::shared_ptr<Socket::Options> options =
+      SocketOptionFactory::buildReusePortBpfCpuSteeringOptions({});
+
+  // With no worker assignment the option attaches nothing and leaves default reuse port hashing.
+  EXPECT_CALL(socket_mock_, setSocketOption(_, _, _, _)).Times(0);
+  EXPECT_TRUE(Network::Socket::applyOptions(
+      options, socket_mock_, envoy::config::core::v3::SocketOption::STATE_LISTENING));
+}
+
+TEST_F(SocketOptionFactoryTest, TestReusePortBpfCpuSteeringOptionOnlyAttachesAtListening) {
+  std::shared_ptr<Socket::Options> options =
+      SocketOptionFactory::buildReusePortBpfCpuSteeringOptions({0, 1});
+
+  // Pre listen states form a separate reuse port group per socket, so nothing is attached.
+  EXPECT_CALL(socket_mock_, setSocketOption(_, _, _, _)).Times(0);
+  EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
+                                            envoy::config::core::v3::SocketOption::STATE_PREBIND));
+  EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
+                                            envoy::config::core::v3::SocketOption::STATE_BOUND));
+}
+
+TEST_F(SocketOptionFactoryTest, TestReusePortBpfCpuSteeringOptionHashAndDetails) {
+  std::shared_ptr<Socket::Options> options =
+      SocketOptionFactory::buildReusePortBpfCpuSteeringOptions({0, 1, 2, 3});
+  const auto& option = *options->at(0);
+  EXPECT_TRUE(option.isSupported());
+
+  std::vector<uint8_t> hash_key;
+  option.hashKey(hash_key);
+  EXPECT_FALSE(hash_key.empty());
+
+  // A different worker to CPU map produces a different hash key.
+  std::vector<uint8_t> other_hash_key;
+  SocketOptionFactory::buildReusePortBpfCpuSteeringOptions({0, 1, 2, 4})
+      ->at(0)
+      ->hashKey(other_hash_key);
+  EXPECT_NE(hash_key, other_hash_key);
+
+  EXPECT_FALSE(
+      option.getOptionDetails(socket_mock_, envoy::config::core::v3::SocketOption::STATE_BOUND)
+          .has_value());
+}
+
+#endif
 
 } // namespace
 } // namespace Network

@@ -482,6 +482,15 @@ WEAK_STUB(ClusterConfigDefineHistogram,
 WEAK_STUB(ClusterConfigRecordHistogramValue,
           envoy_dynamic_module_callback_cluster_config_record_histogram_value(nullptr, 0, nullptr,
                                                                               0, 0))
+WEAK_STUB(ClusterWorkerTimerNew, envoy_dynamic_module_callback_cluster_worker_timer_new(nullptr))
+WEAK_STUB(ClusterWorkerTimerEnable,
+          envoy_dynamic_module_callback_cluster_worker_timer_enable(nullptr, 0))
+WEAK_STUB(ClusterWorkerTimerDisable,
+          envoy_dynamic_module_callback_cluster_worker_timer_disable(nullptr))
+WEAK_STUB(ClusterWorkerTimerEnabled,
+          envoy_dynamic_module_callback_cluster_worker_timer_enabled(nullptr))
+WEAK_STUB(ClusterWorkerTimerDelete,
+          envoy_dynamic_module_callback_cluster_worker_timer_delete(nullptr))
 
 WEAK_STUB(LbGetClusterName, envoy_dynamic_module_callback_lb_get_cluster_name(nullptr, nullptr))
 WEAK_STUB(LbGetHostsCount, envoy_dynamic_module_callback_lb_get_hosts_count(nullptr, 0))

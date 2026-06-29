@@ -11,24 +11,63 @@ namespace FilterChain {
 
 namespace {
 
-OptRef<const FilterChain> routeLevelFilterChain(FilterChainConfig& filter_chain_config,
-                                                Http::FilterChainFactoryCallbacks& callbacks) {
+using FilterChains = absl::InlinedVector<const FilterChain*, 5>;
+// HCM -> RouteConfiguration -> VirtualHost -> Route -> WeightedCluster
+FilterChains getAllFilterChains(OptRef<const FilterChain> default_chain,
+                                Http::FilterChainFactoryCallbacks& callbacks) {
+  FilterChains filter_chains;
+  if (default_chain.has_value()) {
+    filter_chains.push_back(default_chain.ptr());
+  }
+
   const OptRef<const Router::Route> route = callbacks.route();
   if (!route.has_value()) {
-    filter_chain_config.stats().no_route_.inc();
-    return {};
+    return filter_chains;
   }
-  const auto* per_route_config = dynamic_cast<const FilterChainPerRouteConfig*>(
-      route->mostSpecificPerFilterConfig(callbacks.filterConfigName()));
-  if (per_route_config == nullptr) {
-    filter_chain_config.stats().no_route_filter_config_.inc();
-    return {};
+
+  for (auto config : route->perFilterConfigs(callbacks.filterConfigName())) {
+    auto* route_chain = dynamic_cast<const FilterChainPerRouteConfig*>(config);
+    if (route_chain == nullptr) {
+      continue;
+    }
+    if (auto chain = route_chain->filterChain(); chain.has_value()) {
+      filter_chains.push_back(chain.ptr());
+    }
   }
-  if (auto chain = per_route_config->filterChain(); chain.has_value()) {
-    filter_chain_config.stats().use_route_filter_chain_.inc();
-    return chain;
+  return filter_chains;
+}
+
+bool hasFilter(absl::string_view filter_name, absl::Span<const FilterChain*> filter_chains) {
+  for (const auto* filter_chain : filter_chains) {
+    ASSERT(filter_chain != nullptr);
+    if (filter_chain->hasFilter(filter_name)) {
+      return true;
+    }
   }
-  return {};
+  return false;
+}
+
+void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks,
+                       const FilterChain* filter_chain,
+                       absl::Span<const FilterChain*> more_specific_filter_chains) {
+  ASSERT(filter_chain != nullptr);
+
+  for (const auto& config_provider : filter_chain->filterFactories()) {
+    absl::string_view filter_config_name = config_provider->name();
+
+    // If there is a more specific filter chain that has the same name filter, skip this one.
+    if (hasFilter(filter_config_name, more_specific_filter_chains)) {
+      continue;
+    }
+
+    auto config = config_provider->config();
+    // In the filter_chain filter, we only has static filter config providers, so the config should
+    // always be available.
+    if (config.has_value()) {
+      callbacks.setFilterConfigName(filter_config_name);
+      config.value()(callbacks);
+    }
+  }
 }
 
 } // namespace
@@ -39,20 +78,17 @@ Http::FilterFactoryCb FilterChainFilterFactory::createFilterFactoryFromProtoType
   auto filter_config = std::make_shared<FilterChainConfig>(proto_config, context, stats_prefix);
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    OptRef<const FilterChain> chain = routeLevelFilterChain(*filter_config, callbacks);
-
-    // If no route level filter chain, use the default one.
-    if (!chain.has_value()) {
-      if (chain = filter_config->filterChain(); !chain.has_value()) {
-        ENVOY_LOG(debug, "filter chain filter: no filter chain found, passing through");
-        filter_config->stats().pass_through_.inc();
-        return;
-      }
-      filter_config->stats().use_default_filter_chain_.inc();
+    FilterChains filter_chains = getAllFilterChains(filter_config->filterChain(), callbacks);
+    if (filter_chains.empty()) {
+      filter_config->stats().pass_through_.inc();
+      return;
     }
+    absl::Span<const FilterChain*> chains_span = absl::MakeSpan(filter_chains);
 
-    ASSERT(chain.has_value());
-    Http::FilterChainUtility::createFilterChainForFactories(callbacks, chain->filterFactories());
+    for (size_t i = 0; i < chains_span.size(); ++i) {
+      ASSERT(chains_span[i] != nullptr);
+      createFilterChain(callbacks, chains_span[i], chains_span.subspan(i + 1));
+    }
   };
 }
 

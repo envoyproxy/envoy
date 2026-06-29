@@ -13,6 +13,15 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
+uint64_t ReverseConnectionUtility::addJitter(uint64_t interval_ms, uint64_t jitter_percent,
+                                             Random::RandomGenerator& random) {
+  const uint64_t jitter_mod = jitter_percent * interval_ms / 100;
+  if (jitter_mod > 0) {
+    interval_ms += random.random() % jitter_mod;
+  }
+  return interval_ms;
+}
+
 bool ReverseConnectionUtility::isPingMessage(absl::string_view data) {
   if (data.size() != PING_MESSAGE.size()) {
     return false;
