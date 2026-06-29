@@ -68,9 +68,9 @@ private:
 /**
  * Decorates an upstream HTTP/2 client codec for reverse-tunnel clusters, where the TCP
  * client/server roles are reversed relative to the HTTP roles. It owns a DrainAwareClientCallbacks
- * wrapper (installed at codec construction so received GOAWAYs are observed) and forwards every
- * ClientConnection call to the wrapped codec. goAway()/shutdownNotice() are the hooks for emitting
- * a drain GOAWAY to the peer.
+ * wrapper (installed at codec construction so received GOAWAY frames are observed) and forwards
+ * every ClientConnection call to the wrapped codec. goAway()/shutdownNotice() are the hooks for
+ * emitting a drain GOAWAY to the peer.
  */
 class DrainAwareClientConnection : public Envoy::Http::ClientConnection,
                                    public Logger::Loggable<Logger::Id::client> {

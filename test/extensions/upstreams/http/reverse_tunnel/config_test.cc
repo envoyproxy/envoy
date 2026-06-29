@@ -3,7 +3,10 @@
 
 #include "envoy/extensions/upstreams/http/reverse_tunnel/v3/reverse_tunnel_codec.pb.h"
 #include "envoy/http/client_codec_factory.h"
+#include "envoy/server/admin.h"
 
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/upstreams/http/reverse_tunnel/config.h"
 #include "source/extensions/upstreams/http/reverse_tunnel/drain_aware_client_connection.h"
@@ -14,9 +17,13 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/admin_stream.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/test_common/utility.h"
 
+#include "absl/strings/match.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -29,6 +36,8 @@ namespace {
 
 using ::testing::_;
 using ::testing::NiceMock;
+using ::testing::Return;
+using ::testing::ReturnRef;
 
 envoy::extensions::upstreams::http::reverse_tunnel::v3::ReverseTunnelUpstreamCodecOptions
 makeProto(bool enable) {
@@ -57,7 +66,6 @@ protected:
   NiceMock<ThreadLocal::MockInstance> tls_;
 };
 
-// The options object must be recoverable as an Http::ClientCodecFactory via sidecast, which is how
 // The options object surfaces a per-cluster upstream codec factory via the ProtocolOptionsConfig
 // hook (how ClusterInfoImpl discovers it).
 TEST_F(ReverseTunnelUpstreamCodecTest, OptionsExposesCodecFactory) {
@@ -179,6 +187,104 @@ TEST_F(ReverseTunnelUpstreamCodecTest, PassThroughForNonReverseConnectionCluster
           testing::Return(OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>{}));
 
   EXPECT_EQ(opts.createClientCodec(makeContext(Envoy::Http::CodecType::HTTP2)), nullptr);
+}
+
+// Enabled + HTTP/2 + a reverse-connection cluster: the factory builds a drain-aware HTTP/2 client
+// codec (wrapping the stock codec with the GOAWAY-observing callbacks).
+TEST_F(ReverseTunnelUpstreamCodecTest, CreatesDrainAwareCodecForReverseConnectionHttp2) {
+  ReverseTunnelUpstreamCodecOptions opts(makeProto(true), stats_, nullptr);
+
+  envoy::config::cluster::v3::Cluster::CustomClusterType custom_type;
+  custom_type.set_name("envoy.clusters.reverse_connection");
+  ON_CALL(cluster_, clusterType()).WillByDefault(Return(makeOptRef(std::as_const(custom_type))));
+  ON_CALL(cluster_, maxResponseHeadersCount()).WillByDefault(Return(100));
+
+  auto codec = opts.createClientCodec(makeContext(Envoy::Http::CodecType::HTTP2));
+  ASSERT_NE(codec, nullptr);
+  EXPECT_EQ(Envoy::Http::Protocol::Http2, codec->protocol());
+}
+
+// The DrainAwareClientCallbacks wrapper forwards the non-GOAWAY connection callbacks unchanged.
+TEST_F(ReverseTunnelUpstreamCodecTest, CallbacksForwardSettingsAndMaxStreams) {
+  NiceMock<Envoy::Http::MockConnectionCallbacks> inner;
+  DrainAwareClientCallbacks wrapper(inner, stats_);
+
+  NiceMock<Envoy::Http::MockReceivedSettings> settings;
+  EXPECT_CALL(inner, onSettings(_));
+  wrapper.onSettings(settings);
+
+  // onMaxStreamsChanged has a default (non-pure) implementation, so it is not a gmock method;
+  // exercising the forwarding path is enough for coverage.
+  wrapper.onMaxStreamsChanged(42);
+}
+
+// The decorator forwards the remaining ClientConnection surface to the wrapped codec.
+TEST_F(ReverseTunnelUpstreamCodecTest, ConnectionForwardsRemainingCalls) {
+  auto inner = std::make_unique<NiceMock<Envoy::Http::MockClientConnection>>();
+  auto* inner_raw = inner.get();
+  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, stats_);
+  DrainAwareClientConnection codec(std::move(inner), std::move(callbacks), stats_, dispatcher_,
+                                   /*registry=*/nullptr, /*cluster=*/"");
+
+  NiceMock<Envoy::Http::MockResponseDecoder> decoder;
+  NiceMock<Envoy::Http::MockRequestEncoder> encoder;
+  EXPECT_CALL(*inner_raw, newStream(_)).WillOnce(ReturnRef(encoder));
+  codec.newStream(decoder);
+
+  Buffer::OwnedImpl data;
+  EXPECT_CALL(*inner_raw, dispatch(_)).WillOnce(Return(Envoy::Http::okStatus()));
+  EXPECT_TRUE(codec.dispatch(data).ok());
+
+  EXPECT_CALL(*inner_raw, protocol()).WillOnce(Return(Envoy::Http::Protocol::Http2));
+  EXPECT_EQ(Envoy::Http::Protocol::Http2, codec.protocol());
+
+  EXPECT_CALL(*inner_raw, wantsToWrite()).WillOnce(Return(true));
+  EXPECT_TRUE(codec.wantsToWrite());
+
+  EXPECT_CALL(*inner_raw, onUnderlyingConnectionAboveWriteBufferHighWatermark());
+  codec.onUnderlyingConnectionAboveWriteBufferHighWatermark();
+
+  EXPECT_CALL(*inner_raw, onUnderlyingConnectionBelowWriteBufferLowWatermark());
+  codec.onUnderlyingConnectionBelowWriteBufferLowWatermark();
+}
+
+// The factory builds the options object, lazily creates the shared drain registry, and registers
+// the admin drain trigger. Invoking that trigger fans a drain out via the registry.
+TEST_F(ReverseTunnelUpstreamCodecTest, FactoryCreatesOptionsAndRegistersAdminHandler) {
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  auto& admin = factory_context.server_context_.admin_;
+  ON_CALL(factory_context, serverFactoryContext())
+      .WillByDefault(ReturnRef(factory_context.server_context_));
+  ON_CALL(factory_context.server_context_, admin())
+      .WillByDefault(Return(OptRef<Server::Admin>{admin}));
+
+  Server::Admin::HandlerCb captured_handler;
+  EXPECT_CALL(admin, addHandler("/reverse_tunnel/drain_clusters", _, _, false, true, _))
+      .WillOnce([&captured_handler](const std::string&, const std::string&,
+                                    Server::Admin::HandlerCb cb, bool, bool,
+                                    const Server::Admin::ParamDescriptorVec&) {
+        captured_handler = std::move(cb);
+        return true;
+      });
+
+  ReverseTunnelUpstreamCodecFactory factory;
+  auto proto = makeProto(true);
+  auto result = factory.createProtocolOptionsConfig(proto, factory_context);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  ASSERT_NE(result.value(), nullptr);
+  EXPECT_TRUE(result.value()->upstreamHttpClientCodecFactory().has_value());
+
+  // Drive the admin handler with a drain_time_ms query param to exercise its body.
+  ASSERT_TRUE(captured_handler != nullptr);
+  NiceMock<Server::MockAdminStream> admin_stream;
+  Envoy::Http::Utility::QueryParamsMulti params;
+  params.add("cluster", "cluster_a");
+  params.add("drain_time_ms", "1000");
+  ON_CALL(admin_stream, queryParams()).WillByDefault(Return(params));
+  Envoy::Http::TestResponseHeaderMapImpl response_headers;
+  Buffer::OwnedImpl response;
+  EXPECT_EQ(Envoy::Http::Code::OK, captured_handler(response_headers, response, admin_stream));
+  EXPECT_TRUE(absl::StrContains(response.toString(), "cluster_a"));
 }
 
 } // namespace
