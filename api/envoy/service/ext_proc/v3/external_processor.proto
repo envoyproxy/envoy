@@ -108,6 +108,8 @@ message ProcessingRequest {
   // bit less control: as soon as it receives these initial values, it can
   // immediately send a window update that reduces the window, but it
   // must be prepared to handle any data that the sender has already sent.
+  // The initial sizes for the to-sidestream windows are generally
+  // expected to be in the range of 32K to 64K.
   //
   // In ``FULL_DUPLEX_STREAMED`` body send mode, for backward compatibility
   // with existing ext_proc servers that do not support flow control, if
