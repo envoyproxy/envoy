@@ -136,11 +136,11 @@ public:
       // Configure the cache
       auto* cache_config = ext_authz_proto.mutable_cache();
       cache_config->set_name("envoy.filters.http.ext_authz.cache.simple_in_memory");
-      cache_config->mutable_typed_config()->PackFrom(Protobuf::Struct());
+      EXPECT_TRUE(cache_config->mutable_typed_config()->PackFrom(Protobuf::Struct()));
 
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
-      ext_authz_filter.mutable_typed_config()->PackFrom(ext_authz_proto);
+      EXPECT_TRUE(ext_authz_filter.mutable_typed_config()->PackFrom(ext_authz_proto));
 
       // Prepend filter to HCM
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
