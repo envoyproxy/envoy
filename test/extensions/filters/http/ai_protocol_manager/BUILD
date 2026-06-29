@@ -50,3 +50,16 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "ai_protocol_manager_integration_test",
+    size = "large",
+    srcs = ["ai_protocol_manager_integration_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "6gig",
+    shard_count = 4,
+    deps = [
+        "//source/extensions/filters/http/ai_protocol_manager:config",
+        "//test/integration:http_protocol_integration_lib",
+    ],
+)
