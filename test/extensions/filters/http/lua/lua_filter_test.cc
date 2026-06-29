@@ -3767,9 +3767,10 @@ TEST_F(LuaHttpFilterTest, LuaVmCountGaugeDecrementOnDestroy) {
       1, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
-TEST_F(LuaHttpFilterTest, LuaVmCountGaugePerRouteInlineNotCounted) {
+TEST_F(LuaHttpFilterTest, LuaVmCountGaugePerRouteInlineCounted) {
   // FilterConfigPerRoute with inline source_code creates its own PerLuaCodeSetup
-  // with vm_count=nullptr, so it must not affect the gauge owned by FilterConfig.
+  // that tracks VMs in the server root scope under "lua.lua_vm_count", separate
+  // from the per-filter gauge owned by FilterConfig.
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
   proto_config.mutable_default_source_code()->set_inline_string(HEADER_ONLY_SCRIPT);
 
@@ -3779,9 +3780,13 @@ TEST_F(LuaHttpFilterTest, LuaVmCountGaugePerRouteInlineNotCounted) {
   setupConfig(proto_config, per_route_proto_config);
   setupFilter();
 
-  // Only the global inline_code VM is counted; the per-route one is not.
+  // Filter-level VM is tracked in the filter's scoped gauge.
   EXPECT_EQ(
       1, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
+  // Per-route VM is tracked separately in the server root scope gauge.
+  EXPECT_EQ(1, server_factory_context_.store_
+                   .gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate)
+                   .value());
 }
 
 // Test clear route cache.

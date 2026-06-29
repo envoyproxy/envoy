@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -471,7 +472,8 @@ using InitializerList = std::vector<Initializer>;
 class ThreadLocalState : Logger::Loggable<Logger::Id::lua> {
 public:
   ThreadLocalState(const std::string& code, ThreadLocal::SlotAllocator& tls,
-                   Stats::Gauge* vm_count = nullptr);
+                   Stats::Gauge* vm_count = nullptr,
+                   Stats::ScopeSharedPtr scope_keeper = nullptr);
 
   /**
    * @return CoroutinePtr a new coroutine.
@@ -518,12 +520,16 @@ public:
 
 private:
   struct LuaThreadLocal : public ThreadLocal::ThreadLocalObject {
-    LuaThreadLocal(const std::string& code, Stats::Gauge* vm_count);
+    LuaThreadLocal(const std::string& code, Stats::Gauge* vm_count,
+                   Stats::ScopeSharedPtr scope_keeper);
     ~LuaThreadLocal() override;
 
     CSmartPtr<lua_State, lua_close> state_;
     std::vector<int> global_slots_;
     Stats::Gauge* vm_count_;
+    // Keeps the stats scope alive until this TLS object is destroyed, preventing
+    // vm_count_ from becoming a dangling pointer during async TLS cleanup.
+    Stats::ScopeSharedPtr scope_keeper_;
   };
 
   CSmartPtr<lua_State, lua_close>& tlsState() { return (*tls_slot_)->state_; }
