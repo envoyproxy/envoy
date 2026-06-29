@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/filter.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -42,6 +43,9 @@ public:
           injected_end_stream_ = end_stream;
           ++inject_calls_;
         }));
+    // Capture continueDecoding() so trailer-terminated streams can assert the
+    // held trailers are released after the replayed body.
+    ON_CALL(callbacks_, continueDecoding()).WillByDefault(Invoke([this]() { ++continue_calls_; }));
   }
 
   // Run all posted callbacks, including ones enqueued while draining.
@@ -73,6 +77,7 @@ public:
   Buffer::OwnedImpl injected_;
   bool injected_end_stream_{false};
   int inject_calls_{0};
+  int continue_calls_{0};
 };
 
 // The body is offloaded chunk-by-chunk and replayed verbatim once end_stream is
@@ -224,6 +229,27 @@ TEST_F(AiProtocolManagerFilterTest, NestedWatermarksRequireBalancedRelease) {
   drain();
   EXPECT_TRUE(injected_end_stream_);
   EXPECT_EQ(injected_.toString(), big);
+}
+
+// A request whose body is terminated by trailers (last data frame has
+// end_stream=false; the trailers carry END_STREAM) is not stuck: the body is
+// replayed (final frame end_stream=false) and the held trailers are released
+// via continueDecoding() once the body has been injected.
+TEST_F(AiProtocolManagerFilterTest, TrailerTerminatedStream) {
+  Buffer::OwnedImpl body("{\"messages\":[\"hi\"]}");
+  EXPECT_EQ(filter_.decodeData(body, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  Http::TestRequestTrailerMapImpl trailers{{"x-trailer", "1"}};
+  EXPECT_EQ(filter_.decodeTrailers(trailers), Http::FilterTrailersStatus::StopIteration);
+
+  EXPECT_EQ(inject_calls_, 0);
+  EXPECT_EQ(continue_calls_, 0);
+
+  drain();
+
+  EXPECT_GE(inject_calls_, 1);
+  EXPECT_FALSE(injected_end_stream_);
+  EXPECT_EQ(injected_.toString(), "{\"messages\":[\"hi\"]}");
+  EXPECT_EQ(continue_calls_, 1);
 }
 
 } // namespace

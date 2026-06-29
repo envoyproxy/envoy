@@ -28,6 +28,7 @@ public:
   void resumeSource() override { callbacks_.onDecoderFilterBelowWriteBufferLowWatermark(); }
   void registerReplayWatermarks(ReplayWatermarkHandler& handler) override;
   void unregisterReplayWatermarks() override;
+  void continueIteration() override { callbacks_.continueDecoding(); }
   void onUnrecoverableError() override;
 
   // Http::UpstreamWatermarkCallbacks (replay side: upstream back-pressure).
@@ -74,6 +75,7 @@ public:
   void resumeSource() override { encoder_callbacks_.onEncoderFilterBelowWriteBufferLowWatermark(); }
   void registerReplayWatermarks(ReplayWatermarkHandler& handler) override;
   void unregisterReplayWatermarks() override;
+  void continueIteration() override { encoder_callbacks_.continueEncoding(); }
   void onUnrecoverableError() override;
 
   // Http::DownstreamWatermarkCallbacks (replay side: downstream back-pressure).

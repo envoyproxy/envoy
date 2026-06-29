@@ -41,6 +41,7 @@ public:
   // Http::StreamDecoderFilter
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
 
 private:
   ExternalBufferFactory& buffer_factory_;

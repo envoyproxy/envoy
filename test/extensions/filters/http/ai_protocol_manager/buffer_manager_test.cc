@@ -40,6 +40,7 @@ public:
   void resumeSource() override { ++resume_source_calls_; }
   void registerReplayWatermarks(ReplayWatermarkHandler& handler) override { handler_ = &handler; }
   void unregisterReplayWatermarks() override { handler_ = nullptr; }
+  void continueIteration() override { ++continue_calls_; }
   void onUnrecoverableError() override { ++error_calls_; }
 
   Event::Dispatcher& dispatcher_;
@@ -51,6 +52,7 @@ public:
   int inject_calls_{0};
   int pause_source_calls_{0};
   int resume_source_calls_{0};
+  int continue_calls_{0};
   int error_calls_{0};
 };
 
@@ -258,6 +260,71 @@ TEST_F(BufferManagerTest, NestedWatermarksRequireBalancedRelease) {
   drain();
   EXPECT_TRUE(bridge_->injected_end_stream_);
   EXPECT_EQ(bridge_->injected_.toString(), big);
+}
+
+// When the stream is terminated by trailers (end_stream arrives on the trailers
+// callback, not a data frame), the body is still replayed: the final body frame
+// carries end_stream=false and the held trailers are released via the bridge
+// once replay completes.
+TEST_F(BufferManagerTest, TrailerTerminatedStreamReplaysBodyThenReleasesTrailers) {
+  Buffer::OwnedImpl chunk1("{\"messages\":");
+  EXPECT_EQ(manager_->onData(chunk1, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  Buffer::OwnedImpl chunk2("[\"hi\"]}");
+  // Last body frame is NOT end_stream; the trailers will carry it.
+  EXPECT_EQ(manager_->onData(chunk2, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  // Trailers arrive: iteration is held until the replayed body has been injected.
+  EXPECT_EQ(manager_->onTrailers(), Http::FilterTrailersStatus::StopIteration);
+
+  // Nothing replayed yet, and the trailers must not have been released.
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+  EXPECT_EQ(bridge_->continue_calls_, 0);
+
+  drain();
+
+  // Body replayed verbatim, the final frame did NOT set end_stream, and the
+  // trailers were released exactly once after the body.
+  EXPECT_GE(bridge_->inject_calls_, 1);
+  EXPECT_FALSE(bridge_->injected_end_stream_);
+  EXPECT_EQ(bridge_->injected_.toString(), "{\"messages\":[\"hi\"]}");
+  EXPECT_EQ(bridge_->continue_calls_, 1);
+}
+
+// A trailer-terminated request with no body has nothing to replay: onTrailers()
+// returns Continue so the trailers flow normally, and nothing is injected.
+TEST_F(BufferManagerTest, TrailersWithoutBodyContinue) {
+  EXPECT_EQ(manager_->onTrailers(), Http::FilterTrailersStatus::Continue);
+  drain();
+
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+  EXPECT_EQ(bridge_->continue_calls_, 0);
+}
+
+// A large, multi-chunk body terminated by trailers replays in bounded frames,
+// none of which set end_stream, and the trailers are released once after the
+// last chunk.
+TEST_F(BufferManagerTest, LargeTrailerTerminatedStream) {
+  const std::string big(200 * 1024, 'x'); // > ReadChunkSize, multiple chunks.
+  Buffer::OwnedImpl body(big);
+  EXPECT_EQ(manager_->onData(body, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  EXPECT_EQ(manager_->onTrailers(), Http::FilterTrailersStatus::StopIteration);
+  drain();
+
+  EXPECT_GT(bridge_->inject_calls_, 1);
+  EXPECT_FALSE(bridge_->injected_end_stream_);
+  EXPECT_EQ(bridge_->injected_.toString(), big);
+  EXPECT_EQ(bridge_->continue_calls_, 1);
+}
+
+// Trailers terminating an empty body still release the trailers (the empty body
+// produces no injected frame, since the trailers carry stream completion).
+TEST_F(BufferManagerTest, TrailersAfterEmptyBody) {
+  Buffer::OwnedImpl empty;
+  EXPECT_EQ(manager_->onData(empty, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  EXPECT_EQ(manager_->onTrailers(), Http::FilterTrailersStatus::StopIteration);
+  drain();
+
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+  EXPECT_EQ(bridge_->continue_calls_, 1);
 }
 
 } // namespace

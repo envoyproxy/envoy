@@ -57,6 +57,10 @@ public:
   // (upstream watermarks on decode, downstream watermarks on encode).
   virtual void registerReplayWatermarks(ReplayWatermarkHandler& handler) PURE;
   virtual void unregisterReplayWatermarks() PURE;
+  // Resumes filter-chain iteration that was stopped by returning StopIteration
+  // from the trailers callback (continueDecoding/continueEncoding), releasing
+  // the trailers the connection manager is holding behind the replayed body.
+  virtual void continueIteration() PURE;
   // Fails the stream after an unrecoverable external-buffer error.
   virtual void onUnrecoverableError() PURE;
 };
@@ -87,6 +91,13 @@ public:
   // `data` into the external buffer and holds the chain; replay begins once the
   // stream has been fully offloaded.
   Http::FilterDataStatus onData(Buffer::Instance& data, bool end_stream);
+  // Entry point for the path's trailers callback (decodeTrailers/encodeTrailers).
+  // Trailers carry end_stream when the body did not, so this marks the stream
+  // complete and drives replay. Returns StopIteration when there is buffered
+  // body to replay ahead of the trailers (the manager releases them via
+  // continueIteration() once replay finishes); Continue when there is nothing to
+  // replay.
+  Http::FilterTrailersStatus onTrailers();
   // Cancels in-flight work and detaches from the filter chain. After this the
   // async completion handlers are inert.
   void onDestroy();
@@ -104,6 +115,9 @@ private:
   void onAppendComplete(ExternalBufferStatus status);
   // Kicks off reading the offloaded payload back into the filter chain.
   void streamBackToFilterChain();
+  // Ends replay: marks it done and, if the stream was terminated by trailers,
+  // releases them via the bridge so they follow the replayed body.
+  void finishReplay();
   // Issues the next bounded read() in the replay, unless replay is finished or
   // currently paused by chain back-pressure (or a read is already in flight).
   void maybeReadNextChunk();
@@ -123,6 +137,10 @@ private:
   // True once onData() has observed end_stream. Replay begins once this is set
   // and all outstanding appends have completed.
   bool end_stream_seen_{false};
+  // True when the stream was terminated by trailers (end_stream arrived on the
+  // trailers callback, not a data frame). The replayed body must then end with
+  // end_stream=false, and the held trailers are released once replay completes.
+  bool trailers_pending_{false};
   // Number of append() calls whose completion callback has not yet fired.
   uint64_t outstanding_appends_{0};
 

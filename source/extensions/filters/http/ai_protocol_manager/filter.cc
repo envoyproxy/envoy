@@ -32,6 +32,10 @@ Http::FilterDataStatus AiProtocolManagerFilter::decodeData(Buffer::Instance& dat
   return decode_manager_->onData(data, end_stream);
 }
 
+Http::FilterTrailersStatus AiProtocolManagerFilter::decodeTrailers(Http::RequestTrailerMap&) {
+  return decode_manager_->onTrailers();
+}
+
 } // namespace AiProtocolManager
 } // namespace HttpFilters
 } // namespace Extensions

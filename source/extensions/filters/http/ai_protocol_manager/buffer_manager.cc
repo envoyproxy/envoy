@@ -47,6 +47,29 @@ Http::FilterDataStatus BufferManager::onData(Buffer::Instance& data, bool end_st
   return Http::FilterDataStatus::StopIterationNoBuffer;
 }
 
+Http::FilterTrailersStatus BufferManager::onTrailers() {
+  // No body was offloaded (e.g. a headers + trailers request): there is nothing
+  // to replay, so let the trailers flow normally.
+  if (buffer_ == nullptr) {
+    return Http::FilterTrailersStatus::Continue;
+  }
+
+  // The body ended without end_stream on a data frame; the trailers carry it.
+  // Mark the stream complete so replay can begin, and replay the body ahead of
+  // the trailers. If appends are still outstanding, onAppendComplete() starts
+  // replay once they drain.
+  trailers_pending_ = true;
+  end_stream_seen_ = true;
+  ENVOY_LOG(trace, "ai_protocol_manager: trailers observed; stream complete");
+  if (outstanding_appends_ == 0) {
+    streamBackToFilterChain();
+  }
+
+  // Hold the trailers behind the replayed body; finishReplay() releases them via
+  // bridge_->continueIteration() once the last body frame has been injected.
+  return Http::FilterTrailersStatus::StopIteration;
+}
+
 void BufferManager::onAppendComplete(ExternalBufferStatus status) {
   if (destroyed_) {
     return;
@@ -87,11 +110,14 @@ void BufferManager::maybeReadNextChunk() {
   }
 
   if (replay_offset_ >= replay_length_) {
-    // Empty payload (or an empty trailing frame): emit an end_stream marker so
-    // downstream filters see stream completion.
-    replaying_ = false;
-    Buffer::OwnedImpl empty;
-    bridge_->injectData(empty, true);
+    // Empty payload (replay_length_ == 0): there is nothing to read. Emit an
+    // empty end_stream marker so downstream filters see completion -- unless
+    // trailers will carry end_stream, in which case finishReplay() releases them.
+    if (!trailers_pending_) {
+      Buffer::OwnedImpl empty;
+      bridge_->injectData(empty, true);
+    }
+    finishReplay();
     return;
   }
 
@@ -114,16 +140,27 @@ void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::Instance
   }
 
   replay_offset_ += data->length();
-  const bool end_stream = replay_offset_ >= replay_length_;
+  const bool last = replay_offset_ >= replay_length_;
   // Inject even if a high watermark was raised while this read was in flight:
   // at most one extra chunk (ReadChunkSize) overshoots before we pause, which
-  // keeps the overshoot bounded.
-  bridge_->injectData(*data, end_stream);
-  if (end_stream) {
-    replaying_ = false;
+  // keeps the overshoot bounded. When trailers terminate the stream they carry
+  // end_stream, so the final body frame must not.
+  bridge_->injectData(*data, last && !trailers_pending_);
+  if (last) {
+    finishReplay();
     return;
   }
   maybeReadNextChunk();
+}
+
+void BufferManager::finishReplay() {
+  replaying_ = false;
+  if (trailers_pending_) {
+    // The body has been fully replayed ahead of the trailers the connection
+    // manager is holding; release them so they follow the body in order.
+    ENVOY_LOG(trace, "ai_protocol_manager: replay complete; releasing trailers");
+    bridge_->continueIteration();
+  }
 }
 
 void BufferManager::onExternalBufferError() {

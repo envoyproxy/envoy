@@ -47,5 +47,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
         "//source/extensions/filters/http/ai_protocol_manager:filter_lib",
         "//test/mocks/http:http_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
