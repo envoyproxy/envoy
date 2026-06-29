@@ -408,6 +408,29 @@ TEST_F(OrcaOobManagerWireTest, EndStreamDataWithoutTrailersIsTransientFailure) {
   EXPECT_EQ(oobCounter("stream_failures"), 1);
 }
 
+TEST_F(OrcaOobManagerWireTest, NullDialAddressTriggersEnvoyBug) {
+  auto manager = makeManager();
+  ASSERT_OK(manager->initialize());
+
+  auto* attempt_timer = installAttemptTimer();
+  auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  ON_CALL(*host, orcaReportingAddress()).WillByDefault(Return(nullptr));
+  ON_CALL(*host, address()).WillByDefault(Return(nullptr));
+  ON_CALL(*host, hostname()).WillByDefault(testing::ReturnRef(empty_hostname_));
+  priority_set_.runUpdateCallbacks(0, {host}, {});
+
+  // Assertions sit inside EXPECT_ENVOY_BUG so they run in-process on the release path; in debug
+  // the abort fires first and skips them.
+  EXPECT_CALL(*manager, createCodecClient_(_)).Times(0);
+  EXPECT_ENVOY_BUG(
+      {
+        attempt_timer->invokeCallback();
+        EXPECT_EQ(oobCounter("stream_failures"), 1);
+        EXPECT_TRUE(attempt_timer->enabled());
+      },
+      "ORCA OOB host has no resolvable address");
+}
+
 TEST_F(OrcaOobManagerWireTest, UnimplementedTrailerIsTerminal) {
   auto manager = makeManager();
   ASSERT_OK(manager->initialize());

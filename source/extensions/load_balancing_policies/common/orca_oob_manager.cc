@@ -268,7 +268,12 @@ void OrcaOobManager::OobSession::connectAndStream() {
   if (dial_address == nullptr) {
     dial_address = host_->address();
   }
-  ASSERT(dial_address != nullptr);
+  if (dial_address == nullptr) {
+    IS_ENVOY_BUG("ORCA OOB host has no resolvable address");
+    parent_.oob_stats_.stream_failures_.inc();
+    attempt_timer_->enableTimer(std::chrono::milliseconds(backoff_->nextBackOffMs()));
+    return;
+  }
   if (parent_.config_.port_value != 0) {
     if (dial_address->ip() != nullptr) {
       dial_address =
