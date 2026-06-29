@@ -1522,6 +1522,80 @@ TEST(UnifiedDeltaGrpcMuxFactoryTest, InvalidRateLimit) {
                EnvoyException);
 }
 
+TEST_P(GrpcMuxImplTest, XdsConfigTrackerUnsubscriptionTest) {
+  // Setup a mock tracker
+  auto xds_config_tracker = std::make_unique<NiceMock<MockXdsConfigTracker>>();
+  auto* xds_config_tracker_ptr = xds_config_tracker.get();
+
+  // Re-setup the mux with the tracker
+  GrpcMuxContext grpc_mux_context{
+      /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+      /*failover_async_client_=*/nullptr,
+      /*dispatcher_=*/dispatcher_,
+      /*service_method_=*/
+      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.discovery.v3.AggregatedDiscoveryService."
+          "StreamAggregatedResources"),
+      /*local_info_=*/local_info_,
+      /*rate_limit_settings_=*/rate_limit_settings_,
+      /*scope_=*/*stats_.rootScope(),
+      /*config_validators_=*/std::move(config_validators_),
+      /*xds_resources_delegate_=*/XdsResourcesDelegateOptRef(),
+      /*xds_config_tracker_=*/
+      makeOptRefFromPtr<XdsConfigTracker>(xds_config_tracker_ptr),
+      /*backoff_strategy_=*/
+      std::make_unique<JitteredExponentialBackOffStrategy>(
+          SubscriptionFactory::RetryInitialDelayMs,
+          SubscriptionFactory::RetryMaxDelayMs, random_),
+      /*target_xds_authority_=*/"",
+      /*eds_resources_cache_=*/
+      std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+      /*skip_subsequent_node_=*/true};
+  const std::string type_url =
+      "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment";
+
+  grpc_mux_ = std::make_unique<XdsMux::GrpcMuxSotw>(grpc_mux_context);
+  // We do NOT call setup() here because it would overwrite grpc_mux_ with a
+  // default one that has no tracker. Instead, we manually trigger what setup()
+  // does if needed, or just rely on our manual grpc_mux_ initialization.
+  // Actually, GrpcMuxImplTestBase::setup() also initializes other things, but
+  // most importantly it sets grpc_mux_. If we want to use a custom tracker, we
+  // should either:
+  // 1. Modify GrpcMuxImplTestBase to allow passing a tracker to setup().
+  // 2. Or just manually initialize grpc_mux_ and NOT call setup().
+  // Let's see what setup() does: it just calls GrpcMuxSotw constructor.
+  // So we don't need to call setup() if we do it manually.
+  // However, we might need to initialize async_client_ and other things. They
+  // are already initialized in GrpcMuxImplTestBase constructor. So we are good.
+  // We just need to remove the setup() call.
+
+  // Enable verbose logging for config to see what's happening
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
+  // 1. Add watch1 for {"x", "y"}
+  auto watch1 = grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_,
+                                    resource_decoder_, {});
+
+  // 2. Add watch2 for {"x"}
+  NiceMock<MockSubscriptionCallbacks> callbacks2;
+  auto watch2 =
+      grpc_mux_->addWatch(type_url, {"x"}, callbacks2, resource_decoder_, {});
+
+  // 3. Destroy watch1 -> this should trigger unsubscription of {"y"} since no
+  // other watch wants it.
+  EXPECT_CALL(
+      *xds_config_tracker_ptr,
+      onResourceUnsubscribed(type_url, std::vector<absl::string_view>{"y"}));
+  watch1.reset();
+
+  // 4. Destroy watch2 -> this should trigger unsubscription of {"x"} since no
+  // other watch wants it.
+  EXPECT_CALL(
+      *xds_config_tracker_ptr,
+      onResourceUnsubscribed(type_url, std::vector<absl::string_view>{"x"}));
+  watch2.reset();
+}
+
 } // namespace
 } // namespace XdsMux
 } // namespace Config

@@ -1,18 +1,22 @@
 #include "source/extensions/config_subscription/grpc/xds_mux/grpc_mux_impl.h"
 
+#include <memory>
+
+#include "absl/container/flat_hash_set.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
-
+#include "envoy/common/exception.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/backoff_strategy.h"
-#include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/resource_name.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_context_params.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/memory/utils.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/protobuf/utility.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 #include "source/extensions/config_subscription/grpc/eds_resources_cache_impl.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_context.h"
 
 namespace Envoy {
 namespace Config {
@@ -192,6 +196,22 @@ void GrpcMuxImpl<S, F, RQ, RS>::updateWatch(const std::string& type_url, Watch* 
   }
 
   auto added_removed = watch_map.updateWatchInterest(watch, effective_resources);
+  ENVOY_LOG(debug, "GrpcMuxImpl::updateWatch added_removed.removed_ size: {}",
+            added_removed.removed_.size());
+  if (xds_config_tracker_.has_value()) {
+    ENVOY_LOG(debug, "GrpcMuxImpl::updateWatch tracker has value");
+    if (!added_removed.removed_.empty()) {
+      std::vector<absl::string_view> unsubscribed(
+          added_removed.removed_.begin(), added_removed.removed_.end());
+      ENVOY_LOG(debug,
+                "GrpcMuxImpl::updateWatch calling onResourceUnsubscribed for "
+                "{} resources",
+                unsubscribed.size());
+      xds_config_tracker_->onResourceUnsubscribed(type_url, unsubscribed);
+    }
+  } else {
+    ENVOY_LOG(debug, "GrpcMuxImpl::updateWatch tracker has NO value");
+  }
   if (options.use_namespace_matching_) {
     // This is to prevent sending out of requests that contain prefixes instead of resource names
     sub.updateSubscriptionInterest({}, {});

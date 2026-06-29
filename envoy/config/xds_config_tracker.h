@@ -83,6 +83,19 @@ public:
   virtual void
   onConfigRejected(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
                    const absl::string_view error_detail) PURE;
+
+  /**
+   * Invoked when the client unsubscribes from one or more resources of the
+   * given type. This is used to track client-initiated unsubscriptions that do
+   * not result in server-side Delta removals.
+   *
+   * @param type_url The type url of xDS message.
+   * @param resources A list of resource names that the client unsubscribed
+   * from.
+   */
+  virtual void onResourceUnsubscribed(
+      const absl::string_view type_url,
+      const std::vector<absl::string_view>& resources) {}
 };
 
 using XdsConfigTrackerPtr = std::unique_ptr<XdsConfigTracker>;

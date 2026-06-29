@@ -262,5 +262,36 @@ private:
   FactoryCallback cb_;
 };
 
+class MockXdsConfigTracker : public XdsConfigTracker {
+ public:
+  MockXdsConfigTracker();
+  ~MockXdsConfigTracker() override;
+
+  MOCK_METHOD(void, onConfigAccepted,
+              (const absl::string_view type_url,
+               const std::vector<DecodedResourcePtr>& resources),
+              (override));
+  MOCK_METHOD(
+      void, onConfigAccepted,
+      (const absl::string_view type_url,
+       absl::Span<const envoy::service::discovery::v3::Resource* const>
+           added_resources,
+       const Protobuf::RepeatedPtrField<std::string>& removed_resources),
+      (override));
+  MOCK_METHOD(void, onConfigRejected,
+              (const envoy::service::discovery::v3::DiscoveryResponse& message,
+               const absl::string_view error_detail),
+              (override));
+  MOCK_METHOD(
+      void, onConfigRejected,
+      (const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+       const absl::string_view error_detail),
+      (override));
+  MOCK_METHOD(void, onResourceUnsubscribed,
+              (const absl::string_view type_url,
+               const std::vector<absl::string_view>& resources),
+              (override));
+};
+
 } // namespace Config
 } // namespace Envoy
