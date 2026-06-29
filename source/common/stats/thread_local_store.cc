@@ -693,7 +693,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromTaggedName(
   // This keep the consistency with the previous behavior of the legacy mode.
   if (!tagged_name.empty()) {
     base_name = tagged_name;
-    stat_name_tags = absl::nullopt;
+    stat_name_tags = std::nullopt;
   }
 
   // Determine the final name based on the prefix and the passed base_name.
@@ -765,7 +765,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromTaggedName(
   // This keep the consistency with the previous behavior of the legacy mode.
   if (!tagged_name.empty()) {
     base_name = tagged_name;
-    stat_name_tags = absl::nullopt;
+    stat_name_tags = std::nullopt;
   }
 
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
@@ -832,7 +832,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromTaggedName(
   // This keep the consistency with the previous behavior of the legacy mode.
   if (!tagged_name.empty()) {
     base_name = tagged_name;
-    stat_name_tags = absl::nullopt;
+    stat_name_tags = std::nullopt;
   }
 
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
@@ -939,7 +939,7 @@ TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromTaggedName(
   // This keep the consistency with the previous behavior of the legacy mode.
   if (!tagged_name.empty()) {
     base_name = tagged_name;
-    stat_name_tags = absl::nullopt;
+    stat_name_tags = std::nullopt;
   }
 
   // Determine the final name based on the prefix and the passed base_name.
