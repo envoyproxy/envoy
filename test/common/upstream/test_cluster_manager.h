@@ -81,7 +81,7 @@ public:
 
   Http::ConnectionPool::InstancePtr allocateConnPool(
       Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority, std::vector<Http::Protocol>&,
-      const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+      const std::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
           alternate_protocol_options,
       const Network::ConnectionSocket::OptionsSharedPtr& options,
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, TimeSource&,
@@ -97,7 +97,7 @@ public:
                       const Network::ConnectionSocket::OptionsSharedPtr&,
                       Network::TransportSocketOptionsConstSharedPtr,
                       Upstream::ClusterConnectivityState&,
-                      absl::optional<std::chrono::milliseconds>) override {
+                      std::optional<std::chrono::milliseconds>) override {
     return Tcp::ConnectionPool::InstancePtr{allocateTcpConnPool_(host)};
   }
 
@@ -106,6 +106,9 @@ public:
                    Outlier::EventLoggerSharedPtr outlier_event_logger,
                    bool added_via_api) override {
     auto result = clusterFromProto_(cluster, outlier_event_logger, added_via_api);
+    if (result.first == nullptr) {
+      return absl::InvalidArgumentError("Failed to create cluster from proto");
+    }
     return std::make_pair(result.first, ThreadAwareLoadBalancerPtr(result.second));
   }
 
@@ -124,7 +127,7 @@ public:
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(Http::ConnectionPool::Instance*, allocateConnPool_,
               (HostConstSharedPtr host,
-               const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+               const std::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
                    alternate_protocol_options,
                Network::ConnectionSocket::OptionsSharedPtr,
                Network::TransportSocketOptionsConstSharedPtr, ClusterConnectivityState&,

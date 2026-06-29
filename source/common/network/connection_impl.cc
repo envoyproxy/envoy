@@ -80,9 +80,6 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
           [this]() -> void { this->onReadBufferLowWatermark(); },
           [this]() -> void { this->onReadBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
-      detect_early_close_(true), enable_half_close_(false), read_end_stream_raised_(false),
-      read_end_stream_(false), write_end_stream_(false), current_write_end_stream_(false),
-      dispatch_buffered_data_(false), transport_wants_read_(false),
       enable_close_through_filter_manager_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.connection_close_through_filter_manager")) {
 
@@ -849,17 +846,17 @@ void ConnectionImpl::onReadReady() {
   }
 }
 
-absl::optional<Connection::UnixDomainSocketPeerCredentials>
+std::optional<Connection::UnixDomainSocketPeerCredentials>
 ConnectionImpl::unixSocketPeerCredentials() const {
   // TODO(snowp): Support non-linux platforms.
 #ifndef SO_PEERCRED
-  return absl::nullopt;
+  return std::nullopt;
 #else
   struct ucred ucred;
   socklen_t ucred_size = sizeof(ucred);
   int rc = socket_->getSocketOption(SOL_SOCKET, SO_PEERCRED, &ucred, &ucred_size).return_value_;
   if (SOCKET_FAILURE(rc)) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return {{ucred.pid, ucred.uid, ucred.gid}};
@@ -1012,7 +1009,7 @@ absl::string_view ConnectionImpl::transportFailureReason() const {
   return transport_socket_->failureReason();
 }
 
-absl::optional<std::chrono::milliseconds> ConnectionImpl::lastRoundTripTime() const {
+std::optional<std::chrono::milliseconds> ConnectionImpl::lastRoundTripTime() const {
   return socket_->lastRoundTripTime();
 }
 
@@ -1021,7 +1018,7 @@ void ConnectionImpl::configureInitialCongestionWindow(uint64_t bandwidth_bits_pe
   return transport_socket_->configureInitialCongestionWindow(bandwidth_bits_per_sec, rtt);
 }
 
-absl::optional<uint64_t> ConnectionImpl::congestionWindowInBytes() const {
+std::optional<uint64_t> ConnectionImpl::congestionWindowInBytes() const {
   return socket_->congestionWindowInBytes();
 }
 
@@ -1076,11 +1073,14 @@ void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
 }
 bool ServerConnectionImpl::initializeReadFilters() {
   bool initialized = ConnectionImpl::initializeReadFilters();
-  if (initialized) {
+  if (initialized && state() == State::Open) {
     // Server connection starts as connected, and we must explicitly signal to
     // the downstream transport socket that the underlying socket is connected.
     // We delay this step until after the filters are initialized and can
     // receive the connection events.
+    // A filter may close the connection during onNewConnection() (e.g. circuit
+    // breaker overflow), in which case the state is no longer Open and we must
+    // skip signaling onConnected to the transport socket.
     onConnected();
   }
   return initialized;
@@ -1127,7 +1127,7 @@ ClientConnectionImpl::ClientConnectionImpl(
   if (transport_options) {
     for (const auto& object : transport_options->downstreamSharedFilterStateObjects()) {
       // This does not throw as all objects are distinctly named and the stream info is empty.
-      stream_info_.filterState()->setData(object.name_, object.data_, object.state_type_,
+      stream_info_.filterState()->setData(object.name_, object.data_,
                                           StreamInfo::FilterState::LifeSpan::Connection,
                                           object.stream_sharing_);
     }

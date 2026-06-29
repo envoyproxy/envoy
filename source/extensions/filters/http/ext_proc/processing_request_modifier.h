@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/config/typed_config.h"
@@ -9,8 +10,6 @@
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/ext_proc/matching_utils.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,7 +34,7 @@ public:
   // Implementations may modify the request and must return true if any modifications were made.
   virtual bool
   modifyRequest(const Params& params,
-                envoy::service::ext_proc::v3::ProcessingRequest& processingRequest) PURE;
+                envoy::service::ext_proc::v3::ProcessingRequest& processing_request) PURE;
 };
 
 class ProcessingRequestModifierFactory : public Config::TypedFactory {

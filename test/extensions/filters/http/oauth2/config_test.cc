@@ -9,6 +9,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/logging.h"
 
+#include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -492,9 +493,145 @@ config:
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().message(),
-            "invalid combination of forward_bearer_token and preserve_authorization_header "
-            "configuration. If forward_bearer_token is set to true, then "
-            "preserve_authorization_header must be false");
+            "invalid OAuth2 configuration: at most one of forward_bearer_token, "
+            "preserve_authorization_header, or forward_id_token (when forwarding the ID token on "
+            "the Authorization header) may be set, as they all use the Authorization header");
+}
+
+// Builds a minimal valid OAuth2 config YAML with the given extra fields spliced in, then asserts
+// that creating the filter factory fails with the expected status message.
+void expectForwardIdTokenConfigError(const std::string& extra_config,
+                                     const std::string& expected_message) {
+  const std::string yaml = R"EOF(
+config:
+)EOF" + extra_config + R"EOF(
+  token_endpoint:
+    cluster: foo
+    uri: oauth.com/token
+    timeout: 3s
+  credentials:
+    client_id: "secret"
+    token_secret:
+      name: token
+    hmac_secret:
+      name: hmac
+  authorization_endpoint: https://oauth.com/oauth/authorize/
+  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
+  redirect_path_matcher:
+    path:
+      exact: /callback
+  signout_path:
+    path:
+      exact: /signout
+    )EOF";
+
+  OAuth2Config factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
+
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
+  ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
+      .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
+          envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
+
+  const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().message(), expected_message);
+}
+
+constexpr absl::string_view kAuthorizationHeaderConflictMessage =
+    "invalid OAuth2 configuration: at most one of forward_bearer_token, "
+    "preserve_authorization_header, or forward_id_token (when forwarding the ID token on the "
+    "Authorization header) may be set, as they all use the Authorization header";
+
+TEST(ConfigTest, ForwardIdTokenOnAuthorizationHeaderConflictsWithForwardBearerToken) {
+  expectForwardIdTokenConfigError("  forward_bearer_token: true\n"
+                                  "  forward_id_token:\n"
+                                  "    header: Authorization",
+                                  std::string(kAuthorizationHeaderConflictMessage));
+}
+
+TEST(ConfigTest, ForwardIdTokenOnAuthorizationHeaderConflictsWithPreserveAuthorizationHeader) {
+  expectForwardIdTokenConfigError("  preserve_authorization_header: true\n"
+                                  "  forward_id_token:\n"
+                                  "    header: authorization",
+                                  std::string(kAuthorizationHeaderConflictMessage));
+}
+
+TEST(ConfigTest, ForwardIdTokenRejectsPseudoHeader) {
+  expectForwardIdTokenConfigError(
+      "  forward_id_token:\n"
+      "    header: \":path\"",
+      "invalid forward_id_token configuration: header ':path' can not be used to forward the ID "
+      "token; pseudo-headers and the Host header are not allowed");
+}
+
+TEST(ConfigTest, ForwardIdTokenRejectsHostHeader) {
+  expectForwardIdTokenConfigError(
+      "  forward_id_token:\n"
+      "    header: host",
+      "invalid forward_id_token configuration: header 'host' can not be used to forward the ID "
+      "token; pseudo-headers and the Host header are not allowed");
+}
+
+TEST(ConfigTest, ForwardIdTokenRejectsPassThroughMatcherOnSameHeader) {
+  // Matching the pass-through rule on the forwarded ID token header (case-insensitively) is
+  // rejected, since pass-through skips sanitization and would let a client spoof the ID token.
+  expectForwardIdTokenConfigError(
+      "  forward_id_token:\n"
+      "    header: x-id-token\n"
+      "  pass_through_matcher:\n"
+      "  - name: X-Id-Token\n"
+      "    present_match: true",
+      "invalid forward_id_token configuration: pass_through_matcher can "
+      "not match on the forwarded ID token header 'x-id-token'");
+}
+
+// A custom (non-Authorization) header for forward_id_token can coexist with forward_bearer_token.
+TEST(ConfigTest, ForwardIdTokenOnCustomHeaderWithForwardBearerTokenIsValid) {
+  const std::string yaml = R"EOF(
+config:
+  forward_bearer_token: true
+  forward_id_token:
+    header: x-id-token
+  token_endpoint:
+    cluster: foo
+    uri: oauth.com/token
+    timeout: 3s
+  credentials:
+    client_id: "secret"
+    token_secret:
+      name: token
+    hmac_secret:
+      name: hmac
+  authorization_endpoint: https://oauth.com/oauth/authorize/
+  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
+  redirect_path_matcher:
+    path:
+      exact: /callback
+  signout_path:
+    path:
+      exact: /signout
+    )EOF";
+
+  OAuth2Config factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
+
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
+  ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
+      .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
+          envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
+
+  EXPECT_TRUE(factory.createFilterFactoryFromProto(*proto_config, "stats", context).ok());
 }
 
 TEST(ConfigTest, ValidSameSiteConfigs) {

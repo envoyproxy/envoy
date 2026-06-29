@@ -1,3 +1,4 @@
+//go:generate mockgen -source=network_base.go -destination=mocks/mock_network_base.go -package=mocks
 package shared
 
 // NetworkBuffer is an interface that provides access to the read and write buffers of a network
@@ -306,6 +307,24 @@ type NetworkFilterConfigHandle interface {
 	// DefineCounter creates a counter metric during configuration initialization and returns its
 	// opaque ID.
 	DefineCounter(name string) (MetricID, MetricsResult)
+
+	// IncrementCounterValue increases a counter metric by value from the config context.
+	//
+	// Unlike NetworkFilterHandle.IncrementCounterValue, this does not require a per-connection
+	// filter and can be called outside of the connection lifecycle, e.g. from a scheduled task.
+	IncrementCounterValue(id MetricID, value uint64) MetricsResult
+
+	// SetGaugeValue sets a gauge metric to value from the config context.
+	SetGaugeValue(id MetricID, value uint64) MetricsResult
+
+	// IncrementGaugeValue increases a gauge metric by value from the config context.
+	IncrementGaugeValue(id MetricID, value uint64) MetricsResult
+
+	// DecrementGaugeValue decreases a gauge metric by value from the config context.
+	DecrementGaugeValue(id MetricID, value uint64) MetricsResult
+
+	// RecordHistogramValue records value into a histogram metric from the config context.
+	RecordHistogramValue(id MetricID, value uint64) MetricsResult
 
 	// GetScheduler retrieves a scheduler for deferred task execution in the config context.
 	// This should be called only during the plugin configuration phase, and the returned

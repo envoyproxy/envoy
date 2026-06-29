@@ -73,7 +73,7 @@ protected:
 
     auto* reporter_config = custom_config.mutable_reporter_config();
     reporter_config->set_name(MOCK_REPORTER);
-    reporter_config->mutable_typed_config()->PackFrom(Protobuf::StringValue{});
+    std::ignore = reporter_config->mutable_typed_config()->PackFrom(Protobuf::StringValue{});
 
     return custom_config;
   }
@@ -475,7 +475,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, MissThresholdOneMarksDeadOnFirstInval
       UpstreamReverseConnectionSocketInterface cfg;
   cfg.set_stat_prefix("test_prefix");
   cfg.mutable_ping_failure_threshold()->set_value(1);
-  extension_.reset(new ReverseTunnelAcceptorExtension(*socket_interface_, context_, cfg));
+  extension_ = std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, cfg);
 
   // Provide dispatcher to thread local and set expectations for timers/file events.
   thread_local_.setDispatcher(&dispatcher_);
@@ -515,7 +515,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, MissThresholdOneMarksDeadOnFirstInval
   NiceMock<Network::MockIoHandle> mock_read_handle;
   EXPECT_CALL(mock_read_handle, fdDoNotUse()).WillRepeatedly(testing::Return(123));
   EXPECT_CALL(mock_read_handle, read(testing::_, testing::_))
-      .WillOnce(testing::Invoke([](Buffer::Instance& buffer, absl::optional<uint64_t>) {
+      .WillOnce(testing::Invoke([](Buffer::Instance& buffer, std::optional<uint64_t>) {
         buffer.add("XXXXX"); // 5 bytes, not RPING
         return Api::IoCallUint64Result{5, Api::IoError::none()};
       }));
@@ -617,14 +617,14 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateConnectionReporting) {
         auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
 
         EXPECT_CALL(*reporter, reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
-                                                     testing::Eq(tenant_id)));
+                                                     testing::Eq(tenant_id), testing::_));
 
         return reporter;
       }));
 
   extension_ =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
-  extension_->reportConnection(node_id, cluster_id, tenant_id);
+  extension_->reportConnection(node_id, cluster_id, tenant_id, 0);
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateDisconnectionReporting) {

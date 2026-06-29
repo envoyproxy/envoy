@@ -1,5 +1,7 @@
 #include "contrib/sip_proxy/filters/network/source/conn_manager.h"
 
+#include <optional>
+
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 
@@ -30,7 +32,7 @@ TrafficRoutingAssistantHandler::TrafficRoutingAssistantHandler(
 
 void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(
     const std::string& type, const std::string& key, const std::string& val,
-    const absl::optional<TraContextMap> context) {
+    const std::optional<TraContextMap> context) {
 
   bool should_update_tra = true;
 
@@ -50,7 +52,7 @@ void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(
 }
 
 QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
-    const std::string& type, const std::string& key, const absl::optional<TraContextMap> context,
+    const std::string& type, const std::string& key, const std::optional<TraContextMap> context,
     SipFilters::DecoderFilterCallbacks& activetrans, std::string& host) {
 
   host = {};
@@ -74,7 +76,7 @@ QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
 }
 
 void TrafficRoutingAssistantHandler::deleteTrafficRoutingAssistant(
-    const std::string& type, const std::string& key, const absl::optional<TraContextMap> context) {
+    const std::string& type, const std::string& key, const std::optional<TraContextMap> context) {
   cache_manager_.erase(type, key);
   if (traClient()) {
     traClient()->deleteTrafficRoutingAssistant(type, key, context, Tracing::NullSpan::instance(),

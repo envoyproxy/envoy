@@ -17,7 +17,7 @@
 #include "test/mocks/config/eds_resources_cache.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/health_checker.h"
@@ -310,7 +310,7 @@ TEST_F(EdsTest, DeltaOnConfigUpdateSuccess) {
 
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
   auto* resource = resources.Add();
-  resource->mutable_resource()->PackFrom(cluster_load_assignment);
+  std::ignore = resource->mutable_resource()->PackFrom(cluster_load_assignment);
   resource->set_version("v1");
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(
@@ -3491,7 +3491,7 @@ TEST_F(XdstpConfigsEdsTest, DeltaOnConfigUpdateSuccess) {
 
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
   auto* resource = resources.Add();
-  resource->mutable_resource()->PackFrom(cluster_load_assignment);
+  std::ignore = resource->mutable_resource()->PackFrom(cluster_load_assignment);
   resource->set_version("v1");
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(

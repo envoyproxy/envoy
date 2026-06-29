@@ -75,7 +75,7 @@ public:
   absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message& proto,
                                Server::Configuration::TransportSocketFactoryContext&) override {
-    const auto& node = dynamic_cast<const envoy::config::core::v3::Node&>(proto);
+    const auto& node = Envoy::Protobuf::DynamicCastMessage<envoy::config::core::v3::Node>(proto);
     std::string id = "default-foo";
     if (!node.id().empty()) {
       id = node.id();
@@ -648,15 +648,14 @@ on_no_match:
     // Simulate a filter setting network namespace in downstream filter state.
     auto ns_object = std::make_shared<Router::StringAccessorImpl>("/run/netns/namespace-a");
     downstream_filter_state->setData(
-        "envoy.network.namespace", ns_object, StreamInfo::FilterState::StateType::ReadOnly,
-        StreamInfo::FilterState::LifeSpan::Connection,
+        "envoy.network.namespace", ns_object, StreamInfo::FilterState::LifeSpan::Connection,
         StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
 
     // Create TransportSocketOptions with the shared filter state objects.
     auto shared_objects = downstream_filter_state->objectsSharedWithUpstreamConnection();
     auto transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
         "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-        absl::nullopt, std::move(shared_objects));
+        std::nullopt, std::move(shared_objects));
 
     // Resolve transport socket - should select namespace_a_socket.
     auto result = matcher_->resolve(nullptr, nullptr, transport_socket_options);
@@ -672,14 +671,13 @@ on_no_match:
 
     auto ns_object = std::make_shared<Router::StringAccessorImpl>("/run/netns/namespace-b");
     downstream_filter_state->setData(
-        "envoy.network.namespace", ns_object, StreamInfo::FilterState::StateType::ReadOnly,
-        StreamInfo::FilterState::LifeSpan::Connection,
+        "envoy.network.namespace", ns_object, StreamInfo::FilterState::LifeSpan::Connection,
         StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
 
     auto shared_objects = downstream_filter_state->objectsSharedWithUpstreamConnection();
     auto transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
         "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-        absl::nullopt, std::move(shared_objects));
+        std::nullopt, std::move(shared_objects));
 
     auto result = matcher_->resolve(nullptr, nullptr, transport_socket_options);
     const auto& factory = dynamic_cast<const FakeTransportSocketFactory&>(result.factory_);
@@ -702,7 +700,7 @@ on_no_match:
     auto shared_objects = downstream_filter_state->objectsSharedWithUpstreamConnection();
     auto transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
         "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-        absl::nullopt, std::move(shared_objects));
+        std::nullopt, std::move(shared_objects));
 
     auto result = matcher_->resolve(nullptr, nullptr, transport_socket_options);
     const auto& factory = dynamic_cast<const FakeTransportSocketFactory&>(result.factory_);

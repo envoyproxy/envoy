@@ -33,6 +33,7 @@ std::string certToPem(X509& cert) {
   const uint8_t* output;
   size_t length;
   RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
+  // NOLINTNEXTLINE(modernize-return-braced-init-list)
   return std::string(reinterpret_cast<const char*>(output), length);
 }
 
@@ -469,7 +470,7 @@ Ssl::ParsedX509NameOptConstRef ConnectionInfoImplBase::parsedSubjectPeerCertific
   if (parsedName) {
     return {*parsedName};
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 const std::string& ConnectionInfoImplBase::subjectLocalCertificate() const {
@@ -482,18 +483,18 @@ const std::string& ConnectionInfoImplBase::subjectLocalCertificate() const {
   });
 }
 
-absl::optional<SystemTime> ConnectionInfoImplBase::validFromPeerCertificate() const {
+std::optional<SystemTime> ConnectionInfoImplBase::validFromPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
   if (!cert) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return Utility::getValidFrom(*cert);
 }
 
-absl::optional<SystemTime> ConnectionInfoImplBase::expirationPeerCertificate() const {
+std::optional<SystemTime> ConnectionInfoImplBase::expirationPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
   if (!cert) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return Utility::getExpirationTime(*cert);
 }

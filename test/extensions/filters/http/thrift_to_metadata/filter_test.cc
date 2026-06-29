@@ -9,7 +9,6 @@
 #include "test/common/buffer/utility.h"
 #include "test/common/stream_info/test_util.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
@@ -169,7 +168,7 @@ response_rules:
   writeMessage(Buffer::OwnedImpl& buffer, NetworkFilters::ThriftProxy::TransportType transport_type,
                NetworkFilters::ThriftProxy::ProtocolType protocol_type,
                NetworkFilters::ThriftProxy::MessageType message_type,
-               absl::optional<NetworkFilters::ThriftProxy::ReplyType> reply_type = absl::nullopt) {
+               std::optional<NetworkFilters::ThriftProxy::ReplyType> reply_type = std::nullopt) {
     Buffer::OwnedImpl proto_buffer;
     ProtocolConverterSharedPtr protocol_converter = std::make_shared<ProtocolConverter>();
     ProtocolPtr protocol = createProtocol(protocol_type);

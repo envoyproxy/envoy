@@ -34,8 +34,8 @@ private:
   const std::string filename_;
   bool file_changed_{true};
   Filesystem::WatcherPtr watcher_;
-  absl::optional<double> pressure_;
-  absl::optional<EnvoyException> error_;
+  std::optional<double> pressure_;
+  std::optional<EnvoyException> error_;
   Api::Api& api_;
 };
 

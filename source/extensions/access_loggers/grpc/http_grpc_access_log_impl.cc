@@ -31,7 +31,7 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
                                      GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
                                      const Formatter::CommandParserPtrVector& command_parsers)
     : Common::ImplBase(std::move(filter)),
-      config_(std::make_shared<const HttpGrpcAccessLogConfig>(std::move(config))),
+      config_(std::make_shared<const HttpGrpcAccessLogConfig>(config)),
       tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)),
       common_properties_config_(config.common_config(), command_parsers) {
   for (const auto& header : config_->additional_request_headers_to_log()) {
@@ -122,7 +122,7 @@ void HttpGrpcAccessLog::emitLog(const Formatter::Context& context,
 
   if (request_headers.Method() != nullptr) {
     envoy::config::core::v3::RequestMethod method = envoy::config::core::v3::METHOD_UNSPECIFIED;
-    envoy::config::core::v3::RequestMethod_Parse(
+    std::ignore = envoy::config::core::v3::RequestMethod_Parse(
         MessageUtil::sanitizeUtf8String(request_headers.getMethodValue()), &method);
     request_properties->set_request_method(method);
   }

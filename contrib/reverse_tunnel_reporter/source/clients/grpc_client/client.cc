@@ -270,8 +270,9 @@ StreamTunnelsReq GrpcClient::constructMessage(bool full_push) {
 }
 
 void GrpcClient::setTimer(Event::TimerPtr& timer, const std::chrono::milliseconds& ms) {
-  if (timer->enabled())
+  if (timer->enabled()) {
     timer->disableTimer();
+  }
 
   timer->enableTimer(ms);
 }

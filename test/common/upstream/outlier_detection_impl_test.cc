@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -25,7 +26,6 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -597,7 +597,7 @@ TEST_F(OutlierDetectorImplTest, ConnectSuccessWithOptionalHTTP_OK) {
   // such scenario is used by tcp_proxy.
   for (auto i = 0; i < 100; i++) {
     hosts_[0]->outlierDetector().putResult(Result::LocalOriginConnectSuccess,
-                                           absl::optional<uint64_t>(enumToInt(Http::Code::OK)));
+                                           std::optional<uint64_t>(enumToInt(Http::Code::OK)));
     hosts_[0]->outlierDetector().putResult(Result::LocalOriginConnectFailed);
   }
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
@@ -837,7 +837,7 @@ TEST_F(OutlierDetectorImplTest, TimeoutWithHttpCode) {
       runtime_.snapshot_.getInteger(Consecutive5xxRuntime, detector->config().consecutive5xx());
   while (n--) {
     hosts_[0]->outlierDetector().putResult(Result::LocalOriginTimeout,
-                                           absl::optional<uint64_t>(500));
+                                           std::optional<uint64_t>(500));
   }
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
@@ -859,7 +859,7 @@ TEST_F(OutlierDetectorImplTest, TimeoutWithHttpCode) {
   n = runtime_.snapshot_.getInteger(Consecutive5xxRuntime, detector->config().consecutive5xx());
   while (n--) {
     hosts_[0]->outlierDetector().putResult(Result::LocalOriginTimeout,
-                                           absl::optional<uint64_t>(200));
+                                           std::optional<uint64_t>(200));
   }
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
@@ -2673,7 +2673,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   Event::SimulatedTimeSystem time_system;
   // This is rendered as "2018-12-18T09:00:00Z"
   time_system.setSystemTime(std::chrono::milliseconds(1545123600000));
-  absl::optional<MonotonicTime> monotonic_time;
+  std::optional<MonotonicTime> monotonic_time;
   NiceMock<MockDetector> detector;
 
   EXPECT_CALL(log_manager, createAccessLog(Filesystem::FilePathAndType{

@@ -171,11 +171,9 @@ public:
   }
   void TearDown() override { delete g_host_functions; }
 
-  bool init(std::string code = {}) {
+  void init(std::string code = {}) {
     wasm_vm_ = createWasmVm("envoy.wasm.runtime.v8");
-    if (wasm_vm_.get() == nullptr) {
-      return false;
-    }
+    ASSERT_NE(wasm_vm_.get(), nullptr);
 
     if (code.empty()) {
       code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -186,30 +184,19 @@ public:
     std::string_view precompiled = {};
     // clang-format on
 
-    // Load precompiled module on Linux-x86_64, since it's only support there.
-#if defined(__linux__) && defined(__x86_64__)
     if (GetParam() /* allow_precompiled */) {
       // Section name is expected to be available in the tested runtimes.
       const auto section_name = wasm_vm_->getPrecompiledSectionName();
-      if (section_name.empty()) {
-        return false;
-      }
-      if (!proxy_wasm::BytecodeUtil::getCustomSection(code, section_name, precompiled)) {
-        return false;
-      }
+      ASSERT_FALSE(section_name.empty());
+      ASSERT_TRUE(proxy_wasm::BytecodeUtil::getCustomSection(code, section_name, precompiled));
       // Precompiled module is expected to be available in the test file.
-      if (precompiled.empty()) {
-        return false;
-      }
+      ASSERT_FALSE(precompiled.empty());
     }
-#endif
 
     std::string stripped;
-    if (!proxy_wasm::BytecodeUtil::getStrippedSource(code, stripped)) {
-      return false;
-    }
+    ASSERT_TRUE(proxy_wasm::BytecodeUtil::getStrippedSource(code, stripped));
 
-    return wasm_vm_->load(stripped, precompiled, {});
+    ASSERT_TRUE(wasm_vm_->load(stripped, precompiled, {}));
   }
 
 protected:
@@ -218,25 +205,23 @@ protected:
   WasmVmPtr wasm_vm_;
 };
 
-INSTANTIATE_TEST_SUITE_P(AllowPrecompiled, WasmVmTest,
-#if defined(__linux__) && defined(__x86_64__)
-                         testing::Values(false, true)
-#else
-                         testing::Values(false)
-#endif
-);
+INSTANTIATE_TEST_SUITE_P(AllowPrecompiled, WasmVmTest, testing::Values(false, true));
 
-TEST_P(WasmVmTest, V8BadCode) { ASSERT_FALSE(init("bad code")); }
+TEST_P(WasmVmTest, V8BadCode) {
+  wasm_vm_ = createWasmVm("envoy.wasm.runtime.v8");
+  ASSERT_NE(wasm_vm_.get(), nullptr);
+  EXPECT_FALSE(wasm_vm_->load("bad code", "", {}));
+}
 
 TEST_P(WasmVmTest, V8Load) {
-  ASSERT_TRUE(init());
+  ASSERT_NO_FATAL_FAILURE(init());
   EXPECT_TRUE(wasm_vm_->getEngineName() == "v8");
   EXPECT_TRUE(wasm_vm_->cloneable() == Cloneable::CompiledBytecode);
   EXPECT_TRUE(wasm_vm_->clone() != nullptr);
 }
 
 TEST_P(WasmVmTest, V8BadHostFunctions) {
-  ASSERT_TRUE(init());
+  ASSERT_NO_FATAL_FAILURE(init());
 
   wasm_vm_->registerCallback("env", "random", &random, CONVERT_FUNCTION_WORD_TO_UINT32(random));
   EXPECT_FALSE(wasm_vm_->link("test"));
@@ -252,7 +237,7 @@ TEST_P(WasmVmTest, V8BadHostFunctions) {
 }
 
 TEST_P(WasmVmTest, V8BadModuleFunctions) {
-  ASSERT_TRUE(init());
+  ASSERT_NO_FATAL_FAILURE(init());
 
   wasm_vm_->registerCallback("env", "pong", &pong, CONVERT_FUNCTION_WORD_TO_UINT32(pong));
   wasm_vm_->registerCallback("env", "random", &random, CONVERT_FUNCTION_WORD_TO_UINT32(random));
@@ -275,7 +260,7 @@ TEST_P(WasmVmTest, V8BadModuleFunctions) {
 }
 
 TEST_P(WasmVmTest, V8FunctionCalls) {
-  ASSERT_TRUE(init());
+  ASSERT_NO_FATAL_FAILURE(init());
 
   wasm_vm_->registerCallback("env", "pong", &pong, CONVERT_FUNCTION_WORD_TO_UINT32(pong));
   wasm_vm_->registerCallback("env", "random", &random, CONVERT_FUNCTION_WORD_TO_UINT32(random));
@@ -308,7 +293,7 @@ TEST_P(WasmVmTest, V8FunctionCalls) {
 }
 
 TEST_P(WasmVmTest, V8Memory) {
-  ASSERT_TRUE(init());
+  ASSERT_NO_FATAL_FAILURE(init());
 
   wasm_vm_->registerCallback("env", "pong", &pong, CONVERT_FUNCTION_WORD_TO_UINT32(pong));
   wasm_vm_->registerCallback("env", "random", &random, CONVERT_FUNCTION_WORD_TO_UINT32(random));

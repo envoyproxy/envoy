@@ -72,9 +72,9 @@ private:
   // are not freed prematurely and do not leak, their reference counts are kept alive by
   // `StatNameDynamicStorage` instances stored alongside the gauge value in `InflightGauge`
   // within the `AccessLogState`.
-  absl::optional<Stats::StatNameTagVector> owned_tags_;
+  std::optional<Stats::StatNameTagVector> owned_tags_;
 
-  Stats::StatNameTagVectorOptConstRef borrowed_tags_{absl::nullopt};
+  Stats::StatNameTagVectorOptConstRef borrowed_tags_{std::nullopt};
 };
 
 class StatsAccessLog : public AccessLoggers::Common::ImplBase,
@@ -145,8 +145,8 @@ private:
   struct Gauge {
     enum class OperationType {
       SET,
-      PAIRED_ADD,
-      PAIRED_SUBTRACT,
+      PAIRED_ADD,      // NOLINT(readability-identifier-naming)
+      PAIRED_SUBTRACT, // NOLINT(readability-identifier-naming)
     };
 
     NameAndTags stat_;

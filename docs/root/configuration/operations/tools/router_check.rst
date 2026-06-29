@@ -165,7 +165,7 @@ input
   ssl
     *(optional, boolean)* A flag that determines whether to set x-forwarded-proto to https or http.
     By setting x-forwarded-proto to a given protocol, the tool is able to simulate the behavior of
-    a client issuing a request via http or https. By default ssl is false which corresponds to
+    a client issuing a request via HTTP or HTTPS. By default ssl is false which corresponds to
     x-forwarded-proto set to http.
 
   runtime

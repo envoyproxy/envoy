@@ -31,6 +31,45 @@ pub trait EnvoyNetworkFilterConfig {
     name: &str,
   ) -> Result<EnvoyHistogramId, envoy_dynamic_module_type_metrics_result>;
 
+  /// Increment the counter with the given id from the config context.
+  ///
+  /// Unlike [`EnvoyNetworkFilter::increment_counter`], this does not require a per-connection
+  /// filter and can be called outside of the connection lifecycle, for example from a scheduled
+  /// background task.
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of the gauge with the given id from the config context.
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase the gauge with the given id from the config context.
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease the gauge with the given id from the config context.
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in the histogram with the given id from the config context.
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
   /// Create a new implementation of the [`EnvoyNetworkFilterConfigScheduler`] trait.
   ///
   /// This allows scheduling events to be delivered on the main thread.
@@ -276,9 +315,31 @@ pub trait EnvoyNetworkFilter {
   /// Set the string-typed dynamic metadata value with the given namespace and key value.
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str);
 
+  /// Set the dynamic metadata value with the given namespace and key to raw bytes.
+  ///
+  /// The bytes are stored as the metadata value as is, so non-UTF-8 values are preserved. Read
+  /// them back with [`Self::get_dynamic_metadata_string`].
+  fn set_dynamic_metadata_bytes(&mut self, namespace: &str, key: &str, value: &[u8]);
+
+  /// Set multiple string-typed dynamic metadata entries under `namespace` in a single call.
+  ///
+  /// Equivalent to calling [`Self::set_dynamic_metadata_string`] once per entry but resolves the
+  /// namespace and merges into the metadata struct only once. Existing entries with the same key
+  /// are overwritten. Within `entries`, a later entry overwrites an earlier one with the same key.
+  /// An empty `entries` is a no-op and does not create the namespace.
+  fn set_dynamic_metadata_string_batch<'a>(
+    &mut self,
+    namespace: &'a str,
+    entries: &'a [(&'a str, &'a str)],
+  );
+
   /// Get the string-typed dynamic metadata value with the given namespace and key value.
   /// Returns None if the metadata is not found or is the wrong type.
-  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<String>;
+  fn get_dynamic_metadata_string<'a>(
+    &'a self,
+    namespace: &str,
+    key: &str,
+  ) -> Option<EnvoyBuffer<'a>>;
 
   /// Set the number-typed dynamic metadata value with the given namespace and key value.
   /// Returns true if the operation is successful.
@@ -405,15 +466,15 @@ pub trait EnvoyNetworkFilter {
 
   /// Get the upstream host address and port if an upstream host is selected.
   /// Returns None if no upstream host is set or the address is not an IP.
-  fn get_upstream_host_address(&self) -> Option<(String, u32)>;
+  fn get_upstream_host_address<'a>(&'a self) -> Option<(EnvoyBuffer<'a>, u32)>;
 
   /// Get the upstream host hostname if an upstream host is selected.
   /// Returns None if no upstream host is set or hostname is empty.
-  fn get_upstream_host_hostname(&self) -> Option<String>;
+  fn get_upstream_host_hostname<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
 
   /// Get the upstream host cluster name if an upstream host is selected.
   /// Returns None if no upstream host is set.
-  fn get_upstream_host_cluster(&self) -> Option<String>;
+  fn get_upstream_host_cluster<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
 
   /// Check if an upstream host has been selected for this connection.
   fn has_upstream_host(&self) -> bool;
@@ -529,6 +590,10 @@ pub trait EnvoyNetworkFilterScheduler: Send + Sync {
   /// Once this is called, [`NetworkFilter::on_scheduled`] will be called with
   /// the same `event_id` on the worker thread where the filter is running IF
   /// by the time the event is committed, the filter is still alive.
+  ///
+  /// This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+  /// module must join or quiesce any thread that may call this before worker shutdown so a
+  /// scheduled event cannot race the worker dispatcher teardown.
   fn commit(&self, event_id: u64);
 }
 
@@ -677,6 +742,90 @@ impl EnvoyNetworkFilterConfig for EnvoyNetworkFilterConfigImpl {
     Ok(EnvoyHistogramId(id))
   }
 
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_config_increment_counter(
+        self.raw, id, value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_config_set_gauge(self.raw, id, value)
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_config_increment_gauge(self.raw, id, value)
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_config_decrement_gauge(self.raw, id, value)
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_config_record_histogram_value(
+        self.raw, id, value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
   fn new_config_scheduler(&self) -> impl EnvoyNetworkFilterConfigScheduler + 'static {
     unsafe {
       let scheduler_ptr =
@@ -714,24 +863,20 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       return (Vec::new(), 0);
     }
 
-    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null_mut(),
-        length: 0,
-      };
-      size
-    ];
-    unsafe {
+    let mut buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
+    let ok = unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
         self.raw,
-        buffers.as_mut_ptr(),
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
-    let envoy_buffers: Vec<EnvoyBuffer> = buffers
-      .iter()
-      .map(|s| unsafe { EnvoyBuffer::new_from_raw(s.ptr as *const _, s.length) })
-      .collect();
-    (envoy_buffers, total_length)
+    if !ok {
+      return (Vec::new(), 0);
+    }
+    unsafe {
+      buffers.set_len(size);
+    }
+    (buffers, total_length)
   }
 
   fn get_write_buffer_chunks(&mut self) -> (Vec<EnvoyBuffer<'_>>, usize) {
@@ -748,24 +893,20 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       return (Vec::new(), 0);
     }
 
-    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null_mut(),
-        length: 0,
-      };
-      size
-    ];
-    unsafe {
+    let mut buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
+    let ok = unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
         self.raw,
-        buffers.as_mut_ptr(),
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
-    let envoy_buffers: Vec<EnvoyBuffer> = buffers
-      .iter()
-      .map(|s| unsafe { EnvoyBuffer::new_from_raw(s.ptr as *const _, s.length) })
-      .collect();
-    (envoy_buffers, total_length)
+    if !ok {
+      return (Vec::new(), 0);
+    }
+    unsafe {
+      buffers.set_len(size);
+    }
+    (buffers, total_length)
   }
 
   fn drain_read_buffer(&mut self, length: usize) {
@@ -983,34 +1124,20 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       return Vec::new();
     }
 
-    let mut sans_buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null(),
-        length: 0,
-      };
-      size
-    ];
+    let mut sans_buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
     let ok = unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(
         self.raw,
-        sans_buffers.as_mut_ptr(),
+        sans_buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if !ok {
       return Vec::new();
     }
-
+    unsafe {
+      sans_buffers.set_len(size);
+    }
     sans_buffers
-      .iter()
-      .take(size)
-      .map(|buf| {
-        if !buf.ptr.is_null() && buf.length > 0 {
-          unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const _, buf.length) }
-        } else {
-          EnvoyBuffer::default()
-        }
-      })
-      .collect()
   }
 
   fn get_ssl_dns_sans(&self) -> Vec<EnvoyBuffer<'_>> {
@@ -1020,34 +1147,20 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       return Vec::new();
     }
 
-    let mut sans_buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null(),
-        length: 0,
-      };
-      size
-    ];
+    let mut sans_buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
     let ok = unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(
         self.raw,
-        sans_buffers.as_mut_ptr(),
+        sans_buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if !ok {
       return Vec::new();
     }
-
+    unsafe {
+      sans_buffers.set_len(size);
+    }
     sans_buffers
-      .iter()
-      .take(size)
-      .map(|buf| {
-        if !buf.ptr.is_null() && buf.length > 0 {
-          unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const _, buf.length) }
-        } else {
-          EnvoyBuffer::default()
-        }
-      })
-      .collect()
   }
 
   fn get_ssl_subject(&self) -> Option<EnvoyBuffer<'_>> {
@@ -1140,7 +1253,42 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     }
   }
 
-  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<String> {
+  fn set_dynamic_metadata_bytes(&mut self, namespace: &str, key: &str, value: &[u8]) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
+        self.raw,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_string_batch(&mut self, namespace: &str, entries: &[(&str, &str)]) {
+    // `pairs` borrows the key/value bytes of `entries`, which outlive this call. Envoy copies the
+    // bytes into the metadata Struct synchronously, so the pointers never dangle. An empty
+    // `entries` yields an empty Vec paired with a zero length the callback treats as a no-op.
+    let mut pairs: Vec<abi::envoy_dynamic_module_type_module_key_value_pair> =
+      Vec::with_capacity(entries.len());
+    for (key, value) in entries {
+      pairs.push(abi::envoy_dynamic_module_type_module_key_value_pair {
+        key_ptr: key.as_ptr() as *const _,
+        key_length: key.len(),
+        value_ptr: value.as_ptr() as *const _,
+        value_length: value.len(),
+      });
+    }
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
+        self.raw,
+        str_to_module_buffer(namespace),
+        pairs.as_ptr(),
+        pairs.len(),
+      )
+    }
+  }
+
+  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -1154,9 +1302,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       )
     };
     if success && !result.ptr.is_null() && result.length > 0 {
-      let value_str =
-        unsafe { crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length) };
-      Some(value_str.into_owned())
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
     } else {
       None
     }
@@ -1507,7 +1653,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     }
   }
 
-  fn get_upstream_host_address(&self) -> Option<(String, u32)> {
+  fn get_upstream_host_address(&self) -> Option<(EnvoyBuffer<'_>, u32)> {
     let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null_mut(),
       length: 0,
@@ -1523,12 +1669,13 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     if !result || address.length == 0 || address.ptr.is_null() {
       return None;
     }
-    let address_str =
-      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
-    Some((address_str.into_owned(), port))
+    Some((
+      unsafe { EnvoyBuffer::new_from_raw(address.ptr as *const u8, address.length) },
+      port,
+    ))
   }
 
-  fn get_upstream_host_hostname(&self) -> Option<String> {
+  fn get_upstream_host_hostname(&self) -> Option<EnvoyBuffer<'_>> {
     let mut hostname = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null_mut(),
       length: 0,
@@ -1542,12 +1689,10 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     if !result || hostname.length == 0 || hostname.ptr.is_null() {
       return None;
     }
-    let hostname_str =
-      unsafe { crate::ffi_helpers::str_lossy_from_raw(hostname.ptr as *const u8, hostname.length) };
-    Some(hostname_str.into_owned())
+    Some(unsafe { EnvoyBuffer::new_from_raw(hostname.ptr as *const u8, hostname.length) })
   }
 
-  fn get_upstream_host_cluster(&self) -> Option<String> {
+  fn get_upstream_host_cluster(&self) -> Option<EnvoyBuffer<'_>> {
     let mut cluster_name = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null_mut(),
       length: 0,
@@ -1561,10 +1706,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     if !result || cluster_name.length == 0 || cluster_name.ptr.is_null() {
       return None;
     }
-    let cluster_str = unsafe {
-      crate::ffi_helpers::str_lossy_from_raw(cluster_name.ptr as *const u8, cluster_name.length)
-    };
-    Some(cluster_str.into_owned())
+    Some(unsafe { EnvoyBuffer::new_from_raw(cluster_name.ptr as *const u8, cluster_name.length) })
   }
 
   fn has_upstream_host(&self) -> bool {

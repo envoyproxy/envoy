@@ -40,7 +40,6 @@ using ResponseTranslator = ::google::grpc::transcoding::JsonRequestTranslator;
 using ResponseInfo = ::google::grpc::transcoding::RequestInfo;
 using ::envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
     GrpcJsonReverseTranscoder;
-using ::google::api::HttpRule;
 using ::google::grpc::transcoding::Transcoder;
 using ::google::grpc::transcoding::TranscoderInputStream;
 using ::google::grpc::transcoding::TypeHelper;
@@ -50,7 +49,7 @@ GrpcJsonReverseTranscoderConfig::GrpcJsonReverseTranscoderConfig(
   Protobuf::FileDescriptorSet descriptor_set;
   if (!transcoder_config.descriptor_path().empty()) {
     auto file_or_error = api.fileSystem().fileReadToEnd(transcoder_config.descriptor_path());
-    THROW_IF_NOT_OK(file_or_error.status());
+    THROW_IF_NOT_OK_REF(file_or_error.status());
     if (!descriptor_set.ParseFromString(file_or_error.value())) {
       throw EnvoyException("Unable to parse proto descriptor");
     }
@@ -71,15 +70,15 @@ GrpcJsonReverseTranscoderConfig::GrpcJsonReverseTranscoderConfig(
       Grpc::Common::typeUrlPrefix(), &descriptor_pool_));
   max_request_body_size_ =
       transcoder_config.has_max_request_body_size()
-          ? absl::make_optional(transcoder_config.max_request_body_size().value())
+          ? std::make_optional(transcoder_config.max_request_body_size().value())
           : std::nullopt;
   max_response_body_size_ =
       transcoder_config.has_max_response_body_size()
-          ? absl::make_optional(transcoder_config.max_response_body_size().value())
+          ? std::make_optional(transcoder_config.max_response_body_size().value())
           : std::nullopt;
   api_version_header_ = transcoder_config.api_version_header().empty()
                             ? std::nullopt
-                            : absl::make_optional(transcoder_config.api_version_header());
+                            : std::make_optional(transcoder_config.api_version_header());
 
   const auto& print_options = transcoder_config.request_json_print_options();
   request_translate_options_.json_print_options.always_print_enums_as_ints =

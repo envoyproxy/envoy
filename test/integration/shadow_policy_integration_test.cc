@@ -6,7 +6,9 @@
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "test/integration/filters/add_body_filter.pb.h"
 #include "test/integration/filters/repick_cluster_filter.h"
+#include "test/integration/filters/test_filters.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/socket_interface_swap.h"
 #include "test/test_common/test_runtime.h"
@@ -46,15 +48,15 @@ public:
             MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
                 (*cluster->mutable_typed_extension_protocol_options())
                     ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
-        protocol_options.add_http_filters()->set_name(filter_name_);
+        addUpstreamFilter(protocol_options, filter_name_);
         auto* upstream_codec = protocol_options.add_http_filters();
         upstream_codec->set_name("envoy.filters.http.upstream_codec");
-        upstream_codec->mutable_typed_config()->PackFrom(
+        std::ignore = upstream_codec->mutable_typed_config()->PackFrom(
             envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::
                 default_instance());
-        (*cluster->mutable_typed_extension_protocol_options())
-            ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-                .PackFrom(protocol_options);
+        std::ignore = (*cluster->mutable_typed_extension_protocol_options())
+                          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                              .PackFrom(protocol_options);
       }
     });
 
@@ -99,8 +101,26 @@ public:
     cleanupUpstreamAndDownstream();
   }
 
+  void addUpstreamFilter(ConfigHelper::HttpProtocolOptions& protocol_options,
+                         const std::string& name) {
+    auto* filter = protocol_options.add_http_filters();
+    filter->set_name(name);
+    if (name == "on-local-reply-filter") {
+      test::integration::filters::OnLocalReplyFilterConfig config;
+      std::ignore = filter->mutable_typed_config()->PackFrom(config);
+    } else if (name == "encoder-decoder-buffer-filter") {
+      test::integration::filters::EncoderDecoderBufferFilterConfig config;
+      std::ignore = filter->mutable_typed_config()->PackFrom(config);
+    } else if (name == "add-body-filter") {
+      test::integration::filters::AddBodyFilterConfig config;
+      std::ignore = filter->mutable_typed_config()->PackFrom(config);
+    } else {
+      RELEASE_ASSERT(false, fmt::format("Unknown dynamic upstream filter: {}", name));
+    }
+  }
+
   const bool streaming_shadow_ = std::get<1>(GetParam());
-  absl::optional<int> cluster_with_custom_filter_;
+  std::optional<int> cluster_with_custom_filter_;
   std::string filter_name_ = "on-local-reply-filter";
   std::unique_ptr<Http::TestRequestHeaderMapImpl> upstream_headers_;
   std::unique_ptr<Http::TestRequestHeaderMapImpl> mirror_headers_;
@@ -798,13 +818,16 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithRouterUpstreamFilters
                                           v3::HttpConnectionManager& hcm) -> void {
     auto* router_filter_config = hcm.mutable_http_filters(hcm.http_filters_size() - 1);
     envoy::extensions::filters::http::router::v3::Router router_filter;
-    router_filter_config->typed_config().UnpackTo(&router_filter);
-    router_filter.add_upstream_http_filters()->set_name("add-body-filter");
+    std::ignore = router_filter_config->typed_config().UnpackTo(&router_filter);
+    auto* upstream_filter = router_filter.add_upstream_http_filters();
+    upstream_filter->set_name("add-body-filter");
+    test::integration::filters::AddBodyFilterConfig add_body_config;
+    std::ignore = upstream_filter->mutable_typed_config()->PackFrom(add_body_config);
     auto* upstream_codec = router_filter.add_upstream_http_filters();
     upstream_codec->set_name("envoy.filters.http.upstream_codec");
-    upstream_codec->mutable_typed_config()->PackFrom(
+    std::ignore = upstream_codec->mutable_typed_config()->PackFrom(
         envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
-    router_filter_config->mutable_typed_config()->PackFrom(router_filter);
+    std::ignore = router_filter_config->mutable_typed_config()->PackFrom(router_filter);
   });
   filter_name_ = "add-body-filter";
   initialize();
@@ -822,16 +845,21 @@ TEST_P(ShadowPolicyIntegrationTest, ClusterFilterOverridesRouterFilter) {
   filter_name_ = "add-body-filter";
 
   // router filter upstream HTTP filter adds header:
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) -> void {
-        auto* router_filter_config = hcm.mutable_http_filters(hcm.http_filters_size() - 1);
-        envoy::extensions::filters::http::router::v3::Router router_filter;
-        router_filter_config->typed_config().UnpackTo(&router_filter);
-        router_filter.add_upstream_http_filters()->set_name("add-header-filter");
-        router_filter.add_upstream_http_filters()->set_name("envoy.filters.http.upstream_codec");
-        router_filter_config->mutable_typed_config()->PackFrom(router_filter);
-      });
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) -> void {
+    auto* router_filter_config = hcm.mutable_http_filters(hcm.http_filters_size() - 1);
+    envoy::extensions::filters::http::router::v3::Router router_filter;
+    std::ignore = router_filter_config->typed_config().UnpackTo(&router_filter);
+    auto* upstream_filter = router_filter.add_upstream_http_filters();
+    upstream_filter->set_name("add-header-filter");
+    test::integration::filters::AddHeaderEmptyFilterConfig add_header_config;
+    std::ignore = upstream_filter->mutable_typed_config()->PackFrom(add_header_config);
+    auto* upstream_codec = router_filter.add_upstream_http_filters();
+    upstream_codec->set_name("envoy.filters.http.upstream_codec");
+    std::ignore = upstream_codec->mutable_typed_config()->PackFrom(
+        envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
+    std::ignore = router_filter_config->mutable_typed_config()->PackFrom(router_filter);
+  });
 
   initialize();
   sendRequestAndValidateResponse();
@@ -848,7 +876,11 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithClusterHeaderWithFilt
   initialConfigSetup("", "cluster_header_1");
 
   // Add a filter to set cluster_header in headers.
-  config_helper_.addFilter("name: repick-cluster-filter");
+  config_helper_.addFilter(R"EOF(
+    name: repick-cluster-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.RepickClusterFilterConfig
+  )EOF");
 
   initialize();
   sendRequestAndValidateResponse();
@@ -904,8 +936,8 @@ TEST_P(ShadowPolicyIntegrationTest, MirrorClusterWithAddBody) {
         access_log_config.set_path(log_file);
         access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
             "%REQ(CONTENT-LENGTH)%\n");
-        upstream_log_config->mutable_typed_config()->PackFrom(access_log_config);
-        typed_config->PackFrom(router_config);
+        std::ignore = upstream_log_config->mutable_typed_config()->PackFrom(access_log_config);
+        std::ignore = typed_config->PackFrom(router_config);
       });
 
   initialConfigSetup("cluster_1", "");

@@ -67,9 +67,9 @@ are reachable through the reverse tunnel.
 
 .. literalinclude:: /_configs/reverse_connection/initiator-envoy.yaml
     :language: yaml
-    :lines: 17-50
+    :lines: 33-66
     :linenos:
-    :lineno-start: 17
+    :lineno-start: 33
     :caption: :download:`initiator-envoy.yaml </_configs/reverse_connection/initiator-envoy.yaml>`
 
 The special ``rc://`` address format encodes connection and identity metadata:
@@ -94,9 +94,9 @@ The ``downstream-service`` cluster in the example refers to the service behind t
 
 .. literalinclude:: /_configs/reverse_connection/initiator-envoy.yaml
     :language: yaml
-    :lines: 69-80
+    :lines: 85-96
     :linenos:
-    :lineno-start: 69
+    :lineno-start: 85
     :caption: :download:`initiator-envoy.yaml </_configs/reverse_connection/initiator-envoy.yaml>`
 
 Upstream cluster
@@ -108,9 +108,9 @@ This cluster can be defined statically in the bootstrap configuration or added d
 
 .. literalinclude:: /_configs/reverse_connection/initiator-envoy.yaml
     :language: yaml
-    :lines: 54-65
+    :lines: 70-81
     :linenos:
-    :lineno-start: 54
+    :lineno-start: 70
     :caption: :download:`initiator-envoy.yaml </_configs/reverse_connection/initiator-envoy.yaml>`
 
 Multiple cluster support
@@ -215,6 +215,69 @@ concatenates the tenant identifier with the node and cluster identifiers using t
 in any of the reverse tunnel headers are rejected with ``400`` to prevent ambiguous lookups. The flag defaults
 to ``false`` to preserve existing behaviour.
 
+Lifecycle access logs
+~~~~~~~~~~~~~~~~~~~~~
+
+The upstream socket interface can emit access logs for reverse-tunnel lifecycle events directly from
+reverse-tunnel-owned code. Configure the ``access_log`` field on
+``envoy.bootstrap.reverse_tunnel.upstream_socket_interface`` to log tunnel setup, socket handoff,
+tunnel close, and post-handoff HTTP/2 keepalive timeout events:
+
+.. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
+    :language: yaml
+    :lines: 7-24
+    :linenos:
+    :lineno-start: 7
+    :caption: :download:`responder-envoy.yaml </_configs/reverse_connection/responder-envoy.yaml>`
+
+The lifecycle logger emits the following event names:
+
+**Core lifecycle events:**
+
+* ``tunnel_setup`` – emitted when a new reverse tunnel connection is accepted and cached.
+* ``socket_handoff`` – emitted when a cached idle socket is handed off to an upstream connection pool.
+* ``tunnel_closed`` – emitted when the reverse tunnel connection is closed.
+* ``http2_keepalive_timeout`` – emitted when the upstream connection closes locally due to an HTTP/2 keepalive (``PING``) timeout after handoff.
+
+**Idle-phase ping events** (emitted while the socket is idle in the cache):
+
+* ``idle_ping_sent`` – an ``RPING`` probe was sent to verify the idle connection is alive.
+* ``idle_ping_ack`` – the peer acknowledged the ``RPING``.
+* ``idle_ping_miss`` – no ``RPING`` acknowledgement was received within the expected window.
+* ``idle_ping_timeout`` – the idle connection is being closed because the peer failed to respond to ``RPING`` probes.
+
+The dynamic metadata namespace is ``envoy.reverse_tunnel.lifecycle``. The emitted fields are
+``event``, ``node_id``, ``cluster_id``, ``tenant_id``, ``worker``, ``fd``, ``socket_state``,
+and, when relevant, ``handoff_kind`` or ``close_reason``.
+
+**Socket state values** (the ``socket_state`` field):
+
+* ``idle`` – the socket is cached and waiting for a data request.
+* ``handed_off`` – the socket has been handed off to an upstream connection pool.
+* ``in_use`` – the socket is actively being used for upstream traffic.
+
+**Handoff kind values** (the ``handoff_kind`` field, present only in ``socket_handoff`` events):
+
+* ``pool_to_upstream`` – the socket was handed off from the idle cache to the upstream connection pool.
+
+**Close reason values** (the ``close_reason`` field, present only in ``tunnel_closed`` events):
+
+* ``idle_peer_close`` – the peer closed the connection while it was idle.
+* ``idle_read_error`` – a read error occurred on the idle connection.
+* ``idle_ping_write_failure`` – writing an ``RPING`` probe to the idle connection failed.
+* ``idle_ping_timeout`` – the idle connection was closed because ``RPING`` probes went unanswered.
+* ``remote_close`` – the peer closed the connection after handoff.
+* ``local_close`` – Envoy closed the connection after handoff.
+* ``explicit_close`` – the connection was explicitly closed (e.g., during shutdown).
+
+The same identifiers are also copied into connection filter state under these keys:
+
+* ``envoy.reverse_tunnel.node_id``
+* ``envoy.reverse_tunnel.cluster_id``
+* ``envoy.reverse_tunnel.tenant_id``
+* ``envoy.reverse_tunnel.worker``
+* ``envoy.reverse_tunnel.fd``
+
 .. _config_reverse_tunnel_network_filter:
 
 Reverse tunnel network filter
@@ -226,9 +289,9 @@ parameters.
 
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
     :language: yaml
-    :lines: 17-28
+    :lines: 29-41
     :linenos:
-    :lineno-start: 17
+    :lineno-start: 29
     :caption: :download:`responder-envoy.yaml </_configs/reverse_connection/responder-envoy.yaml>`
 
 .. _config_reverse_connection_cluster:
@@ -258,11 +321,26 @@ automatically constructs tenant-scoped identifiers using the formatted tenant ID
    will not be routed. This ensures strict tenant isolation and prevents requests from being routed without
    proper tenant scoping.
 
+To observe post-handoff upstream connection events such as HTTP/2 keepalive timeout, add the reverse
+tunnel lifecycle upstream network filter to the reverse connection cluster:
+
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
     :language: yaml
-    :lines: 92-112
+    :lines: 105-111
     :linenos:
-    :lineno-start: 92
+    :lineno-start: 105
+    :caption: :download:`responder-envoy.yaml </_configs/reverse_connection/responder-envoy.yaml>`
+
+This filter copies the reverse-tunnel identifiers into the handed-off upstream connection's filter
+state and emits exactly one ``http2_keepalive_timeout`` access-log event when the upstream
+connection closes locally with ``http2_ping_timeout``. The subsequent ``tunnel_closed`` record
+reuses the same close reason.
+
+.. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
+    :language: yaml
+    :lines: 104-129
+    :linenos:
+    :lineno-start: 104
     :caption: :download:`responder-envoy.yaml </_configs/reverse_connection/responder-envoy.yaml>`
 
 The reverse connection cluster configuration includes several key fields:
@@ -311,9 +389,9 @@ that identifies the target downstream node for each request.
 
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
     :language: yaml
-    :lines: 31-88
+    :lines: 43-101
     :linenos:
-    :lineno-start: 31
+    :lineno-start: 43
     :caption: :download:`responder-envoy.yaml </_configs/reverse_connection/responder-envoy.yaml>`
 
 The example above demonstrates using a :ref:`Lua filter <config_http_filters_lua>` to implement flexible
@@ -371,6 +449,104 @@ The header priority order is:
       If tenant isolation is enabled and ``tenant_id_format`` is configured, but the tenant ID cannot
       be inferred from the request (e.g., the ``x-tenant-id`` header is missing or the formatter
       evaluates to empty), host selection will fail and the request will not be routed.
+
+.. _config_reverse_tunnel_access_logging:
+
+Access logging
+--------------
+
+Both the initiator and responder bootstrap extensions support access logging for reverse tunnel
+lifecycle events. Access logs are emitted at key connection lifecycle points, providing visibility
+into tunnel establishment, handshake outcomes, and connection teardown.
+
+Initiator access logging
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The initiator (downstream) Envoy can be configured to log reverse tunnel lifecycle events by adding
+an ``access_log`` field to the downstream socket interface bootstrap extension:
+
+.. literalinclude:: /_configs/reverse_connection/initiator-envoy.yaml
+    :language: yaml
+    :lines: 7-28
+    :linenos:
+    :lineno-start: 7
+    :caption: :download:`initiator-envoy.yaml </_configs/reverse_connection/initiator-envoy.yaml>`
+
+Any :ref:`access log <arch_overview_access_logs>` type supported by Envoy (file, stdout, gRPC, etc.)
+can be used. The access log configuration follows the same format as access logs in other Envoy
+components such as the :ref:`TCP proxy <config_network_filters_tcp_proxy>` and
+:ref:`HTTP connection manager <config_http_conn_man>`.
+
+Initiator lifecycle events
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The initiator emits access log entries at the following lifecycle points:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Event
+     - Description
+   * - ``handshake_success``
+     - A reverse tunnel handshake completed successfully. The connection is now established
+       and available for data requests from the responder.
+   * - ``handshake_failure``
+     - A reverse tunnel handshake failed. The ``error`` field contains the failure reason
+       (e.g., HTTP status error, encode error, connection closed).
+   * - ``connection_closed``
+     - An established reverse tunnel connection was closed. This triggers re-establishment
+       on the next maintenance cycle.
+
+Initiator dynamic metadata fields
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+All initiator access log fields are available under the ``envoy.reverse_tunnel.initiator`` dynamic
+metadata namespace and can be referenced using the ``%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:FIELD)%``
+:ref:`format string <config_access_log_format_strings>`.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 15 65
+
+   * - Field
+     - Type
+     - Description
+   * - ``event``
+     - string
+     - The lifecycle event that triggered this log entry. One of: ``handshake_success``,
+       ``handshake_failure``, ``connection_closed``.
+   * - ``node_id``
+     - string
+     - The ``src_node_id`` of this initiator Envoy instance, as configured in the ``rc://``
+       listener address.
+   * - ``cluster_id``
+     - string
+     - The ``src_cluster_id`` of this initiator Envoy instance, as configured in the ``rc://``
+       listener address.
+   * - ``tenant_id``
+     - string
+     - The ``src_tenant_id`` of this initiator Envoy instance, as configured in the ``rc://``
+       listener address. Empty if tenant isolation is not used.
+   * - ``upstream_cluster``
+     - string
+     - The name of the upstream cluster that this reverse tunnel connects to.
+   * - ``host_address``
+     - string
+     - The resolved address of the specific upstream host that this connection targets.
+   * - ``connection_key``
+     - string
+     - A unique identifier for this specific reverse tunnel connection instance. Useful for
+       correlating handshake and close events for the same connection.
+   * - ``error``
+     - string
+     - The error message describing the failure reason. Empty string on non-failure events.
+       Populated on ``handshake_failure`` events with the failure reason, e.g.,
+       ``HTTP handshake failed with status 401``, ``HTTP handshake encode failed``,
+       ``Connection closed``.
+
+In addition to dynamic metadata fields, standard Envoy access log format strings such as
+``%START_TIME%``, ``%DURATION%``, and ``%CONNECTION_TERMINATION_DETAILS%`` are also available.
 
 .. _config_reverse_connection_security:
 

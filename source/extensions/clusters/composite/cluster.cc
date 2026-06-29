@@ -47,13 +47,13 @@ CompositeClusterLoadBalancer::getAttemptCount(Upstream::LoadBalancerContext* con
   return 0;
 }
 
-absl::optional<size_t>
+std::optional<size_t>
 CompositeClusterLoadBalancer::mapAttemptToClusterIndex(uint32_t attempt_count) const {
   // Attempt count is 1-based in Envoy router.
   // First attempt (count = 1) uses first cluster (index 0).
   if (attempt_count == 0) {
     ENVOY_LOG(warn, "invalid attempt count 0 in composite cluster '{}'", parent_info_->name());
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   const size_t cluster_index = attempt_count - 1;
@@ -63,7 +63,7 @@ CompositeClusterLoadBalancer::mapAttemptToClusterIndex(uint32_t attempt_count) c
   }
 
   // Attempts exceed available clusters - fail the request.
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 Upstream::ThreadLocalCluster*
@@ -150,20 +150,20 @@ CompositeClusterLoadBalancer::peekAnotherHost(Upstream::LoadBalancerContext* con
   return cluster->loadBalancer().peekAnotherHost(&composite_context);
 }
 
-absl::optional<Upstream::SelectedPoolAndConnection>
+std::optional<Upstream::SelectedPoolAndConnection>
 CompositeClusterLoadBalancer::selectExistingConnection(Upstream::LoadBalancerContext* context,
                                                        const Upstream::Host& host,
                                                        std::vector<uint8_t>& hash_key) {
   const uint32_t attempt_count = getAttemptCount(context);
   const auto cluster_index_opt = mapAttemptToClusterIndex(attempt_count);
   if (!cluster_index_opt.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   const size_t cluster_index = cluster_index_opt.value();
   auto* cluster = getClusterByIndex(cluster_index);
   if (cluster == nullptr) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   CompositeLoadBalancerContext composite_context(context, cluster_index);

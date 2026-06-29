@@ -70,7 +70,7 @@ TEST(Context, RequestAttributes) {
   // "2018-04-03T23:06:09.123Z".
   const SystemTime start_time(std::chrono::milliseconds(1522796769123));
   EXPECT_CALL(info, startTime()).WillRepeatedly(Return(start_time));
-  absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
+  std::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
   EXPECT_CALL(info, requestComplete()).WillRepeatedly(Return(dur));
   EXPECT_CALL(info, protocol()).WillRepeatedly(Return(Http::Protocol::Http2));
 
@@ -345,7 +345,7 @@ TEST(Context, ResponseAttributes) {
   EXPECT_CALL(time_system, monotonicTime)
       .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(25000000))));
 
-  const absl::optional<std::string> code_details = "unauthorized";
+  const std::optional<std::string> code_details = "unauthorized";
   EXPECT_CALL(info, responseCodeDetails()).WillRepeatedly(ReturnRef(code_details));
 
   {
@@ -575,7 +575,7 @@ TEST(Context, ConnectionAttributes) {
   info.upstreamInfo()->setUpstreamTransportFailureReason(upstream_transport_failure_reason);
   EXPECT_CALL(info, connectionID()).WillRepeatedly(Return(123));
   info.downstream_connection_info_provider_->setConnectionID(123);
-  const absl::optional<std::string> connection_termination_details = "unauthorized";
+  const std::optional<std::string> connection_termination_details = "unauthorized";
   EXPECT_CALL(info, connectionTerminationDetails())
       .WillRepeatedly(ReturnRef(connection_termination_details));
   const std::string downstream_transport_failure_reason = "TlsError";
@@ -939,7 +939,7 @@ TEST(Context, FilterStateAttributes) {
   const std::string missing = "missing_key";
 
   auto accessor = std::make_shared<Envoy::Router::StringAccessorImpl>(serialized);
-  filter_state.setData(key, accessor, StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state.setData(key, accessor);
 
   EXPECT_EQ(0, wrapper.size());
 
@@ -967,7 +967,7 @@ TEST(Context, FilterStateAttributes) {
   cel_state->setValue(v.SerializeAsString());
   EXPECT_TRUE(cel_state->serializeAsString().has_value());
   const std::string cel_key = "cel_state_key";
-  filter_state.setData(cel_key, cel_state, StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state.setData(cel_key, cel_state);
 
   {
     auto value = wrapper[CelValue::CreateStringView(cel_key)];
@@ -981,8 +981,7 @@ TEST(Context, FilterStateAttributes) {
   const std::string port_string = "port";
   filter_state.setData(address_key,
                        std::make_unique<Network::AddressObject>(
-                           std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 6666)),
-                       StreamInfo::FilterState::StateType::ReadOnly);
+                           std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 6666)));
   {
     auto value = wrapper[CelValue::CreateStringView(address_key)];
     ASSERT_TRUE(value.has_value());

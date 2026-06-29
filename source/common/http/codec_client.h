@@ -155,9 +155,6 @@ public:
 
   bool connectCalled() const { return connect_called_; }
 
-  // Get the underlying connection of the codec client for lifetimeCallbacks.
-  const Network::Connection& connection() const { return *connection_; }
-
 protected:
   /**
    * Create a codec client and connect to a remote host/port.
@@ -216,7 +213,7 @@ protected:
   Network::ClientConnectionPtr connection_;
   ClientConnectionPtr codec_;
   Event::TimerPtr idle_timer_;
-  const absl::optional<std::chrono::milliseconds> idle_timeout_;
+  const std::optional<std::chrono::milliseconds> idle_timeout_;
   const bool enable_idle_timer_only_when_connected_;
 
 private:

@@ -51,7 +51,7 @@ HeaderValueExtractorImpl::computeFragment(const Http::HeaderMap& headers) const 
   // This is an implicitly untrusted header, so per the API documentation only the first
   // value is used.
   std::vector<absl::string_view> elements{header_entry[0]->value().getStringView()};
-  if (header_value_extractor_config_.element_separator().length() > 0) {
+  if (!header_value_extractor_config_.element_separator().empty()) {
     elements = absl::StrSplit(header_entry[0]->value().getStringView(),
                               header_value_extractor_config_.element_separator());
   }

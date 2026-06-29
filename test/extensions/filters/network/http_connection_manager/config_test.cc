@@ -28,6 +28,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 
@@ -82,7 +83,7 @@ http_filters:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
-                            "Didn't find a registered implementation for name: 'foo'");
+                            "Didn't find a registered implementation for 'foo' with type URL: ''");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, InvalidServerName) {
@@ -232,14 +233,14 @@ http_filters:
 
 #ifdef ENVOY_ENABLE_QUIC
   {
-    EXPECT_CALL(listener_info_, isQuic()).WillOnce(Return(false));
+    EXPECT_CALL(context_.listener_info_, isQuic()).WillOnce(Return(false));
 
     EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
                               "HTTP/3 codec configured on non-QUIC listener.");
   }
   {
     creation_status_ = absl::OkStatus();
-    EXPECT_CALL(listener_info_, isQuic()).WillOnce(Return(true));
+    EXPECT_CALL(context_.listener_info_, isQuic()).WillOnce(Return(true));
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                        date_provider_, route_config_provider_manager_,
                                        &scoped_routes_config_provider_manager_, tracer_manager_,
@@ -273,7 +274,7 @@ http_filters:
     "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(listener_info_, isQuic()).WillOnce(Return(true));
+  EXPECT_CALL(context_.listener_info_, isQuic()).WillOnce(Return(true));
 
   EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
                             "Non-HTTP/3 codec configured on QUIC listener.");
@@ -338,7 +339,7 @@ http_filters:
   // Simulate tracer provider configuration in the bootstrap config.
   envoy::config::trace::v3::Tracing tracing_config;
   tracing_config.mutable_http()->set_name("zipkin");
-  tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
+  std::ignore = tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
       envoy::config::trace::v3::ZipkinConfig{});
   context_.server_factory_context_.http_context_.setDefaultTracingConfig(tracing_config);
 
@@ -420,7 +421,7 @@ http_filters:
   // Simulate tracer provider configuration in the bootstrap config.
   envoy::config::trace::v3::Tracing tracing_config;
   tracing_config.mutable_http()->set_name("zipkin");
-  tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
+  std::ignore = tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
       envoy::config::trace::v3::ZipkinConfig{});
   context_.server_factory_context_.http_context_.setDefaultTracingConfig(tracing_config);
 
@@ -472,7 +473,7 @@ http_filters:
   // Simulate tracer provider configuration in the bootstrap config.
   envoy::config::trace::v3::Tracing bootstrap_tracing_config;
   bootstrap_tracing_config.mutable_http()->set_name("opentelemetry");
-  bootstrap_tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
+  std::ignore = bootstrap_tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
       envoy::config::trace::v3::OpenTelemetryConfig{});
   context_.server_factory_context_.http_context_.setDefaultTracingConfig(bootstrap_tracing_config);
 
@@ -483,7 +484,7 @@ http_filters:
   zipkin_config.set_collector_cluster("zipkin");
   zipkin_config.set_collector_endpoint("/api/v2/spans");
   zipkin_config.set_collector_endpoint_version(envoy::config::trace::v3::ZipkinConfig::HTTP_JSON);
-  inlined_tracing_config.mutable_typed_config()->PackFrom(zipkin_config);
+  std::ignore = inlined_tracing_config.mutable_typed_config()->PackFrom(zipkin_config);
 
   // When tracing is enabled on a given "envoy.filters.network.http_connection_manager" filter,
   // an actual Tracer must be obtained from the HttpTracerManager.
@@ -800,6 +801,8 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultInternalAddress) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -826,6 +829,8 @@ TEST_F(HttpConnectionManagerConfigTest, CidrRangeBasedInternalAddress) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1105,6 +1110,107 @@ TEST_F(HttpConnectionManagerConfigTest, StreamFlushTimeoutAndStreamIdleTimeoutSe
   EXPECT_EQ(10 * 1000, config.streamIdleTimeout().count());
   ASSERT_TRUE(config.streamFlushTimeout().has_value());
   EXPECT_EQ(20 * 1000, config.streamFlushTimeout().value().count());
+}
+
+// Validate max_connection_duration_jitter is parsed from common_http_protocol_options.
+TEST_F(HttpConnectionManagerConfigTest, MaxConnectionDurationJitter) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    max_connection_duration: 10s
+    max_connection_duration_jitter:
+      value: 50.0
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  // With jitter configured (50%), each call returns a value in [10000, 15000].
+  // The jittering is internal to the config; we observe it by sampling.
+  for (int i = 0; i < 5; ++i) {
+    const auto value = config.maxConnectionDuration().value().count();
+    EXPECT_GE(value, 10000);
+    EXPECT_LE(value, 15000);
+  }
+}
+
+// Validate that max_connection_duration_jitter defaults to unset.
+TEST_F(HttpConnectionManagerConfigTest, MaxConnectionDurationJitterDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    max_connection_duration: 10s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  EXPECT_EQ(10000, config.maxConnectionDuration().value().count());
+}
+
+// Validate drain_timeout_jitter is parsed from HCM config.
+TEST_F(HttpConnectionManagerConfigTest, DrainTimeoutJitter) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  drain_timeout: 5s
+  drain_timeout_jitter:
+    value: 25.0
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  // With jitter configured (25%), each call returns a value in [5000, 6250].
+  for (int i = 0; i < 5; ++i) {
+    const auto value = config.drainTimeout().count();
+    EXPECT_GE(value, 5000);
+    EXPECT_LE(value, 6250);
+  }
+}
+
+// Validate that drain_timeout_jitter defaults to unset.
+TEST_F(HttpConnectionManagerConfigTest, DrainTimeoutJitterDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  // No jitter configured: drainTimeout() returns its base (default 5s).
+  EXPECT_EQ(5000, config.drainTimeout().count());
 }
 
 // Validate that idle_timeout set in common_http_protocol_options is used.
@@ -1969,9 +2075,6 @@ TEST_F(HttpConnectionManagerConfigTest, UnconfiguredRequestTimeout) {
 }
 
 TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   const std::string yaml_string = R"EOF(
 codec_type: http1
 stat_prefix: router
@@ -1987,6 +2090,8 @@ route_config:
         cluster: cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
 - name: envoy.filters.http.router
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -2595,11 +2700,11 @@ public:
 
   void set(Http::RequestHeaderMap&, bool, bool) override {}
   void setInResponse(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&) override {}
-  absl::optional<absl::string_view> get(const Http::RequestHeaderMap&) const override {
-    return absl::nullopt;
+  std::optional<absl::string_view> get(const Http::RequestHeaderMap&) const override {
+    return std::nullopt;
   }
-  absl::optional<uint64_t> getInteger(const Http::RequestHeaderMap&) const override {
-    return absl::nullopt;
+  std::optional<uint64_t> getInteger(const Http::RequestHeaderMap&) const override {
+    return std::nullopt;
   }
   Tracing::Reason getTraceReason(const Http::RequestHeaderMap&) override {
     return Tracing::Reason::Sampling;
@@ -2692,7 +2797,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownHttpFilterWithException) {
 
   EXPECT_THROW_WITH_REGEX(
       createHttpConnectionManagerConfig(yaml_string), EnvoyException,
-      "Didn't find a registered implementation for name: 'envoy.filters.http.unknown'");
+      "Didn't find a registered implementation for 'envoy.filters.http.unknown' with type URL: ''");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, UnknownOptionalHttpFilterWithIgnore) {
@@ -3573,8 +3678,8 @@ public:
   createFromProto(const Protobuf::Message& message,
                   Server::Configuration::ServerFactoryContext& server_context) override {
     auto mptr = ::Envoy::Config::Utility::translateAnyToFactoryConfig(
-        dynamic_cast<const Protobuf::Any&>(message), server_context.messageValidationVisitor(),
-        *this);
+        Envoy::Protobuf::DynamicCastMessage<Protobuf::Any>(message),
+        server_context.messageValidationVisitor(), *this);
     const auto& proto_config =
         MessageUtil::downcastAndValidate<const ::envoy::extensions::http::header_validators::
                                              envoy_default::v3::HeaderValidatorConfig&>(

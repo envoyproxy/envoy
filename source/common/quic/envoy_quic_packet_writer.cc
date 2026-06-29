@@ -47,7 +47,7 @@ quic::WriteResult EnvoyQuicPacketWriter::WritePacket(
   return convertToQuicWriteResult(result);
 }
 
-absl::optional<int> EnvoyQuicPacketWriter::MessageTooBigErrorCode() const { return EMSGSIZE; }
+std::optional<int> EnvoyQuicPacketWriter::MessageTooBigErrorCode() const { return EMSGSIZE; }
 
 quic::QuicByteCount
 EnvoyQuicPacketWriter::GetMaxPacketSize(const quic::QuicSocketAddress& peer_address) const {

@@ -3,6 +3,7 @@
 #include <http_parser.h>
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -33,7 +34,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "quiche/http2/adapter/http2_protocol.h"
 
 namespace Envoy {
@@ -552,13 +552,13 @@ void Utility::QueryParamsMulti::overwrite(absl::string_view key, absl::string_vi
   this->data_[key] = std::vector<std::string>{std::string(value)};
 }
 
-absl::optional<std::string> Utility::QueryParamsMulti::getFirstValue(absl::string_view key) const {
+std::optional<std::string> Utility::QueryParamsMulti::getFirstValue(absl::string_view key) const {
   auto it = this->data_.find(key);
   if (it == this->data_.end()) {
     return std::nullopt;
   }
 
-  return absl::optional<std::string>{it->second.at(0)};
+  return std::optional<std::string>{it->second.at(0)};
 }
 
 absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
@@ -656,11 +656,11 @@ uint64_t Utility::getResponseStatus(const ResponseHeaderMap& headers) {
   return status.value();
 }
 
-absl::optional<uint64_t> Utility::getResponseStatusOrNullopt(const ResponseHeaderMap& headers) {
+std::optional<uint64_t> Utility::getResponseStatusOrNullopt(const ResponseHeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
   if (!header || !absl::SimpleAtoi(headers.getStatusValue(), &response_code)) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return response_code;
 }
@@ -1070,7 +1070,7 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
 }
 
 std::string Utility::buildOriginalUri(const Http::RequestHeaderMap& request_headers,
-                                      const absl::optional<uint32_t> max_path_length) {
+                                      const std::optional<uint32_t> max_path_length) {
   if (!request_headers.Path()) {
     return "";
   }
@@ -1190,6 +1190,8 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "overload manager reset";
   case Http::StreamResetReason::Http1PrematureUpstreamHalfClose:
     return "HTTP/1 premature upstream half close";
+  case Http::StreamResetReason::RemoteResetNoError:
+    return "remote reset (no error)";
   }
 
   return "";
@@ -1326,41 +1328,17 @@ namespace {
 // %-encode all ASCII character codepoints, EXCEPT:
 // ALPHA | DIGIT | * | - | . | _
 // SPACE is encoded as %20, NOT as the + character
-constexpr std::array<uint32_t, 8> kUrlEncodedCharTable = {
-    // control characters
-    0b11111111111111111111111111111111,
-    // !"#$%&'()*+,-./0123456789:;<=>?
-    0b11111111110110010000000000111111,
-    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
-    0b10000000000000000000000000011110,
-    //`abcdefghijklmnopqrstuvwxyz{|}~
-    0b10000000000000000000000000011111,
-    // extended ascii
-    0b11111111111111111111111111111111,
-    0b11111111111111111111111111111111,
-    0b11111111111111111111111111111111,
-    0b11111111111111111111111111111111,
-};
+constexpr CharTable kUrlEncodedCharTable =
+    ~(CharTables::kAlphanumeric | CharTable::fromChars("*-._"));
 
-constexpr std::array<uint32_t, 8> kUrlDecodedCharTable = {
-    // control characters
-    0b00000000000000000000000000000000,
-    // !"#$%&'()*+,-./0123456789:;<=>?
-    0b01011111111111111111111111110101,
-    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
-    0b11111111111111111111111111110101,
-    //`abcdefghijklmnopqrstuvwxyz{|}~
-    0b11111111111111111111111111100010,
-    // extended ascii
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-};
+// The set of characters which, if they are percent-encoded, should be
+// decoded.
+constexpr CharTable kUrlDecodedCharTable =
+    CharTables::kAlphanumeric | CharTable::fromChars("!#$%&'()*+,-./:;=?@[]_`~");
 
-bool shouldPercentEncodeChar(char c) { return testCharInTable(kUrlEncodedCharTable, c); }
+constexpr bool shouldPercentEncodeChar(char c) { return kUrlEncodedCharTable.hasChar(c); }
 
-bool shouldPercentDecodeChar(char c) { return testCharInTable(kUrlDecodedCharTable, c); }
+constexpr bool shouldPercentDecodeChar(char c) { return kUrlDecodedCharTable.hasChar(c); }
 } // namespace
 
 std::string Utility::PercentEncoding::urlEncode(absl::string_view value) {
@@ -1432,7 +1410,7 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   // effort attempt.
   const auto colon_pos = host.rfind(':');
   absl::string_view host_to_resolve = host;
-  absl::optional<uint16_t> port;
+  std::optional<uint16_t> port;
   if (colon_pos != absl::string_view::npos && host_to_resolve.back() != ']') {
     const absl::string_view string_view_host = host;
     host_to_resolve = string_view_host.substr(0, colon_pos);
@@ -1643,6 +1621,30 @@ std::string Utility::newUri(::Envoy::OptRef<const Utility::RedirectConfig> redir
   return fmt::format("{}://{}{}{}", final_scheme, final_host, final_port, final_path);
 }
 
+std::string Utility::newUriWithFormatter(OptRef<const RedirectConfig> redirect_config,
+                                         const Http::RequestHeaderMap& headers,
+                                         const Formatter::Formatter& formatter,
+                                         const StreamInfo::StreamInfo& stream_info) {
+  const Formatter::Context context(&headers);
+  const std::string formatted_path = formatter.format(context, stream_info);
+  if (!formatted_path.empty()) {
+    const RedirectConfig path_redirect_config{
+        redirect_config ? redirect_config->scheme_redirect_ : "",
+        redirect_config ? redirect_config->host_redirect_ : "",
+        redirect_config ? redirect_config->port_redirect_ : "",
+        formatted_path,
+        "",
+        "",
+        nullptr,
+        nullptr,
+        formatted_path.find('?') != std::string::npos,
+        redirect_config ? redirect_config->https_redirect_ : false,
+        redirect_config ? redirect_config->strip_query_ : false};
+    return newUri(makeOptRef<const RedirectConfig>(path_redirect_config), headers);
+  }
+  return newUri(redirect_config, headers);
+}
+
 bool Utility::isValidRefererValue(absl::string_view value) {
 
   // First, we try to parse it as an absolute URL and
@@ -1673,7 +1675,7 @@ bool Utility::isValidRefererValue(absl::string_view value) {
       seen_slash = true;
       continue;
     default:
-      if (!testCharInTable(kUriQueryAndFragmentCharTable, c)) {
+      if (!CharTables::kUriQueryAndFragment.hasChar(c)) {
         return false;
       }
     }

@@ -106,6 +106,7 @@ uint64_t getBufferSizeBytes(
 std::vector<std::string> getFilterStateObjectsToLog(
     const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
         config) {
+  // NOLINTNEXTLINE(modernize-return-braced-init-list)
   return std::vector<std::string>(config.filter_state_objects_to_log().begin(),
                                   config.filter_state_objects_to_log().end());
 }

@@ -817,7 +817,6 @@ TEST_P(AdsIntegrationTest, CdsKeepEdsAfterWarmingFailure) {
 
 TEST_P(AdsIntegrationTest, CdsKeepEdsDropOverloadAfterWarmingFailure) {
   // This test should be kept after the runtime guard is deprecated
-  config_helper_.addRuntimeOverride("envoy.restart_features.use_eds_cache_for_ads", "true");
   initialize();
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
   envoy::config::cluster::v3::Cluster cluster = buildCluster("cluster_0");
@@ -2827,7 +2826,7 @@ TEST_P(AdsIntegrationTest, SrdsPausedDuringLds) {
 // ADS integration tests that exercise the ADS-replacement mechanism.
 class AdsReplacementIntegrationTest : public AdsIntegrationTest {
 public:
-  AdsReplacementIntegrationTest() {}
+  AdsReplacementIntegrationTest() = default;
 
   void createXdsUpstream() override {
     // Create the first ADS upstream.
@@ -2889,7 +2888,8 @@ public:
             TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
       }
       ads_cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
-      ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
+      std::ignore =
+          ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
 
       // Add the second ADS cluster (copy the ads_cluster and update its name).
       auto* second_ads_cluster = bootstrap.mutable_static_resources()->add_clusters();

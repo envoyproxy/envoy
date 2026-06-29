@@ -26,7 +26,7 @@ public:
   Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
   Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext* context) override;
   OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override;
-  absl::optional<Upstream::SelectedPoolAndConnection>
+  std::optional<Upstream::SelectedPoolAndConnection>
   selectExistingConnection(Upstream::LoadBalancerContext* context, const Upstream::Host& host,
                            std::vector<uint8_t>& hash_key) override;
 
@@ -46,7 +46,7 @@ private:
   DynamicModuleLbConfigSharedPtr config_;
   const Upstream::PrioritySet& priority_set_;
   std::string cluster_name_;
-  envoy_dynamic_module_type_lb_module_ptr in_module_lb_;
+  envoy_dynamic_module_type_lb_module_ptr in_module_lb_{nullptr};
 
   // Handle for the member update callback registration. Automatically unregisters on destruction.
   Envoy::Common::CallbackHandlePtr member_update_cb_;

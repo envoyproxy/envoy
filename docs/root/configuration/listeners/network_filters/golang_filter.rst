@@ -15,7 +15,7 @@ for more details on the filter's implementation.
 .. warning::
   The Envoy Golang filter is designed to be run with the ``GODEBUG=cgocheck=0`` environment variable set.
 
-  This disables the cgo pointer check.
+  This disables the `cgo <https://go.dev/doc/articles/c_go_cgo>`_ pointer check.
 
   Failure to set this environment variable will cause Envoy to crash!
 

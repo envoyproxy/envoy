@@ -7,6 +7,7 @@
 #include "test/fuzz/utility.h"
 #include "test/integration/h2_capture_fuzz.pb.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/file_system_for_test.h"
 
 namespace Envoy {
 

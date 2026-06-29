@@ -56,7 +56,7 @@ namespace {
 
 struct AddressFamily {
   Address::Type type;
-  absl::optional<Address::IpVersion> version;
+  std::optional<Address::IpVersion> version;
 
   bool operator==(const AddressFamily& other) const {
     return type == other.type && version == other.version;
@@ -74,7 +74,7 @@ AddressFamily getFamily(const Address::InstanceConstSharedPtr& addr) {
   if (addr->type() == Address::Type::Ip) {
     return {Address::Type::Ip, addr->ip()->version()};
   }
-  return {addr->type(), absl::nullopt};
+  return {addr->type(), std::nullopt};
 }
 
 } // namespace
@@ -114,10 +114,10 @@ std::vector<Address::InstanceConstSharedPtr> HappyEyeballsConnectionProvider::so
     preferred_family = {Address::Type::Ip, Address::IpVersion::v6};
     break;
   case envoy::config::cluster::v3::UpstreamConnectionOptions::PIPE:
-    preferred_family = {Address::Type::Pipe, absl::nullopt};
+    preferred_family = {Address::Type::Pipe, std::nullopt};
     break;
   case envoy::config::cluster::v3::UpstreamConnectionOptions::INTERNAL:
-    preferred_family = {Address::Type::EnvoyInternal, absl::nullopt};
+    preferred_family = {Address::Type::EnvoyInternal, std::nullopt};
     break;
   default:
     break;

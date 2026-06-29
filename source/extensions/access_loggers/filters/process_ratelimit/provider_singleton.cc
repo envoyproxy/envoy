@@ -115,8 +115,7 @@ RateLimiterProviderSingleton::TokenBucketSubscription::getLimiter() {
 RateLimiterProviderSingleton::TokenBucketSubscription::TokenBucketSubscription(
     RateLimiterProviderSingleton& parent, absl::string_view resource_name)
     : parent_(parent), resource_name_(resource_name),
-      resource_type_helper_(parent.factory_context_.messageValidationVisitor(), ""),
-      token_bucket_config_hash_(0) {
+      resource_type_helper_(parent.factory_context_.messageValidationVisitor(), "") {
   subscription_ =
       THROW_OR_RETURN_VALUE(parent.factory_context_.xdsManager().subscribeToSingletonResource(
                                 resource_name, parent.config_source_,
@@ -132,7 +131,8 @@ RateLimiterProviderSingleton::TokenBucketSubscription::~TokenBucketSubscription(
 
 void RateLimiterProviderSingleton::TokenBucketSubscription::handleAddedResource(
     const Config::DecodedResourceRef& resource) {
-  const auto& config = dynamic_cast<const envoy::type::v3::TokenBucket&>(resource.get().resource());
+  const auto& config =
+      Envoy::Protobuf::DynamicCastMessage<envoy::type::v3::TokenBucket>(resource.get().resource());
   size_t new_hash = MessageUtil::hash(config);
   // If the config is the same, no op.
   if (new_hash == token_bucket_config_hash_) {

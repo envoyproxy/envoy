@@ -88,8 +88,7 @@ private:
   struct ResponseDecoder : public DecoderCallbacks, public DecoderEventHandler {
     ResponseDecoder(ActiveRpc& parent, Transport& transport, Protocol& protocol)
         : parent_(parent), decoder_(std::make_unique<Decoder>(transport, protocol, *this)),
-          protocol_converter_(std::make_shared<ProtocolConverter>()), complete_{false},
-          passthrough_{false}, pending_transport_end_{false} {
+          protocol_converter_(std::make_shared<ProtocolConverter>()) {
       protocol_converter_->initProtocolConverter(*parent_.parent_.protocol_,
                                                  parent_.response_buffer_);
     }
@@ -134,10 +133,10 @@ private:
     Buffer::OwnedImpl upstream_buffer_;
     MessageMetadataSharedPtr metadata_;
     ProtocolConverterSharedPtr protocol_converter_;
-    absl::optional<bool> success_;
-    bool complete_ : 1;
-    bool passthrough_ : 1;
-    bool pending_transport_end_ : 1;
+    std::optional<bool> success_;
+    bool complete_ : 1 = false;
+    bool passthrough_ : 1 = false;
+    bool pending_transport_end_ : 1 = false;
   };
   using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
 
@@ -218,9 +217,7 @@ private:
           stream_id_(parent_.random_generator_.random()),
           stream_info_(parent_.time_source_,
                        parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr(),
-                       StreamInfo::FilterState::LifeSpan::FilterChain),
-          local_response_sent_{false}, pending_transport_end_{false}, passthrough_{false},
-          under_on_local_reply_{false} {
+                       StreamInfo::FilterState::LifeSpan::FilterChain) {
       parent_.stats_.request_active_.inc();
     }
     ~ActiveRpc() override {
@@ -365,22 +362,22 @@ private:
     std::list<ThriftFilters::FilterBaseSharedPtr> base_filters_;
     DecoderEventHandlerSharedPtr upgrade_handler_;
     ResponseDecoderPtr response_decoder_;
-    absl::optional<Router::RouteConstSharedPtr> cached_route_;
+    std::optional<Router::RouteConstSharedPtr> cached_route_;
     Buffer::OwnedImpl response_buffer_;
     int32_t original_sequence_id_{0};
     MessageType original_msg_type_{MessageType::Call};
     std::function<FilterStatus(DecoderEventHandler*)> filter_action_;
-    bool local_response_sent_ : 1;
-    bool pending_transport_end_ : 1;
-    bool passthrough_ : 1;
-    bool under_on_local_reply_ : 1;
+    bool local_response_sent_ : 1 = false;
+    bool pending_transport_end_ : 1 = false;
+    bool passthrough_ : 1 = false;
+    bool under_on_local_reply_ : 1 = false;
   };
 
   using ActiveRpcPtr = std::unique_ptr<ActiveRpc>;
 
   void continueDecoding();
   void dispatch();
-  absl::optional<DirectResponse::ResponseType>
+  std::optional<DirectResponse::ResponseType>
   sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
   void doDeferredRpcDestroy(ActiveRpc& rpc);
   void resetAllRpcs(bool local_reset);

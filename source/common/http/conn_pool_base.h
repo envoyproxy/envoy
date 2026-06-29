@@ -74,6 +74,9 @@ public:
     drainConnectionsImpl(drain_behavior);
   }
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
+  const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() override {
+    return Envoy::ConnectionPool::ConnPoolImplBase::socketOptions();
+  }
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
                                          Http::ConnectionPool::Callbacks& callbacks,
                                          const Instance::StreamOptions& options) override;
@@ -95,27 +98,18 @@ public:
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
   Random::RandomGenerator& randomGenerator() { return random_generator_; }
 
-  virtual absl::optional<HttpServerPropertiesCache::Origin>& origin() { return origin_; }
+  virtual std::optional<HttpServerPropertiesCache::Origin>& origin() { return origin_; }
   virtual Http::HttpServerPropertiesCacheSharedPtr cache() { return nullptr; }
-
-  void setLifetimeCallbacks(OptRef<ConnectionPool::ConnectionLifetimeCallbacks> callbacks,
-                            std::vector<uint8_t> hash_key) override;
-
-  void onConnectionOpen(const Network::Connection& connection);
-
-  void onConnectionDraining(const Network::Connection& connection);
 
 protected:
   friend class ActiveClient;
 
-  void setOrigin(absl::optional<HttpServerPropertiesCache::Origin> origin) { origin_ = origin; }
+  void setOrigin(std::optional<HttpServerPropertiesCache::Origin> origin) { origin_ = origin; }
 
   Random::RandomGenerator& random_generator_;
 
 private:
-  absl::optional<HttpServerPropertiesCache::Origin> origin_;
-  OptRef<ConnectionPool::ConnectionLifetimeCallbacks> callbacks_;
-  std::vector<uint8_t> hash_key_;
+  std::optional<HttpServerPropertiesCache::Origin> origin_;
 };
 
 // An implementation of Envoy::ConnectionPool::ActiveClient for HTTP/1.1 and HTTP/2
@@ -152,7 +146,7 @@ public:
   }
 
   void initializeReadFilters() override { codec_client_->initializeReadFilters(); }
-  absl::optional<Http::Protocol> protocol() const override { return codec_client_->protocol(); }
+  std::optional<Http::Protocol> protocol() const override { return codec_client_->protocol(); }
   void close(Network::ConnectionCloseType type, absl::string_view details) override {
     codec_client_->close(type, details);
   }
@@ -193,7 +187,7 @@ public:
       Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
       CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocols,
       Server::OverloadManager& overload_manager,
-      absl::optional<Http::HttpServerPropertiesCache::Origin> origin = absl::nullopt,
+      std::optional<Http::HttpServerPropertiesCache::Origin> origin = std::nullopt,
       Http::HttpServerPropertiesCacheSharedPtr cache = nullptr)
       : HttpConnPoolImplBase(host, priority, dispatcher, options, transport_socket_options,
                              random_generator, state, protocols, overload_manager),
@@ -250,9 +244,6 @@ public:
   // Http::ConnectionCallbacks
   void onGoAway(Http::GoAwayErrorCode error_code) override;
   void onSettings(ReceivedSettings& settings) override;
-
-  // Override to provide the lifetimeCallbacks.
-  void onEvent(Network::ConnectionEvent event) override;
 
 private:
   bool closed_with_active_rq_{};

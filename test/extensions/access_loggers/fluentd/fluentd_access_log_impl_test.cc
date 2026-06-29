@@ -36,7 +36,7 @@ public:
         flush_timer_(new Event::MockTimer(&dispatcher_)),
         retry_timer_(new Event::MockTimer(&dispatcher_)) {}
 
-  void init(int buffer_size_bytes = 1, absl::optional<int> max_connect_attempts = absl::nullopt) {
+  void init(int buffer_size_bytes = 1, std::optional<int> max_connect_attempts = std::nullopt) {
     EXPECT_CALL(*async_client_, setAsyncTcpClientCallbacks(_));
     EXPECT_CALL(*flush_timer_, enableTimer(_, _));
 
@@ -66,6 +66,7 @@ public:
       packer.pack_bin_body(record_bytes, data_.size());
     }
 
+    // NOLINTNEXTLINE(modernize-return-braced-init-list)
     return std::string(buffer.data(), buffer.size());
   }
 

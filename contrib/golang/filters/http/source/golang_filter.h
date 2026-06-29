@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <optional>
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/http/filter.h"
@@ -15,7 +16,6 @@
 #include "source/extensions/filters/common/expr/evaluator.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/types/optional.h"
 #include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.h"
 #include "contrib/golang/filters/http/source/processor_state.h"
 #include "contrib/golang/filters/http/source/stats.h"
@@ -57,13 +57,14 @@ private:
 
 using MetricStoreSharedPtr = std::shared_ptr<MetricStore>;
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 struct httpConfigInternal;
 
 class SecretReader {
 public:
   SecretReader(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
                Server::Configuration::FactoryContext& context);
-  absl::optional<const std::string> secret(const std::string& name) const;
+  std::optional<const std::string> secret(const std::string& name) const;
 
 private:
   absl::flat_hash_map<std::string, std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>>
@@ -388,8 +389,8 @@ private:
 
   CAPIStatus getStringPropertyCommon(absl::string_view path, uint64_t* value_data, int* value_len);
   CAPIStatus getStringPropertyInternal(absl::string_view path, std::string* result);
-  absl::optional<google::api::expr::runtime::CelValue> findValue(absl::string_view name,
-                                                                 Protobuf::Arena* arena);
+  std::optional<google::api::expr::runtime::CelValue> findValue(absl::string_view name,
+                                                                Protobuf::Arena* arena);
   CAPIStatus serializeStringValue(Filters::Common::Expr::CelValue value, std::string* result);
 
   const FilterConfigSharedPtr config_;
@@ -448,8 +449,10 @@ private:
   std::atomic<bool> has_destroyed_{false};
 };
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 struct httpConfigInternal : httpConfig {
   std::weak_ptr<FilterConfig> config_;
+  // NOLINTNEXTLINE(readability-identifier-naming)
   httpConfigInternal(std::weak_ptr<FilterConfig> c) { config_ = c; }
   std::weak_ptr<FilterConfig> weakFilterConfig() { return config_; }
 };

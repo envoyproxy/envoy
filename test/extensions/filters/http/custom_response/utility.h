@@ -10,7 +10,7 @@
 #include "source/extensions/filters/http/custom_response/policy.h"
 #include "source/extensions/http/custom_response/redirect_policy/redirect_policy.h"
 
-// #include "test/integration/filters/common.h"
+#include "test/extensions/filters/http/custom_response/custom_response_test_filters.pb.h"
 
 #include "absl/strings/string_view.h"
 
@@ -182,9 +182,9 @@ void modifyPolicy(
     if (action.typed_config().type_url() == Traits<Policy>::getTypeUrl() && action.name() == name) {
       auto& any = *action.mutable_typed_config();
       Policy policy;
-      any.UnpackTo(&policy);
+      std::ignore = any.UnpackTo(&policy);
       function(policy);
-      any.PackFrom(policy);
+      std::ignore = any.PackFrom(policy);
     }
   }
 }
@@ -207,7 +207,7 @@ public:
                 "envoy.filters.http.custom_response");
     if (!filter_state) {
       decoder_callbacks_->sendLocalReply(::Envoy::Http::Code::InternalServerError, "", nullptr,
-                                         absl::nullopt, "");
+                                         std::nullopt, "");
       return ::Envoy::Http::FilterHeadersStatus::StopIteration;
     }
     return ::Envoy::Http::FilterHeadersStatus::Continue;
@@ -229,7 +229,7 @@ public:
                                 "envoy.filters.http.custom_response");
     if (!filter_state) {
       encoder_callbacks_->sendLocalReply(::Envoy::Http::Code::InternalServerError, "", nullptr,
-                                         absl::nullopt, "");
+                                         std::nullopt, "");
       return ::Envoy::Http::FilterHeadersStatus::StopIteration;
     }
     return ::Envoy::Http::FilterHeadersStatus::Continue;

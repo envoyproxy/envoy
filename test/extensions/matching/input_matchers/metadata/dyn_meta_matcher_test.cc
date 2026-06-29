@@ -14,7 +14,7 @@
 
 #include "test/common/matcher/test_utility.h"
 #include "test/mocks/matcher/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
@@ -55,10 +55,11 @@ public:
     metadata_input.set_filter(kFilterNamespace);
     metadata_input.mutable_path()->Add()->set_key(kMetadataKey);
     single_predicate->mutable_input()->set_name("envoy.matching.inputs.dynamic_metadata");
-    single_predicate->mutable_input()->mutable_typed_config()->PackFrom(metadata_input);
+    std::ignore =
+        single_predicate->mutable_input()->mutable_typed_config()->PackFrom(metadata_input);
 
     auto* custom_matcher = single_predicate->mutable_custom_match();
-    custom_matcher->mutable_typed_config()->PackFrom(meta_matcher);
+    std::ignore = custom_matcher->mutable_typed_config()->PackFrom(meta_matcher);
 
     xds::type::matcher::v3::Matcher::OnMatch on_match;
     std::string on_match_config = R"EOF(

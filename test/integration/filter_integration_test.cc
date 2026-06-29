@@ -1,4 +1,5 @@
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/logging.h"
 
 namespace Envoy {
 namespace {
@@ -60,6 +61,8 @@ INSTANTIATE_TEST_SUITE_P(
 
 static std::string on_local_reply_filter = R"EOF(
 name: on-local-reply-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.OnLocalReplyFilterConfig
 )EOF";
 
 TEST_P(FilterIntegrationTest, OnLocalReply) {
@@ -109,6 +112,8 @@ TEST_P(FilterIntegrationTest, AddInvalidDecodedData) {
         useAccessLog("%RESPONSE_CODE_DETAILS%");
         prependFilter(R"EOF(
   name: add-invalid-data-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.AddInvalidDataFilterConfig
   )EOF");
         initialize();
         codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -127,9 +132,13 @@ TEST_P(FilterIntegrationTest, AddInvalidDecodedData) {
 TEST_P(FilterIntegrationTest, AddBodyToRequestAndWaitForIt) {
   prependFilter(R"EOF(
   name: wait-for-whole-request-and-response-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.WaitForWholeRequestAndResponseFilterConfig
   )EOF");
   prependFilter(R"EOF(
   name: add-body-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.AddBodyFilterConfig
   )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -150,9 +159,13 @@ TEST_P(FilterIntegrationTest, AddBodyToRequestAndWaitForIt) {
 TEST_P(FilterIntegrationTest, AddBodyToResponseAndWaitForIt) {
   prependFilter(R"EOF(
   name: add-body-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.AddBodyFilterConfig
   )EOF");
   prependFilter(R"EOF(
   name: wait-for-whole-request-and-response-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.WaitForWholeRequestAndResponseFilterConfig
   )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -205,7 +218,11 @@ TEST_P(FilterIntegrationTest, AddBodyAndTrailer) {
 TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
                "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%");
-  prependFilter("{ name: invalid-header-filter }");
+  prependFilter(R"EOF(
+    name: invalid-header-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.InvalidHeaderFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -231,7 +248,11 @@ TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
 TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyUpstreamBytesCount) {
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
                "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
-  prependFilter("{ name: invalid-header-filter }");
+  prependFilter(R"EOF(
+    name: invalid-header-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.InvalidHeaderFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -253,7 +274,11 @@ TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyUpstreamBytesCount) {
 
 TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyWithBody) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  prependFilter("{ name: invalid-header-filter }");
+  prependFilter(R"EOF(
+    name: invalid-header-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.InvalidHeaderFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -275,7 +300,11 @@ TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyWithBody) {
 TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyWithBodyBytesCount) {
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
                "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%");
-  prependFilter("{ name: invalid-header-filter }");
+  prependFilter(R"EOF(
+    name: invalid-header-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.InvalidHeaderFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -317,7 +346,11 @@ TEST_P(FilterIntegrationTest, BufferContinue) {
       });
 
   useAccessLog();
-  prependFilter("{ name: buffer-continue-filter }");
+  prependFilter(R"EOF(
+    name: buffer-continue-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.BufferContinueFilterConfig
+  )EOF");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -354,6 +387,8 @@ TEST_P(FilterIntegrationTest, BufferContinue) {
 TEST_P(FilterIntegrationTest, ContinueHeadersOnlyInjectBodyFilter) {
   prependFilter(R"EOF(
   name: continue-headers-only-inject-body-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.ContinueHeadersOnlyInjectBodyFilterConfig
   )EOF");
   initialize();
 
@@ -380,6 +415,8 @@ TEST_P(FilterIntegrationTest, ContinueHeadersOnlyInjectBodyFilter) {
 TEST_P(FilterIntegrationTest, StopIterationHeadersInjectBodyFilter) {
   prependFilter(R"EOF(
   name: stop-iteration-headers-inject-body-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.StopIterationHeadersInjectBodyFilterConfig
   )EOF");
   initialize();
 
@@ -406,6 +443,8 @@ TEST_P(FilterIntegrationTest, StopIterationHeadersInjectBodyFilter) {
 TEST_P(FilterIntegrationTest, AddEncodedTrailers) {
   prependFilter(R"EOF(
 name: add-trailers-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.AddTrailersFilterConfig
 )EOF");
   initialize();
 
@@ -432,7 +471,11 @@ name: add-trailers-filter
 // Tests missing headers needed for H/1 codec first line.
 TEST_P(FilterIntegrationTest, DownstreamRequestWithFaultyFilter) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  prependFilter("{ name: invalid-header-filter }");
+  prependFilter(R"EOF(
+    name: invalid-header-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.InvalidHeaderFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -470,7 +513,11 @@ TEST_P(FilterIntegrationTest, FaultyFilterWithConnect) {
                                        downstreamProtocol() == Http::CodecType::HTTP3);
       });
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  prependFilter("{ name: invalid-header-filter }");
+  prependFilter(R"EOF(
+    name: invalid-header-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.InvalidHeaderFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -492,7 +539,11 @@ TEST_P(FilterIntegrationTest, HittingDecoderFilterLimit) {
   // The StopAllIteration with async host resolution messes with the expectations of this test.
   async_lb_ = false;
 
-  prependFilter("{ name: encoder-decoder-buffer-filter }");
+  prependFilter(R"EOF(
+    name: encoder-decoder-buffer-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
+  )EOF");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -534,7 +585,11 @@ TEST_P(FilterIntegrationTest, HittingEncoderFilterLimit) {
       });
 
   useAccessLog();
-  prependFilter("{ name: encoder-decoder-buffer-filter }");
+  prependFilter(R"EOF(
+    name: encoder-decoder-buffer-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
+  )EOF");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -579,6 +634,8 @@ TEST_P(FilterIntegrationTest, HittingEncoderFilterLimit) {
 TEST_P(FilterIntegrationTest, LocalReplyDuringEncoding) {
   prependFilter(R"EOF(
 name: local-reply-during-encode
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringEncodeConfig
 )EOF");
   initialize();
 
@@ -603,6 +660,8 @@ name: local-reply-during-encode
 TEST_P(FilterIntegrationTest, LocalReplyDuringEncodingData) {
   prependFilter(R"EOF(
 name: local-reply-during-encode-data
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringEncodeDataConfig
 )EOF");
   initialize();
 
@@ -631,12 +690,18 @@ name: local-reply-during-encode-data
 TEST_P(FilterIntegrationTest, TestDecodeHeadersReturnsStopAll) {
   prependFilter(R"EOF(
 name: call-decodedata-once-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.CallDecodedataOnceFilterConfig
 )EOF");
   prependFilter(R"EOF(
 name: decode-headers-return-stop-all-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.DecodeHeadersReturnStopAllFilterConfig
 )EOF");
   prependFilter(R"EOF(
 name: passthrough-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.PassthroughFilterConfig
 )EOF");
 
   initialize();
@@ -684,9 +749,13 @@ TEST_P(FilterIntegrationTest, TestDecodeHeadersReturnsStopAllWatermark) {
   async_lb_ = false;
   prependFilter(R"EOF(
 name: decode-headers-return-stop-all-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.DecodeHeadersReturnStopAllFilterConfig
 )EOF");
   prependFilter(R"EOF(
 name: passthrough-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.PassthroughFilterConfig
 )EOF");
 
   // Sets initial stream window to min value to make the client sensitive to a low watermark.
@@ -742,12 +811,18 @@ name: passthrough-filter
 TEST_P(FilterIntegrationTest, TestTwoFiltersDecodeHeadersReturnsStopAll) {
   prependFilter(R"EOF(
 name: decode-headers-return-stop-all-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.DecodeHeadersReturnStopAllFilterConfig
 )EOF");
   prependFilter(R"EOF(
 name: decode-headers-return-stop-all-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.DecodeHeadersReturnStopAllFilterConfig
 )EOF");
   prependFilter(R"EOF(
 name: passthrough-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.PassthroughFilterConfig
 )EOF");
 
   initialize();
@@ -790,6 +865,8 @@ name: passthrough-filter
 TEST_P(FilterIntegrationTest, TestEncodeHeadersReturnsStopAll) {
   prependFilter(R"EOF(
 name: encode-headers-return-stop-all-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.EncodeHeadersReturnStopAllFilterConfig
 )EOF");
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -824,6 +901,8 @@ name: encode-headers-return-stop-all-filter
 TEST_P(MultiProtocolFilterIntegrationTest, TestEncodeHeadersReturnsStopAllWatermark) {
   prependFilter(R"EOF(
 name: encode-headers-return-stop-all-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.EncodeHeadersReturnStopAllFilterConfig
 )EOF");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
@@ -887,6 +966,8 @@ name: encode-headers-return-stop-all-filter
 TEST_P(FilterIntegrationTest, LocalReplyWithMetadata) {
   prependFilter(R"EOF(
   name: local-reply-with-metadata-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.LocalReplyWithMetadataFilterConfig
   )EOF");
   initialize();
 
@@ -900,6 +981,8 @@ TEST_P(FilterIntegrationTest, LocalReplyWithMetadata) {
 
 static std::string remove_response_headers_filter = R"EOF(
 name: remove-response-headers-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.RemoveResponseHeadersFilterConfig
 )EOF";
 
 TEST_P(FilterIntegrationTest, HeadersOnlyRequestWithRemoveResponseHeadersFilter) {
@@ -973,6 +1056,8 @@ TEST_P(FilterIntegrationTest, OverflowEncoderBufferFromEncodeDataWithResponseHea
   // sent downstream.
   prependFilter(R"EOF(
   name: encoder-decoder-buffer-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
   )EOF");
   prependFilter(R"EOF(
   name: crash-filter
@@ -1074,6 +1159,8 @@ TEST_P(FilterIntegrationTest, OverflowDecoderBufferFromDecodeData) {
   // Buffer filter causes filter manager to buffer data
   prependFilter(R"EOF(
   name: encoder-decoder-buffer-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
   )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1119,6 +1206,8 @@ TEST_P(FilterIntegrationTest, OverflowDecoderBufferFromDecodeDataContinueIterati
   )EOF");
   prependFilter(R"EOF(
   name: encoder-decoder-buffer-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
   )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1236,6 +1325,8 @@ TEST_P(FilterIntegrationTest, ResetFilter) {
   // Make the add-body-filter stop iteration from encodeData. Headers should be sent to the client.
   prependFilter(R"EOF(
   name: reset-stream-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.ResetStreamFilterConfig
   )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1251,6 +1342,8 @@ TEST_P(FilterIntegrationTest, EncoderResetFilter) {
   // Make the add-body-filter stop iteration from encodeData. Headers should be sent to the client.
   prependFilter(R"EOF(
   name: encoder-reset-stream-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.EncoderResetStreamFilterConfig
   )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1272,6 +1365,8 @@ TEST_P(FilterIntegrationTest, EncoderResetFilterAndContinue) {
   // Make the add-body-filter stop iteration from encodeData. Headers should be sent to the client.
   prependFilter(R"EOF(
   name: encoder-reset-stream-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.EncoderResetStreamFilterConfig
   )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1293,6 +1388,8 @@ TEST_P(FilterIntegrationTest, EncoderResetFilterAndContinue) {
 TEST_P(FilterIntegrationTest, LocalReplyViaFilterChainDoesNotConcurrentlyInvokeFilter) {
   prependFilter(R"EOF(
   name: assert-non-reentrant-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.AssertNonReentrantFilterConfig
   )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1316,7 +1413,9 @@ TEST_P(FilterIntegrationTest, LocalReplyFromDecodeMetadata) {
   )EOF");
   prependFilter(R"EOF(
     name: metadata-control-filter
-  )EOF");
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.MetadataControlFilterConfig
+    )EOF");
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1351,6 +1450,8 @@ TEST_P(FilterIntegrationTest, LocalReplyFromEncodeMetadata) {
 
   prependFilter(R"EOF(
   name: metadata-control-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.MetadataControlFilterConfig
   )EOF");
   autonomous_upstream_ = false;
   initialize();
@@ -1380,6 +1481,8 @@ TEST_P(FilterIntegrationTest, FilterAddsTrailersWithIndependentHalfClose) {
       "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
   prependFilter(R"EOF(
   name: add-trailers-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.AddTrailersFilterConfig
   )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1521,6 +1624,8 @@ void FilterIntegrationTest::testFilterAddsDataAndTrailersToHeaderOnlyRequest() {
   }
   prependFilter(R"EOF(
   name: add-trailers-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.AddTrailersFilterConfig
   )EOF");
   prependFilter(R"EOF(
   name: add-body-filter-2
@@ -1593,8 +1698,16 @@ TEST_P(FilterIntegrationTest, RecreateStreamAfterEncodeMetadata) {
     return;
   }
 
-  prependFilter("{ name: add-metadata-encode-headers-filter }");
-  prependFilter("{ name: encoder-recreate-stream-filter }");
+  prependFilter(R"EOF(
+    name: add-metadata-encode-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.AddMetadataEncodeHeadersFilterConfig
+  )EOF");
+  prependFilter(R"EOF(
+    name: encoder-recreate-stream-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.EncoderRecreateStreamFilterConfig
+  )EOF");
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
@@ -1638,8 +1751,16 @@ TEST_P(FilterIntegrationTest, EncodeMetadataOnLocalReply) {
     return;
   }
 
-  prependFilter("{ name: local-reply-during-decode }");
-  prependFilter("{ name: add-metadata-encode-headers-filter }");
+  prependFilter(R"EOF(
+    name: local-reply-during-decode
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringDecodeConfig
+  )EOF");
+  prependFilter(R"EOF(
+    name: add-metadata-encode-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.AddMetadataEncodeHeadersFilterConfig
+  )EOF");
 
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&

@@ -17,8 +17,6 @@
 #include "test/mocks/common.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/router/router_filter_interface.h"
-#include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -267,7 +265,7 @@ TEST_F(UdpConnPoolTest, ConnectionInfoProviderHasRemoteAddress) {
       [&remote_address](std::unique_ptr<Envoy::Router::GenericUpstream>&&,
                         Upstream::HostDescriptionConstSharedPtr,
                         const Network::ConnectionInfoProvider& connection_info_provider,
-                        StreamInfo::StreamInfo&, absl::optional<Envoy::Http::Protocol>) {
+                        StreamInfo::StreamInfo&, std::optional<Envoy::Http::Protocol>) {
         if (connection_info_provider.remoteAddress() != nullptr) {
           remote_address = connection_info_provider.remoteAddress()->asStringView();
         }

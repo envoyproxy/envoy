@@ -66,12 +66,16 @@ envoy_extension_cc_test(
     name = "odcds_integration_test",
     size = "large",
     srcs = ["odcds_integration_test.cc"],
-    extension_names = ["envoy.filters.http.on_demand"],
+    extension_names = [
+        "envoy.filters.http.on_demand",
+    ],
     rbe_pool = "6gig",
     deps = [
         "//source/common/common:macros",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/on_demand:config",
         "//source/extensions/filters/http/on_demand:on_demand_update_lib",
+        "//test/common/config:dummy_config_proto_cc_proto",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration:ads_integration_lib",
         "//test/integration:ads_xdstp_config_sources_integration_lib",

@@ -121,7 +121,7 @@ public:
     auto* single = entry->mutable_predicate()->mutable_single_predicate();
     single->mutable_input()->set_name("envoy.matching.inputs.cel_data_input");
     xds::type::matcher::v3::HttpAttributesCelMatchInput input_config;
-    single->mutable_input()->mutable_typed_config()->PackFrom(input_config);
+    std::ignore = single->mutable_input()->mutable_typed_config()->PackFrom(input_config);
 
     auto* custom_match = single->mutable_custom_match();
     custom_match->set_name("envoy.matching.matchers.cel_matcher");
@@ -129,11 +129,12 @@ public:
     auto parse_status = google::api::expr::parser::Parse("true");
     RELEASE_ASSERT(parse_status.ok(), "Failed to parse CEL expression");
     *cel_matcher.mutable_expr_match()->mutable_cel_expr_parsed() = *parse_status;
-    custom_match->mutable_typed_config()->PackFrom(cel_matcher);
+    std::ignore = custom_match->mutable_typed_config()->PackFrom(cel_matcher);
 
     // Configure Action (RemoveField).
     envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction remove_action;
-    entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(remove_action);
+    std::ignore = entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
+        remove_action);
     entry->mutable_on_match()->mutable_action()->set_name("remove_field");
 
     *(*rules)[field_path].mutable_matcher() = matcher;
@@ -253,11 +254,12 @@ bool verifyFilterBehavior(benchmark::State& state, FilterBenchmarkFixture& fixtu
 
 // Measures the latency of processing a unary request when no fields match the scrubbing rules.
 // This establishes the baseline overhead of the filter's traversal logic.
-static void BM_Request_Unary_Passthrough(benchmark::State& state) {
+static void bmRequestUnaryPassthrough(benchmark::State& state) {
   FilterBenchmarkFixture fixture(state.range(0), false);
   // Perform validation to ensure setup is correct.
-  if (!verifyFilterBehavior(state, fixture, false, false))
+  if (!verifyFilterBehavior(state, fixture, false, false)) {
     return;
+  }
 
   Http::TestRequestHeaderMapImpl headers{
       {":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
@@ -275,14 +277,15 @@ static void BM_Request_Unary_Passthrough(benchmark::State& state) {
   }
   state.SetComplexityN(state.range(0));
 }
-BENCHMARK(BM_Request_Unary_Passthrough)->RangeMultiplier(10)->Range(10, 10000)->Complexity();
+BENCHMARK(bmRequestUnaryPassthrough)->RangeMultiplier(10)->Range(10, 10000)->Complexity();
 
 // Measures the latency of processing a unary request when fields (including Maps) are actively
 // scrubbed. This measures the cost of path normalization, match evaluation, and field removal.
-static void BM_Request_Unary_Scrubbing(benchmark::State& state) {
+static void bmRequestUnaryScrubbing(benchmark::State& state) {
   FilterBenchmarkFixture fixture(state.range(0), true);
-  if (!verifyFilterBehavior(state, fixture, false, true))
+  if (!verifyFilterBehavior(state, fixture, false, true)) {
     return;
+  }
 
   Http::TestRequestHeaderMapImpl headers{
       {":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
@@ -300,14 +303,15 @@ static void BM_Request_Unary_Scrubbing(benchmark::State& state) {
   }
   state.SetComplexityN(state.range(0));
 }
-BENCHMARK(BM_Request_Unary_Scrubbing)->RangeMultiplier(10)->Range(10, 10000)->Complexity();
+BENCHMARK(bmRequestUnaryScrubbing)->RangeMultiplier(10)->Range(10, 10000)->Complexity();
 
 // Measures the latency of processing a streaming request with active scrubbing.
 // In streaming mode, data frames may be processed incrementally.
-static void BM_Request_Streaming_Scrubbing(benchmark::State& state) {
+static void bmRequestStreamingScrubbing(benchmark::State& state) {
   FilterBenchmarkFixture fixture(state.range(0), true);
-  if (!verifyFilterBehavior(state, fixture, false, true))
+  if (!verifyFilterBehavior(state, fixture, false, true)) {
     return;
+  }
 
   Http::TestRequestHeaderMapImpl headers{
       {":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
@@ -328,13 +332,14 @@ static void BM_Request_Streaming_Scrubbing(benchmark::State& state) {
   filter->decodeData(empty, true);
   state.SetComplexityN(state.range(0));
 }
-BENCHMARK(BM_Request_Streaming_Scrubbing)->RangeMultiplier(10)->Range(10, 10000)->Complexity();
+BENCHMARK(bmRequestStreamingScrubbing)->RangeMultiplier(10)->Range(10, 10000)->Complexity();
 
 // Measures the latency of processing a unary response when no fields match the scrubbing rules.
-static void BM_Response_Unary_Passthrough(benchmark::State& state) {
+static void bmResponseUnaryPassthrough(benchmark::State& state) {
   FilterBenchmarkFixture fixture(state.range(0), false);
-  if (!verifyFilterBehavior(state, fixture, true, false))
+  if (!verifyFilterBehavior(state, fixture, true, false)) {
     return;
+  }
 
   Http::TestRequestHeaderMapImpl req_headers{
       {":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
@@ -356,13 +361,14 @@ static void BM_Response_Unary_Passthrough(benchmark::State& state) {
   }
   state.SetComplexityN(state.range(0));
 }
-BENCHMARK(BM_Response_Unary_Passthrough)->RangeMultiplier(10)->Range(10, 10000)->Complexity();
+BENCHMARK(bmResponseUnaryPassthrough)->RangeMultiplier(10)->Range(10, 10000)->Complexity();
 
 // Measures the latency of processing a unary response with active scrubbing enabled.
-static void BM_Response_Unary_Scrubbing(benchmark::State& state) {
+static void bmResponseUnaryScrubbing(benchmark::State& state) {
   FilterBenchmarkFixture fixture(state.range(0), true);
-  if (!verifyFilterBehavior(state, fixture, true, true))
+  if (!verifyFilterBehavior(state, fixture, true, true)) {
     return;
+  }
 
   Http::TestRequestHeaderMapImpl req_headers{
       {":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
@@ -384,13 +390,14 @@ static void BM_Response_Unary_Scrubbing(benchmark::State& state) {
   }
   state.SetComplexityN(state.range(0));
 }
-BENCHMARK(BM_Response_Unary_Scrubbing)->RangeMultiplier(10)->Range(10, 10000)->Complexity();
+BENCHMARK(bmResponseUnaryScrubbing)->RangeMultiplier(10)->Range(10, 10000)->Complexity();
 
 // Measures the latency of processing a streaming response with active scrubbing enabled.
-static void BM_Response_Streaming_Scrubbing(benchmark::State& state) {
+static void bmResponseStreamingScrubbing(benchmark::State& state) {
   FilterBenchmarkFixture fixture(state.range(0), true);
-  if (!verifyFilterBehavior(state, fixture, true, true))
+  if (!verifyFilterBehavior(state, fixture, true, true)) {
     return;
+  }
 
   Http::TestRequestHeaderMapImpl req_headers{
       {":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
@@ -415,12 +422,12 @@ static void BM_Response_Streaming_Scrubbing(benchmark::State& state) {
   filter->encodeData(empty, true);
   state.SetComplexityN(state.range(0));
 }
-BENCHMARK(BM_Response_Streaming_Scrubbing)->RangeMultiplier(10)->Range(10, 10000)->Complexity();
+BENCHMARK(bmResponseStreamingScrubbing)->RangeMultiplier(10)->Range(10, 10000)->Complexity();
 
 // Raw Protobuf Round-Trip (Control Group).
 // Measures the theoretical minimum cost of Parsing and Serializing the payload
 // using the raw Google Protobuf library, bypassing all Envoy filter logic.
-static void BM_Raw_Proto_RoundTrip(benchmark::State& state) {
+static void bmRawProtoRoundTrip(benchmark::State& state) {
   FilterBenchmarkFixture fixture(state.range(0), false);
 
   // Get the full gRPC frame
@@ -452,7 +459,7 @@ static void BM_Raw_Proto_RoundTrip(benchmark::State& state) {
   }
   state.SetComplexityN(state.range(0));
 }
-BENCHMARK(BM_Raw_Proto_RoundTrip)->RangeMultiplier(10)->Range(10, 10000)->Complexity();
+BENCHMARK(bmRawProtoRoundTrip)->RangeMultiplier(10)->Range(10, 10000)->Complexity();
 
 } // namespace
 } // namespace ProtoApiScrubber

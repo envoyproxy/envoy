@@ -13,6 +13,7 @@
 #include "source/extensions/transport_sockets/common/passthrough.h"
 
 // Defined in /usr/include/linux/tcp.h.
+// NOLINTNEXTLINE(readability-identifier-naming)
 struct tcp_info;
 
 namespace Envoy {
@@ -44,7 +45,7 @@ public:
          Stats::Scope& scope);
 
   TcpStats stats_;
-  const absl::optional<std::chrono::milliseconds> update_period_;
+  const std::optional<std::chrono::milliseconds> update_period_;
 
 private:
   TcpStats generateStats(Stats::Scope& scope);
@@ -63,7 +64,7 @@ public:
   void closeSocket(Network::ConnectionEvent event, bool abort_reset) override;
 
 private:
-  absl::optional<struct tcp_info> querySocketInfo();
+  std::optional<struct tcp_info> querySocketInfo();
   void recordStats();
 
   const ConfigConstSharedPtr config_;

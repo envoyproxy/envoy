@@ -160,7 +160,7 @@ TEST_F(A2aFilterTest, DecodeDataBodyTooLarge) {
   Buffer::OwnedImpl buffer(json);
 
   EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::BadRequest, "request body is too large.", _, _, _));
+              sendLocalReply(Http::Code::PayloadTooLarge, "request body is too large.", _, _, _));
   // Should increment body_too_large stat
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
@@ -186,7 +186,7 @@ TEST_F(A2aFilterTest, DecodeDataBodyTooLargePartial) {
   Buffer::OwnedImpl buffer2(part2);
 
   EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::BadRequest, "request body is too large.", _, _, _));
+              sendLocalReply(Http::Code::PayloadTooLarge, "request body is too large.", _, _, _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer2, true));
   EXPECT_EQ(1, config_->stats().body_too_large_.value());
 }

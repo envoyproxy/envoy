@@ -5,6 +5,7 @@
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "gtest/gtest.h"
 
@@ -19,7 +20,7 @@ public:
     Http::MetadataMap metadata_map = {{"headers", "headers"}, {"duplicate", "duplicate"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     decoder_callbacks_->addDecodedMetadata().emplace_back(std::move(metadata_map_ptr));
-    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "", nullptr, absl::nullopt,
+    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "", nullptr, std::nullopt,
                                        "local_reply_with_metadata_filter_is_ready");
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -33,11 +34,15 @@ public:
 };
 
 constexpr char LocalReplyWithMetadataFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<LocalReplyWithMetadataFilter>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<LocalReplyWithMetadataFilter,
+                             test::integration::filters::LocalReplyWithMetadataFilterConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
-static Registry::RegisterFactory<SimpleFilterConfig<LocalReplyWithMetadataFilter>,
-                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<LocalReplyWithMetadataFilter,
+                             test::integration::filters::LocalReplyWithMetadataFilterConfig>,
+    Server::Configuration::UpstreamHttpFilterConfigFactory>
     register_upstream_;
 
 } // namespace Envoy

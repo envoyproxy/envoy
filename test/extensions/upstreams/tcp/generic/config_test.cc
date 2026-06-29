@@ -56,7 +56,7 @@ INSTANTIATE_TEST_SUITE_P(UpstreamHttpFiltersWithTunneling, TcpConnPoolTest,
                          ::testing::Values(true, false));
 
 TEST_P(TcpConnPoolTest, TestNoTunnelingConfig) {
-  EXPECT_CALL(thread_local_cluster_, tcpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(thread_local_cluster_, tcpConnPool(_, _, _)).WillOnce(Return(std::nullopt));
   EXPECT_EQ(nullptr, factory_.createGenericConnPool(nullptr, thread_local_cluster_,
                                                     TcpProxy::TunnelingConfigHelperOptConstRef(),
                                                     &lb_context_, callbacks_, decoder_callbacks_,
@@ -64,16 +64,15 @@ TEST_P(TcpConnPoolTest, TestNoTunnelingConfig) {
 }
 
 TEST_P(TcpConnPoolTest, TestTunnelingDisabledByFilterState) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
   const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
 
   downstream_stream_info_.filterState()->setData(
       TcpProxy::DisableTunnelingFilterStateKey,
       std::make_shared<StreamInfo::BoolAccessorImpl>(true),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
-  EXPECT_CALL(thread_local_cluster_, tcpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(thread_local_cluster_, tcpConnPool(_, _, _)).WillOnce(Return(std::nullopt));
   EXPECT_EQ(nullptr,
             factory_.createGenericConnPool(
                 nullptr, thread_local_cluster_, TcpProxy::TunnelingConfigHelperOptConstRef(config),
@@ -81,17 +80,16 @@ TEST_P(TcpConnPoolTest, TestTunnelingDisabledByFilterState) {
 }
 
 TEST_P(TcpConnPoolTest, TestTunnelingNotDisabledIfFilterStateHasFalseValue) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
   const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
 
   downstream_stream_info_.filterState()->setData(
       TcpProxy::DisableTunnelingFilterStateKey,
       std::make_shared<StreamInfo::BoolAccessorImpl>(false),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   if (!useUpstreamFilters()) {
-    EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(absl::nullopt));
+    EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(std::nullopt));
   }
 
   EXPECT_EQ(nullptr,
@@ -101,11 +99,10 @@ TEST_P(TcpConnPoolTest, TestTunnelingNotDisabledIfFilterStateHasFalseValue) {
 }
 
 TEST_P(TcpConnPoolTest, TestNoConnPool) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
   const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
   if (!useUpstreamFilters()) {
-    EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(absl::nullopt));
+    EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(std::nullopt));
   }
   EXPECT_EQ(nullptr,
             factory_.createGenericConnPool(
@@ -117,11 +114,10 @@ TEST_P(TcpConnPoolTest, Http2Config) {
   auto info = std::make_shared<Upstream::MockClusterInfo>();
   const std::string fake_cluster_name = "fake_cluster";
 
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
   const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
   if (!useUpstreamFilters()) {
-    EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(absl::nullopt));
+    EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(std::nullopt));
   }
   EXPECT_EQ(nullptr,
             factory_.createGenericConnPool(
@@ -136,11 +132,10 @@ TEST_P(TcpConnPoolTest, Http3Config) {
       .Times(AnyNumber())
       .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP3));
   EXPECT_CALL(thread_local_cluster_, info).Times(AnyNumber()).WillRepeatedly(Return(info));
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
   const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
   if (!useUpstreamFilters()) {
-    EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(absl::nullopt));
+    EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(std::nullopt));
   }
   EXPECT_EQ(nullptr,
             factory_.createGenericConnPool(

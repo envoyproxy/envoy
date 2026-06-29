@@ -23,7 +23,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/health_check_event_logger.h"
@@ -122,8 +122,8 @@ public:
          const Extensions::NetworkFilters::Common::Redis::Client::ConfigSharedPtr&,
          const Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&,
          Stats::Scope&, const std::string&, const std::string&, bool,
-         absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>,
-         absl::optional<
+         std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>,
+         std::optional<
              NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>)
       override {
     EXPECT_EQ(22120, host->address()->ip()->port());

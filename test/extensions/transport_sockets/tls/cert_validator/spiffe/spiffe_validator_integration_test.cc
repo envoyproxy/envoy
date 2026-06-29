@@ -37,7 +37,7 @@ void SslSPIFFECertValidatorIntegrationTest::TearDown() {
 
 Network::ClientConnectionPtr SslSPIFFECertValidatorIntegrationTest::makeSslClientConnection(
     const ClientSslTransportOptions& options, bool use_expired = false,
-    absl::optional<std::string> workload_trust_domain = {}) {
+    std::optional<std::string> workload_trust_domain = {}) {
   ClientSslTransportOptions modified_options{options};
   modified_options.setTlsVersion(tls_version_);
   modified_options.use_expired_spiffe_cert_ = use_expired;
@@ -51,7 +51,6 @@ Network::ClientConnectionPtr SslSPIFFECertValidatorIntegrationTest::makeSslClien
     StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
     filter_state.setData("envoy.tls.cert_validator.spiffe.workload_trust_domain",
                          std::make_shared<Router::StringAccessorImpl>(*workload_trust_domain),
-                         StreamInfo::FilterState::StateType::ReadOnly,
                          StreamInfo::FilterState::LifeSpan::Connection,
                          StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
     socket_options = Network::TransportSocketOptionsUtility::fromFilterState(filter_state);
@@ -193,7 +192,7 @@ typed_config:
   initialize();
   auto conn = makeSslClientConnection({});
   if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2) {
-    auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+    auto codec = makeRawHttpConnection(std::move(conn), std::nullopt);
     EXPECT_FALSE(codec->connected());
   } else {
     auto codec = makeHttpConnection(std::move(conn));
@@ -226,7 +225,7 @@ typed_config:
   initialize();
   auto conn = makeSslClientConnection({});
   if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2) {
-    auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+    auto codec = makeRawHttpConnection(std::move(conn), std::nullopt);
     EXPECT_FALSE(codec->connected());
   } else {
     auto codec = makeHttpConnection(std::move(conn));
@@ -253,7 +252,7 @@ typed_config:
   initialize();
   auto conn = makeSslClientConnection({});
   if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2) {
-    auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+    auto codec = makeRawHttpConnection(std::move(conn), std::nullopt);
     EXPECT_FALSE(codec->connected());
   } else {
     auto codec = makeHttpConnection(std::move(conn));
@@ -284,7 +283,7 @@ typed_config:
   initialize();
   auto conn = makeSslClientConnection({});
   if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2) {
-    auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+    auto codec = makeRawHttpConnection(std::move(conn), std::nullopt);
     EXPECT_FALSE(codec->connected());
   } else {
     auto codec = makeHttpConnection(std::move(conn));
@@ -343,7 +342,7 @@ typed_config:
   initialize();
   auto conn = makeSslClientConnection({});
   if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2) {
-    auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+    auto codec = makeRawHttpConnection(std::move(conn), std::nullopt);
     EXPECT_FALSE(codec->connected());
   } else {
     auto codec = makeHttpConnection(std::move(conn));
@@ -387,7 +386,7 @@ typed_config:
   client_validator_config_ = &typed_conf;
   initialize();
   auto conn = makeSslClientConnection({});
-  auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  auto codec = makeRawHttpConnection(std::move(conn), std::nullopt);
   EXPECT_FALSE(codec->connected());
 }
 
@@ -429,7 +428,7 @@ typed_config:
   client_validator_config_ = &typed_conf;
   initialize();
   auto conn = makeSslClientConnection({});
-  auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  auto codec = makeRawHttpConnection(std::move(conn), std::nullopt);
   EXPECT_FALSE(codec->connected());
 }
 

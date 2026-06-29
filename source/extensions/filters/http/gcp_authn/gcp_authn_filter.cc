@@ -1,14 +1,29 @@
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_filter.h"
 
 #include <memory>
+#include <optional>
 #include <string>
+#include <utility>
+
+#include "envoy/common/exception.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
+#include "envoy/router/router.h"
+#include "envoy/ssl/context_config.h"
+#include "envoy/ssl/tls_certificate_config.h"
+#include "envoy/upstream/thread_local_cluster.h"
 
 #include "source/common/common/enum_to_int.h"
-#include "source/common/http/header_map_impl.h"
-#include "source/common/http/utility.h"
-#include "source/common/runtime/runtime_features.h"
+#include "source/common/common/logger.h"
+#include "source/common/jwt/jwt.h"
+#include "source/common/jwt/status.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/gcp_authn/crypto_utils.h"
 
-#include "absl/strings/str_replace.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,11 +40,67 @@ void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str
     hdrs.setCopy(Http::LowerCaseString(header.name()), id_token);
   }
 }
+
+std::optional<envoy::extensions::filters::http::gcp_authn::v3::Audience>
+retrieveAudience(Upstream::ThreadLocalCluster* cluster) {
+  if (cluster == nullptr) {
+    return std::nullopt;
+  }
+
+  auto filter_metadata = cluster->info()->metadata().typed_filter_metadata();
+  const auto filter_it = filter_metadata.find(std::string(FilterName));
+  if (filter_it == filter_metadata.end()) {
+    return std::nullopt;
+  }
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  if (MessageUtil::unpackTo(filter_it->second, audience).ok()) {
+    return audience;
+  }
+
+  return std::nullopt;
+}
 } // namespace
 
 using ::Envoy::Router::RouteConstSharedPtr;
 using Http::FilterHeadersStatus;
 using JwtVerify::Status;
+
+std::optional<std::string>
+GcpAuthnFilter::getClientCertFingerprint(Upstream::ThreadLocalCluster* cluster) {
+  if (cluster == nullptr) {
+    return std::nullopt;
+  }
+
+  auto match_data = cluster->info()->transportSocketMatcher().resolve(nullptr, nullptr);
+  auto& factory = match_data.factory_;
+  auto client_context_config_opt = factory.clientContextConfig();
+  if (!client_context_config_opt.has_value()) {
+    return std::nullopt;
+  }
+
+  const Ssl::ClientContextConfig& client_context_config = client_context_config_opt.value();
+  const auto tls_certs = client_context_config.tlsCertificates();
+  if (tls_certs.empty()) {
+    return std::nullopt;
+  }
+
+  const auto& cert_config = tls_certs[0].get();
+  const std::string& cert_pem = cert_config.certificateChain();
+  if (cert_pem.empty()) {
+    return std::nullopt;
+  }
+
+  auto fingerprint_or_error = cert_fingerprinter_->getFingerprintFromPem(cert_pem);
+  if (!fingerprint_or_error.ok()) {
+    ENVOY_LOG(warn, "Failed to calculate certificate fingerprint: {}",
+              fingerprint_or_error.status().message());
+    return std::nullopt;
+  }
+
+  stats_.client_cert_fingerprint_calculated_.inc();
+  return fingerprint_or_error.value();
+}
 
 // TODO(tyxia) Handle the duplicated outstanding requests.
 Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& hdrs, bool) {
@@ -46,48 +117,60 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
       context_.serverFactoryContext().clusterManager().getThreadLocalCluster(
           route->routeEntry()->clusterName());
 
-  if (cluster != nullptr) {
-    // The `audience` is passed to filter through cluster metadata.
-    auto filter_metadata = cluster->info()->metadata().typed_filter_metadata();
-    const auto filter_it = filter_metadata.find(std::string(FilterName));
-    if (filter_it != filter_metadata.end()) {
-      envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-      THROW_IF_NOT_OK(MessageUtil::unpackTo(filter_it->second, audience));
-      audience_str_ = audience.url();
-    }
-  }
-
-  if (!audience_str_.empty()) {
-    if (jwt_token_cache_ != nullptr) {
-      auto token = jwt_token_cache_->lookUp(audience_str_);
-      if (token != nullptr) {
-        // If token is found in the cache, we add the token string to the request directly and
-        // continue the filter chain iteration.
-        addTokenToRequest(hdrs, token->jwt_, filter_config_->token_header());
-        return FilterHeadersStatus::Continue;
-      }
-    }
-
-    // Save the pointer to the request headers for header manipulation based on http response later.
-    request_header_map_ = &hdrs;
-    // Audience is URL of receiving service that will perform authentication.
-    // The URL format is
-    // "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
-    // So, we add the audience from the config to the final url by substituting the `[AUDIENCE]`
-    // with real audience string from the config.
-
-    std::string final_url = absl::StrReplaceAll(UrlString, {{"[AUDIENCE]", audience_str_}});
-    client_->fetchToken(*this, buildRequest(final_url));
-    initiating_call_ = false;
-  } else {
-    // There is no need to fetch the token if no audience is specified because no
-    // authentication will be performed. So, we just continue the filter chain iteration.
+  auto audience_opt = retrieveAudience(cluster);
+  if (!audience_opt.has_value()) {
     stats_.retrieve_audience_failed_.inc();
     state_ = State::Complete;
+    return FilterHeadersStatus::Continue;
   }
 
-  // Stop the iteration for headers as well as data and trailers for the current filter and the
-  // filters following.
+  audience_ = audience_opt.value();
+
+  // Resolve fingerprint if bound token is requested. Note client_cert_fingerprint_ remains
+  // std::nullopt by default for unbound tokens.
+  if (audience_.has_bound_jwt() || audience_.has_bound_access_token()) {
+    client_cert_fingerprint_ = getClientCertFingerprint(cluster);
+    if (!client_cert_fingerprint_.has_value()) {
+      ENVOY_LOG(warn,
+                "Failed to fetch bound token: client certificate fingerprint is unavailable.");
+      state_ = State::Complete;
+      decoder_callbacks_->sendLocalReply(
+          Http::Code::InternalServerError,
+          "Failed to fetch bound token: client certificate fingerprint is unavailable.", nullptr,
+          std::nullopt, "bound_token_fingerprint_unavailable");
+      return FilterHeadersStatus::StopAllIterationAndWatermark;
+    }
+  }
+
+  // Check cache first and reuse previously fetched token if possible.
+  if (jwt_token_cache_ != nullptr) {
+    auto token = jwt_token_cache_->lookUp(audience_, client_cert_fingerprint_);
+    if (token.has_value()) {
+      addTokenToRequest(hdrs, token.value(), filter_config_->token_header());
+      state_ = State::Complete;
+      return FilterHeadersStatus::Continue;
+    }
+  }
+
+  request_header_map_ = &hdrs;
+
+  // Execute token-type specific fetch calls.
+  if (audience_.has_bound_access_token()) {
+    client_->fetchBoundAccessToken(audience_, client_cert_fingerprint_.value(), *this);
+  } else if (audience_.has_bound_jwt()) {
+    client_->fetchBoundJwt(audience_, client_cert_fingerprint_.value(), *this);
+  } else if (audience_.has_access_token()) {
+    client_->fetchUnboundAccessToken(audience_, *this);
+  } else if (!audience_.url().empty()) {
+    client_->fetchUnboundJwt(audience_, *this);
+  } else {
+    ENVOY_LOG(warn, "Audience is configured but no token is specified, continuing without token.");
+    stats_.empty_audience_.inc();
+    state_ = State::Complete;
+    return FilterHeadersStatus::Continue;
+  }
+
+  initiating_call_ = false;
   return state_ == State::Complete ? FilterHeadersStatus::Continue
                                    : Http::FilterHeadersStatus::StopAllIterationAndWatermark;
 }
@@ -96,29 +179,24 @@ void GcpAuthnFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallback
   decoder_callbacks_ = &callbacks;
 }
 
-void GcpAuthnFilter::onComplete(const Http::ResponseMessage* response) {
+void GcpAuthnFilter::onComplete(absl::StatusOr<GcpToken> token) {
   state_ = State::Complete;
   if (!initiating_call_) {
-    if (response != nullptr) {
+    if (token.ok()) {
       // Modify the request header to include the ID token in a header (by default, the
       // `Authorization: Bearer ID_TOKEN` header).
-      std::string token_str = response->bodyAsString();
+      GcpToken token_val = *token;
       if (request_header_map_ != nullptr) {
-        addTokenToRequest(*request_header_map_, token_str, filter_config_->token_header());
+        addTokenToRequest(*request_header_map_, token_val.token, filter_config_->token_header());
       } else {
         ENVOY_LOG(debug, "No request header to be modified.");
       }
-      // Decode the tokens.
-      std::unique_ptr<JwtVerify::Jwt> jwt = std::make_unique<JwtVerify::Jwt>();
-      Status status = jwt->parseFromString(token_str);
-      if (status == Status::Ok) {
-        if (jwt_token_cache_ != nullptr) {
-          // Insert the token into cache along with the ownership transfer.
-          jwt_token_cache_->insert(audience_str_, std::move(jwt));
-        }
-      } else {
-        ENVOY_LOG(error, "Failed to parse the token string, status : {}", Envoy::enumToInt(status));
+      if (jwt_token_cache_ != nullptr) {
+        // Insert the token into cache along with the ownership transfer.
+        jwt_token_cache_->insert(std::make_unique<GcpToken>(token_val));
       }
+    } else {
+      ENVOY_LOG(error, "Failed to fetch token: {}", token.status().message());
     }
     decoder_callbacks_->continueDecoding();
   }
