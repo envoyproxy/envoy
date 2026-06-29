@@ -154,7 +154,8 @@ TEST_F(DrainAwareServerConnectionTest, TimerFiresAfterGoAwaySentIsNoop) {
 // With an on_local_drain callback set, shutdownNotice() fires the callback and SUPPRESSES the
 // inner shutdownNotice (the early GOAWAY), so the peer keeps using the tunnel during the grace
 // window while a replacement is dialed.
-TEST_F(DrainAwareServerConnectionTest, ShutdownNoticeWithLocalDrainFiresCallbackAndSuppressesInner) {
+TEST_F(DrainAwareServerConnectionTest,
+       ShutdownNoticeWithLocalDrainFiresCallbackAndSuppressesInner) {
   bool fired = false;
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(100), _));
   auto conn = std::make_unique<DrainAwareServerConnection>(

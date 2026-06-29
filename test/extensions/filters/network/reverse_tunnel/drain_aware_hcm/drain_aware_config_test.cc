@@ -130,6 +130,33 @@ TEST_F(DrainAwareConfigTest, CreateCodecReturnsNullptrWhenBaseReturnsNullptr) {
   EXPECT_EQ(nullptr, codec);
 }
 
+// Same defensive nullptr check, but with drain_with_goaway enabled: createCodec runs the re-dial
+// wiring block first (here a plain socket, so no wiring), then returns nullptr when the base codec
+// declines.
+TEST_F(DrainAwareConfigTest, CreateCodecReturnsNullptrWhenBaseReturnsNullptrDrainEnabled) {
+  auto proto_config = parseConfig(kMinimalConfig);
+  const auto& hcm_config = proto_config.hcm_config();
+  auto singletons = HttpConnectionManager::Utility::createSingletons(context_);
+
+  absl::Status creation_status = absl::OkStatus();
+  auto config = std::make_shared<NullCodecDrainAwareConfig>(
+      hcm_config, context_, *singletons.date_provider_, *singletons.route_config_provider_manager_,
+      singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
+      *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/true,
+      creation_status);
+  ASSERT_TRUE(creation_status.ok()) << creation_status.message();
+
+  NiceMock<Network::MockConnection> connection;
+  Network::ConnectionSocketPtr socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+  ON_CALL(connection, getSocket()).WillByDefault(ReturnRef(socket));
+  NiceMock<Http::MockServerConnectionCallbacks> callbacks;
+  NiceMock<Server::MockOverloadManager> overload_manager;
+  Buffer::OwnedImpl data;
+
+  auto codec = config->createCodec(connection, data, callbacks, overload_manager);
+  EXPECT_EQ(nullptr, codec);
+}
+
 // Subclass that returns a real (mock) codec from createBaseCodec, so createCodec() exercises the
 // drain-aware wrapping path rather than the defensive nullptr branch.
 class FakeCodecDrainAwareConfig : public DrainAwareHttpConnectionManagerConfig {
