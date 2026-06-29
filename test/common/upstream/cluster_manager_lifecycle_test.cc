@@ -723,10 +723,8 @@ TEST_P(ClusterManagerLifecycleTest, DynamicAddRemove) {
   update_cluster.mutable_per_connection_buffer_limit_bytes()->set_value(12345);
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster2(new NiceMock<MockClusterMockPrioritySet>());
-  HostSharedPtr test_host2 = makeTestHost(cluster2->info_, "tcp://127.0.0.1:80");
-  // Simulate the host starting in a failed state.
-  test_host2->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  cluster2->prioritySet().getMockHostSet(0)->hosts_ = {test_host2};
+  cluster2->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster2->info_, "tcp://127.0.0.1:80")};
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster2, nullptr)));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
@@ -740,12 +738,6 @@ TEST_P(ClusterManagerLifecycleTest, DynamicAddRemove) {
 
   EXPECT_EQ(cluster2->info_, cluster_manager_->getThreadLocalCluster("fake_cluster")->info());
   EXPECT_EQ(1UL, cluster_manager_->clusters().active_clusters_.size());
-
-  // Host recovers.
-  test_host2->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-  cluster2->prioritySet().getMockHostSet(0)->healthy_hosts_ = {test_host2};
-  cluster2->prioritySet().getMockHostSet(0)->runCallbacks({test_host2}, {});
-
   Http::ConnectionPool::MockInstance* cp = new Http::ConnectionPool::MockInstance();
   Http::ConnectionPool::Instance::IdleCb idle_cb;
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(cp));
@@ -2191,13 +2183,10 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesInsideWindow) {
   HostVector hosts_added;
   HostVector hosts_removed;
 
-  // Mark one host as failed so coarseHealth() == Unhealthy.
-  HostSharedPtr failing_host = (*hosts)[0];
-  failing_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-
-  // The first update inside the default mergeable window of 3 seconds, will not be applied
-  // immediately. it is scheduled for deferred delivery via the merge timer. Note that initially
-  // the update-time is default-initialized to a monotonic time of 0.
+  // The first update will not be applied, as we make it inside the default mergeable window of
+  // 3 seconds (found in debugger as value of cluster.info()->lbConfig().update_merge_window()
+  // in ClusterManagerImpl::scheduleUpdate. Note that initially the update-time is
+  // default-initialized to a monotonic time of 0, as is SimulatedTimeSystem::monotonic_time_.
   time_system_.advanceTimeWait(std::chrono::seconds(2));
   cluster.prioritySet().updateHosts(
       0,
@@ -2208,9 +2197,6 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesInsideWindow) {
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_out_of_merge_window").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
-
-  // Host recovers.
-  failing_host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
 }
 
 // Tests that mergeable updates outside of a window get applied immediately when

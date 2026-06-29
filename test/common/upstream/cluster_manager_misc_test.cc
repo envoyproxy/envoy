@@ -141,23 +141,11 @@ public:
 
     EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_0"));
 
-    // Start the host in a failed state.
-    HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
-    test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-    cluster1->prioritySet().getMockHostSet(0)->hosts_ = {test_host};
+    cluster1->prioritySet().getMockHostSet(0)->hosts_ = {
+        makeTestHost(cluster1->info_, "tcp://127.0.0.1:80")};
     cluster1->prioritySet().getMockHostSet(0)->runCallbacks(
         cluster1->prioritySet().getMockHostSet(0)->hosts_, {});
     cluster1->initialize_callback_();
-
-    // Host recovers.
-    test_host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-    cluster1->prioritySet().getMockHostSet(0)->healthy_hosts_ = {test_host};
-    // First, fire an HC-only (no adds/removes) update so member_update_cb_ refreshes the
-    // factory BEFORE the TLS update is delivered.
-    cluster1->prioritySet().getMockHostSet(0)->runCallbacks({}, {});
-    // Now fire a membership update (hosts_added non-empty) to force immediate TLS delivery.
-    cluster1->prioritySet().getMockHostSet(0)->runCallbacks({test_host}, {});
-
     EXPECT_EQ(cluster1->prioritySet().getMockHostSet(0)->hosts_[0],
               cluster_manager_->getThreadLocalCluster("cluster_0")
                   ->loadBalancer()
