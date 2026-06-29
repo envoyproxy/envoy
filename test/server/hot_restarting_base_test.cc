@@ -1,5 +1,11 @@
 #include "source/server/hot_restarting_base.h"
 
+#include <endian.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+#include <vector>
+
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
@@ -79,6 +85,60 @@ TEST_F(HotRestartingBaseTest, SendMsgRetrySucceedsEventually) {
   EXPECT_TRUE(retried);
 }
 
+// Tests that receiveHotRestartMessage asserts when the wire length wraps uint64.
+TEST_F(HotRestartingBaseTest, OverflowDeathUint64Max) {
+  int fds[2];
+  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_DGRAM, 0, fds));
+
+  RpcStream stream(0);
+  stream.domain_socket_ = fds[0];
+
+  const uint64_t network_len = htobe64(0xFFFFFFFFFFFFFFFFULL);
+  ASSERT_EQ(8, write(fds[1], &network_len, 8));
+
+  EXPECT_DEATH(stream.receiveHotRestartMessage(RpcStream::Blocking::No), "");
+  close(fds[1]);
+}
+
+// Tests that receiveHotRestartMessage asserts when 0xFFFFFFFFFFFFFFF8 + 8 = 0.
+TEST_F(HotRestartingBaseTest, OverflowDeathMaxMinus7) {
+  int fds[2];
+  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_DGRAM, 0, fds));
+
+  RpcStream stream(0);
+  stream.domain_socket_ = fds[0];
+
+  const uint64_t network_len = htobe64(0xFFFFFFFFFFFFFFF8ULL);
+  ASSERT_EQ(8, write(fds[1], &network_len, 8));
+
+  EXPECT_DEATH(stream.receiveHotRestartMessage(RpcStream::Blocking::No), "");
+  close(fds[1]);
+}
+
+// Tests that a normal small message is received successfully (no assert).
+TEST_F(HotRestartingBaseTest, NormalLengthSuccess) {
+  int fds[2];
+  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_DGRAM, 0, fds));
+
+  RpcStream stream(0);
+  stream.domain_socket_ = fds[0];
+
+  HotRestartMessage msg;
+  msg.mutable_request()->mutable_stats();
+  std::string serialized = msg.SerializeAsString();
+  const uint64_t total_size = sizeof(uint64_t) + serialized.size();
+
+  std::vector<uint8_t> buf(total_size);
+  const uint64_t network_len = htobe64(serialized.size());
+  memcpy(buf.data(), &network_len, sizeof(uint64_t));
+  memcpy(buf.data() + sizeof(uint64_t), serialized.data(), serialized.size());
+
+  ASSERT_EQ(static_cast<ssize_t>(total_size), write(fds[1], buf.data(), buf.size()));
+
+  auto result = stream.receiveHotRestartMessage(RpcStream::Blocking::No);
+  EXPECT_NE(result, nullptr);
+  close(fds[1]);
+}
 } // namespace
 } // namespace Server
 } // namespace Envoy
