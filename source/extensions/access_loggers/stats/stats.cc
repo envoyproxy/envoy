@@ -79,8 +79,8 @@ public:
 
 AccessLogState::~AccessLogState() {
   for (const auto& p : inflight_gauges_) {
-    Stats::Gauge& gauge_stat = parent_->scope().gaugeFromStatNameWithTags(
-        p.first.statName(), p.first.tags(), p.second.import_mode_);
+    Stats::Gauge& gauge_stat = parent_->scope().gaugeFromTaggedName(
+        p.first.statName(), Stats::Scope::toTagSpan(p.first.tags()), {}, p.second.import_mode_);
     gauge_stat.sub(p.second.value_);
   }
 }
@@ -103,7 +103,9 @@ void AccessLogState::addInflightGauge(Stats::StatName stat_name,
     it = new_it;
   }
   it->second.value_ += value;
-  parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode).add(value);
+  parent_->scope()
+      .gaugeFromTaggedName(stat_name, Stats::Scope::toTagSpan(tags), {}, import_mode)
+      .add(value);
 }
 
 void AccessLogState::removeInflightGauge(Stats::StatName stat_name,
@@ -115,8 +117,8 @@ void AccessLogState::removeInflightGauge(Stats::StatName stat_name,
 
   GaugeKey key{stat_name, tags};
 
-  Stats::Gauge& gauge_stat =
-      parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode);
+  Stats::Gauge& gauge_stat = parent_->scope().gaugeFromTaggedName(
+      stat_name, Stats::Scope::toTagSpan(tags), {}, import_mode);
 
   auto it = inflight_gauges_.find(key);
   const bool was_found = (it != inflight_gauges_.end());
@@ -386,8 +388,8 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
 
     uint64_t value = *computed_value_opt;
 
-    auto& histogram_stat =
-        scope_->histogramFromStatNameWithTags(histogram.stat_.name_, tags, histogram.unit_);
+    auto& histogram_stat = scope_->histogramFromTaggedName(
+        histogram.stat_.name_, Stats::Scope::toTagSpan(tags), {}, histogram.unit_);
     histogram_stat.recordValue(value);
   }
 
@@ -411,7 +413,8 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
       value = counter.value_fixed_;
     }
 
-    auto& counter_stat = scope_->counterFromStatNameWithTags(counter.stat_.name_, tags);
+    auto& counter_stat =
+        scope_->counterFromTaggedName(counter.stat_.name_, Stats::Scope::toTagSpan(tags), {});
     counter_stat.add(value);
   }
 
@@ -452,8 +455,8 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
                                              : Stats::Gauge::ImportMode::Accumulate;
 
   if (op == Gauge::OperationType::SET) {
-    Stats::Gauge& gauge_stat =
-        scope_->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
+    Stats::Gauge& gauge_stat = scope_->gaugeFromTaggedName(
+        gauge.stat_.name_, Stats::Scope::toTagSpan(tags), {}, import_mode);
     gauge_stat.set(value);
   } else if (op == Gauge::OperationType::PAIRED_ADD ||
              op == Gauge::OperationType::PAIRED_SUBTRACT) {
