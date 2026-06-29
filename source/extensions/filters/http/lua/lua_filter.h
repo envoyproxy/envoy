@@ -20,18 +20,22 @@ namespace Lua {
 /**
  * All lua stats. @see stats_macros.h
  */
-#define ALL_LUA_FILTER_STATS(COUNTER) COUNTER(errors) COUNTER(executions)
+#define ALL_LUA_FILTER_STATS(COUNTER, GAUGE)                                                       \
+  COUNTER(errors)                                                                                   \
+  COUNTER(executions)                                                                               \
+  GAUGE(lua_vm_count, Accumulate)
 
 /**
  * Struct definition for all Lua stats. @see stats_macros.h
  */
 struct LuaFilterStats {
-  ALL_LUA_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+  ALL_LUA_FILTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 class PerLuaCodeSetup : Logger::Loggable<Logger::Id::lua> {
 public:
-  PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls);
+  PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
+                  Stats::Gauge* vm_count = nullptr);
 
   Extensions::Filters::Common::Lua::CoroutinePtr createCoroutine() {
     return lua_state_.createCoroutine();
@@ -479,7 +483,8 @@ private:
   LuaFilterStats generateStats(const std::string& prefix, const std::string& filter_stats_prefix,
                                Stats::Scope& scope) {
     const std::string final_prefix = absl::StrCat(prefix, "lua.", filter_stats_prefix);
-    return {ALL_LUA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+    return {ALL_LUA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
+                                 POOL_GAUGE_PREFIX(scope, final_prefix))};
   }
 
   const bool clear_route_cache_{};
