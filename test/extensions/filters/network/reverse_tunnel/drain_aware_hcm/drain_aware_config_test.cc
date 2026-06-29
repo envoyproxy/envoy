@@ -110,7 +110,8 @@ TEST_F(DrainAwareConfigTest, CreateCodecReturnsNullptrWhenBaseReturnsNullptr) {
   auto config = std::make_shared<NullCodecDrainAwareConfig>(
       hcm_config, context_, *singletons.date_provider_, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
-      *singletons.filter_config_provider_manager_, creation_status);
+      *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/false,
+      creation_status);
   ASSERT_TRUE(creation_status.ok()) << creation_status.message();
 
   NiceMock<Network::MockConnection> connection;

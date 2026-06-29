@@ -47,6 +47,19 @@ public:
    */
   const Network::ConnectionSocket& getSocket() const { return *owned_socket_; }
 
+  /**
+   * Key the parent IOHandle uses to track this tunnel (the local address of the outbound TCP
+   * socket at handoff time). The drain-aware HCM passes this back to parent() when the tunnel
+   * begins draining so the parent can drop it from tracking and dial a replacement.
+   */
+  const std::string& connectionKey() const { return connection_key_; }
+
+  /**
+   * Parent ReverseConnectionIOHandle that owns this tunnel. Defensive nullptr return if the
+   * parent has already been torn down.
+   */
+  ReverseConnectionIOHandle* parent() const { return parent_; }
+
 private:
   // The socket that this IOHandle owns and manages lifetime for.
   Network::ConnectionSocketPtr owned_socket_;
