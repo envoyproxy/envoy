@@ -216,7 +216,7 @@ ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::scopeFromTaggedName(
     // re-interns them into the child's own pool).
     const TagUtility::TagStatNameJoiner joiner(base_prefix_, prefix_tags_, prefix_, base_name,
                                                name_tags, tagged_name, symbolTable());
-    std::shared_ptr<ScopeImpl> new_scope = std::make_shared<ScopeImpl>(
+    auto new_scope = std::make_shared<ScopeImpl>(
         joiner.tagExtractedName(), joiner.effectiveTags().value_or(StatNameTagSpan{}),
         joiner.nameWithTags(), parent_, evictable, limits, std::move(child_matcher));
     parent_.addScope(new_scope);
@@ -489,10 +489,8 @@ ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(StatName base_name, StatNameTagSpan n
       central_cache_(new CentralCacheEntry(parent.alloc_.symbolTable())) {
   parent_.ensureOverflowStats(limits_);
 
-  // Explicit-tags mode: prefix_ is the tag-extracted prefix, and base_prefix_ is the flat (tagged)
-  // prefix. The tag-extracted prefix is used for stat name interning and the flat prefix is used
-  // for stat name formatting. The tag-extracted prefix is always valid, but the flat prefix may be
-  // empty if the scope is created with an empty prefix and no tags.
+  // Explicit-tags mode: ``prefix_`` is the flat (tagged) prefix and ``base_prefix_`` is the
+  // tag-extracted prefix.
   parent_.alloc_.symbolTable().populateList(tagged_name, base_name, name_tags, prefix_list_);
   ASSERT(prefix_list_.size() == 2 + name_tags.size() * 2);
   prefix_tags_.resize(name_tags.size());
@@ -688,8 +686,8 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromTaggedName(
   }
 
   // Legacy mode don't support explicit tagged name. If a non-empty `tagged_name` is provided,
-  // it becomes the counter's flat name (the tag-extracted `base_name` and tags are dropped).
-  // In otherwise, `base_name` and `stat_name_tags` are used to construct the counter's name.
+  // it becomes the stat's flat name (the tag-extracted `base_name` and tags are dropped).
+  // In otherwise, `base_name` and `stat_name_tags` are used to construct the stat's name.
   // This keep the consistency with the previous behavior of the legacy mode.
   if (!tagged_name.empty()) {
     base_name = tagged_name;
@@ -760,8 +758,8 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromTaggedName(
   }
 
   // Legacy mode don't support explicit tagged name. If a non-empty `tagged_name` is provided,
-  // it becomes the counter's flat name (the tag-extracted `base_name` and tags are dropped).
-  // In otherwise, `base_name` and `stat_name_tags` are used to construct the counter's name.
+  // it becomes the stat's flat name (the tag-extracted `base_name` and tags are dropped).
+  // In otherwise, `base_name` and `stat_name_tags` are used to construct the stat's name.
   // This keep the consistency with the previous behavior of the legacy mode.
   if (!tagged_name.empty()) {
     base_name = tagged_name;
@@ -827,8 +825,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromTaggedName(
   }
 
   // Legacy mode don't support explicit tagged name. If a non-empty `tagged_name` is provided,
-  // it becomes the counter's flat name (the tag-extracted `base_name` and tags are dropped).
-  // In otherwise, `base_name` and `stat_name_tags` are used to construct the counter's name.
+  // it becomes the stat's flat name (the tag-extracted `base_name` and tags are dropped).
+  // In otherwise, `base_name` and `stat_name_tags` are used to construct the stat's name.
   // This keep the consistency with the previous behavior of the legacy mode.
   if (!tagged_name.empty()) {
     base_name = tagged_name;
@@ -934,8 +932,8 @@ TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromTaggedName(
   }
 
   // Legacy mode don't support explicit tagged name. If a non-empty `tagged_name` is provided,
-  // it becomes the counter's flat name (the tag-extracted `base_name` and tags are dropped).
-  // In otherwise, `base_name` and `stat_name_tags` are used to construct the counter's name.
+  // it becomes the stat's flat name (the tag-extracted `base_name` and tags are dropped).
+  // In otherwise, `base_name` and `stat_name_tags` are used to construct the stat's name.
   // This keep the consistency with the previous behavior of the legacy mode.
   if (!tagged_name.empty()) {
     base_name = tagged_name;
