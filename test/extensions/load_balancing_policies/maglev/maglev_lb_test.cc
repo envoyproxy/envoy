@@ -760,11 +760,6 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedGlobalPanic) {
 
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", zone_a, 1),
                       makeTestHost(info_, "tcp://127.0.0.1:91", zone_b, 2)};
-  // Set FAILED_ACTIVE_HC so coarseHealth() returns Unhealthy, consistent with
-  // the empty healthy_hosts_ snapshot.
-  for (auto& host : host_set_.hosts_) {
-    host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  }
   host_set_.healthy_hosts_ = {};
   host_set_.hosts_per_locality_ =
       makeHostsPerLocality({{host_set_.hosts_[0]}, {host_set_.hosts_[1]}});
@@ -816,9 +811,6 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedLopsided) {
   for (uint32_t i = 0; i < 1024; ++i) {
     auto host_locality = i == 0 ? zone_a : zone_b;
     auto host(makeTestHost(info_, fmt::format("tcp://127.0.0.1:{}", i), host_locality));
-    // Set FAILED_ACTIVE_HC so coarseHealth() returns Unhealthy, consistent with
-    // the empty healthy_hosts_ snapshot.
-    host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
     host_set_.hosts_.push_back(host);
     (i == 0 ? heavy_but_sparse : light_but_dense).push_back(host);
   }

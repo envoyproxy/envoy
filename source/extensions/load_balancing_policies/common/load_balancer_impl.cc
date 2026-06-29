@@ -19,7 +19,6 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
-#include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -156,77 +155,6 @@ void LoadBalancerBase::processDirtyPriorities() {
 //   then priorities are not in panic, but there are no healthy hosts to route to.
 //   In this case just mark P=0 as recipient of 100% of the traffic (nothing will be routed
 //   to P=0 anyways as there are no healthy hosts there).
-
-namespace {
-// Aggregated healthy/degraded/total weight (or host-count) for a single priority level.
-struct Tally {
-  uint64_t healthy = 0;
-  uint64_t degraded = 0;
-  uint64_t total = 0;
-};
-
-absl::flat_hash_set<const Host*> buildExcludedSet(const HostVector& excluded_hosts) {
-  absl::flat_hash_set<const Host*> excluded;
-  excluded.reserve(excluded_hosts.size());
-  for (const auto& h : excluded_hosts) {
-    excluded.insert(h.get());
-  }
-  return excluded;
-}
-
-// Compute the Tally for a host set.
-// When weighted is true the tally accumulates host weights; otherwise it counts hosts.
-Tally computeWeights(const HostSet& host_set, bool use_live_health, bool weighted) {
-  Tally t;
-
-  if (use_live_health) {
-    const absl::flat_hash_set<const Host*> excluded = buildExcludedSet(host_set.excludedHosts());
-
-    uint64_t excluded_total = 0;
-    for (const auto& host : host_set.hosts()) {
-      const uint64_t w = weighted ? host->weight() : 1;
-      t.total += w;
-      if (excluded.contains(host.get())) {
-        excluded_total += w;
-        continue;
-      }
-      const auto health = host->coarseHealth();
-      if (health == Host::Health::Healthy) {
-        t.healthy += w;
-      } else if (health == Host::Health::Degraded) {
-        t.degraded += w;
-      }
-    }
-    ASSERT(t.total >= excluded_total);
-    t.total -= excluded_total;
-  } else {
-    if (weighted) {
-      for (const auto& host : host_set.healthyHosts()) {
-        t.healthy += host->weight();
-      }
-      for (const auto& host : host_set.degradedHosts()) {
-        t.degraded += host->weight();
-      }
-      for (const auto& host : host_set.hosts()) {
-        t.total += host->weight();
-      }
-      uint64_t excluded_weight = 0;
-      for (const auto& host : host_set.excludedHosts()) {
-        excluded_weight += host->weight();
-      }
-      ASSERT(t.total >= excluded_weight);
-      t.total -= excluded_weight;
-    } else {
-      t.healthy = host_set.healthyHosts().size();
-      t.degraded = host_set.degradedHosts().size();
-      t.total = host_set.hosts().size() - host_set.excludedHosts().size();
-    }
-  }
-
-  return t;
-}
-} // namespace
-
 void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                                                    const PrioritySet& priority_set,
                                                    HealthyAndDegradedLoad& per_priority_load,
@@ -240,18 +168,41 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   total_healthy_hosts = 0;
 
   // Determine the health of the newly modified priority level.
+  // Health ranges from 0-100, and is the ratio of healthy/degraded hosts to total hosts, modified
+  // by the overprovisioning factor.
   HostSet& host_set = *priority_set.hostSetsPerPriority()[priority];
   per_priority_health.get()[priority] = 0;
   per_priority_degraded.get()[priority] = 0;
   const auto host_count = host_set.hosts().size() - host_set.excludedHosts().size();
-  const bool use_live_health = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update");
 
   if (host_count > 0) {
-    const Tally t = computeWeights(host_set, use_live_health, host_set.weightedPriorityHealth());
-    const uint64_t healthy_weight = t.healthy;
-    const uint64_t degraded_weight = t.degraded;
-    const uint64_t total_weight = t.total;
+    uint64_t healthy_weight = 0;
+    uint64_t degraded_weight = 0;
+    uint64_t total_weight = 0;
+    if (host_set.weightedPriorityHealth()) {
+      for (const auto& host : host_set.healthyHosts()) {
+        healthy_weight += host->weight();
+      }
+
+      for (const auto& host : host_set.degradedHosts()) {
+        degraded_weight += host->weight();
+      }
+
+      for (const auto& host : host_set.hosts()) {
+        total_weight += host->weight();
+      }
+
+      uint64_t excluded_weight = 0;
+      for (const auto& host : host_set.excludedHosts()) {
+        excluded_weight += host->weight();
+      }
+      ASSERT(total_weight >= excluded_weight);
+      total_weight -= excluded_weight;
+    } else {
+      healthy_weight = host_set.healthyHosts().size();
+      degraded_weight = host_set.degradedHosts().size();
+      total_weight = host_count;
+    }
     // Each priority level's health is ratio of healthy hosts to total number of hosts in a
     // priority multiplied by overprovisioning factor of 1.4 and capped at 100%. It means that if
     // all hosts are healthy that priority's health is 100%*1.4=140% and is capped at 100% which
@@ -332,20 +283,8 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                     std::accumulate(per_priority_load.degraded_priority_load_.get().begin(),
                                     per_priority_load.degraded_priority_load_.get().end(), 0));
 
-  if (use_live_health) {
-    // Count total healthy hosts from live flags, consistent with the live-flag counts above.
-    for (auto& hs : priority_set.hostSetsPerPriority()) {
-      const absl::flat_hash_set<const Host*> excluded = buildExcludedSet(hs->excludedHosts());
-      for (const auto& host : hs->hosts()) {
-        if (!excluded.contains(host.get()) && host->coarseHealth() == Host::Health::Healthy) {
-          ++total_healthy_hosts;
-        }
-      }
-    }
-  } else {
-    for (auto& host_set : priority_set.hostSetsPerPriority()) {
-      total_healthy_hosts += host_set->healthyHosts().size();
-    }
+  for (auto& host_set : priority_set.hostSetsPerPriority()) {
+    total_healthy_hosts += host_set->healthyHosts().size();
   }
 }
 

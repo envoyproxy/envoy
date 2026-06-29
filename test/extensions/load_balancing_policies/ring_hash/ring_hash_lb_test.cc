@@ -219,9 +219,6 @@ TEST_P(RingHashLoadBalancerTest, Basic) {
   }
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 
-  for (auto& host : hostSet().hosts_) {
-    host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  }
   hostSet().healthy_hosts_.clear();
   hostSet().runCallbacks({}, {});
   lb = lb_->factory()->create(lb_params_);
@@ -235,9 +232,6 @@ TEST_P(RingHashLoadBalancerTest, Basic) {
 // Ensure if all the hosts with priority 0 unhealthy, the next priority hosts are used.
 TEST_P(RingHashFailoverTest, BasicFailover) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
-  // Mark the P=0 host unhealthy so coarseHealth() is consistent with the
-  // empty healthy_hosts_ (never populated for this host set before failover).
-  host_set_.hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
 
@@ -250,29 +244,21 @@ TEST_P(RingHashFailoverTest, BasicFailover) {
   LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb->chooseHost(nullptr).host);
 
-  // Add a healthy host at P=0: clear the failure flag first so coarseHealth()
-  // returns Healthy, consistent with adding it to healthy_hosts_.
-  host_set_.hosts_[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  // Add a healthy host at P=0 and it will be chosen.
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks({}, {});
   lb = lb_->factory()->create(lb_params_);
   EXPECT_EQ(host_set_.healthy_hosts_[0], lb->chooseHost(nullptr).host);
 
-  // Remove the healthy host and ensure we fail back over to the failover_host_set_.
-  // Set FAILED_ACTIVE_HC so coarseHealth() returns Unhealthy, consistent with
-  // the empty healthy_hosts_ snapshot.
-  host_set_.hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  // Remove the healthy host and ensure we fail back over to the failover_host_set_
   host_set_.healthy_hosts_ = {};
   host_set_.runCallbacks({}, {});
   lb = lb_->factory()->create(lb_params_);
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb->chooseHost(nullptr).host);
 
   // Set up so P=0 gets 70% of the load, and P=1 gets 30%.
-  // hosts_[1] is unhealthy: mark it so coarseHealth() is consistent with
-  // it being absent from healthy_hosts_.
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
                       makeTestHost(info_, "tcp://127.0.0.1:81")};
-  host_set_.hosts_[1]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   host_set_.healthy_hosts_ = {host_set_.hosts_[0]};
   host_set_.runCallbacks({}, {});
   lb = lb_->factory()->create(lb_params_);
@@ -397,9 +383,6 @@ TEST_P(RingHashLoadBalancerTest, BasicWithDoundedLoad) {
   { EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(nullptr).host); }
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 
-  for (auto& host : hostSet().hosts_) {
-    host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  }
   hostSet().healthy_hosts_.clear();
   hostSet().runCallbacks({}, {});
   lb = lb_->factory()->create(lb_params_);
@@ -469,9 +452,6 @@ TEST_P(RingHashLoadBalancerTest, BasicWithHostname) {
   { EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(nullptr).host); }
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 
-  for (auto& host : hostSet().hosts_) {
-    host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  }
   hostSet().healthy_hosts_.clear();
   hostSet().runCallbacks({}, {});
   lb = lb_->factory()->create(lb_params_);
@@ -541,9 +521,6 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMetadataHashKey) {
   { EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(nullptr).host); }
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 
-  for (auto& host : hostSet().hosts_) {
-    host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  }
   hostSet().healthy_hosts_.clear();
   hostSet().runCallbacks({}, {});
   lb = lb_->factory()->create(lb_params_);
