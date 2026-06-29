@@ -472,8 +472,7 @@ using InitializerList = std::vector<Initializer>;
 class ThreadLocalState : Logger::Loggable<Logger::Id::lua> {
 public:
   ThreadLocalState(const std::string& code, ThreadLocal::SlotAllocator& tls,
-                   Stats::Gauge* vm_count = nullptr,
-                   Stats::ScopeSharedPtr scope_keeper = nullptr);
+                   Stats::Gauge* vm_count = nullptr, Stats::ScopeSharedPtr scope_keeper = nullptr);
 
   /**
    * @return CoroutinePtr a new coroutine.

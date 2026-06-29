@@ -854,9 +854,8 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
     default_lua_code_setup_ =
         std::make_unique<PerLuaCodeSetup>(code, tls, &stats_.lua_vm_count_, lua_stats_scope_);
   } else if (!proto_config.inline_code().empty()) {
-    default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(proto_config.inline_code(), tls,
-                                                                 &stats_.lua_vm_count_,
-                                                                 lua_stats_scope_);
+    default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(
+        proto_config.inline_code(), tls, &stats_.lua_vm_count_, lua_stats_scope_);
   }
 
   for (const auto& source : proto_config.source_codes()) {
@@ -884,8 +883,8 @@ FilterConfigPerRoute::FilterConfigPerRoute(
         Config::DataSource::read(config.source_code(), true, context.api()), std::string);
     // Track per-route VMs in the server root scope. The root scope has server lifetime,
     // so no scope_keeper is needed — vm_count_ will remain valid for the filter's lifetime.
-    Stats::Gauge& per_route_vm_count = context.scope().gaugeFromString(
-        "lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate);
+    Stats::Gauge& per_route_vm_count =
+        context.scope().gaugeFromString("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate);
     per_lua_code_setup_ptr_ =
         std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal(), &per_route_vm_count);
   }
