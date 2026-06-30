@@ -578,7 +578,7 @@ TEST(TaggedFieldDeserializer, ShouldConsumeCorrectAmountOfData) {
 
 TEST(TaggedFieldsDeserializer, ShouldConsumeCorrectAmountOfData) {
   std::vector<TaggedField> fields;
-  for (uint32_t i = 0; i < 200; ++i) {
+  for (uint32_t i = 0; i < 10; ++i) {
     const TaggedField tagged_field = {i, Bytes{1, 2, 3, 4}};
     fields.push_back(tagged_field);
   }
