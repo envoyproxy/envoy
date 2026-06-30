@@ -60,9 +60,8 @@ TEST_F(FilterStateTest, FactoryRegistered) {
 TEST_F(FilterStateTest, FactoryCreatesEmptyConfigProto) {
   auto proto = factory_->createEmptyConfigProto();
   ASSERT_NE(proto, nullptr);
-  EXPECT_NE(dynamic_cast<envoy::extensions::internal_redirect::filter_state::v3::FilterStateConfig*>(
-                proto.get()),
-            nullptr);
+  EXPECT_EQ(proto->GetTypeName(),
+            "envoy.extensions.internal_redirect.filter_state.v3.FilterStateConfig");
 }
 
 TEST_F(FilterStateTest, PredicateName) {
