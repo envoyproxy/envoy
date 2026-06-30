@@ -159,6 +159,7 @@ private:
 
   mutable Thread::ThreadSynchronizer synchronizer_; // Used for testing only.
   const bool always_consume_default_token_bucket_{};
+  bool always_deny_default_{false};
 };
 
 class AlwaysDenyLocalRateLimiter : public LocalRateLimiter {
