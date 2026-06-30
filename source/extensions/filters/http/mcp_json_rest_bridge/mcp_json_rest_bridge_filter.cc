@@ -175,7 +175,8 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
       max_request_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_request_body_size,
                                                              DEFAULT_MAX_REQUEST_BODY_SIZE)),
       max_response_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_response_body_size,
-                                                              DEFAULT_MAX_RESPONSE_BODY_SIZE)) {
+                                                              DEFAULT_MAX_RESPONSE_BODY_SIZE)),
+      clear_route_cache_(proto_config_.clear_route_cache()) {
   for (const auto& tool : proto_config.tool_config().tools()) {
     tool_entries_[tool.name()] = {tool.http_rule(), tool.text_content_streaming_enabled()};
   }
@@ -629,7 +630,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
                                  Http::CustomHeaders::get().AcceptEncodingValues.Identity);
       }
 
-      if (decoder_callbacks_->downstreamCallbacks().has_value()) {
+      if (config_->clearRouteCache() && decoder_callbacks_->downstreamCallbacks().has_value()) {
         decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
       }
       return;
@@ -860,7 +861,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
                              Http::CustomHeaders::get().AcceptEncodingValues.Identity);
   }
 
-  if (decoder_callbacks_->downstreamCallbacks().has_value()) {
+  if (config_->clearRouteCache() && decoder_callbacks_->downstreamCallbacks().has_value()) {
     decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
 }
