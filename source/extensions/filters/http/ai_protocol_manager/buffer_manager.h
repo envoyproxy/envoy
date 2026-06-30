@@ -6,6 +6,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/schedulable_cb.h"
 #include "envoy/http/filter.h"
 
 #include "source/common/common/logger.h"
@@ -79,8 +80,8 @@ using FilterChainBridgePtr = std::unique_ptr<FilterChainBridge>;
 //   - Replay: re-injected data is paced against the chain's back-pressure,
 //     delivered through ReplayWatermarkHandler. We pause issuing reads/injects
 //     while the chain is backed up; without this the read->inject loop would
-//     push the entire payload downstream regardless of drain rate, defeating the
-//     bounded-footprint goal.
+//     push the entire payload into the chain regardless of drain rate, defeating
+//     the bounded-footprint goal.
 class BufferManager : public ExternalBufferWatermarkCallbacks,
                       public ReplayWatermarkHandler,
                       Logger::Loggable<Logger::Id::filter> {
@@ -118,9 +119,15 @@ private:
   // Ends replay: marks it done and, if the stream was terminated by trailers,
   // releases them via the bridge so they follow the replayed body.
   void finishReplay();
-  // Issues the next bounded read() in the replay, unless replay is finished or
-  // currently paused by chain back-pressure (or a read is already in flight).
+  // Issues the next replay read and injects it (via onReadComplete). A
+  // synchronous store completes the read on-stack and re-enters here, chaining
+  // chunks until the burst hits ReplayChunksPerIteration, at which point it yields
+  // via replay_cb_ and resumes next iteration. An asynchronous store drives one
+  // chunk per completion and paces itself.
   void maybeReadNextChunk();
+  // Resumes replay on a fresh event-loop iteration after the per-iteration chunk
+  // budget was spent (the target of replay_cb_).
+  void onReplayContinuation();
   // Completion handler for a read() issued during replay.
   void onReadComplete(ExternalBufferStatus status, Buffer::InstancePtr data);
   // Fails the stream when an external-buffer operation errors out.
@@ -129,10 +136,21 @@ private:
   // Size of each chunk streamed back to the filter chain during replay. Keeps
   // the replay footprint bounded regardless of total payload size.
   static constexpr uint64_t ReadChunkSize = 64 * 1024;
+  // Maximum number of chunks to replay in one synchronous burst before yielding
+  // to the event loop. Only a store that completes reads synchronously (e.g. the
+  // in-memory buffer) can drive the read->inject loop back-to-back; without a cap
+  // it would replay the entire payload in one iteration, starving other
+  // connections/timers on this worker. ReadChunkSize * this bounds the bytes
+  // injected per iteration. A store that completes reads asynchronously paces
+  // itself one chunk per completion and never reaches this cap.
+  static constexpr uint32_t ReplayChunksPerIteration = 8;
 
   ExternalBufferFactory& buffer_factory_;
   FilterChainBridgePtr bridge_;
   ExternalBufferPtr buffer_;
+  // Reschedules replay on the next event-loop iteration once the per-iteration
+  // chunk budget is spent, so a large replay cannot monopolize the worker.
+  Event::SchedulableCallbackPtr replay_cb_;
 
   // True once onData() has observed end_stream. Replay begins once this is set
   // and all outstanding appends have completed.
@@ -146,8 +164,19 @@ private:
 
   // True between streamBackToFilterChain() and the final injected frame.
   bool replaying_{false};
-  // True while a replay read() is outstanding; prevents overlapping reads.
+  // True while a replay read() is outstanding; prevents overlapping reads. For a
+  // synchronous store it is set then cleared within the same maybeReadNextChunk()
+  // call; for an asynchronous store it stays set until the posted completion fires.
   bool read_in_flight_{false};
+  // True only while inside the synchronous buffer_->read() call. A store that
+  // completes the read on-stack re-enters maybeReadNextChunk() (via onReadComplete)
+  // with this set -- that is how a synchronous burst is detected and bounded; an
+  // asynchronous completion re-enters with it clear and so paces itself.
+  bool in_read_{false};
+  // Length of the current synchronous replay burst, capped at
+  // ReplayChunksPerIteration. A fresh (non-re-entrant) entry restarts it at 1; a
+  // re-entrant (synchronous) chunk increments it and yields once it hits the cap.
+  uint32_t replay_sync_chunks_{0};
   // Replay cursor: next offset to read and the total length being replayed.
   uint64_t replay_offset_{0};
   uint64_t replay_length_{0};

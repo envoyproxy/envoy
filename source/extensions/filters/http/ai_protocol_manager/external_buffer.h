@@ -63,11 +63,14 @@ public:
 // decides what to do, the bytes are streamed back into the filter chain via
 // read().
 //
-// Because an implementation may perform real I/O, every data operation is
-// asynchronous and reports completion through a callback. All callbacks are
-// invoked on the owning dispatcher's thread and never re-entrantly from within
-// the call that scheduled them. Destroying the buffer cancels any pending
-// callbacks; they will not fire afterwards.
+// Because an implementation may perform real I/O, data operations report
+// completion through a callback. Callbacks are always invoked on the owning
+// dispatcher's thread, but an implementation MAY invoke a callback either
+// synchronously (re-entrantly, before the operation returns) or asynchronously
+// on a later event-loop iteration -- whichever fits its backing store. A purely
+// in-memory store completes reads synchronously; a disk/remote store typically
+// posts and completes later. Callers must tolerate both. Destroying the buffer
+// cancels any pending asynchronous callbacks; they will not fire afterwards.
 class ExternalBuffer {
 public:
   virtual ~ExternalBuffer() = default;
@@ -84,7 +87,8 @@ public:
 
   // Reads `length` bytes starting at absolute byte offset `offset`. It is an
   // error to request a range that extends past the current length(). `cb`
-  // receives the requested bytes.
+  // receives the requested bytes and may be invoked synchronously (see the class
+  // comment).
   virtual void read(uint64_t offset, uint64_t length, ReadCallback cb) PURE;
 
   // Total number of bytes appended (and acknowledged) so far. Reflects only

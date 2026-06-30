@@ -17,7 +17,7 @@ namespace AiProtocolManager {
 // large and we must not pin it all in the connection manager's buffers. This
 // filter therefore offloads the request body into an ExternalBuffer as it
 // arrives, and once the stream ends it streams the bytes back into the filter
-// chain for the downstream filters (and, eventually, the parser/validator) to
+// chain for the subsequent filters (and, eventually, the parser/validator) to
 // consume.
 //
 // The offload/replay pipeline and its bidirectional flow control live in the
@@ -31,9 +31,9 @@ namespace AiProtocolManager {
 // the payload that drives routing and admission decisions has been parsed, so
 // decodeHeaders() pauses chain iteration (StopIteration) whenever a body
 // follows. The headers stay pinned at this filter while decodeData() keeps
-// offloading the body; they are released to the downstream filters only when
+// offloading the body; they are released to the subsequent filters only when
 // replay begins -- the first injectDecodedDataToFilterChain() call flushes the
-// held headers ahead of the replayed body, so downstream filters observe the
+// held headers ahead of the replayed body, so the subsequent filters observe the
 // headers immediately followed by the (now fully buffered) payload.
 //
 // Current behavior is a straight offload-then-replay. Streaming JSON parsing and

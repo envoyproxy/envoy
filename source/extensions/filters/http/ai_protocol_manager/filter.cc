@@ -36,8 +36,8 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // A body follows: pin the headers at this filter so routing and admission
-  // filters downstream do not act on them until the payload has been offloaded.
+  // A body follows: pin the headers at this filter so the subsequent routing and
+  // admission filters do not act on them until the payload has been offloaded.
   // decodeData() still fires on this filter while iteration is stopped here, so
   // the BufferManager keeps offloading; the held headers are released when replay
   // injects the first body frame (or, for an empty/trailer-only body, when the

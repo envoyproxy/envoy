@@ -44,12 +44,12 @@ void InMemoryExternalBuffer::read(uint64_t offset, uint64_t length, ReadCallback
     out->add(slice.get(), length);
   }
 
-  dispatcher_.post([alive = alive_, out = std::move(out), cb = std::move(cb)]() mutable {
-    if (!*alive) {
-      return;
-    }
-    cb(ExternalBufferStatus::Ok, std::move(out));
-  });
+  // No real I/O: the bytes are already in memory on the dispatcher thread, so the
+  // read completes synchronously and the callback runs on-stack. The BufferManager
+  // tolerates re-entrant completion -- it flattens the resulting read loop and
+  // bounds the work done per event-loop iteration. A disk/remote store would
+  // instead post and complete on a later iteration; both satisfy the contract.
+  cb(ExternalBufferStatus::Ok, std::move(out));
 }
 
 void InMemoryExternalBuffer::setWatermarks(uint32_t high_watermark, uint32_t low_watermark,

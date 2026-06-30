@@ -13,15 +13,15 @@ namespace AiProtocolManager {
 // A pure in-memory ExternalBuffer. The bytes are held in an owned buffer on the
 // heap; there is no real backing store.
 //
-// To honor the asynchronous contract of the interface (and to flush out
-// ordering / lifetime bugs in callers that a real I/O implementation would
-// expose), completion callbacks are posted to the dispatcher rather than run
-// inline. Because writes are durable the instant they land in memory, there is
-// never any in-flight backlog: the high watermark is never crossed and flow
-// control is effectively a no-op. This implementation therefore does NOT bound
-// the resident footprint -- it exists as a reference and for tests. A
-// disk- or remote-backed implementation is what makes the footprint guarantee
-// real, and it reuses the exact same interface.
+// Reads complete synchronously (the bytes are already in memory): the callback
+// runs on-stack from within read(). append() completions are posted to the
+// dispatcher, modelling a write that is not durable until acknowledged and
+// flushing out ordering/lifetime bugs in callers. Because writes are durable the
+// instant they land in memory, there is never any in-flight backlog: the high
+// watermark is never crossed and flow control is effectively a no-op. This
+// implementation therefore does NOT bound the resident footprint -- it exists as
+// a reference and for tests. A disk- or remote-backed implementation is what
+// makes the footprint guarantee real, and it reuses the exact same interface.
 class InMemoryExternalBuffer : public ExternalBuffer {
 public:
   explicit InMemoryExternalBuffer(Event::Dispatcher& dispatcher);

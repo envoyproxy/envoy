@@ -6,6 +6,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -32,6 +33,10 @@ public:
     ON_CALL(callbacks_, removeUpstreamWatermarkCallbacks(testing::_))
         .WillByDefault(
             Invoke([this](Http::UpstreamWatermarkCallbacks&) { watermark_cb_ = nullptr; }));
+    // The manager creates a SchedulableCallback (to resume replay across event-loop
+    // iterations) when setDecoderFilterCallbacks() builds it; construct the mock
+    // first so it claims that call. The manager takes ownership of it.
+    replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
     filter_.setDecoderFilterCallbacks(callbacks_);
     // The in-memory buffer delivers completions via dispatcher.post(). Capture
     // those callbacks so the test can run the event loop deterministically.
@@ -42,6 +47,11 @@ public:
           injected_.add(data);
           injected_end_stream_ = end_stream;
           ++inject_calls_;
+          // Simulate upstream back-pressure arising mid-replay: when configured,
+          // raise the watermark right after the Nth injected chunk.
+          if (watermark_cb_ != nullptr && inject_calls_ == raise_watermark_at_inject_) {
+            watermark_cb_->onAboveWriteBufferHighWatermark();
+          }
         }));
     // Capture continueDecoding() so trailer-terminated streams can assert the
     // held trailers are released after the replayed body.
@@ -57,27 +67,20 @@ public:
     }
   }
 
-  // Run a single posted callback (FIFO); returns false if the queue was empty.
-  bool drainOne() {
-    if (posted_.empty()) {
-      return false;
-    }
-    Event::PostCb cb = std::move(posted_.front());
-    posted_.pop_front();
-    cb();
-    return true;
-  }
-
   std::deque<Event::PostCb> posted_;
   InMemoryExternalBufferFactory factory_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::UpstreamWatermarkCallbacks* watermark_cb_{};
+  // Owned by the manager the filter builds; present so createSchedulableCallback()
+  // returns a usable callback during construction.
+  NiceMock<Event::MockSchedulableCallback>* replay_cb_{nullptr};
   AiProtocolManagerFilter filter_;
 
   Buffer::OwnedImpl injected_;
   bool injected_end_stream_{false};
   int inject_calls_{0};
   int continue_calls_{0};
+  int raise_watermark_at_inject_{0}; // 0 = never.
 };
 
 // When a body follows the headers, iteration is paused so the rest of the chain
@@ -203,33 +206,26 @@ TEST_F(AiProtocolManagerFilterTest, ReplayPausesUnderUpstreamBackPressure) {
   EXPECT_EQ(injected_.toString(), big);
 }
 
-// Back-pressure applied mid-replay halts further injection (bounded by one
-// in-flight chunk of overshoot), and replay resumes when it clears.
+// Back-pressure arising mid-replay (the upstream fills as we inject) halts the
+// synchronous read loop, and replay resumes when it clears.
 TEST_F(AiProtocolManagerFilterTest, ReplayResumesMidStream) {
   const std::string big(200 * 1024, 'x'); // 4 chunks of 64KiB + remainder.
+  // Upstream backs up right after the first replayed chunk; the loop must then
+  // stop until it is released.
+  raise_watermark_at_inject_ = 1;
   Buffer::OwnedImpl body(big);
   EXPECT_EQ(filter_.decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
 
-  // Step the event loop: append completes, replay starts, first read is issued
-  // and its chunk injected. Stop once at least one chunk has been injected.
-  ASSERT_NE(watermark_cb_, nullptr);
-  while (inject_calls_ == 0) {
-    ASSERT_TRUE(drainOne());
-  }
-  const int injects_before_pause = inject_calls_;
-  EXPECT_FALSE(injected_end_stream_);
-
-  // Apply back-pressure, then fully drain. At most one already-in-flight read
-  // may land after the watermark; replay then stalls (not complete).
-  watermark_cb_->onAboveWriteBufferHighWatermark();
+  // Append completes, replay injects one chunk, then pauses on the watermark
+  // raised during that inject.
   drain();
-  EXPECT_LE(inject_calls_, injects_before_pause + 1);
+  EXPECT_EQ(inject_calls_, 1);
   EXPECT_FALSE(injected_end_stream_);
   EXPECT_LT(injected_.length(), big.size());
 
-  // Release and finish.
+  // Release back-pressure; replay resumes synchronously to completion.
+  ASSERT_NE(watermark_cb_, nullptr);
   watermark_cb_->onBelowWriteBufferLowWatermark();
-  drain();
   EXPECT_TRUE(injected_end_stream_);
   EXPECT_EQ(injected_.toString(), big);
 }

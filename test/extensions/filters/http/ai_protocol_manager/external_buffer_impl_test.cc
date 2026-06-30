@@ -63,8 +63,7 @@ TEST_F(InMemoryExternalBufferTest, AppendThenReadRoundTrips) {
                  EXPECT_EQ(status, ExternalBufferStatus::Ok);
                  read_back = data->toString();
                });
-  EXPECT_TRUE(read_back.empty()); // read is async too.
-  drain();
+  // Reads complete synchronously: the callback has already run.
   EXPECT_EQ(read_back, "abcdefghij");
 }
 
@@ -78,9 +77,9 @@ TEST_F(InMemoryExternalBufferTest, ReadAtOffsetIsRepeatable) {
     EXPECT_EQ(status, ExternalBufferStatus::Ok);
     results.push_back(data->toString());
   };
+  // Reads complete synchronously, so results are populated immediately.
   buffer_.read(3, 4, collect);
   buffer_.read(3, 4, collect);
-  drain();
 
   ASSERT_EQ(results.size(), 2);
   EXPECT_EQ(results[0], "3456");
