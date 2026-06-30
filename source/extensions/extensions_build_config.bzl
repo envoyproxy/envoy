@@ -551,6 +551,12 @@ EXTENSIONS = {
     "envoy.network.dns_resolver.hickory":              "//source/extensions/network/dns_resolver/hickory:config",
 
     #
+    # Socket interfaces
+    #
+
+    "envoy.extensions.network.socket_interface.sockmap": "//source/extensions/network/socket_interface/sockmap:config",
+
+    #
     # Address Resolvers
     #
 

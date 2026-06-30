@@ -83,6 +83,8 @@ public:
   MOCK_METHOD(void, SetOnDraining, (quiche::SingleUseCallback<void()> callback), (override));
   MOCK_METHOD(std::optional<std::string>, GetNegotiatedSubprotocol, (), // NOLINT(std::optional)
               (const, override));
+  MOCK_METHOD(webtransport::Perspective, GetPerspective, (), (const, override));
+  MOCK_METHOD(webtransport::UnderlyingProtocol, GetUnderlyingProtocol, (), (const, override));
 };
 
 } // namespace Http

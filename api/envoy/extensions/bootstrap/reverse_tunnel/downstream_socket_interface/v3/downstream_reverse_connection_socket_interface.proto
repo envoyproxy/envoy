@@ -6,7 +6,10 @@ import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
 
+import "google/protobuf/duration.proto";
+
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3";
 option java_outer_classname = "DownstreamReverseConnectionSocketInterfaceProto";
@@ -20,6 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for the downstream reverse connection socket interface.
 // This interface initiates reverse connections to upstream Envoys and provides
 // them as socket connections for downstream requests.
+// [#next-free-field: 6]
 message DownstreamReverseConnectionSocketInterface {
   // HTTP handshake settings for initiator envoy initiated reverse tunnels.
   message HttpHandshakeConfig {
@@ -60,4 +64,10 @@ message DownstreamReverseConnectionSocketInterface {
   // Reverse tunnel metadata (``node_id``, ``cluster_id``, ``tenant_id``, upstream cluster, etc.)
   // is available via ``%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:*)%`` substitutions.
   repeated config.accesslog.v3.AccessLog access_log = 4;
+
+  // Upper bound on the per-host reconnect backoff. The initiator retries a failed handshake on a
+  // deterministic exponential schedule (1s, 2s, 4s, ...) with small upward jitter; this value caps
+  // that schedule.
+  google.protobuf.Duration max_reconnect_backoff = 5
+      [(validate.rules).duration = {gte {seconds: 1}}];
 }

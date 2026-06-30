@@ -819,7 +819,11 @@ envoy_extension_cc_test(
     srcs = ["ext_proc_benchmark_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = "6gig",
-    tags = ["skip_on_windows"],
+    tags = [
+        "no_san",
+        "nocoverage",
+        "skip_on_windows",
+    ],
     deps = [
         ":test_processor_lib",
         "//envoy/http:header_map_interface",

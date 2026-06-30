@@ -86,6 +86,8 @@ areas:
     title: ratelimit
   rbac:
     title: rbac
+  redis_proxy:
+    title: redis_proxy
   resource_monitors:
     title: resource_monitors
   router:

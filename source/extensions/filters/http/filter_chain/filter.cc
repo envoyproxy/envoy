@@ -16,10 +16,10 @@ namespace {
 constexpr absl::string_view FilterChainName = "envoy.filters.http.filter_chain";
 
 // Helper to process filter config and create filter factories
-Http::FilterChainUtility::FilterFactoriesList createFilterFactoriesFromConfig(
+FilterFactoriesVector createFilterFactoriesFromConfig(
     const envoy::extensions::filters::http::filter_chain::v3::FilterChain& proto_config,
     Server::Configuration::ServerFactoryContext& context, const std::string& stats_prefix) {
-  Http::FilterChainUtility::FilterFactoriesList filter_factories;
+  FilterFactoriesVector filter_factories;
   filter_factories.reserve(proto_config.filters_size());
 
   for (const auto& filter_config : proto_config.filters()) {
@@ -38,16 +38,16 @@ Http::FilterChainUtility::FilterFactoriesList createFilterFactoriesFromConfig(
     auto filter_config_provider =
         Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(context)
             ->createStaticFilterConfigProvider(callback_or_error, filter_config.name());
-    filter_factories.push_back({std::move(filter_config_provider), false});
+    filter_factories.push_back({std::move(filter_config_provider)});
   }
   return filter_factories;
 }
 
 // Helper to process filter config and create filter factories
-Http::FilterChainUtility::FilterFactoriesList createFilterFactoriesFromConfig(
+FilterFactoriesVector createFilterFactoriesFromConfig(
     const envoy::extensions::filters::http::filter_chain::v3::FilterChain& proto_config,
     Server::Configuration::FactoryContext& context, const std::string& stats_prefix) {
-  Http::FilterChainUtility::FilterFactoriesList filter_factories;
+  FilterFactoriesVector filter_factories;
   filter_factories.reserve(proto_config.filters_size());
 
   for (const auto& filter_config : proto_config.filters()) {
@@ -68,7 +68,7 @@ Http::FilterChainUtility::FilterFactoriesList createFilterFactoriesFromConfig(
             context.serverFactoryContext())
             ->createStaticFilterConfigProvider(std::move(callback_or_error.value()),
                                                filter_config.name());
-    filter_factories.push_back({std::move(filter_config_provider), false});
+    filter_factories.push_back({std::move(filter_config_provider)});
   }
   return filter_factories;
 }
@@ -78,12 +78,20 @@ Http::FilterChainUtility::FilterFactoriesList createFilterFactoriesFromConfig(
 FilterChain::FilterChain(
     const envoy::extensions::filters::http::filter_chain::v3::FilterChain& proto_config,
     Server::Configuration::ServerFactoryContext& context, const std::string& stats_prefix)
-    : filter_factories_(createFilterFactoriesFromConfig(proto_config, context, stats_prefix)) {}
+    : filter_factories_(createFilterFactoriesFromConfig(proto_config, context, stats_prefix)) {
+  for (const auto& factory : filter_factories_) {
+    filters_.insert(factory->name());
+  }
+}
 
 FilterChain::FilterChain(
     const envoy::extensions::filters::http::filter_chain::v3::FilterChain& proto_config,
     Server::Configuration::FactoryContext& context, const std::string& stats_prefix)
-    : filter_factories_(createFilterFactoriesFromConfig(proto_config, context, stats_prefix)) {}
+    : filter_factories_(createFilterFactoriesFromConfig(proto_config, context, stats_prefix)) {
+  for (const auto& factory : filter_factories_) {
+    filters_.insert(factory->name());
+  }
+}
 
 FilterChainPerRouteConfig::FilterChainPerRouteConfig(
     const envoy::extensions::filters::http::filter_chain::v3::FilterChainConfigPerRoute&
