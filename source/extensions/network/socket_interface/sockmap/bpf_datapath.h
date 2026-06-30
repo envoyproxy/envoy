@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
@@ -33,6 +34,10 @@ struct BpfDatapathConfig {
   std::string bpf_program_path;
   std::string cgroup_path;
   uint32_t sockhash_max_entries{0};
+  // Proxy listener ports (host byte order) that scope which connections the `sock_ops` program adds
+  // to the sockhash. When non-empty, only a socket whose local or peer port is one of these is
+  // registered. When empty, every same-host connection in the cgroup is registered.
+  std::vector<uint32_t> accelerated_ports;
 };
 
 // Registers connected sockets into the sockhash so the `sk_msg` program can redirect their
@@ -46,7 +51,7 @@ public:
   virtual void registerSocket(os_fd_t fd, const Address::Instance& local,
                               const Address::Instance& peer) PURE;
 
-  // Removes the tuple key for a connected socket from the sockhash. Best effort and never throws; a
+  // Removes the tuple key for a connected socket from the sockhash. Best effort and never throws. A
   // missing key is not an error.
   virtual void unregisterSocket(const Address::Instance& local, const Address::Instance& peer) PURE;
 };

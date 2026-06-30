@@ -36,6 +36,8 @@ Server::BootstrapExtensionPtr SockmapSocketInterface::createBootstrapExtension(
   datapath_config.cgroup_path = message.cgroup_path();
   datapath_config.sockhash_max_entries =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, sockhash_max_entries, 65536);
+  datapath_config.accelerated_ports.assign(message.accelerated_ports().begin(),
+                                           message.accelerated_ports().end());
   const bool register_user_space_sockets =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, register_user_space_sockets, true);
   BpfDatapathSharedPtr datapath = createDatapath(datapath_config);

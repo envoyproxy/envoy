@@ -48,6 +48,8 @@ namespace {
 constexpr char SockhashName[] = "envoy_sockhash";
 constexpr char SockOpsName[] = "envoy_sockops";
 constexpr char SkMsgName[] = "envoy_sk_msg";
+constexpr char AccelPortsName[] = "envoy_accel_ports";
+constexpr char AccelFilterName[] = "envoy_accel_filter";
 
 // Loads the `sock_ops` and `sk_msg` programs through libbpf, attaches the `sk_msg` verdict to the
 // sockhash and, when configured, the `sock_ops` program to a cgroup. Every registration is best
@@ -131,6 +133,29 @@ BpfDatapathSharedPtr LibbpfDatapath::create(const BpfDatapathConfig& config) {
     ENVOY_LOG_MISC(warn, "sockmap could not load eBPF programs: {}", errorDetails(errno));
     bpf_object__close(obj);
     return nullptr;
+  }
+
+  // Populate the optional proxy-port allowlist so the `sock_ops` program only registers connections
+  // on a proxy port and leaves every other same-host connection in the cgroup on the standard
+  // datapath. An empty list keeps the default of registering every connection.
+  if (!config.accelerated_ports.empty()) {
+    struct bpf_map* ports_map = bpf_object__find_map_by_name(obj, AccelPortsName);
+    struct bpf_map* filter_map = bpf_object__find_map_by_name(obj, AccelFilterName);
+    if (ports_map == nullptr || filter_map == nullptr) {
+      ENVOY_LOG_MISC(warn, "sockmap accelerated_ports set but the allowlist maps are missing, "
+                           "registering all same-host hops in the cgroup");
+    } else {
+      const uint32_t zero = 0;
+      const uint32_t enabled = 1;
+      bpf_map_update_elem(bpf_map__fd(filter_map), &zero, &enabled, BPF_ANY);
+      const int ports_fd = bpf_map__fd(ports_map);
+      const uint8_t present = 1;
+      for (const uint32_t port : config.accelerated_ports) {
+        bpf_map_update_elem(ports_fd, &port, &present, BPF_ANY);
+      }
+      ENVOY_LOG_MISC(info, "sockmap acceleration scoped to {} proxy port(s)",
+                     config.accelerated_ports.size());
+    }
   }
 
   const int sockhash_fd = bpf_map__fd(map);

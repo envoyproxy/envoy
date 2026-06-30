@@ -33,6 +33,25 @@ struct {
   __type(value, int);
 } envoy_sockhash SEC(".maps");
 
+// Optional proxy-port allowlist that scopes which connections the sock_ops program registers. User
+// space fills both maps after load. envoy_accel_filter[0] is nonzero when the allowlist is active
+// and envoy_accel_ports holds each proxy listener port in host byte order. Its 64-entry cap matches
+// the accelerated_ports max_items in sockmap.proto. Connections matching no listed port stay off
+// the sockhash so unrelated same-host traffic is never redirected.
+struct {
+  __uint(type, BPF_MAP_TYPE_HASH);
+  __uint(max_entries, 64);
+  __type(key, __u32);
+  __type(value, __u8);
+} envoy_accel_ports SEC(".maps");
+
+struct {
+  __uint(type, BPF_MAP_TYPE_ARRAY);
+  __uint(max_entries, 1);
+  __type(key, __u32);
+  __type(value, __u32);
+} envoy_accel_filter SEC(".maps");
+
 // Builds the key for the socket owning skops. Ports are stored network order in the low 16 bits. The
 // kernel exposes local_port host order in the low 16 bits, so it is converted with htons, and
 // remote_port network order in the high 16 bits, so it is normalized down with htons(ntohl()).
@@ -55,6 +74,19 @@ int envoy_sockops(struct bpf_sock_ops *skops) {
   switch (skops->op) {
   case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB:
   case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB: {
+    // When the allowlist is active, only register a connection whose local or peer port matches one
+    // of the proxy ports. local_port is already host order and remote_port is network order, so
+    // remote_port is converted with ntohl before the lookup.
+    __u32 zero = 0;
+    __u32 *filter = bpf_map_lookup_elem(&envoy_accel_filter, &zero);
+    if (filter && *filter) {
+      __u32 lport = skops->local_port;
+      __u32 rport = bpf_ntohl(skops->remote_port);
+      if (bpf_map_lookup_elem(&envoy_accel_ports, &lport) == NULL &&
+          bpf_map_lookup_elem(&envoy_accel_ports, &rport) == NULL) {
+        break;
+      }
+    }
     struct sock_key key = {};
     sockops_key(skops, &key);
     bpf_sock_hash_update(skops, &envoy_sockhash, &key, BPF_NOEXIST);
