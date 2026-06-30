@@ -1801,6 +1801,47 @@ TEST_F(RedisClusterTest, ZoneDiscoveryMakeRequestReturnsNull) {
       cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->locality().zone().empty());
 }
 
+// A refresh (periodic resolve timer, DNS update) that arrives after CLUSTER
+// SLOTS completes but before the zone-discovery INFO replies return must not
+// start a second resolution. current_request_ is already null in that window,
+// so without gating on pending_zone_requests_ the refresh starts another zone
+// discovery and overwrites zone_callbacks_, freeing the callbacks that the
+// in-flight INFO requests still reference (use-after-free).
+TEST_F(RedisClusterTest, ZoneDiscoveryRefreshWhileInfoInFlightIsSkipped) {
+  auto* zone_client = setupZoneDiscoveryWithTwoNodes();
+
+  // Zone discovery is in flight (two INFO requests outstanding). A refresh in
+  // this window must not issue another CLUSTER SLOTS request.
+  EXPECT_CALL(*client_, makeRequest_(Ref(RedisCluster::ClusterSlotsRequest::instance_), _))
+      .Times(0);
+  EXPECT_CALL(*zone_client, makeRequest_(Ref(RedisCluster::ClusterSlotsRequest::instance_), _))
+      .Times(0);
+  resolve_timer_->invokeCallback();
+
+  // The original in-flight INFO callbacks are still valid and complete normally.
+  NetworkFilters::Common::Redis::RespValuePtr info_resp_1(
+      new NetworkFilters::Common::Redis::RespValue());
+  info_resp_1->type(NetworkFilters::Common::Redis::RespType::BulkString);
+  info_resp_1->asString() = "# Server\navailability_zone:us-east-1a\n";
+  auto zone_cb_1 = std::next(client_->client_callbacks_.begin());
+  (*zone_cb_1)->onResponse(std::move(info_resp_1));
+
+  NetworkFilters::Common::Redis::RespValuePtr info_resp_2(
+      new NetworkFilters::Common::Redis::RespValue());
+  info_resp_2->type(NetworkFilters::Common::Redis::RespType::BulkString);
+  info_resp_2->asString() = "# Server\navailability_zone:us-east-1b\n";
+  zone_client->client_callbacks_.front()->onResponse(std::move(info_resp_2));
+
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  for (const auto& host : cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()) {
+    if (host->address()->asString() == "127.0.0.1:22120") {
+      EXPECT_EQ("us-east-1a", host->locality().zone());
+    } else {
+      EXPECT_EQ("us-east-1b", host->locality().zone());
+    }
+  }
+}
+
 } // namespace Redis
 } // namespace Clusters
 } // namespace Extensions
