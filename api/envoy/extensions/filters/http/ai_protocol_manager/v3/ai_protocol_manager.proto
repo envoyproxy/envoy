@@ -15,7 +15,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: AI Protocol Manager]
 // AI Protocol Manager filter
-// :ref:`configuration overview <config_http_filters_ai_protocol_manager_filter>`.
+// :ref:`configuration overview <config_http_filters_ai_protocol_manager>`.
 // [#extension: envoy.filters.http.ai_protocol_manager]
 
 // Configuration for the AI Protocol Manager filter.
