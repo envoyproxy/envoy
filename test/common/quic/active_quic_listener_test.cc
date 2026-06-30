@@ -802,8 +802,9 @@ protected:
     envoy::config::listener::v3::QuicProtocolOptions options;
     options.mutable_connection_id_generator_config()->set_name(
         "envoy.quic.mock_connection_id_generator");
-    options.mutable_connection_id_generator_config()->mutable_typed_config()->PackFrom(
-        test::common::config::DummyConfig());
+    std::ignore =
+        options.mutable_connection_id_generator_config()->mutable_typed_config()->PackFrom(
+            test::common::config::DummyConfig());
 
     return std::make_unique<ActiveQuicListenerFactory>(options, concurrency, quic_stat_names_,
                                                        validation_visitor_, listener_context_);
