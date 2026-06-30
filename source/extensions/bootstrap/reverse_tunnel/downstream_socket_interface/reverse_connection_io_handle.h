@@ -323,6 +323,18 @@ public:
   std::pair<std::string, std::string> dropTunnelFromTracking(const std::string& connection_key);
 
   /**
+   * Child DownstreamReverseConnectionIOHandles register/unregister here at construction/destruction
+   * so that, if this parent is destroyed while a tunnel connection is still draining, it can null
+   * each child's back-pointer (see cleanup()) and the child's parent() safely returns nullptr.
+   */
+  void registerChildIoHandle(DownstreamReverseConnectionIOHandle& child) {
+    child_io_handles_.insert(&child);
+  }
+  void unregisterChildIoHandle(DownstreamReverseConnectionIOHandle& child) {
+    child_io_handles_.erase(&child);
+  }
+
+  /**
    * Get reference to the cluster manager.
    * @return reference to the cluster manager
    */
@@ -477,6 +489,8 @@ private:
   absl::flat_hash_map<std::string, HostConnectionInfo> host_to_conn_info_map_;
   // Map from cluster name to set of resolved hosts
   absl::flat_hash_map<std::string, absl::flat_hash_set<std::string>> cluster_to_resolved_hosts_map_;
+  // Live child tunnel IoHandles; their back-pointers to this object are nulled on teardown.
+  absl::flat_hash_set<DownstreamReverseConnectionIOHandle*> child_io_handles_;
 
   // Core components
   const ReverseConnectionSocketConfig config_; // Configuration for reverse connections

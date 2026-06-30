@@ -55,10 +55,17 @@ public:
   const std::string& connectionKey() const { return connection_key_; }
 
   /**
-   * Parent ReverseConnectionIOHandle that owns this tunnel. Defensive nullptr return if the
-   * parent has already been torn down.
+   * Parent ReverseConnectionIOHandle that owns this tunnel, or nullptr if the parent has already
+   * been torn down (it clears this back-pointer via detachParent() on teardown). Always re-check
+   * for nullptr at the point of use rather than caching the result.
    */
   ReverseConnectionIOHandle* parent() const { return parent_; }
+
+  /**
+   * Called by the parent ReverseConnectionIOHandle when it is destroyed, so a surviving tunnel's
+   * parent() returns nullptr instead of a dangling pointer.
+   */
+  void detachParent() { parent_ = nullptr; }
 
 private:
   // The socket that this IOHandle owns and manages lifetime for.

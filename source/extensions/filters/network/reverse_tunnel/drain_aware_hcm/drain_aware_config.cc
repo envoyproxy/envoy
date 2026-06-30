@@ -44,14 +44,18 @@ Http::ServerConnectionPtr DrainAwareHttpConnectionManagerConfig::createCodec(
           &connection.getSocket()->ioHandle());
     }
     if (tunnel_iohandle != nullptr && tunnel_iohandle->parent() != nullptr) {
-      auto* owner = tunnel_iohandle->parent();
       std::string connection_key = tunnel_iohandle->connectionKey();
       ENVOY_LOG_MISC(debug, "drain_aware_hcm: wired dial-replacement-on-drain for tunnel key='{}'",
                      connection_key);
-      // markTunnelDrainingAndDialReplacement is idempotent for a given key, so both triggers can
-      // safely share the same closure.
-      auto redial = [owner, connection_key]() {
-        owner->markTunnelDrainingAndDialReplacement(connection_key);
+      // Capture the tunnel IoHandle (owned by this connection, so alive whenever the closure can
+      // fire) and resolve parent() at invocation rather than caching the raw parent pointer: the
+      // parent ReverseConnectionIOHandle may be torn down first, in which case it has nulled this
+      // back-pointer. markTunnelDrainingAndDialReplacement is idempotent, so both triggers share
+      // it.
+      auto redial = [tunnel_iohandle, connection_key]() {
+        if (auto* owner = tunnel_iohandle->parent(); owner != nullptr) {
+          owner->markTunnelDrainingAndDialReplacement(connection_key);
+        }
       };
       on_local_drain = redial;
       on_peer_goaway = redial;

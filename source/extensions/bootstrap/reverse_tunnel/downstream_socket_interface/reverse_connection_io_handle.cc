@@ -82,6 +82,13 @@ void ReverseConnectionIOHandle::emitAccessLog(const std::string& event,
 void ReverseConnectionIOHandle::cleanup() {
   ENVOY_LOG_MISC(debug, "Starting cleanup of reverse connection resources.");
 
+  // Detach any still-live child tunnel IoHandles so their parent() returns nullptr instead of a
+  // dangling pointer after this object is destroyed.
+  for (auto* child : child_io_handles_) {
+    child->detachParent();
+  }
+  child_io_handles_.clear();
+
   // Reset file events before closing trigger pipe to avoid busy loop from EOF on read FD.
   ENVOY_LOG_MISC(trace,
                  "reverse_tunnel: resetting file events before closing trigger pipe; "
