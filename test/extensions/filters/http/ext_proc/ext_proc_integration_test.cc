@@ -3777,7 +3777,7 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveTypedDynamicMetadata) {
   initializeConfig(config_option);
   HttpIntegrationTest::initialize();
 
-  auto response = sendDownstreamRequest(absl::nullopt);
+  auto response = sendDownstreamRequest(std::nullopt);
 
   testSendTypedDyanmicMetadata();
 

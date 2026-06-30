@@ -776,7 +776,7 @@ void ExtProcIntegrationTest::testSendTypedDyanmicMetadata() {
   typed_md_to_stuff.set_metadata_namespace("typed_value from ext_proc");
 
   Protobuf::Any typed_val;
-  typed_val.PackFrom(typed_md_to_stuff);
+  EXPECT_TRUE(typed_val.PackFrom(typed_md_to_stuff));
 
   processGenericMessage(*grpc_upstreams_[0], true,
                         [typed_val](const ProcessingRequest&, ProcessingResponse& resp) {

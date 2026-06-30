@@ -4404,7 +4404,7 @@ TEST_F(HttpFilterTest, EmitTypedDynamicMetadata) {
     Protobuf::Struct foobar;
     (*foobar.mutable_fields())["foo"].set_string_value("bar");
     Protobuf::Any typed_val;
-    typed_val.PackFrom(foobar);
+    EXPECT_TRUE(typed_val.PackFrom(foobar));
     (*resp.mutable_typed_dynamic_metadata())["envoy.filters.http.ext_proc"] = typed_val;
   });
 
@@ -4454,7 +4454,7 @@ TEST_F(HttpFilterTest, EmitTypedDynamicMetadataNotAllowed) {
     Protobuf::Struct foobar;
     (*foobar.mutable_fields())["foo"].set_string_value("bar");
     Protobuf::Any typed_val;
-    typed_val.PackFrom(foobar);
+    EXPECT_TRUE(typed_val.PackFrom(foobar));
     (*resp.mutable_typed_dynamic_metadata())["envoy.filters.http.ext_proc"] = typed_val;
   });
 
