@@ -195,7 +195,7 @@ TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
       cluster.set_name("cluster_1");
       expectAdd("cluster_1", "v1");
       auto* resource = resources.Add();
-      resource->mutable_resource()->PackFrom(cluster);
+      std::ignore = resource->mutable_resource()->PackFrom(cluster);
       resource->set_name("cluster_1");
       resource->set_version("v1");
     }
@@ -204,7 +204,7 @@ TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
       cluster.set_name("cluster_2");
       expectAdd("cluster_2", "v1");
       auto* resource = resources.Add();
-      resource->mutable_resource()->PackFrom(cluster);
+      std::ignore = resource->mutable_resource()->PackFrom(cluster);
       resource->set_name("cluster_2");
       resource->set_version("v1");
     }
@@ -220,7 +220,7 @@ TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
       cluster.set_name("cluster_3");
       expectAdd("cluster_3", "v3");
       auto* resource = resources.Add();
-      resource->mutable_resource()->PackFrom(cluster);
+      std::ignore = resource->mutable_resource()->PackFrom(cluster);
       resource->set_name("cluster_3");
       resource->set_version("v3");
     }

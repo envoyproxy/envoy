@@ -11,7 +11,7 @@
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/process_context.h"
 #include "envoy/stats/custom_stat_namespaces.h"
-#include "envoy/stats/store.h"
+#include "envoy/stats/scope.h"
 #include "envoy/thread/thread.h"
 
 namespace Envoy {

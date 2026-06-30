@@ -482,6 +482,15 @@ WEAK_STUB(ClusterConfigDefineHistogram,
 WEAK_STUB(ClusterConfigRecordHistogramValue,
           envoy_dynamic_module_callback_cluster_config_record_histogram_value(nullptr, 0, nullptr,
                                                                               0, 0))
+WEAK_STUB(ClusterWorkerTimerNew, envoy_dynamic_module_callback_cluster_worker_timer_new(nullptr))
+WEAK_STUB(ClusterWorkerTimerEnable,
+          envoy_dynamic_module_callback_cluster_worker_timer_enable(nullptr, 0))
+WEAK_STUB(ClusterWorkerTimerDisable,
+          envoy_dynamic_module_callback_cluster_worker_timer_disable(nullptr))
+WEAK_STUB(ClusterWorkerTimerEnabled,
+          envoy_dynamic_module_callback_cluster_worker_timer_enabled(nullptr))
+WEAK_STUB(ClusterWorkerTimerDelete,
+          envoy_dynamic_module_callback_cluster_worker_timer_delete(nullptr))
 
 WEAK_STUB(LbGetClusterName, envoy_dynamic_module_callback_lb_get_cluster_name(nullptr, nullptr))
 WEAK_STUB(LbGetHostsCount, envoy_dynamic_module_callback_lb_get_hosts_count(nullptr, 0))
@@ -1218,6 +1227,10 @@ WEAK_STUB(NetworkSetDynamicMetadataBool,
 WEAK_STUB(NetworkGetDynamicMetadataBool,
           envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(nullptr, {nullptr, 0},
                                                                           {nullptr, 0}, nullptr))
+WEAK_STUB(NetworkSetDynamicMetadataStringBatch,
+          envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(nullptr,
+                                                                                  {nullptr, 0},
+                                                                                  nullptr, 0))
 
 WEAK_STUB(ListenerFilterGetAddressType,
           envoy_dynamic_module_callback_listener_filter_get_address_type(nullptr))
@@ -1228,6 +1241,9 @@ WEAK_STUB(ListenerFilterGetDynamicMetadataNumber,
 WEAK_STUB(ListenerFilterSetDynamicMetadataNumber,
           envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(
               nullptr, {nullptr, 0}, {nullptr, 0}, 0))
+WEAK_STUB(ListenerFilterSetDynamicMetadataStringBatch,
+          envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch(
+              nullptr, {nullptr, 0}, nullptr, 0))
 
 WEAK_STUB(HttpAddDynamicMetadataListNumber,
           envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(nullptr, {nullptr, 0},

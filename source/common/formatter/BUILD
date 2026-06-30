@@ -29,6 +29,9 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/json:json_streamer_lib",
         "//source/common/json:json_utility_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:str_format",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -44,6 +47,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
         "//source/server:generic_factory_context_lib",
+        "@abseil-cpp//absl/status:statusor",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

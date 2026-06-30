@@ -1,7 +1,7 @@
 #pragma once
 
 #include <chrono>
-#include <ostream>
+#include <memory>
 
 #include "source/common/common/interval_value.h"
 

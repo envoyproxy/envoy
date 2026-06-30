@@ -5,6 +5,7 @@
 
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/trace_driver.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/tracers/datadog/tracer_stats.h"

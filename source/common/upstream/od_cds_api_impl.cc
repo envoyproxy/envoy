@@ -214,7 +214,7 @@ private:
               resource_name_,
               old_ads
                   ? makeOptRef<const envoy::config::core::v3::ConfigSource>(staticAdsConfigSource())
-                  : absl::nullopt,
+                  : std::nullopt,
               Grpc::Common::typeUrl(resource_type), *parent_.scope_, *this,
               resource_type_helper_.resourceDecoder(), {});
       RETURN_IF_NOT_OK_REF(subscription_or_error.status());

@@ -52,6 +52,12 @@ public:
 
   virtual OAuthState getState() const PURE;
 
+  /**
+   * Cancels any in-flight token request and detaches from the filter so late async completions
+   * cannot invoke filter callbacks or decoder callbacks after stream teardown.
+   */
+  virtual void cancel() PURE;
+
   // Http::AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& m) override PURE;
   void onFailure(const Http::AsyncClient::Request&,
@@ -66,11 +72,7 @@ public:
       : cm_(cm), uri_(uri), retry_policy_(std::move(retry_policy)),
         default_expires_in_(default_expires_in) {}
 
-  ~OAuth2ClientImpl() override {
-    if (in_flight_request_ != nullptr) {
-      in_flight_request_->cancel();
-    }
-  }
+  ~OAuth2ClientImpl() override { cancel(); }
 
   // OAuth2Client
   void asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
@@ -86,6 +88,8 @@ public:
   }
 
   OAuthState getState() const override { return state_; }
+
+  void cancel() override;
 
   // AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& m) override;

@@ -82,7 +82,7 @@ public:
         transport_socket->set_name("envoy.transport_sockets.tls");
         envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
         configToUseSds(*tls_context.mutable_common_tls_context(), on_demand_config);
-        transport_socket->mutable_typed_config()->PackFrom(tls_context);
+        std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
         if (!filter_state_value_.empty()) {
           const std::string set_filter_state = fmt::format(R"EOF(
           name: envoy.filters.network.set_filter_state
@@ -114,7 +114,7 @@ public:
         tls_context.set_disable_stateless_session_resumption(true);
         tls_context.set_disable_stateful_session_resumption(true);
         tls_context.mutable_require_client_certificate()->set_value(mtls_);
-        transport_socket->mutable_typed_config()->PackFrom(tls_context);
+        std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
       }
     });
     BaseTcpProxySslIntegrationTest::initialize();
@@ -160,8 +160,9 @@ public:
     // Configure config source
     setConfigSource(on_demand.mutable_config_source());
     common_tls_context.mutable_custom_tls_certificate_selector()->set_name("on-demand-config");
-    common_tls_context.mutable_custom_tls_certificate_selector()->mutable_typed_config()->PackFrom(
-        on_demand);
+    std::ignore = common_tls_context.mutable_custom_tls_certificate_selector()
+                      ->mutable_typed_config()
+                      ->PackFrom(on_demand);
   }
 
   void setConfigSource(envoy::config::core::v3::ConfigSource* config_source) {
@@ -248,7 +249,7 @@ protected:
     discovery_response.set_type_url(Config::TestTypeUrl::get().Secret);
     auto* resource = discovery_response.add_resources();
     resource->set_name(name);
-    resource->mutable_resource()->PackFrom(makeSecret(name, cert));
+    std::ignore = resource->mutable_resource()->PackFrom(makeSecret(name, cert));
     xds_stream.sendGrpcMessage(discovery_response);
   }
 

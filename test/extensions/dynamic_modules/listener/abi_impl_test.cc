@@ -1456,6 +1456,56 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullValue) 
                                                                             key_buf, value_buf);
 }
 
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStringBatch) {
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(callbacks_, setDynamicMetadata(std::string("test_ns"), testing::_))
+      .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())["test_ns"]));
+
+  char ns[] = "test_ns";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
+
+  // A batch sets every entry, and within the batch a later duplicate key wins.
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> entries = {
+      {"k1", 2, "v1", 2},
+      {"k2", 2, "v2", 2},
+      {"k1", 2, "v1b", 3},
+  };
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch(
+      filterPtr(), ns_buf, entries.data(), entries.size());
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
+      filterPtr(), ns_buf, {"k1", 2}, &result));
+  EXPECT_EQ("v1b", std::string(result.ptr, result.length));
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
+      filterPtr(), ns_buf, {"k2", 2}, &result));
+  EXPECT_EQ("v2", std::string(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStringBatchEmpty) {
+  // An empty batch is a no-op and must not set any metadata.
+  EXPECT_CALL(callbacks_, setDynamicMetadata(testing::_, testing::_)).Times(0);
+
+  char ns[] = "test_ns";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch(
+      filterPtr(), ns_buf, nullptr, 0);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStringBatchNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
+
+  char ns[] = "test_ns";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> entries = {{"k1", 2, "v1", 2}};
+  // Should not crash with null callbacks.
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch(
+      static_cast<void*>(filter.get()), ns_buf, entries.data(), entries.size());
+}
+
 // =============================================================================
 // Tests for set_filter_state.
 // =============================================================================
@@ -2064,6 +2114,32 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
   envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
 }
 
+// new_scheduler captures weak_from_this. On a make_unique-owned filter that is empty, so commit
+// never posts and onScheduled never runs. Shared ownership delivers the event. This guards the
+// scheduler half of the fix the same way the callout test guards the callout half.
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SchedulerRequiresSharedOwnership) {
+  auto unique_filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
+  unique_filter->onAccept(callbacks_);
+  auto* unique_scheduler =
+      envoy_dynamic_module_callback_listener_filter_scheduler_new(unique_filter.get());
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).Times(0);
+  envoy_dynamic_module_callback_listener_filter_scheduler_commit(unique_scheduler, 1);
+  envoy_dynamic_module_callback_listener_filter_scheduler_delete(unique_scheduler);
+  testing::Mock::VerifyAndClearExpectations(&worker_thread_dispatcher_);
+
+  auto shared_filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  shared_filter->onAccept(callbacks_);
+  auto* shared_scheduler =
+      envoy_dynamic_module_callback_listener_filter_scheduler_new(shared_filter.get());
+  Event::PostCb captured_cb;
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  }));
+  envoy_dynamic_module_callback_listener_filter_scheduler_commit(shared_scheduler, 1);
+  captured_cb();
+  envoy_dynamic_module_callback_listener_filter_scheduler_delete(shared_scheduler);
+}
+
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
        ListenerFilterConfigSchedulerCommitAfterConfigDestroyedDoesNotCrash) {
   auto* scheduler = envoy_dynamic_module_callback_listener_filter_config_scheduler_new(
@@ -2482,6 +2558,40 @@ TEST_F(DynamicModuleListenerFilterHttpCalloutTest, SendHttpCalloutSuccess) {
 
   EXPECT_CALL(request, cancel());
   filter_.reset();
+}
+
+// sendHttpCallout calls shared_from_this. On a make_unique-owned filter that throws
+// std::bad_weak_ptr. Under shared ownership the call proceeds and returns CannotCreateRequest. The
+// integration test guards the production factory wiring.
+TEST_F(DynamicModuleListenerFilterHttpCalloutTest, HttpCalloutRequiresSharedOwnership) {
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  NiceMock<Http::MockAsyncClient> async_client;
+  ON_CALL(cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillByDefault(testing::Return(&cluster));
+  ON_CALL(cluster, httpAsyncClient()).WillByDefault(testing::ReturnRef(async_client));
+  ON_CALL(async_client, send_(testing::_, testing::_, testing::_))
+      .WillByDefault(testing::Return(nullptr));
+
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {.key_ptr = ":method", .key_length = 7, .value_ptr = "GET", .value_length = 3},
+      {.key_ptr = ":path", .key_length = 5, .value_ptr = "/test", .value_length = 5},
+      {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
+  };
+  uint64_t callout_id = 0;
+
+  auto unique_filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
+  unique_filter->onAccept(callbacks_);
+  EXPECT_THROW(envoy_dynamic_module_callback_listener_filter_http_callout(
+                   unique_filter.get(), &callout_id, {"test_cluster", 12}, headers.data(),
+                   headers.size(), {nullptr, 0}, 5000),
+               std::bad_weak_ptr);
+
+  auto shared_filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  shared_filter->onAccept(callbacks_);
+  EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest,
+            envoy_dynamic_module_callback_listener_filter_http_callout(
+                shared_filter.get(), &callout_id, {"test_cluster", 12}, headers.data(),
+                headers.size(), {nullptr, 0}, 5000));
 }
 
 TEST_F(DynamicModuleListenerFilterHttpCalloutTest, SendHttpCalloutSuccessWithCallback) {

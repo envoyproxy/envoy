@@ -244,16 +244,16 @@ public:
     SharedConfig(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
                  Server::Configuration::FactoryContext& context);
     const TcpProxyStats& stats() { return stats_; }
-    const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
+    const std::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
     bool flushAccessLogOnConnected() const { return flush_access_log_on_connected_; }
     bool flushAccessLogOnStart() const { return flush_access_log_on_start_; }
-    const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
+    const std::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
       return max_downstream_connection_duration_;
     }
-    const absl::optional<double>& maxDownstreamConnectionDurationJitterPercentage() const {
+    const std::optional<double>& maxDownstreamConnectionDurationJitterPercentage() const {
       return max_downstream_connection_duration_jitter_percentage_;
     }
-    const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const {
+    const std::optional<std::chrono::milliseconds>& accessLogFlushInterval() const {
       return access_log_flush_interval_;
     }
     TunnelingConfigHelperOptConstRef tunnelingConfigHelper() {
@@ -296,10 +296,10 @@ public:
     const TcpProxyStats stats_;
     bool flush_access_log_on_connected_ : 1;
     const bool flush_access_log_on_start_ : 1;
-    absl::optional<std::chrono::milliseconds> idle_timeout_;
-    absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
-    absl::optional<double> max_downstream_connection_duration_jitter_percentage_;
-    absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
+    std::optional<std::chrono::milliseconds> idle_timeout_;
+    std::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
+    std::optional<double> max_downstream_connection_duration_jitter_percentage_;
+    std::optional<std::chrono::milliseconds> access_log_flush_interval_;
     std::unique_ptr<TunnelingConfigHelper> tunneling_config_helper_;
     std::unique_ptr<OnDemandConfig> on_demand_config_;
     BackOffStrategyPtr backoff_strategy_;
@@ -329,18 +329,18 @@ public:
   const TcpProxyStats& stats() { return shared_config_->stats(); }
   const AccessLog::InstanceSharedPtrVector& accessLogs() { return access_logs_; }
   uint32_t maxConnectAttempts() const { return max_connect_attempts_; }
-  const absl::optional<std::chrono::milliseconds>& idleTimeout() {
+  const std::optional<std::chrono::milliseconds>& idleTimeout() {
     return shared_config_->idleTimeout();
   }
-  const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
+  const std::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
     return shared_config_->maxDownstreamConnectionDuration();
   }
-  const absl::optional<double>& maxDownstreamConnectionDurationJitterPercentage() const {
+  const std::optional<double>& maxDownstreamConnectionDurationJitterPercentage() const {
     return shared_config_->maxDownstreamConnectionDurationJitterPercentage();
   }
-  const absl::optional<std::chrono::milliseconds>
+  const std::optional<std::chrono::milliseconds>
   calculateMaxDownstreamConnectionDurationWithJitter();
-  const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const {
+  const std::optional<std::chrono::milliseconds>& accessLogFlushInterval() const {
     return shared_config_->accessLogFlushInterval();
   }
   // Return nullptr if there is no tunneling config.
@@ -378,7 +378,7 @@ public:
     return upstream_connect_mode_;
   }
 
-  const absl::optional<uint32_t>& maxEarlyDataBytes() const { return max_early_data_bytes_; }
+  const std::optional<uint32_t>& maxEarlyDataBytes() const { return max_early_data_bytes_; }
   bool checkDrainClose() const { return check_drain_close_; }
   const Network::DrainDecision& drainDecision() const { return drain_decision_; }
   Network::DrainDirection drainCloseScope() const { return drain_close_scope_; }
@@ -437,7 +437,7 @@ private:
   Regex::Engine& regex_engine_; // Static lifetime object, safe to store as a reference
   envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode upstream_connect_mode_{
       envoy::extensions::filters::network::tcp_proxy::v3::IMMEDIATE};
-  absl::optional<uint32_t> max_early_data_bytes_;
+  std::optional<uint32_t> max_early_data_bytes_;
   const Network::DrainDecision& drain_decision_;
   const Network::DrainDirection drain_close_scope_{};
   const bool check_drain_close_{false};
@@ -452,7 +452,7 @@ class PerConnectionCluster : public StreamInfo::FilterState::Object {
 public:
   PerConnectionCluster(absl::string_view cluster) : cluster_(cluster) {}
   const std::string& value() const { return cluster_; }
-  absl::optional<std::string> serializeAsString() const override { return cluster_; }
+  std::optional<std::string> serializeAsString() const override { return cluster_; }
   static const std::string& key();
 
 private:
@@ -489,7 +489,7 @@ public:
 
   // Upstream::LoadBalancerContext
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override;
-  absl::optional<uint64_t> computeHashKey() override {
+  std::optional<uint64_t> computeHashKey() override {
     auto hash_policy = config_->hashPolicy();
     if (hash_policy) {
       return hash_policy->generateHash(*downstreamConnection());
@@ -595,8 +595,8 @@ public:
     void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {}
     void sendLocalReply(Http::Code, absl::string_view,
                         std::function<void(Http::ResponseHeaderMap& headers)>,
-                        const absl::optional<Grpc::Status::GrpcStatus>,
-                        absl::string_view) override {}
+                        const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) override {
+    }
     void sendGoAwayAndClose(bool graceful [[maybe_unused]] = false) override {}
     void encode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
     Http::ResponseHeaderMapOptRef informationalHeaders() override { return {}; }
@@ -639,8 +639,8 @@ public:
     OptRef<Http::DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return {}; }
     OptRef<Http::UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {}; }
     void resetIdleTimer() override {}
-    // absl::optional<absl::string_view> upstreamOverrideHost() const override {
-    //   return absl::nullopt;
+    // std::optional<absl::string_view> upstreamOverrideHost() const override {
+    //   return std::nullopt;
     // }
     absl::string_view filterConfigName() const override { return ""; }
 
@@ -742,12 +742,12 @@ protected:
   // Time the filter first attempted to connect to the upstream after the
   // cluster is discovered. Capture the first time as the filter may try multiple times to connect
   // to the upstream.
-  absl::optional<MonotonicTime> initial_upstream_connection_start_time_;
+  std::optional<MonotonicTime> initial_upstream_connection_start_time_;
   RouteConstSharedPtr route_;
   Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::Socket::OptionsSharedPtr upstream_options_;
-  absl::optional<std::chrono::milliseconds> idle_timeout_;
+  std::optional<std::chrono::milliseconds> idle_timeout_;
   uint32_t connect_attempts_{};
   bool connecting_{};
   bool downstream_closed_{};
@@ -780,7 +780,7 @@ public:
   Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedPtr& config,
           const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
           Tcp::ConnectionPool::ConnectionDataPtr&& conn_data, Event::TimerPtr&& idle_timer,
-          absl::optional<std::chrono::milliseconds> idle_timeout,
+          std::optional<std::chrono::milliseconds> idle_timeout,
           const Upstream::HostDescriptionConstSharedPtr& upstream_host);
 
   void onEvent(Network::ConnectionEvent event);
@@ -795,7 +795,7 @@ private:
   std::shared_ptr<Filter::UpstreamCallbacks> callbacks_;
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
   Event::TimerPtr idle_timer_;
-  absl::optional<std::chrono::milliseconds> idle_timeout_;
+  std::optional<std::chrono::milliseconds> idle_timeout_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   Config::SharedConfigSharedPtr config_;
 };
@@ -808,7 +808,7 @@ public:
   void add(const Config::SharedConfigSharedPtr& config,
            Tcp::ConnectionPool::ConnectionDataPtr&& upstream_conn_data,
            const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
-           Event::TimerPtr&& idle_timer, absl::optional<std::chrono::milliseconds> idle_timeout,
+           Event::TimerPtr&& idle_timer, std::optional<std::chrono::milliseconds> idle_timeout,
            const Upstream::HostDescriptionConstSharedPtr& upstream_host);
   void remove(Drainer& drainer, Event::Dispatcher& dispatcher);
 

@@ -1,22 +1,32 @@
 #pragma once
 
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
 #include <vector>
 
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/common/pure.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/filter/config_provider_manager.h"
+#include "envoy/network/address.h"
+#include "envoy/network/connection_handler.h"
 #include "envoy/network/filter.h"
-#include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
+#include "envoy/network/socket.h"
 #include "envoy/network/socket_interface.h"
 #include "envoy/server/api_listener.h"
 #include "envoy/server/drain_manager.h"
-#include "envoy/server/filter_config.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/server/guarddog.h"
 
 #include "source/common/protobuf/protobuf.h"
+
+#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Filter {

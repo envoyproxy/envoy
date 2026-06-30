@@ -20,12 +20,12 @@ public:
       callback(pair.first, pair.second);
     }
   }
-  absl::optional<absl::string_view> get(absl::string_view key) const override {
+  std::optional<absl::string_view> get(absl::string_view key) const override {
     auto iter = data_.find(key);
     if (iter == data_.end()) {
-      return absl::nullopt;
+      return std::nullopt;
     }
-    return absl::make_optional<absl::string_view>(iter->second);
+    return std::make_optional<absl::string_view>(iter->second);
   }
   void set(absl::string_view key, absl::string_view val) override { data_[key] = std::string(val); }
   void erase(absl::string_view key) override { data_.erase(key); }
@@ -102,7 +102,7 @@ public:
         data.emplace(pair);
       }
 
-      absl::optional<uint64_t> stream_id;
+      std::optional<uint64_t> stream_id;
       bool end_stream = true;
       bool one_way_stream = false;
 
@@ -246,7 +246,7 @@ public:
       return response;
     }
 
-    absl::optional<uint32_t> message_size_;
+    std::optional<uint32_t> message_size_;
     Buffer::OwnedImpl buffer_;
     Buffer::OwnedImpl encoding_buffer_;
     ServerCodecCallbacks* callback_{};
@@ -272,7 +272,7 @@ public:
         data.emplace(pair);
       }
 
-      absl::optional<uint64_t> stream_id;
+      std::optional<uint64_t> stream_id;
       bool end_stream = true;
       bool close_connection = false;
 
@@ -407,7 +407,7 @@ public:
       return encoded_size;
     }
 
-    absl::optional<uint32_t> message_size_;
+    std::optional<uint32_t> message_size_;
     Buffer::OwnedImpl buffer_;
     Buffer::OwnedImpl encoding_buffer_;
     ClientCodecCallbacks* callback_{};

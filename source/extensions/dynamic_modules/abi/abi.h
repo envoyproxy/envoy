@@ -529,7 +529,9 @@ bool envoy_dynamic_module_callback_is_validation_mode();
  * cross-module interactions.
  *
  * Registration is typically done once during bootstrap (e.g., in on_server_initialized). The
- * function pointer must remain valid for the lifetime of the process.
+ * function pointer must remain valid for the lifetime of the process, so a module that registers
+ * functions must be loaded with do_not_close set to true to avoid being unloaded while the registry
+ * still hands out the pointer.
  *
  * Callers are responsible for agreeing on the function signature out-of-band, since the registry
  * stores opaque void* pointers — analogous to dlsym semantics.
@@ -576,7 +578,9 @@ bool envoy_dynamic_module_callback_get_function(envoy_dynamic_module_type_module
  * Callers are responsible for managing the lifetime of overwritten data pointers.
  *
  * Registration is typically done once during bootstrap (e.g., in on_server_initialized or
- * on_scheduled). The data pointer must remain valid for the lifetime of the process.
+ * on_scheduled). The data pointer must remain valid while reachable through the registry. A module
+ * that registers a pointer into its own memory must either be loaded with do_not_close set to true
+ * or overwrite the pointer on each reload before any consumer reads it.
  *
  * This is thread-safe and can be called from any thread.
  *
@@ -2463,6 +2467,10 @@ envoy_dynamic_module_callback_http_filter_scheduler_new(
  *
  * This can be called multiple times to schedule multiple events to the same filter.
  *
+ * This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+ * module must join or quiesce any thread that may call this before worker shutdown so a scheduled
+ * event cannot race the worker dispatcher teardown.
+ *
  * @param scheduler_module_ptr is the pointer to the HTTP filter scheduler created by
  * envoy_dynamic_module_callback_http_filter_scheduler_new.
  * @param event_id is the ID of the event. This can be used to differentiate between multiple
@@ -4250,6 +4258,25 @@ bool envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer key, bool* result);
 
+/**
+ * envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch is called by the module
+ * to set multiple string-valued dynamic metadata entries under a single namespace in one call. It
+ * is equivalent to calling envoy_dynamic_module_callback_network_set_dynamic_metadata_string once
+ * per entry but resolves the namespace and merges into the metadata struct only once. Existing
+ * entries with the same key are overwritten. Within a single call, a later entry overwrites an
+ * earlier entry with the same key. An empty array is a no-op and does not create the namespace.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param entries is the pointer to an array of key-value pairs whose values are set as strings. It
+ * may be null only when entries_size is zero.
+ * @param entries_size is the number of entries in the array.
+ */
+void envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
+
 // ------------------------------ HTTP Callouts -------------------------------
 
 /**
@@ -4702,6 +4729,10 @@ envoy_dynamic_module_callback_network_filter_scheduler_new(
  * event hook on the worker thread.
  *
  * This can be called multiple times to schedule multiple events to the same filter.
+ *
+ * This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+ * module must join or quiesce any thread that may call this before worker shutdown so a scheduled
+ * event cannot race the worker dispatcher teardown.
  *
  * @param scheduler_module_ptr is the pointer to the network filter scheduler created by
  * envoy_dynamic_module_callback_network_filter_scheduler_new.
@@ -5647,6 +5678,26 @@ void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(
     envoy_dynamic_module_type_module_buffer key, double value);
 
 /**
+ * envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch is called by the
+ * module to set multiple string-valued dynamic metadata entries under a single namespace in one
+ * call. It is equivalent to calling
+ * envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string once per entry but
+ * resolves the namespace and merges into the metadata struct only once. Existing entries with the
+ * same key are overwritten. Within a single call, a later entry overwrites an earlier entry with
+ * the same key. An empty array is a no-op and does not create the namespace.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_namespace is the namespace of the metadata.
+ * @param entries is the pointer to an array of key-value pairs whose values are set as strings. It
+ * may be null only when entries_size is zero.
+ * @param entries_size is the number of entries in the array.
+ */
+void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
+
+/**
  * envoy_dynamic_module_callback_listener_filter_max_read_bytes is called by the
  * module to determine the maximum number of bytes to read from the socket.
  *
@@ -5918,6 +5969,10 @@ envoy_dynamic_module_callback_listener_filter_scheduler_new(
  * event hook on the worker thread.
  *
  * This can be called multiple times to schedule multiple events to the same filter.
+ *
+ * This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+ * module must join or quiesce any thread that may call this before worker shutdown so a scheduled
+ * event cannot race the worker dispatcher teardown.
  *
  * @param scheduler_module_ptr is the pointer to the listener filter scheduler created by
  * envoy_dynamic_module_callback_listener_filter_scheduler_new.
@@ -9179,6 +9234,21 @@ typedef void* envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr;
  */
 typedef void* envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr;
 
+/**
+ * envoy_dynamic_module_type_cluster_worker_timer_module_ptr is a raw pointer to the
+ * DynamicModuleClusterWorkerTimer class in Envoy. The timer runs on the worker thread that created
+ * it (the dispatcher captured during envoy_dynamic_module_on_cluster_lb_choose_host), so the timer,
+ * its callback, and its deletion are all confined to a single worker thread.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module when the timer is
+ * no longer needed. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new and the destruction is done by
+ * envoy_dynamic_module_callback_cluster_worker_timer_delete. Since its lifecycle is owned/managed
+ * by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_cluster_worker_timer_module_ptr;
+
 // =============================================================================
 // Cluster Event Hooks
 // =============================================================================
@@ -9424,6 +9494,27 @@ void envoy_dynamic_module_on_cluster_http_callout_done(
     envoy_dynamic_module_type_http_callout_result result,
     envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size);
+
+/**
+ * envoy_dynamic_module_on_cluster_worker_timer_fired is called when a timer created by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new fires. It runs on the worker thread that
+ * created the timer, so it can safely touch that worker's per-load-balancer state without
+ * synchronization.
+ *
+ * This is optional. Only modules that create worker timers need to implement it.
+ *
+ * The timer is one-shot per Envoy semantics; the module re-arms it by calling
+ * envoy_dynamic_module_callback_cluster_worker_timer_enable again for periodic behavior.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy-side load balancer, usable with the cluster LB
+ * callbacks (e.g. host queries) for the duration of this call.
+ * @param lb_module_ptr is the pointer to the in-module load balancer that owns the timer.
+ * @param timer_ptr is the pointer to the timer that fired.
+ */
+void envoy_dynamic_module_on_cluster_worker_timer_fired(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_cluster_lb_module_ptr lb_module_ptr,
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr timer_ptr);
 
 // =============================================================================
 // Cluster Dynamic Module Callbacks
@@ -9999,6 +10090,87 @@ envoy_dynamic_module_callback_cluster_worker_slot_get(
 void envoy_dynamic_module_callback_cluster_get_name(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result);
+
+// -------------------- Cluster Dynamic Module Callbacks - Worker Timer --------------------
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_timer_new creates a new timer on the calling
+ * worker thread's dispatcher. The timer is not enabled upon creation; the module must call
+ * envoy_dynamic_module_callback_cluster_worker_timer_enable to arm it.
+ *
+ * This must be called on a worker thread from within an
+ * envoy_dynamic_module_on_cluster_lb_choose_host call, so that the worker dispatcher has been
+ * captured for this load balancer. When the timer fires,
+ * envoy_dynamic_module_on_cluster_worker_timer_fired is called on the same worker thread.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy-side load balancer. The module receives this as
+ * the second parameter to envoy_dynamic_module_on_cluster_lb_new.
+ * @return the pointer to the created timer, or NULL if no worker dispatcher has been captured yet
+ * (no choose_host has run on this worker).
+ *
+ * NOTE: it is the caller's responsibility to delete the timer using
+ * envoy_dynamic_module_callback_cluster_worker_timer_delete when it is no longer needed, on the
+ * same worker thread.
+ */
+envoy_dynamic_module_type_cluster_worker_timer_module_ptr
+envoy_dynamic_module_callback_cluster_worker_timer_new(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_timer_enable enables the timer with a given delay.
+ * If the timer is already enabled, it is reset to the new delay.
+ *
+ * This must be called on the worker thread that created the timer.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new.
+ * @param delay_milliseconds is the delay in milliseconds before the timer fires.
+ */
+void envoy_dynamic_module_callback_cluster_worker_timer_enable(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr timer_ptr,
+    uint64_t delay_milliseconds);
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_timer_disable disables the timer without destroying
+ * it. The timer can be re-enabled later using
+ * envoy_dynamic_module_callback_cluster_worker_timer_enable.
+ *
+ * This must be called on the worker thread that created the timer.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new.
+ */
+void envoy_dynamic_module_callback_cluster_worker_timer_disable(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr timer_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_timer_enabled checks whether the timer is currently
+ * armed.
+ *
+ * This must be called on the worker thread that created the timer.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new.
+ * @return true if the timer is currently enabled, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_worker_timer_enabled(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr timer_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_timer_delete deletes a timer created by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new. The timer is automatically disabled
+ * before deletion.
+ *
+ * This must be called on the worker thread that created the timer. The underlying Envoy timer
+ * `deregisters` from that worker dispatcher's timer list in its destructor, so invoking this
+ * callback from any other thread is undefined behavior. Same-thread ordering with
+ * envoy_dynamic_module_on_cluster_worker_timer_fired guarantees the timer cannot fire after delete.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new.
+ */
+void envoy_dynamic_module_callback_cluster_worker_timer_delete(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr timer_ptr);
 
 // =============================================================================
 // Cluster Dynamic Module Callbacks - Metrics

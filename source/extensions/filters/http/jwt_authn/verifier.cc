@@ -168,7 +168,7 @@ public:
 
   void verify(ContextSharedPtr context) const override {
     auto& ctximpl = static_cast<ContextImpl&>(*context);
-    auto auth = auth_factory_.create(nullptr, absl::nullopt, true, true);
+    auto auth = auth_factory_.create(nullptr, std::nullopt, true, true);
     extractor_->sanitizeHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
@@ -200,7 +200,7 @@ public:
     ENVOY_LOG(debug, "Called AllowMissingVerifierImpl.verify : {}", __func__);
 
     auto& ctximpl = static_cast<ContextImpl&>(*context);
-    auto auth = auth_factory_.create(nullptr, absl::nullopt, false /* allow failed */,
+    auto auth = auth_factory_.create(nullptr, std::nullopt, false /* allow failed */,
                                      true /* allow missing */);
     extractor_->sanitizeHeaders(ctximpl.headers());
     auth->verify(
@@ -402,7 +402,7 @@ public:
     // allow_missing=true keeps "no token" reported as Ok via the missing
     // path. The verifier itself collapses any remaining failure into Ok
     // below, since extract-only mode never fails the request.
-    auto auth = auth_factory_.create(nullptr, absl::nullopt,
+    auto auth = auth_factory_.create(nullptr, std::nullopt,
                                      /*=allow failed*/ false,
                                      /*=allow missing*/ true);
 

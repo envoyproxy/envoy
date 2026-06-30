@@ -21,9 +21,9 @@ MockTransportSocket::MockTransportSocket() {
     return TransportSocket::connect(socket);
   }));
   ON_CALL(*this, doRead(_))
-      .WillByDefault(Return(IoResult{PostIoAction::KeepOpen, 0, false, absl::nullopt}));
+      .WillByDefault(Return(IoResult{PostIoAction::KeepOpen, 0, false, std::nullopt}));
   ON_CALL(*this, doWrite(_, _))
-      .WillByDefault(Return(IoResult{PostIoAction::KeepOpen, 0, false, absl::nullopt}));
+      .WillByDefault(Return(IoResult{PostIoAction::KeepOpen, 0, false, std::nullopt}));
 }
 
 MockTransportSocket::~MockTransportSocket() = default;

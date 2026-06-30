@@ -23,12 +23,14 @@ class WorkloadMetadataProvider {
 public:
   virtual ~WorkloadMetadataProvider() = default;
   virtual std::optional<Istio::Common::WorkloadMetadataObject>
-  getMetadata(const Network::Address::InstanceConstSharedPtr& address) PURE;
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  GetMetadata(const Network::Address::InstanceConstSharedPtr& address) PURE;
 };
 
 using WorkloadMetadataProviderSharedPtr = std::shared_ptr<WorkloadMetadataProvider>;
 
-WorkloadMetadataProviderSharedPtr getProvider(Server::Configuration::ServerFactoryContext& context);
+// NOLINTNEXTLINE(readability-identifier-naming)
+WorkloadMetadataProviderSharedPtr GetProvider(Server::Configuration::ServerFactoryContext& context);
 
 } // namespace WorkloadDiscovery
 } // namespace Common
