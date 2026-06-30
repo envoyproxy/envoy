@@ -1554,21 +1554,7 @@ TEST_P(GrpcMuxImplTest, XdsConfigTrackerUnsubscriptionTest) {
 
   grpc_mux_ = std::make_unique<XdsMux::GrpcMuxSotw>(grpc_mux_context);
   // We do NOT call setup() here because it would overwrite grpc_mux_ with a
-  // default one that has no tracker. Instead, we manually trigger what setup()
-  // does if needed, or just rely on our manual grpc_mux_ initialization.
-  // Actually, GrpcMuxImplTestBase::setup() also initializes other things, but
-  // most importantly it sets grpc_mux_. If we want to use a custom tracker, we
-  // should either:
-  // 1. Modify GrpcMuxImplTestBase to allow passing a tracker to setup().
-  // 2. Or just manually initialize grpc_mux_ and NOT call setup().
-  // Let's see what setup() does: it just calls GrpcMuxSotw constructor.
-  // So we don't need to call setup() if we do it manually.
-  // However, we might need to initialize async_client_ and other things. They
-  // are already initialized in GrpcMuxImplTestBase constructor. So we are good.
-  // We just need to remove the setup() call.
-
-  // Enable verbose logging for config to see what's happening
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  // default one that has no tracker.
 
   // 1. Add watch1 for {"x", "y"}
   auto watch1 = grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_, resource_decoder_, {});
