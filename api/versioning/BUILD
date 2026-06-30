@@ -284,6 +284,7 @@ proto_library(
         "//envoy/extensions/http/stateful_session/envelope/v3:pkg",
         "//envoy/extensions/http/stateful_session/header/v3:pkg",
         "//envoy/extensions/internal_redirect/allow_listed_routes/v3:pkg",
+        "//envoy/extensions/internal_redirect/filter_state/v3:pkg",
         "//envoy/extensions/internal_redirect/previous_routes/v3:pkg",
         "//envoy/extensions/internal_redirect/safe_cross_scheme/v3:pkg",
         "//envoy/extensions/key_value/file_based/v3:pkg",

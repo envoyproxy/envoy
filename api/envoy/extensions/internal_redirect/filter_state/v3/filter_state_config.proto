@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package envoy.extensions.internal_redirect.filter_state.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.internal_redirect.filter_state.v3";
+option java_outer_classname = "FilterStateConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/internal_redirect/filter_state/v3;filter_statev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Filter-state internal redirect predicate]
+
+// An internal redirect predicate that decides whether to follow a redirect by
+// comparing a filter-state string object — set earlier in the request by another
+// filter (Lua, ext_proc, ``set_filter_state``, a dynamic module, ...) — against
+// a configured value. This lets a request-phase filter decide, per request,
+// whether an otherwise-enabled internal redirect is actually taken, without
+// changing route matching.
+//
+// The predicate reads the filter-state object named ``filter_state_key`` (a
+// string object, e.g. one produced by the ``envoy.string`` object factory) and:
+//
+// * with ``allow_value``: follows the redirect only when the value equals it;
+// * with ``deny_value``: follows the redirect unless the value equals it;
+// * when the object is absent: ``allow_if_absent`` decides (default: do not
+//   follow), giving an opt-in posture.
+//
+// Rich, request-time logic (tenant, JWT claim, header, time-of-day, rollout %)
+// belongs in the filter that *sets* the value; this predicate is a thin reader
+// performing a single string comparison.
+// [#extension: envoy.internal_redirect_predicates.filter_state]
+message FilterStateConfig {
+  // Name of the filter-state string object to read. Must be non-empty.
+  string filter_state_key = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Exactly one of ``allow_value`` / ``deny_value`` must be set; it fixes both
+  // the polarity of the gate and the value to compare against.
+  oneof policy {
+    option (validate.required) = true;
+
+    // Follow the redirect only when the filter-state value equals this.
+    string allow_value = 2;
+
+    // Skip the redirect (proxy the 3xx downstream) when the filter-state value
+    // equals this; follow the redirect otherwise.
+    string deny_value = 3;
+  }
+
+  // Decision when the filter-state object is absent. Defaults to false (do not
+  // follow the redirect), which gives an opt-in posture: the redirect fires only
+  // when a filter explicitly set the gate.
+  bool allow_if_absent = 4;
+}
