@@ -26,6 +26,7 @@
 #include "envoy/server/options.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/ssl/context_manager.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/store.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/thread_local/thread_local.h"
