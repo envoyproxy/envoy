@@ -883,8 +883,10 @@ FilterConfigPerRoute::FilterConfigPerRoute(
         Config::DataSource::read(config.source_code(), true, context.api()), std::string);
     // Track per-route VMs in the server root scope. The root scope has server lifetime,
     // so no scope_keeper is needed — vm_count_ will remain valid for the filter's lifetime.
-    Stats::Gauge& per_route_vm_count =
-        context.scope().gaugeFromString("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate);
+    Stats::StatNameManagedStorage vm_count_stat_name("lua.lua_vm_count",
+                                                     context.scope().symbolTable());
+    Stats::Gauge& per_route_vm_count = context.scope().gaugeFromStatName(
+        vm_count_stat_name.statName(), Stats::Gauge::ImportMode::Accumulate);
     per_lua_code_setup_ptr_ =
         std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal(), &per_route_vm_count);
   }
