@@ -303,9 +303,6 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerPartialUpdate) {
 }
 
 TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerUnsubscription) {
-  // Enable debug logging to trace the crash.
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
-
   // Add ADS config to support EDS clusters using ADS, and make CDS use ADS.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto api_type = bootstrap.dynamic_resources().cds_config().api_config_source().api_type();
