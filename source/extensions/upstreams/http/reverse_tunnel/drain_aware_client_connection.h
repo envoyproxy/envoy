@@ -24,11 +24,9 @@ namespace Http {
 namespace ReverseTunnel {
 
 /**
- * Wraps the codec connection callbacks so the upstream (client) side can observe a peer GOAWAY on
- * a reverse tunnel. When the downstream (HTTP server) emits GOAWAY as it drains or rotates a
- * tunnel, the upstream client codec calls back into these callbacks with onGoAway(),
- * which we log + count before forwarding to the real callbacks so the pool's normal drain handling
- * is preserved. (Reporter wiring is intentionally deferred per design; log + stat for now.)
+ * Wraps the codec connection callbacks so the upstream (client) side observes a peer GOAWAY: a
+ * received GOAWAY is logged and counted, then forwarded so the pool's normal drain handling is
+ * preserved.
  */
 class DrainAwareClientCallbacks : public Envoy::Http::ConnectionCallbacks,
                                   public Logger::Loggable<Logger::Id::client> {
@@ -49,15 +47,10 @@ public:
     inner_.onMaxStreamsChanged(num_streams);
   }
 
-  // Ask the connection pool to gracefully drain THIS connection by driving the codec's onGoAway
-  // into the pool's active client (MultiplexedActiveClientBase::onGoAway): the pool stops assigning
-  // new streams to this connection, lets in-flight streams finish, and closes it once idle. After
-  // that, new egress requests are served by the downstream's replacement tunnel.
-  //
-  // We invoke this ourselves because the drain GOAWAY is emitted out-of-band (the peer did not send
-  // it), so the pool would otherwise never learn this connection is draining and would keep
-  // multiplexing new requests onto it. This is the local-drain path, so it is NOT counted as a
-  // received peer GOAWAY (goaway_received_ is left untouched).
+  // Drive onGoAway into the pool's active client so the pool drains THIS connection (no new
+  // streams, in-flight finish, close when idle). Needed because our drain GOAWAY is emitted
+  // out-of-band, so the pool would not otherwise stop multiplexing onto it. This is a local drain,
+  // not a received peer GOAWAY, so goaway_received_ is left untouched.
   void drainOwnPoolConnection() { inner_.onGoAway(Envoy::Http::GoAwayErrorCode::NoError); }
 
 private:
@@ -66,18 +59,15 @@ private:
 };
 
 /**
- * Decorates an upstream HTTP/2 client codec for reverse-tunnel clusters, where the TCP
- * client/server roles are reversed relative to the HTTP roles. It owns a DrainAwareClientCallbacks
- * wrapper (installed at codec construction so received GOAWAY frames are observed) and forwards
- * every ClientConnection call to the wrapped codec. goAway()/shutdownNotice() are the hooks for
- * emitting a drain GOAWAY to the peer.
+ * Decorates an upstream HTTP/2 client codec for reverse-tunnel clusters so it can emit a drain
+ * GOAWAY to the peer. Owns the DrainAwareClientCallbacks wrapper and forwards every
+ * ClientConnection call to the wrapped codec.
  */
 class DrainAwareClientConnection : public Envoy::Http::ClientConnection,
                                    public Logger::Loggable<Logger::Id::client> {
 public:
-  // `h2_codec` is a non-owning, typed view of `inner` when the inner codec is our HTTP/2 subclass
-  // (it is the same object as `inner`). It is used to emit the graceful first GOAWAY; nullptr
-  // disables the two-phase send and falls back to shutdownNotice().
+  // `h2_codec` is a typed, non-owning view of `inner` (the same object) used to emit the graceful
+  // first GOAWAY; nullptr falls back to shutdownNotice().
   DrainAwareClientConnection(Envoy::Http::ClientConnectionPtr inner,
                              std::unique_ptr<DrainAwareClientCallbacks> callbacks,
                              const ReverseTunnelUpstreamCodecStats& stats,
@@ -122,16 +112,13 @@ public:
     } else {
       inner_->shutdownNotice();
     }
-    // Phase 2: after the drain window, send the final GOAWAY (real last-stream-id) and gracefully
-    // DRAIN this connection out of the upstream pool -- we deliberately do NOT force-close it.
-    // Draining makes the pool stop assigning new streams here (new egress requests rebuild onto the
-    // downstream's replacement tunnel, or fast-fail to a retryable 503 if none is cached) while
-    // in-flight requests finish on this connection; the pool closes it once idle. A hard close
-    // would abort in-flight requests, which is exactly what we want to avoid.
+    // Phase 2: after the drain window, send the final GOAWAY and gracefully drain this connection
+    // out of the pool. We deliberately do NOT force-close it: a hard close would abort in-flight
+    // requests, whereas draining lets them finish while new requests move to the replacement
+    // tunnel.
     drain_timer_ = dispatcher_.createTimer([this]() {
-      ENVOY_LOG(debug, "reverse_tunnel upstream codec: drain timer fired; sending final GOAWAY and "
-                       "draining the pool connection (in-flight requests finish; new requests use "
-                       "the replacement tunnel)");
+      ENVOY_LOG(debug,
+                "reverse_tunnel upstream codec: drain timer fired; final GOAWAY + pool drain");
       stats_.goaway_sent_.inc();
       inner_->goAway();
       // NOTE: if this connection is already idle the pool closes it here, which may deferred-delete

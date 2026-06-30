@@ -21,10 +21,9 @@ class DrainAwareClientConnection;
 
 /**
  * Process-global, thread-local-backed registry of active drain-aware reverse-tunnel client codecs,
- * keyed by cluster name. Codecs register on their worker thread at construction and unregister at
- * destruction. The admin endpoint (main thread) uses drainCluster()/drainAll() to fan a graceful
- * drain out to every registered codec via runOnAllThreads(). This keeps the graceful drain fully
- * in the extension layer (no core conn-pool change).
+ * keyed by cluster name. Codecs register/unregister on their worker thread at construction/
+ * destruction; the admin endpoint calls drainCluster() to fan a graceful drain out to every
+ * registered codec via runOnAllThreads(), keeping the drain logic in the extension layer.
  */
 class UpstreamCodecDrainRegistry : public Singleton::Instance {
 public:
