@@ -1456,7 +1456,7 @@ bool FilterManager::hasSavedResponseMetadata() const {
       continue;
     }
     for (const auto& metadata_map : *entry->saved_response_metadata_) {
-      if (!metadata_map->empty()) {
+      if (metadata_map != nullptr && !metadata_map->empty()) {
         return true;
       }
     }
@@ -1467,19 +1467,19 @@ bool FilterManager::hasSavedResponseMetadata() const {
 void FilterManager::encodeSavedResponseMetadataToCodec() {
   // A direct local reply skips the remaining encoder filters, so saved metadata must also bypass
   // filter iteration and be flushed straight to the codec before the stream is ended.
-  for (auto entry = encoder_filters_.begin(); entry != encoder_filters_.end(); ++entry) {
-    if ((*entry)->saved_response_metadata_ == nullptr) {
+  for (auto& entry : encoder_filters_.entries_) {
+    if (entry->saved_response_metadata_ == nullptr) {
       continue;
     }
-    for (auto& metadata_map : *(*entry)->saved_response_metadata_) {
-      if (!metadata_map->empty()) {
+    for (auto& metadata_map : *entry->saved_response_metadata_) {
+      if (metadata_map != nullptr && !metadata_map->empty()) {
         filter_manager_callbacks_.encodeMetadata(std::move(metadata_map));
         if (state_.saw_downstream_reset_) {
           return;
         }
       }
     }
-    (*entry)->saved_response_metadata_->clear();
+    entry->saved_response_metadata_->clear();
   }
 }
 
@@ -1928,6 +1928,14 @@ void ActiveStreamEncoderFilter::handleMetadataAfterHeadersCallback() {
   if (parent_.state_.recreated_stream_) {
     // The stream has been recreated. In this case, there's no reason to encode saved metadata.
     getSavedResponseMetadata()->clear();
+    return;
+  }
+  if (parent_.state_.encoder_filter_chain_aborted_) {
+    // A local reply has stopped encoder iteration. Saved response metadata is either flushed
+    // directly to the codec by the local reply path or discarded when that path is disabled.
+    if (saved_response_metadata_ != nullptr) {
+      getSavedResponseMetadata()->clear();
+    }
     return;
   }
 
