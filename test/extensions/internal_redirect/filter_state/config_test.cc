@@ -52,7 +52,23 @@ protected:
   Router::InternalRedirectPredicateFactory* factory_;
 };
 
-TEST_F(FilterStateTest, FactoryRegistered) { ASSERT_NE(factory_, nullptr); }
+TEST_F(FilterStateTest, FactoryRegistered) {
+  ASSERT_NE(factory_, nullptr);
+  EXPECT_EQ(factory_->name(), "envoy.internal_redirect_predicates.filter_state");
+}
+
+TEST_F(FilterStateTest, FactoryCreatesEmptyConfigProto) {
+  auto proto = factory_->createEmptyConfigProto();
+  ASSERT_NE(proto, nullptr);
+  EXPECT_NE(dynamic_cast<envoy::extensions::internal_redirect::filter_state::v3::FilterStateConfig*>(
+                proto.get()),
+            nullptr);
+}
+
+TEST_F(FilterStateTest, PredicateName) {
+  auto predicate = makePredicate(Polarity::Allow, "allow", false);
+  EXPECT_EQ(predicate->name(), "envoy.internal_redirect_predicates.filter_state");
+}
 
 // allow_value: follow only when the gate equals the configured value.
 TEST_F(FilterStateTest, AllowValueMatchesFollows) {
