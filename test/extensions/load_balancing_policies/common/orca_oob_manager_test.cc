@@ -165,8 +165,12 @@ TEST_F(OrcaOobManagerLifecycleTest, NonPositivePeriodClampedToDefault) {
   auto manager = makeManager(config);
   ASSERT_OK(manager->initialize());
 
-  // onHostsAdded jitters by random % period; a zero period would SIGFPE without the clamp.
-  installAttemptTimer();
+  // onHostsAdded jitters by random % period; random = default-1 makes the initial delay
+  // default-1 only if the period clamped to the default (and a zero period would SIGFPE).
+  ON_CALL(random_, random()).WillByDefault(Return(kDefaultOobReportingPeriodMs - 1));
+  auto* attempt_timer = installAttemptTimer();
+  EXPECT_CALL(*attempt_timer,
+              enableTimer(std::chrono::milliseconds(kDefaultOobReportingPeriodMs - 1), _));
   priority_set_.runUpdateCallbacks(0, {makeHost()}, {});
   EXPECT_EQ(activeOobSessions(), 1);
 

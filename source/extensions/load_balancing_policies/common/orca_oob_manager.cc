@@ -13,7 +13,6 @@
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/protobuf/utility.h"
 
 #include "xds/service/orca/v3/orca.pb.h"
 
