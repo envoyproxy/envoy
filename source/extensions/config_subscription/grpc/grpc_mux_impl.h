@@ -149,7 +149,9 @@ private:
         if (eds_resources_cache_.has_value()) {
           removeResourcesFromCache(resources_);
         }
-        notifyUnsubscribedResources(resources_);
+        if (parent_.xds_config_tracker_.has_value()) {
+          notifyUnsubscribedResources(resources_);
+        }
       }
     }
 
@@ -195,18 +197,22 @@ private:
             }
             return resource_name;
           });
-      // Computes the removed resources.
       std::set<std::string> removed_resources;
-      std::set_difference(previous_resources.begin(), previous_resources.end(), resources_.begin(),
-                          resources_.end(),
-                          std::inserter(removed_resources, removed_resources.begin()));
+      if (eds_resources_cache_.has_value() || parent_.xds_config_tracker_.has_value()) {
+        // Computes the removed resources.
+        std::set_difference(previous_resources.begin(), previous_resources.end(), resources_.begin(),
+                            resources_.end(),
+                            std::inserter(removed_resources, removed_resources.begin()));
+      }
 
       if (eds_resources_cache_.has_value()) {
         // Removes the computed resources from cache.
         removeResourcesFromCache(removed_resources);
       }
-      // Notifies the config tracker, if present.
-      notifyUnsubscribedResources(removed_resources);
+      if (parent_.xds_config_tracker_.has_value()) {
+        // Notifies the config tracker, if present.
+        notifyUnsubscribedResources(removed_resources);
+      }
 
       // move this watch to the beginning of the list
       iter_ = watches_.emplace(watches_.begin(), this);
@@ -237,9 +243,6 @@ private:
     }
 
     void notifyUnsubscribedResources(const std::set<std::string>& resources_to_remove) {
-      if (!parent_.xds_config_tracker_.has_value()) {
-        return;
-      }
       std::vector<absl::string_view> truly_removed;
       for (const auto& resource_name : resources_to_remove) {
         bool watched = false;

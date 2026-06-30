@@ -103,7 +103,7 @@ public:
 
   void onResourceUnsubscribed(const absl::string_view,
                               const std::vector<absl::string_view>& resources) override {
-    for (const auto _ : resources) {
+    for (size_t i = 0; i < resources.size(); ++i) {
       stats_.on_resource_unsubscribed_.inc();
     }
   }
