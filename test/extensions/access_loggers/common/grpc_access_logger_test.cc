@@ -434,7 +434,7 @@ public:
   StreamingGrpcAccessLogClientTest() {
     client_ =
         std::make_unique<Common::StreamingGrpcAccessLogClient<Protobuf::Struct, Protobuf::Struct>>(
-            Grpc::RawAsyncClientSharedPtr{async_client_}, mockMethodDescriptor(), absl::nullopt);
+            Grpc::RawAsyncClientSharedPtr{async_client_}, mockMethodDescriptor(), std::nullopt);
   }
 
   Grpc::MockAsyncClient* async_client_{new Grpc::MockAsyncClient()};
