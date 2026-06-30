@@ -127,6 +127,64 @@ public:
   PostingExternalBuffer* last_{nullptr};
 };
 
+// An ExternalBuffer that reports an I/O error from its write or read completion,
+// to exercise the BufferManager's unrecoverable-error path. The write completion
+// is posted (so the test drives it via the event loop); the read completes
+// synchronously, like the in-memory store.
+class FailingExternalBuffer : public ExternalBuffer {
+public:
+  enum class FailMode { Write, Read };
+  FailingExternalBuffer(Event::Dispatcher& dispatcher, FailMode mode)
+      : dispatcher_(dispatcher), mode_(mode) {}
+  ~FailingExternalBuffer() override { *alive_ = false; }
+
+  void write(Buffer::InstancePtr data, WriteCallback cb) override {
+    dispatcher_.post([this, alive = alive_, data = std::move(data), cb = std::move(cb)]() mutable {
+      if (!*alive) {
+        return;
+      }
+      if (mode_ == FailMode::Write) {
+        cb(ExternalBufferStatus::Error);
+        return;
+      }
+      // A read-failure run still needs the bytes to become durable so replay can
+      // begin and reach the failing read.
+      data_.move(*data);
+      cb(ExternalBufferStatus::Ok);
+    });
+  }
+  void read(uint64_t offset, uint64_t length, ReadCallback cb) override {
+    if (mode_ == FailMode::Read) {
+      // On error `data` is nullptr (see external_buffer.h).
+      cb(ExternalBufferStatus::Error, nullptr);
+      return;
+    }
+    auto out = std::make_unique<Buffer::OwnedImpl>();
+    if (length > 0) {
+      auto slice = std::make_unique<uint8_t[]>(length);
+      data_.copyOut(offset, length, slice.get());
+      out->add(slice.get(), length);
+    }
+    cb(ExternalBufferStatus::Ok, std::move(out));
+  }
+  uint64_t length() const override { return data_.length(); }
+
+private:
+  Event::Dispatcher& dispatcher_;
+  FailMode mode_;
+  Buffer::OwnedImpl data_;
+  std::shared_ptr<bool> alive_{std::make_shared<bool>(true)};
+};
+
+class FailingExternalBufferFactory : public ExternalBufferFactory {
+public:
+  explicit FailingExternalBufferFactory(FailingExternalBuffer::FailMode mode) : mode_(mode) {}
+  ExternalBufferPtr createBuffer(Event::Dispatcher& dispatcher) override {
+    return std::make_unique<FailingExternalBuffer>(dispatcher, mode_);
+  }
+  FailingExternalBuffer::FailMode mode_;
+};
+
 class BufferManagerTest : public testing::Test {
 public:
   BufferManagerTest() {
@@ -169,6 +227,8 @@ public:
   InMemoryExternalBufferFactory factory_;
   // Declared before manager_ so it outlives the manager that references it.
   PostingExternalBufferFactory posting_factory_;
+  FailingExternalBufferFactory write_failing_factory_{FailingExternalBuffer::FailMode::Write};
+  FailingExternalBufferFactory read_failing_factory_{FailingExternalBuffer::FailMode::Read};
   FakeBridge* bridge_{nullptr};
   // Owned by manager_; fire invokeCallback() to simulate the next event-loop
   // iteration resuming replay after a per-iteration budget yield (or starting a
@@ -558,6 +618,61 @@ TEST_F(BufferManagerTest, NestedWatermarksRequireBalancedRelease) {
   drain();
   EXPECT_TRUE(replay_done_);
   EXPECT_EQ(bridge_->injected_.toString(), big);
+}
+
+// A write that fails fails the stream: the manager surfaces the unrecoverable
+// error through the bridge and injects nothing. A pending replay never starts.
+TEST_F(BufferManagerTest, WriteErrorFailsStream) {
+  manager_ = makeManager(write_failing_factory_);
+
+  Buffer::OwnedImpl body("payload");
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
+
+  // The failing completion is posted; nothing has happened yet.
+  EXPECT_EQ(bridge_->error_calls_, 0);
+
+  drain();
+
+  EXPECT_EQ(bridge_->error_calls_, 1);
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+  EXPECT_FALSE(replay_done_);
+}
+
+// A read that fails during replay fails the stream: the manager reports the error
+// through the bridge and does not finish the replay or inject the failed chunk.
+TEST_F(BufferManagerTest, ReadErrorFailsStream) {
+  manager_ = makeManager(read_failing_factory_);
+
+  Buffer::OwnedImpl body("payload");
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
+
+  // Draining makes the write durable and starts replay, whose first read fails.
+  drain();
+
+  EXPECT_EQ(bridge_->error_calls_, 1);
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+  EXPECT_FALSE(replay_done_);
+}
+
+// An external-buffer error delivered after onDestroy() is inert: the completion
+// handlers bail out and never touch the (detached) bridge.
+TEST_F(BufferManagerTest, ErrorAfterDestroyIsInert) {
+  manager_ = makeManager(write_failing_factory_);
+
+  Buffer::OwnedImpl body("payload");
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
+  manager_->onDestroy();
+
+  // The posted write completion (whether it carried Ok or Error) is dropped once
+  // the buffer is reset in onDestroy(); no error reaches the bridge.
+  drain();
+  EXPECT_EQ(bridge_->error_calls_, 0);
 }
 
 } // namespace
