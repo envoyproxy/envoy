@@ -104,18 +104,12 @@ public:
               "reverse_tunnel upstream codec: starting graceful drain (first GOAWAY now, final "
               "GOAWAY in {}ms)",
               drain_time.count());
-    // Phase 1: graceful GOAWAY with max stream id. shutdownNotice() is a no-op on a client codec
-    // (server-only), so use the subclass's direct SubmitGoAway when available.
-    if (h2_codec_ != nullptr) {
-      stats_.goaway_sent_.inc();
-      h2_codec_->sendGracefulGoAway();
-    } else {
-      inner_->shutdownNotice();
-    }
-    // Phase 2: after the drain window, send the final GOAWAY and gracefully drain this connection
-    // out of the pool. We deliberately do NOT force-close it: a hard close would abort in-flight
-    // requests, whereas draining lets them finish while new requests move to the replacement
-    // tunnel.
+    // Phase 2 (deferred): after the drain window, send the final GOAWAY and gracefully drain this
+    // connection out of the pool. We deliberately do NOT force-close it: a hard close would abort
+    // in-flight requests, whereas draining lets them finish while new requests move to the
+    // replacement tunnel. The timer is armed BEFORE the Phase 1 send below because that send can
+    // synchronously close the connection and destroy this object on a write error; since the timer
+    // is owned by this, it is cancelled on destruction and no member is touched afterward.
     drain_timer_ = dispatcher_.createTimer([this]() {
       ENVOY_LOG(debug,
                 "reverse_tunnel upstream codec: drain timer fired; final GOAWAY + pool drain");
@@ -126,6 +120,16 @@ public:
       callbacks_->drainOwnPoolConnection();
     });
     drain_timer_->enableTimer(drain_time);
+
+    // Phase 1 (now): graceful first GOAWAY with max stream id. shutdownNotice() is a no-op on a
+    // client codec (server-only), so use the subclass's direct SubmitGoAway when available. Keep
+    // this LAST: it can synchronously destroy this object on a write error.
+    if (h2_codec_ != nullptr) {
+      stats_.goaway_sent_.inc();
+      h2_codec_->sendGracefulGoAway();
+    } else {
+      inner_->shutdownNotice();
+    }
   }
 
   // Envoy::Http::ClientConnection

@@ -40,11 +40,15 @@ public:
     }
   }
 
-  // Called on a worker thread (codec destruction).
+  // Called on a worker thread (codec destruction). Drops the now-empty cluster entry so empty sets
+  // do not accumulate as dynamic clusters come and go.
   void remove(absl::string_view cluster, DrainAwareClientConnection& codec) {
     if (auto reg = tls_->get(); reg.has_value()) {
       if (auto it = reg->codecs_.find(cluster); it != reg->codecs_.end()) {
         it->second.erase(&codec);
+        if (it->second.empty()) {
+          reg->codecs_.erase(it);
+        }
       }
     }
   }

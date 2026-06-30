@@ -17,19 +17,33 @@ void UpstreamCodecDrainRegistry::drainCluster(absl::string_view cluster,
     if (!reg.has_value()) {
       return;
     }
-    const auto drain_set = [drain_time](absl::flat_hash_set<DrainAwareClientConnection*>& codecs) {
-      // Snapshot first: startGracefulDrain() can indirectly mutate the set via timer/close paths.
-      std::vector<DrainAwareClientConnection*> snapshot(codecs.begin(), codecs.end());
+    // Draining a codec can synchronously close its connection, which destroys the codec and
+    // unregisters it -- mutating both the per-cluster set and the codecs_ map (an emptied entry is
+    // erased). To stay safe against that re-entrancy we (1) copy the target cluster keys before
+    // iterating, (2) re-find the entry and (3) confirm the codec is still registered before each
+    // drain, so we never iterate a mutated container or dereference a stale pointer.
+    std::vector<std::string> cluster_keys;
+    if (key.empty()) {
+      cluster_keys.reserve(reg->codecs_.size());
+      for (const auto& entry : reg->codecs_) {
+        cluster_keys.push_back(entry.first);
+      }
+    } else {
+      cluster_keys.push_back(key);
+    }
+    for (const auto& cluster_key : cluster_keys) {
+      auto it = reg->codecs_.find(cluster_key);
+      if (it == reg->codecs_.end()) {
+        continue;
+      }
+      const std::vector<DrainAwareClientConnection*> snapshot(it->second.begin(), it->second.end());
       for (auto* codec : snapshot) {
+        auto live = reg->codecs_.find(cluster_key);
+        if (live == reg->codecs_.end() || !live->second.contains(codec)) {
+          continue;
+        }
         codec->startGracefulDrain(drain_time);
       }
-    };
-    if (key.empty()) {
-      for (auto& entry : reg->codecs_) {
-        drain_set(entry.second);
-      }
-    } else if (auto it = reg->codecs_.find(key); it != reg->codecs_.end()) {
-      drain_set(it->second);
     }
   });
 }
