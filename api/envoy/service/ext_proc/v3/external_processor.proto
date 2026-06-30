@@ -308,6 +308,7 @@ message HttpHeaders {
 
 // This message is sent to the external server when the HTTP request and response bodies are
 // received.
+// [#next-free-field: 6]
 message HttpBody {
   // The contents of the body in the HTTP request/response. Note that in streaming mode multiple
   // ``HttpBody`` messages may be sent.
