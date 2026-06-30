@@ -23,7 +23,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "stats_interface",
     hdrs = [
-        "allocator.h",
         "histogram.h",
         "scope.h",
         "stats.h",
@@ -38,6 +37,7 @@ envoy_cc_library(
         "//envoy/common:interval_set_interface",
         "//envoy/common:optref_lib",
         "//envoy/common:time_interface",
+        "//source/common/stats:symbol_table_lib",
         "@abseil-cpp//absl/container:inlined_vector",
     ],
 )

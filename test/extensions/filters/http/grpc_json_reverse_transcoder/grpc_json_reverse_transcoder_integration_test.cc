@@ -64,7 +64,7 @@ typed_config:
                              ->Mutable(0)
                              ->mutable_typed_per_filter_config();
 
-          (*config)["grpc_json_reverse_transcoder"].PackFrom(per_route_config);
+          std::ignore = (*config)["grpc_json_reverse_transcoder"].PackFrom(per_route_config);
         };
     config_helper_.addConfigModifier(modifier);
   }
@@ -139,7 +139,7 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, SimpleRequest) {
   std::ignore = decoder.decode(transcoded_buffer, frames);
 
   bookstore::Book book;
-  book.ParseFromString(frames[0].data_->toString());
+  std::ignore = book.ParseFromString(frames[0].data_->toString());
 
   EXPECT_TRUE(MessageDifferencer::Equals(expected_book, book));
 
@@ -214,7 +214,7 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, HttpBodyRequestResponse) {
   std::ignore = decoder.decode(transcoded_buffer, frames);
 
   google::api::HttpBody transcoded_res;
-  transcoded_res.ParseFromString(frames[0].data_->toString());
+  std::ignore = transcoded_res.ParseFromString(frames[0].data_->toString());
 
   EXPECT_TRUE(MessageDifferencer::Equals(expected_res, transcoded_res));
 
@@ -298,7 +298,7 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, NestedHttpBodyRequest) {
   std::ignore = decoder.decode(transcoded_buffer, frames);
 
   google::api::HttpBody transcoded_res;
-  transcoded_res.ParseFromString(frames[0].data_->toString());
+  std::ignore = transcoded_res.ParseFromString(frames[0].data_->toString());
 
   EXPECT_TRUE(MessageDifferencer::Equals(expected_res, transcoded_res));
 
@@ -373,7 +373,7 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, RequestWithQueryParams) {
   std::ignore = decoder.decode(transcoded_buffer, frames);
 
   bookstore::ListBooksResponse transcoded_res;
-  transcoded_res.ParseFromString(frames[0].data_->toString());
+  std::ignore = transcoded_res.ParseFromString(frames[0].data_->toString());
 
   EXPECT_TRUE(MessageDifferencer::Equals(expected_res, transcoded_res));
 

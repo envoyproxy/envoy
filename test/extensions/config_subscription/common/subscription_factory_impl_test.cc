@@ -539,7 +539,7 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionSubscriptionUnsu
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
   std::string expected_config_text = R"pb(api_type: GRPC)pb";
   envoy::config::core::v3::ApiConfigSource expected_config_proto;
-  Protobuf::TextFormat::ParseFromString(expected_config_text, &expected_config_proto);
+  std::ignore = Protobuf::TextFormat::ParseFromString(expected_config_text, &expected_config_proto);
   EXPECT_THROW_WITH_REGEX(
       collectionSubscriptionFromUrl(
           "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar", config)

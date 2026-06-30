@@ -18,7 +18,7 @@ namespace Network {
 
 IoUringSocketHandleImpl::IoUringSocketHandleImpl(Io::IoUringWorkerFactory& io_uring_worker_factory,
                                                  os_fd_t fd, bool socket_v6only,
-                                                 absl::optional<int> domain, bool is_server_socket)
+                                                 std::optional<int> domain, bool is_server_socket)
     : IoSocketHandleBaseImpl(fd, socket_v6only, domain),
       io_uring_worker_factory_(io_uring_worker_factory),
       io_uring_socket_type_(is_server_socket ? IoUringSocketType::Server
@@ -86,10 +86,10 @@ IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, ui
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
-                                                      absl::optional<uint64_t> max_length_opt) {
+                                                      std::optional<uint64_t> max_length_opt) {
   ENVOY_LOG(trace, "read, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
 
-  absl::optional<Api::IoCallUint64Result> read_result = checkReadResult();
+  std::optional<Api::IoCallUint64Result> read_result = checkReadResult();
   if (read_result.has_value()) {
     return std::move(*read_result);
   }
@@ -105,7 +105,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
                                                         uint64_t num_slice) {
   ENVOY_LOG(trace, "writev, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
 
-  absl::optional<Api::IoCallUint64Result> write_result = checkWriteResult();
+  std::optional<Api::IoCallUint64Result> write_result = checkWriteResult();
   if (write_result.has_value()) {
     return std::move(*write_result);
   }
@@ -128,7 +128,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
 Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer) {
   ENVOY_LOG(trace, "write {}, fd = {}, type = {}", buffer.length(), fd_, ioUringSocketTypeStr());
 
-  absl::optional<Api::IoCallUint64Result> write_result = checkWriteResult();
+  std::optional<Api::IoCallUint64Result> write_result = checkWriteResult();
   if (write_result.has_value()) {
     return std::move(*write_result);
   }
@@ -367,14 +367,14 @@ Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int how) {
   return Api::SysCallIntResult{0, 0};
 }
 
-absl::optional<Api::IoCallUint64Result> IoUringSocketHandleImpl::checkReadResult() const {
+std::optional<Api::IoCallUint64Result> IoUringSocketHandleImpl::checkReadResult() const {
   ASSERT(io_uring_socket_.has_value());
   ASSERT(io_uring_socket_type_ == IoUringSocketType::Server ||
          io_uring_socket_type_ == IoUringSocketType::Client);
 
   const OptRef<Io::ReadParam>& read_param = io_uring_socket_->getReadParam();
-  // A absl::nullopt read param means that there is no io_uring request which has been done.
-  if (read_param == absl::nullopt) {
+  // A std::nullopt read param means that there is no io_uring request which has been done.
+  if (read_param == std::nullopt) {
     if (io_uring_socket_->getStatus() != Io::IoUringSocketStatus::RemoteClosed) {
       return Api::IoCallUint64Result{0, IoSocketError::getIoSocketEagainError()};
     } else {
@@ -403,29 +403,29 @@ absl::optional<Api::IoCallUint64Result> IoUringSocketHandleImpl::checkReadResult
   if (read_param->buf_.length() == 0) {
     return Api::IoCallUint64Result{0, IoSocketError::getIoSocketEagainError()};
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
-absl::optional<Api::IoCallUint64Result> IoUringSocketHandleImpl::checkWriteResult() const {
+std::optional<Api::IoCallUint64Result> IoUringSocketHandleImpl::checkWriteResult() const {
   ASSERT(io_uring_socket_.has_value());
   ASSERT(io_uring_socket_type_ == IoUringSocketType::Server ||
          io_uring_socket_type_ == IoUringSocketType::Client);
 
   const OptRef<Io::WriteParam>& write_param = io_uring_socket_->getWriteParam();
-  if (write_param != absl::nullopt) {
+  if (write_param != std::nullopt) {
     // EAGAIN indicates an injected write event to trigger IO handle write. Submit the new write to
     // the io_uring.
     if (write_param->result_ < 0 && write_param->result_ != -EAGAIN) {
       return Api::IoCallUint64Result{0, IoSocketError::create(-write_param->result_)};
     }
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::copyOut(uint64_t max_length,
                                                          Buffer::RawSlice* slices,
                                                          uint64_t num_slice) {
-  absl::optional<Api::IoCallUint64Result> read_result = checkReadResult();
+  std::optional<Api::IoCallUint64Result> read_result = checkReadResult();
   if (read_result.has_value()) {
     return std::move(*read_result);
   }

@@ -73,7 +73,7 @@ protected:
 
     auto* reporter_config = custom_config.mutable_reporter_config();
     reporter_config->set_name(MOCK_REPORTER);
-    reporter_config->mutable_typed_config()->PackFrom(Protobuf::StringValue{});
+    std::ignore = reporter_config->mutable_typed_config()->PackFrom(Protobuf::StringValue{});
 
     return custom_config;
   }
@@ -515,7 +515,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, MissThresholdOneMarksDeadOnFirstInval
   NiceMock<Network::MockIoHandle> mock_read_handle;
   EXPECT_CALL(mock_read_handle, fdDoNotUse()).WillRepeatedly(testing::Return(123));
   EXPECT_CALL(mock_read_handle, read(testing::_, testing::_))
-      .WillOnce(testing::Invoke([](Buffer::Instance& buffer, absl::optional<uint64_t>) {
+      .WillOnce(testing::Invoke([](Buffer::Instance& buffer, std::optional<uint64_t>) {
         buffer.add("XXXXX"); // 5 bytes, not RPING
         return Api::IoCallUint64Result{5, Api::IoError::none()};
       }));

@@ -40,7 +40,7 @@ protected:
           dynamic_module_config;
       dynamic_module_config.mutable_dynamic_module_config()->set_name("listener_integration_test");
       dynamic_module_config.set_filter_name(filter_name);
-      filter->mutable_typed_config()->PackFrom(dynamic_module_config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(dynamic_module_config);
     });
 
     BaseIntegrationTest::initialize();

@@ -57,7 +57,7 @@ protected:
   static constexpr auto kMessageTimeoutNanos =
       std::chrono::duration_cast<std::chrono::nanoseconds>(kMessageTimeout).count();
 
-  void initialize(absl::optional<std::function<void(ExternalProcessor&)>> cb) {
+  void initialize(std::optional<std::function<void(ExternalProcessor&)>> cb) {
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
     EXPECT_CALL(*client_, start(_, _, _, _)).WillRepeatedly(Invoke(this, &OrderingTest::doStart));
@@ -257,7 +257,7 @@ TEST_F(OrderingTest, TotallyInvalidResponse) {
 
 // A normal call with the default configuration
 TEST_F(OrderingTest, DefaultOrderingGet) {
-  initialize(absl::nullopt);
+  initialize(std::nullopt);
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -537,7 +537,7 @@ TEST_F(OrderingTest, ProcessingModeRequestTrailers) {
 
 // An immediate response on the request path
 TEST_F(OrderingTest, ImmediateResponseOnRequest) {
-  initialize(absl::nullopt);
+  initialize(std::nullopt);
 
   // MockTimer constructor sets up expectations in the Dispatcher class to wire it up
   MockTimer* request_timer = new MockTimer(&dispatcher_);
@@ -553,7 +553,7 @@ TEST_F(OrderingTest, ImmediateResponseOnRequest) {
 
 // An immediate response on the response path
 TEST_F(OrderingTest, ImmediateResponseOnResponse) {
-  initialize(absl::nullopt);
+  initialize(std::nullopt);
 
   MockTimer* request_timer = new MockTimer(&dispatcher_);
   EXPECT_CALL(*request_timer, enabled()).Times(AnyNumber());
@@ -668,7 +668,7 @@ TEST_F(OrderingTest, IncorrectResponseHeadersReply) {
 // Receive an extra message -- we should ignore it
 // and not send anything else to the server
 TEST_F(OrderingTest, ExtraReply) {
-  initialize(absl::nullopt);
+  initialize(std::nullopt);
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -687,7 +687,7 @@ TEST_F(OrderingTest, ExtraReply) {
 // Receive an extra message after the immediate response -- it should
 // be ignored.
 TEST_F(OrderingTest, ExtraAfterImmediateResponse) {
-  initialize(absl::nullopt);
+  initialize(std::nullopt);
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -757,7 +757,7 @@ TEST_F(OrderingTest, GrpcErrorOutOfLine) {
 
 // gRPC close after a proper message means rest of stream is ignored
 TEST_F(OrderingTest, GrpcCloseAfter) {
-  initialize(absl::nullopt);
+  initialize(std::nullopt);
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -874,7 +874,7 @@ TEST_F(OrderingTest, TimeoutOnRequestBody) {
 
 // gRPC failure while opening stream
 TEST_F(FastFailOrderingTest, GrpcErrorOnStartRequestHeaders) {
-  initialize(absl::nullopt);
+  initialize(std::nullopt);
   HttpTestUtility::addDefaultHeaders(request_headers_);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));

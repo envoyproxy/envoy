@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "envoy/extensions/resource_monitors/cpu_utilization/v3/cpu_utilization.pb.h"
 #include "envoy/registry/registry.h"
 
@@ -10,7 +12,6 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/options.h"
 
-#include "absl/types/optional.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -36,8 +37,8 @@ public:
   double pressure() const { return pressure_.value_or(0.0); }
 
 private:
-  absl::optional<double> pressure_;
-  absl::optional<EnvoyException> error_;
+  std::optional<double> pressure_;
+  std::optional<EnvoyException> error_;
   bool has_success_ = false;
   bool has_error_ = false;
 };

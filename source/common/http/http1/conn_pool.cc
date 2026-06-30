@@ -116,7 +116,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
       std::move(host), std::move(priority), dispatcher, options, transport_socket_options,
       random_generator, state,
       [](HttpConnPoolImplBase* pool) {
-        return std::make_unique<ActiveClient>(*pool, absl::nullopt);
+        return std::make_unique<ActiveClient>(*pool, std::nullopt);
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
         CodecClientPtr codec{new CodecClientProd(
@@ -124,7 +124,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
             pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions())};
         return codec;
       },
-      std::vector<Protocol>{Protocol::Http11}, overload_manager, absl::nullopt, nullptr);
+      std::vector<Protocol>{Protocol::Http11}, overload_manager, std::nullopt, nullptr);
 }
 
 } // namespace Http1

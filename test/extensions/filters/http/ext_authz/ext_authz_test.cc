@@ -128,7 +128,7 @@ public:
 
   static envoy::extensions::filters::http::ext_authz::v3::ExtAuthz
   getFilterConfig(bool failure_mode_allow, bool http_client, bool emit_filter_state_stats = false,
-                  absl::optional<Envoy::Protobuf::Struct> filter_metadata = absl::nullopt) {
+                  std::optional<Envoy::Protobuf::Struct> filter_metadata = std::nullopt) {
     const std::string http_config = R"EOF(
     failure_mode_allow_header_add: true
     http_service:
@@ -257,13 +257,13 @@ INSTANTIATE_TEST_SUITE_P(ParameterizedFilterConfig, HttpFilterTestParam,
 
 class ExtAuthzLoggingInfoTest
     : public testing::TestWithParam<
-          std::tuple<std::string /* field_name */, absl::optional<uint64_t> /* value */>> {
+          std::tuple<std::string /* field_name */, std::optional<uint64_t> /* value */>> {
 public:
   ExtAuthzLoggingInfoTest() : logging_info_({}) {}
 
   void SetUp() override {
     std::string fieldName = std::get<0>(GetParam());
-    absl::optional<uint64_t> optional = std::get<1>(GetParam());
+    std::optional<uint64_t> optional = std::get<1>(GetParam());
     if (optional.has_value()) {
       if (fieldName == "latency_us") {
         logging_info_.setLatency(std::chrono::microseconds(optional.value()));
@@ -279,7 +279,7 @@ public:
 
   void test() {
     ASSERT_TRUE(logging_info_.hasFieldSupport());
-    absl::optional<uint64_t> optional = std::get<1>(GetParam());
+    std::optional<uint64_t> optional = std::get<1>(GetParam());
     if (optional.has_value()) {
       EXPECT_THAT(logging_info_.getField(std::get<0>(GetParam())),
                   testing::VariantWith<int64_t>(optional.value()));
@@ -290,7 +290,7 @@ public:
   }
 
   static std::string paramsToString(
-      const testing::TestParamInfo<std::tuple<std::string, absl::optional<uint64_t>>>& info) {
+      const testing::TestParamInfo<std::tuple<std::string, std::optional<uint64_t>>>& info) {
     return absl::StrCat(std::get<1>(info.param).has_value() ? "" : "no_", std::get<0>(info.param),
                         std::get<1>(info.param).has_value()
                             ? absl::StrCat("_", std::to_string(std::get<1>(info.param).value()))
@@ -303,13 +303,13 @@ public:
 INSTANTIATE_TEST_SUITE_P(
     ExtAuthzLoggingInfoTestValid, ExtAuthzLoggingInfoTest,
     testing::Combine(testing::Values("latency_us", "bytesSent", "bytesReceived"),
-                     testing::Values(absl::optional<uint64_t>{}, absl::optional<uint64_t>{0},
-                                     absl::optional<uint64_t>{1})),
+                     testing::Values(std::optional<uint64_t>{}, std::optional<uint64_t>{0},
+                                     std::optional<uint64_t>{1})),
     ExtAuthzLoggingInfoTest::paramsToString);
 
 INSTANTIATE_TEST_SUITE_P(ExtAuthzLoggingInfoTestInvalid, ExtAuthzLoggingInfoTest,
                          testing::Values(std::make_tuple("wrong_property_name",
-                                                         absl::optional<uint64_t>{})),
+                                                         std::optional<uint64_t>{})),
                          ExtAuthzLoggingInfoTest::paramsToString);
 
 class EmitFilterStateTest
@@ -318,9 +318,9 @@ class EmitFilterStateTest
 public:
   EmitFilterStateTest() : expected_output_(filterMetadata()) {}
 
-  absl::optional<Envoy::Protobuf::Struct> filterMetadata() const {
+  std::optional<Envoy::Protobuf::Struct> filterMetadata() const {
     if (!std::get<2>(GetParam())) {
-      return absl::nullopt;
+      return std::nullopt;
     }
 
     auto filter_metadata = Envoy::Protobuf::Struct();
@@ -370,11 +370,11 @@ public:
     prepareCheck();
 
     auto& filter_state = decoder_filter_callbacks_.streamInfo().filterState();
-    absl::optional<ExtAuthzLoggingInfo> preexisting_data_copy =
+    std::optional<ExtAuthzLoggingInfo> preexisting_data_copy =
         filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName)
-            ? absl::make_optional(
+            ? std::make_optional(
                   *filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName))
-            : absl::nullopt;
+            : std::nullopt;
 
     // ext_authz makes a single call to the external auth service once it sees the end of stream.
     EXPECT_CALL(*client_, check(_, _, _, _))
@@ -823,7 +823,7 @@ TEST_F(HttpFilterTest, MutationRejectedSizeLimitExceededEffect) {
 }
 
 struct DecoderHeaderMutationRulesTestOpts {
-  absl::optional<envoy::config::common::mutation_rules::v3::HeaderMutationRules> rules;
+  std::optional<envoy::config::common::mutation_rules::v3::HeaderMutationRules> rules;
   bool expect_reject_response = false;
   Filters::Common::ExtAuthz::UnsafeHeaderVector allowed_headers_to_add;
   Filters::Common::ExtAuthz::UnsafeHeaderVector disallowed_headers_to_add;
@@ -1681,7 +1681,7 @@ TEST_F(HttpFilterTest, ErrorResponseHeaderLimitsEnforcedWithMock) {
       .WillOnce(
           Invoke([&](Http::Code, absl::string_view,
                      std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                     const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
+                     const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
             // Create a ResponseHeaderMap with a low max_headers_count to trigger the limit.
             Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/3);
             if (modify_headers) {
@@ -1738,7 +1738,7 @@ TEST_F(HttpFilterTest, ErrorResponseHeaderLimitsEnforcedInSet) {
       .WillOnce(
           Invoke([&](Http::Code, absl::string_view,
                      std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                     const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
+                     const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
             // Create a ResponseHeaderMap with a limit of 1 to trigger the break in headers_to_set.
             Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/1);
             if (modify_headers) {
@@ -1761,7 +1761,7 @@ TEST_F(HttpFilterTest, ErrorResponseHeaderLimitsEnforcedInSet) {
 
 // Test for ExtAuthzLoggingInfo clear methods.
 TEST(ExtAuthzLoggingInfoTest, ClearMethods) {
-  ExtAuthzLoggingInfo logging_info(absl::nullopt);
+  ExtAuthzLoggingInfo logging_info(std::nullopt);
   logging_info.setLatency(std::chrono::microseconds(100));
   logging_info.setBytesSent(10);
   logging_info.setBytesReceived(20);
@@ -1823,7 +1823,7 @@ TEST_F(HttpFilterTest, ErrorResponseHeaderLimitsEnforcedInAppend) {
       .WillOnce(
           Invoke([&](Http::Code, absl::string_view,
                      std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                     const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
+                     const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
             // Create a ResponseHeaderMap with max_headers_count=2 to trigger limit in append loop.
             Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/2);
             if (modify_headers) {
@@ -3193,18 +3193,17 @@ TEST_F(HttpFilterTest, MetadataContext) {
             check_request.attributes().metadata_context().filter_metadata().count("hiphop.drums"));
 
   helloworld::HelloRequest hello;
-  check_request.attributes()
-      .metadata_context()
-      .typed_filter_metadata()
-      .at("blues.piano")
-      .UnpackTo(&hello);
+  std::ignore = check_request.attributes()
+                    .metadata_context()
+                    .typed_filter_metadata()
+                    .at("blues.piano")
+                    .UnpackTo(&hello);
   EXPECT_EQ("jack dupree", hello.name());
-
-  check_request.attributes()
-      .metadata_context()
-      .typed_filter_metadata()
-      .at("jazz.sax")
-      .UnpackTo(&hello);
+  std::ignore = check_request.attributes()
+                    .metadata_context()
+                    .typed_filter_metadata()
+                    .at("jazz.sax")
+                    .UnpackTo(&hello);
   EXPECT_EQ("shorter wayne", hello.name());
 
   EXPECT_EQ(
@@ -3325,18 +3324,17 @@ TEST_F(HttpFilterTest, ConnectionMetadataContext) {
                    "typed.connection.data"));
 
   helloworld::HelloRequest hello;
-  check_request.attributes()
-      .metadata_context()
-      .typed_filter_metadata()
-      .at("typed.connection.data")
-      .UnpackTo(&hello);
+  std::ignore = check_request.attributes()
+                    .metadata_context()
+                    .typed_filter_metadata()
+                    .at("typed.connection.data")
+                    .UnpackTo(&hello);
   EXPECT_EQ("connection_typed", hello.name());
-
-  check_request.attributes()
-      .metadata_context()
-      .typed_filter_metadata()
-      .at("untyped.and.typed.connection.data")
-      .UnpackTo(&hello);
+  std::ignore = check_request.attributes()
+                    .metadata_context()
+                    .typed_filter_metadata()
+                    .at("untyped.and.typed.connection.data")
+                    .UnpackTo(&hello);
   EXPECT_EQ("connection_typed", hello.name());
 
   EXPECT_EQ(0, check_request.attributes().metadata_context().typed_filter_metadata().count(
@@ -4957,6 +4955,70 @@ TEST_P(HttpFilterTestParam, OnDestroyCancelsDefaultClient) {
   filter_->onDestroy();
 }
 
+// Verify that the default client is NOT destroyed when a per-route client override
+// is active.
+TEST_P(HttpFilterTestParam, OnDestroyPreservesDefaultClientWithPerRouteOverride) {
+  if (std::get<1>(GetParam())) {
+    return;
+  }
+
+  prepareCheck();
+
+  // Create per-route configuration with gRPC service override.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  per_route_config.mutable_check_settings()
+      ->mutable_grpc_service()
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("per_route_ext_authz_cluster");
+
+  std::unique_ptr<FilterConfigPerRoute> per_route_filter_config =
+      std::make_unique<FilterConfigPerRoute>(per_route_config);
+
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(per_route_filter_config.get()));
+
+  Router::RouteSpecificFilterConfigs per_route_configs;
+  per_route_configs.push_back(per_route_filter_config.get());
+  ON_CALL(decoder_filter_callbacks_, perFilterConfigs()).WillByDefault(Return(per_route_configs));
+
+  // Create a new filter with an explicitly tracked default client.
+  auto default_client = std::make_unique<Filters::Common::ExtAuthz::MockClient>();
+  auto* default_client_ptr = default_client.get();
+
+  // we'll verify after decodeHeaders() to prove the client is still alive.
+  EXPECT_CALL(*default_client_ptr, streamInfo()).WillRepeatedly(Return(nullptr));
+
+  auto test_filter = std::make_unique<Filter>(config_, std::move(default_client), factory_context_);
+  test_filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+  test_filter->setEncoderFilterCallbacks(encoder_filter_callbacks_);
+
+  // Mock successful gRPC async client manager access.
+  auto mock_grpc_client_manager = std::make_shared<Grpc::MockAsyncClientManager>();
+  ON_CALL(factory_context_, clusterManager()).WillByDefault(ReturnRef(cm_));
+  ON_CALL(cm_, grpcAsyncClientManager()).WillByDefault(ReturnRef(*mock_grpc_client_manager));
+
+  auto mock_raw_grpc_client = std::make_shared<Grpc::MockAsyncClient>();
+  auto mock_async_request = std::make_unique<Grpc::MockAsyncRequest>();
+  auto* mock_async_request_ptr = mock_async_request.get();
+
+  EXPECT_CALL(*mock_grpc_client_manager, getOrCreateRawAsyncClientWithHashKey(_, _, true))
+      .WillOnce(Return(absl::StatusOr<Grpc::RawAsyncClientSharedPtr>(mock_raw_grpc_client)));
+
+  EXPECT_CALL(*mock_raw_grpc_client, sendRaw(_, _, _, _, _, _))
+      .WillOnce(Return(mock_async_request_ptr));
+
+  // The default client's check should NOT be called.
+  EXPECT_CALL(*default_client_ptr, check(_, _, _, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            test_filter->decodeHeaders(request_headers_, false));
+
+  EXPECT_EQ(nullptr, default_client_ptr->streamInfo());
+
+  EXPECT_CALL(*default_client_ptr, cancel()).Times(0);
+  EXPECT_CALL(*mock_async_request_ptr, cancel());
+  test_filter->onDestroy();
+}
+
 // Regression test for https://github.com/envoyproxy/envoy/pull/8436.
 // Test that ext_authz filter is not in noop mode when cluster is not specified per route
 // (this could be the case when route is configured with redirect or direct response action).
@@ -5321,7 +5383,7 @@ TEST_P(EmitFilterStateTest, PreexistingFilterStateSameTypeMutable) {
       FilterConfigName,
       // This will not cast to ExtAuthzLoggingInfo, so when the filter tries to
       // getMutableData<ExtAuthzLoggingInfo>(...), it will return nullptr.
-      std::make_shared<ExtAuthzLoggingInfo>(absl::nullopt),
+      std::make_shared<ExtAuthzLoggingInfo>(std::nullopt),
       Envoy::StreamInfo::FilterState::LifeSpan::Request);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -5762,7 +5824,7 @@ TEST_P(HttpFilterTestParam, PerRouteConfigurationIntegrationTest) {
         check_response.mutable_ok_response();
 
         std::string serialized_response;
-        check_response.SerializeToString(&serialized_response);
+        std::ignore = check_response.SerializeToString(&serialized_response);
         auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
 
         callbacks.onSuccessRaw(std::move(response), parent_span);
@@ -5838,7 +5900,7 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcClientCreationAndUsage) {
 
         // Serialize the response to a buffer.
         std::string serialized_response;
-        check_response.SerializeToString(&serialized_response);
+        std::ignore = check_response.SerializeToString(&serialized_response);
         auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
 
         callbacks.onSuccessRaw(std::move(response), parent_span);
@@ -6100,7 +6162,7 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcClientTimeoutConfiguration) {
   // timeout_seconds=30 -> expect 30000ms timeout
   // timeout_seconds=0  -> expect no timeout (infinite)
   for (const auto& [timeout_seconds, expect_timeout_ms] :
-       std::vector<std::pair<int64_t, absl::optional<int64_t>>>{{30, 30000}, {0, absl::nullopt}}) {
+       std::vector<std::pair<int64_t, std::optional<int64_t>>>{{30, 30000}, {0, std::nullopt}}) {
     SCOPED_TRACE(absl::StrCat("timeout_seconds=", timeout_seconds));
 
     // Create per-route configuration with custom timeout.
@@ -6146,7 +6208,7 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcClientTimeoutConfiguration) {
             check_response.mutable_ok_response();
 
             std::string serialized_response;
-            check_response.SerializeToString(&serialized_response);
+            std::ignore = check_response.SerializeToString(&serialized_response);
             auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
 
             callbacks.onSuccessRaw(std::move(response), parent_span);
@@ -6163,7 +6225,7 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcClientTimeoutConfiguration) {
             check_response.mutable_ok_response();
 
             std::string serialized_response;
-            check_response.SerializeToString(&serialized_response);
+            std::ignore = check_response.SerializeToString(&serialized_response);
             auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
 
             callbacks.onSuccessRaw(std::move(response), parent_span);
@@ -6402,7 +6464,7 @@ TEST_F(HttpFilterTest, DeniedResponseLocalReplyExceedsLimit) {
       .WillOnce(
           Invoke([&](Http::Code, absl::string_view,
                      std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                     const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
+                     const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
             Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/2);
             if (modify_headers) {
               modify_headers(response_headers);
@@ -6448,7 +6510,7 @@ TEST_F(HttpFilterTest, DeniedResponseLocalReplyExceedsLimitDisabled) {
       .WillOnce(
           Invoke([&](Http::Code, absl::string_view,
                      std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                     const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
+                     const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
             Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/2);
             if (modify_headers) {
               modify_headers(response_headers);
@@ -7184,7 +7246,7 @@ TEST_F(HttpFilterTest, ValidErrorResponseWithMutations) {
       .WillOnce(
           Invoke([&](Http::Code, absl::string_view,
                      std::function<void(Http::ResponseHeaderMap&)> modify_headers,
-                     const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
+                     const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
             Http::TestResponseHeaderMapImpl response_headers;
             modify_headers(response_headers);
             EXPECT_EQ("value", response_headers.get_("x-error-header"));

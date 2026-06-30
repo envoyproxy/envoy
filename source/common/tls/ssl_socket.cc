@@ -99,7 +99,7 @@ SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
       remaining -= rc;
       result.bytes_read_ += rc;
     } else {
-      result.error_ = absl::make_optional<int>(rc);
+      result.error_ = std::make_optional<int>(rc);
       break;
     }
   }
@@ -177,7 +177,7 @@ void SslSocket::onPrivateKeyMethodComplete() { resumeHandshake(); }
 
 void SslSocket::resumeHandshake() {
   ASSERT(callbacks_ != nullptr && callbacks_->connection().dispatcher().isThreadSafe());
-  ASSERT(info_->state() == Ssl::SocketState::HandshakeInProgress);
+  ASSERT(info_->state() == Ssl::SocketState::HandshakeBlockedOnAsyncOperation);
 
   // Resume handshake.
   PostIoAction action = doHandshake();
@@ -202,12 +202,39 @@ void SslSocket::onSuccess(SSL* ssl) {
     callbacks_->connection().streamInfo().downstreamTiming().onDownstreamHandshakeComplete(
         callbacks_->connection().dispatcher().timeSource());
   }
+
+  // There is at least one assertion that reads are enabled when the connected event is raised, so
+  // ensure we are in the correct state. The same operation would happen in
+  // `SslSocket::doHandshake()`, but it wouldn't happen until after the event was raised.
+  if (read_disabled_) {
+    read_disabled_ = false;
+    callbacks_->connection().readDisable(false);
+  }
+
   callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 }
 
 void SslSocket::onFailure() { drainErrorQueue(); }
 
-PostIoAction SslSocket::doHandshake() { return info_->doHandshake(); }
+PostIoAction SslSocket::doHandshake() {
+  auto ret = info_->doHandshake();
+  if (ret == PostIoAction::KeepOpen) {
+    if (info_->state() == Ssl::SocketState::HandshakeBlockedOnAsyncOperation && !read_disabled_) {
+      // Connection close events can only be detected if the connection has reading disabled.
+      // If reading is disabled, the connection registers for close events directly.
+      // If reading is enabled, the connection registers for read events, but `doRead()` doesn't
+      // process any data (including an EOF) when the handshake is in this state, so the connection
+      // close isn't detected.
+      read_disabled_ = true;
+      callbacks_->connection().readDisable(true);
+    } else if (info_->state() != Ssl::SocketState::HandshakeBlockedOnAsyncOperation &&
+               read_disabled_) {
+      read_disabled_ = false;
+      callbacks_->connection().readDisable(false);
+    }
+  }
+  return ret;
+}
 
 void SslSocket::drainErrorQueue() {
   bool saw_error = false;
@@ -360,12 +387,14 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
   return {PostIoAction::KeepOpen, total_bytes_written, false};
 }
 
-void SslSocket::onConnected() { ASSERT(info_->state() == Ssl::SocketState::PreHandshake); }
+void SslSocket::onConnected() {
+  ASSERT(info_->state() == Ssl::SocketState::HandshakeWaitingForConnectionData);
+}
 
 Ssl::ConnectionInfoConstSharedPtr SslSocket::ssl() const { return info_; }
 
 void SslSocket::shutdownSsl() {
-  ASSERT(info_->state() != Ssl::SocketState::PreHandshake);
+  ASSERT(info_->state() != Ssl::SocketState::HandshakeWaitingForConnectionData);
   if (info_->state() != Ssl::SocketState::ShutdownSent &&
       callbacks_->connection().state() != Network::Connection::State::Closed) {
     int rc = SSL_shutdown(rawSsl());
@@ -414,7 +443,7 @@ void SslSocket::closeSocket(Network::ConnectionEvent, bool abort_reset) {
   // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
   // there is no room on the socket. We can extend the state machine to handle this at some point
   // if needed.
-  if (info_->state() == Ssl::SocketState::HandshakeInProgress ||
+  if (info_->state() == Ssl::SocketState::HandshakeBlockedOnAsyncOperation ||
       info_->state() == Ssl::SocketState::HandshakeComplete) {
     shutdownSsl();
   } else {
@@ -430,14 +459,14 @@ absl::string_view SslSocket::failureReason() const { return failure_reason_; }
 
 void SslSocket::onAsynchronousCertValidationComplete() {
   ENVOY_CONN_LOG(debug, "Async cert validation completed", callbacks_->connection());
-  if (info_->state() == Ssl::SocketState::HandshakeInProgress) {
+  if (info_->state() == Ssl::SocketState::HandshakeBlockedOnAsyncOperation) {
     resumeHandshake();
   }
 }
 
 void SslSocket::onAsynchronousCertificateSelectionComplete() {
   ENVOY_CONN_LOG(debug, "Async cert selection completed", callbacks_->connection());
-  if (info_->state() != Ssl::SocketState::HandshakeInProgress) {
+  if (info_->state() != Ssl::SocketState::HandshakeBlockedOnAsyncOperation) {
     IS_ENVOY_BUG(fmt::format("unexpected handshake state: {}", static_cast<int>(info_->state())));
     return;
   }

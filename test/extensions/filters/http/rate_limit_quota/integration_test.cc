@@ -108,12 +108,12 @@ protected:
 
   // Changes to apply to a matcher's OnMatch and its underlying RateLimitQuotaBucketSettings.
   struct Manipulations {
-    absl::optional<BlanketRule> no_assignment_blanket_rule = std::nullopt;
+    std::optional<BlanketRule> no_assignment_blanket_rule = std::nullopt;
     bool unsupported_no_assignment_strategy = false;
-    absl::optional<BucketId> custom_bucket_id = std::nullopt;
-    absl::optional<RateLimitStrategy> fallback_rate_limit_strategy = std::nullopt;
+    std::optional<BucketId> custom_bucket_id = std::nullopt;
+    std::optional<RateLimitStrategy> fallback_rate_limit_strategy = std::nullopt;
     int fallback_ttl_sec = kFallbackTtlSecDefault;
-    absl::optional<DenyResponseSettings> deny_response_settings = std::nullopt;
+    std::optional<DenyResponseSettings> deny_response_settings = std::nullopt;
   };
 
   void manipulateOnMatch(const Manipulations& config_option, OnMatch* mutable_on_match) {
@@ -163,7 +163,7 @@ protected:
           *config_option.deny_response_settings;
     }
 
-    mutable_config->PackFrom(mutable_bucket_settings);
+    std::ignore = mutable_config->PackFrom(mutable_bucket_settings);
   }
 
   static Matcher constructPreviewMatcher() {
@@ -219,7 +219,7 @@ protected:
       // to JSON so that we can add it to the overall config
       envoy::config::listener::v3::Filter rate_limit_quota_filter;
       rate_limit_quota_filter.set_name("envoy.filters.http.rate_limit_quota");
-      rate_limit_quota_filter.mutable_typed_config()->PackFrom(proto_config_);
+      std::ignore = rate_limit_quota_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(
           MessageUtil::getJsonStringFromMessageOrError(rate_limit_quota_filter));
     });

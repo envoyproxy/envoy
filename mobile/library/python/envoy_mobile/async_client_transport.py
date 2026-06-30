@@ -211,3 +211,6 @@ class AsyncEnvoyClientTransport(httpx.AsyncBaseTransport):
                 stream, handler.data_queue, handler.stream_complete, self._executor
             ),
         )
+
+    async def aclose(self) -> None:
+        self._engine.drain_connections_by_socket_tag(self._transport_tag)

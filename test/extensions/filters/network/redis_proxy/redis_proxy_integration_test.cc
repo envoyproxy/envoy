@@ -756,7 +756,7 @@ public:
                                    std::vector<FakeRawConnectionPtr>& fake_upstream_connections,
                                    const std::vector<std::string>& auth_usernames,
                                    const std::vector<std::string>& auth_passwords,
-                                   absl::optional<uint64_t>& matched_upstream_index);
+                                   std::optional<uint64_t>& matched_upstream_index);
 
 protected:
   const int num_upstreams_;
@@ -1073,7 +1073,7 @@ void RedisProxyIntegrationTest::roundtripToSomeUpstreamStep(
     const std::string& response, IntegrationTcpClientPtr& redis_client,
     std::vector<FakeRawConnectionPtr>& fake_upstream_connections,
     const std::vector<std::string>& auth_usernames, const std::vector<std::string>& auth_passwords,
-    absl::optional<uint64_t>& matched_upstream_index) {
+    std::optional<uint64_t>& matched_upstream_index) {
   redis_client->clearData();
   for (auto& fake_upstream_connection : fake_upstream_connections) {
     if (fake_upstream_connection != nullptr) {
@@ -1822,7 +1822,7 @@ TEST_P(RedisProxyWithSeparateAuthPasswordsIntegrationTest, TransparentAuthentica
   // iterate a lot to hopefully hit all upstreams.
   for (int i = 0; i < 100; ++i) {
     const std::string request = makeBulkStringArray({"get", Envoy::Random::RandomUtility::uuid()});
-    absl::optional<uint64_t> upstream_index;
+    std::optional<uint64_t> upstream_index;
     roundtripToSomeUpstreamStep(fake_upstreams_, request, response, redis_client,
                                 fake_upstream_connections, endpoint_usernames, endpoint_passwords,
                                 upstream_index);

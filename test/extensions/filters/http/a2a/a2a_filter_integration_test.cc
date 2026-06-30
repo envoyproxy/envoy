@@ -125,7 +125,7 @@ TEST_P(A2aFilterIntegrationTest, ValidA2aPostRequestWithRichMetadata) {
     auto* access_log = hcm.add_access_log();
     access_log->set_name("envoy.access_loggers.test");
     test::integration::accesslog::FakeAccessLog access_log_config;
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
   });
 
   initializeFilter();

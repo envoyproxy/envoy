@@ -42,12 +42,12 @@ struct LookupResult {
   // If the cache entry is still populating, and the cache supports streaming,
   // and the response had no content-length header, the content length may be
   // unknown at lookup-time.
-  absl::optional<uint64_t> content_length_;
+  std::optional<uint64_t> content_length_;
 
   // If the request is a range request, this struct indicates if the ranges can
   // be satisfied and which ranges are requested. nullopt indicates that this is
   // not a range request or the range header has been ignored.
-  absl::optional<RangeDetails> range_details_;
+  std::optional<RangeDetails> range_details_;
 
   // Update the content length of the object and its response headers.
   void setContentLength(uint64_t new_length) {
@@ -97,7 +97,7 @@ public:
   // there).
   LookupResult makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
                                 ResponseMetadata&& metadata,
-                                absl::optional<uint64_t> content_length) const;
+                                std::optional<uint64_t> content_length) const;
 
   const Http::RequestHeaderMap& requestHeaders() const { return *request_headers_; }
   const VaryAllowList& varyAllowList() const { return vary_allow_list_; }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
@@ -9,8 +10,6 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/protobuf/protobuf.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {

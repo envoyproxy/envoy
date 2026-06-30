@@ -33,7 +33,7 @@ TEST(UInt32AccessorImplTest, TestProto) {
 TEST(UInt32AccessorImplTest, TestString) {
   uint32_t init_value = 0xdeadbeef;
   UInt32AccessorImpl accessor(init_value);
-  absl::optional<std::string> value = accessor.serializeAsString();
+  std::optional<std::string> value = accessor.serializeAsString();
   ASSERT_TRUE(value.has_value());
   EXPECT_EQ(value, std::to_string(init_value));
 }

@@ -52,6 +52,80 @@ envoy_cc_library(
     }),
 )
 
+# libelf from elfutils, used by libbpf for the sockmap socket interface. Only libelf and its helper
+# library are built; debuginfod, lzma, bzip2 and zstd are disabled so the build needs nothing
+# beyond zlib. Built only when sockmap is enabled.
+configure_make(
+    name = "elfutils",
+    configure_in_place = True,
+    configure_options = [
+        "--disable-debuginfod",
+        "--disable-libdebuginfod",
+        "--disable-symbol-versioning",
+        "--disable-nls",
+        "--without-bzlib",
+        "--without-lzma",
+        "--without-zstd",
+    ],
+    # Only the static libelf archive is built, so zlib is never linked here; its symbols are left
+    # unresolved and bound when Envoy links against zlib-ng. The zlib-ng dep supplies zlib.h for
+    # compiling elf_compress.c, and the cached gzdirect result satisfies the configure check without
+    # a real libz.
+    env = {
+        "CFLAGS": "-fPIC -Wno-error -D_GNU_SOURCE",
+        "ac_cv_search_gzdirect": "none required",
+    },
+    lib_source = "@elfutils//:all",
+    out_static_libs = ["libelf.a"],
+    # Build only the static archive (elfutils is not libtool based, so --disable-shared is ignored
+    # and a full build would link libelf.so and need a real zlib). Collect the archive and the
+    # public headers by hand.
+    postfix_script = "mkdir -p $$INSTALLDIR/lib $$INSTALLDIR/include && cp libelf/libelf.a $$INSTALLDIR/lib/ && cp libelf/libelf.h libelf/gelf.h libelf/elf.h libelf/nlist.h $$INSTALLDIR/include/",
+    tags = [
+        "nocompdb",
+        "skip_on_windows",
+    ],
+    targets = [
+        "-C lib",
+        "-C libelf libelf.a",
+    ],
+    deps = ["@zlib-ng//:zlib-ng"],
+)
+
+# libbpf for the sockmap socket interface, built from src/ against the vendored libelf and zlib.
+make(
+    name = "libbpf",
+    # Build only the static lib (BUILD_STATIC_ONLY skips the libbpf.so link that would need a real
+    # zlib). The libelf and zlib headers reach the compile through the CPPFLAGS the rule sets from
+    # the deps. libbpf's install target fights the rule's auto-appended PREFIX, so the archive and
+    # the public plus uapi headers are collected by hand into INSTALLDIR.
+    args = [
+        "-C src",
+        "BUILD_STATIC_ONLY=1",
+    ],
+    lib_source = "@libbpf//:all",
+    out_static_libs = ["libbpf.a"],
+    postfix_script = "mkdir -p $$INSTALLDIR/lib $$INSTALLDIR/include/bpf $$INSTALLDIR/include/linux && cp src/libbpf.a $$INSTALLDIR/lib/ && cp src/bpf.h src/libbpf.h src/btf.h src/libbpf_common.h src/libbpf_legacy.h src/bpf_helpers.h src/bpf_helper_defs.h src/bpf_tracing.h src/bpf_endian.h src/bpf_core_read.h src/skel_internal.h src/libbpf_version.h src/usdt.bpf.h $$INSTALLDIR/include/bpf/ && cp include/uapi/linux/bpf.h include/uapi/linux/bpf_common.h include/uapi/linux/btf.h $$INSTALLDIR/include/linux/",
+    tags = [
+        "nocompdb",
+        "skip_on_windows",
+    ],
+    targets = [""],
+    deps = [
+        ":elfutils",
+        "@zlib-ng//:zlib-ng",
+    ],
+)
+
+envoy_cc_library(
+    name = "libbpf_linux",
+    srcs = [],
+    deps = select({
+        "//bazel:linux": [":libbpf"],
+        "//conditions:default": [],
+    }),
+)
+
 make(
     name = "lz4",
     args = [

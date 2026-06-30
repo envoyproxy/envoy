@@ -337,13 +337,13 @@ secret_data:
   filename: "/var/run/secrets/kubernetes.io/serviceaccount/token"
   )",
                             file_based_metadata_config);
-  config_source.mutable_api_config_source()
-      ->mutable_grpc_services(0)
-      ->mutable_google_grpc()
-      ->mutable_call_credentials(0)
-      ->mutable_from_plugin()
-      ->mutable_typed_config()
-      ->PackFrom(file_based_metadata_config);
+  std::ignore = config_source.mutable_api_config_source()
+                    ->mutable_grpc_services(0)
+                    ->mutable_google_grpc()
+                    ->mutable_call_credentials(0)
+                    ->mutable_from_plugin()
+                    ->mutable_typed_config()
+                    ->PackFrom(file_based_metadata_config);
   auto secret_provider3 = secret_manager->findOrCreateTlsCertificateProvider(
       config_source, "abc.com", secret_context.server_context_, init_manager, true);
 

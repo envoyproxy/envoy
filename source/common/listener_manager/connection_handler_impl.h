@@ -33,18 +33,18 @@ class ConnectionHandlerImpl : public ConnectionHandler,
                               Logger::Loggable<Logger::Id::conn_handler> {
 public:
   using UdpListenerCallbacksOptRef =
-      absl::optional<std::reference_wrapper<Network::UdpListenerCallbacks>>;
-  using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;
+      std::optional<std::reference_wrapper<Network::UdpListenerCallbacks>>;
+  using ActiveTcpListenerOptRef = std::optional<std::reference_wrapper<ActiveTcpListener>>;
 
-  ConnectionHandlerImpl(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index);
-  ConnectionHandlerImpl(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index,
+  ConnectionHandlerImpl(Event::Dispatcher& dispatcher, std::optional<uint32_t> worker_index);
+  ConnectionHandlerImpl(Event::Dispatcher& dispatcher, std::optional<uint32_t> worker_index,
                         OverloadManager& overload_manager, OverloadManager& null_overload_manager);
 
   // Network::ConnectionHandler
   uint64_t numConnections() const override { return num_handler_connections_; }
   void incNumConnections() override;
   void decNumConnections() override;
-  void addListener(absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& config,
+  void addListener(std::optional<uint64_t> overridden_listener, Network::ListenerConfig& config,
                    Runtime::Loader& runtime, Random::RandomGenerator& random) override;
   void removeListeners(uint64_t listener_tag) override;
   void removeFilterChains(uint64_t listener_tag,
@@ -145,17 +145,17 @@ private:
     }
   };
 
-  using ActiveListenerDetailsOptRef = absl::optional<std::reference_wrapper<ActiveListenerDetails>>;
+  using ActiveListenerDetailsOptRef = std::optional<std::reference_wrapper<ActiveListenerDetails>>;
   ActiveListenerDetailsOptRef findActiveListenerByTag(uint64_t listener_tag);
 
   using PerAddressActiveListenerDetailsOptRef =
-      absl::optional<std::reference_wrapper<PerAddressActiveListenerDetails>>;
+      std::optional<std::reference_wrapper<PerAddressActiveListenerDetails>>;
   PerAddressActiveListenerDetailsOptRef
   findPerAddressActiveListenerDetails(const ActiveListenerDetailsOptRef active_listener_details,
                                       const Network::Address::Instance& address);
 
   // This has a value on worker threads, and no value on the main thread.
-  const absl::optional<uint32_t> worker_index_;
+  const std::optional<uint32_t> worker_index_;
   Event::Dispatcher& dispatcher_;
   OptRef<OverloadManager> overload_manager_;
   OptRef<OverloadManager> null_overload_manager_;
@@ -175,7 +175,7 @@ private:
 class ConnectionHandlerFactoryImpl : public ConnectionHandlerFactory {
 public:
   std::unique_ptr<ConnectionHandler>
-  createConnectionHandler(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index,
+  createConnectionHandler(Event::Dispatcher& dispatcher, std::optional<uint32_t> worker_index,
                           OverloadManager& overload_manager,
                           OverloadManager& null_overload_manager) override {
     return std::make_unique<ConnectionHandlerImpl>(dispatcher, worker_index, overload_manager,
@@ -183,7 +183,7 @@ public:
   }
   std::unique_ptr<ConnectionHandler>
   createConnectionHandler(Event::Dispatcher& dispatcher,
-                          absl::optional<uint32_t> worker_index) override {
+                          std::optional<uint32_t> worker_index) override {
     return std::make_unique<ConnectionHandlerImpl>(dispatcher, worker_index);
   }
 

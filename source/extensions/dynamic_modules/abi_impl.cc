@@ -831,6 +831,41 @@ envoy_dynamic_module_callback_cluster_get_name(envoy_dynamic_module_type_cluster
   IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_get_name: not implemented in this context");
 }
 
+// ---- Cluster worker timer callbacks ----
+
+__attribute__((weak)) envoy_dynamic_module_type_cluster_worker_timer_module_ptr
+envoy_dynamic_module_callback_cluster_worker_timer_new(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_worker_timer_new: "
+               "not implemented in this context");
+  return nullptr;
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_worker_timer_enable(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_worker_timer_enable: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_worker_timer_disable(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_worker_timer_disable: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_worker_timer_enabled(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_worker_timer_enabled: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_worker_timer_delete(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_worker_timer_delete: "
+               "not implemented in this context");
+}
+
 __attribute__((weak)) envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_cluster_config_define_counter(
     envoy_dynamic_module_type_cluster_config_envoy_ptr, envoy_dynamic_module_type_module_buffer,

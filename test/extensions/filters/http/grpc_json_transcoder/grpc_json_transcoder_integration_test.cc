@@ -220,7 +220,7 @@ typed_config:
                              ->Mutable(0)
                              ->mutable_typed_per_filter_config();
 
-          (*config)["grpc_json_transcoder"].PackFrom(per_route_config);
+          std::ignore = (*config)["grpc_json_transcoder"].PackFrom(per_route_config);
         };
 
     config_helper_.addConfigModifier(modifier);
@@ -1158,7 +1158,7 @@ std::string jsonStrToPbStrucStr(std::string json) {
   Envoy::Protobuf::Struct message;
   std::string structStr;
   TestUtility::loadFromJson(json, message);
-  TextFormat::PrintToString(message, &structStr);
+  std::ignore = TextFormat::PrintToString(message, &structStr);
   return structStr;
 }
 

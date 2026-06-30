@@ -167,7 +167,7 @@ fragments:
             ScopeKeyBuilder scope_key_builder;
         TestUtility::loadFromYaml(scope_key_builder_config_yaml, scope_key_builder);
         *filter.mutable_scoped_routes()->mutable_scope_key_builder() = scope_key_builder;
-        config->PackFrom(filter);
+        std::ignore = config->PackFrom(filter);
       });
     }
     modifications_set_up_ = true;
@@ -254,7 +254,7 @@ fragments:
     response.set_type_url(route_conguration_type_url);
     auto route_configuration =
         TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(route_config);
-    response.add_resources()->PackFrom(route_configuration);
+    std::ignore = response.add_resources()->PackFrom(route_configuration);
     ASSERT(rds_upstream_info_.stream_by_resource_name_[route_configuration.name()] != nullptr);
     rds_upstream_info_.stream_by_resource_name_[route_configuration.name()]->sendGrpcMessage(
         response);
@@ -290,7 +290,7 @@ fragments:
       auto resource = response.add_resources();
       resource->set_name(scoped_route_proto.name());
       resource->set_version(version);
-      resource->mutable_resource()->PackFrom(scoped_route_proto);
+      std::ignore = resource->mutable_resource()->PackFrom(scoped_route_proto);
     }
     scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_]->sendGrpcMessage(
         response);
@@ -309,7 +309,7 @@ fragments:
     for (const auto& resource_proto : resource_protos) {
       envoy::config::route::v3::ScopedRouteConfiguration scoped_route_proto;
       TestUtility::loadFromYaml(resource_proto, scoped_route_proto);
-      response.add_resources()->PackFrom(scoped_route_proto);
+      std::ignore = response.add_resources()->PackFrom(scoped_route_proto);
     }
     scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_]->sendGrpcMessage(
         response);

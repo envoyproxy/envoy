@@ -271,6 +271,176 @@ TEST(ProxyProtocolHeaderTest, GeneratesV2WithCustomTLVsNoPassthrough) {
   EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
 }
 
+// Validate that any combined TLVs over the maximum length are removed.
+TEST(ProxyProtocolHeaderTest, SkippedTLVs) {
+  auto src_addr = Network::Address::InstanceConstSharedPtr(
+      new Network::Address::Ipv4Instance("1.2.3.4", 12345));
+  auto dst_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("5.6.7.8", 443));
+
+  // Attacker passthrough TLV: 65520-byte value containing a smuggled HTTP
+  // request after the 3-byte TLV header. This is the value that "spills over"
+  // when the TLV is "skipped" but emitted anyway.
+  std::string smuggled = "\r\nGET /admin HTTP/1.1\r\nHost: internal\r\n\r\n";
+  std::vector<unsigned char> attack_value(smuggled.begin(), smuggled.end());
+  attack_value.resize(65520, '#'); // pad with #
+  Network::ProxyProtocolTLV attacker_tlv{0x0a, attack_value};
+
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {attacker_tlv}};
+
+  // Config: 2 small custom `TLVs` (canonical AWS pattern: `VPC-ID` + region).
+  // Their presence is what makes combined_tlv_vector != just-the-passthrough,
+  // pushing the total over 65535 so the attacker TLV gets "skipped".
+  std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs = {
+      {0xea, std::vector<unsigned char>(10, 0x41)}, // 13 bytes total
+      {0xeb, std::vector<unsigned char>(10, 0x42)}, // 13 bytes total
+  };
+
+  Buffer::OwnedImpl buff{};
+  // Passthrough all `TLVs` so the attacker TLV is in `proxy_proto_data.tlv_vector_`
+  // and gets considered.
+  const bool pass_all_tlvs = true;
+  EXPECT_LOG_CONTAINS("warn", "Skipping TLV type 10 because adding it would exceed the 65535 limit",
+                      generateV2Header(proxy_proto_data, buff, pass_all_tlvs, {}, custom_tlvs));
+
+  // Proxy protocol v2 wire format: [12B signature][1B version+command][1B family+protocol][2B
+  // length][len bytes]
+  //   = 16-byte fixed prefix + len bytes
+  // The 2-byte length at offset 14-15 (big-endian) advertises everything after.
+  ASSERT_GE(buff.length(), 16u);
+  uint8_t hdr[16];
+  buff.copyOut(0, 16, hdr);
+  uint16_t advertised_len = (static_cast<uint16_t>(hdr[14]) << 8) | hdr[15];
+
+  uint64_t actual_body_len = buff.length() - 16;
+
+  // advertised_len = 12 (INET addresses) + 13 (custom 0xea) + 13 (custom 0xeb) = 38
+  // actual_body_len = 38 + 3 (TLV 0x0a header) + 65520 (TLV 0x0a value) = 65561
+  // The 65523-byte difference is the attacker spillover.
+  EXPECT_EQ(actual_body_len, advertised_len);
+}
+
+// Validate that a TLV which is small enough to satisfy a naive 65535-byte cap on the
+// TLV portion alone (extension_length <= 65535) but which would push the on-wire `len`
+// field (addr struct + extensions) past 65535 is correctly skipped, and the resulting
+// header's advertised len matches the actual body length.
+TEST(ProxyProtocolHeaderTest, SkipsTLVThatWouldOverflowAddrPlusExtensionLength) {
+  auto src_addr = Network::Address::InstanceConstSharedPtr(
+      new Network::Address::Ipv4Instance("1.2.3.4", 12345));
+  auto dst_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("5.6.7.8", 443));
+
+  // value.size() = 65530 → TLV (3-byte header + value) = 65533 bytes.
+  // Old check: 65533 <= 65535, allowed. extension_length becomes 65533.
+  // Then addr_length = 12 (INET) + 65533 = 65545, which truncates to 9 in uint16_t — the
+  // wire smuggling bug. New check: 65533 > (65535 - 12), skip.
+  std::vector<unsigned char> overflow_value(65530, 'X');
+  Network::ProxyProtocolTLV overflow_tlv{0xAA, overflow_value};
+
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {overflow_tlv}};
+
+  Buffer::OwnedImpl buff{};
+  const bool pass_all_tlvs = true;
+  EXPECT_LOG_CONTAINS("warn",
+                      "Skipping TLV type 170 because adding it would exceed the 65535 limit",
+                      generateV2Header(proxy_proto_data, buff, pass_all_tlvs, {}, {}));
+
+  // The advertised wire `len` (offset 14-15, big-endian) must equal what we actually wrote
+  // after the 16-byte fixed prefix.
+  ASSERT_GE(buff.length(), 16u);
+  uint8_t hdr[16];
+  buff.copyOut(0, 16, hdr);
+  uint16_t advertised_len = (static_cast<uint16_t>(hdr[14]) << 8) | hdr[15];
+  uint64_t actual_body_len = buff.length() - 16;
+  EXPECT_EQ(actual_body_len, advertised_len);
+
+  // With the overflow TLV skipped and no other TLVs, only the 12-byte IPv4 address
+  // struct should be present.
+  EXPECT_EQ(advertised_len, 12u);
+}
+
+// Validate the IPv6 boundary: with addr struct = 36, an extension of 65500 bytes (= 3 + 65497
+// from a single TLV) would be allowed by the old 65535 cap (65500 <= 65535) but would push
+// addr_length to 36 + 65500 = 65536, overflowing.
+TEST(ProxyProtocolHeaderTest, SkipsTLVThatWouldOverflowAddrPlusExtensionLengthIPv6) {
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("::1", 12345));
+  auto dst_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("::2", 443));
+
+  std::vector<unsigned char> overflow_value(65497, 'Y');
+  Network::ProxyProtocolTLV overflow_tlv{0xBB, overflow_value};
+
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {overflow_tlv}};
+
+  Buffer::OwnedImpl buff{};
+  const bool pass_all_tlvs = true;
+  EXPECT_LOG_CONTAINS("warn",
+                      "Skipping TLV type 187 because adding it would exceed the 65535 limit",
+                      generateV2Header(proxy_proto_data, buff, pass_all_tlvs, {}, {}));
+
+  ASSERT_GE(buff.length(), 16u);
+  uint8_t hdr[16];
+  buff.copyOut(0, 16, hdr);
+  uint16_t advertised_len = (static_cast<uint16_t>(hdr[14]) << 8) | hdr[15];
+  uint64_t actual_body_len = buff.length() - 16;
+  EXPECT_EQ(actual_body_len, advertised_len);
+  EXPECT_EQ(advertised_len, 36u);
+}
+
+// Validate the boundary right at the limit: with addr struct = 12 and a TLV producing
+// extension_length = 65523 (= 3 + 65520), the wire len is exactly 65535 — the largest
+// legal value — and the TLV is kept.
+TEST(ProxyProtocolHeaderTest, KeepsTLVAtExactBoundary) {
+  auto src_addr = Network::Address::InstanceConstSharedPtr(
+      new Network::Address::Ipv4Instance("1.2.3.4", 12345));
+  auto dst_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("5.6.7.8", 443));
+
+  std::vector<unsigned char> max_value(65520, 'Z');
+  Network::ProxyProtocolTLV max_tlv{0xCC, max_value};
+
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {max_tlv}};
+
+  Buffer::OwnedImpl buff{};
+  const bool pass_all_tlvs = true;
+  EXPECT_TRUE(generateV2Header(proxy_proto_data, buff, pass_all_tlvs, {}, {}));
+
+  ASSERT_GE(buff.length(), 16u);
+  uint8_t hdr[16];
+  buff.copyOut(0, 16, hdr);
+  uint16_t advertised_len = (static_cast<uint16_t>(hdr[14]) << 8) | hdr[15];
+  uint64_t actual_body_len = buff.length() - 16;
+  EXPECT_EQ(advertised_len, std::numeric_limits<uint16_t>::max());
+  EXPECT_EQ(actual_body_len, advertised_len);
+}
+
+// Defensive check on the low-level overload: passing an extension_length that, combined with the
+// address struct, would overflow the 16 bit length field triggers ENVOY_BUG. Instead of incorrectly
+// framing on the wire, the function emits a 16-byte v2-shaped header with a deliberately invalid
+// command and length=0 so the peer drops per spec while the framing stays self-consistent.
+TEST(ProxyProtocolHeaderTest, LowLevelGenerateV2HeaderRejectsOverflow) {
+  Buffer::OwnedImpl buff;
+  EXPECT_ENVOY_BUG(
+      {
+        generateV2Header("1.2.3.4", "5.6.7.8", 12345, 443, Network::Address::IpVersion::v4,
+                         /*extension_length=*/65530, buff);
+        ASSERT_EQ(buff.length(), 16u);
+        uint8_t hdr[16];
+        buff.copyOut(0, 16, hdr);
+        // Bytes 0-11: v2 signature so the peer recognizes this as proxy protocol v2.
+        EXPECT_EQ(0, ::memcmp(hdr, PROXY_PROTO_V2_SIGNATURE, PROXY_PROTO_V2_SIGNATURE_LEN));
+        // Byte 12: version=2 in the upper nibble, command=0xF (unassigned) in the lower nibble.
+        // Per proxy-protocol.txt the receiver must drop on unexpected command values.
+        EXPECT_EQ(hdr[12], 0x2F);
+        // Bytes 14-15: length=0 so the on-wire framing is self-consistent (no trailing bytes).
+        const uint16_t advertised_len = (static_cast<uint16_t>(hdr[14]) << 8) | hdr[15];
+        EXPECT_EQ(advertised_len, 0u);
+        EXPECT_EQ(buff.length() - 16, advertised_len);
+      },
+      "v2 PROXY protocol header length would overflow uint16_t");
+}
+
 } // namespace
 } // namespace ProxyProtocol
 } // namespace Common

@@ -58,8 +58,8 @@ public:
       : path_(absl::StrSplit(path, ':')), request_body_(request_body) {}
 
   // FormatterProvider
-  absl::optional<std::string> format(const Formatter::Context& context,
-                                     const StreamInfo::StreamInfo&) const override;
+  std::optional<std::string> format(const Formatter::Context& context,
+                                    const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const Formatter::Context& context,
                               const StreamInfo::StreamInfo&) const override;
 
@@ -135,8 +135,8 @@ public:
   bool clearClusterCache() const { return clear_cluster_cache_; }
 
 private:
-  absl::optional<Transformation> request_transformation_;
-  absl::optional<Transformation> response_transformation_;
+  std::optional<Transformation> request_transformation_;
+  std::optional<Transformation> response_transformation_;
   const bool clear_route_cache_{};
   const bool clear_cluster_cache_{};
 };

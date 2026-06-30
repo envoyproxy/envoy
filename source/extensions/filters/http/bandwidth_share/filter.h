@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "envoy/common/optref.h"
 #include "envoy/common/time.h"
@@ -8,8 +9,6 @@
 
 #include "source/extensions/filters/http/bandwidth_share/filter_config.h"
 #include "source/extensions/filters/http/common/stream_rate_limiter.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {

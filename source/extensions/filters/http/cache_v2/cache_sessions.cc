@@ -28,10 +28,10 @@ ActiveLookupRequest::ActiveLookupRequest(
   }
 }
 
-absl::optional<std::vector<RawByteRange>> ActiveLookupRequest::parseRange() const {
+std::optional<std::vector<RawByteRange>> ActiveLookupRequest::parseRange() const {
   auto range_header = RangeUtils::getRangeHeader(*request_headers_);
   if (!range_header) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return RangeUtils::parseRangeHeader(range_header.value(), 1);
 }

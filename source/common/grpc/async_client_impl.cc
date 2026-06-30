@@ -284,6 +284,10 @@ void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
       streamError(Status::WellKnownGrpcStatus::Internal);
       return;
     }
+    // If the HTTP stream has already been reset, we can return early.
+    if (http_reset_) {
+      return;
+    }
   }
 
   if (end_stream) {

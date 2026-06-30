@@ -273,9 +273,9 @@ public:
   void onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot);
 
   // CEL evaluation
-  absl::optional<google::api::expr::runtime::CelValue>
+  std::optional<google::api::expr::runtime::CelValue>
   findValue(absl::string_view name, Protobuf::Arena* arena, bool last) const;
-  absl::optional<google::api::expr::runtime::CelValue>
+  std::optional<google::api::expr::runtime::CelValue>
   FindValue(absl::string_view name, Protobuf::Arena* arena) const override;
 
   // Foreign function state

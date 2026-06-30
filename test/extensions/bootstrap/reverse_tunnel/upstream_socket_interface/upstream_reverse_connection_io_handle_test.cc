@@ -295,7 +295,7 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, ReadConsumesFullRping) {
   ASSERT_EQ(write(fds[1], rping.data(), rping.size()), static_cast<ssize_t>(rping.size()));
 
   Buffer::OwnedImpl buffer;
-  auto result = io_handle_->read(buffer, absl::nullopt);
+  auto result = io_handle_->read(buffer, std::nullopt);
 
   EXPECT_EQ(result.err_, nullptr);
   EXPECT_EQ(result.return_value_, rping.size());
@@ -317,7 +317,7 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, ReadConsumesRpingAndReturnsTrailin
   ASSERT_EQ(write(fds[1], combined.data(), combined.size()), static_cast<ssize_t>(combined.size()));
 
   Buffer::OwnedImpl buffer;
-  auto result = io_handle_->read(buffer, absl::nullopt);
+  auto result = io_handle_->read(buffer, std::nullopt);
 
   EXPECT_EQ(result.err_, nullptr);
   EXPECT_EQ(result.return_value_, payload.size());
@@ -337,7 +337,7 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, OnPingMessageIsNoOpAndDoesNotWrite
   ASSERT_EQ(write(fds[1], rping.data(), rping.size()), static_cast<ssize_t>(rping.size()));
 
   Buffer::OwnedImpl buffer;
-  auto result = io_handle_->read(buffer, absl::nullopt);
+  auto result = io_handle_->read(buffer, std::nullopt);
   EXPECT_EQ(result.err_, nullptr);
   EXPECT_EQ(result.return_value_, rping.size());
 
@@ -364,7 +364,7 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, NonRpingFirstDisablesPingModeThenR
             static_cast<ssize_t>(non_rping.size()));
 
   Buffer::OwnedImpl first_buffer;
-  auto first = io_handle_->read(first_buffer, absl::nullopt);
+  auto first = io_handle_->read(first_buffer, std::nullopt);
   EXPECT_EQ(first.err_, nullptr);
   EXPECT_EQ(first.return_value_, non_rping.size());
   EXPECT_EQ(first_buffer.toString(), non_rping);
@@ -373,7 +373,7 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, NonRpingFirstDisablesPingModeThenR
   ASSERT_EQ(write(fds[1], rping.data(), rping.size()), static_cast<ssize_t>(rping.size()));
 
   Buffer::OwnedImpl second_buffer;
-  auto second = io_handle_->read(second_buffer, absl::nullopt);
+  auto second = io_handle_->read(second_buffer, std::nullopt);
   EXPECT_EQ(second.err_, nullptr);
   EXPECT_EQ(second.return_value_, rping.size());
   EXPECT_EQ(second_buffer.toString(), rping);

@@ -74,7 +74,7 @@ protected:
 
   // Check if it is a valid JSON-RPC request or response.
   void checkValidJsonRpc(absl::string_view name,
-                         absl::optional<absl::string_view> value = absl::nullopt);
+                         std::optional<absl::string_view> value = std::nullopt);
 
   // Protocol-specific interface
   virtual bool isNotification(const std::string& method) const = 0;

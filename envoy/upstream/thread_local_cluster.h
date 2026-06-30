@@ -118,9 +118,9 @@ public:
    *        valid until newConnection is called on the pool (if it is to be called).
    * @return the connection pool data or nullopt if there is no host available in the cluster.
    */
-  virtual absl::optional<HttpPoolData>
+  virtual std::optional<HttpPoolData>
   httpConnPool(HostConstSharedPtr host, ResourcePriority priority,
-               absl::optional<Http::Protocol> downstream_protocol,
+               std::optional<Http::Protocol> downstream_protocol,
                LoadBalancerContext* context) PURE;
 
   /**
@@ -133,13 +133,12 @@ public:
    *        valid until newConnection is called on the pool (if it is to be called).
    * @return the connection pool data or nullopt if there is no host available in the cluster.
    */
-  virtual absl::optional<TcpPoolData> tcpConnPool(HostConstSharedPtr host,
-                                                  ResourcePriority priority,
-                                                  LoadBalancerContext* context) PURE;
+  virtual std::optional<TcpPoolData> tcpConnPool(HostConstSharedPtr host, ResourcePriority priority,
+                                                 LoadBalancerContext* context) PURE;
 
   /* a legacy API which synchronously chooses a host and creates a conn pool*/
-  virtual absl::optional<TcpPoolData> tcpConnPool(ResourcePriority priority,
-                                                  LoadBalancerContext* context) PURE;
+  virtual std::optional<TcpPoolData> tcpConnPool(ResourcePriority priority,
+                                                 LoadBalancerContext* context) PURE;
 
   /**
    * Allocate a load balanced TCP connection for a cluster. The created connection is already
@@ -189,7 +188,7 @@ public:
   virtual void setDropCategory(absl::string_view drop_category) PURE;
 };
 
-using ThreadLocalClusterOptRef = absl::optional<std::reference_wrapper<ThreadLocalCluster>>;
+using ThreadLocalClusterOptRef = std::optional<std::reference_wrapper<ThreadLocalCluster>>;
 
 } // namespace Upstream
 } // namespace Envoy

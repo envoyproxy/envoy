@@ -407,7 +407,7 @@ std::vector<envoy::config::route::v3::RouteConfiguration> XdsFuzzTest::getRoutes
   std::vector<envoy::config::route::v3::RouteConfiguration> dump_routes;
   for (const auto& route : dump.dynamic_route_configs()) {
     envoy::config::route::v3::RouteConfiguration dyn_route;
-    route.route_config().UnpackTo(&dyn_route);
+    std::ignore = route.route_config().UnpackTo(&dyn_route);
     dump_routes.push_back(dyn_route);
   }
   return dump_routes;
