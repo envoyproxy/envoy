@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -603,10 +604,10 @@ private:
   envoy::service::auth::v3::CheckRequest check_request_;
   // Cached request attributes collected during initiateCall(), used as authorization context
   // inputs for cache lookups and CheckRequest construction.
-  absl::optional<RequestAttributes> request_attributes_;
+  std::optional<RequestAttributes> request_attributes_;
   // Cached consolidated per-route configuration merged across route specific filter configs,
   // used to override default authorization services and provide context extensions.
-  absl::optional<FilterConfigPerRoute> merged_per_route_config_;
+  std::optional<FilterConfigPerRoute> merged_per_route_config_;
 };
 
 } // namespace ExtAuthz
