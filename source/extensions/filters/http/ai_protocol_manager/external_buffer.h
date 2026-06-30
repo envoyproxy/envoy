@@ -37,7 +37,7 @@ using ReadCallback = absl::AnyInvocable<void(ExternalBufferStatus, Buffer::Insta
 // and later streams ranges back out.
 //
 // I/O reports completion through a callback on the owning dispatcher's thread. An
-// implementation MAY invoke that callback synchronously (re-entrantly, before the
+// implementation MAY invoke that callback synchronously (reentrantly, before the
 // call returns) or asynchronously on a later iteration -- whichever fits its
 // store -- and the BufferManager tolerates both. Destroying the buffer cancels
 // any pending callbacks; they will not fire afterwards.

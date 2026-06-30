@@ -1328,6 +1328,7 @@ redispatch
 redistributions
 reentrant
 reentrants
+reentrantly
 refactor
 refactored
 refcount
@@ -1756,6 +1757,5 @@ smartptr
 JA3
 JA4
 AiProtocolManager
-re-entrantly
 modelling
 delegator

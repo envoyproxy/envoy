@@ -157,7 +157,7 @@ private:
   void maybeReadNextChunk();
   // Target of replay_cb_. Runs off the caller's stack to either start replay
   // deferred from replay() (the caller may invoke it from a data callback, where
-  // injecting re-entrantly is unsafe) or resume replay after the per-iteration
+  // injecting reentrantly is unsafe) or resume replay after the per-iteration
   // chunk budget was spent.
   void onReplayContinuation();
   // Completion handler for a read() issued during replay.
@@ -191,7 +191,7 @@ private:
   ExternalBufferPtr buffer_;
   // Reschedules replay work out of the current call stack: starts it when replay()
   // is requested after the offload is already durable (deferred to later in the
-  // same event-loop pass so we never inject re-entrantly from the caller's
+  // same event-loop pass so we never inject reentrantly from the caller's
   // context) and resumes it on the next iteration once the per-iteration chunk
   // budget is spent, so a large replay cannot monopolize the worker.
   Event::SchedulableCallbackPtr replay_cb_;
@@ -237,8 +237,8 @@ private:
   // asynchronous completion re-enters with it clear and so paces itself.
   bool in_read_{false};
   // Length of the current synchronous replay burst, capped at
-  // ReplayChunksPerIteration. A fresh (non-re-entrant) entry restarts it at 1; a
-  // re-entrant (synchronous) chunk increments it and yields once it hits the cap.
+  // ReplayChunksPerIteration. A fresh (non-reentrant) entry restarts it at 1; a
+  // reentrant (synchronous) chunk increments it and yields once it hits the cap.
   uint32_t replay_sync_chunks_{0};
   // Cursor for the active replay range: next offset to read and the end offset
   // (the requested offset + length). Reading is done when replay_offset_ reaches

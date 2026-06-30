@@ -14,7 +14,7 @@ BufferManager::BufferManager(ExternalBufferFactory& buffer_factory, FilterChainB
     : buffer_factory_(buffer_factory), bridge_(std::move(bridge)) {
   // Reschedules replay work out of the current call stack: it starts a replay
   // deferred from replay() (later in this same event-loop pass, once the caller's
-  // filter callback unwinds, so we avoid injecting re-entrantly) and resumes
+  // filter callback unwinds, so we avoid injecting reentrantly) and resumes
   // replay on the next iteration after the per-iteration chunk budget is spent
   // (see maybeReadNextChunk).
   replay_cb_ =
@@ -73,7 +73,7 @@ void BufferManager::replay(uint64_t offset, uint64_t length, ReplayDoneCallback 
   ENVOY_LOG(debug, "ai_protocol_manager: replay requested for [{}, {})", offset, replay_end_);
   // If the offload is already fully durable, the caller may be invoking us from a
   // filter data callback; defer the start so we do not inject into the chain
-  // re-entrantly. Current-iteration (the same primitive dispatcher.post() uses)
+  // reentrantly. Current-iteration (the same primitive dispatcher.post() uses)
   // runs once this callback unwinds but still within this event-loop pass, matching
   // the in-flight-write path -- whose completion is delivered via post() -- and
   // avoiding an extra iteration of latency. If a write is still in flight, that
@@ -185,7 +185,7 @@ void BufferManager::maybeReadNextChunk() {
   // in_read_ set; we chain such chunks only up to ReplayChunksPerIteration, then
   // yield so a fast store cannot replay the whole payload back-to-back and starve
   // other connections/timers on this worker. The budget also caps the recursion
-  // depth. A non-re-entrant entry (offload done, resume, or an asynchronous read
+  // depth. A non-reentrant entry (offload done, resume, or an asynchronous read
   // completion) restarts the burst -- an async store thus paces itself one chunk
   // per iteration and never reaches the cap.
   if (in_read_) {

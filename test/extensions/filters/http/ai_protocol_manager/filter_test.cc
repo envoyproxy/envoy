@@ -141,7 +141,7 @@ TEST_F(AiProtocolManagerFilterTest, SingleFrameBody) {
 }
 
 // An empty terminal frame produces an empty end_stream marker downstream. It
-// issues no write, so replay is scheduled (not started re-entrantly from
+// issues no write, so replay is scheduled (not started reentrantly from
 // decodeData) and runs on the next event-loop iteration.
 TEST_F(AiProtocolManagerFilterTest, EmptyBody) {
   Buffer::OwnedImpl empty;
