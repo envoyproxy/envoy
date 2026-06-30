@@ -113,7 +113,7 @@ RBAC):
    destination.address, string, Downstream connection local address
    destination.port, int, Downstream connection local port
    connection.id, uint, Downstream connection ID
-   connection.mtls, bool, Indicates whether TLS is applied to the downstream connection and the peer ceritificate is presented
+   connection.mtls, bool, Indicates whether TLS is applied to the downstream connection and the peer certificate is presented
    connection.requested_server_name, string, Requested server name in the downstream TLS connection
    connection.tls_version, string, TLS version of the downstream TLS connection
    connection.subject_local_certificate, string, The subject field of the local certificate in the downstream TLS connection
@@ -124,6 +124,7 @@ RBAC):
    connection.uri_san_peer_certificate, string, The first URI entry in the SAN field of the peer certificate in the downstream TLS connection
    connection.sha256_peer_certificate_digest, string, SHA256 digest of the peer certificate in the downstream TLS connection if present
    connection.peer_certificate, string, PEM-encoded peer certificate in the downstream TLS connection if present
+   connection.peer_certificate_valid, bool, Indicates whether the peer certificate in the downstream TLS connection was presented and validated
    connection.transport_failure_reason, string, The transport failure reason e.g. certificate validation failed
 
 The following additional attributes are available upon the downstream connection termination:

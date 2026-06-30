@@ -128,6 +128,30 @@ liburing:
   - dataplane_core
   - controlplane
 
+elfutils:
+  project_name: "elfutils"
+  project_desc: "Utilities and libraries for handling ELF files, providing libelf for libbpf"
+  project_url: "https://sourceware.org/elfutils"
+  release_date: "2026-04-15"
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.extensions.network.socket_interface.sockmap
+  license: "LGPL-3.0-or-later OR GPL-2.0-or-later"
+  license_url: "https://sourceware.org/git/?p=elfutils.git;a=blob_plain;f=COPYING-LGPLV3;hb=elfutils-{version}"
+
+libbpf:
+  project_name: "libbpf"
+  project_desc: "Library for loading eBPF programs and reading their data structures"
+  project_url: "https://github.com/libbpf/libbpf"
+  release_date: "2026-03-16"
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.extensions.network.socket_interface.sockmap
+  license: "LGPL-2.1-only OR BSD-2-Clause"
+  license_url: "https://github.com/libbpf/libbpf/blob/v{version}/LICENSE"
+
 buildtools:
   project_name: "Bazel build tools"
   project_desc: "Developer tools for working with Google's bazel buildtool."
@@ -296,7 +320,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-06-25"
+  release_date: "2026-06-29"
   use_category:
   - controlplane
   - dataplane_core

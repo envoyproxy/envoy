@@ -108,6 +108,22 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "liburing-liburing-{version}",
         urls = ["https://github.com/axboe/liburing/archive/liburing-{version}.tar.gz"],
     ),
+    # libelf, used by libbpf for the sockmap socket interface. Built only when sockmap is enabled
+    # with --define=sockmap=enabled. Never built for releases.
+    elfutils = dict(
+        version = "0.195",
+        sha256 = "37629fdf7f1f3dc2818e138fca2b8094177d6c2d0f701d3bb650a561218dc026",
+        strip_prefix = "elfutils-{version}",
+        urls = ["https://sourceware.org/elfutils/ftp/{version}/elfutils-{version}.tar.bz2"],
+    ),
+    # eBPF loader for the sockmap socket interface. Built only when sockmap is enabled with
+    # --define=sockmap=enabled. Never built for releases.
+    libbpf = dict(
+        version = "1.7.0",
+        sha256 = "7ab5feffbf78557f626f2e3e3204788528394494715a30fc2070fcddc2051b7b",
+        strip_prefix = "libbpf-{version}",
+        urls = ["https://github.com/libbpf/libbpf/archive/refs/tags/v{version}.tar.gz"],
+    ),
     # This dependency is built only when performance tracing is enabled with the
     # option --define=perf_tracing=enabled. It's never built for releases.
     perfetto = dict(
@@ -553,8 +569,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "4729ceb221725bb52c6f4d48229d9c3ba059c36e",
-        sha256 = "4262624d5b23dd3dc5e75bcf6a4f70fe91f7e5a0cbcf994067d5e0897d8f5e0f",
+        version = "2e79733d0b831ab194dde343845aca66d5bedde3",
+        sha256 = "eeb92fb31981b3383b17dc1ec7ac8f67a5e52b615e899c88c7ee4edb671285cc",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),
