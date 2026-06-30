@@ -115,8 +115,7 @@ public:
   }
   // True until the first onData().
   bool empty() const {
-	  return buffer_ == nullptr ||
-		  buffer_->length() + pending_.length() + in_flight_write_size_ == 0;
+    return buffer_ == nullptr || buffer_->length() + pending_.length() + in_flight_write_size_ == 0;
   }
   // Cancels in-flight work and detaches from the filter chain. After this the
   // async completion handlers are inert.
