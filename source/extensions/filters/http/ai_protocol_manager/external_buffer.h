@@ -24,34 +24,13 @@ enum class ExternalBufferStatus {
   Error,
 };
 
-// Invoked when an asynchronous append() completes.
-using AppendCallback = absl::AnyInvocable<void(ExternalBufferStatus)>;
+// Invoked when an asynchronous write() completes.
+using WriteCallback = absl::AnyInvocable<void(ExternalBufferStatus)>;
 
 // Invoked when an asynchronous read() completes. On Ok, `data` holds exactly
 // the requested bytes and ownership is transferred to the callee. On Error,
 // `data` is nullptr.
 using ReadCallback = absl::AnyInvocable<void(ExternalBufferStatus, Buffer::InstancePtr)>;
-
-// Callbacks an ExternalBuffer uses to signal flow-control state to its
-// producer. These mirror Envoy's watermark-buffer convention: onAboveHigh
-// fires when the volume of in-flight (not-yet-durable) bytes crosses the high
-// watermark, onBelowLow when it drains back below the low watermark.
-//
-// The producer is expected to stop appending after onAboveHighWatermark() and
-// resume after onBelowLowWatermark(). Honoring this is what keeps the resident
-// memory footprint bounded when the backing store cannot keep up with ingest.
-class ExternalBufferWatermarkCallbacks {
-public:
-  virtual ~ExternalBufferWatermarkCallbacks() = default;
-
-  // The amount of in-flight (not-yet-persisted) data has exceeded the high
-  // watermark. The producer should stop appending until onBelowLowWatermark().
-  virtual void onAboveHighWatermark() PURE;
-
-  // In-flight data has drained below the low watermark; the producer may
-  // resume appending.
-  virtual void onBelowLowWatermark() PURE;
-};
 
 // An append-only, random-access byte store with asynchronous I/O.
 //
@@ -75,15 +54,23 @@ class ExternalBuffer {
 public:
   virtual ~ExternalBuffer() = default;
 
-  // Appends an owned `data` buffer to the end of the store, taking ownership of
-  // it. `cb` is invoked once the bytes are durable. Appends are ordered:
-  // completion callbacks fire in the order append() was called.
+  // Writes an owned `data` buffer to the end of the store (the store is
+  // append-only), taking ownership of it. `cb` is invoked once the bytes are
+  // durable.
+  //
+  // The caller issues at most one write at a time: it must not call write()
+  // again until the previous write's completion callback has fired. This
+  // single-writer contract means an implementation never has to maintain its own
+  // write queue or reason about overlapping/out-of-order writes -- the
+  // BufferManager serializes writes and queues the backlog. An implementation
+  // that cannot keep up applies back-pressure simply by deferring `cb`; the
+  // caller will not issue the next write until it fires.
   //
   // The caller transfers an already-owned buffer rather than a borrowed
   // reference, so an implementation never has to grab the bytes synchronously to
   // keep them alive across asynchronous I/O -- that ownership hand-off is
   // storage-agnostic and is done once by the BufferManager.
-  virtual void append(Buffer::InstancePtr data, AppendCallback cb) PURE;
+  virtual void write(Buffer::InstancePtr data, WriteCallback cb) PURE;
 
   // Reads `length` bytes starting at absolute byte offset `offset`. It is an
   // error to request a range that extends past the current length(). `cb`
@@ -91,15 +78,9 @@ public:
   // comment).
   virtual void read(uint64_t offset, uint64_t length, ReadCallback cb) PURE;
 
-  // Total number of bytes appended (and acknowledged) so far. Reflects only
-  // appends whose completion callback has already fired.
+  // Total number of bytes written (and acknowledged) so far. Reflects only
+  // writes whose completion callback has already fired.
   virtual uint64_t length() const PURE;
-
-  // Registers flow-control callbacks and the high/low watermarks (in bytes) on
-  // in-flight append data. A high watermark of 0 disables flow control.
-  // `callbacks` must outlive the buffer.
-  virtual void setWatermarks(uint32_t high_watermark, uint32_t low_watermark,
-                             ExternalBufferWatermarkCallbacks& callbacks) PURE;
 };
 
 using ExternalBufferPtr = std::unique_ptr<ExternalBuffer>;
@@ -112,7 +93,7 @@ public:
   virtual ~ExternalBufferFactory() = default;
 
   // Creates a fresh, empty buffer that uses `dispatcher` to deliver completion
-  // and watermark callbacks.
+  // callbacks.
   virtual ExternalBufferPtr createBuffer(Event::Dispatcher& dispatcher) PURE;
 };
 

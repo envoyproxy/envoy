@@ -18,7 +18,7 @@ InMemoryExternalBuffer::~InMemoryExternalBuffer() {
   *alive_ = false;
 }
 
-void InMemoryExternalBuffer::append(Buffer::InstancePtr data, AppendCallback cb) {
+void InMemoryExternalBuffer::write(Buffer::InstancePtr data, WriteCallback cb) {
   // The bytes only become visible to length() / read() once the (asynchronous)
   // completion callback below runs, modelling a write that is not durable until
   // acknowledged.
@@ -50,13 +50,6 @@ void InMemoryExternalBuffer::read(uint64_t offset, uint64_t length, ReadCallback
   // bounds the work done per event-loop iteration. A disk/remote store would
   // instead post and complete on a later iteration; both satisfy the contract.
   cb(ExternalBufferStatus::Ok, std::move(out));
-}
-
-void InMemoryExternalBuffer::setWatermarks(uint32_t high_watermark, uint32_t low_watermark,
-                                           ExternalBufferWatermarkCallbacks& callbacks) {
-  high_watermark_ = high_watermark;
-  low_watermark_ = low_watermark;
-  watermark_callbacks_ = &callbacks;
 }
 
 } // namespace AiProtocolManager

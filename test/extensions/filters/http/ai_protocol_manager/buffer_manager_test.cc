@@ -1,6 +1,7 @@
 #include <deque>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
@@ -63,7 +64,7 @@ public:
   int raise_replay_watermark_at_inject_{0}; // 0 = never.
 };
 
-// An ExternalBuffer that completes both append and read asynchronously, via
+// An ExternalBuffer that completes both write and read asynchronously, via
 // dispatcher.post() -- modelling a network/disk-backed store. Used to exercise
 // the BufferManager's asynchronous (non-re-entrant) replay path, where each read
 // completion runs on its own event-loop iteration.
@@ -72,12 +73,19 @@ public:
   explicit PostingExternalBuffer(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
   ~PostingExternalBuffer() override { *alive_ = false; }
 
-  void append(Buffer::InstancePtr data, AppendCallback cb) override {
+  void write(Buffer::InstancePtr data, WriteCallback cb) override {
+    // Enforce the single-writer contract: the manager must never issue a write
+    // while another is outstanding.
+    EXPECT_FALSE(write_active_);
+    write_active_ = true;
+    ++write_calls_;
+    write_sizes_.push_back(data->length());
     dispatcher_.post([this, alive = alive_, data = std::move(data), cb = std::move(cb)]() mutable {
       if (!*alive) {
         return;
       }
       data_.move(*data);
+      write_active_ = false;
       cb(ExternalBufferStatus::Ok);
     });
   }
@@ -96,25 +104,37 @@ public:
     });
   }
   uint64_t length() const override { return data_.length(); }
-  void setWatermarks(uint32_t, uint32_t, ExternalBufferWatermarkCallbacks&) override {}
+
+  // Number of write() calls and the byte length each carried, so tests can assert
+  // that the manager serializes and coalesces queued writes.
+  int write_calls_{0};
+  std::vector<uint64_t> write_sizes_;
 
 private:
   Event::Dispatcher& dispatcher_;
   Buffer::OwnedImpl data_;
+  // True while a write's posted completion has not yet run; used to verify the
+  // single-writer contract.
+  bool write_active_{false};
   std::shared_ptr<bool> alive_{std::make_shared<bool>(true)};
 };
 
 class PostingExternalBufferFactory : public ExternalBufferFactory {
 public:
   ExternalBufferPtr createBuffer(Event::Dispatcher& dispatcher) override {
-    return std::make_unique<PostingExternalBuffer>(dispatcher);
+    auto buffer = std::make_unique<PostingExternalBuffer>(dispatcher);
+    last_ = buffer.get();
+    return buffer;
   }
+
+  // The most recently created buffer (owned by the BufferManager under test).
+  PostingExternalBuffer* last_{nullptr};
 };
 
 class BufferManagerTest : public testing::Test {
 public:
   BufferManagerTest() {
-    // The in-memory buffer delivers append completions via dispatcher.post().
+    // The in-memory buffer delivers write completions via dispatcher.post().
     // Capture those callbacks so the test can run the event loop deterministically.
     ON_CALL(dispatcher_, post(testing::_)).WillByDefault(Invoke([this](Event::PostCb cb) {
       posted_.push_back(std::move(cb));
@@ -161,7 +181,7 @@ TEST_F(BufferManagerTest, OffloadsAndReplaysBody) {
   Buffer::OwnedImpl chunk2("[\"hi\"]}");
   EXPECT_EQ(manager_->onData(chunk2, true), Http::FilterDataStatus::StopIterationNoBuffer);
 
-  // Nothing has been replayed yet: appends and replay are all asynchronous.
+  // Nothing has been replayed yet: writes and replay are all asynchronous.
   EXPECT_EQ(bridge_->inject_calls_, 0);
 
   drain();
@@ -181,12 +201,18 @@ TEST_F(BufferManagerTest, SingleFrameBody) {
   EXPECT_EQ(bridge_->injected_.toString(), "{}");
 }
 
-// An empty terminal frame produces an empty end_stream marker downstream.
+// An empty terminal frame produces an empty end_stream marker downstream. Since
+// it issues no write, replay is scheduled (not started re-entrantly from the data
+// callback) and runs on the next event-loop iteration.
 TEST_F(BufferManagerTest, EmptyBody) {
   Buffer::OwnedImpl empty;
   EXPECT_EQ(manager_->onData(empty, true), Http::FilterDataStatus::StopIterationNoBuffer);
-  drain();
 
+  // Nothing injected synchronously; the replay continuation is scheduled.
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+  EXPECT_TRUE(replay_cb_->enabled());
+
+  replay_cb_->invokeCallback();
   EXPECT_EQ(bridge_->inject_calls_, 1);
   EXPECT_TRUE(bridge_->injected_end_stream_);
   EXPECT_EQ(bridge_->injected_.length(), 0);
@@ -274,14 +300,85 @@ TEST_F(BufferManagerTest, DestroyUnregistersReplayWatermarks) {
   EXPECT_EQ(bridge_->handler_, nullptr);
 }
 
-// Ingest back-pressure from the external buffer is forwarded to the source via
-// the bridge.
-TEST_F(BufferManagerTest, IngestWatermarksDriveSourceFlowControl) {
-  manager_->onAboveHighWatermark();
+// Not-yet-durable bytes crossing the buffer limit pause the data source via the
+// bridge; once the write completes and they drain, the source resumes.
+TEST_F(BufferManagerTest, IngestBackpressureDrivesSourceFlowControl) {
+  // Small limit so a single frame crosses the high watermark (high=100, low=50).
+  bridge_->buffer_limit_ = 100;
+
+  // The frame exceeds the high watermark. The in-memory write completion is
+  // posted, so its bytes stay not-yet-durable until the event loop runs: the
+  // source is paused immediately.
+  Buffer::OwnedImpl body(std::string(150, 'x'));
+  EXPECT_EQ(manager_->onData(body, false), Http::FilterDataStatus::StopIterationNoBuffer);
   EXPECT_EQ(bridge_->pause_source_calls_, 1);
   EXPECT_EQ(bridge_->resume_source_calls_, 0);
-  manager_->onBelowLowWatermark();
+
+  // Draining makes the write durable; not-yet-durable bytes fall to zero (<= low)
+  // and the source resumes.
+  drain();
   EXPECT_EQ(bridge_->resume_source_calls_, 1);
+}
+
+// Sub-threshold frames are batched: each is held in the queue rather than written
+// individually, and they coalesce into a single write flushed at end_stream.
+TEST_F(BufferManagerTest, BatchesSmallFramesUntilEndStream) {
+  manager_ = makeManager(posting_factory_);
+
+  Buffer::OwnedImpl f1("aaa");
+  Buffer::OwnedImpl f2("bbb");
+  EXPECT_EQ(manager_->onData(f1, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  EXPECT_EQ(manager_->onData(f2, false), Http::FilterDataStatus::StopIterationNoBuffer);
+
+  // The buffer is created lazily on the first onData(); neither small frame has
+  // triggered a write -- they wait in the queue.
+  PostingExternalBuffer* buffer = posting_factory_.last_;
+  ASSERT_NE(buffer, nullptr);
+  EXPECT_EQ(buffer->write_calls_, 0);
+
+  Buffer::OwnedImpl f3("cc");
+  EXPECT_EQ(manager_->onData(f3, true), Http::FilterDataStatus::StopIterationNoBuffer);
+
+  // end_stream flushes the batched backlog as a single write.
+  EXPECT_EQ(buffer->write_calls_, 1);
+  EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(8)); // "aaa"+"bbb"+"cc".
+
+  drain();
+  EXPECT_TRUE(bridge_->injected_end_stream_);
+  EXPECT_EQ(bridge_->injected_.toString(), "aaabbbcc");
+}
+
+// A frame at the flush threshold is written immediately; frames that arrive while
+// that write is in flight queue and coalesce into a single follow-up write. The
+// manager issues exactly one write at a time (asserted in the fake) and replays
+// the reassembled payload verbatim.
+TEST_F(BufferManagerTest, SerializesAndCoalescesQueuedWrites) {
+  manager_ = makeManager(posting_factory_);
+
+  // Each frame is exactly the flush threshold (WriteFlushThreshold == 64KiB), so
+  // the first flushes at once.
+  const uint64_t threshold = 64 * 1024;
+  const std::string chunk(threshold, 'x');
+  Buffer::OwnedImpl f1(chunk);
+  Buffer::OwnedImpl f2(chunk);
+  Buffer::OwnedImpl f3(chunk);
+  EXPECT_EQ(manager_->onData(f1, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  EXPECT_EQ(manager_->onData(f2, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  EXPECT_EQ(manager_->onData(f3, true), Http::FilterDataStatus::StopIterationNoBuffer);
+
+  // Only the first frame has been written; f2 and f3 wait behind the in-flight write.
+  PostingExternalBuffer* buffer = posting_factory_.last_;
+  ASSERT_NE(buffer, nullptr);
+  EXPECT_EQ(buffer->write_calls_, 1);
+
+  drain();
+
+  // The queued backlog coalesced into one follow-up write -- two writes total,
+  // never overlapping (asserted in the fake) -- and the payload round-trips.
+  EXPECT_EQ(buffer->write_calls_, 2);
+  EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(threshold, 2 * threshold));
+  EXPECT_TRUE(bridge_->injected_end_stream_);
+  EXPECT_EQ(bridge_->injected_.toString(), chunk + chunk + chunk);
 }
 
 // When the chain we replay into is backed up before replay starts, no data is
@@ -295,7 +392,7 @@ TEST_F(BufferManagerTest, ReplayPausesUnderBackPressure) {
   ASSERT_NE(bridge_->handler_, nullptr);
   bridge_->handler_->onReplayAboveHighWatermark();
 
-  // Draining completes the append and starts replay, but replay is paused: no
+  // Draining completes the write and starts replay, but replay is paused: no
   // chunk is read or injected while the high watermark is held.
   drain();
   EXPECT_EQ(bridge_->inject_calls_, 0);

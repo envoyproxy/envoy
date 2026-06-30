@@ -74,17 +74,19 @@ using FilterChainBridgePtr = std::unique_ptr<FilterChainBridge>;
 // paths each construct a BufferManager with the appropriate bridge.
 //
 // Flow control is enforced in both directions:
-//   - Ingest: appends honor the external buffer's in-flight watermark and push
-//     back on the data source via the bridge when the backing store cannot keep
-//     up (ExternalBufferWatermarkCallbacks below).
+//   - Ingest: the manager serializes writes (at most one outstanding) and queues
+//     the backlog itself, batching small frames into chunk-sized writes
+//     (WriteFlushThreshold) so a store that keeps up does not get a stream of tiny
+//     writes. It tracks the not-yet-durable byte count (queued plus in-flight)
+//     against the configured buffer limit and pushes back on the data source via
+//     the bridge when the backing store cannot keep up. Because the manager owns
+//     the queue, the external buffer needs no flow-control surface of its own.
 //   - Replay: re-injected data is paced against the chain's back-pressure,
 //     delivered through ReplayWatermarkHandler. We pause issuing reads/injects
 //     while the chain is backed up; without this the read->inject loop would
 //     push the entire payload into the chain regardless of drain rate, defeating
 //     the bounded-footprint goal.
-class BufferManager : public ExternalBufferWatermarkCallbacks,
-                      public ReplayWatermarkHandler,
-                      Logger::Loggable<Logger::Id::filter> {
+class BufferManager : public ReplayWatermarkHandler, Logger::Loggable<Logger::Id::filter> {
 public:
   BufferManager(ExternalBufferFactory& buffer_factory, FilterChainBridgePtr bridge);
 
@@ -103,17 +105,28 @@ public:
   // async completion handlers are inert.
   void onDestroy();
 
-  // ExternalBufferWatermarkCallbacks (ingest side: backing-store back-pressure).
-  void onAboveHighWatermark() override;
-  void onBelowLowWatermark() override;
-
   // ReplayWatermarkHandler (replay side: filter-chain back-pressure).
   void onReplayAboveHighWatermark() override;
   void onReplayBelowLowWatermark() override;
 
 private:
-  // Completion handler for an append() issued from onData().
-  void onAppendComplete(ExternalBufferStatus status);
+  // Issues a write of the queued backlog when one is warranted: no write is in
+  // flight and the backlog has reached WriteFlushThreshold, the stream has ended,
+  // or the source is paused. Hands the whole backlog to the buffer as a single
+  // write() (honoring the single-writer contract); anything that arrives
+  // afterwards waits in pending_ for the next write.
+  void maybeIssueWrite();
+  // Completion handler for a write() issued by maybeIssueWrite(). Drains the next
+  // queued write or, once the stream has ended and the queue is empty, begins
+  // replay.
+  void onWriteComplete(ExternalBufferStatus status);
+  // Begins replay once the stream has ended and every accepted byte is durable
+  // (no write in flight and nothing queued). Idempotent.
+  void maybeStartReplay();
+  // Recomputes ingest back-pressure from the not-yet-durable byte count (queued
+  // plus in-flight write) and pauses/resumes the data source via the bridge as
+  // it crosses the high/low watermark.
+  void updateIngestBackpressure();
   // Kicks off reading the offloaded payload back into the filter chain.
   void streamBackToFilterChain();
   // Ends replay: marks it done and, if the stream was terminated by trailers,
@@ -125,8 +138,9 @@ private:
   // via replay_cb_ and resumes next iteration. An asynchronous store drives one
   // chunk per completion and paces itself.
   void maybeReadNextChunk();
-  // Resumes replay on a fresh event-loop iteration after the per-iteration chunk
-  // budget was spent (the target of replay_cb_).
+  // Target of replay_cb_. Runs on a fresh event-loop iteration to either start
+  // replay deferred from onData (an empty terminal frame issues no write to drive
+  // it) or resume replay after the per-iteration chunk budget was spent.
   void onReplayContinuation();
   // Completion handler for a read() issued during replay.
   void onReadComplete(ExternalBufferStatus status, Buffer::InstancePtr data);
@@ -144,23 +158,52 @@ private:
   // injected per iteration. A store that completes reads asynchronously paces
   // itself one chunk per completion and never reaches this cap.
   static constexpr uint32_t ReplayChunksPerIteration = 8;
+  // Minimum queued backlog that triggers a write while the stream is still open
+  // and the source is flowing. Because only one write is outstanding at a time, a
+  // store that keeps up would otherwise get one tiny write per arriving frame;
+  // batching coalesces small frames into chunk-sized writes. The backlog is
+  // flushed regardless of size at end_stream (nothing more is coming) or while the
+  // source is paused for back-pressure (the batch cannot grow, so waiting would
+  // stall -- this also guarantees progress when the buffer limit is below the
+  // threshold).
+  static constexpr uint64_t WriteFlushThreshold = ReadChunkSize;
 
   ExternalBufferFactory& buffer_factory_;
   FilterChainBridgePtr bridge_;
   ExternalBufferPtr buffer_;
-  // Reschedules replay on the next event-loop iteration once the per-iteration
-  // chunk budget is spent, so a large replay cannot monopolize the worker.
+  // Drives replay on a fresh event-loop iteration: starts it for an empty
+  // terminal frame (which issues no write to drive it) and resumes it once the
+  // per-iteration chunk budget is spent, so a large replay cannot monopolize the
+  // worker.
   Event::SchedulableCallbackPtr replay_cb_;
 
   // True once onData() has observed end_stream. Replay begins once this is set
-  // and all outstanding appends have completed.
+  // and the write queue has fully drained (no write in flight, nothing pending).
   bool end_stream_seen_{false};
   // True when the stream was terminated by trailers (end_stream arrived on the
   // trailers callback, not a data frame). The replayed body must then end with
   // end_stream=false, and the held trailers are released once replay completes.
   bool trailers_pending_{false};
-  // Number of append() calls whose completion callback has not yet fired.
-  uint64_t outstanding_appends_{0};
+  // Ingest write queue. Accepted-but-not-yet-written bytes accumulate here; the
+  // manager hands the whole backlog to the buffer as a single write() once the
+  // previous write completes, enforcing the buffer's single-writer contract.
+  Buffer::OwnedImpl pending_;
+  // True while a write() is outstanding (between maybeIssueWrite() and its
+  // onWriteComplete()). Prevents overlapping writes.
+  bool write_in_flight_{false};
+  // Byte length of the in-flight write, counted as not-yet-durable for ingest
+  // back-pressure until onWriteComplete() fires. Zero when no write is in flight.
+  uint64_t in_flight_write_size_{0};
+
+  // Ingest back-pressure thresholds (bytes), derived from the configured buffer
+  // limit. The source is paused when not-yet-durable bytes (pending_ plus the
+  // in-flight write) exceed high_watermark_ and resumed once they fall to
+  // low_watermark_. A high_watermark_ of 0 disables ingest flow control.
+  uint32_t high_watermark_{0};
+  uint32_t low_watermark_{0};
+  // True while the data source is paused for ingest back-pressure; tracked so we
+  // pause/resume the source exactly once per crossing.
+  bool source_paused_{false};
 
   // True between streamBackToFilterChain() and the final injected frame.
   bool replaying_{false};

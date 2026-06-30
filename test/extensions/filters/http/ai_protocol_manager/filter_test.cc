@@ -120,7 +120,7 @@ TEST_F(AiProtocolManagerFilterTest, OffloadsAndReplaysBody) {
   Buffer::OwnedImpl chunk2("[\"hi\"]}");
   EXPECT_EQ(filter_.decodeData(chunk2, true), Http::FilterDataStatus::StopIterationNoBuffer);
 
-  // Nothing has been replayed yet: appends and replay are all asynchronous.
+  // Nothing has been replayed yet: writes and replay are all asynchronous.
   EXPECT_EQ(inject_calls_, 0);
 
   drain();
@@ -140,11 +140,16 @@ TEST_F(AiProtocolManagerFilterTest, SingleFrameBody) {
   EXPECT_EQ(injected_.toString(), "{}");
 }
 
-// An empty terminal frame produces an empty end_stream marker downstream.
+// An empty terminal frame produces an empty end_stream marker downstream. It
+// issues no write, so replay is scheduled (not started re-entrantly from
+// decodeData) and runs on the next event-loop iteration.
 TEST_F(AiProtocolManagerFilterTest, EmptyBody) {
   Buffer::OwnedImpl empty;
   EXPECT_EQ(filter_.decodeData(empty, true), Http::FilterDataStatus::StopIterationNoBuffer);
-  drain();
+
+  EXPECT_EQ(inject_calls_, 0);
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
 
   EXPECT_EQ(inject_calls_, 1);
   EXPECT_TRUE(injected_end_stream_);
@@ -192,7 +197,7 @@ TEST_F(AiProtocolManagerFilterTest, ReplayPausesUnderUpstreamBackPressure) {
   ASSERT_NE(watermark_cb_, nullptr);
   watermark_cb_->onAboveWriteBufferHighWatermark();
 
-  // Draining completes the append and starts replay, but replay is paused: no
+  // Draining completes the write and starts replay, but replay is paused: no
   // chunk is read or injected while the high watermark is held.
   drain();
   EXPECT_EQ(inject_calls_, 0);
