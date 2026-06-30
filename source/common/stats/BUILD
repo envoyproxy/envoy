@@ -286,6 +286,7 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     deps = [
         ":symbol_table_lib",
+        "//envoy/stats:scope_interface",
         "//envoy/stats:stats_interface",
     ],
 )
