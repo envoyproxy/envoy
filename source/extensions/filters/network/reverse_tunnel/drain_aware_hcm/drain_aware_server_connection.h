@@ -15,13 +15,11 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ReverseTunnel {
 
-// Interposes between the HTTP/2 server codec and the HCM's ServerConnectionCallbacks so we can
-// observe a GOAWAY sent by the peer (the upstream's client codec). The default server
-// path ignores a received GOAWAY (ConnectionManagerImpl::onGoAway is a no-op for servers); for
-// reverse tunnels we treat it as "this tunnel is going away" and dial a replacement immediately,
-// while the old tunnel keeps serving in-flight streams until the peer's final GOAWAY closes it.
-//
-// All other callbacks are forwarded unchanged to the real HCM callbacks.
+// Interposes between the HTTP/2 server codec and the HCM's ServerConnectionCallbacks to observe a
+// peer GOAWAY, which the default server path ignores (ConnectionManagerImpl::onGoAway is a no-op
+// for servers). For reverse tunnels we treat it as "this tunnel is going away" and dial a
+// replacement immediately, while the old tunnel serves in-flight streams until the peer's final
+// GOAWAY closes it. All other callbacks are forwarded unchanged.
 class DrainAwareServerConnectionCallbacks : public Http::ServerConnectionCallbacks,
                                             public Logger::Loggable<Logger::Id::filter> {
 public:
@@ -93,16 +91,11 @@ public:
   void goAway() override { inner_->goAway(); }
   Http::Protocol protocol() override { return inner_->protocol(); }
   void shutdownNotice() override {
-    // The HCM calls this at the start of a graceful drain (e.g. max_connection_duration), before
-    // the final GOAWAY emitted at drain_timeout.
-    //
-    // For reverse tunnels (on_local_drain_ set) we use this as the "tunnel is draining" signal to
-    // dial a replacement tunnel NOW, but we deliberately SUPPRESS the early GOAWAY: not forwarding
-    // shutdownNotice() means the peer (upstream client) keeps sending new requests over this tunnel
-    // during the grace window. The HCM still emits the final GOAWAY at drain_timeout via goAway(),
-    // by which point the replacement tunnel is established -- so new requests migrate to it while
-    // in-flight requests finish on this one. This is the "have a replacement before we stop
-    // accepting requests" behavior.
+    // The HCM calls this at the start of a graceful drain (e.g. max_connection_duration). For
+    // reverse tunnels (on_local_drain_ set) we use it as the "tunnel draining" signal to dial a
+    // replacement now, but SUPPRESS the early GOAWAY so the peer keeps using this tunnel during the
+    // grace window. The HCM's final GOAWAY at drain_timeout (via goAway()) then migrates new
+    // requests to the established replacement while in-flight requests finish here.
     if (on_local_drain_ != nullptr) {
       notifyLocalDrain();
       return;

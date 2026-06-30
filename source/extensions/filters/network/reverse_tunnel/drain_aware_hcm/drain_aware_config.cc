@@ -25,18 +25,14 @@ Http::ServerConnectionPtr DrainAwareHttpConnectionManagerConfig::createBaseCodec
 Http::ServerConnectionPtr DrainAwareHttpConnectionManagerConfig::createCodec(
     Network::Connection& connection, const Buffer::Instance& data,
     Http::ServerConnectionCallbacks& callbacks, Server::OverloadManager& overload_manager) {
-  // Build the "dial a replacement tunnel" action, shared by two triggers:
-  //   - on_local_drain: this connection begins draining locally (max_connection_duration /
-  //     graceful shutdown / listener drain), surfaced via shutdownNotice()/the drain timer.
-  //   - on_peer_goaway: the peer (the upstream's client codec) sends a GOAWAY,
-  //     surfaced via the interposed ServerConnectionCallbacks below.
-  // In both cases we ask the initiator IOHandle to dial a replacement tunnel immediately so the
-  // upstream has a fresh tunnel for new requests while in-flight streams finish on the old one.
-  // Opt-in via enable_drain_with_goaway; off by default.
+  // Build the "dial a replacement tunnel" action shared by two triggers: on_local_drain (this
+  // connection drains locally via max_connection_duration/graceful shutdown/listener drain) and
+  // on_peer_goaway (the peer's client codec sends a GOAWAY). Either way we ask the initiator
+  // IOHandle to dial a replacement immediately so new requests get a fresh tunnel while in-flight
+  // streams finish on the old one. Opt-in via enable_drain_with_goaway.
   //
-  // Recover the ReverseConnectionIOHandle by typed cast on the accepted socket's IoHandle. We
-  // can't key off connection.localAddress() because the listener exposes its bound rc:// address
-  // rather than the underlying socket's local port.
+  // Recover the IOHandle by typed cast on the accepted socket: connection.localAddress() can't be
+  // used because the listener exposes its bound rc:// address, not the socket's local port.
   std::function<void()> on_local_drain = nullptr;
   std::function<void()> on_peer_goaway = nullptr;
   if (enable_drain_with_goaway_) {
