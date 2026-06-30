@@ -842,9 +842,11 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ReachableTunnels) {
   }
 
   ASSERT_TRUE(by_node.contains("node1"));
+  EXPECT_EQ("cluster1", by_node["node1"].cluster_id);
   EXPECT_EQ(2, by_node["node1"].connection_count);
 
   ASSERT_TRUE(by_node.contains("node2"));
+  EXPECT_EQ("cluster2", by_node["node2"].cluster_id);
   EXPECT_EQ(1, by_node["node2"].connection_count);
 }
 
@@ -873,6 +875,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ReachableTunnelsTenantScoped) {
   auto tunnels = extension_->reachableTunnels();
   ASSERT_EQ(1, tunnels.size());
   EXPECT_EQ("tenant-a:node1", tunnels[0].node_id);
+  EXPECT_EQ("tenant-a:cluster1", tunnels[0].cluster_id);
   EXPECT_EQ(1, tunnels[0].connection_count);
 }
 

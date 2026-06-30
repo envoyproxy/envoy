@@ -143,11 +143,12 @@ public:
   absl::flat_hash_map<std::string, uint64_t> getCrossWorkerStatMap();
 
   /**
-   * A currently-reachable reverse-tunnel node and its connection count. node_id is the
-   * tenant-scoped identifier (the same value the reverse-connection cluster uses as its host key).
+   * A currently-reachable reverse-tunnel node: its tenant-scoped node_id (the cluster's host key),
+   * the tenant-scoped cluster_id it belongs to, and its connection count.
    */
   struct ReachableTunnel {
     std::string node_id;
+    std::string cluster_id;
     uint64_t connection_count{0};
   };
 

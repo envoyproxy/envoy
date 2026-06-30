@@ -2320,11 +2320,11 @@ TEST_F(ReverseConnectionClusterTest, AdminEndpointsExposeReachableTunnels) {
   ASSERT_EQ(1, endpoints.size());
   const auto& ep = endpoints[0];
 
-  // Mirrors a real reverse-tunnel host: placeholder 127.0.0.1:0 address with the node identity in
-  // logicalName/hostname (clusterName + node id), weight 1, healthy.
+  // Mirrors a real reverse-tunnel host: placeholder 127.0.0.1:0 address, node id in logicalName,
+  // and "cluster:node" in the hostname, weight 1, healthy.
   EXPECT_EQ("node-a", ep.address->logicalName());
   EXPECT_EQ("127.0.0.1:0", ep.address->asString());
-  EXPECT_EQ("namenode-a", ep.hostname);
+  EXPECT_EQ("cluster-a:node-a", ep.hostname);
   EXPECT_EQ(1u, ep.weight);
   EXPECT_EQ(envoy::config::core::v3::HEALTHY, ep.health);
 
@@ -2373,6 +2373,9 @@ TEST_F(ReverseConnectionClusterTest, AdminEndpointsSkipNodesWithRealHost) {
       Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "node-a"}}};
   auto result = lb.chooseHost(&lb_context);
   ASSERT_NE(result.host, nullptr);
+
+  // The real host carries the same "cluster:node" hostname as the synthetic endpoint did.
+  EXPECT_EQ("cluster-a:node-a", result.host->hostname());
 
   // Now that node-a has a real host, it is no longer reported as a synthetic endpoint.
   EXPECT_TRUE(cluster_->adminEndpoints().empty());

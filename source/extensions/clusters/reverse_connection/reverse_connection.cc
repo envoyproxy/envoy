@@ -21,7 +21,6 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/str_cat.h"
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
@@ -151,9 +150,13 @@ RevConCluster::checkAndCreateHost(absl::string_view host_id,
   Network::Address::InstanceConstSharedPtr host_address(
       std::make_shared<UpstreamReverseConnectionAddress>(node_id));
 
-  // Create a standard HostImpl using the custom address.
+  // Hostname "[tenant:]cluster:node" matches the synthetic admin endpoint, so /clusters shows
+  // the spoke cluster.
+  const std::string cluster_id = socket_manager->getClusterForNode(node_id);
   auto host_result = Upstream::HostImpl::create(
-      info(), absl::StrCat(info()->name(), static_cast<std::string>(node_id)),
+      info(),
+      BootstrapReverseConnection::ReverseConnectionUtility::buildClusterScopedIdentifier(
+          node_id, cluster_id),
       std::move(host_address), nullptr /* endpoint_metadata */, nullptr /* locality_metadata */,
       1 /* initial_weight */, std::make_shared<const envoy::config::core::v3::Locality>(),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(),
@@ -260,9 +263,11 @@ std::vector<Upstream::AdminEndpointProvider::AdminEndpoint> RevConCluster::admin
     }
 
     Upstream::AdminEndpointProvider::AdminEndpoint endpoint;
-    // Mirror the real host: placeholder 127.0.0.1:0 address, node identity in the hostname.
+    // Placeholder 127.0.0.1:0 address; "[tenant:]cluster:node" hostname, matching the real host.
     endpoint.address = std::make_shared<UpstreamReverseConnectionAddress>(tunnel.node_id);
-    endpoint.hostname = absl::StrCat(info()->name(), tunnel.node_id);
+    endpoint.hostname =
+        BootstrapReverseConnection::ReverseConnectionUtility::buildClusterScopedIdentifier(
+            tunnel.node_id, tunnel.cluster_id);
     endpoint.weight = 1;
     endpoint.health = envoy::config::core::v3::HEALTHY;
     endpoint.gauges.emplace_back("rt_connection_count", tunnel.connection_count);

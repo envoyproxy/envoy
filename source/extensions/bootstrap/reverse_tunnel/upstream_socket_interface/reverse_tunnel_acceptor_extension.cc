@@ -415,10 +415,12 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
     }
   }
 
-  // Per-node connection-count gauge keyed by the tenant-scoped node id (the reverse-connection host
-  // key), so admin endpoints can enumerate reachable nodes by scanning these gauges.
+  // Connection-count gauge keyed by "[tenant:]cluster:node" so /clusters can list reachable nodes
+  // and their cluster.
   if (!node_id.empty()) {
-    const std::string tunnel_stat_name = fmt::format("{}.tunnels.{}", stat_prefix_, node_id);
+    const std::string tunnel_key =
+        ReverseConnectionUtility::buildClusterScopedIdentifier(node_id, cluster_id);
+    const std::string tunnel_stat_name = fmt::format("{}.tunnels.{}", stat_prefix_, tunnel_key);
     adjust_gauge(tunnel_stat_name, increment, Stats::Gauge::ImportMode::HiddenAccumulate);
   }
 
@@ -445,8 +447,10 @@ ReverseTunnelAcceptorExtension::reachableTunnels() const {
     if (start == std::string::npos) {
       return true;
     }
-    // Everything after the prefix is the (tenant-scoped) node id.
-    result.push_back({name.substr(start + prefix.size()), gauge->value()});
+    // Recover the scoped node and cluster ids from the "[tenant:]cluster:node" suffix.
+    auto [node_id, cluster_id] =
+        ReverseConnectionUtility::splitClusterScopedIdentifier(name.substr(start + prefix.size()));
+    result.push_back({std::move(node_id), std::move(cluster_id), gauge->value()});
     return true;
   };
   getStatsScope().iterate(gauge_callback);
