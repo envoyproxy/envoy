@@ -27,7 +27,7 @@ using ::testing::StrictMock;
 class TestSampler : public Sampler {
 public:
   MOCK_METHOD(SamplingResult, shouldSample,
-              ((const StreamInfo::StreamInfo&), (const absl::optional<SpanContext>),
+              ((const StreamInfo::StreamInfo&), (const std::optional<SpanContext>),
                (const std::string&), (const std::string&), (OTelSpanKind),
                (OptRef<const Tracing::TraceContext>), (const std::vector<SpanContext>&)),
               (override));
@@ -140,7 +140,7 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
 
   // shouldSample returns a result without additional attributes and Decision::RecordAndSample
   EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, _, _, _))
-      .WillOnce([](const StreamInfo::StreamInfo&, const absl::optional<SpanContext>,
+      .WillOnce([](const StreamInfo::StreamInfo&, const std::optional<SpanContext>,
                    const std::string&, const std::string&, OTelSpanKind,
                    OptRef<const Tracing::TraceContext>, const std::vector<SpanContext>&) {
         SamplingResult res;
@@ -160,7 +160,7 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
 
   // shouldSamples return a result containing additional attributes and Decision::Drop
   EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, _, _, _))
-      .WillOnce([](const StreamInfo::StreamInfo&, const absl::optional<SpanContext>,
+      .WillOnce([](const StreamInfo::StreamInfo&, const std::optional<SpanContext>,
                    const std::string&, const std::string&, OTelSpanKind,
                    OptRef<const Tracing::TraceContext>, const std::vector<SpanContext>&) {
         SamplingResult res;

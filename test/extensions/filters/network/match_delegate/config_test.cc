@@ -240,7 +240,7 @@ template <class InputType, class ActionType>
 Matcher::MatchTreeSharedPtr<Envoy::Network::MatchingData>
 createMatchingTree(const std::string& name, const std::string& value) {
   auto tree = *Matcher::ExactMapMatcher<Envoy::Network::MatchingData>::create(
-      std::make_unique<InputType>(name), absl::nullopt);
+      std::make_unique<InputType>(name), std::nullopt);
 
   tree->addChild(value, Matcher::OnMatch<Envoy::Network::MatchingData>{
                             std::make_shared<ActionType>(), nullptr, false});
@@ -389,7 +389,7 @@ template <class InputType>
 Matcher::MatchTreeSharedPtr<Envoy::Network::MatchingData>
 createMatchingTreeWithTestAction(const std::string& name, const std::string& value) {
   auto tree = *Matcher::ExactMapMatcher<Envoy::Network::MatchingData>::create(
-      std::make_unique<InputType>(name), absl::nullopt);
+      std::make_unique<InputType>(name), std::nullopt);
 
   tree->addChild(value, Matcher::OnMatch<Envoy::Network::MatchingData>{
                             std::make_shared<TestAction>(), nullptr, false});

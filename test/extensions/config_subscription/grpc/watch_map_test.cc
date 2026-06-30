@@ -92,7 +92,7 @@ wrapInResource(const Protobuf::RepeatedPtrField<Protobuf::Any>& anys, const std:
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> ret;
   for (const auto& a : anys) {
     envoy::config::endpoint::v3::ClusterLoadAssignment cur_endpoint;
-    a.UnpackTo(&cur_endpoint);
+    std::ignore = a.UnpackTo(&cur_endpoint);
     auto* cur_resource = ret.Add();
     cur_resource->set_name(cur_endpoint.cluster_name());
     cur_resource->mutable_resource()->CopyFrom(a);
@@ -152,10 +152,10 @@ TEST(WatchMapTest, Basic) {
     Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
     envoy::config::endpoint::v3::ClusterLoadAssignment bob;
     bob.set_cluster_name("bob");
-    updated_resources.Add()->PackFrom(bob);
+    std::ignore = updated_resources.Add()->PackFrom(bob);
     envoy::config::endpoint::v3::ClusterLoadAssignment carol;
     carol.set_cluster_name("carol");
-    updated_resources.Add()->PackFrom(carol);
+    std::ignore = updated_resources.Add()->PackFrom(carol);
 
     // ...so the watch should receive only Bob.
     std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment> expected_resources;
@@ -175,13 +175,13 @@ TEST(WatchMapTest, Basic) {
     Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
     envoy::config::endpoint::v3::ClusterLoadAssignment alice;
     alice.set_cluster_name("alice");
-    updated_resources.Add()->PackFrom(alice);
+    std::ignore = updated_resources.Add()->PackFrom(alice);
     envoy::config::endpoint::v3::ClusterLoadAssignment carol;
     carol.set_cluster_name("carol");
-    updated_resources.Add()->PackFrom(carol);
+    std::ignore = updated_resources.Add()->PackFrom(carol);
     envoy::config::endpoint::v3::ClusterLoadAssignment dave;
     dave.set_cluster_name("dave");
-    updated_resources.Add()->PackFrom(dave);
+    std::ignore = updated_resources.Add()->PackFrom(dave);
 
     // ...so the watch should receive only Carol and Dave.
     std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment> expected_resources;
@@ -213,7 +213,7 @@ TEST(WatchMapTest, Overlap) {
   Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
   envoy::config::endpoint::v3::ClusterLoadAssignment alice;
   alice.set_cluster_name("alice");
-  updated_resources.Add()->PackFrom(alice);
+  std::ignore = updated_resources.Add()->PackFrom(alice);
 
   // First watch becomes interested.
   {
@@ -285,7 +285,7 @@ TEST(WatchMapTest, CacheResourceAddResource) {
   Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
   envoy::config::endpoint::v3::ClusterLoadAssignment alice;
   alice.set_cluster_name("alice");
-  updated_resources.Add()->PackFrom(alice);
+  std::ignore = updated_resources.Add()->PackFrom(alice);
 
   // First watch becomes interested.
   {
@@ -361,7 +361,7 @@ public:
   void SetUp() override {
     envoy::config::endpoint::v3::ClusterLoadAssignment alice;
     alice.set_cluster_name("alice");
-    updated_resources_.Add()->PackFrom(alice);
+    std::ignore = updated_resources_.Add()->PackFrom(alice);
     watch1_ = watch_map_.addWatch(callbacks1_, resource_decoder_);
     watch2_ = watch_map_.addWatch(callbacks2_, resource_decoder_);
     watch_map_.updateWatchInterest(watch1_, {"alice"});
@@ -443,7 +443,7 @@ TEST(WatchMapTest, AddRemoveAdd) {
   Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
   envoy::config::endpoint::v3::ClusterLoadAssignment alice;
   alice.set_cluster_name("alice");
-  updated_resources.Add()->PackFrom(alice);
+  std::ignore = updated_resources.Add()->PackFrom(alice);
 
   // First watch becomes interested.
   {
@@ -500,12 +500,12 @@ TEST(WatchMapTest, UninterestingUpdate) {
   Protobuf::RepeatedPtrField<Protobuf::Any> alice_update;
   envoy::config::endpoint::v3::ClusterLoadAssignment alice;
   alice.set_cluster_name("alice");
-  alice_update.Add()->PackFrom(alice);
+  std::ignore = alice_update.Add()->PackFrom(alice);
 
   Protobuf::RepeatedPtrField<Protobuf::Any> bob_update;
   envoy::config::endpoint::v3::ClusterLoadAssignment bob;
   bob.set_cluster_name("bob");
-  bob_update.Add()->PackFrom(bob);
+  std::ignore = bob_update.Add()->PackFrom(bob);
 
   // We are watching for alice, and an update for just bob arrives. It should be ignored.
   expectNoUpdate(callbacks, "version1");
@@ -547,10 +547,10 @@ TEST(WatchMapTest, WatchingEverything) {
   Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
   envoy::config::endpoint::v3::ClusterLoadAssignment alice;
   alice.set_cluster_name("alice");
-  updated_resources.Add()->PackFrom(alice);
+  std::ignore = updated_resources.Add()->PackFrom(alice);
   envoy::config::endpoint::v3::ClusterLoadAssignment bob;
   bob.set_cluster_name("bob");
-  updated_resources.Add()->PackFrom(bob);
+  std::ignore = updated_resources.Add()->PackFrom(bob);
 
   std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment> expected_resources1;
   expected_resources1.push_back(alice);
@@ -590,7 +590,7 @@ TEST(WatchMapTest, DeltaOnConfigUpdate) {
     Protobuf::RepeatedPtrField<Protobuf::Any> prepare_removed;
     envoy::config::endpoint::v3::ClusterLoadAssignment will_be_removed_later;
     will_be_removed_later.set_cluster_name("removed");
-    prepare_removed.Add()->PackFrom(will_be_removed_later);
+    std::ignore = prepare_removed.Add()->PackFrom(will_be_removed_later);
     expectDeltaAndSotwUpdate(callbacks2, {will_be_removed_later}, {}, "version0");
     expectDeltaAndSotwUpdate(callbacks3, {will_be_removed_later}, {}, "version0");
     doDeltaAndSotwUpdate(watch_map, prepare_removed, {}, "version0");
@@ -599,7 +599,7 @@ TEST(WatchMapTest, DeltaOnConfigUpdate) {
   Protobuf::RepeatedPtrField<Protobuf::Any> update;
   envoy::config::endpoint::v3::ClusterLoadAssignment updated;
   updated.set_cluster_name("updated");
-  update.Add()->PackFrom(updated);
+  std::ignore = update.Add()->PackFrom(updated);
 
   expectDeltaAndSotwUpdate(callbacks1, {updated}, {}, "version1");          // only update
   expectDeltaAndSotwUpdate(callbacks2, {updated}, {"removed"}, "version1"); // update+remove
@@ -642,20 +642,20 @@ TEST(WatchMapTest, OnConfigUpdateXdsTpGlobCollections) {
     Protobuf::RepeatedPtrField<Protobuf::Any> update;
     envoy::config::endpoint::v3::ClusterLoadAssignment resource1;
     resource1.set_cluster_name("xdstp://foo/bar/baz/a?some=thing&thing=some");
-    update.Add()->PackFrom(resource1);
+    std::ignore = update.Add()->PackFrom(resource1);
     envoy::config::endpoint::v3::ClusterLoadAssignment resource2;
     resource2.set_cluster_name("xdstp://foo/bar/baz/b?thing=some&some=thing");
-    update.Add()->PackFrom(resource2);
+    std::ignore = update.Add()->PackFrom(resource2);
     // Ignore non-matching resources.
     envoy::config::endpoint::v3::ClusterLoadAssignment ignored_resource;
     ignored_resource.set_cluster_name("xdstp://foo/bar/baz/c?thing=some");
-    update.Add()->PackFrom(ignored_resource);
+    std::ignore = update.Add()->PackFrom(ignored_resource);
     ignored_resource.set_cluster_name("xdstp://foo/bar/baz/d");
-    update.Add()->PackFrom(ignored_resource);
+    std::ignore = update.Add()->PackFrom(ignored_resource);
     ignored_resource.set_cluster_name("xdstp://blah/bar/baz/e");
-    update.Add()->PackFrom(ignored_resource);
+    std::ignore = update.Add()->PackFrom(ignored_resource);
     ignored_resource.set_cluster_name("whatevs");
-    update.Add()->PackFrom(ignored_resource);
+    std::ignore = update.Add()->PackFrom(ignored_resource);
     expectDeltaUpdate(callbacks, {resource1, resource2}, {}, "version0");
     doDeltaUpdate(watch_map, update, {}, "version0");
   }
@@ -687,17 +687,17 @@ TEST(WatchMapTest, OnConfigUpdateXdsTpSingletons) {
     Protobuf::RepeatedPtrField<Protobuf::Any> update;
     envoy::config::endpoint::v3::ClusterLoadAssignment resource1;
     resource1.set_cluster_name("xdstp://foo/bar/baz?thing=some&some=thing");
-    update.Add()->PackFrom(resource1);
+    std::ignore = update.Add()->PackFrom(resource1);
     // Ignore non-matching resources.
     envoy::config::endpoint::v3::ClusterLoadAssignment ignored_resource;
     ignored_resource.set_cluster_name("xdstp://foo/bar/baz/c?thing=some&some=thing");
-    update.Add()->PackFrom(ignored_resource);
+    std::ignore = update.Add()->PackFrom(ignored_resource);
     ignored_resource.set_cluster_name("xdstp://foo/bar/bazd");
-    update.Add()->PackFrom(ignored_resource);
+    std::ignore = update.Add()->PackFrom(ignored_resource);
     ignored_resource.set_cluster_name("xdstp://blah/bar/baz/e");
-    update.Add()->PackFrom(ignored_resource);
+    std::ignore = update.Add()->PackFrom(ignored_resource);
     ignored_resource.set_cluster_name("whatevs");
-    update.Add()->PackFrom(ignored_resource);
+    std::ignore = update.Add()->PackFrom(ignored_resource);
     expectDeltaUpdate(callbacks, {resource1}, {}, "version0");
     doDeltaUpdate(watch_map, update, {}, "version0");
   }
@@ -730,7 +730,7 @@ TEST(WatchMapTest, OnConfigUpdateUsingNamespaces) {
     Protobuf::RepeatedPtrField<Protobuf::Any> update;
     envoy::config::endpoint::v3::ClusterLoadAssignment resource;
     resource.set_cluster_name("ns1/resource1");
-    update.Add()->PackFrom(resource);
+    std::ignore = update.Add()->PackFrom(resource);
     expectDeltaUpdate(callbacks1, {resource}, {}, "version0");
     expectDeltaUpdate(callbacks2, {resource}, {}, "version0");
     doDeltaUpdate(watch_map, update, {}, "version0");

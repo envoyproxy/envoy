@@ -113,7 +113,8 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterEmptyProto) {
   RateLimitFilterConfig factory;
 
   envoy::extensions::filters::http::ratelimit::v3::RateLimit empty_proto_config =
-      *dynamic_cast<envoy::extensions::filters::http::ratelimit::v3::RateLimit*>(
+      *Envoy::Protobuf::DynamicCastMessage<
+          envoy::extensions::filters::http::ratelimit::v3::RateLimit>(
           factory.createEmptyConfigProto().get());
 
   EXPECT_THROW(factory.createFilterFactoryFromProto(empty_proto_config, "stats", context).value(),

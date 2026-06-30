@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/grpc/context.h"
@@ -11,8 +12,6 @@
 #include "source/common/grpc/stat_names.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -28,20 +27,20 @@ public:
 
   // Context
   void chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                  const absl::optional<RequestStatNames>& request_names,
+                  const std::optional<RequestStatNames>& request_names,
                   const Http::HeaderEntry* grpc_status) override;
   void chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                  const absl::optional<RequestStatNames>& request_names, bool success) override;
+                  const std::optional<RequestStatNames>& request_names, bool success) override;
   void chargeStat(const Upstream::ClusterInfo& cluster,
-                  const absl::optional<RequestStatNames>& request_names, bool success) override;
+                  const std::optional<RequestStatNames>& request_names, bool success) override;
   void chargeRequestMessageStat(const Upstream::ClusterInfo& cluster,
-                                const absl::optional<RequestStatNames>& request_names,
+                                const std::optional<RequestStatNames>& request_names,
                                 uint64_t amount) override;
   void chargeResponseMessageStat(const Upstream::ClusterInfo& cluster,
-                                 const absl::optional<RequestStatNames>& request_names,
+                                 const std::optional<RequestStatNames>& request_names,
                                  uint64_t amount) override;
   void chargeUpstreamStat(const Upstream::ClusterInfo& cluster,
-                          const absl::optional<RequestStatNames>& request_names,
+                          const std::optional<RequestStatNames>& request_names,
                           std::chrono::milliseconds duration) override;
 
   /**
@@ -50,7 +49,7 @@ public:
    * @return if both gRPC serve and method have been resolved successfully returns
    *   a populated RequestStatNames, otherwise returns an empty optional.
    */
-  absl::optional<RequestStatNames>
+  std::optional<RequestStatNames>
   resolveDynamicServiceAndMethod(const Http::HeaderEntry* path) override;
 
   /**
@@ -60,7 +59,7 @@ public:
    * @return if both gRPC serve and method have been resolved successfully returns
    *   a populated RequestStatNames, otherwise returns an empty optional.
    */
-  absl::optional<RequestStatNames>
+  std::optional<RequestStatNames>
   resolveDynamicServiceAndMethodWithDotReplaced(const Http::HeaderEntry* path) override;
 
   Stats::StatName successStatName(bool success) const { return success ? success_ : failure_; }
@@ -74,7 +73,7 @@ private:
   // Creates an array of stat-name elements, comprising the protocol, optional
   // service and method, and a suffix.
   Stats::ElementVec statElements(Protocol protocol,
-                                 const absl::optional<RequestStatNames>& request_names,
+                                 const std::optional<RequestStatNames>& request_names,
                                  Stats::Element suffix);
 
   Stats::StatNamePool stat_name_pool_;

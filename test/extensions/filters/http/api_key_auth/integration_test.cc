@@ -59,7 +59,7 @@ public:
                              ->Mutable(0)
                              ->mutable_typed_per_filter_config();
 
-          (*config)["envoy.filters.http.api_key_auth"].PackFrom(per_route_config);
+          std::ignore = (*config)["envoy.filters.http.api_key_auth"].PackFrom(per_route_config);
         });
     config_helper_.prependFilter(ApiKeyAuthFilterConfig);
     initialize();

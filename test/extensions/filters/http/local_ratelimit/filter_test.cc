@@ -186,7 +186,7 @@ TEST_F(FilterTest, RequestRateLimited) {
   EXPECT_CALL(decoder_callbacks_2_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
       .WillOnce(Invoke([](Http::Code code, absl::string_view body,
                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                          const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                          const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                           absl::string_view details) {
         EXPECT_EQ(Http::Code::TooManyRequests, code);
         EXPECT_EQ("local_rate_limited", body);
@@ -201,7 +201,7 @@ TEST_F(FilterTest, RequestRateLimited) {
         EXPECT_EQ("123", response_headers.get(Http::LowerCaseString("test-resp-req-id"))[0]
                              ->value()
                              .getStringView());
-        EXPECT_EQ(grpc_status, absl::nullopt);
+        EXPECT_EQ(grpc_status, std::nullopt);
         EXPECT_EQ(details, "local_rate_limited");
       }));
 
@@ -227,7 +227,7 @@ TEST_F(FilterTest, RequestRateLimitedResourceExhausted) {
   EXPECT_CALL(decoder_callbacks_2_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
       .WillOnce(Invoke([](Http::Code code, absl::string_view body,
                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                          const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                          const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                           absl::string_view details) {
         EXPECT_EQ(Http::Code::TooManyRequests, code);
         EXPECT_EQ("local_rate_limited", body);
@@ -243,7 +243,7 @@ TEST_F(FilterTest, RequestRateLimitedResourceExhausted) {
                              ->value()
                              .getStringView());
         EXPECT_EQ(grpc_status,
-                  absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted));
+                  std::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted));
         EXPECT_EQ(details, "local_rate_limited");
       }));
 
@@ -275,7 +275,7 @@ TEST_F(FilterTest, RequestRateLimitedPerConnection) {
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
       .WillOnce(Invoke([](Http::Code code, absl::string_view body,
                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                          const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                          const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                           absl::string_view details) {
         EXPECT_EQ(Http::Code::TooManyRequests, code);
         EXPECT_EQ("local_rate_limited", body);
@@ -286,7 +286,7 @@ TEST_F(FilterTest, RequestRateLimitedPerConnection) {
                               ->value()
                               .getStringView());
 
-        EXPECT_EQ(grpc_status, absl::nullopt);
+        EXPECT_EQ(grpc_status, std::nullopt);
         EXPECT_EQ(details, "local_rate_limited");
       }));
 

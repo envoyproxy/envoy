@@ -104,6 +104,12 @@ fn test_header_callbacks_filter_on_request_headers() {
     .once();
 
   envoy_filter
+    .expect_get_attribute_string()
+    .withf(|id| *id == abi::envoy_dynamic_module_type_attribute_id::ConnectionRequestedServerName)
+    .returning(|_| Some(EnvoyBuffer::new(b"example.com")))
+    .once();
+
+  envoy_filter
     .expect_get_worker_index()
     .return_const(0u32)
     .once();
@@ -312,6 +318,13 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
   envoy_filter
     .expect_set_dynamic_metadata_string_batch()
     .withf(|ns, entries| ns == "ns_req_header_batch_empty" && entries.is_empty())
+    .return_const(())
+    .once();
+  envoy_filter
+    .expect_set_dynamic_metadata_bytes()
+    .withf(|ns, key, value| {
+      ns == "ns_req_header_bytes" && key == "key" && value == &[0xff, 0x00, 0xfe]
+    })
     .return_const(())
     .once();
   // Route/Cluster/Host metadata.

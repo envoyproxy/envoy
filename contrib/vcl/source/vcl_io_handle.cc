@@ -50,13 +50,13 @@ void vclEndptCopy(sockaddr* addr, socklen_t* addrlen, const vppcom_endpt_t& ep) 
   if (ep.is_ip4) {
     sockaddr_in* addr4 = reinterpret_cast<sockaddr_in*>(addr);
     addr4->sin_family = AF_INET;
-    *addrlen = std::min(static_cast<unsigned int>(sizeof(struct sockaddr_in)), *addrlen);
+    *addrlen = std::min(static_cast<unsigned int>(sizeof(struct in_addr)), *addrlen);
     memcpy(&addr4->sin_addr, ep.ip, *addrlen); // NOLINT(safe-memcpy)
     addr4->sin_port = ep.port;
   } else {
     sockaddr_in6* addr6 = reinterpret_cast<sockaddr_in6*>(addr);
     addr6->sin6_family = AF_INET6;
-    *addrlen = std::min(static_cast<unsigned int>(sizeof(struct sockaddr_in6)), *addrlen);
+    *addrlen = std::min(static_cast<unsigned int>(sizeof(struct in6_addr)), *addrlen);
     memcpy(&addr6->sin6_addr, ep.ip, *addrlen); // NOLINT(safe-memcpy)
     addr6->sin6_port = ep.port;
   }
@@ -69,13 +69,13 @@ Envoy::Network::Address::InstanceConstSharedPtr vclEndptToAddress(const vppcom_e
 
   if (ep.is_ip4) {
     addr.ss_family = AF_INET;
-    len = sizeof(struct sockaddr_in);
+    len = sizeof(struct in_addr);
     auto in4 = reinterpret_cast<struct sockaddr_in*>(&addr);
     memcpy(&in4->sin_addr, ep.ip, len); // NOLINT(safe-memcpy)
     in4->sin_port = ep.port;
   } else {
     addr.ss_family = AF_INET6;
-    len = sizeof(struct sockaddr_in6);
+    len = sizeof(struct in6_addr);
     auto in6 = reinterpret_cast<struct sockaddr_in6*>(&addr);
     memcpy(&in6->sin6_addr, ep.ip, len); // NOLINT(safe-memcpy)
     in6->sin6_port = ep.port;

@@ -629,6 +629,69 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeLiteralHeaders) {
   EXPECT_NE(encoded_request.find("x-literal: 100% literal"), std::string::npos);
 }
 
+// Test that connect() includes an x-envoy-reverse-tunnel-initiation-time header
+// with a valid epoch milliseconds value.
+TEST_F(RCConnectionWrapperTest, ConnectIncludesInitiationTimeHeader) {
+  auto mock_connection = getDeletableConn(dispatcher_);
+
+  EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, addReadFilter(_));
+  EXPECT_CALL(*mock_connection, connect());
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12345));
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+
+  auto mock_address = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1", 8080);
+  auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
+
+  EXPECT_CALL(*mock_connection, connectionInfoProvider())
+      .WillRepeatedly(Invoke([mock_address,
+                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+        static auto mock_provider =
+            std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
+        return *mock_provider;
+      }));
+
+  Buffer::OwnedImpl captured_buffer;
+  EXPECT_CALL(*mock_connection, write(_, _))
+      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+        captured_buffer.add(buffer);
+        buffer.drain(buffer.length());
+      }));
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+
+  auto before_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          dispatcher_.timeSource().systemTime().time_since_epoch()) // NO_CHECK_FORMAT(real_time)
+          .count();
+  wrapper.connect("test-tenant", "test-cluster", "test-node");
+  auto after_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          dispatcher_.timeSource().systemTime().time_since_epoch()) // NO_CHECK_FORMAT(real_time)
+          .count();
+
+  const std::string encoded_request = captured_buffer.toString();
+
+  // Verify the initiation-time header is present.
+  const std::string header_prefix = "x-envoy-reverse-tunnel-initiation-time: ";
+  auto pos = encoded_request.find(header_prefix);
+  ASSERT_NE(pos, std::string::npos) << "initiation-time header not found in handshake request";
+
+  // Extract and validate the timestamp value.
+  auto value_start = pos + header_prefix.size();
+  auto value_end = encoded_request.find("\r\n", value_start);
+  ASSERT_NE(value_end, std::string::npos);
+  std::string timestamp_str = encoded_request.substr(value_start, value_end - value_start);
+
+  int64_t timestamp_ms;
+  ASSERT_TRUE(absl::SimpleAtoi(timestamp_str, &timestamp_ms))
+      << "initiation-time header value is not a valid integer: " << timestamp_str;
+  EXPECT_GE(timestamp_ms, before_ms);
+  EXPECT_LE(timestamp_ms, after_ms);
+}
+
 // Test RCConnectionWrapper::connect() method with connection write failure.
 TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWriteFailure) {
   // Create a mock connection that fails to write.
@@ -1199,6 +1262,55 @@ TEST_F(RCConnectionWrapperTest, DecodeHeadersUpgradeMode) {
     headers->setStatus(200);
     wrapper.decodeHeaders(std::move(headers), true);
   }
+}
+
+// parseRetryAfter honors the RFC 7231 delta-seconds form, clamps it (overflow guard) at one hour,
+// and returns nullopt for absent/zero/HTTP-date/malformed values so the caller falls back to its
+// computed backoff.
+TEST_F(RCConnectionWrapperTest, ParseRetryAfter) {
+  {
+    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+    headers->addCopy(Http::LowerCaseString("retry-after"), "7");
+    auto result = RCConnectionWrapper::parseRetryAfter(*headers);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->count(), 7000);
+  }
+  {
+    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+    EXPECT_FALSE(RCConnectionWrapper::parseRetryAfter(*headers).has_value());
+  }
+  {
+    // A zero cool-off must be treated as absent so it cannot short-circuit the backoff.
+    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+    headers->addCopy(Http::LowerCaseString("retry-after"), "0");
+    EXPECT_FALSE(RCConnectionWrapper::parseRetryAfter(*headers).has_value());
+  }
+  {
+    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+    headers->addCopy(Http::LowerCaseString("retry-after"), "Wed, 21 Oct 2026 07:28:00 GMT");
+    EXPECT_FALSE(RCConnectionWrapper::parseRetryAfter(*headers).has_value());
+  }
+  {
+    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+    headers->addCopy(Http::LowerCaseString("retry-after"), "100000"); // > 1h.
+    auto result = RCConnectionWrapper::parseRetryAfter(*headers);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->count(), 3600 * 1000);
+  }
+}
+
+// A 429 carrying Retry-After is handled by decodeHeaders via the failure/cool-off path.
+TEST_F(RCConnectionWrapperTest, DecodeHeadersRateLimited) {
+  auto mock_connection = setupMockConnection();
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+
+  Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+  headers->setStatus(429);
+  headers->addCopy(Http::LowerCaseString("retry-after"), "5");
+
+  wrapper.decodeHeaders(std::move(headers), true);
 }
 
 // In upgrade mode, connect() emits `Connection: Upgrade` + `Upgrade: reverse-tunnel`

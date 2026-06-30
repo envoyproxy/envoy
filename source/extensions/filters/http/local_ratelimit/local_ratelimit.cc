@@ -44,14 +44,14 @@ FilterConfig::FilterConfig(
       local_info_(context.localInfo()), runtime_(context.runtime()),
       filter_enabled_(
           config.has_filter_enabled()
-              ? absl::optional<Envoy::Runtime::FractionalPercent>(
+              ? std::optional<Envoy::Runtime::FractionalPercent>(
                     Envoy::Runtime::FractionalPercent(config.filter_enabled(), runtime_))
-              : absl::nullopt),
+              : std::nullopt),
       filter_enforced_(
           config.has_filter_enforced()
-              ? absl::optional<Envoy::Runtime::FractionalPercent>(
+              ? std::optional<Envoy::Runtime::FractionalPercent>(
                     Envoy::Runtime::FractionalPercent(config.filter_enforced(), runtime_))
-              : absl::nullopt),
+              : std::nullopt),
       response_headers_parser_(THROW_OR_RETURN_VALUE(
           Envoy::Router::HeaderParser::configure(config.response_headers_to_add()),
           Router::HeaderParserPtr)),
@@ -65,8 +65,8 @@ FilterConfig::FilterConfig(
       vh_rate_limits_(config.vh_rate_limits()),
       rate_limited_grpc_status_(
           config.rate_limited_as_resource_exhausted()
-              ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
-              : absl::nullopt) {
+              ? std::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
+              : std::nullopt) {
   // Note: no token bucket is fine for the global config, which would be the case for enabling
   //       the filter globally but disabled and then applying limits at the virtual host or
   //       route level. At the virtual or route level, it makes no sense to have an no token

@@ -39,7 +39,7 @@ public:
   ClusterSpecifierPluginSharedPtr
   createClusterSpecifierPlugin(const Protobuf::Message& config,
                                Server::Configuration::ServerFactoryContext&) override {
-    const auto& typed_config = dynamic_cast<const Protobuf::Struct&>(config);
+    const auto& typed_config = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(config);
     return std::make_shared<FakeClusterSpecifierPlugin>(
         typed_config.fields().at("name").string_value());
   }

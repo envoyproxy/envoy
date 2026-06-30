@@ -90,10 +90,10 @@ public:
     uint32_t healthy_endpoints = 0;
     uint32_t degraded_endpoints = 0;
     uint32_t disable_active_hc_endpoints = 0;
-    absl::optional<uint32_t> load_balancing_weight = absl::nullopt;
-    absl::optional<bool> weighted_priority_health = absl::nullopt;
-    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt;
-    absl::optional<uint32_t> drop_overload_numerator = absl::nullopt;
+    std::optional<uint32_t> load_balancing_weight = std::nullopt;
+    std::optional<bool> weighted_priority_health = std::nullopt;
+    std::optional<uint32_t> overprovisioning_factor = std::nullopt;
+    std::optional<uint32_t> drop_overload_numerator = std::nullopt;
   };
 
   // We need to supply the endpoints via EDS to provide health status. Use a

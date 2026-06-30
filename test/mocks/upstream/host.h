@@ -28,10 +28,10 @@ public:
   ~MockDetectorHostMonitor() override;
 
   MOCK_METHOD(uint32_t, numEjections, ());
-  MOCK_METHOD(void, putResult, (Result result, absl::optional<uint64_t> code));
+  MOCK_METHOD(void, putResult, (Result result, std::optional<uint64_t> code));
   MOCK_METHOD(void, putResponseTime, (std::chrono::milliseconds time));
-  MOCK_METHOD(const absl::optional<MonotonicTime>&, lastEjectionTime, ());
-  MOCK_METHOD(const absl::optional<MonotonicTime>&, lastUnejectionTime, ());
+  MOCK_METHOD(const std::optional<MonotonicTime>&, lastEjectionTime, ());
+  MOCK_METHOD(const std::optional<MonotonicTime>&, lastUnejectionTime, ());
   MOCK_METHOD(double, successRate, (DetectorHostMonitor::SuccessRateMonitorType type), (const));
   MOCK_METHOD(void, successRate,
               (DetectorHostMonitor::SuccessRateMonitorType type, double new_success_rate));
@@ -107,7 +107,7 @@ public:
   MOCK_METHOD(const envoy::config::core::v3::Locality&, locality, (), (const));
   MOCK_METHOD(uint32_t, priority, (), (const));
   MOCK_METHOD(void, priority, (uint32_t));
-  MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
+  MOCK_METHOD(std::optional<MonotonicTime>, lastHcPassTime, (), (const));
   MOCK_METHOD(void, setLastHcPassTime, (MonotonicTime last_hc_pass_time));
   Stats::StatName localityZoneStatName() const override {
     locality_zone_stat_name_ =
@@ -230,12 +230,12 @@ public:
   MOCK_METHOD(uint32_t, priority, (), (const));
   MOCK_METHOD(void, priority, (uint32_t));
   MOCK_METHOD(bool, warmed, (), (const));
-  MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
+  MOCK_METHOD(std::optional<MonotonicTime>, lastHcPassTime, (), (const));
   MOCK_METHOD(void, addLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
   MOCK_METHOD(size_t, lbPolicyDataCount, (), (const));
   MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyDataAt, (size_t index), (const));
   MOCK_METHOD(void, setLastHealthCheckHttpStatus, (uint64_t));
-  MOCK_METHOD(absl::optional<uint64_t>, lastHealthCheckHttpStatus, (), (const));
+  MOCK_METHOD(std::optional<uint64_t>, lastHealthCheckHttpStatus, (), (const));
 
   bool disable_active_health_check_ = false;
   std::string observability_name_;

@@ -450,12 +450,12 @@ TEST_F(GcpAuthnClientImplTest, SuccessBoundJwt) {
 
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_jwt()->set_url("http://test_audience");
-  const std::string fingerprint = "test_fingerprint_value";
+  const std::string fingerprint = "abc+def/ghi=";
   client_->fetchBoundJwt(audience, fingerprint, request_callbacks_);
   EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
   EXPECT_EQ(message_->headers().Path()->value().getStringView(),
             "/computeMetadata/v1/instance/service-accounts/default/identity?audience=http://"
-            "test_audience&client_certificate_sha256=test_fingerprint_value");
+            "test_audience&bindCertificateFingerprint=abc%252Bdef%252Fghi%253D");
 
   EXPECT_EQ(options_.retry_policy->num_retries().value(), 5);
 
@@ -477,12 +477,12 @@ TEST_F(GcpAuthnClientImplTest, SuccessBoundAccessToken) {
 
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_access_token();
-  const std::string fingerprint = "test_fingerprint_value";
+  const std::string fingerprint = "abc+def/ghi=";
   client_->fetchBoundAccessToken(audience, fingerprint, request_callbacks_);
   EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
   EXPECT_EQ(message_->headers().Path()->value().getStringView(),
             "/computeMetadata/v1/instance/service-accounts/default/"
-            "token?client_certificate_sha256=test_fingerprint_value");
+            "token?bindCertificateFingerprint=abc%252Bdef%252Fghi%253D");
 
   EXPECT_EQ(options_.retry_policy->num_retries().value(), 5);
 

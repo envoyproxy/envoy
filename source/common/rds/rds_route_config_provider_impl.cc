@@ -24,7 +24,7 @@ RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
   subscription_->routeConfigProvider() = nullptr;
 }
 
-const absl::optional<RouteConfigProvider::ConfigInfo>&
+const std::optional<RouteConfigProvider::ConfigInfo>&
 RdsRouteConfigProviderImpl::configInfo() const {
   return config_update_info_->configInfo();
 }

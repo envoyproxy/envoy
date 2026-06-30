@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -15,8 +16,6 @@
 #include "source/common/init/target_impl.h"
 #include "source/common/init/watcher_impl.h"
 #include "source/common/rds/route_config_provider_manager.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Rds {

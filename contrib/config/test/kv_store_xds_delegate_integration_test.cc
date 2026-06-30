@@ -97,7 +97,7 @@ public:
           tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
       setUpSdsConfig(secret_config, CLIENT_CERT_NAME);
       transport_socket->set_name("envoy.transport_sockets.tls");
-      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
     });
 
     // Add static runtime values.
@@ -455,10 +455,10 @@ public:
     envoy::service::discovery::v3::Resource r;
     r.set_name(cluster_name);
     r.set_version("1");
-    r.mutable_resource()->PackFrom(cluster_resource);
+    std::ignore = r.mutable_resource()->PackFrom(cluster_resource);
 
     std::string value;
-    r.SerializeToString(&value);
+    std::ignore = r.SerializeToString(&value);
 
     cb(key, value);
   }

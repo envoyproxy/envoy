@@ -87,6 +87,7 @@ envoy_extension_cc_test(
         "//source/server/config_validation:server_lib",
         "//test/integration:http_integration_lib",
         "//test/mocks/server:options_mocks",
+        "//test/test_common:file_system_for_test_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

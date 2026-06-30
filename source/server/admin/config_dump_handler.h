@@ -25,16 +25,16 @@ public:
                                Buffer::Instance& response, AdminStream&) const;
 
 private:
-  absl::optional<std::pair<Http::Code, std::string>>
-  addAllConfigToDump(envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
+  std::optional<std::pair<Http::Code, std::string>>
+  addAllConfigToDump(envoy::admin::v3::ConfigDump& dump, const std::optional<std::string>& mask,
                      const Matchers::StringMatcher& name_matcher, bool include_eds) const;
   /**
    * Add the config matching the passed resource to the passed config dump.
-   * @return absl::nullopt on success, else the Http::Code and an error message that should be added
+   * @return std::nullopt on success, else the Http::Code and an error message that should be added
    * to the admin response.
    */
-  absl::optional<std::pair<Http::Code, std::string>>
-  addResourceToDump(envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
+  std::optional<std::pair<Http::Code, std::string>>
+  addResourceToDump(envoy::admin::v3::ConfigDump& dump, const std::optional<std::string>& mask,
                     const std::string& resource, const Matchers::StringMatcher& name_matcher,
                     bool include_eds) const;
 

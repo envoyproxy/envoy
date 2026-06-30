@@ -19,16 +19,26 @@ envoy_cc_library(
     hdrs = ["tag.h"],
 )
 
+envoy_cc_library(
+    name = "store_interface",
+    hdrs = ["store.h"],
+    deps = [
+        ":stats_interface",
+        "//envoy/common:optref_lib",
+        "//envoy/common:pure_lib",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/thread_local:thread_local_interface",
+    ],
+)
+
 # TODO(jmarantz): atomize the build rules to match the include files.
 envoy_cc_library(
     name = "stats_interface",
     hdrs = [
-        "allocator.h",
         "histogram.h",
         "scope.h",
         "stats.h",
         "stats_matcher.h",
-        "store.h",
         "tag_extractor.h",
         "tag_producer.h",
     ],
@@ -38,6 +48,7 @@ envoy_cc_library(
         "//envoy/common:interval_set_interface",
         "//envoy/common:optref_lib",
         "//envoy/common:time_interface",
+        "//source/common/stats:symbol_table_lib",
         "@abseil-cpp//absl/container:inlined_vector",
     ],
 )

@@ -141,12 +141,12 @@ private:
 
   void headersWritten(const Http::ResponseHeaderMap&& response_headers,
                       ResponseMetadata&& response_metadata,
-                      absl::optional<uint64_t> content_length_override, bool end_stream)
+                      std::optional<uint64_t> content_length_override, bool end_stream)
       ABSL_LOCKS_EXCLUDED(mu_);
 
   // Populates the headers in memory.
   void saveHeaders(const Http::ResponseHeaderMap&& response_headers,
-                   ResponseMetadata&& response_metadata, absl::optional<uint64_t> content_length,
+                   ResponseMetadata&& response_metadata, std::optional<uint64_t> content_length,
                    bool end_stream) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
 
   bool requiresValidationFor(const ActiveLookupRequest& lookup) const

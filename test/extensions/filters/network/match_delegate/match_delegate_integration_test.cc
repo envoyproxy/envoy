@@ -152,7 +152,7 @@ public:
   absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::FactoryContext&) override {
-    const auto& config = dynamic_cast<const StringValue&>(proto_config);
+    const auto& config = Envoy::Protobuf::DynamicCastMessage<StringValue>(proto_config);
     return [value = config.value()](auto& filter_manager) {
       auto filter = std::make_shared<SetFilterStateFilter>(value);
       filter_manager.addReadFilter(filter);
@@ -222,7 +222,7 @@ public:
       auto* typed_config = filter->mutable_typed_config();
       StringValue string_value;
       string_value.set_value(value);
-      typed_config->PackFrom(string_value);
+      std::ignore = typed_config->PackFrom(string_value);
     });
 
     initialize();

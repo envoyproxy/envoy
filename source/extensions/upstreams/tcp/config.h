@@ -27,10 +27,10 @@ public:
   ProtocolOptionsConfigImpl(
       const envoy::extensions::upstreams::tcp::v3::TcpProtocolOptions& options);
 
-  absl::optional<std::chrono::milliseconds> idleTimeout() const { return idle_timeout_; }
+  std::optional<std::chrono::milliseconds> idleTimeout() const { return idle_timeout_; }
 
 private:
-  absl::optional<std::chrono::milliseconds> idle_timeout_;
+  std::optional<std::chrono::milliseconds> idle_timeout_;
 };
 
 class ProtocolOptionsConfigFactory : public Server::Configuration::ProtocolOptionsFactory {

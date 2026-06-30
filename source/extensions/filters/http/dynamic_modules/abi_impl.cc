@@ -964,7 +964,7 @@ void envoy_dynamic_module_callback_http_send_response_headers(
     headers->addCopy(Http::LowerCaseString(key), value);
   }
 
-  filter->decoder_callbacks_->encodeHeaders(std::move(headers), end_stream, "");
+  filter->sendResponseHeaders(std::move(headers), end_stream);
 }
 
 void envoy_dynamic_module_callback_http_send_response_data(
@@ -976,7 +976,7 @@ void envoy_dynamic_module_callback_http_send_response_data(
   }
 
   Buffer::OwnedImpl buffer(absl::string_view{data.ptr, data.length});
-  filter->decoder_callbacks_->encodeData(buffer, end_stream);
+  filter->sendResponseData(buffer, end_stream);
 }
 
 void envoy_dynamic_module_callback_http_send_response_trailers(
@@ -996,7 +996,7 @@ void envoy_dynamic_module_callback_http_send_response_trailers(
     trailers->addCopy(Http::LowerCaseString(key), value);
   }
 
-  filter->decoder_callbacks_->encodeTrailers(std::move(trailers));
+  filter->sendResponseTrailers(std::move(trailers));
 }
 
 size_t envoy_dynamic_module_callback_http_get_body_size(
@@ -1645,12 +1645,24 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     }
     break;
   }
+  case envoy_dynamic_module_type_attribute_id_ConnectionRequestedServerName: {
+    const auto stream_info = filter->streamInfo();
+    if (stream_info) {
+      // Downstream TLS SNI; empty when no SNI was offered, read as not-found.
+      const absl::string_view sni = stream_info->downstreamAddressProvider().requestedServerName();
+      if (!sni.empty()) {
+        *result = {sni.data(), sni.size()};
+        ok = true;
+      }
+    }
+    break;
+  }
   case envoy_dynamic_module_type_attribute_id_RequestId: {
     const auto stream_info = filter->streamInfo();
     if (stream_info) {
       auto stream_id_provider = stream_info->getStreamIdProvider();
       if (stream_id_provider.has_value()) {
-        const absl::optional<absl::string_view> request_id = stream_id_provider->toStringView();
+        const std::optional<absl::string_view> request_id = stream_id_provider->toStringView();
         if (request_id.has_value()) {
           *result = {request_id->data(), request_id->size()};
           ok = true;
@@ -1761,7 +1773,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
         filter->connection(),
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->dnsSansLocalCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->dnsSansLocalCertificate().front();
         },
@@ -1771,7 +1783,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
         filter->connection(),
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->dnsSansPeerCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->dnsSansPeerCertificate().front();
         },
@@ -1781,7 +1793,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
         filter->connection(),
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->uriSanLocalCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->uriSanLocalCertificate().front();
         },
@@ -1791,7 +1803,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
         filter->connection(),
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->uriSanPeerCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->uriSanPeerCertificate().front();
         },
@@ -2381,6 +2393,15 @@ void envoy_dynamic_module_callback_http_span_set_sampled(
   }
   auto* span = static_cast<Tracing::Span*>(span_ptr);
   span->setSampled(sampled);
+}
+
+void envoy_dynamic_module_callback_http_span_disable_local_decision(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr) {
+  if (span_ptr == nullptr) {
+    return;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  span->disableLocalDecision();
 }
 
 // Thread-local storage for temporary strings returned by tracing functions.
