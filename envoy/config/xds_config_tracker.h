@@ -93,9 +93,8 @@ public:
    * @param resources A list of resource names that the client unsubscribed
    * from.
    */
-  virtual void onResourceUnsubscribed(
-      const absl::string_view type_url,
-      const std::vector<absl::string_view>& resources) PURE;
+  virtual void onResourceUnsubscribed(const absl::string_view type_url,
+                                      const std::vector<absl::string_view>& resources) PURE;
 };
 
 using XdsConfigTrackerPtr = std::unique_ptr<XdsConfigTracker>;

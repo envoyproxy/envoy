@@ -149,6 +149,7 @@ private:
         if (eds_resources_cache_.has_value()) {
           removeResourcesFromCache(resources_);
         }
+        notifyUnsubscribedResources(resources_);
       }
     }
 
@@ -194,14 +195,16 @@ private:
             }
             return resource_name;
           });
+      std::set<std::string> removed_resources;
+      std::set_difference(previous_resources.begin(), previous_resources.end(), resources_.begin(),
+                          resources_.end(),
+                          std::inserter(removed_resources, removed_resources.begin()));
+
       if (eds_resources_cache_.has_value()) {
-        // Compute the removed resources and remove them from the cache.
-        std::set<std::string> removed_resources;
-        std::set_difference(previous_resources.begin(), previous_resources.end(),
-                            resources_.begin(), resources_.end(),
-                            std::inserter(removed_resources, removed_resources.begin()));
         removeResourcesFromCache(removed_resources);
       }
+
+      notifyUnsubscribedResources(removed_resources);
       // move this watch to the beginning of the list
       iter_ = watches_.emplace(watches_.begin(), this);
     }
@@ -227,6 +230,31 @@ private:
         if (resource_watchers_count == 0) {
           eds_resources_cache_->removeResource(resource_name);
         }
+      }
+    }
+
+    void notifyUnsubscribedResources(const std::set<std::string>& resources_to_remove) {
+      if (!parent_.xds_config_tracker_.has_value()) {
+        return;
+      }
+      std::vector<absl::string_view> truly_removed;
+      for (const auto& resource_name : resources_to_remove) {
+        bool watched = false;
+        for (const auto& watch : watches_) {
+          if (watch == this) {
+            continue;
+          }
+          if (watch->resources_.find(resource_name) != watch->resources_.end()) {
+            watched = true;
+            break;
+          }
+        }
+        if (!watched) {
+          truly_removed.push_back(resource_name);
+        }
+      }
+      if (!truly_removed.empty()) {
+        parent_.xds_config_tracker_->onResourceUnsubscribed(type_url_, truly_removed);
       }
     }
 

@@ -1545,14 +1545,12 @@ TEST_P(GrpcMuxImplTest, XdsConfigTrackerUnsubscriptionTest) {
       makeOptRefFromPtr<XdsConfigTracker>(xds_config_tracker_ptr),
       /*backoff_strategy_=*/
       std::make_unique<JitteredExponentialBackOffStrategy>(
-          SubscriptionFactory::RetryInitialDelayMs,
-          SubscriptionFactory::RetryMaxDelayMs, random_),
+          SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
       /*target_xds_authority_=*/"",
       /*eds_resources_cache_=*/
       std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
       /*skip_subsequent_node_=*/true};
-  const std::string type_url =
-      "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment";
+  const std::string type_url = "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment";
 
   grpc_mux_ = std::make_unique<XdsMux::GrpcMuxSotw>(grpc_mux_context);
   // We do NOT call setup() here because it would overwrite grpc_mux_ with a
@@ -1573,26 +1571,22 @@ TEST_P(GrpcMuxImplTest, XdsConfigTrackerUnsubscriptionTest) {
   Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   // 1. Add watch1 for {"x", "y"}
-  auto watch1 = grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_,
-                                    resource_decoder_, {});
+  auto watch1 = grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_, resource_decoder_, {});
 
   // 2. Add watch2 for {"x"}
   NiceMock<MockSubscriptionCallbacks> callbacks2;
-  auto watch2 =
-      grpc_mux_->addWatch(type_url, {"x"}, callbacks2, resource_decoder_, {});
+  auto watch2 = grpc_mux_->addWatch(type_url, {"x"}, callbacks2, resource_decoder_, {});
 
   // 3. Destroy watch1 -> this should trigger unsubscription of {"y"} since no
   // other watch wants it.
-  EXPECT_CALL(
-      *xds_config_tracker_ptr,
-      onResourceUnsubscribed(type_url, std::vector<absl::string_view>{"y"}));
+  EXPECT_CALL(*xds_config_tracker_ptr,
+              onResourceUnsubscribed(type_url, std::vector<absl::string_view>{"y"}));
   watch1.reset();
 
   // 4. Destroy watch2 -> this should trigger unsubscription of {"x"} since no
   // other watch wants it.
-  EXPECT_CALL(
-      *xds_config_tracker_ptr,
-      onResourceUnsubscribed(type_url, std::vector<absl::string_view>{"x"}));
+  EXPECT_CALL(*xds_config_tracker_ptr,
+              onResourceUnsubscribed(type_url, std::vector<absl::string_view>{"x"}));
   watch2.reset();
 }
 

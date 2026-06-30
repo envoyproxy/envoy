@@ -2,10 +2,10 @@
 
 #include <memory>
 
-#include "absl/container/flat_hash_set.h"
+#include "envoy/common/exception.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
-#include "envoy/common/exception.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/common/backoff_strategy.h"
 #include "source/common/config/resource_name.h"
@@ -17,6 +17,8 @@
 #include "source/common/singleton/threadsafe_singleton.h"
 #include "source/extensions/config_subscription/grpc/eds_resources_cache_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_context.h"
+
+#include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
 namespace Config {
@@ -201,8 +203,8 @@ void GrpcMuxImpl<S, F, RQ, RS>::updateWatch(const std::string& type_url, Watch* 
   if (xds_config_tracker_.has_value()) {
     ENVOY_LOG(debug, "GrpcMuxImpl::updateWatch tracker has value");
     if (!added_removed.removed_.empty()) {
-      std::vector<absl::string_view> unsubscribed(
-          added_removed.removed_.begin(), added_removed.removed_.end());
+      std::vector<absl::string_view> unsubscribed(added_removed.removed_.begin(),
+                                                  added_removed.removed_.end());
       ENVOY_LOG(debug,
                 "GrpcMuxImpl::updateWatch calling onResourceUnsubscribed for "
                 "{} resources",
