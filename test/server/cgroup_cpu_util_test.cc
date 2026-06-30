@@ -735,4 +735,89 @@ TEST_F(CgroupCpuUtilTest, ReadActualLimitsV2_EmptyParts) {
   EXPECT_THAT(diag.message, testing::HasSubstr("malformed cgroup v2 cpu.max"));
 }
 
+// =============================================================================
+// Test: CgroupDetectorImpl end-to-end detection + deferred logResult()
+// =============================================================================
+
+TEST_F(CgroupCpuUtilTest, DetectorImpl_V2DetectedLimitLogged) {
+  fs_.setFileContents("/proc/self/mountinfo",
+                      "25 21 0:22 / /sys/fs/cgroup rw - cgroup2 cgroup2 rw\n");
+  fs_.setFileContents("/proc/self/cgroup", "0::/mygroup\n");
+  fs_.setFileContents("/sys/fs/cgroup/mygroup/cpu.max", "250000 100000\n");
+
+  CgroupDetectorImpl detector;
+  auto limit = detector.getCpuLimit(fs_);
+  ASSERT_TRUE(limit.has_value());
+  EXPECT_EQ(limit.value(), 2U); // floor(250000/100000) = 2
+
+  EXPECT_LOG_CONTAINS("debug", "cgroup CPU limit detected: 2", { detector.logResult(); });
+  // Result is consumed; a second logResult() is a no-op.
+  EXPECT_NO_LOGS({ detector.logResult(); });
+}
+
+TEST_F(CgroupCpuUtilTest, DetectorImpl_V1DetectedLimit) {
+  fs_.setFileContents("/proc/self/mountinfo",
+                      "56 22 0:40 / /sys/fs/cgroup/cpu rw - cgroup cgroup rw,cpu,cpuacct\n");
+  fs_.setFileContents("/proc/self/cgroup", "2:cpu,cpuacct:/mygroup\n");
+  fs_.setFileContents("/sys/fs/cgroup/cpu/mygroup/cpu.cfs_quota_us", "150000\n");
+  fs_.setFileContents("/sys/fs/cgroup/cpu/mygroup/cpu.cfs_period_us", "100000\n");
+
+  CgroupDetectorImpl detector;
+  auto limit = detector.getCpuLimit(fs_);
+  ASSERT_TRUE(limit.has_value());
+  EXPECT_EQ(limit.value(), 1U); // floor(150000/100000) = 1
+}
+
+TEST_F(CgroupCpuUtilTest, DetectorImpl_ErrorDiagnosticLogsWarn) {
+  fs_.setFileContents("/proc/self/mountinfo",
+                      "25 21 0:22 / /sys/fs/cgroup rw - cgroup2 cgroup2 rw\n");
+  fs_.setFileContents("/proc/self/cgroup", "0::/mygroup\n");
+  fs_.setFileContents("/sys/fs/cgroup/mygroup/cpu.max", "garbage\n"); // Not "quota period"
+
+  CgroupDetectorImpl detector;
+  auto limit = detector.getCpuLimit(fs_);
+  EXPECT_FALSE(limit.has_value());
+
+  EXPECT_LOG_CONTAINS("warn", "no cgroup CPU limit detected: malformed cgroup v2 cpu.max",
+                      { detector.logResult(); });
+}
+
+TEST_F(CgroupCpuUtilTest, DetectorImpl_NoMount) {
+  fs_.setFileContents("/proc/self/mountinfo", ""); // No cgroup mounts
+
+  CgroupDetectorImpl detector;
+  auto limit = detector.getCpuLimit(fs_);
+  EXPECT_FALSE(limit.has_value());
+
+  EXPECT_LOG_CONTAINS("debug", "no cgroup CPU limit detected: no cgroup filesystem mounts found",
+                      { detector.logResult(); });
+}
+
+TEST_F(CgroupCpuUtilTest, DetectorImpl_NoCgroupPath) {
+  fs_.setFileContents("/proc/self/mountinfo",
+                      "25 21 0:22 / /sys/fs/cgroup rw - cgroup2 cgroup2 rw\n");
+  // /proc/self/cgroup missing -> no valid cgroup path.
+
+  CgroupDetectorImpl detector;
+  auto limit = detector.getCpuLimit(fs_);
+  EXPECT_FALSE(limit.has_value());
+
+  EXPECT_LOG_CONTAINS("debug", "no cgroup CPU limit detected: no valid cgroup path found",
+                      { detector.logResult(); });
+}
+
+TEST_F(CgroupCpuUtilTest, DetectorImpl_FilesNotAccessible) {
+  fs_.setFileContents("/proc/self/mountinfo",
+                      "25 21 0:22 / /sys/fs/cgroup rw - cgroup2 cgroup2 rw\n");
+  fs_.setFileContents("/proc/self/cgroup", "0::/mygroup\n");
+  // cpu.max missing -> CPU files not accessible.
+
+  CgroupDetectorImpl detector;
+  auto limit = detector.getCpuLimit(fs_);
+  EXPECT_FALSE(limit.has_value());
+
+  EXPECT_LOG_CONTAINS("debug", "no cgroup CPU limit detected: cgroup CPU files not accessible",
+                      { detector.logResult(); });
+}
+
 } // namespace Envoy
