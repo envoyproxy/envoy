@@ -410,15 +410,13 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     initiating_cache_lookup_ = true;
     filter_return_ = FilterReturn::StopDecoding;
 
-    bool cb_called = false;
-    active_lookup_ = cache_session_->lookup(
-        *decoder_callbacks_, *request_attributes_,
-        [this, &cb_called](Filters::Common::ExtAuthz::ResponsePtr&& response) {
-          cb_called = true;
-          active_lookup_ = nullptr;
-          onCacheLookupComplete(std::move(response));
-        });
-    if (cb_called) {
+    active_lookup_ =
+        cache_session_->lookup(*decoder_callbacks_, *request_attributes_,
+                               [this](Filters::Common::ExtAuthz::ResponsePtr&& response) {
+                                 active_lookup_ = nullptr;
+                                 onCacheLookupComplete(std::move(response));
+                               });
+    if (state_ != State::CacheLookup) {
       ENVOY_BUG(
           active_lookup_ == nullptr,
           "AuthCacheSession::lookup returned a handle even though it called cb synchronously");
