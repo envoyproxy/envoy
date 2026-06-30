@@ -987,7 +987,7 @@ public:
 
   OptRef<const envoy::config::core::v3::TypedExtensionConfig> queueStrategyConfig() const override {
     if (queue_strategy_config_ == nullptr) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     return *queue_strategy_config_;
   }

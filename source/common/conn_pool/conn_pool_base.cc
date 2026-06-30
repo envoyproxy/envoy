@@ -39,18 +39,16 @@ PendingStreamQueuePtr createPendingStreamQueue(
                                                                validation_visitor, *factory);
   } else {
     factory = Config::Utility::getFactoryByName<PendingStreamQueueFactory>(DefaultQueueStrategy);
-    if (factory == nullptr) {
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("Didn't find a registered implementation for default queue strategy: '{}'",
-                      DefaultQueueStrategy));
-    }
+    RELEASE_ASSERT(
+        factory != nullptr,
+        fmt::format("Default queue strategy factory is not registered: {}", DefaultQueueStrategy));
     factory_config = factory->createEmptyConfigProto();
   }
 
-  return THROW_OR_RETURN_VALUE(
-      factory->createQueueStrategy(*factory_config, "cluster." + std::string(DefaultQueueStrategy),
-                                   validation_visitor),
-      PendingStreamQueuePtr);
+  auto queue = factory->createQueueStrategy(
+      *factory_config, "cluster." + std::string(DefaultQueueStrategy), validation_visitor);
+  RELEASE_ASSERT(queue.ok(), queue.status().ToString());
+  return std::move(*queue);
 }
 } // namespace
 

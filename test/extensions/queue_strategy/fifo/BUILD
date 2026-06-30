@@ -18,7 +18,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/protobuf:message_validator_lib",
         "//source/extensions/queue_strategy/fifo:fifo_queue_strategy_impl",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )

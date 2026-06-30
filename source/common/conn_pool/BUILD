@@ -12,10 +12,11 @@ envoy_cc_library(
     name = "conn_pool_base_lib",
     srcs = [
         "conn_pool_base.cc",
-    "pending_stream.cc",
+        "pending_stream.cc",
     ],
-    hdrs = ["conn_pool_base.h",
-    "pending_stream.h",
+    hdrs = [
+        "conn_pool_base.h",
+        "pending_stream.h",
     ],
     deps = [
         "//envoy/stats:timespan_interface",

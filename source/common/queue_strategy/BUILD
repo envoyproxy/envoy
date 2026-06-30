@@ -16,7 +16,7 @@ envoy_cc_library(
         "//envoy/config:typed_config_interface",
         "//envoy/protobuf:message_validator_interface",
         "//source/common/common:linked_object",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/types:variant",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/types:variant",
     ],
 )

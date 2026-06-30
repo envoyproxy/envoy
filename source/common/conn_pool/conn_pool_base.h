@@ -338,8 +338,8 @@ protected:
     const auto stream_added = pending_streams_->add(std::move(pending_stream));
     cluster_connectivity_state_.incrPendingStreams(1);
     if (pending_streams_->isOverloaded()) {
-        host_->cluster().trafficStats()->upstream_queue_overloaded_.inc();
-      }
+      host_->cluster().trafficStats()->upstream_queue_overloaded_.inc();
+    }
     return stream_added;
   }
 
