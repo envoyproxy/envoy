@@ -26,7 +26,7 @@ public:
   // Phase 1 of a graceful drain: GOAWAY with the max sentinel stream id (no error).
   void sendGracefulGoAway() {
     static constexpr int32_t MaxStreamId = 0x7fffffff; // 2^31 - 1
-    ENVOY_LOG(info,
+    ENVOY_LOG(debug,
               "reverse_tunnel upstream codec: submitting graceful GOAWAY last_stream_id={:#x}",
               MaxStreamId);
     adapter_->SubmitGoAway(MaxStreamId, http2::adapter::Http2ErrorCode::HTTP2_NO_ERROR, "");
