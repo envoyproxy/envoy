@@ -14,6 +14,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/net
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Sockmap socket interface configuration]
+// Sockmap socket interface :ref:`configuration overview <config_sock_interface_sockmap>`.
 // [#extension: envoy.extensions.network.socket_interface.sockmap]
 
 // Configuration for the ``sockmap`` socket interface. It accelerates same-host TCP hops by
