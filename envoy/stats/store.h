@@ -6,22 +6,15 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag_producer.h"
+#include "envoy/thread_local/thread_local.h"
 
 namespace Envoy {
-namespace Event {
-
-class Dispatcher;
-}
-
-namespace ThreadLocal {
-class Instance;
-}
-
 namespace Stats {
 
 class Sink;

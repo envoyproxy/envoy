@@ -19,6 +19,18 @@ envoy_cc_library(
     hdrs = ["tag.h"],
 )
 
+envoy_cc_library(
+    name = "store_interface",
+    hdrs = ["store.h"],
+    deps = [
+        ":stats_interface",
+        "//envoy/common:optref_lib",
+        "//envoy/common:pure_lib",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/thread_local:thread_local_interface",
+    ],
+)
+
 # TODO(jmarantz): atomize the build rules to match the include files.
 envoy_cc_library(
     name = "stats_interface",
@@ -27,7 +39,6 @@ envoy_cc_library(
         "scope.h",
         "stats.h",
         "stats_matcher.h",
-        "store.h",
         "tag_extractor.h",
         "tag_producer.h",
     ],
