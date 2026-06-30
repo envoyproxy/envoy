@@ -33,7 +33,7 @@ void BufferManager::onDestroy() {
   buffer_.reset();
 }
 
-Http::FilterDataStatus BufferManager::onData(Buffer::Instance& data, bool end_stream) {
+void BufferManager::onData(Buffer::Instance& data) {
   if (buffer_ == nullptr) {
     buffer_ = buffer_factory_.createBuffer(bridge_->dispatcher());
     // Bound the not-yet-durable payload to the configured buffer limit so the
@@ -43,9 +43,7 @@ Http::FilterDataStatus BufferManager::onData(Buffer::Instance& data, bool end_st
     low_watermark_ = high_watermark_ / 2;
   }
 
-  end_stream_seen_ = end_stream;
-  ENVOY_LOG(trace, "ai_protocol_manager: offloading {} bytes (end_stream={})", data.length(),
-            end_stream);
+  ENVOY_LOG(trace, "ai_protocol_manager: offloading {} bytes", data.length());
   // Queue the bytes, taking ownership now so the filter chain's buffer reference
   // does not dangle across the asynchronous offload. maybeIssueWrite() flushes the
   // queued backlog to the buffer as a single write once it is worth doing (batching
@@ -54,40 +52,30 @@ Http::FilterDataStatus BufferManager::onData(Buffer::Instance& data, bool end_st
   pending_.move(data);
   updateIngestBackpressure();
   maybeIssueWrite();
-  // A non-empty frame replays once its write completes (onWriteComplete, a posted
-  // context). An empty terminal frame issues no write, so nothing would drive
-  // replay; schedule it on a fresh event-loop iteration. We must not start replay
-  // synchronously here -- injecting into the filter chain re-entrantly from within
-  // the data callback is unsafe.
-  if (end_stream_seen_ && !write_in_flight_ && pending_.length() == 0 && !replaying_) {
-    replay_cb_->scheduleCallbackNextIteration();
-  }
-
-  // We own all buffering and continuation: hold the chain here and replay the
-  // payload ourselves once it has been fully offloaded.
-  return Http::FilterDataStatus::StopIterationNoBuffer;
 }
 
-Http::FilterTrailersStatus BufferManager::onTrailers() {
-  // No body was offloaded (e.g. a headers + trailers request): there is nothing
-  // to replay, so let the trailers flow normally.
-  if (buffer_ == nullptr) {
-    return Http::FilterTrailersStatus::Continue;
-  }
-
-  // The body ended without end_stream on a data frame; the trailers carry it.
-  // Mark the stream complete so replay can begin, and replay the body ahead of
-  // the trailers. The stream has ended, so flush any batched backlog now; if the
-  // write queue is still draining, onWriteComplete() starts replay once it empties.
-  trailers_pending_ = true;
+void BufferManager::endStream() {
   end_stream_seen_ = true;
-  ENVOY_LOG(trace, "ai_protocol_manager: trailers observed; stream complete");
+  ENVOY_LOG(trace, "ai_protocol_manager: stream complete");
+  // No more data is coming: flush whatever is batched, even below the threshold.
   maybeIssueWrite();
-  maybeStartReplay();
+}
 
-  // Hold the trailers behind the replayed body; finishReplay() releases them via
-  // bridge_->continueIteration() once the last body frame has been injected.
-  return Http::FilterTrailersStatus::StopIteration;
+void BufferManager::replay(uint64_t offset, uint64_t length, ReplayDoneCallback done) {
+  // One replay at a time: the caller chains sub-ranges from the done callback.
+  ASSERT(!replaying_ && !replay_requested_);
+  replay_offset_ = offset;
+  replay_end_ = offset + length;
+  replay_done_ = std::move(done);
+  replay_requested_ = true;
+  ENVOY_LOG(debug, "ai_protocol_manager: replay requested for [{}, {})", offset, replay_end_);
+  // If the offload is already fully durable, the caller may be invoking us from a
+  // filter data callback; defer the start to a fresh event-loop iteration so we do
+  // not inject into the chain re-entrantly. Otherwise the in-flight write's
+  // completion (a posted context) starts replay via maybeStartReplay().
+  if (!write_in_flight_ && pending_.length() == 0) {
+    replay_cb_->scheduleCallbackNextIteration();
+  }
 }
 
 void BufferManager::maybeIssueWrite() {
@@ -132,17 +120,20 @@ void BufferManager::onWriteComplete(ExternalBufferStatus status) {
   updateIngestBackpressure();
   // Drain the next queued write, if any; replay waits until the queue empties.
   maybeIssueWrite();
-  // Begin replay only after the last byte has been offloaded.
+  // Begin a requested replay only after the last byte has been offloaded.
   maybeStartReplay();
 }
 
 void BufferManager::maybeStartReplay() {
-  // Idempotent: replaying_ stays set through replay, and the conditions below are
-  // only satisfiable before the first (and only) start.
-  if (replaying_ || !end_stream_seen_ || write_in_flight_ || pending_.length() > 0) {
+  // Start only once the caller has requested a replay and every accepted byte is
+  // durable. Consumes the request; the range was set by replay().
+  if (replaying_ || !replay_requested_ || write_in_flight_ || pending_.length() > 0) {
     return;
   }
-  streamBackToFilterChain();
+  replay_requested_ = false;
+  replaying_ = true;
+  ENVOY_LOG(debug, "ai_protocol_manager: replaying [{}, {})", replay_offset_, replay_end_);
+  maybeReadNextChunk();
 }
 
 void BufferManager::updateIngestBackpressure() {
@@ -162,14 +153,6 @@ void BufferManager::updateIngestBackpressure() {
   }
 }
 
-void BufferManager::streamBackToFilterChain() {
-  replaying_ = true;
-  replay_offset_ = 0;
-  replay_length_ = buffer_->length();
-  ENVOY_LOG(debug, "ai_protocol_manager: replaying {} buffered bytes", replay_length_);
-  maybeReadNextChunk();
-}
-
 void BufferManager::maybeReadNextChunk() {
   if (!replaying_ || read_in_flight_) {
     return;
@@ -183,14 +166,9 @@ void BufferManager::maybeReadNextChunk() {
     return;
   }
 
-  if (replay_offset_ >= replay_length_) {
-    // Reached only for an empty payload; a non-empty payload finishes in
-    // onReadComplete() when the last chunk is injected with end_stream. Emit an
-    // empty end_stream marker unless trailers will carry stream completion.
-    if (!trailers_pending_) {
-      Buffer::OwnedImpl empty;
-      bridge_->injectData(empty, true);
-    }
+  if (replay_offset_ >= replay_end_) {
+    // The requested range is fully injected (reached immediately for a zero-length
+    // range). Hand control back to the caller; it terminates the stream.
     finishReplay();
     return;
   }
@@ -215,7 +193,7 @@ void BufferManager::maybeReadNextChunk() {
     replay_sync_chunks_ = 1;
   }
 
-  const uint64_t chunk = std::min(ReadChunkSize, replay_length_ - replay_offset_);
+  const uint64_t chunk = std::min(ReadChunkSize, replay_end_ - replay_offset_);
   read_in_flight_ = true;
   in_read_ = true;
   buffer_->read(replay_offset_, chunk,
@@ -229,13 +207,16 @@ void BufferManager::onReplayContinuation() {
   if (destroyed_) {
     return;
   }
-  // Fresh event-loop iteration. This fires either to start replay deferred from
-  // onData (an empty terminal frame, which issues no write to drive it) or to
-  // resume after the per-iteration burst budget was spent. maybeStartReplay() is
-  // a no-op once replay is underway; maybeReadNextChunk() then makes progress
-  // with a fresh budget.
-  maybeStartReplay();
-  maybeReadNextChunk();
+  // Fresh event-loop iteration: either start replay deferred from replay() (the
+  // offload was already durable when the caller requested it) or resume after the
+  // per-iteration burst budget was spent. maybeStartReplay() already drives the
+  // first read, so dispatch on whether replay is underway to avoid advancing a
+  // fresh burst twice.
+  if (!replaying_) {
+    maybeStartReplay();
+  } else {
+    maybeReadNextChunk();
+  }
 }
 
 void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::InstancePtr data) {
@@ -249,13 +230,12 @@ void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::Instance
   }
 
   replay_offset_ += data->length();
-  const bool last = replay_offset_ >= replay_length_;
-  // Inject even if a high watermark was raised while this read was in flight:
-  // at most one extra chunk (ReadChunkSize) overshoots before we pause, which
-  // keeps the overshoot bounded. When trailers terminate the stream they carry
-  // end_stream, so the final body frame must not.
-  bridge_->injectData(*data, last && !trailers_pending_);
-  if (last) {
+  // Inject even if a high watermark was raised while this read was in flight: at
+  // most one extra chunk (ReadChunkSize) overshoots before we pause, which keeps
+  // the overshoot bounded. Always a non-terminal frame; the caller terminates the
+  // stream from the replay-done callback.
+  bridge_->injectData(*data);
+  if (replay_offset_ >= replay_end_) {
     finishReplay();
     return;
   }
@@ -264,11 +244,13 @@ void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::Instance
 
 void BufferManager::finishReplay() {
   replaying_ = false;
-  if (trailers_pending_) {
-    // The body has been fully replayed ahead of the trailers the connection
-    // manager is holding; release them so they follow the body in order.
-    ENVOY_LOG(trace, "ai_protocol_manager: replay complete; releasing trailers");
-    bridge_->continueIteration();
+  ENVOY_LOG(trace, "ai_protocol_manager: replay range [.., {}) complete", replay_end_);
+  // Hand control back to the caller. Its callback may start the next sub-range or
+  // terminate the stream; move the callback out first so it can re-arm replay().
+  ReplayDoneCallback done = std::move(replay_done_);
+  replay_done_ = nullptr;
+  if (done) {
+    done();
   }
 }
 

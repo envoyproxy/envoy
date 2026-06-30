@@ -21,14 +21,13 @@ public:
   // FilterChainBridge
   Event::Dispatcher& dispatcher() override { return callbacks_.dispatcher(); }
   uint32_t bufferLimit() override { return callbacks_.decoderBufferLimit(); }
-  void injectData(Buffer::Instance& data, bool end_stream) override {
-    callbacks_.injectDecodedDataToFilterChain(data, end_stream);
+  void injectData(Buffer::Instance& data) override {
+    callbacks_.injectDecodedDataToFilterChain(data, /*end_stream=*/false);
   }
   void pauseSource() override { callbacks_.onDecoderFilterAboveWriteBufferHighWatermark(); }
   void resumeSource() override { callbacks_.onDecoderFilterBelowWriteBufferLowWatermark(); }
   void registerReplayWatermarks(ReplayWatermarkHandler& handler) override;
   void unregisterReplayWatermarks() override;
-  void continueIteration() override { callbacks_.continueDecoding(); }
   void onUnrecoverableError() override;
 
   // Http::UpstreamWatermarkCallbacks (replay side: upstream back-pressure).
@@ -68,14 +67,13 @@ public:
   // FilterChainBridge
   Event::Dispatcher& dispatcher() override { return encoder_callbacks_.dispatcher(); }
   uint32_t bufferLimit() override { return encoder_callbacks_.encoderBufferLimit(); }
-  void injectData(Buffer::Instance& data, bool end_stream) override {
-    encoder_callbacks_.injectEncodedDataToFilterChain(data, end_stream);
+  void injectData(Buffer::Instance& data) override {
+    encoder_callbacks_.injectEncodedDataToFilterChain(data, /*end_stream=*/false);
   }
   void pauseSource() override { encoder_callbacks_.onEncoderFilterAboveWriteBufferHighWatermark(); }
   void resumeSource() override { encoder_callbacks_.onEncoderFilterBelowWriteBufferLowWatermark(); }
   void registerReplayWatermarks(ReplayWatermarkHandler& handler) override;
   void unregisterReplayWatermarks() override;
-  void continueIteration() override { encoder_callbacks_.continueEncoding(); }
   void onUnrecoverableError() override;
 
   // Http::DownstreamWatermarkCallbacks (replay side: downstream back-pressure).

@@ -282,6 +282,20 @@ TEST_F(AiProtocolManagerFilterTest, TrailerTerminatedStream) {
   EXPECT_EQ(continue_calls_, 1);
 }
 
+// A trailer-only request (headers + trailers, no body) has nothing to offload, so
+// the trailers flow immediately (Continue) and nothing is injected or held.
+TEST_F(AiProtocolManagerFilterTest, TrailersWithoutBody) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/v1/chat"}};
+  EXPECT_EQ(filter_.decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+
+  Http::TestRequestTrailerMapImpl trailers{{"x-trailer", "1"}};
+  EXPECT_EQ(filter_.decodeTrailers(trailers), Http::FilterTrailersStatus::Continue);
+  drain();
+
+  EXPECT_EQ(inject_calls_, 0);
+  EXPECT_EQ(continue_calls_, 0);
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

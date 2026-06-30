@@ -32,9 +32,8 @@ public:
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   uint32_t bufferLimit() override { return buffer_limit_; }
-  void injectData(Buffer::Instance& data, bool end_stream) override {
+  void injectData(Buffer::Instance& data) override {
     injected_.add(data);
-    injected_end_stream_ = end_stream;
     ++inject_calls_;
     // Simulate downstream back-pressure arising mid-replay: when configured, raise
     // the replay high watermark right after the Nth injected chunk, as a real
@@ -47,7 +46,6 @@ public:
   void resumeSource() override { ++resume_source_calls_; }
   void registerReplayWatermarks(ReplayWatermarkHandler& handler) override { handler_ = &handler; }
   void unregisterReplayWatermarks() override { handler_ = nullptr; }
-  void continueIteration() override { ++continue_calls_; }
   void onUnrecoverableError() override { ++error_calls_; }
 
   Event::Dispatcher& dispatcher_;
@@ -55,11 +53,9 @@ public:
   ReplayWatermarkHandler* handler_{nullptr};
 
   Buffer::OwnedImpl injected_;
-  bool injected_end_stream_{false};
   int inject_calls_{0};
   int pause_source_calls_{0};
   int resume_source_calls_{0};
-  int continue_calls_{0};
   int error_calls_{0};
   int raise_replay_watermark_at_inject_{0}; // 0 = never.
 };
@@ -152,6 +148,13 @@ public:
     return std::make_unique<BufferManager>(factory, std::move(bridge));
   }
 
+  // Replays the whole offloaded payload, recording completion in replay_done_.
+  // (End-of-stream handling lives in the filter, not the manager, so the unit
+  // tests just observe that the requested range was injected and done fired.)
+  void replayAll() {
+    manager_->replay(0, manager_->length(), [this]() { replay_done_ = true; });
+  }
+
   // Run all posted callbacks, including ones enqueued while draining.
   void drain() {
     while (!posted_.empty()) {
@@ -168,54 +171,61 @@ public:
   PostingExternalBufferFactory posting_factory_;
   FakeBridge* bridge_{nullptr};
   // Owned by manager_; fire invokeCallback() to simulate the next event-loop
-  // iteration resuming replay after a per-iteration budget yield.
+  // iteration resuming replay after a per-iteration budget yield (or starting a
+  // replay that was deferred because the offload was already durable).
   NiceMock<Event::MockSchedulableCallback>* replay_cb_{nullptr};
+  bool replay_done_{false};
   BufferManagerPtr manager_;
 };
 
-// The body is offloaded chunk-by-chunk and replayed verbatim once end_stream is
-// seen, with end_stream propagated on the final injected frame.
+// The body is offloaded chunk-by-chunk and replayed verbatim once the caller
+// triggers replay; completion is reported through the done callback.
 TEST_F(BufferManagerTest, OffloadsAndReplaysBody) {
   Buffer::OwnedImpl chunk1("{\"messages\":");
-  EXPECT_EQ(manager_->onData(chunk1, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  manager_->onData(chunk1);
   Buffer::OwnedImpl chunk2("[\"hi\"]}");
-  EXPECT_EQ(manager_->onData(chunk2, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  manager_->onData(chunk2);
+  manager_->endStream();
+  replayAll();
 
   // Nothing has been replayed yet: writes and replay are all asynchronous.
   EXPECT_EQ(bridge_->inject_calls_, 0);
+  EXPECT_FALSE(replay_done_);
 
   drain();
 
   EXPECT_GE(bridge_->inject_calls_, 1);
-  EXPECT_TRUE(bridge_->injected_end_stream_);
+  EXPECT_TRUE(replay_done_);
   EXPECT_EQ(bridge_->injected_.toString(), "{\"messages\":[\"hi\"]}");
 }
 
-// A body that arrives in a single end_stream frame is still round-tripped.
+// A body that arrives in a single frame is still round-tripped.
 TEST_F(BufferManagerTest, SingleFrameBody) {
   Buffer::OwnedImpl body("{}");
-  EXPECT_EQ(manager_->onData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
   drain();
 
-  EXPECT_TRUE(bridge_->injected_end_stream_);
+  EXPECT_TRUE(replay_done_);
   EXPECT_EQ(bridge_->injected_.toString(), "{}");
 }
 
-// An empty terminal frame produces an empty end_stream marker downstream. Since
-// it issues no write, replay is scheduled (not started re-entrantly from the data
-// callback) and runs on the next event-loop iteration.
+// An empty body has nothing to inject: a zero-length replay still reports done so
+// the caller can terminate the stream. With nothing offloaded the data is already
+// durable, so replay is deferred to a fresh event-loop iteration.
 TEST_F(BufferManagerTest, EmptyBody) {
   Buffer::OwnedImpl empty;
-  EXPECT_EQ(manager_->onData(empty, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  manager_->onData(empty);
+  manager_->endStream();
+  replayAll();
 
-  // Nothing injected synchronously; the replay continuation is scheduled.
-  EXPECT_EQ(bridge_->inject_calls_, 0);
+  EXPECT_FALSE(replay_done_);
   EXPECT_TRUE(replay_cb_->enabled());
 
   replay_cb_->invokeCallback();
-  EXPECT_EQ(bridge_->inject_calls_, 1);
-  EXPECT_TRUE(bridge_->injected_end_stream_);
-  EXPECT_EQ(bridge_->injected_.length(), 0);
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->inject_calls_, 0);
 }
 
 // A payload larger than the replay chunk size is streamed back in multiple
@@ -223,11 +233,13 @@ TEST_F(BufferManagerTest, EmptyBody) {
 TEST_F(BufferManagerTest, LargePayloadReplayedInChunks) {
   const std::string big(200 * 1024, 'x'); // > ReadChunkSize (64KiB)
   Buffer::OwnedImpl body(big);
-  EXPECT_EQ(manager_->onData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
   drain();
 
   EXPECT_GT(bridge_->inject_calls_, 1);
-  EXPECT_TRUE(bridge_->injected_end_stream_);
+  EXPECT_TRUE(replay_done_);
   EXPECT_EQ(bridge_->injected_.length(), big.size());
   EXPECT_EQ(bridge_->injected_.toString(), big);
 }
@@ -242,14 +254,16 @@ TEST_F(BufferManagerTest, ReplayYieldsAcrossIterationsForLargePayload) {
   const uint64_t chunk = 64 * 1024;
   const std::string big(10 * chunk, 'x');
   Buffer::OwnedImpl body(big);
-  EXPECT_EQ(manager_->onData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
 
   // First iteration: exactly the budget of chunks is injected, then replay yields
-  // (the continuation is scheduled, not posted) without completing the stream.
+  // (the continuation is scheduled, not posted) without finishing.
   drain();
   EXPECT_EQ(bridge_->inject_calls_, 8);
   EXPECT_EQ(bridge_->injected_.length(), 8 * chunk);
-  EXPECT_FALSE(bridge_->injected_end_stream_);
+  EXPECT_FALSE(replay_done_);
   EXPECT_TRUE(replay_cb_->enabled());
 
   // The scheduled continuation (next event-loop iteration) resumes replay to
@@ -257,7 +271,7 @@ TEST_F(BufferManagerTest, ReplayYieldsAcrossIterationsForLargePayload) {
   replay_cb_->invokeCallback();
   drain();
   EXPECT_EQ(bridge_->inject_calls_, 10);
-  EXPECT_TRUE(bridge_->injected_end_stream_);
+  EXPECT_TRUE(replay_done_);
   EXPECT_EQ(bridge_->injected_.toString(), big);
 }
 
@@ -270,23 +284,80 @@ TEST_F(BufferManagerTest, AsyncStoreReplaysOneChunkPerCallWithoutYield) {
 
   const std::string big(10 * 64 * 1024, 'x'); // 10 chunks > ReplayChunksPerIteration (8).
   Buffer::OwnedImpl body(big);
-  EXPECT_EQ(manager_->onData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
   drain();
 
   EXPECT_FALSE(replay_cb_->enabled());
   EXPECT_EQ(bridge_->inject_calls_, 10);
-  EXPECT_TRUE(bridge_->injected_end_stream_);
+  EXPECT_TRUE(replay_done_);
   EXPECT_EQ(bridge_->injected_.toString(), big);
+}
+
+// Replay is caller-triggered: the body can be fully offloaded and durable before
+// the caller decides to replay. replay() then starts playback on a fresh
+// event-loop iteration, decoupling offload from playback.
+TEST_F(BufferManagerTest, ReplayDeferredUntilCallerRequests) {
+  Buffer::OwnedImpl body("{\"messages\":[\"hi\"]}");
+  manager_->onData(body);
+  manager_->endStream();
+
+  // The write completes, but with no replay() request nothing is injected.
+  drain();
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+
+  // The caller decides to proceed. Replay is deferred to a fresh iteration (the
+  // caller may be inside a data callback), so nothing is injected synchronously.
+  replayAll();
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+  EXPECT_TRUE(replay_cb_->enabled());
+
+  replay_cb_->invokeCallback();
+  EXPECT_GE(bridge_->inject_calls_, 1);
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), "{\"messages\":[\"hi\"]}");
+}
+
+// The caller can stream the payload back as independent sub-ranges, chaining the
+// next from each range's done callback. The ranges reassemble to the full payload.
+TEST_F(BufferManagerTest, ReplaysSubRangesInSequence) {
+  Buffer::OwnedImpl body("HELLOWORLD");
+  manager_->onData(body);
+  manager_->endStream();
+  drain(); // Make the payload durable; replay not yet requested.
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+
+  bool second_done = false;
+  // Replay the first half, then chain the second half from its done callback.
+  manager_->replay(0, 5, [&]() {
+    EXPECT_EQ(bridge_->injected_.toString(), "HELLO");
+    manager_->replay(5, 5, [&second_done]() { second_done = true; });
+  });
+
+  // First range was deferred (offload already durable).
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+  EXPECT_FALSE(second_done);
+
+  // The chained second range is itself deferred; fire it to completion.
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+  EXPECT_TRUE(second_done);
+  EXPECT_EQ(bridge_->injected_.toString(), "HELLOWORLD");
 }
 
 // Destroying the manager mid-flight cancels pending callbacks; no replay occurs.
 TEST_F(BufferManagerTest, DestroyBeforeReplay) {
   Buffer::OwnedImpl body("payload");
-  EXPECT_EQ(manager_->onData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
   manager_->onDestroy();
   drain();
 
   EXPECT_EQ(bridge_->inject_calls_, 0);
+  EXPECT_FALSE(replay_done_);
 }
 
 // The manager subscribes to replay watermarks on construction so it can observe
@@ -300,6 +371,29 @@ TEST_F(BufferManagerTest, DestroyUnregistersReplayWatermarks) {
   EXPECT_EQ(bridge_->handler_, nullptr);
 }
 
+// With no body offloaded the manager reports empty(), so the caller knows there is
+// nothing to replay (a trailer-only request lets its trailers flow without calling
+// endStream()/replay()).
+TEST_F(BufferManagerTest, EmptyWhenNoDataOffloaded) {
+  EXPECT_TRUE(manager_->empty());
+  Buffer::OwnedImpl body("x");
+  manager_->onData(body);
+  EXPECT_FALSE(manager_->empty());
+}
+
+// length() reports the total offloaded so far, including not-yet-durable bytes.
+TEST_F(BufferManagerTest, LengthCountsNotYetDurableBytes) {
+  Buffer::OwnedImpl chunk1("abc");
+  manager_->onData(chunk1);
+  Buffer::OwnedImpl chunk2("defg");
+  manager_->onData(chunk2);
+  manager_->endStream();
+  // The writes are still in flight (posted), but length() already reflects them.
+  EXPECT_EQ(manager_->length(), 7);
+  drain();
+  EXPECT_EQ(manager_->length(), 7);
+}
+
 // Not-yet-durable bytes crossing the buffer limit pause the data source via the
 // bridge; once the write completes and they drain, the source resumes.
 TEST_F(BufferManagerTest, IngestBackpressureDrivesSourceFlowControl) {
@@ -310,7 +404,7 @@ TEST_F(BufferManagerTest, IngestBackpressureDrivesSourceFlowControl) {
   // posted, so its bytes stay not-yet-durable until the event loop runs: the
   // source is paused immediately.
   Buffer::OwnedImpl body(std::string(150, 'x'));
-  EXPECT_EQ(manager_->onData(body, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  manager_->onData(body);
   EXPECT_EQ(bridge_->pause_source_calls_, 1);
   EXPECT_EQ(bridge_->resume_source_calls_, 0);
 
@@ -321,14 +415,14 @@ TEST_F(BufferManagerTest, IngestBackpressureDrivesSourceFlowControl) {
 }
 
 // Sub-threshold frames are batched: each is held in the queue rather than written
-// individually, and they coalesce into a single write flushed at end_stream.
+// individually, and they coalesce into a single write flushed at endStream().
 TEST_F(BufferManagerTest, BatchesSmallFramesUntilEndStream) {
   manager_ = makeManager(posting_factory_);
 
   Buffer::OwnedImpl f1("aaa");
   Buffer::OwnedImpl f2("bbb");
-  EXPECT_EQ(manager_->onData(f1, false), Http::FilterDataStatus::StopIterationNoBuffer);
-  EXPECT_EQ(manager_->onData(f2, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  manager_->onData(f1);
+  manager_->onData(f2);
 
   // The buffer is created lazily on the first onData(); neither small frame has
   // triggered a write -- they wait in the queue.
@@ -337,14 +431,16 @@ TEST_F(BufferManagerTest, BatchesSmallFramesUntilEndStream) {
   EXPECT_EQ(buffer->write_calls_, 0);
 
   Buffer::OwnedImpl f3("cc");
-  EXPECT_EQ(manager_->onData(f3, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  manager_->onData(f3);
+  manager_->endStream();
 
-  // end_stream flushes the batched backlog as a single write.
+  // endStream() flushes the batched backlog as a single write.
   EXPECT_EQ(buffer->write_calls_, 1);
   EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(8)); // "aaa"+"bbb"+"cc".
 
+  replayAll();
   drain();
-  EXPECT_TRUE(bridge_->injected_end_stream_);
+  EXPECT_TRUE(replay_done_);
   EXPECT_EQ(bridge_->injected_.toString(), "aaabbbcc");
 }
 
@@ -362,22 +458,24 @@ TEST_F(BufferManagerTest, SerializesAndCoalescesQueuedWrites) {
   Buffer::OwnedImpl f1(chunk);
   Buffer::OwnedImpl f2(chunk);
   Buffer::OwnedImpl f3(chunk);
-  EXPECT_EQ(manager_->onData(f1, false), Http::FilterDataStatus::StopIterationNoBuffer);
-  EXPECT_EQ(manager_->onData(f2, false), Http::FilterDataStatus::StopIterationNoBuffer);
-  EXPECT_EQ(manager_->onData(f3, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  manager_->onData(f1);
+  manager_->onData(f2);
+  manager_->onData(f3);
+  manager_->endStream();
 
   // Only the first frame has been written; f2 and f3 wait behind the in-flight write.
   PostingExternalBuffer* buffer = posting_factory_.last_;
   ASSERT_NE(buffer, nullptr);
   EXPECT_EQ(buffer->write_calls_, 1);
 
+  replayAll();
   drain();
 
   // The queued backlog coalesced into one follow-up write -- two writes total,
   // never overlapping (asserted in the fake) -- and the payload round-trips.
   EXPECT_EQ(buffer->write_calls_, 2);
   EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(threshold, 2 * threshold));
-  EXPECT_TRUE(bridge_->injected_end_stream_);
+  EXPECT_TRUE(replay_done_);
   EXPECT_EQ(bridge_->injected_.toString(), chunk + chunk + chunk);
 }
 
@@ -386,7 +484,9 @@ TEST_F(BufferManagerTest, SerializesAndCoalescesQueuedWrites) {
 TEST_F(BufferManagerTest, ReplayPausesUnderBackPressure) {
   const std::string big(200 * 1024, 'x'); // > ReadChunkSize, multiple chunks.
   Buffer::OwnedImpl body(big);
-  EXPECT_EQ(manager_->onData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
 
   // The chain signals back-pressure before replay begins.
   ASSERT_NE(bridge_->handler_, nullptr);
@@ -396,12 +496,12 @@ TEST_F(BufferManagerTest, ReplayPausesUnderBackPressure) {
   // chunk is read or injected while the high watermark is held.
   drain();
   EXPECT_EQ(bridge_->inject_calls_, 0);
-  EXPECT_FALSE(bridge_->injected_end_stream_);
+  EXPECT_FALSE(replay_done_);
 
   // Releasing back-pressure resumes replay to completion.
   bridge_->handler_->onReplayBelowLowWatermark();
   drain();
-  EXPECT_TRUE(bridge_->injected_end_stream_);
+  EXPECT_TRUE(replay_done_);
   EXPECT_EQ(bridge_->injected_.length(), big.size());
   EXPECT_EQ(bridge_->injected_.toString(), big);
 }
@@ -414,19 +514,21 @@ TEST_F(BufferManagerTest, ReplayResumesMidStream) {
   // chunk; the loop must then stop until it is released.
   bridge_->raise_replay_watermark_at_inject_ = 1;
   Buffer::OwnedImpl body(big);
-  EXPECT_EQ(manager_->onData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
 
-  // Append completes, replay injects one chunk, then pauses on the watermark
+  // The write completes, replay injects one chunk, then pauses on the watermark
   // raised during that inject.
   drain();
   EXPECT_EQ(bridge_->inject_calls_, 1);
-  EXPECT_FALSE(bridge_->injected_end_stream_);
+  EXPECT_FALSE(replay_done_);
   EXPECT_LT(bridge_->injected_.length(), big.size());
 
   // Release back-pressure; replay resumes synchronously to completion.
   ASSERT_NE(bridge_->handler_, nullptr);
   bridge_->handler_->onReplayBelowLowWatermark();
-  EXPECT_TRUE(bridge_->injected_end_stream_);
+  EXPECT_TRUE(replay_done_);
   EXPECT_EQ(bridge_->injected_.toString(), big);
 }
 
@@ -435,7 +537,9 @@ TEST_F(BufferManagerTest, ReplayResumesMidStream) {
 TEST_F(BufferManagerTest, NestedWatermarksRequireBalancedRelease) {
   const std::string big(200 * 1024, 'x');
   Buffer::OwnedImpl body(big);
-  EXPECT_EQ(manager_->onData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
 
   ASSERT_NE(bridge_->handler_, nullptr);
   bridge_->handler_->onReplayAboveHighWatermark();
@@ -447,78 +551,13 @@ TEST_F(BufferManagerTest, NestedWatermarksRequireBalancedRelease) {
   bridge_->handler_->onReplayBelowLowWatermark();
   drain();
   EXPECT_EQ(bridge_->inject_calls_, 0);
-  EXPECT_FALSE(bridge_->injected_end_stream_);
+  EXPECT_FALSE(replay_done_);
 
   // Balanced release resumes replay.
   bridge_->handler_->onReplayBelowLowWatermark();
   drain();
-  EXPECT_TRUE(bridge_->injected_end_stream_);
+  EXPECT_TRUE(replay_done_);
   EXPECT_EQ(bridge_->injected_.toString(), big);
-}
-
-// When the stream is terminated by trailers (end_stream arrives on the trailers
-// callback, not a data frame), the body is still replayed: the final body frame
-// carries end_stream=false and the held trailers are released via the bridge
-// once replay completes.
-TEST_F(BufferManagerTest, TrailerTerminatedStreamReplaysBodyThenReleasesTrailers) {
-  Buffer::OwnedImpl chunk1("{\"messages\":");
-  EXPECT_EQ(manager_->onData(chunk1, false), Http::FilterDataStatus::StopIterationNoBuffer);
-  Buffer::OwnedImpl chunk2("[\"hi\"]}");
-  // Last body frame is NOT end_stream; the trailers will carry it.
-  EXPECT_EQ(manager_->onData(chunk2, false), Http::FilterDataStatus::StopIterationNoBuffer);
-  // Trailers arrive: iteration is held until the replayed body has been injected.
-  EXPECT_EQ(manager_->onTrailers(), Http::FilterTrailersStatus::StopIteration);
-
-  // Nothing replayed yet, and the trailers must not have been released.
-  EXPECT_EQ(bridge_->inject_calls_, 0);
-  EXPECT_EQ(bridge_->continue_calls_, 0);
-
-  drain();
-
-  // Body replayed verbatim, the final frame did NOT set end_stream, and the
-  // trailers were released exactly once after the body.
-  EXPECT_GE(bridge_->inject_calls_, 1);
-  EXPECT_FALSE(bridge_->injected_end_stream_);
-  EXPECT_EQ(bridge_->injected_.toString(), "{\"messages\":[\"hi\"]}");
-  EXPECT_EQ(bridge_->continue_calls_, 1);
-}
-
-// A trailer-terminated request with no body has nothing to replay: onTrailers()
-// returns Continue so the trailers flow normally, and nothing is injected.
-TEST_F(BufferManagerTest, TrailersWithoutBodyContinue) {
-  EXPECT_EQ(manager_->onTrailers(), Http::FilterTrailersStatus::Continue);
-  drain();
-
-  EXPECT_EQ(bridge_->inject_calls_, 0);
-  EXPECT_EQ(bridge_->continue_calls_, 0);
-}
-
-// A large, multi-chunk body terminated by trailers replays in bounded frames,
-// none of which set end_stream, and the trailers are released once after the
-// last chunk.
-TEST_F(BufferManagerTest, LargeTrailerTerminatedStream) {
-  const std::string big(200 * 1024, 'x'); // > ReadChunkSize, multiple chunks.
-  Buffer::OwnedImpl body(big);
-  EXPECT_EQ(manager_->onData(body, false), Http::FilterDataStatus::StopIterationNoBuffer);
-  EXPECT_EQ(manager_->onTrailers(), Http::FilterTrailersStatus::StopIteration);
-  drain();
-
-  EXPECT_GT(bridge_->inject_calls_, 1);
-  EXPECT_FALSE(bridge_->injected_end_stream_);
-  EXPECT_EQ(bridge_->injected_.toString(), big);
-  EXPECT_EQ(bridge_->continue_calls_, 1);
-}
-
-// Trailers terminating an empty body still release the trailers (the empty body
-// produces no injected frame, since the trailers carry stream completion).
-TEST_F(BufferManagerTest, TrailersAfterEmptyBody) {
-  Buffer::OwnedImpl empty;
-  EXPECT_EQ(manager_->onData(empty, false), Http::FilterDataStatus::StopIterationNoBuffer);
-  EXPECT_EQ(manager_->onTrailers(), Http::FilterTrailersStatus::StopIteration);
-  drain();
-
-  EXPECT_EQ(bridge_->inject_calls_, 0);
-  EXPECT_EQ(bridge_->continue_calls_, 1);
 }
 
 } // namespace

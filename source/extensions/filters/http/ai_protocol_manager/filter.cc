@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_chain_bridge.h"
 
 namespace Envoy {
@@ -48,11 +49,38 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
 
 Http::FilterDataStatus AiProtocolManagerFilter::decodeData(Buffer::Instance& data,
                                                            bool end_stream) {
-  return decode_manager_->onData(data, end_stream);
+  decode_manager_->onData(data);
+  if (end_stream) {
+    // The full body has been offloaded. The filter owns replay and end-of-stream:
+    // a future change will assemble and inspect the request here (and may replay
+    // sub-ranges); for now replay the whole body, then emit the terminal frame.
+    decode_manager_->endStream();
+    decode_manager_->replay(0, decode_manager_->length(), [this]() {
+      // Terminate the stream with an empty end_stream data frame after the replayed
+      // body (also releases the held headers when the body was empty).
+      Buffer::OwnedImpl end_marker;
+      decoder_callbacks_->injectDecodedDataToFilterChain(end_marker, /*end_stream=*/true);
+    });
+  }
+  // Hold the chain here; the BufferManager replays the payload once told to.
+  return Http::FilterDataStatus::StopIterationNoBuffer;
 }
 
 Http::FilterTrailersStatus AiProtocolManagerFilter::decodeTrailers(Http::RequestTrailerMap&) {
-  return decode_manager_->onTrailers();
+  // A trailer-only request (no body) has nothing to replay; let the trailers flow.
+  if (decode_manager_->empty()) {
+    return Http::FilterTrailersStatus::Continue;
+  }
+  // The body ended without end_stream on a data frame; the trailers carry it.
+  decode_manager_->endStream();
+  decode_manager_->replay(0, decode_manager_->length(), [this]() {
+    // Body fully replayed; release the held trailers (they carry END_STREAM) so
+    // they follow the body in order.
+    decoder_callbacks_->continueDecoding();
+  });
+  // Hold the trailers behind the replayed body until the replay-done callback
+  // above releases them.
+  return Http::FilterTrailersStatus::StopIteration;
 }
 
 } // namespace AiProtocolManager
