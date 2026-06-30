@@ -19,9 +19,9 @@ void UpstreamCodecDrainRegistry::drainCluster(absl::string_view cluster,
     }
     // Draining a codec can synchronously close its connection, which destroys the codec and
     // unregisters it -- mutating both the per-cluster set and the codecs_ map (an emptied entry is
-    // erased). To stay safe against that re-entrancy we (1) copy the target cluster keys before
-    // iterating, (2) re-find the entry and (3) confirm the codec is still registered before each
-    // drain, so we never iterate a mutated container or dereference a stale pointer.
+    // erased). To stay safe against that reentrant removal we (1) copy the target cluster keys
+    // before iterating, (2) re-find the entry and (3) confirm the codec is still registered before
+    // each drain, so we never iterate a mutated container or dereference a stale pointer.
     std::vector<std::string> cluster_keys;
     if (key.empty()) {
       cluster_keys.reserve(reg->codecs_.size());
