@@ -9,6 +9,7 @@
 #include "envoy/server/options.h"
 #include "envoy/singleton/manager.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/http/http2/codec_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
@@ -66,6 +67,11 @@ ReverseTunnelUpstreamCodecFactory::createProtocolOptionsConfig(
   const auto& typed_config = MessageUtil::downcastAndValidate<
       const ReverseTunnelProto::ReverseTunnelUpstreamCodecOptions&>(
       config, context.messageValidationVisitor());
+
+  // Logged once per cluster config load, unlike the per-connection codec lifecycle logs.
+  ENVOY_LOG_MISC(info,
+                 "reverse_tunnel: drain-aware upstream codec configured (drain_with_goaway={})",
+                 typed_config.enable_drain_with_goaway());
 
   auto& server_context = context.serverFactoryContext();
   auto registry = server_context.singletonManager().getTyped<UpstreamCodecDrainRegistry>(
