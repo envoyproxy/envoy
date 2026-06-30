@@ -19,9 +19,7 @@ namespace HttpFilters {
 namespace AiProtocolManager {
 
 // Invoked once a replay() range has been fully injected into the filter chain. The
-// caller uses it to stream further sub-ranges or to terminate the stream (emit the
-// end_stream marker, release held trailers): end-of-stream handling lives in the
-// caller, not in the BufferManager.
+// caller can start to stream further sub-ranges or to terminate the stream.
 using ReplayDoneCallback = absl::AnyInvocable<void()>;
 
 // Replay-side flow-control sink. The BufferManager implements this so a
@@ -56,8 +54,7 @@ public:
   // buffer limit).
   virtual uint32_t bufferLimit() PURE;
   // Re-injects a replayed data frame into the filter chain. Always a non-terminal
-  // frame: end-of-stream is the caller's concern (see ReplayDoneCallback), not the
-  // BufferManager's.
+  // frame: end-of-stream is the caller's concern (see ReplayDoneCallback).
   virtual void injectData(Buffer::Instance& data) PURE;
   // Pushes ingest back-pressure toward the data source (the filter's own
   // write-buffer high/low watermark on this path).
@@ -77,9 +74,7 @@ using FilterChainBridgePtr = std::unique_ptr<FilterChainBridge>;
 // Offload and replay are decoupled and the caller is in control: it streams the
 // body in via onData(), marks it complete with endStream(), then replays whatever
 // ranges it wants via replay(offset, length, done) -- one range at a time, each
-// reporting completion through its callback. The BufferManager only moves bytes;
-// end-of-stream handling (emitting the terminal frame, releasing held trailers)
-// is the caller's, done from the replay callback. All interaction with the filter
+// reporting completion through its callback. All interaction with the filter
 // chain goes through the owned FilterChainBridge, so the manager is path-agnostic:
 // the decode and encode paths each construct a BufferManager with the appropriate
 // bridge.
@@ -94,9 +89,7 @@ using FilterChainBridgePtr = std::unique_ptr<FilterChainBridge>;
 //     the queue, the external buffer needs no flow-control surface of its own.
 //   - Replay: re-injected data is paced against the chain's back-pressure,
 //     delivered through ReplayWatermarkHandler. We pause issuing reads/injects
-//     while the chain is backed up; without this the read->inject loop would
-//     push the entire payload into the chain regardless of drain rate, defeating
-//     the bounded-footprint goal.
+//     while the chain is backed up.
 class BufferManager : public ReplayWatermarkHandler, Logger::Loggable<Logger::Id::filter> {
 public:
   BufferManager(ExternalBufferFactory& buffer_factory, FilterChainBridgePtr bridge);
@@ -105,15 +98,14 @@ public:
   // holds the filter chain (returns StopIteration*) while the body is buffered.
   void onData(Buffer::Instance& data);
   // Signals that the full body has been offloaded, flushing any batched backlog to
-  // the buffer so all of it becomes durable. Does not start replay.
+  // the buffer so all of it becomes durable, and is ready to replay.
   void endStream();
   // Replays the byte range [offset, offset+length) back into the filter chain as
   // data frames, invoking `done` once the whole range has been injected. The
-  // caller drives end-of-stream itself from `done` (emit the terminal frame or
-  // release held trailers) and may stream further sub-ranges with another
-  // replay(). Only one replay may be in flight at a time; call the next from
-  // `done`. The range must lie within length(); replay begins on a fresh
-  // event-loop iteration, once any in-flight write has drained.
+  // caller may stream further sub-ranges with another replay(). Only one replay may be in flight
+  // at a time. The range must lie within length().
+  //
+  // Only call after endStream(). It may wait until all write is done before start streaming.
   void replay(uint64_t offset, uint64_t length, ReplayDoneCallback done);
   // Total number of bytes offloaded so far (durable, queued, and in-flight). The
   // caller uses this to size replay ranges; it is final once endStream() has been
@@ -121,10 +113,11 @@ public:
   uint64_t length() const {
     return (buffer_ == nullptr ? 0 : buffer_->length()) + pending_.length() + in_flight_write_size_;
   }
-  // True until the first onData(): lets the caller tell whether any body was
-  // offloaded (e.g. a trailer-only request has none, so there is nothing to
-  // replay).
-  bool empty() const { return buffer_ == nullptr; }
+  // True until the first onData().
+  bool empty() const {
+	  return buffer_ == nullptr ||
+		  buffer_->length() + pending_.length() + in_flight_write_size_ == 0;
+  }
   // Cancels in-flight work and detaches from the filter chain. After this the
   // async completion handlers are inert.
   void onDestroy();
@@ -148,7 +141,7 @@ private:
   // in flight, nothing queued). Idempotent. Starts replay synchronously, so it
   // must only be called from a context where injecting into the filter chain is
   // safe: a write completion or the scheduled continuation, never directly from
-  // replay() (which defers via replay_cb_ instead).
+  // replay(), which can be called in decodeData or encodeData of a filter.
   void maybeStartReplay();
   // Recomputes ingest back-pressure from the not-yet-durable byte count (queued
   // plus in-flight write) and pauses/resumes the data source via the bridge as
@@ -163,10 +156,10 @@ private:
   // via replay_cb_ and resumes next iteration. An asynchronous store drives one
   // chunk per completion and paces itself.
   void maybeReadNextChunk();
-  // Target of replay_cb_. Runs on a fresh event-loop iteration to either start
-  // replay deferred from replay() (the caller may invoke it from a data callback,
-  // where injecting re-entrantly is unsafe) or resume replay after the
-  // per-iteration chunk budget was spent.
+  // Target of replay_cb_. Runs off the caller's stack to either start replay
+  // deferred from replay() (the caller may invoke it from a data callback, where
+  // injecting re-entrantly is unsafe) or resume replay after the per-iteration
+  // chunk budget was spent.
   void onReplayContinuation();
   // Completion handler for a read() issued during replay.
   void onReadComplete(ExternalBufferStatus status, Buffer::InstancePtr data);
@@ -197,10 +190,11 @@ private:
   ExternalBufferFactory& buffer_factory_;
   FilterChainBridgePtr bridge_;
   ExternalBufferPtr buffer_;
-  // Drives replay on a fresh event-loop iteration: starts it when replay() is
-  // requested after the offload is already durable (deferred so we never inject
-  // re-entrantly from the caller's context) and resumes it once the per-iteration
-  // chunk budget is spent, so a large replay cannot monopolize the worker.
+  // Reschedules replay work out of the current call stack: starts it when replay()
+  // is requested after the offload is already durable (deferred to later in the
+  // same event-loop pass so we never inject re-entrantly from the caller's
+  // context) and resumes it on the next iteration once the per-iteration chunk
+  // budget is spent, so a large replay cannot monopolize the worker.
   Event::SchedulableCallbackPtr replay_cb_;
 
   // True once endStream() has been called; gates flushing the batched backlog (the

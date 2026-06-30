@@ -12,32 +12,27 @@ namespace AiProtocolManager {
 
 // AI Protocol Manager HTTP filter (alpha).
 //
-// Routing and admission decisions for AI traffic can only be made once the
-// full request payload has been parsed and validated, but the payload can be
-// large and we must not pin it all in the connection manager's buffers. This
-// filter therefore offloads the request body into an ExternalBuffer as it
-// arrives, and once the stream ends it streams the bytes back into the filter
-// chain for the subsequent filters (and, eventually, the parser/validator) to
-// consume.
+// AI requests carry a JSON payload the filter must vet before the rest of the
+// chain acts on the request. As the body arrives the filter offloads it into an
+// ExternalBuffer -- keeping a large payload out of the connection manager's
+// buffers -- and parses and validates the JSON in a streaming fashion alongside.
+// The chain is held meanwhile: decodeHeaders() stops iteration when a body
+// follows, and the headers stay pinned here while decodeData() keeps offloading.
+// Only once the payload is validated does the filter replay the buffered body
+// back into the chain; the first injectDecodedDataToFilterChain() call releases
+// the held headers ahead of it, so subsequent filters see the headers immediately
+// followed by the payload. An invalid payload is rejected rather than forwarded.
 //
 // The offload/replay pipeline and its bidirectional flow control live in the
-// path-agnostic BufferManager (buffer_manager.h); the filter is a thin
-// delegator that constructs one BufferManager per direction with the matching
-// FilterChainBridge (filter_chain_bridge.h). Today only the decode (request)
-// path is wired; the encode path will construct a second BufferManager with the
+// path-agnostic BufferManager (buffer_manager.h); the filter is a thin delegator
+// that constructs one BufferManager per direction with the matching
+// FilterChainBridge (filter_chain_bridge.h). Today only the decode (request) path
+// is wired; the encode path will construct a second BufferManager with the
 // encoder bridge.
 //
-// We must not let the rest of the filter chain act on the request headers before
-// the payload that drives routing and admission decisions has been parsed, so
-// decodeHeaders() pauses chain iteration (StopIteration) whenever a body
-// follows. The headers stay pinned at this filter while decodeData() keeps
-// offloading the body; they are released to the subsequent filters only when
-// replay begins -- the first injectDecodedDataToFilterChain() call flushes the
-// held headers ahead of the replayed body, so the subsequent filters observe the
-// headers immediately followed by the (now fully buffered) payload.
-//
-// Current behavior is a straight offload-then-replay. Streaming JSON parsing and
-// admission control will be layered on top of this plumbing.
+// The offload/replay plumbing is in place today; streaming JSON parsing and
+// validation, and an AI-specific extension chain to store, manipulate, and
+// rewrite the payload before replay, will be layered on in later changes.
 class AiProtocolManagerFilter : public Http::PassThroughFilter,
                                 public Logger::Loggable<Logger::Id::filter> {
 public:

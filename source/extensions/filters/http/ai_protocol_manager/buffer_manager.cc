@@ -12,9 +12,11 @@ namespace AiProtocolManager {
 
 BufferManager::BufferManager(ExternalBufferFactory& buffer_factory, FilterChainBridgePtr bridge)
     : buffer_factory_(buffer_factory), bridge_(std::move(bridge)) {
-  // Drives replay on a fresh event-loop iteration: starts it for an empty
-  // terminal frame (see onData) and resumes it once the per-iteration chunk
-  // budget is spent (see maybeReadNextChunk).
+  // Reschedules replay work out of the current call stack: it starts a replay
+  // deferred from replay() (later in this same event-loop pass, once the caller's
+  // filter callback unwinds, so we avoid injecting re-entrantly) and resumes
+  // replay on the next iteration after the per-iteration chunk budget is spent
+  // (see maybeReadNextChunk).
   replay_cb_ =
       bridge_->dispatcher().createSchedulableCallback([this]() { onReplayContinuation(); });
   // Subscribe to the path's replay watermarks so replay can be paced against
@@ -70,11 +72,14 @@ void BufferManager::replay(uint64_t offset, uint64_t length, ReplayDoneCallback 
   replay_requested_ = true;
   ENVOY_LOG(debug, "ai_protocol_manager: replay requested for [{}, {})", offset, replay_end_);
   // If the offload is already fully durable, the caller may be invoking us from a
-  // filter data callback; defer the start to a fresh event-loop iteration so we do
-  // not inject into the chain re-entrantly. Otherwise the in-flight write's
-  // completion (a posted context) starts replay via maybeStartReplay().
+  // filter data callback; defer the start so we do not inject into the chain
+  // re-entrantly. Current-iteration (the same primitive dispatcher.post() uses)
+  // runs once this callback unwinds but still within this event-loop pass, matching
+  // the in-flight-write path -- whose completion is delivered via post() -- and
+  // avoiding an extra iteration of latency. If a write is still in flight, that
+  // completion starts replay via maybeStartReplay() instead.
   if (!write_in_flight_ && pending_.length() == 0) {
-    replay_cb_->scheduleCallbackNextIteration();
+    replay_cb_->scheduleCallbackCurrentIteration();
   }
 }
 
@@ -146,7 +151,9 @@ void BufferManager::updateIngestBackpressure() {
     source_paused_ = true;
     ENVOY_LOG(debug, "ai_protocol_manager: ingest high watermark ({} bytes not durable)", unacked);
     bridge_->pauseSource();
-  } else if (source_paused_ && unacked <= low_watermark_) {
+    return;
+  }
+  if (source_paused_ && unacked <= low_watermark_) {
     source_paused_ = false;
     ENVOY_LOG(debug, "ai_protocol_manager: ingest low watermark ({} bytes not durable)", unacked);
     bridge_->resumeSource();
@@ -207,7 +214,7 @@ void BufferManager::onReplayContinuation() {
   if (destroyed_) {
     return;
   }
-  // Fresh event-loop iteration: either start replay deferred from replay() (the
+  // Off the caller's stack: either start replay deferred from replay() (the
   // offload was already durable when the caller requested it) or resume after the
   // per-iteration burst budget was spent. maybeStartReplay() already drives the
   // first read, so dispatch on whether replay is underway to avoid advancing a
@@ -236,6 +243,10 @@ void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::Instance
   // stream from the replay-done callback.
   bridge_->injectData(*data);
   if (replay_offset_ >= replay_end_) {
+    // Finish here rather than fall through to maybeReadNextChunk(): the inject
+    // above may have raised the replay high watermark, and maybeReadNextChunk()
+    // tests that pause before the end-of-range check, so it would stall instead of
+    // completing a range that is already fully injected.
     finishReplay();
     return;
   }

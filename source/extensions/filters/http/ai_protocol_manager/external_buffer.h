@@ -32,44 +32,23 @@ using WriteCallback = absl::AnyInvocable<void(ExternalBufferStatus)>;
 // `data` is nullptr.
 using ReadCallback = absl::AnyInvocable<void(ExternalBufferStatus, Buffer::InstancePtr)>;
 
-// An append-only, random-access byte store with asynchronous I/O.
+// An append-only, random-access byte store with asynchronous I/O. The
+// BufferManager offloads a payload into it (potentially off-heap or off-host)
+// and later streams ranges back out.
 //
-// The AI Protocol Manager streams a request body into an ExternalBuffer so it
-// can be held off the hot path (and potentially off-heap or off-host) while
-// the full payload is parsed and validated. Routing and admission decisions
-// require the fully parsed payload, so the body must be retained; offloading it
-// here keeps it out of the connection manager's in-memory buffers. Once parsing
-// decides what to do, the bytes are streamed back into the filter chain via
-// read().
-//
-// Because an implementation may perform real I/O, data operations report
-// completion through a callback. Callbacks are always invoked on the owning
-// dispatcher's thread, but an implementation MAY invoke a callback either
-// synchronously (re-entrantly, before the operation returns) or asynchronously
-// on a later event-loop iteration -- whichever fits its backing store. A purely
-// in-memory store completes reads synchronously; a disk/remote store typically
-// posts and completes later. Callers must tolerate both. Destroying the buffer
-// cancels any pending asynchronous callbacks; they will not fire afterwards.
+// I/O reports completion through a callback on the owning dispatcher's thread. An
+// implementation MAY invoke that callback synchronously (re-entrantly, before the
+// call returns) or asynchronously on a later iteration -- whichever fits its
+// store -- and the BufferManager tolerates both. Destroying the buffer cancels
+// any pending callbacks; they will not fire afterwards.
 class ExternalBuffer {
 public:
   virtual ~ExternalBuffer() = default;
 
-  // Writes an owned `data` buffer to the end of the store (the store is
-  // append-only), taking ownership of it. `cb` is invoked once the bytes are
-  // durable.
-  //
-  // The caller issues at most one write at a time: it must not call write()
-  // again until the previous write's completion callback has fired. This
-  // single-writer contract means an implementation never has to maintain its own
-  // write queue or reason about overlapping/out-of-order writes -- the
-  // BufferManager serializes writes and queues the backlog. An implementation
-  // that cannot keep up applies back-pressure simply by deferring `cb`; the
-  // caller will not issue the next write until it fires.
-  //
-  // The caller transfers an already-owned buffer rather than a borrowed
-  // reference, so an implementation never has to grab the bytes synchronously to
-  // keep them alive across asynchronous I/O -- that ownership hand-off is
-  // storage-agnostic and is done once by the BufferManager.
+  // Appends owned `data` to the store, taking ownership; `cb` fires once the bytes
+  // are durable. The caller issues at most one write at a time -- it will not call
+  // write() again until `cb` fires -- so an implementation needs no write queue of
+  // its own and can apply back-pressure simply by deferring `cb`.
   virtual void write(Buffer::InstancePtr data, WriteCallback cb) PURE;
 
   // Reads `length` bytes starting at absolute byte offset `offset`. It is an
