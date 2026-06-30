@@ -75,8 +75,8 @@ TEST_F(ReverseTunnelUpstreamCodecTest, OptionsExposesCodecFactory) {
   EXPECT_TRUE(opts->upstreamHttpClientCodecFactory().has_value());
 }
 
-// Scenario 1/2: a received GOAWAY is observed (logged + counted) and forwarded to the real
-// callbacks so the pool's normal drain handling still runs.
+// A received GOAWAY is observed (logged + counted) and forwarded to the real callbacks so the
+// pool's normal drain handling still runs.
 TEST_F(ReverseTunnelUpstreamCodecTest, CallbacksObserveAndForwardGoaway) {
   NiceMock<Envoy::Http::MockConnectionCallbacks> inner;
   DrainAwareClientCallbacks wrapper(inner, stats_);
@@ -86,7 +86,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, CallbacksObserveAndForwardGoaway) {
   EXPECT_EQ(1, stats_.goaway_received_.value());
 }
 
-// The decorator forwards ClientConnection calls and counts a sent GOAWAY (scenario 3 hook).
+// The decorator forwards ClientConnection calls and counts a sent GOAWAY.
 TEST_F(ReverseTunnelUpstreamCodecTest, ConnectionForwardsAndCountsGoawaySent) {
   auto inner = std::make_unique<NiceMock<Envoy::Http::MockClientConnection>>();
   auto* inner_raw = inner.get();
@@ -102,7 +102,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, ConnectionForwardsAndCountsGoawaySent) {
   codec.shutdownNotice();
 }
 
-// Scenario 3: graceful drain sends a shutdown notice immediately, then after drain_time sends the
+// Graceful drain sends a shutdown notice immediately, then after drain_time sends the
 // final GOAWAY to the peer AND gracefully drains the local pool connection (drives onGoAway into
 // the pool's active client) instead of hard-closing it. The pool drain is what lets in-flight
 // requests finish and routes new requests onto the replacement tunnel; a hard close would abort
@@ -135,8 +135,8 @@ TEST_F(ReverseTunnelUpstreamCodecTest, StartGracefulDrainTwoPhase) {
   codec.startGracefulDrain(std::chrono::milliseconds(5000));
 }
 
-// Scenario 3: the registry fans a drain out to a registered codec for the matching cluster, which
-// triggers the two-phase graceful drain (shutdownNotice now, GOAWAY after drain_time).
+// The registry fans a drain out to a registered codec for the matching cluster, which triggers
+// the two-phase graceful drain (shutdownNotice now, GOAWAY after drain_time).
 TEST_F(ReverseTunnelUpstreamCodecTest, RegistryDrainsRegisteredCluster) {
   auto registry = std::make_shared<UpstreamCodecDrainRegistry>(tls_);
 
@@ -235,10 +235,10 @@ TEST_F(ReverseTunnelUpstreamCodecTest, CreatesDrainAwareCodecForReverseConnectio
   EXPECT_EQ(Envoy::Http::Protocol::Http2, codec->protocol());
 }
 
-// Scenario 3 end-to-end on a real HTTP/2 client codec: startGracefulDrain sends the graceful
-// first GOAWAY via the HTTP/2 subclass (sendGracefulGoAway) immediately, then the final GOAWAY and
-// a graceful pool drain after drain_time. Exercises the h2_codec_ != nullptr path that the
-// mock-inner tests cannot reach.
+// End-to-end on a real HTTP/2 client codec: startGracefulDrain sends the graceful first GOAWAY via
+// the HTTP/2 subclass (sendGracefulGoAway) immediately, then the final GOAWAY and a graceful pool
+// drain after drain_time. Exercises the h2_codec_ != nullptr path that the mock-inner tests cannot
+// reach.
 TEST_F(ReverseTunnelUpstreamCodecTest, GracefulDrainTwoPhaseOnRealHttp2Codec) {
   ON_CALL(cluster_, maxResponseHeadersCount()).WillByDefault(Return(100));
 
