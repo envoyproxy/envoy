@@ -6,6 +6,7 @@
 
 #include "envoy/http/codes.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/options.h"
 #include "envoy/singleton/manager.h"
 
 #include "source/common/http/http2/codec_impl.h"
@@ -27,20 +28,14 @@ namespace ReverseTunnelProto = envoy::extensions::upstreams::http::reverse_tunne
 
 SINGLETON_MANAGER_REGISTRATION(reverse_tunnel_upstream_codec_drain);
 
-// Default grace period between the shutdown notice and the final GOAWAY when an operator triggers
-// a drain without specifying drain_time_ms.
-constexpr uint64_t DefaultDrainTimeMs = 5000;
-
 // The cluster type this drain-aware upstream codec applies to.
 constexpr absl::string_view ReverseConnectionClusterType = "envoy.clusters.reverse_connection";
 
 Envoy::Http::ClientConnectionPtr
 ReverseTunnelUpstreamCodecOptions::createClientCodec(const Context& context) const {
-  // Scope the drain-aware codec to HTTP/2 reverse-connection clusters. The core codec-factory seam
-  // is intentionally generic (it discovers any protocol-options object that exposes a
-  // ClientCodecFactory), so we enforce the cluster-type specificity here in the extension rather
-  // than coupling core to the reverse_connection cluster name. If these options are ever attached
-  // to a non-reverse-connection cluster, return nullptr so CodecClientProd uses the stock codec.
+  // Only HTTP/2 reverse-connection clusters get the drain-aware codec; otherwise return nullptr so
+  // CodecClientProd uses the stock codec. The cluster-type gate lives here to keep the core
+  // codec-factory seam generic.
   const auto custom_type = context.cluster.clusterType();
   const bool is_reverse_connection =
       custom_type.has_value() && custom_type->name() == ReverseConnectionClusterType;
@@ -82,15 +77,22 @@ ReverseTunnelUpstreamCodecFactory::createProtocolOptionsConfig(
   // Register the admin trigger once (subsequent clusters get addHandler() == false, which is fine).
   // The captured registry shared_ptr keeps it alive for the handler's lifetime.
   if (auto admin = server_context.admin(); admin.has_value()) {
+    // Default the rotation grace window to the server's configured drain time (--drain-time-s) so
+    // in-flight requests get the same window to finish as a normal drain; overridable per call via
+    // the drain_time_ms query param.
+    const uint64_t default_drain_time_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(server_context.options().drainTime())
+            .count();
     admin->addHandler(
         "/reverse_tunnel/drain_clusters",
         "gracefully drain reverse-tunnel upstream client codecs; optional query params: "
-        "cluster=<name> (default: all), drain_time_ms=<n> (default 5000)",
-        [registry](Envoy::Http::ResponseHeaderMap&, Buffer::Instance& response,
-                   Server::AdminStream& admin_stream) -> Envoy::Http::Code {
+        "cluster=<name> (default: all), drain_time_ms=<n> (default: server drain time)",
+        [registry, default_drain_time_ms](Envoy::Http::ResponseHeaderMap&,
+                                          Buffer::Instance& response,
+                                          Server::AdminStream& admin_stream) -> Envoy::Http::Code {
           const auto params = admin_stream.queryParams();
           const std::string cluster = params.getFirstValue("cluster").value_or("");
-          uint64_t drain_time_ms = DefaultDrainTimeMs;
+          uint64_t drain_time_ms = default_drain_time_ms;
           if (auto v = params.getFirstValue("drain_time_ms"); v.has_value()) {
             uint64_t parsed = 0;
             if (absl::SimpleAtoi(v.value(), &parsed)) {

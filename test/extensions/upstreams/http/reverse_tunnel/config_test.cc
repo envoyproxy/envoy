@@ -320,6 +320,9 @@ TEST_F(ReverseTunnelUpstreamCodecTest, FactoryCreatesOptionsAndRegistersAdminHan
       .WillByDefault(ReturnRef(factory_context.server_context_));
   ON_CALL(factory_context.server_context_, admin())
       .WillByDefault(Return(OptRef<Server::Admin>{admin}));
+  // The handler defaults the rotation grace window to the server's drain time.
+  ON_CALL(factory_context.server_context_.options_, drainTime())
+      .WillByDefault(Return(std::chrono::seconds(30)));
 
   Server::Admin::HandlerCb captured_handler;
   EXPECT_CALL(admin, addHandler("/reverse_tunnel/drain_clusters", _, _, false, true, _))
@@ -348,6 +351,15 @@ TEST_F(ReverseTunnelUpstreamCodecTest, FactoryCreatesOptionsAndRegistersAdminHan
   Buffer::OwnedImpl response;
   EXPECT_EQ(Envoy::Http::Code::OK, captured_handler(response_headers, response, admin_stream));
   EXPECT_TRUE(absl::StrContains(response.toString(), "cluster_a"));
+  EXPECT_TRUE(absl::StrContains(response.toString(), "drain_time_ms=1000"));
+
+  // Without an explicit drain_time_ms, the handler falls back to the server drain time (30s).
+  Envoy::Http::Utility::QueryParamsMulti default_params;
+  ON_CALL(admin_stream, queryParams()).WillByDefault(Return(default_params));
+  Buffer::OwnedImpl default_response;
+  EXPECT_EQ(Envoy::Http::Code::OK,
+            captured_handler(response_headers, default_response, admin_stream));
+  EXPECT_TRUE(absl::StrContains(default_response.toString(), "drain_time_ms=30000"));
 }
 
 } // namespace

@@ -28,6 +28,7 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/server:admin_interface",
         "//envoy/server:filter_config_interface",
+        "//envoy/server:options_interface",
         "//envoy/singleton:instance_interface",
         "//envoy/singleton:manager_interface",
         "//envoy/stats:stats_interface",
