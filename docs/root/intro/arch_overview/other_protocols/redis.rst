@@ -185,7 +185,9 @@ For details on each command's usage see the official
   :widths: 1, 1
 
   AUTH, Authentication
+  CLIENT, Connection
   ECHO, Connection
+  HELLO, Connection
   PING, Connection
   QUIT, Connection
   DEL, Generic

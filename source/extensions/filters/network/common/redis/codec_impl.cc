@@ -1094,8 +1094,8 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
           // Reject whitespace and non-printable bytes up front. ``SimpleAtod`` tolerates
           // surrounding ASCII whitespace, so without this an embedded space/tab (or, since
           // only ``\r`` terminates this state, a bare ``\n``) would validate and then be
-          // re-emitted verbatim inside a line-framed RESP3 Double — desyncing strict
-          // downstream parsers. Legitimate Double tokens are printable, space-free ASCII
+          // re-emitted verbatim inside a line-framed RESP3 Double, which would desynchronize
+          // strict downstream parsers. Legitimate Double tokens are printable, space-free ASCII
           // (digits, sign, '.', 'e'/'E', "inf"/"nan").
           const unsigned char c = static_cast<unsigned char>(buffer[0]);
           if (absl::ascii_isspace(c) || !absl::ascii_isprint(c)) {
@@ -1295,8 +1295,7 @@ void EncoderImpl::encode(const RespValue& value, Buffer::Instance& out) {
     // stray element while RESP2 emitted it).
     const std::vector<RespValue>& stored = value.asArray();
     ENVOY_BUG(stored.size() % 2 == 0, "Map storage must have even length");
-    const absl::Span<const RespValue> pairs(stored.data(),
-                                            stored.size() & ~static_cast<size_t>(1));
+    const absl::Span<const RespValue> pairs(stored.data(), stored.size() & ~static_cast<size_t>(1));
     if (protocol_version_ == RespProtocolVersion::Resp3) {
       encodeMap(pairs, out);
     } else {

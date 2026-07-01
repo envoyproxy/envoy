@@ -1298,7 +1298,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   // ID, NO-EVICT, ...) are deliberately rejected: they expose or mutate
   // upstream connection state, which would be ambiguous over a multiplexed
   // proxy connection. Inside an active MULTI the local +OK shortcut is rejected with the
-  // transaction allowlist's error shape — an out-of-band +OK here would desync EXEC's reply
+  // transaction allowlist's error shape — an out-of-band +OK here would desynchronize EXEC's reply
   // count. (Real Redis queues CLIENT in a transaction; the proxy's transaction model only
   // forwards allowlisted data commands.)
   if (command_name == Common::Redis::SupportedCommands::client()) {

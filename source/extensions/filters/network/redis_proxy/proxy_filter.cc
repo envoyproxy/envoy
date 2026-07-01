@@ -283,7 +283,7 @@ void ProxyFilter::resumeAuthHeldRequests() {
   // a resumed AUTH whose external-auth call resolves synchronously (gRPC send() can fail
   // inline) re-enters this method and drains further entries. Re-scanning from begin() after
   // every dispatch is therefore required for memory safety; the scan is bounded by how many
-  // commands the client pipelined during one auth round trip. The reentrancy guard keeps the
+  // commands the client pipelined during one auth round trip. The reentrant guard keeps the
   // outermost invocation as the single drain loop; the nested call returns immediately and the
   // outer loop re-checks the auth status on its next pass.
   if (resuming_held_requests_) {

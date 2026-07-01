@@ -293,10 +293,11 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
           ProtocolOptionsConfigImpl::authCredentials(cluster_->info(), api_, host);
       client = std::make_unique<ThreadLocalActiveClient>(*this);
       client->host_ = host;
-      client->redis_client_ = client_factory_.create(
-          host, dispatcher_, config_, redis_command_stats_, *(stats_scope_), credentials.username,
-          credentials.password, false, aws_iam_config_, aws_iam_authenticator_,
-          upstream_protocol_version_, makeOptRef(redis_cluster_stats_.upstream_resp3_hello_failure_));
+      client->redis_client_ =
+          client_factory_.create(host, dispatcher_, config_, redis_command_stats_, *(stats_scope_),
+                                 credentials.username, credentials.password, false, aws_iam_config_,
+                                 aws_iam_authenticator_, upstream_protocol_version_,
+                                 makeOptRef(redis_cluster_stats_.upstream_resp3_hello_failure_));
 
       client->redis_client_->addConnectionCallbacks(*client);
       // RESP3 HELLO 3 negotiation runs inside ClientImpl::initialize (driven by the

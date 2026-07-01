@@ -74,6 +74,8 @@ envoy_cc_library(
         ":aws_iam_authenticator_lib",
         ":codec_lib",
         ":redis_command_stats_lib",
+        "//envoy/common:optref_lib",
+        "//envoy/stats:stats_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/extensions/common/aws/signers:sigv4_signer_impl_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",

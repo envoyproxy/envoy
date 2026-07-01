@@ -621,12 +621,11 @@ void ClientImpl::replayHeldUserRequests() {
 void ClientImpl::failHeldUserRequests() {
   // Failure can only happen during init and replay only happens on Ready, so every entry here
   // is expected to be non-replayed (live_request_ == nullptr) — a front-pop drain suffices and
-  // avoids the per-iteration rescan a skip-based drain needs. Pop before firing so re-entrant
+  // avoids the per-iteration re-scan a skip-based drain needs. Pop before firing so re-entrant
   // mutations (sibling cancel erasing its own node) cannot invalidate anything we hold. Should
   // the invariant ever break, stop and leave the replayed remainder to fail through onEvent's
   // pending_requests_ drain (their wrapper owns them there); the ASSERT flags that in debug.
-  while (!held_user_requests_.empty() &&
-         held_user_requests_.front()->live_request_ == nullptr) {
+  while (!held_user_requests_.empty() && held_user_requests_.front()->live_request_ == nullptr) {
     auto held = std::move(held_user_requests_.front());
     held_user_requests_.pop_front();
     if (!held->canceled_) {

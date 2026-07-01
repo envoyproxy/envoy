@@ -232,8 +232,8 @@ void InfoCmdAggregateResponseHandler::processAggregatedResponses(ClusterScopeCmd
     // 4-byte format prefix ("txt:"/"mkd:"); strip it so section parsing sees the first real
     // line. The decoder guarantees the prefix is present (isValidResp3VerbatimString), so the
     // size check below only defends against hand-synthesized values. The sibling aggregate
-    // handlers need no equivalent: DBSIZE stays an Integer under RESP3 and CONFIG GET's Map is
-    // already accepted by the array-merge handler.
+    // handlers need no equivalent: an integer-sum reply stays an Integer under RESP3 and CONFIG
+    // GET's Map is already accepted by the array-merge handler.
     absl::string_view response_str = resp->asString();
     if (resp->type() == Common::Redis::RespType::VerbatimString && response_str.size() >= 4) {
       response_str.remove_prefix(4);

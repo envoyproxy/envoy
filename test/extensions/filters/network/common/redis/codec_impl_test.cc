@@ -2075,9 +2075,10 @@ TEST_F(RedisEncoderDecoderImplTest, DoubleAtBoundaryAccepted) {
 }
 
 // A Double payload containing whitespace or a control byte must be rejected during
-// accumulation, not silently accepted by SimpleAtod (which tolerates surrounding whitespace)
+// accumulation, not silently accepted by the double parser (which tolerates surrounding whitespace)
 // and re-emitted verbatim. An embedded bare ``\n`` is the dangerous case: only ``\r`` ends the
-// token, so ``,1.5\n\r\n`` would otherwise store "1.5\n" and desync an LF-splitting reader.
+// token, so ``,1.5\n\r\n`` would otherwise store "1.5\n" and desynchronize a newline-splitting
+// reader.
 TEST_F(RedisEncoderDecoderImplTest, DoubleWithWhitespaceOrControlByteRejected) {
   for (const char* frame : {",1.5\n\r\n", ", 1.5\r\n", ",1.5 \r\n", ",1\t5\r\n"}) {
     SCOPED_TRACE(frame);
@@ -2089,7 +2090,8 @@ TEST_F(RedisEncoderDecoderImplTest, DoubleWithWhitespaceOrControlByteRejected) {
 }
 
 // The rejection is a charset check, not a numeric-format check: exponents, signs, and the
-// special inf/nan tokens are still accepted (SimpleAtod parses them; none contain whitespace).
+// special inf/nan tokens are still accepted (the double parser accepts them; none contain
+// whitespace).
 TEST_F(RedisEncoderDecoderImplTest, DoubleAcceptsExponentAndSpecialForms) {
   for (const char* frame : {",3.0e2\r\n", ",-2.5E-3\r\n", ",inf\r\n", ",-inf\r\n", ",nan\r\n"}) {
     SCOPED_TRACE(frame);

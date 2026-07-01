@@ -149,14 +149,11 @@ public:
     last_inline_auth_requested_version_ = requested_version;
     return inline_auth_attempt_;
   }
-  absl::optional<uint32_t> takePendingHelloAuthVersion() override {
-    auto version = pending_hello_auth_version_;
-    pending_hello_auth_version_.reset();
-    return version;
-  }
+  // The deferred HELLO-AUTH version is exercised through the real ProxyFilter::PendingRequest in
+  // proxy_filter_test; no MockSplitCallbacks test drives it, so this stub simply reports "none".
+  absl::optional<uint32_t> takePendingHelloAuthVersion() override { return absl::nullopt; }
 
   uint32_t downstream_resp_version_{2};
-  absl::optional<uint32_t> pending_hello_auth_version_;
   // Defaults to RESP2 listener — matches the proto default. Tests covering the RESP3-listener
   // path drive this to Resp3.
   Common::Redis::RespProtocolVersion protocol_version_{Common::Redis::RespProtocolVersion::Resp2};

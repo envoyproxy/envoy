@@ -1855,6 +1855,49 @@ TEST_P(RedisProxyResp3ListenerIntegrationTest, Resp3TransactionNegotiatesHello3B
   redis_client->close();
 }
 
+// RESP3 + transaction HELLO 3 FAILURE: the dedicated transaction client owns its upstream
+// connection, a different ownership path than the pooled-client failure covered by
+// UpstreamHello3FailureIncrementsStat. When that client's HELLO 3 is answered with proto=2,
+// negotiation must fail cleanly: the failure counter increments, the held MULTI...EXEC is failed
+// downstream, and the transaction client's connection is torn down (no half-open transaction).
+TEST_P(RedisProxyResp3ListenerIntegrationTest, Resp3TransactionHello3FailureFailsHeldMultiExec) {
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_NO_FATAL_FAILURE(negotiateDownstreamResp3(redis_client));
+
+  const std::string txn = makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"set", "k", "v"}) +
+                          makeBulkStringArray({"exec"});
+  ASSERT_TRUE(redis_client->write(txn));
+
+  // The transaction opens a dedicated upstream connection; HELLO 3 is sent before any MULTI byte.
+  FakeRawConnectionPtr conn;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(conn));
+  const std::string upstream_hello = makeBulkStringArray({"HELLO", "3"});
+  std::string seen;
+  ASSERT_TRUE(conn->waitForData(upstream_hello.size(), &seen));
+  ASSERT_EQ(upstream_hello, seen);
+
+  // Answer HELLO 3 with proto=2 → negotiation fails on the transaction client.
+  ASSERT_TRUE(conn->write("%1\r\n$5\r\nproto\r\n:2\r\n"));
+
+  // The failure counter increments and the held transaction fails downstream rather than
+  // reaching Redis (a half-open transaction must not survive). MULTI was already answered
+  // locally with +OK to open the transaction; the queued SET and the EXEC then each fail with
+  // ``-upstream failure`` when the transaction client's HELLO 3 negotiation fails — so the
+  // full downstream reply is the local MULTI ack followed by two upstream-failure errors.
+  test_server_->waitForCounter("cluster.cluster_0.redis_cluster.upstream_resp3_hello_failure",
+                               testing::Ge(1));
+  const std::string expected_reply = "+OK\r\n-upstream failure\r\n-upstream failure\r\n";
+  redis_client->waitForData(expected_reply);
+  EXPECT_EQ(expected_reply, redis_client->data());
+
+  // The transaction client's connection is torn down; no MULTI/SET/EXEC byte ever reached the
+  // upstream (only HELLO 3 did).
+  EXPECT_TRUE(conn->waitForDisconnect());
+
+  redis_client->close();
+}
 // RESP3 + mirror: the filter-level protocol_version applies to the mirror conn pools too, so the
 // primary AND every mirror upstream negotiate HELLO 3 before the mirrored write. Pins that a
 // mirror does not silently stay on RESP2 and that the mirrored SET never precedes its HELLO 3.

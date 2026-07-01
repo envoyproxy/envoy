@@ -193,8 +193,8 @@ private:
   // Drain any pending_request_value_ entries left in pending_requests_ after an external-auth
   // round trip resolved (called from onAuthenticateExternal). Walks the entire list in FIFO
   // order, not just the front; bails if a resumed entry starts a new round trip, and is
-  // reentrancy-guarded because a resumed AUTH can resolve synchronously (gRPC send() may fail
-  // inline) and re-enter this method from within processRespValue.
+  // guarded against reentrant calls because a resumed AUTH can resolve synchronously (gRPC send()
+  // may fail inline) and re-enter this method from within processRespValue.
   void resumeAuthHeldRequests();
 
   Common::Redis::DecoderPtr decoder_;

@@ -414,7 +414,7 @@ message RedisProxy {
   // RESP protocol version enforced for both downstream connections and every
   // routed upstream conn pool for this listener. Mismatched negotiation is
   // rejected at HELLO (``HELLO N`` where ``N`` does not match returns
-  // ``-NOPROTO``) and, when set to ``RESP3``, at the first non-HELLO/AUTH/QUIT
+  // ``-NOPROTO``) and, when set to ``RESP3``, at every non-HELLO/AUTH/QUIT
   // command on a connection that has not yet negotiated RESP3 (so clients
   // must perform an explicit ``HELLO 3`` handshake before any data command).
   //

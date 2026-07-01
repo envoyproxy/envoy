@@ -1336,7 +1336,7 @@ TEST_F(RedisSingleServerRequestTest, HelloRejectedInsideTransaction) {
 }
 
 // CLIENT SETNAME inside an active MULTI likewise skips the local +OK shortcut and is rejected:
-// an out-of-band +OK would desync EXEC's reply count.
+// an out-of-band +OK would desynchronize EXEC's reply count.
 TEST_F(RedisSingleServerRequestTest, ClientSetnameRejectedInsideTransaction) {
   InSequence s;
   callbacks_.transaction().start();
