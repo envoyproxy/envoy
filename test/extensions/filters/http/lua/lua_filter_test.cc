@@ -59,6 +59,13 @@ public:
     EXPECT_CALL(decoder_callbacks_, decodingBuffer()).Times(AtLeast(0));
     EXPECT_CALL(decoder_callbacks_, route()).Times(AtLeast(0));
 
+    // Route both the filter-config-level and route-level VM-count gauge lookups at the same
+    // underlying store so `lua.lua_vm_count` is a single, consistent stat in tests, matching
+    // production where both sides read the same server root scope.
+    ON_CALL(api_, rootScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
+    ON_CALL(server_factory_context_.api_, rootScope())
+        .WillByDefault(ReturnRef(*stats_store_.rootScope()));
+
     EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
         .Times(AtLeast(0))
         .WillRepeatedly(Invoke([this](Buffer::Instance& data, bool) {
@@ -89,7 +96,8 @@ public:
       const envoy::extensions::filters::http::lua::v3::LuaPerRoute& per_route_proto_config) {
     // Setup filter config for Lua filter.
     config_ = std::make_shared<FilterConfig>(proto_config, tls_, cluster_manager_, api_,
-                                             *stats_store_.rootScope(), "test.");
+                                             *stats_store_.rootScope(), "test.",
+                                             server_factory_context_.options().concurrency());
     // Setup per route config for Lua filter.
     per_route_config_ =
         std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
@@ -295,7 +303,7 @@ TEST(LuaHttpFilterConfigTest, BadCode) {
   proto_config.mutable_default_source_code()->set_inline_string(SCRIPT);
 
   EXPECT_THROW_WITH_MESSAGE(
-      FilterConfig(proto_config, tls, cluster_manager, api, *stats_store.rootScope(), "lua"),
+      FilterConfig(proto_config, tls, cluster_manager, api, *stats_store.rootScope(), "lua", 1),
       Filters::Common::Lua::LuaException,
       "script load error: [string \"...\"]:3: '=' expected near '<eof>'");
 }
@@ -3645,8 +3653,10 @@ TEST_F(LuaHttpFilterTest, Stats) {
   InSequence s;
   setup(REQUEST_RESPONSE_RUNTIME_ERROR_SCRIPT);
 
-  EXPECT_EQ(
-      1, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
+  // One PerLuaCodeSetup accounts for (concurrency + 1) VMs: one per worker thread plus main.
+  const uint32_t expected_vm_count = server_factory_context_.options().concurrency() + 1;
+  EXPECT_EQ(expected_vm_count,
+            stats_store_.gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
 
   // Request error
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
@@ -3703,14 +3713,14 @@ TEST_F(LuaHttpFilterTest, StatsWithPerFilterPrefix) {
   EXPECT_EQ(2, stats_store_.counter("test.lua.my_script.errors").value());
 }
 
-// lua_vm_count gauge tracks one VM per ThreadLocalState (= one per PerLuaCodeSetup) created by
-// FilterConfig. The mock TLS calls the set() callback once (single dispatcher), so each
-// PerLuaCodeSetup contributes exactly 1 to the gauge in tests.
+// The lua_vm_count gauge is updated once per PerLuaCodeSetup with (concurrency + 1), not per
+// worker thread, so its value does not depend on how many threads the mock TLS dispatches to.
 TEST_F(LuaHttpFilterTest, LuaVmCountGaugeInlineCode) {
   setup(HEADER_ONLY_SCRIPT);
-  // One default_source_code PerLuaCodeSetup → 1 VM.
-  EXPECT_EQ(
-      1, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
+  // One default_source_code PerLuaCodeSetup.
+  const uint32_t expected_vm_count = server_factory_context_.options().concurrency() + 1;
+  EXPECT_EQ(expected_vm_count,
+            stats_store_.gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 TEST_F(LuaHttpFilterTest, LuaVmCountGaugeWithSourceCodes) {
@@ -3737,40 +3747,41 @@ TEST_F(LuaHttpFilterTest, LuaVmCountGaugeWithSourceCodes) {
   setupConfig(proto_config, per_route_proto_config);
   setupFilter();
 
-  // 1 default + 2 source_codes = 3 VMs.
-  EXPECT_EQ(
-      3, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
+  // 1 default + 2 source_codes = 3 PerLuaCodeSetups, each contributing (concurrency + 1) VMs.
+  const uint32_t per_setup_vm_count = server_factory_context_.options().concurrency() + 1;
+  EXPECT_EQ(3 * per_setup_vm_count,
+            stats_store_.gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 TEST_F(LuaHttpFilterTest, LuaVmCountGaugeDecrementOnDestroy) {
   // Use the normal single-script setup so the fixture destructor is satisfied.
   setup(HEADER_ONLY_SCRIPT);
-  EXPECT_EQ(
-      1, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
+  const uint32_t per_setup_vm_count = server_factory_context_.options().concurrency() + 1;
+  EXPECT_EQ(per_setup_vm_count,
+            stats_store_.gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
 
-  // Create a second FilterConfig in a local scope. It shares the same stats scope,
-  // so its VM contributes to the same gauge.
+  // Create a second FilterConfig in a local scope. Both read/write the same server-root-scope
+  // gauge, so its VM contributes to the same total.
   {
     envoy::extensions::filters::http::lua::v3::Lua extra_proto;
     envoy::config::core::v3::DataSource src;
     src.set_inline_string(HEADER_ONLY_SCRIPT);
     extra_proto.mutable_source_codes()->insert({"extra.lua", src});
-    auto extra_config = std::make_shared<FilterConfig>(extra_proto, tls_, cluster_manager_, api_,
-                                                       *stats_store_.rootScope(), "test.");
-    // 1 (setup) + 1 (extra_config source_codes) = 2
-    EXPECT_EQ(
-        2,
-        stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
-    // extra_config destroyed at end of scope → its LuaThreadLocal destructor fires.
+    auto extra_config = std::make_shared<FilterConfig>(
+        extra_proto, tls_, cluster_manager_, api_, *stats_store_.rootScope(), "test.",
+        server_factory_context_.options().concurrency());
+    EXPECT_EQ(2 * per_setup_vm_count,
+              stats_store_.gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
+    // extra_config destroyed at end of scope → its PerLuaCodeSetup destructor fires.
   }
-  EXPECT_EQ(
-      1, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
+  EXPECT_EQ(per_setup_vm_count,
+            stats_store_.gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
-TEST_F(LuaHttpFilterTest, LuaVmCountGaugePerRouteInlineCounted) {
-  // FilterConfigPerRoute with inline source_code creates its own PerLuaCodeSetup
-  // that tracks VMs in the server root scope under "lua.lua_vm_count", separate
-  // from the per-filter gauge owned by FilterConfig.
+TEST_F(LuaHttpFilterTest, LuaVmCountGaugeSharedBetweenRouteAndFilterConfig) {
+  // Both FilterConfig and FilterConfigPerRoute build their VM-count gauge directly from the
+  // server root scope using the exact same stat name ("lua.lua_vm_count"), so route-level and
+  // filter-config-level VMs are tracked in the exact same gauge, not separate ones.
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
   proto_config.mutable_default_source_code()->set_inline_string(HEADER_ONLY_SCRIPT);
 
@@ -3780,13 +3791,10 @@ TEST_F(LuaHttpFilterTest, LuaVmCountGaugePerRouteInlineCounted) {
   setupConfig(proto_config, per_route_proto_config);
   setupFilter();
 
-  // Filter-level VM is tracked in the filter's scoped gauge.
-  EXPECT_EQ(
-      1, stats_store_.gauge("test.lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
-  // Per-route VM is tracked separately in the server root scope gauge.
-  EXPECT_EQ(1, server_factory_context_.store_
-                   .gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate)
-                   .value());
+  // 1 filter-level PerLuaCodeSetup + 1 route-level PerLuaCodeSetup, same gauge.
+  const uint32_t per_setup_vm_count = server_factory_context_.options().concurrency() + 1;
+  EXPECT_EQ(2 * per_setup_vm_count,
+            stats_store_.gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 // Test clear route cache.

@@ -79,8 +79,7 @@ void Coroutine::resume(int num_args, const std::function<void()>& yield_callback
   }
 }
 
-ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAllocator& tls,
-                                   Stats::Gauge* vm_count, Stats::ScopeSharedPtr scope_keeper)
+ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAllocator& tls)
     : tls_slot_(ThreadLocal::TypedSlot<LuaThreadLocal>::makeUnique(tls)) {
 
   // First verify that the supplied code can be parsed.
@@ -93,9 +92,7 @@ ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAll
   }
 
   // Now initialize on all threads.
-  tls_slot_->set([code, vm_count, scope_keeper](Event::Dispatcher&) {
-    return std::make_shared<LuaThreadLocal>(code, vm_count, scope_keeper);
-  });
+  tls_slot_->set([code](Event::Dispatcher&) { return std::make_shared<LuaThreadLocal>(code); });
 }
 
 int ThreadLocalState::getGlobalRef(uint64_t slot) {
@@ -128,23 +125,13 @@ CoroutinePtr ThreadLocalState::createCoroutine() {
   return std::make_unique<Coroutine>(std::make_pair(lua_newthread(state), state));
 }
 
-ThreadLocalState::LuaThreadLocal::LuaThreadLocal(const std::string& code, Stats::Gauge* vm_count,
-                                                 Stats::ScopeSharedPtr scope_keeper)
-    : state_(luaL_newstate()), vm_count_(vm_count), scope_keeper_(std::move(scope_keeper)) {
+ThreadLocalState::LuaThreadLocal::LuaThreadLocal(const std::string& code)
+    : state_(luaL_newstate()) {
 
   RELEASE_ASSERT(state_.get() != nullptr, "unable to create new Lua state object");
   luaL_openlibs(state_.get());
   int rc = luaL_dostring(state_.get(), code.c_str());
   ASSERT(rc == 0);
-  if (vm_count_ != nullptr) {
-    vm_count_->inc();
-  }
-}
-
-ThreadLocalState::LuaThreadLocal::~LuaThreadLocal() {
-  if (vm_count_ != nullptr) {
-    vm_count_->dec();
-  }
 }
 
 } // namespace Lua
