@@ -1528,7 +1528,7 @@ public:
     xds_config_tracker_ptr_ = &xds_config_tracker_;
 
     // Re-setup the mux with the tracker
-    grpc_mux_context_ = std::make_unique<GrpcMuxContext>(
+    GrpcMuxContext grpc_mux_context{
         /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
         /*failover_async_client_=*/nullptr,
         /*dispatcher_=*/dispatcher_,
@@ -1550,9 +1550,9 @@ public:
         /*target_xds_authority_=*/"",
         /*eds_resources_cache_=*/
         std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
-        /*skip_subsequent_node_=*/true);
+        /*skip_subsequent_node_=*/true};
 
-    grpc_mux_ = std::make_unique<XdsMux::GrpcMuxSotw>(*grpc_mux_context_);
+    grpc_mux_ = std::make_unique<XdsMux::GrpcMuxSotw>(grpc_mux_context);
   }
 
   const std::string type_url_ =
@@ -1560,7 +1560,6 @@ public:
 
   NiceMock<MockXdsConfigTracker> xds_config_tracker_;
   MockXdsConfigTracker* xds_config_tracker_ptr_;
-  std::unique_ptr<GrpcMuxContext> grpc_mux_context_;
 };
 
 INSTANTIATE_TEST_SUITE_P(GrpcMuxImpl, GrpcMuxImplConfigTrackerTest, ::testing::Bool());
