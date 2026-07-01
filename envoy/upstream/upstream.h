@@ -34,6 +34,7 @@
 
 namespace Envoy {
 namespace Http {
+class ClientCodecFactory;
 class FilterChainManager;
 class HashPolicy;
 } // namespace Http
@@ -916,6 +917,18 @@ using ClusterTimeoutBudgetStatsOptRef =
 class ProtocolOptionsConfig {
 public:
   virtual ~ProtocolOptionsConfig() = default;
+
+  /**
+   * @return an optional upstream (client) HTTP codec factory provided by this options object.
+   *         Defaults to none. An options extension attached via typed_extension_protocol_options
+   *         can override this to make CodecClientProd build a custom or decorated client codec.
+   *         The returned factory's lifetime must be owned by this options object (e.g. by being
+   *         the object itself or a member of it): ClusterInfoImpl pins it with a shared_ptr
+   *         aliasing the options object, so a factory owned elsewhere would dangle.
+   */
+  virtual OptRef<const Http::ClientCodecFactory> upstreamHttpClientCodecFactory() const {
+    return {};
+  }
 };
 using ProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const ProtocolOptionsConfig>;
 
@@ -1092,6 +1105,15 @@ public:
   template <class Derived>
   std::shared_ptr<const Derived> extensionProtocolOptionsTyped(const std::string& name) const {
     return std::dynamic_pointer_cast<const Derived>(extensionProtocolOptions(name));
+  }
+
+  /**
+   * @return OptRef<const Http::ClientCodecFactory> a per-cluster factory for the upstream (client)
+   *         HTTP codec, if one was attached via typed_extension_protocol_options. When empty, the
+   *         stock codec is used. Non-pure so that only ClusterInfoImpl has to provide it.
+   */
+  virtual OptRef<const Http::ClientCodecFactory> upstreamHttpClientCodecFactory() const {
+    return {};
   }
 
   /**

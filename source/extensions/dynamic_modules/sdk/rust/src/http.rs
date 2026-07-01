@@ -130,6 +130,13 @@ pub trait HttpFilterConfig<EHF: EnvoyHttpFilter>: Sync {
 /// All the event hooks are called on the same thread as the one that the [`HttpFilter`] is created
 /// via the [`HttpFilterConfig::new_http_filter`] method. In other words, the [`HttpFilter`] object
 /// is thread-local.
+///
+/// The response hooks (`on_response_headers`, `on_response_body`, `on_response_trailers`) and
+/// `on_stream_complete` can run for a stream whose request hooks never ran, for example an
+/// Envoy-generated local reply for a request that failed before reaching this filter. Such a
+/// stream has no per-stream state built during decode, so these hooks must not assume it exists.
+/// Keep per-stream state in an `Option` set from a request hook and treat `None` as the
+/// never-decoded case.
 pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   /// This is called when the request headers are received.
   /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.

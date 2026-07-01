@@ -54,6 +54,12 @@ protected:
     EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*stats_scope_));
     EXPECT_CALL(context_, clusterManager()).WillRepeatedly(ReturnRef(cluster_manager_));
 
+    // Make the jittered reconnect backoff deterministic in tests. The backoff is the deterministic
+    // exponential schedule (1s, 2s, 4s, ...) plus addJitter()'s upward jitter of random() % (15% of
+    // the interval). With a fixed random of 3999 the jitter is reproducible, e.g. the first three
+    // failures yield 1099/2099/4399ms (1000+99, 2000+99, 4000+399).
+    ON_CALL(context_.api_.random_, random()).WillByDefault(Return(3999));
+
     // Create the socket interface.
     socket_interface_ = std::make_unique<ReverseTunnelInitiator>(context_);
 
@@ -219,6 +225,22 @@ protected:
 
   void trackConnectionFailure(const std::string& host_address, const std::string& cluster_name) {
     io_handle_->trackConnectionFailure(host_address, cluster_name);
+  }
+
+  void trackConnectionFailureWithRetryAfter(const std::string& host_address,
+                                            const std::string& cluster_name,
+                                            std::chrono::milliseconds retry_after) {
+    io_handle_->trackConnectionFailure(host_address, cluster_name, retry_after);
+  }
+
+  // Returns the backoff window (backoff_until - last_failure_time) in ms for a host. Both stamps
+  // come from the same trackConnectionFailure() call, so this is the exact delay, free of
+  // wall-clock drift.
+  int64_t getBackoffDelayMs(const std::string& host_address) const {
+    const auto& info = getHostConnectionInfo(host_address);
+    return std::chrono::duration_cast<std::chrono::milliseconds>(info.backoff_until -
+                                                                 info.last_failure_time)
+        .count();
   }
 
   void resetHostBackoff(const std::string& host_address) {
@@ -931,7 +953,9 @@ TEST_F(ReverseConnectionIOHandleTest, ResetHostBackoffReturnsIfHostNotFound) {
   EXPECT_EQ(stat_map["test_scope.reverse_connections.host.non-existent-host.recovered"], 0);
 }
 
-// Test trackConnectionFailure exponential backoff.
+// Test trackConnectionFailure deterministic exponential backoff with upward jitter. The schedule is
+// base * 2^(failure_count-1) (1s, 2s, 4s, ...) plus addJitter()'s random() % (15% of the interval).
+// With the fixture's fixed random of 3999 the jitter is exactly 1000+99/2000+99/4000+399ms.
 TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureExponentialBackoff) {
   // Set up thread local slot first so stats can be properly tracked.
   setupThreadLocalSlot();
@@ -965,45 +989,99 @@ TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureExponentialBackoff) 
   const auto& host_info_initial = getHostConnectionInfo("192.168.1.1");
   EXPECT_EQ(host_info_initial.failure_count, 0);
 
-  // First failure - should have 1 second backoff (1000ms)
+  // getBackoffDelayMs() measures backoff_until - last_failure_time, the exact delay free of
+  // wall-clock slop, so the deterministic+jitter values can be asserted precisely.
+  // Failure 1: 1000 (base) + 3999 % 150  = 1000 + 99  = 1099ms.
   trackConnectionFailure("192.168.1.1", "test-cluster");
-  const auto& host_info_1 = getHostConnectionInfo("192.168.1.1");
-  EXPECT_EQ(host_info_1.failure_count, 1);
-  // Verify backoff_until is set to a future time (approximately current_time + 1000ms)
-  auto backoff_duration_1 =
-      host_info_1.backoff_until - std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
-  // backoff_delay_ms = 1000 * 2^(1-1) = 1000 * 2^0 = 1000 * 1 = 1000ms
-  auto backoff_ms_1 =
-      std::chrono::duration_cast<std::chrono::milliseconds>(backoff_duration_1).count();
-  EXPECT_GE(backoff_ms_1, 900);  // Should be at least 900ms (allowing for small timing variations)
-  EXPECT_LE(backoff_ms_1, 1100); // Should be at most 1100ms
+  EXPECT_EQ(getHostConnectionInfo("192.168.1.1").failure_count, 1);
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.1"), 1099);
 
-  // Second failure - should have 2 second backoff (2000ms)
+  // Failure 2: 2000 + 3999 % 300 = 2000 + 99 = 2099ms.
   trackConnectionFailure("192.168.1.1", "test-cluster");
-  const auto& host_info_2 = getHostConnectionInfo("192.168.1.1");
-  EXPECT_EQ(host_info_2.failure_count, 2);
-  // backoff_delay_ms = 1000 * 2^(2-1) = 1000 * 2^1 = 1000 * 2 = 2000ms
-  auto backoff_duration_2 =
-      host_info_2.backoff_until - std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
-  auto backoff_ms_2 =
-      std::chrono::duration_cast<std::chrono::milliseconds>(backoff_duration_2).count();
-  EXPECT_GE(backoff_ms_2, 1900); // Should be at least 1900ms
-  EXPECT_LE(backoff_ms_2, 2100); // Should be at most 2100ms
+  EXPECT_EQ(getHostConnectionInfo("192.168.1.1").failure_count, 2);
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.1"), 2099);
 
-  // Third failure - should have 4 second backoff (4000ms)
+  // Failure 3: 4000 + 3999 % 600 = 4000 + 399 = 4399ms.
   trackConnectionFailure("192.168.1.1", "test-cluster");
-  const auto& host_info_3 = getHostConnectionInfo("192.168.1.1");
-  EXPECT_EQ(host_info_3.failure_count, 3);
-  // backoff_delay_ms = 1000 * 2^(3-1) = 1000 * 2^2 = 1000 * 4 = 4000ms
-  auto backoff_duration_3 =
-      host_info_3.backoff_until - std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
-  auto backoff_ms_3 =
-      std::chrono::duration_cast<std::chrono::milliseconds>(backoff_duration_3).count();
-  EXPECT_GE(backoff_ms_3, 3900); // Should be at least 3900ms
-  EXPECT_LE(backoff_ms_3, 4100); // Should be at most 4100ms
+  EXPECT_EQ(getHostConnectionInfo("192.168.1.1").failure_count, 3);
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.1"), 4399);
 
   // Verify that shouldAttemptConnectionToHost returns false during backoff.
   EXPECT_FALSE(shouldAttemptConnectionToHost("192.168.1.1", "test-cluster"));
+}
+
+// Test that a server Retry-After hint is honored as the per-host backoff: bounded by the configured
+// max (default 30s) and then jittered upward like every other reconnect delay.
+TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureHonorsRetryAfter) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  // A 7s hint is below the cap, so it is used as-is then jittered: 7000 + 3999 % 1050 = 7000 + 849.
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+  trackConnectionFailureWithRetryAfter("192.168.1.1", "test-cluster",
+                                       std::chrono::milliseconds(7000));
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.1"), 7849);
+  EXPECT_FALSE(shouldAttemptConnectionToHost("192.168.1.1", "test-cluster"));
+
+  // A 20-minute hint is first clamped to the 30s max, then jittered: 30000 + 3999 % 4500 = 33999.
+  // (Jitter is intentionally applied after the cap and not re-capped, so a small overshoot is
+  // expected.)
+  addHostConnectionInfo("192.168.1.2", "test-cluster", 1);
+  trackConnectionFailureWithRetryAfter("192.168.1.2", "test-cluster",
+                                       std::chrono::milliseconds(1200000));
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.2"), 33999);
+}
+
+// Test that max_reconnect_backoff caps the exponential schedule. With a 5s cap, the schedule
+// saturates at 5000ms (then jittered) instead of continuing to 8s/16s/etc.
+TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureRespectsConfiguredMaxBackoff) {
+  // Rebuild the extension with a 5s max_reconnect_backoff, then wire its thread-local slot (the IO
+  // handle reads the time source through the extension's slot, so it must be set on this instance).
+  config_.mutable_max_reconnect_backoff()->set_seconds(5);
+  extension_ = std::make_unique<ReverseTunnelInitiatorExtension>(context_, config_);
+  setupThreadLocalSlot();
+  EXPECT_EQ(extension_->maxReconnectBackoffMs(), 5000);
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config); // Uses the rebuilt extension_.
+  ASSERT_NE(io_handle_, nullptr);
+
+  // Drive 4 failures. The deterministic step on the 4th failure would be 1000 * 2^3 = 8000ms, but
+  // it is capped at the configured 5000ms and then jittered: 5000 + 3999 % 750 = 5000 + 249 =
+  // 5249ms.
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+  for (int i = 0; i < 4; ++i) {
+    trackConnectionFailure("192.168.1.1", "test-cluster");
+  }
+  EXPECT_EQ(getHostConnectionInfo("192.168.1.1").failure_count, 4);
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.1"), 5249);
+}
+
+// Test that resetHostBackoff clears failure_count so the next failure restarts at the base
+// interval.
+TEST_F(ReverseConnectionIOHandleTest, ResetHostBackoffRestartsScheduleAtBase) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  // Escalate (failure_count starts at 0), then reset.
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+  trackConnectionFailure("192.168.1.1", "test-cluster"); // failure_count 0 -> 1
+  trackConnectionFailure("192.168.1.1", "test-cluster"); // failure_count 1 -> 2
+  trackConnectionFailure("192.168.1.1", "test-cluster"); // failure_count 2 -> 3
+  EXPECT_EQ(getHostConnectionInfo("192.168.1.1").failure_count, 3);
+  resetHostBackoff("192.168.1.1");
+  EXPECT_EQ(getHostConnectionInfo("192.168.1.1").failure_count, 0);
+
+  // The next failure starts from the base interval again (1000 + jitter), not an escalated value.
+  trackConnectionFailure("192.168.1.1", "test-cluster");
+  EXPECT_EQ(getHostConnectionInfo("192.168.1.1").failure_count, 1);
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.1"), 1099);
 }
 
 // Test host mapping and backoff integration.

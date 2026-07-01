@@ -30,6 +30,8 @@ envoy_cc_library(
         "//envoy/server:admin_interface",
         "//envoy/server:options_interface",
         "//envoy/singleton:manager_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:store_interface",
         "//envoy/tcp:conn_pool_interface",
         "//envoy/thread_local:thread_local_interface",
         "@abseil-cpp//absl/container:node_hash_map",

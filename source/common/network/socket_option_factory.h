@@ -10,6 +10,8 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/types/span.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -49,6 +51,8 @@ public:
   static std::unique_ptr<Socket::Options> buildIpPacketInfoOptions();
   static std::unique_ptr<Socket::Options> buildRxQueueOverFlowOptions();
   static std::unique_ptr<Socket::Options> buildReusePortOptions();
+  static std::unique_ptr<Socket::Options>
+  buildReusePortBpfCpuSteeringOptions(absl::Span<const uint32_t> worker_cpus);
   static std::unique_ptr<Socket::Options> buildUdpGroOptions();
   static std::unique_ptr<Socket::Options> buildZeroSoLingerOptions();
   static std::unique_ptr<Socket::Options> buildIpRecvTosOptions();

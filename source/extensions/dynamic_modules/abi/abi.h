@@ -9234,6 +9234,21 @@ typedef void* envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr;
  */
 typedef void* envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr;
 
+/**
+ * envoy_dynamic_module_type_cluster_worker_timer_module_ptr is a raw pointer to the
+ * DynamicModuleClusterWorkerTimer class in Envoy. The timer runs on the worker thread that created
+ * it (the dispatcher captured during envoy_dynamic_module_on_cluster_lb_choose_host), so the timer,
+ * its callback, and its deletion are all confined to a single worker thread.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module when the timer is
+ * no longer needed. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new and the destruction is done by
+ * envoy_dynamic_module_callback_cluster_worker_timer_delete. Since its lifecycle is owned/managed
+ * by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_cluster_worker_timer_module_ptr;
+
 // =============================================================================
 // Cluster Event Hooks
 // =============================================================================
@@ -9479,6 +9494,27 @@ void envoy_dynamic_module_on_cluster_http_callout_done(
     envoy_dynamic_module_type_http_callout_result result,
     envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size);
+
+/**
+ * envoy_dynamic_module_on_cluster_worker_timer_fired is called when a timer created by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new fires. It runs on the worker thread that
+ * created the timer, so it can safely touch that worker's per-load-balancer state without
+ * synchronization.
+ *
+ * This is optional. Only modules that create worker timers need to implement it.
+ *
+ * The timer is one-shot per Envoy semantics; the module re-arms it by calling
+ * envoy_dynamic_module_callback_cluster_worker_timer_enable again for periodic behavior.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy-side load balancer, usable with the cluster LB
+ * callbacks (e.g. host queries) for the duration of this call.
+ * @param lb_module_ptr is the pointer to the in-module load balancer that owns the timer.
+ * @param timer_ptr is the pointer to the timer that fired.
+ */
+void envoy_dynamic_module_on_cluster_worker_timer_fired(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_cluster_lb_module_ptr lb_module_ptr,
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr timer_ptr);
 
 // =============================================================================
 // Cluster Dynamic Module Callbacks
@@ -10054,6 +10090,87 @@ envoy_dynamic_module_callback_cluster_worker_slot_get(
 void envoy_dynamic_module_callback_cluster_get_name(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result);
+
+// -------------------- Cluster Dynamic Module Callbacks - Worker Timer --------------------
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_timer_new creates a new timer on the calling
+ * worker thread's dispatcher. The timer is not enabled upon creation; the module must call
+ * envoy_dynamic_module_callback_cluster_worker_timer_enable to arm it.
+ *
+ * This must be called on a worker thread from within an
+ * envoy_dynamic_module_on_cluster_lb_choose_host call, so that the worker dispatcher has been
+ * captured for this load balancer. When the timer fires,
+ * envoy_dynamic_module_on_cluster_worker_timer_fired is called on the same worker thread.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy-side load balancer. The module receives this as
+ * the second parameter to envoy_dynamic_module_on_cluster_lb_new.
+ * @return the pointer to the created timer, or NULL if no worker dispatcher has been captured yet
+ * (no choose_host has run on this worker).
+ *
+ * NOTE: it is the caller's responsibility to delete the timer using
+ * envoy_dynamic_module_callback_cluster_worker_timer_delete when it is no longer needed, on the
+ * same worker thread.
+ */
+envoy_dynamic_module_type_cluster_worker_timer_module_ptr
+envoy_dynamic_module_callback_cluster_worker_timer_new(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_timer_enable enables the timer with a given delay.
+ * If the timer is already enabled, it is reset to the new delay.
+ *
+ * This must be called on the worker thread that created the timer.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new.
+ * @param delay_milliseconds is the delay in milliseconds before the timer fires.
+ */
+void envoy_dynamic_module_callback_cluster_worker_timer_enable(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr timer_ptr,
+    uint64_t delay_milliseconds);
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_timer_disable disables the timer without destroying
+ * it. The timer can be re-enabled later using
+ * envoy_dynamic_module_callback_cluster_worker_timer_enable.
+ *
+ * This must be called on the worker thread that created the timer.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new.
+ */
+void envoy_dynamic_module_callback_cluster_worker_timer_disable(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr timer_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_timer_enabled checks whether the timer is currently
+ * armed.
+ *
+ * This must be called on the worker thread that created the timer.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new.
+ * @return true if the timer is currently enabled, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_worker_timer_enabled(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr timer_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_timer_delete deletes a timer created by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new. The timer is automatically disabled
+ * before deletion.
+ *
+ * This must be called on the worker thread that created the timer. The underlying Envoy timer
+ * `deregisters` from that worker dispatcher's timer list in its destructor, so invoking this
+ * callback from any other thread is undefined behavior. Same-thread ordering with
+ * envoy_dynamic_module_on_cluster_worker_timer_fired guarantees the timer cannot fire after delete.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new.
+ */
+void envoy_dynamic_module_callback_cluster_worker_timer_delete(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr timer_ptr);
 
 // =============================================================================
 // Cluster Dynamic Module Callbacks - Metrics

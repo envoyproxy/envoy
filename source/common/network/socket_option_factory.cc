@@ -5,6 +5,7 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/network/addr_family_aware_socket_option_impl.h"
+#include "source/common/network/reuse_port_bpf_cpu_steering_option_impl.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/win32_redirect_records_option_impl.h"
 
@@ -170,6 +171,14 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildReusePortOptions() {
   std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
   options->push_back(std::make_shared<Network::SocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_SO_REUSEPORT, 1));
+  return options;
+}
+
+std::unique_ptr<Socket::Options>
+SocketOptionFactory::buildReusePortBpfCpuSteeringOptions(absl::Span<const uint32_t> worker_cpus) {
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+  options->push_back(std::make_shared<ReusePortBpfCpuSteeringOptionImpl>(
+      std::vector<uint32_t>(worker_cpus.begin(), worker_cpus.end())));
   return options;
 }
 
