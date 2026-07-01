@@ -2,6 +2,8 @@
 
 #include <utility>
 
+#include "envoy/common/optref.h"
+
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {

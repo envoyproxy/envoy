@@ -101,6 +101,7 @@ envoy_cc_library(
         "arena_wrapped_proto.h",
     ],
     deps = [
+        "//envoy/common:optref_lib",
         "@com_google_protobuf//:protobuf",
     ],
 )
