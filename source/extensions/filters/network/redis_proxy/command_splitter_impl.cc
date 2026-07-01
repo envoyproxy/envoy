@@ -1261,8 +1261,16 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   }
 
   // HELLO has its own gate with inline-AUTH support; see InstanceImpl::handleHelloCommand. It runs
-  // before the connectionAllowed gate so a ``HELLO N AUTH ...`` can authenticate inline.
+  // before the connectionAllowed gate so a ``HELLO N AUTH ...`` can authenticate inline. Inside an
+  // active MULTI it is rejected with the transaction allowlist's error shape instead — real Redis
+  // likewise refuses HELLO in a transaction, and answering it locally here would flip the
+  // protocol mid-transaction and emit a reply EXEC never accounts for.
   if (command_name == Common::Redis::SupportedCommands::hello()) {
+    if (callbacks.transaction().active_) {
+      callbacks.onResponse(Common::Redis::Utility::makeError(
+          fmt::format("'{}' command is not supported within transaction", command_name)));
+      return nullptr;
+    }
     return handleHelloCommand(*request, callbacks);
   }
 
@@ -1289,8 +1297,16 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   // discarding the supplied metadata. Other CLIENT subcommands (LIST, KILL,
   // ID, NO-EVICT, ...) are deliberately rejected: they expose or mutate
   // upstream connection state, which would be ambiguous over a multiplexed
-  // proxy connection.
+  // proxy connection. Inside an active MULTI the local +OK shortcut is rejected with the
+  // transaction allowlist's error shape — an out-of-band +OK here would desync EXEC's reply
+  // count. (Real Redis queues CLIENT in a transaction; the proxy's transaction model only
+  // forwards allowlisted data commands.)
   if (command_name == Common::Redis::SupportedCommands::client()) {
+    if (callbacks.transaction().active_) {
+      callbacks.onResponse(Common::Redis::Utility::makeError(
+          fmt::format("'{}' command is not supported within transaction", command_name)));
+      return nullptr;
+    }
     if (request->asArray().size() < 2) {
       onInvalidRequest(callbacks);
       return nullptr;

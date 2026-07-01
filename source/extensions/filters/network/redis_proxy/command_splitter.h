@@ -167,15 +167,6 @@ public:
 };
 
 /**
- * Build the HELLO command reply (Map for a RESP3 downstream; the encoder converts to a flat
- * array on a RESP2 downstream) for the given negotiated protocol version. Exposed so
- * ``ProxyFilter`` can emit a deferred HELLO reply after an external-auth round trip completes
- * for ``HELLO N AUTH <user> <pass>`` — the splitter's HELLO handler returns control before
- * the reply is built in that case.
- */
-Common::Redis::RespValuePtr buildHelloReply(uint32_t downstream_version);
-
-/**
  * A command splitter that takes incoming redis commands and splits them as appropriate to a
  * backend connection pool.
  */
@@ -196,11 +187,10 @@ public:
    *         deferred the response to an out-of-band path that the implementing
    *         ``SplitCallbacks`` will complete (currently: HELLO N AUTH ... routed to an
    *         external auth provider — see ``attemptDownstreamAuthInline`` returning
-   *         ``ImplOwnsResponse``). In both cases the caller's ``SplitCallbacks`` will eventually
-   *         be
-   *         notified, but in case (2) the notification arrives via a separate code path
-   *         (e.g. ``ProxyFilter::onAuthenticateExternal``) rather than from the splitter
-   *         itself.
+   *         ``ImplOwnsResponse``). In both cases the caller's ``SplitCallbacks`` will
+   *         eventually be notified, but in case (2) the notification arrives via a separate
+   *         code path (e.g. ``ProxyFilter::onAuthenticateExternal``) rather than from the
+   *         splitter itself.
    */
   virtual SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
                                       SplitCallbacks& callbacks, Event::Dispatcher& dispatcher,

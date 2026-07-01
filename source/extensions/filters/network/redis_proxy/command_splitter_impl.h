@@ -29,6 +29,15 @@ namespace RedisProxy {
 namespace CommandSplitter {
 
 /**
+ * Build the HELLO command reply (Map for a RESP3 downstream; the encoder converts to a flat
+ * array on a RESP2 downstream) for the given negotiated protocol version. Exposed so
+ * ``ProxyFilter`` can emit a deferred HELLO reply after an external-auth round trip completes
+ * for ``HELLO N AUTH <user> <pass>`` — the splitter's HELLO handler returns control before
+ * the reply is built in that case.
+ */
+Common::Redis::RespValuePtr buildHelloReply(uint32_t downstream_version);
+
+/**
  * All command level stats. @see stats_macros.h
  */
 #define ALL_COMMAND_STATS(COUNTER)                                                                 \

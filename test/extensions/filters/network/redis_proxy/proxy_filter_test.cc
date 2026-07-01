@@ -5,6 +5,7 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
 #include "source/extensions/filters/network/redis_proxy/config.h"
 #include "source/extensions/filters/network/redis_proxy/proxy_filter.h"
 #include "source/extensions/filters/network/well_known_names.h"
@@ -2089,6 +2090,45 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration,
         // Failed HELLO AUTH must NOT flip connection_allowed_ to true. A subsequent ordinary
         // command on this connection still hits the auth gate.
         EXPECT_FALSE(filter_->connectionAllowed());
+        return nullptr;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+// The external provider's detail message flows into a RESP Error line; CR/LF in it would
+// re-frame the downstream protocol. Both the WRONGPASS (HELLO AUTH) sink and the plain-AUTH
+// ERR sink must sanitize control bytes to spaces.
+TEST_F(RedisProxyFilterWithExternalAuthAndExpiration,
+       HelloAuthExternalAuthUnauthorizedMessageIsSanitized) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_CALL(*external_auth_client_, authenticateExternal(_, _, _, "alice", "wrong"))
+            .WillOnce(WithArgs<0, 1>(
+                Invoke([&](ExternalAuth::AuthenticateCallback& callback,
+                           CommandSplitter::SplitCallbacks& pending_request) -> void {
+                  ExternalAuth::AuthenticateResponsePtr auth_response =
+                      std::make_unique<ExternalAuth::AuthenticateResponse>();
+                  auth_response->status = ExternalAuth::AuthenticationRequestStatus::Unauthorized;
+                  auth_response->message = "rejected\r\n-FAKE injected frame";
+                  callback.onAuthenticateExternal(pending_request, std::move(auth_response));
+                })));
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::Error);
+        reply->asString() = "WRONGPASS rejected  -FAKE injected frame";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::ImplOwnsResponse,
+                  callbacks.attemptDownstreamAuthInline("alice", "wrong", 3));
         return nullptr;
       }));
 

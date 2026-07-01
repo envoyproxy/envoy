@@ -15,6 +15,7 @@
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter.h"
+#include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
 #include "absl/strings/ascii.h"
 
@@ -248,13 +249,16 @@ void ProxyFilter::onAuthenticateExternal(CommandSplitter::SplitCallbacks& reques
     redis_response->type(Common::Redis::RespType::Error);
     if (is_hello_auth) {
       // Match the WRONGPASS shape the splitter emits for a denied local-auth HELLO so RESP3
-      // clients see the same error code regardless of which auth backend is configured.
+      // clients see the same error code regardless of which auth backend is configured. The
+      // provider-supplied detail is sanitized: a CR/LF in it would re-frame the RESP error line.
       const std::string detail =
           response->message.empty() ? "invalid username-password pair" : response->message;
-      redis_response->asString() = fmt::format("WRONGPASS {}", detail);
+      redis_response->asString() =
+          fmt::format("WRONGPASS {}", Common::Redis::sanitizeControlBytes(detail));
     } else {
       const std::string detail = response->message.empty() ? "unauthorized" : response->message;
-      redis_response->asString() = fmt::format("ERR {}", detail);
+      redis_response->asString() =
+          fmt::format("ERR {}", Common::Redis::sanitizeControlBytes(detail));
     }
   } else {
     redis_response = std::make_unique<Common::Redis::RespValue>();

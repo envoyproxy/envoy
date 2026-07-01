@@ -1316,6 +1316,43 @@ TEST_F(RedisSingleServerRequestTest, Resp2ListenerAcceptsHello2) {
   EXPECT_EQ(2U, callbacks_.downstream_resp_version_);
 }
 
+// HELLO inside an active MULTI is rejected with the transaction allowlist's error shape (real
+// Redis refuses HELLO in a transaction too). Answering it locally would flip the protocol
+// mid-transaction and emit a reply that EXEC's response array never accounts for. The
+// rejection happens before handleHelloCommand, so no auth gate interaction occurs.
+TEST_F(RedisSingleServerRequestTest, HelloRejectedInsideTransaction) {
+  InSequence s;
+  callbacks_.transaction().start();
+
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "'hello' command is not supported within transaction";
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"hello", "3"});
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+}
+
+// CLIENT SETNAME inside an active MULTI likewise skips the local +OK shortcut and is rejected:
+// an out-of-band +OK would desync EXEC's reply count.
+TEST_F(RedisSingleServerRequestTest, ClientSetnameRejectedInsideTransaction) {
+  InSequence s;
+  callbacks_.transaction().start();
+
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "'client' command is not supported within transaction";
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"client", "setname", "myapp"});
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+}
+
 TEST_F(RedisSingleServerRequestTest, CustomCommand) {
   absl::flat_hash_set<std::string> cmds = {"example"};
   auto splitter = getSplitter(std::move(cmds));
