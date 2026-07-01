@@ -70,7 +70,7 @@ TEST(ArenaWrappedProtoTest, GetConstAndNonConst) {
 TEST(ArenaWrappedProtoTest, MoveConstructor) {
   ArenaWrappedProto<test::TestMessage> wrapped;
   wrapped->set_name("moved_name");
-  google::protobuf::Arena* original_arena = wrapped.arena();
+  Protobuf::Arena* original_arena = wrapped.arena();
   test::TestMessage* original_proto = wrapped.get();
 
   ArenaWrappedProto<test::TestMessage> moved(std::move(wrapped));
@@ -87,7 +87,7 @@ TEST(ArenaWrappedProtoTest, MoveConstructor) {
 TEST(ArenaWrappedProtoTest, MoveAssignment) {
   ArenaWrappedProto<test::TestMessage> wrapped;
   wrapped->set_name("moved_name");
-  google::protobuf::Arena* original_arena = wrapped.arena();
+  Protobuf::Arena* original_arena = wrapped.arena();
   test::TestMessage* original_proto = wrapped.get();
 
   ArenaWrappedProto<test::TestMessage> moved;
