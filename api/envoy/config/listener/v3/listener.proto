@@ -364,7 +364,7 @@ message Listener {
   //
   // .. note::
   //
-  //  Currently only one ApiListener can be installed; and it can only be done via bootstrap config,
+  //  Multiple API listeners can be installed, but they can only be configured via bootstrap config,
   //  not LDS.
   //
   // [#next-major-version: In the v3 API, instead of this messy approach where the socket
