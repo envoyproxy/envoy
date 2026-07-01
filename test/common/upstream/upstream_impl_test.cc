@@ -2460,6 +2460,19 @@ TEST_F(HostImplTest, HealthcheckHostname) {
   EXPECT_EQ("foo", descr->hostnameForHealthChecks());
 }
 
+std::optional<Network::Socket::Option::Details>
+findOptionDetails(const Network::Socket::Options& options, Network::SocketOptionName name,
+                  envoy::config::core::v3::SocketOption::SocketState state,
+                  Network::Socket& socket) {
+  for (const auto& option : options) {
+    const auto details = option->getOptionDetails(socket, state);
+    if (details.has_value() && details->name_ == name) {
+      return details;
+    }
+  }
+  return std::nullopt;
+}
+
 class StaticClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
 
 TEST_F(StaticClusterImplTest, InitialHosts) {
@@ -4270,23 +4283,11 @@ public:
   HostVectorSharedPtr hosts_;
   HostsPerLocalitySharedPtr hosts_per_locality_;
   TestRandomGenerator random_;
-
-  NiceMock<Network::MockSocket> socket_;
-
-  std::optional<Network::Socket::Option::Details>
-  findOptionDetails(const Network::Socket::Options& options, Network::SocketOptionName name,
-                    envoy::config::core::v3::SocketOption::SocketState state) {
-    for (const auto& option : options) {
-      const auto details = option->getOptionDetails(socket_, state);
-      if (details.has_value() && details->name_ == name) {
-        return details;
-      }
-    }
-    return std::nullopt;
-  }
 };
 
 TEST_F(StaticClusterImplTest, AppendBindAddressNoPortOption) {
+  NiceMock<Network::MockSocket> socket;
+
   if (!ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT.hasValue()) {
     GTEST_SKIP() << "IP_BIND_ADDRESS_NO_PORT is not supported on this platform";
   }
@@ -4326,7 +4327,7 @@ TEST_F(StaticClusterImplTest, AppendBindAddressNoPortOption) {
                                                                                     nullptr, {});
     auto option = findOptionDetails(*upstream_local_address.socket_options_,
                                     ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT,
-                                    envoy::config::core::v3::SocketOption::STATE_PREBIND);
+                                    envoy::config::core::v3::SocketOption::STATE_PREBIND, socket);
     EXPECT_TRUE(option.has_value());
   }
 
@@ -4341,7 +4342,7 @@ TEST_F(StaticClusterImplTest, AppendBindAddressNoPortOption) {
                                                                                     nullptr, {});
     auto option = findOptionDetails(*upstream_local_address.socket_options_,
                                     ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT,
-                                    envoy::config::core::v3::SocketOption::STATE_PREBIND);
+                                    envoy::config::core::v3::SocketOption::STATE_PREBIND, socket);
     EXPECT_FALSE(option.has_value());
   }
 
@@ -4374,7 +4375,7 @@ TEST_F(StaticClusterImplTest, AppendBindAddressNoPortOption) {
                                                                                     nullptr, {});
     auto option = findOptionDetails(*upstream_local_address.socket_options_,
                                     ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT,
-                                    envoy::config::core::v3::SocketOption::STATE_PREBIND);
+                                    envoy::config::core::v3::SocketOption::STATE_PREBIND, socket);
     EXPECT_FALSE(option.has_value());
   }
 }
