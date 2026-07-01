@@ -31,12 +31,23 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "scope_interface",
+    hdrs = ["scope.h"],
+    deps = [
+        ":refcount_ptr_interface",
+        ":stats_interface",
+        ":tag_interface",
+        "//envoy/common:pure_lib",
+        "//source/common/stats:symbol_table_lib",
+    ],
+)
+
 # TODO(jmarantz): atomize the build rules to match the include files.
 envoy_cc_library(
     name = "stats_interface",
     hdrs = [
         "histogram.h",
-        "scope.h",
         "stats.h",
         "stats_matcher.h",
         "tag_extractor.h",
