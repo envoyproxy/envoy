@@ -3836,6 +3836,36 @@ TEST_F(ClusterScopeInfoTest, InfoAggregationAllTypes) {
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.success").value());
 }
 
+// A RESP3 upstream (listener pinned to ``protocol_version: RESP3``) returns INFO as a
+// VerbatimString whose payload carries a 4-byte format prefix ("txt:"). The aggregate handler
+// must accept the type and strip the prefix so the "# Section" header on the first line is
+// still recognized; a bulk-string shard reply in the same fan-out must merge with it.
+TEST_F(ClusterScopeInfoTest, InfoAggregationAcceptsResp3VerbatimString) {
+  InSequence s;
+  setup(2, {});
+  EXPECT_NE(nullptr, handle_);
+
+  auto verbatim = std::make_unique<Common::Redis::RespValue>();
+  verbatim->type(Common::Redis::RespType::VerbatimString);
+  verbatim->asString() = "txt:# Clients\r\nconnected_clients:10\r\n";
+  pool_callbacks_[0]->onResponse(std::move(verbatim));
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.info.latency"), 10));
+  EXPECT_CALL(callbacks_, onResponse_(_)).WillOnce([](Common::Redis::RespValuePtr& response) {
+    ASSERT_NE(nullptr, response);
+    ASSERT_EQ(Common::Redis::RespType::BulkString, response->type());
+    // connected_clients is a Sum metric: 10 (verbatim shard) + 15 (bulk shard). The section
+    // header hidden behind the "txt:" prefix must have been parsed for the metric to be
+    // attributed to the Clients section at all.
+    EXPECT_THAT(response->asString(), testing::HasSubstr("connected_clients:25"));
+  });
+  pool_callbacks_[1]->onResponse(infoResponse("# Clients\r\nconnected_clients:15\r\n"));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.success").value());
+}
+
 // Test section filtering - iterates through all major sections with same comprehensive response
 // This tests shouldIncludeSection() logic with case-insensitive matching
 TEST_F(ClusterScopeInfoTest, InfoSectionFiltering) {
