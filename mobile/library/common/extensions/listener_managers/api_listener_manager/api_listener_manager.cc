@@ -7,7 +7,7 @@
 
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
+#include <optional>
 #include "envoy/server/listener_manager.h"
 #include "source/common/common/logger.h"
 
@@ -137,7 +137,7 @@ ApiListenerOptRef ApiListenerManagerImpl::apiListener() {
     return ApiListenerOptRef(std::ref(*it->second));
   }
   if (api_listeners_.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   // Fall back to the first listener if the default one is not found but we have
   // one.
@@ -149,7 +149,7 @@ ApiListenerOptRef ApiListenerManagerImpl::apiListener(absl::string_view name) {
   if (it != api_listeners_.end()) {
     return ApiListenerOptRef(std::ref(*it->second));
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 Http::Client* ApiListenerManagerImpl::httpClient(const std::string& name) {

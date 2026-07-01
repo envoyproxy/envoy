@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/common/pure.h"
@@ -10,7 +11,6 @@
 
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -150,7 +150,7 @@ public:
    * @param key The metadata key of string view type.
    * @return The optional metadata value of string_view type.
    */
-  virtual absl::optional<absl::string_view> get(absl::string_view /*key*/) const { return {}; }
+  virtual std::optional<absl::string_view> get(absl::string_view /*key*/) const { return {}; }
 
   /**
    * Set new generic stream metadata key/value pair.

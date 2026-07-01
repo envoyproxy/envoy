@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 #include "envoy/network/connection.h"
@@ -21,7 +22,6 @@
 
 #include "absl/container/node_hash_map.h"
 #include "absl/synchronization/mutex.h"
-#include "absl/types/optional.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -91,7 +91,7 @@ private:
 
   struct ReadResult {
     uint64_t bytes_read_{0};
-    absl::optional<int> error_;
+    std::optional<int> error_;
   };
   ReadResult sslReadIntoSlice(Buffer::RawSlice& slice);
 
@@ -106,7 +106,8 @@ private:
   ContextImplSharedPtr ctx_;
   uint64_t bytes_to_retry_{};
   std::string failure_reason_;
-  absl::optional<Api::IoError::IoErrorCode> detected_io_error_;
+  std::optional<Api::IoError::IoErrorCode> detected_io_error_;
+  bool read_disabled_{false};
 
   SslHandshakerImplSharedPtr info_;
 };

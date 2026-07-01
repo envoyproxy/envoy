@@ -40,6 +40,8 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//envoy/access_log:access_log_interface",
+        "//envoy/api:api_interface",
+        "//envoy/common:random_generator_interface",
         "//envoy/http:header_map_interface",
         "//envoy/server:bootstrap_extension_config_interface",
         "//envoy/stats:stats_interface",
@@ -75,6 +77,7 @@ envoy_cc_library(
         ":reverse_tunnel_extension_lib",
         "//envoy/access_log:access_log_interface",
         "//envoy/api:io_error_interface",
+        "//envoy/common:random_generator_interface",
         "//envoy/grpc:async_client_interface",
         "//envoy/network:address_interface",
         "//envoy/network:io_handle_interface",

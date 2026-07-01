@@ -600,7 +600,7 @@ TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
 
 TEST_P(EnvoyQuicClientSessionTest, EcnReportingIsEnabled) {
   const Network::ConnectionSocketPtr& socket = quic_connection_->connectionSocket();
-  absl::optional<Network::Address::IpVersion> version = socket->ipVersion();
+  std::optional<Network::Address::IpVersion> version = socket->ipVersion();
   EXPECT_TRUE(version.has_value());
   int optval;
   socklen_t optlen = sizeof(optval);
@@ -615,7 +615,7 @@ TEST_P(EnvoyQuicClientSessionTest, EcnReportingIsEnabled) {
 }
 
 TEST_P(EnvoyQuicClientSessionTest, EcnReporting) {
-  absl::optional<Network::Address::IpVersion> version = peer_socket_->ipVersion();
+  std::optional<Network::Address::IpVersion> version = peer_socket_->ipVersion();
   EXPECT_TRUE(version.has_value());
   // Make the peer socket send ECN marks
   Api::SysCallIntResult rv;

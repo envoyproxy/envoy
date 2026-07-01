@@ -601,7 +601,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, NoInitialStreams) {
   initialize();
 
   // Create the client connection and send a request.
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},

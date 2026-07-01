@@ -169,7 +169,6 @@ envoy_cc_test(
         "//test/mocks/upstream:thread_aware_load_balancer_mocks",
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -480,7 +479,6 @@ envoy_cc_test(
         "//test/mocks/upstream:host_set_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/cluster/v3:pkg_cc_proto",
     ],
@@ -587,6 +585,7 @@ envoy_cc_test(
         ":test_local_address_selector",
         ":utility_lib",
         "//envoy/api:api_interface",
+        "//envoy/http:client_codec_factory_interface",
         "//envoy/http:codec_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:metadata_lib",
@@ -827,7 +826,6 @@ envoy_cc_test_library(
     ],
     deps = [
         "//envoy/upstream:upstream_interface",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 

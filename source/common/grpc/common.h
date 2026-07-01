@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 #include "envoy/common/exception.h"
@@ -14,7 +15,6 @@
 #include "source/common/grpc/status.h"
 #include "source/common/protobuf/protobuf.h"
 
-#include "absl/types/optional.h"
 #include "google/rpc/status.pb.h"
 
 namespace Envoy {
@@ -22,10 +22,10 @@ namespace Grpc {
 
 class Exception : public EnvoyException {
 public:
-  Exception(const absl::optional<uint64_t>& grpc_status, const std::string& message)
+  Exception(const std::optional<uint64_t>& grpc_status, const std::string& message)
       : EnvoyException(message), grpc_status_(grpc_status) {}
 
-  const absl::optional<uint64_t> grpc_status_;
+  const std::optional<uint64_t> grpc_status_;
 };
 
 class Common {
@@ -102,10 +102,10 @@ public:
    * @param trailers the trailers to parse.
    * @param allow_user_status whether allow user defined grpc status.
    *        if this value is false, custom grpc status is regarded as invalid status
-   * @return absl::optional<Status::GrpcStatus> the parsed status code or InvalidCode if no valid
+   * @return std::optional<Status::GrpcStatus> the parsed status code or InvalidCode if no valid
    * status is found.
    */
-  static absl::optional<Status::GrpcStatus>
+  static std::optional<Status::GrpcStatus>
   getGrpcStatus(const Http::ResponseHeaderOrTrailerMap& trailers, bool allow_user_defined = false);
 
   /**
@@ -114,13 +114,13 @@ public:
    * @param headers the headers to parse if no status code was found in the trailers
    * @param info the StreamInfo to check for HTTP response code if no code was found in the trailers
    * or headers
-   * @return absl::optional<Status::GrpcStatus> the parsed status code or absl::nullopt if no status
+   * @return std::optional<Status::GrpcStatus> the parsed status code or std::nullopt if no status
    * is found
    */
-  static absl::optional<Status::GrpcStatus> getGrpcStatus(const Http::ResponseTrailerMap& trailers,
-                                                          const Http::ResponseHeaderMap& headers,
-                                                          const StreamInfo::StreamInfo& info,
-                                                          bool allow_user_defined = false);
+  static std::optional<Status::GrpcStatus> getGrpcStatus(const Http::ResponseTrailerMap& trailers,
+                                                         const Http::ResponseHeaderMap& headers,
+                                                         const StreamInfo::StreamInfo& info,
+                                                         bool allow_user_defined = false);
 
   /**
    * Returns the grpc-message from a given set of trailers, if present.
@@ -136,7 +136,7 @@ public:
    * @return std::unique_ptr<google::rpc::Status> the gRPC status message or empty pointer if no
    *         grpc-status-details-bin trailer found or it was invalid.
    */
-  static absl::optional<google::rpc::Status>
+  static std::optional<google::rpc::Status>
   getGrpcStatusDetailsBin(const Http::HeaderMap& trailers);
 
   /**
@@ -144,10 +144,10 @@ public:
    * @param request_headers the header map from which to extract the value of 'grpc-timeout' header.
    *        If this header is missing the timeout corresponds to infinity. The header is encoded in
    *        maximum of 8 decimal digits and a char for the unit.
-   * @return absl::optional<std::chrono::milliseconds> the duration in milliseconds. absl::nullopt
+   * @return std::optional<std::chrono::milliseconds> the duration in milliseconds. std::nullopt
    *         is returned if 'grpc-timeout' is missing or malformed.
    */
-  static absl::optional<std::chrono::milliseconds>
+  static std::optional<std::chrono::milliseconds>
   getGrpcTimeout(const Http::RequestHeaderMap& request_headers);
 
   /**
@@ -175,7 +175,7 @@ public:
   static Http::RequestMessagePtr
   prepareHeaders(absl::string_view upstream_cluster, absl::string_view service_full_name,
                  absl::string_view method_name,
-                 const absl::optional<std::chrono::milliseconds>& timeout);
+                 const std::optional<std::chrono::milliseconds>& timeout);
 
   /**
    * @return const std::string& type URL prefix.
@@ -215,7 +215,7 @@ public:
    *   a populated RequestNames, otherwise returns an empty optional.
    * @note The return value is only valid as long as `path` is still valid and unmodified.
    */
-  static absl::optional<RequestNames> resolveServiceAndMethod(const Http::HeaderEntry* path);
+  static std::optional<RequestNames> resolveServiceAndMethod(const Http::HeaderEntry* path);
 
 private:
   static constexpr size_t MAX_GRPC_TIMEOUT_VALUE = 99999999;

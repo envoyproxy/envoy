@@ -114,7 +114,7 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
     reset_headers_ = ResetHeaderParserImpl::buildResetHeaderParserVector(
         retry_policy.rate_limited_retry_back_off().reset_headers());
 
-    absl::optional<std::chrono::milliseconds> reset_max_interval =
+    std::optional<std::chrono::milliseconds> reset_max_interval =
         PROTOBUF_GET_OPTIONAL_MS(retry_policy.rate_limited_retry_back_off(), max_interval);
     if (reset_max_interval.has_value()) {
       std::chrono::milliseconds max_interval = reset_max_interval.value();

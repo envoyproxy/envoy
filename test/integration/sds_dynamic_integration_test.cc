@@ -615,7 +615,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, MultipleCerts) {
           .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"}),
       context_manager_, *api_);
   auto ssl_client1 = makeSslClientConnection();
-  codec_client_ = makeRawHttpConnection(std::move(ssl_client1), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(std::move(ssl_client1), std::nullopt);
   EXPECT_TRUE(codec_client_->connected());
   codec_client_->connection()->close(Network::ConnectionCloseType::NoFlush);
   // peer certificate is not present when using QUIC
@@ -633,7 +633,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, MultipleCerts) {
           .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"}),
       context_manager_, *api_);
   auto ssl_client2 = makeSslClientConnection();
-  codec_client_ = makeRawHttpConnection(std::move(ssl_client2), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(std::move(ssl_client2), std::nullopt);
   EXPECT_TRUE(codec_client_->connected());
   codec_client_->connection()->close(Network::ConnectionCloseType::NoFlush);
   // peer certificate is not present when using QUIC
@@ -662,7 +662,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
   };
   initialize();
 
-  codec_client_ = makeRawHttpConnection(makeSslClientConnection(), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeSslClientConnection(), std::nullopt);
   // the connection state is not connected.
   EXPECT_FALSE(codec_client_->connected());
   codec_client_->connection()->close(Network::ConnectionCloseType::NoFlush);

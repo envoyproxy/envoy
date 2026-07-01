@@ -17,7 +17,7 @@ namespace Redis {
 absl::StatusOr<std::unique_ptr<RedisCluster::RedisHost>> RedisCluster::RedisHost::create(
     Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
     Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary,
-    const absl::optional<std::string>& zone) {
+    const std::optional<std::string>& zone) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::make_unique<RedisCluster::RedisHost>(cluster, hostname, address, parent, primary,
                                                        zone, creation_status);
@@ -28,7 +28,7 @@ absl::StatusOr<std::unique_ptr<RedisCluster::RedisHost>> RedisCluster::RedisHost
 std::shared_ptr<const envoy::config::core::v3::Locality>
 RedisCluster::RedisHost::makeLocalityWithZone(
     const envoy::config::core::v3::Locality& base_locality,
-    const absl::optional<std::string>& zone) {
+    const std::optional<std::string>& zone) {
   if (!zone.has_value()) {
     // No zone provided - return copy of base locality without modification.
     return std::make_shared<const envoy::config::core::v3::Locality>(base_locality);
@@ -150,7 +150,7 @@ void RedisCluster::updateAllHosts(const Upstream::HostVector& hosts_added,
 
   priority_state_manager.updateClusterPrioritySet(
       current_priority, std::move(priority_state_manager.priorityState()[current_priority].first),
-      hosts_added, hosts_removed, absl::nullopt, absl::nullopt, absl::nullopt);
+      hosts_added, hosts_removed, std::nullopt, std::nullopt, std::nullopt);
 }
 
 void RedisCluster::onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots,
@@ -159,9 +159,9 @@ void RedisCluster::onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots,
   absl::flat_hash_set<std::string> all_new_hosts;
 
   // Helper to look up zone from map
-  auto get_zone = [&host_zone_map](const std::string& address) -> absl::optional<std::string> {
+  auto get_zone = [&host_zone_map](const std::string& address) -> std::optional<std::string> {
     auto it = host_zone_map.find(address);
-    return (it != host_zone_map.end()) ? absl::optional<std::string>(it->second) : absl::nullopt;
+    return (it != host_zone_map.end()) ? std::optional<std::string>(it->second) : std::nullopt;
   };
 
   for (const ClusterSlot& slot : *slots) {
@@ -382,11 +382,11 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
   if (!client) {
     client = std::make_unique<RedisDiscoveryClient>(*this);
     client->host_ = current_host_address_;
-    // absl::nullopt here disables AWS IAM authentication in redis client which is not supported by
+    // std::nullopt here disables AWS IAM authentication in redis client which is not supported by
     // redis cluster implementation
     client->client_ = client_factory_.create(
         host, dispatcher_, shared_from_this(), redis_command_stats_, parent_.info()->statsScope(),
-        parent_.auth_username_, parent_.auth_password_, false, absl::nullopt, absl::nullopt);
+        parent_.auth_username_, parent_.auth_password_, false, std::nullopt, std::nullopt);
     client->client_->addConnectionCallbacks(*client);
   }
   ENVOY_LOG(debug, "executing redis cluster slot request for '{}'", parent_.info_->name());
@@ -746,7 +746,7 @@ void RedisCluster::RedisDiscoverySession::startZoneDiscovery(ClusterSlotsSharedP
       client->host_ = addr;
       client->client_ = client_factory_.create(
           host, dispatcher_, shared_from_this(), redis_command_stats_, parent_.info()->statsScope(),
-          parent_.auth_username_, parent_.auth_password_, false, absl::nullopt, absl::nullopt);
+          parent_.auth_username_, parent_.auth_password_, false, std::nullopt, std::nullopt);
       client->client_->addConnectionCallbacks(*client);
     }
 

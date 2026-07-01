@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <optional>
 #include <vector>
 
 #include "envoy/common/conn_pool.h"
@@ -11,7 +12,6 @@
 #include "source/common/common/debug_recursion_checker.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -22,7 +22,7 @@ template <typename KEY_TYPE, typename POOL_TYPE> class ConnPoolMap {
 public:
   using PoolFactory = std::function<std::unique_ptr<POOL_TYPE>()>;
   using IdleCb = typename POOL_TYPE::IdleCb;
-  using PoolOptRef = absl::optional<std::reference_wrapper<POOL_TYPE>>;
+  using PoolOptRef = std::optional<std::reference_wrapper<POOL_TYPE>>;
 
   ConnPoolMap(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host,
               ResourcePriority priority);
@@ -30,7 +30,7 @@ public:
   /**
    * Returns an existing pool for `key`, or creates a new one using `factory`. Note that it is
    * possible for this to fail if a limit on the number of pools allowed is reached.
-   * @return The pool corresponding to `key`, or `absl::nullopt`.
+   * @return The pool corresponding to `key`, or `std::nullopt`.
    */
   PoolOptRef getPool(const KEY_TYPE& key, const PoolFactory& factory);
 

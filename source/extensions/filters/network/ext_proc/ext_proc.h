@@ -275,8 +275,8 @@ private:
   Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_{};
   DownstreamCallbacks downstream_callbacks_;
 
-  absl::optional<MonotonicTime> read_call_start_time_;
-  absl::optional<MonotonicTime> write_call_start_time_;
+  std::optional<MonotonicTime> read_call_start_time_;
+  std::optional<MonotonicTime> write_call_start_time_;
   NetworkExtProcLoggingInfo* logging_info_{nullptr};
 
   bool processing_complete_{false};

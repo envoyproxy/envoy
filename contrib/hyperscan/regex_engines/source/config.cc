@@ -12,7 +12,7 @@ namespace Hyperscan {
 Envoy::Regex::EnginePtr
 Config::createEngine(const Protobuf::Message& config,
                      Server::Configuration::ServerFactoryContext& server_factory_context) {
-  const auto hyperscan = MessageUtil::downcastAndValidate<
+  MessageUtil::downcastAndValidate<
       const envoy::extensions::regex_engines::hyperscan::v3alpha::Hyperscan&>(
       config, server_factory_context.messageValidationVisitor());
 #ifdef HYPERSCAN_DISABLED

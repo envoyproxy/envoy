@@ -261,7 +261,7 @@ void ConnectionManagerImpl::checkForDeferredClose(bool skip_delay_close) {
   if (drain_state_ == DrainState::Closing && streams_.empty() && !codec_->wantsToWrite()) {
     // We are closing a draining connection with no active streams and the codec has
     // nothing to write.
-    doConnectionClose(close, absl::nullopt,
+    doConnectionClose(close, std::nullopt,
                       StreamInfo::LocalCloseReasons::get().DeferredCloseOnDrainedConnection);
   }
 }
@@ -596,7 +596,7 @@ Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
 }
 
 void ConnectionManagerImpl::resetAllStreams(
-    absl::optional<StreamInfo::CoreResponseFlag> response_flag, absl::string_view details) {
+    std::optional<StreamInfo::CoreResponseFlag> response_flag, absl::string_view details) {
   while (!streams_.empty()) {
     // Mimic a downstream reset in this case. We must also remove callbacks here. Though we are
     // about to close the connection and will disable further reads, it is possible that flushing
@@ -651,14 +651,14 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
     // NOTE: In the case where a local close comes from outside the filter, this will cause any
     // stream closures to increment remote close stats. We should do better here in the future,
     // via the pre-close callback mentioned above.
-    doConnectionClose(absl::nullopt, StreamInfo::CoreResponseFlag::DownstreamConnectionTermination,
+    doConnectionClose(std::nullopt, StreamInfo::CoreResponseFlag::DownstreamConnectionTermination,
                       details);
   }
 }
 
 void ConnectionManagerImpl::doConnectionClose(
-    absl::optional<Network::ConnectionCloseType> close_type,
-    absl::optional<StreamInfo::CoreResponseFlag> response_flag, absl::string_view details) {
+    std::optional<Network::ConnectionCloseType> close_type,
+    std::optional<StreamInfo::CoreResponseFlag> response_flag, absl::string_view details) {
   if (connection_idle_timer_) {
     connection_idle_timer_->disableTimer();
     connection_idle_timer_.reset();
@@ -707,7 +707,7 @@ bool ConnectionManagerImpl::isPrematureRstStream(const ActiveStream& stream) con
   // Check if the request was prematurely reset, by comparing its lifetime to the configured
   // threshold.
   ASSERT(!stream.state_.is_internally_destroyed_);
-  absl::optional<std::chrono::nanoseconds> duration =
+  std::optional<std::chrono::nanoseconds> duration =
       stream.filter_manager_.streamInfo().currentDuration();
 
   // Check if request lifetime is longer than the premature reset threshold.
@@ -772,7 +772,7 @@ void ConnectionManagerImpl::maybeDrainDueToPrematureResets() {
     // Mark the the connection has been drained due to too many premature resets.
     drained_due_to_premature_resets_ = true;
 
-    doConnectionClose(Network::ConnectionCloseType::Abort, absl::nullopt,
+    doConnectionClose(Network::ConnectionCloseType::Abort, std::nullopt,
                       "too_many_premature_resets");
   }
 }
@@ -788,7 +788,7 @@ void ConnectionManagerImpl::onIdleTimeout() {
   if (!codec_) {
     // No need to delay close after flushing since an idle timeout has already fired. Attempt to
     // write out buffered data one last time and issue a local close if successful.
-    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt,
+    doConnectionClose(Network::ConnectionCloseType::FlushWrite, std::nullopt,
                       StreamInfo::LocalCloseReasons::get().IdleTimeoutOnConnection);
   } else if (drain_state_ == DrainState::NotDraining) {
     startDrainSequence();
@@ -847,7 +847,7 @@ void ConnectionManagerImpl::sendGoAwayAndClose(bool graceful) {
     codec_->shutdownNotice();
     codec_->goAway();
     go_away_sent_ = true;
-    doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,
+    doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, std::nullopt,
                       "forced_goaway");
   }
 }
@@ -870,7 +870,7 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
   }
 }
 
-absl::optional<absl::string_view>
+std::optional<absl::string_view>
 ConnectionManagerImpl::HttpStreamIdProviderImpl::toStringView() const {
   if (parent_.request_headers_ == nullptr) {
     return {};
@@ -879,7 +879,7 @@ ConnectionManagerImpl::HttpStreamIdProviderImpl::toStringView() const {
   return parent_.connection_manager_.config_->requestIDExtension()->get(*parent_.request_headers_);
 }
 
-absl::optional<uint64_t> ConnectionManagerImpl::HttpStreamIdProviderImpl::toInteger() const {
+std::optional<uint64_t> ConnectionManagerImpl::HttpStreamIdProviderImpl::toInteger() const {
   if (parent_.request_headers_ == nullptr) {
     return {};
   }
@@ -897,7 +897,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                                                   Buffer::BufferMemoryAccountSharedPtr account)
     : connection_manager_(connection_manager),
       connection_manager_tracing_config_(connection_manager_.config_->tracingConfig() == nullptr
-                                             ? absl::nullopt
+                                             ? std::nullopt
                                              : makeOptRef<const TracingConnectionManagerConfig>(
                                                    *connection_manager_.config_->tracingConfig())),
       stream_id_(connection_manager.random_generator_.random()),
@@ -1064,7 +1064,7 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   filter_manager_.streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::StreamIdleTimeout);
   sendLocalReply(
       Http::Utility::maybeRequestTimeoutCode(filter_manager_.hasLastDownstreamByteReceived()),
-      "stream timeout", nullptr, absl::nullopt,
+      "stream timeout", nullptr, std::nullopt,
       StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
 }
 
@@ -1072,7 +1072,7 @@ void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   connection_manager_.stats_.named_.downstream_rq_timeout_.inc();
   sendLocalReply(
       Http::Utility::maybeRequestTimeoutCode(filter_manager_.hasLastDownstreamByteReceived()),
-      "request timeout", nullptr, absl::nullopt,
+      "request timeout", nullptr, std::nullopt,
       StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
 }
 
@@ -1080,7 +1080,7 @@ void ConnectionManagerImpl::ActiveStream::onRequestHeaderTimeout() {
   connection_manager_.stats_.named_.downstream_rq_header_timeout_.inc();
   sendLocalReply(
       Http::Utility::maybeRequestTimeoutCode(filter_manager_.hasLastDownstreamByteReceived()),
-      "request header timeout", nullptr, absl::nullopt,
+      "request header timeout", nullptr, std::nullopt,
       StreamInfo::ResponseCodeDetails::get().RequestHeaderTimeout);
 }
 
@@ -1109,7 +1109,7 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& h
   }
 
   // No response is sent back downstream for internal redirects, so don't charge downstream stats.
-  const absl::optional<std::string>& response_code_details =
+  const std::optional<std::string>& response_code_details =
       filter_manager_.streamInfo().responseCodeDetails();
   if (response_code_details.has_value() &&
       response_code_details == Envoy::StreamInfo::ResponseCodeDetails::get().InternalRedirect) {
@@ -1251,7 +1251,7 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
       Code response_code = failure_details == Http1ResponseCodeDetail::get().InvalidTransferEncoding
                                ? Code::NotImplemented
                                : Code::BadRequest;
-      absl::optional<Grpc::Status::GrpcStatus> grpc_status;
+      std::optional<Grpc::Status::GrpcStatus> grpc_status;
       if (redirect && !is_grpc) {
         response_code = Code::TemporaryRedirect;
         modify_headers = [new_path = request_headers_->Path()->value().getStringView()](
@@ -1302,7 +1302,7 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers(RequestTrailerMap& tr
   }
 
   Code response_code = Code::BadRequest;
-  absl::optional<Grpc::Status::GrpcStatus> grpc_status;
+  std::optional<Grpc::Status::GrpcStatus> grpc_status;
   if (Grpc::Common::hasGrpcContentType(*request_headers_)) {
     grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
   }
@@ -1424,7 +1424,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
                                  Http::Headers::get().EnvoyOverloadedValues.True);
           }
         },
-        absl::nullopt, StreamInfo::ResponseCodeDetails::get().Overload);
+        std::nullopt, StreamInfo::ResponseCodeDetails::get().Overload);
     return;
   }
 
@@ -1447,16 +1447,16 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
 
   if (!request_headers_->Host()) {
     // Require host header. For HTTP/1.1 Host has already been translated to :authority.
-    sendLocalReply(Code::BadRequest, "", nullptr, absl::nullopt,
+    sendLocalReply(Code::BadRequest, "", nullptr, std::nullopt,
                    StreamInfo::ResponseCodeDetails::get().MissingHost);
     return;
   }
 
   // Apply header sanity checks.
-  absl::optional<std::reference_wrapper<const absl::string_view>> error =
+  std::optional<std::reference_wrapper<const absl::string_view>> error =
       HeaderUtility::requestHeadersValid(*request_headers_);
-  if (error != absl::nullopt) {
-    sendLocalReply(Code::BadRequest, "", nullptr, absl::nullopt, error.value().get());
+  if (error != std::nullopt) {
+    sendLocalReply(Code::BadRequest, "", nullptr, std::nullopt, error.value().get());
     if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
       connection_manager_.handleCodecError(error.value().get());
     }
@@ -1469,7 +1469,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   // is enabled on the HCM.
   if ((!HeaderUtility::isConnect(*request_headers_) || request_headers_->Path()) &&
       request_headers_->getPathValue().empty()) {
-    sendLocalReply(Code::NotFound, "", nullptr, absl::nullopt,
+    sendLocalReply(Code::NotFound, "", nullptr, std::nullopt,
                    StreamInfo::ResponseCodeDetails::get().MissingPath);
     return;
   }
@@ -1477,7 +1477,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   // Rewrite the host of CONNECT-UDP requests.
   if (HeaderUtility::isConnectUdpRequest(*request_headers_) &&
       !HeaderUtility::rewriteAuthorityForConnectUdp(*request_headers_)) {
-    sendLocalReply(Code::NotFound, "The path is incorrect for CONNECT-UDP", nullptr, absl::nullopt,
+    sendLocalReply(Code::NotFound, "The path is incorrect for CONNECT-UDP", nullptr, std::nullopt,
                    StreamInfo::ResponseCodeDetails::get().InvalidPath);
     return;
   }
@@ -1485,7 +1485,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   // Currently we only support relative paths at the application layer.
   if (!request_headers_->getPathValue().empty() && request_headers_->getPathValue()[0] != '/') {
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
-    sendLocalReply(Code::NotFound, "", nullptr, absl::nullopt,
+    sendLocalReply(Code::NotFound, "", nullptr, std::nullopt,
                    StreamInfo::ResponseCodeDetails::get().AbsolutePath);
     return;
   }
@@ -1501,7 +1501,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
       (action == ConnectionManagerUtility::NormalizePathAction::Redirect &&
        Grpc::Common::hasGrpcContentType(*request_headers_))) {
     connection_manager_.stats_.named_.downstream_rq_failed_path_normalization_.inc();
-    sendLocalReply(Code::BadRequest, "", nullptr, absl::nullopt,
+    sendLocalReply(Code::BadRequest, "", nullptr, std::nullopt,
                    StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
     return;
   } else if (action == ConnectionManagerUtility::NormalizePathAction::Redirect) {
@@ -1512,7 +1512,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
             Http::ResponseHeaderMap& response_headers) -> void {
           response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
         },
-        absl::nullopt, StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
+        std::nullopt, StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
     return;
   }
 
@@ -1540,7 +1540,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
       const auto& reject_request_params = mutate_result.reject_request.value();
       connection_manager_.stats_.named_.downstream_rq_rejected_via_ip_detection_.inc();
       sendLocalReply(reject_request_params.response_code, reject_request_params.body, nullptr,
-                     absl::nullopt,
+                     std::nullopt,
                      StreamInfo::ResponseCodeDetails::get().OriginalIPDetectionFailed);
       return;
     }
@@ -1583,7 +1583,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
       // contains a smuggled HTTP request.
       filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
-      sendLocalReply(Code::Forbidden, "", nullptr, absl::nullopt,
+      sendLocalReply(Code::Forbidden, "", nullptr, std::nullopt,
                      StreamInfo::ResponseCodeDetails::get().UpgradeFailed);
       return;
     }
@@ -1881,7 +1881,7 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
   }
 }
 
-absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream::routeConfig() {
+std::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream::routeConfig() {
   if (connection_manager_.config_->routeConfigProvider() != nullptr) {
     return {connection_manager_.config_->routeConfigProvider()->configCast()};
   }
@@ -2467,7 +2467,7 @@ void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
   }
 
   setCachedRoute({});
-  cached_cluster_info_ = absl::optional<Upstream::ClusterInfoConstSharedPtr>();
+  cached_cluster_info_ = std::optional<Upstream::ClusterInfoConstSharedPtr>();
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshRouteCluster() {
@@ -2507,7 +2507,7 @@ void ConnectionManagerImpl::ActiveStream::recreateClusterInfo() {
 }
 
 void ConnectionManagerImpl::ActiveStream::setCachedRoute(
-    absl::optional<Router::RouteConstSharedPtr>&& route) {
+    std::optional<Router::RouteConstSharedPtr>&& route) {
   if (hasCachedRoute()) {
     // The configuration of the route may be referenced by some filters.
     // Cache the route to avoid it being destroyed before the stream is destroyed.

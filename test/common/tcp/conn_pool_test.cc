@@ -73,7 +73,7 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
   testing::MockFunction<void()> mock_pool_failure_cb_;
   testing::MockFunction<void()> mock_pool_ready_cb_;
   ConnectionPool::ConnectionDataPtr conn_data_;
-  absl::optional<ConnectionPool::PoolFailureReason> reason_;
+  std::optional<ConnectionPool::PoolFailureReason> reason_;
   std::string failure_reason_string_;
   Upstream::HostDescriptionConstSharedPtr host_;
   Ssl::ConnectionInfoConstSharedPtr ssl_;
@@ -186,7 +186,7 @@ protected:
                         Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                         ConnPoolBase& parent, Server::OverloadManager& overload_manager)
         : ConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, options,
-                       transport_socket_options, state_, absl::nullopt, overload_manager),
+                       transport_socket_options, state_, std::nullopt, overload_manager),
           parent_(parent) {}
 
     void onConnReleased(Envoy::ConnectionPool::ActiveClient& client) override {
@@ -195,7 +195,7 @@ protected:
     }
 
     Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override {
-      absl::optional<std::chrono::milliseconds> idle_timeout;
+      std::optional<std::chrono::milliseconds> idle_timeout;
       if (parent_.has_idle_timers_) {
         // put a random timeout to equip the idle timer, and simulates by manual invokeCallback
         idle_timeout = std::chrono::hours(1);
@@ -273,7 +273,7 @@ public:
     host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000");
     conn_pool_ =
         std::make_unique<ConnPoolImpl>(dispatcher_, host_, Upstream::ResourcePriority::Default,
-                                       nullptr, nullptr, state_, absl::nullopt, overload_manager_);
+                                       nullptr, nullptr, state_, std::nullopt, overload_manager_);
     ssl_ = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
   }
   ~TcpConnPoolImplDestructorTest() override = default;

@@ -345,7 +345,7 @@ public:
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
       duration_message.CheckTypeAndMergeFrom(message);
 #else
-      duration_message.MergeFromCord(message.SerializeAsCord());
+      std::ignore = duration_message.MergeFromCord(message.SerializeAsCord());
 #endif
       // Validate the value of the duration.
       RETURN_IF_NOT_OK(validateDurationNoThrow(duration_message));
@@ -741,7 +741,7 @@ Protobuf::Value ValueUtil::stringValue(absl::string_view str) {
   return val;
 }
 
-Protobuf::Value ValueUtil::optionalStringValue(const absl::optional<std::string>& str) {
+Protobuf::Value ValueUtil::optionalStringValue(const std::optional<std::string>& str) {
   if (str.has_value()) {
     return ValueUtil::stringValue(str.value());
   }

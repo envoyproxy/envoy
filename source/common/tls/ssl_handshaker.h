@@ -3,6 +3,7 @@
 #include <sys/types.h>
 
 #include <cstdint>
+#include <optional>
 
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
@@ -21,7 +22,6 @@
 
 #include "absl/container/node_hash_map.h"
 #include "absl/synchronization/mutex.h"
-#include "absl/types/optional.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -118,7 +118,7 @@ private:
   Ssl::ValidateStatus cert_validation_result_{Ssl::ValidateStatus::NotStarted};
   // Latch the in-flight cert selection callback.
   // nullopt if there is none.
-  OptRef<CertificateSelectionCallbackImpl> cert_selection_callback_{absl::nullopt};
+  OptRef<CertificateSelectionCallbackImpl> cert_selection_callback_{std::nullopt};
   // Stores the cert selection result if there is any.
   // NotStarted if no cert selection has ever been kicked off.
   Ssl::CertificateSelectionStatus cert_selection_result_{
@@ -162,7 +162,7 @@ public:
 private:
   Ssl::HandshakeCallbacks* handshake_callbacks_;
 
-  Ssl::SocketState state_{Ssl::SocketState::PreHandshake};
+  Ssl::SocketState state_{Ssl::SocketState::HandshakeWaitingForConnectionData};
   mutable SslExtendedSocketInfoImpl extended_socket_info_;
   std::vector<bssl::UniquePtr<X509>> validated_chain_;
 };

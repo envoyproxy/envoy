@@ -68,7 +68,7 @@ public:
    * @param runtime the runtime for the server.
    * @param random a random number generator.
    */
-  virtual void addListener(absl::optional<uint64_t> overridden_listener, ListenerConfig& config,
+  virtual void addListener(std::optional<uint64_t> overridden_listener, ListenerConfig& config,
                            Runtime::Loader& runtime, Random::RandomGenerator& random) PURE;
 
   /**
@@ -286,7 +286,7 @@ class UdpConnectionHandler : public virtual ConnectionHandler {
 public:
   /**
    * Get the ``UdpListenerCallbacks`` associated with ``listener_tag`` and ``address``. This will be
-   * absl::nullopt for non-UDP listeners and for ``listener_tag`` values that have already been
+   * std::nullopt for non-UDP listeners and for ``listener_tag`` values that have already been
    * removed.
    */
   virtual UdpListenerCallbacksOptRef
@@ -363,7 +363,7 @@ public:
 };
 
 using InternalListenerManagerOptRef =
-    absl::optional<std::reference_wrapper<InternalListenerManager>>;
+    std::optional<std::reference_wrapper<InternalListenerManager>>;
 
 // The thread local registry.
 class LocalInternalListenerRegistry {

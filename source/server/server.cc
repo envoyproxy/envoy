@@ -67,7 +67,7 @@ std::unique_ptr<ConnectionHandler> getHandler(Event::Dispatcher& dispatcher) {
   auto* factory = Config::Utility::getFactoryByName<ConnectionHandlerFactory>(
       "envoy.connection_handler.default");
   if (factory) {
-    return factory->createConnectionHandler(dispatcher, absl::nullopt);
+    return factory->createConnectionHandler(dispatcher, std::nullopt);
   }
   ENVOY_LOG_MISC(debug, "Unable to find envoy.connection_handler.default factory");
   return nullptr;
@@ -93,7 +93,7 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
       random_generator_(std::move(random_generator)),
       api_(new Api::Impl(
           thread_factory, store, time_system, file_system, *random_generator_, bootstrap_,
-          process_context ? ProcessContextOptRef(std::ref(*process_context)) : absl::nullopt,
+          process_context ? ProcessContextOptRef(std::ref(*process_context)) : std::nullopt,
           watermark_factory)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       access_log_manager_(options.fileFlushIntervalMsec(), options.fileFlushMinSizeKB(), *api_,
@@ -310,7 +310,7 @@ bool InstanceBase::healthCheckFailed() { return !live_.load(); }
 
 ProcessContextOptRef InstanceBase::processContext() {
   if (process_context_ == nullptr) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return *process_context_;
@@ -975,7 +975,7 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
   return std::move(loader.value());
 }
 
-void InstanceBase::loadServerFlags(const absl::optional<std::string>& flags_path) {
+void InstanceBase::loadServerFlags(const std::optional<std::string>& flags_path) {
   if (!flags_path) {
     return;
   }

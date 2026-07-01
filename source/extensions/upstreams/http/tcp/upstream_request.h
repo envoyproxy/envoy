@@ -61,7 +61,7 @@ private:
     return false;
   }
 
-  absl::optional<Envoy::Upstream::TcpPoolData> conn_pool_data_;
+  std::optional<Envoy::Upstream::TcpPoolData> conn_pool_data_;
   Envoy::Tcp::ConnectionPool::Cancellable* upstream_handle_{};
   Router::GenericConnectionPoolCallbacks* callbacks_{};
 };

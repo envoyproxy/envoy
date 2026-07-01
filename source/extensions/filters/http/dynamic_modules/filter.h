@@ -78,7 +78,7 @@ public:
 
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
-                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details);
 
   // Drive the response encoder directly for the streaming-response ABI. These set
@@ -102,7 +102,7 @@ public:
 
   // Temporary storage for the serialized typed filter state value returned by
   // get_filter_state_typed. Valid until the end of the current event hook.
-  absl::optional<std::string> last_serialized_filter_state_;
+  std::optional<std::string> last_serialized_filter_state_;
 
   // Temporary holder for host metadata snapshots returned by host metadata getters.
   // Valid until the next metadata getter call on this filter.
@@ -125,28 +125,28 @@ public:
     if (decoder_callbacks_) {
       return decoder_callbacks_->requestHeaders();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   RequestTrailerMapOptRef requestTrailers() {
     if (decoder_callbacks_) {
       return decoder_callbacks_->requestTrailers();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   ResponseHeaderMapOptRef responseHeaders() {
     if (encoder_callbacks_) {
       return encoder_callbacks_->responseHeaders();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   ResponseTrailerMapOptRef responseTrailers() {
     if (encoder_callbacks_) {
       return encoder_callbacks_->responseTrailers();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   /**

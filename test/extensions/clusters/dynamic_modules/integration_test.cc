@@ -217,6 +217,29 @@ TEST_P(DynamicModuleClusterIntegrationTest, LifecycleCallbacks) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Drives the per-worker timer ABI end to end. The first request arms a 50ms repeating worker timer
+// from choose_host (which exercises enable/enabled/disable and increments timer_armed_total). The
+// timer then fires repeatedly on the worker dispatcher and re-arms itself, so timer_fired_total
+// keeps climbing without further requests — proving the timer is created on the worker dispatcher,
+// fires on the worker thread, and re-arms.
+TEST_P(DynamicModuleClusterIntegrationTest, WorkerTimerArmsFiresAndReArms) {
+  initializeWithDecCluster("worker_timer");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  // The first request runs choose_host, which captures the worker dispatcher and arms the timer.
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // The timer is armed exactly once, with enabled()/disable() observed as expected.
+  test_server_->waitForCounter("dynamicmodulescustom.timer_armed_total", testing::Eq(1));
+
+  // The timer fires on the worker dispatcher and re-arms, so the counter keeps climbing.
+  test_server_->waitForCounter("dynamicmodulescustom.timer_fired_total", testing::Ge(3));
+}
+
 // =============================================================================
 // Filter-state read ABI: an upstream HTTP filter writes filter state on the
 // request path; the dynamic-module cluster reads it back during host selection.

@@ -511,7 +511,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
                      *decoder_callbacks_);
     error_ = true;
     decoder_callbacks_->sendLocalReply(
-        static_cast<Http::Code>(http_code), status.message(), nullptr, absl::nullopt,
+        static_cast<Http::Code>(http_code), status.message(), nullptr, std::nullopt,
         absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{",
                      StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(status.code())),
                      "}"));
@@ -536,7 +536,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
           *decoder_callbacks_);
       error_ = true;
       decoder_callbacks_->sendLocalReply(
-          Http::Code::BadRequest, "Bad request", nullptr, absl::nullopt,
+          Http::Code::BadRequest, "Bad request", nullptr, std::nullopt,
           absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{BAD_REQUEST}"));
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -796,7 +796,7 @@ void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_
 
   response_in_.finish();
 
-  const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
+  const std::optional<Grpc::Status::GrpcStatus> grpc_status =
       Grpc::Common::getGrpcStatus(headers_or_trailers, true);
   if (grpc_status && maybeConvertGrpcStatus(*grpc_status, headers_or_trailers)) {
     return;
@@ -872,7 +872,7 @@ bool JsonTranscoderFilter::checkAndRejectIfRequestTranscoderFailed(const std::st
     decoder_callbacks_->sendLocalReply(
         Http::Code::BadRequest,
         absl::string_view(request_status.message().data(), request_status.message().size()),
-        nullptr, absl::nullopt,
+        nullptr, std::nullopt,
         absl::StrCat(
             details, "{",
             StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(request_status.code())),
@@ -892,7 +892,7 @@ bool JsonTranscoderFilter::checkAndRejectIfResponseTranscoderFailed() {
     encoder_callbacks_->sendLocalReply(
         Http::Code::BadGateway,
         absl::string_view(response_status.message().data(), response_status.message().size()),
-        nullptr, absl::nullopt,
+        nullptr, std::nullopt,
         absl::StrCat(
             RcDetails::get().GrpcTranscodeFailed, "{",
             StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(response_status.code())),
@@ -1075,7 +1075,7 @@ bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
         Http::Code::PayloadTooLarge,
         "Request rejected because the transcoder's internal buffer size exceeds the configured "
         "limit.",
-        nullptr, absl::nullopt,
+        nullptr, std::nullopt,
         absl::StrCat(RcDetails::get().GrpcTranscodeFailed, "{request_buffer_size_limit_reached}"));
     return true;
   }
@@ -1098,7 +1098,7 @@ bool JsonTranscoderFilter::encoderBufferLimitReached(uint64_t buffer_length) {
         Http::Code::InternalServerError,
         "Response not transcoded because the transcoder's internal buffer size exceeds the "
         "configured limit.",
-        nullptr, absl::nullopt,
+        nullptr, std::nullopt,
         absl::StrCat(RcDetails::get().GrpcTranscodeFailed, "{response_buffer_size_limit_reached}"));
     return true;
   }

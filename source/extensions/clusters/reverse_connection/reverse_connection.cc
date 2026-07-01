@@ -175,7 +175,7 @@ void RevConCluster::addHostToHostSet(Upstream::HostSharedPtr host) {
             all_hosts->size());
   priority_set_.updateHosts(
       0, Upstream::HostSetImpl::partitionHosts(all_hosts, Upstream::HostsPerLocalityImpl::empty()),
-      {}, {std::move(host)}, {}, absl::nullopt, absl::nullopt);
+      {}, {std::move(host)}, {}, std::nullopt, std::nullopt);
 }
 
 void RevConCluster::cleanup() {
@@ -203,7 +203,7 @@ void RevConCluster::cleanup() {
     priority_set_.updateHosts(0,
                               Upstream::HostSetImpl::partitionHosts(
                                   keeping_hosts, Upstream::HostsPerLocalityImpl::empty()),
-                              {}, {}, to_be_removed, absl::nullopt, absl::nullopt);
+                              {}, {}, to_be_removed, std::nullopt, std::nullopt);
   }
 
   cleanup_timer_->enableTimer(cleanup_interval_);

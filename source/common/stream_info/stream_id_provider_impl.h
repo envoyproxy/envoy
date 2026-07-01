@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/stream_info/stream_id_provider.h"
 
 namespace Envoy {
@@ -12,12 +14,12 @@ public:
   StreamIdProviderImpl(std::string&& id) : id_(std::move(id)) {}
 
   // StreamInfo::StreamIdProvider
-  absl::optional<absl::string_view> toStringView() const override {
-    return absl::make_optional<absl::string_view>(id_);
+  std::optional<absl::string_view> toStringView() const override {
+    return std::make_optional<absl::string_view>(id_);
   }
 
   // This is only supported for UUID format ids.
-  absl::optional<uint64_t> toInteger() const override;
+  std::optional<uint64_t> toInteger() const override;
 
 private:
   const std::string id_;

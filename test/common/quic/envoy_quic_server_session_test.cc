@@ -1417,8 +1417,8 @@ class EnvoyQuicServerSessionTestWillNotInitialize : public EnvoyQuicServerSessio
 };
 
 TEST_F(EnvoyQuicServerSessionTestWillNotInitialize, GetRttAndCwnd) {
-  EXPECT_EQ(envoy_quic_session_.lastRoundTripTime(), absl::nullopt);
-  EXPECT_EQ(envoy_quic_session_.congestionWindowInBytes(), absl::nullopt);
+  EXPECT_EQ(envoy_quic_session_.lastRoundTripTime(), std::nullopt);
+  EXPECT_EQ(envoy_quic_session_.congestionWindowInBytes(), std::nullopt);
 }
 
 } // namespace Quic

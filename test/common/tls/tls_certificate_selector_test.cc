@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/config/listener/v3/listener.pb.h"
@@ -37,7 +38,6 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_replace.h"
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"

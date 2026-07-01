@@ -42,7 +42,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 43]
+// [#next-free-field: 44]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -433,6 +433,17 @@ message Bootstrap {
   // Optional configuration for memory allocation manager.
   // Memory releasing is only supported for `tcmalloc allocator <https://github.com/google/tcmalloc>`_.
   MemoryAllocatorManager memory_allocator_manager = 41;
+
+  // When enabled, Envoy pins each worker thread to a distinct CPU from the process affinity mask,
+  // worker ``i`` to the ``i-th`` CPU in ascending order. This improves CPU cache and ``NUMA``
+  // locality for high concurrency deployments on bare metal. It is available on Linux only and is
+  // ignored on other platforms. Pinning requires a worker count no greater than the number of CPUs
+  // in the process affinity mask. When the worker count exceeds the available CPUs no worker is
+  // pinned. Pinning is applied once when the workers start, so a later change to the process
+  // affinity mask does not re-pin.
+  //
+  // Defaults to ``false``.
+  bool enable_worker_cpu_affinity = 43;
 }
 
 // Administration interface :ref:`operations documentation

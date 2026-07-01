@@ -86,6 +86,8 @@ areas:
     title: ratelimit
   rbac:
     title: rbac
+  redis_proxy:
+    title: redis_proxy
   resource_monitors:
     title: resource_monitors
   router:
@@ -100,6 +102,8 @@ areas:
     title: stat_sinks
   stats:
     title: stats
+  tap:
+    title: tap
   tcp_proxy:
     title: tcp_proxy
   tls:
@@ -114,3 +118,5 @@ areas:
     title: proxy_protocol
   zstd:
     title: zstd
+  server:
+    title: server

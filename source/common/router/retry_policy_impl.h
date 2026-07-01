@@ -3,14 +3,13 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/route/v3/route_components.pb.validate.h"
 #include "envoy/router/router.h"
 #include "envoy/server/factory_context.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -50,8 +49,8 @@ public:
   const std::vector<Http::HeaderMatcherSharedPtr>& retriableRequestHeaders() const override {
     return retriable_request_headers_;
   }
-  absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
-  absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
+  std::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
+  std::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
   const std::vector<ResetHeaderParserSharedPtr>& resetHeaders() const override {
     return reset_headers_;
   }
@@ -81,8 +80,8 @@ private:
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
-  absl::optional<std::chrono::milliseconds> base_interval_;
-  absl::optional<std::chrono::milliseconds> max_interval_;
+  std::optional<std::chrono::milliseconds> base_interval_;
+  std::optional<std::chrono::milliseconds> max_interval_;
   std::vector<ResetHeaderParserSharedPtr> reset_headers_;
   std::chrono::milliseconds reset_max_interval_{300000};
   ProtobufMessage::ValidationVisitor* validation_visitor_{};

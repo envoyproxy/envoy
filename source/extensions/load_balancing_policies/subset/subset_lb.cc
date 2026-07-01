@@ -272,7 +272,7 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHostIteration(LoadBalancerContext* 
       return host;
     }
     // otherwise check if there is fallback policy configured for given route metadata
-    absl::optional<SubsetSelectorFallbackParamsRef> selector_fallback_params =
+    std::optional<SubsetSelectorFallbackParamsRef> selector_fallback_params =
         tryFindSelectorFallbackParams(actual_used_context);
     if (selector_fallback_params &&
         selector_fallback_params->get().fallback_policy_ !=
@@ -303,16 +303,16 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHostIteration(LoadBalancerContext* 
   return nullptr;
 }
 
-absl::optional<SubsetLoadBalancer::SubsetSelectorFallbackParamsRef>
+std::optional<SubsetLoadBalancer::SubsetSelectorFallbackParamsRef>
 SubsetLoadBalancer::tryFindSelectorFallbackParams(LoadBalancerContext* context) {
   const Router::MetadataMatchCriteria* match_criteria = context->metadataMatchCriteria();
   if (!match_criteria) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const auto match_criteria_vec = match_criteria->metadataMatchCriteria();
   SubsetSelectorMapPtr selectors = selectors_;
   if (selectors == nullptr) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   for (uint32_t i = 0; i < match_criteria_vec.size(); i++) {
     const Router::MetadataMatchCriterion& match_criterion = *match_criteria_vec[i];
@@ -329,7 +329,7 @@ SubsetLoadBalancer::tryFindSelectorFallbackParams(LoadBalancerContext* context) 
     selectors = subset_it->second;
   }
 
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 HostConstSharedPtr SubsetLoadBalancer::chooseHostForSelectorFallbackPolicy(
@@ -830,8 +830,8 @@ LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocal
 }
 
 HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
-    uint32_t priority, absl::optional<bool> weighted_priority_health,
-    absl::optional<uint32_t> overprovisioning_factor) {
+    uint32_t priority, std::optional<bool> weighted_priority_health,
+    std::optional<uint32_t> overprovisioning_factor) {
   // Use original hostset's overprovisioning_factor.
   RELEASE_ASSERT(priority < original_priority_set_.hostSetsPerPriority().size(), "");
 

@@ -52,10 +52,10 @@ public:
             std::move(host), std::move(priority), dispatcher, options, transport_socket_options,
             random_generator, state,
             [](HttpConnPoolImplBase* pool) {
-              return std::make_unique<ActiveClient>(*pool, absl::nullopt);
+              return std::make_unique<ActiveClient>(*pool, std::nullopt);
             },
             [](Upstream::Host::CreateConnectionData&, HttpConnPoolImplBase*) { return nullptr; },
-            std::vector<Protocol>{Protocol::Http2}, overload_manager, absl::nullopt, nullptr) {}
+            std::vector<Protocol>{Protocol::Http2}, overload_manager, std::nullopt, nullptr) {}
 
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override {
     // We expect to own the connection, but already have it, so just release it to prevent it from
@@ -121,8 +121,7 @@ public:
     }
   }
 
-  void expectConnectionSetupForClient(int num_clients,
-                                      absl::optional<uint32_t> buffer_limits = {}) {
+  void expectConnectionSetupForClient(int num_clients, std::optional<uint32_t> buffer_limits = {}) {
     // Set the createClientConnection mocks. The createCodecClient_ invoke
     // below takes care of making sure connection_index_ is updated.
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
@@ -159,13 +158,13 @@ public:
 
   // Creates a new test client, expecting a new connection to be created and associated
   // with the new client.
-  void expectClientCreate(absl::optional<uint32_t> buffer_limits = {}) {
+  void expectClientCreate(std::optional<uint32_t> buffer_limits = {}) {
     createTestClients(1);
     expectConnectionSetupForClient(1, buffer_limits);
   }
   void expectClientsCreate(int num_clients) {
     createTestClients(num_clients);
-    expectConnectionSetupForClient(num_clients, absl::nullopt);
+    expectConnectionSetupForClient(num_clients, std::nullopt);
   }
 
   // Connects a pending connection for client with the given index.
@@ -1974,7 +1973,7 @@ protected:
   }
 
   TestScopedRuntime scoped_runtime_;
-  absl::optional<HttpServerPropertiesCache::Origin> origin_{{"https", "hostname.com", 443}};
+  std::optional<HttpServerPropertiesCache::Origin> origin_{{"https", "hostname.com", 443}};
   std::shared_ptr<Upstream::MockHost> mock_host_{std::make_shared<NiceMock<Upstream::MockHost>>()};
   std::shared_ptr<MockHttpServerPropertiesCache> cache_{
       std::make_shared<NiceMock<MockHttpServerPropertiesCache>>()};

@@ -92,7 +92,7 @@ Http::FilterHeadersStatus A2aFilter::decodeHeaders(Http::RequestHeaderMap& heade
     ENVOY_LOG(debug, "rejecting non-A2A traffic");
     config_->stats().requests_rejected_.inc();
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "Only A2A traffic is allowed",
-                                       nullptr, absl::nullopt, "a2a_filter_reject");
+                                       nullptr, std::nullopt, "a2a_filter_reject");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -139,7 +139,7 @@ Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_st
       if (!status.ok()) {
         config_->stats().invalid_json_.inc();
         decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "not a valid JSON", nullptr,
-                                           absl::nullopt, "a2a_filter_not_valid_jsonrpc");
+                                           std::nullopt, "a2a_filter_not_valid_jsonrpc");
         return Http::FilterDataStatus::StopIterationNoBuffer;
       }
     }
@@ -160,7 +160,7 @@ Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_st
         ENVOY_LOG(debug, "request body is too large.");
         is_a2a_request_ = false;
         decoder_callbacks_->sendLocalReply(Http::Code::PayloadTooLarge,
-                                           "request body is too large.", nullptr, absl::nullopt,
+                                           "request body is too large.", nullptr, std::nullopt,
                                            "a2a_filter_body_too_large");
       } else {
         config_->stats().invalid_json_.inc();
@@ -177,7 +177,7 @@ Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_st
 void A2aFilter::handleParseError(absl::string_view error_msg) {
   ENVOY_LOG(debug, "parse error: {}", error_msg);
   is_a2a_request_ = false;
-  decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, error_msg, nullptr, absl::nullopt,
+  decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, error_msg, nullptr, std::nullopt,
                                      "a2a_filter_parse_error");
 }
 
@@ -190,7 +190,7 @@ Http::FilterDataStatus A2aFilter::completeParsing() {
   if (!is_a2a_request_ && shouldRejectRequest()) {
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
                                        "request must be a valid JSON-RPC 2.0 message for A2A",
-                                       nullptr, absl::nullopt, "a2a_filter_not_valid_jsonrpc");
+                                       nullptr, std::nullopt, "a2a_filter_not_valid_jsonrpc");
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 

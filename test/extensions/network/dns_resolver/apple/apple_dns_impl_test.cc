@@ -116,8 +116,8 @@ public:
       const std::string& address, const DnsLookupFamily lookup_family,
       const DnsResolver::ResolutionStatus expected_status, const bool expected_results,
       const bool exit_dispatcher = true,
-      const absl::optional<std::vector<HasTraceMatcherP<AppleDnsTrace>>>&& expected_traces =
-          absl::nullopt) {
+      const std::optional<std::vector<HasTraceMatcherP<AppleDnsTrace>>>&& expected_traces =
+          std::nullopt) {
     active_dns_query_ =
         resolver_->resolve(address, lookup_family,
                            [=, this](DnsResolver::ResolutionStatus status, absl::string_view,
@@ -125,7 +125,7 @@ public:
                              EXPECT_EQ(expected_status, status);
                              if (expected_results) {
                                EXPECT_FALSE(results.empty());
-                               absl::optional<bool> is_v4{};
+                               std::optional<bool> is_v4{};
                                for (const auto& result : results) {
                                  const auto& addrinfo = result.addrInfo();
                                  switch (lookup_family) {
