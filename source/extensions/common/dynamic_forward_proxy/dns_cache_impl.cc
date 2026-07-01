@@ -192,7 +192,7 @@ DnsCacheImpl::loadDnsCacheEntryWithForceRefresh(absl::string_view raw_host, uint
           [&tls_host_info, resolved_info]() { tls_host_info.onHostMapUpdate(resolved_info); });
     }
   }
-  return {LoadDnsCacheEntryStatus::Loading, std::move(handle), absl::nullopt};
+  return {LoadDnsCacheEntryStatus::Loading, std::move(handle), std::nullopt};
 }
 
 Upstream::ResourceAutoIncDecPtr DnsCacheImpl::canCreateDnsRequest() {

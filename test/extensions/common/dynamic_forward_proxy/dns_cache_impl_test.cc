@@ -2802,7 +2802,7 @@ TEST_F(DnsCacheImplTest, LoadDnsCacheEntryRaceWithInlineResolve) {
 
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_);
+  EXPECT_EQ(std::nullopt, result.host_info_);
 
   checkStats(1, 1, 0, 1, 1, 0, 1);
 }
@@ -2830,7 +2830,7 @@ TEST_F(DnsCacheImplTest, LoadDnsCacheEntryNoRaceWithAsyncResolve) {
 
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_);
+  EXPECT_EQ(std::nullopt, result.host_info_);
   checkStats(1, 0, 0, 0, 1, 0, 1);
 
   // Now fire resolve_cb to complete the async resolution.
