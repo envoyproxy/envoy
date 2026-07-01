@@ -31,7 +31,7 @@ TEST(BsonImplTest, Equal) {
 TEST(BsonImplTest, InvalidMessageLength) {
   Buffer::OwnedImpl buffer;
   BufferHelper::writeInt32(buffer, 100);
-  EXPECT_THROW(DocumentImpl::create(buffer), EnvoyException);
+  EXPECT_THROW(DocumentImpl::create(buffer, 128), EnvoyException);
 }
 
 TEST(BsonImplTest, InvalidElementType) {
@@ -41,7 +41,7 @@ TEST(BsonImplTest, InvalidElementType) {
   uint8_t invalid_element_type = 0x20;
   buffer.add(&invalid_element_type, sizeof(invalid_element_type));
   BufferHelper::writeCString(buffer, key_name);
-  EXPECT_THROW(DocumentImpl::create(buffer), EnvoyException);
+  EXPECT_THROW(DocumentImpl::create(buffer, 128), EnvoyException);
 }
 
 TEST(BsonImplTest, InvalodDocumentTermination) {
@@ -49,13 +49,13 @@ TEST(BsonImplTest, InvalodDocumentTermination) {
   BufferHelper::writeInt32(buffer, 5);
   uint8_t invalid_document_end = 0x1;
   buffer.add(&invalid_document_end, sizeof(invalid_document_end));
-  EXPECT_THROW(DocumentImpl::create(buffer), EnvoyException);
+  EXPECT_THROW(DocumentImpl::create(buffer, 128), EnvoyException);
 }
 
 TEST(BsonImplTest, DocumentSizeUnderflow) {
   Buffer::OwnedImpl buffer;
   BufferHelper::writeInt32(buffer, 2);
-  EXPECT_THROW(DocumentImpl::create(buffer), EnvoyException);
+  EXPECT_THROW(DocumentImpl::create(buffer, 128), EnvoyException);
 }
 
 TEST(BufferHelperTest, InvalidSize) {
@@ -127,7 +127,7 @@ TEST(BsonImplTest, ParsingDepthLimit) {
   root->encode(data);
 
   // Now try to parse it. It should throw because 200 > 128.
-  EXPECT_THROW_WITH_MESSAGE(DocumentImpl::create(data), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(DocumentImpl::create(data, 128), EnvoyException,
                             "BSON recursion limit exceeded");
 }
 
@@ -144,16 +144,11 @@ TEST(BsonImplTest, ParsingDepthLimitJustBelow) {
   root->encode(data);
 
   // This should be fine (128 <= 128).
-  DocumentSharedPtr parsed = DocumentImpl::create(data);
+  DocumentSharedPtr parsed = DocumentImpl::create(data, 128);
   EXPECT_TRUE(*root == *parsed);
 }
 
 TEST(BsonImplTest, ConfigurableParsingDepthLimit) {
-  const uint32_t original_max_depth = DocumentImpl::MaxDepth;
-
-  // Change the limit to something small.
-  DocumentImpl::MaxDepth = 10;
-
   Buffer::OwnedImpl data;
   DocumentSharedPtr root = DocumentImpl::create();
   DocumentSharedPtr current = root;
@@ -165,12 +160,9 @@ TEST(BsonImplTest, ConfigurableParsingDepthLimit) {
 
   root->encode(data);
 
-  // Now try to parse it. It should throw because 15 > 10.
-  EXPECT_THROW_WITH_MESSAGE(DocumentImpl::create(data), EnvoyException,
+  // Now try to parse it with a small limit. It should throw because 15 > 10.
+  EXPECT_THROW_WITH_MESSAGE(DocumentImpl::create(data, 10), EnvoyException,
                             "BSON recursion limit exceeded");
-
-  // Restore the original limit.
-  DocumentImpl::MaxDepth = original_max_depth;
 }
 
 } // namespace Bson

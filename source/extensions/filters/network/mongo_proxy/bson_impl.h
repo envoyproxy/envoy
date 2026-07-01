@@ -178,9 +178,10 @@ class DocumentImpl : public Document,
                      public std::enable_shared_from_this<DocumentImpl> {
 public:
   static DocumentSharedPtr create() { return DocumentSharedPtr{new DocumentImpl()}; }
-  static DocumentSharedPtr create(Buffer::Instance& data, uint32_t depth = 0) {
+  static DocumentSharedPtr create(Buffer::Instance& data, uint32_t max_depth,
+                                  uint32_t current_depth = 0) {
     std::shared_ptr<DocumentImpl> new_doc{new DocumentImpl()};
-    new_doc->fromBuffer(data, depth);
+    new_doc->fromBuffer(data, max_depth, current_depth);
     return new_doc;
   }
 
@@ -263,12 +264,10 @@ public:
   std::string toString() const override;
   const std::list<FieldPtr>& values() const override { return fields_; }
 
-  static uint32_t MaxDepth;
-
 private:
   DocumentImpl() = default;
 
-  void fromBuffer(Buffer::Instance& data, uint32_t depth);
+  void fromBuffer(Buffer::Instance& data, uint32_t max_depth, uint32_t current_depth);
 
   std::list<FieldPtr> fields_;
 };

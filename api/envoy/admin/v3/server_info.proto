@@ -208,7 +208,4 @@ message CommandLineOptions {
 
   // See :option:`--stats-tag` for details.
   repeated string stats_tag = 38;
-
-  // See :option:`--mongo-bson-max-depth` for details.
-  uint32 mongo_bson_max_depth = 43;
 }

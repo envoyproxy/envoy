@@ -101,14 +101,6 @@ TEST_F(OptionsImplTest, ConcurrencyZeroIsOne) {
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
 }
 
-TEST_F(OptionsImplTest, MongoBsonMaxDepth) {
-  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mongo-bson-max-depth 256");
-  EXPECT_EQ(256U, options->mongoBsonMaxDepth());
-
-  options = createOptionsImpl("envoy");
-  EXPECT_EQ(128U, options->mongoBsonMaxDepth());
-}
-
 TEST_F(OptionsImplTest, AllOptions) {
 
   std::unique_ptr<OptionsImpl> options = createOptionsImpl(

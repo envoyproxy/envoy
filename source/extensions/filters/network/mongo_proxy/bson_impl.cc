@@ -16,8 +16,6 @@ namespace NetworkFilters {
 namespace MongoProxy {
 namespace Bson {
 
-uint32_t DocumentImpl::MaxDepth = 128;
-
 int32_t BufferHelper::peekInt32(Buffer::Instance& data) {
   if (data.length() < sizeof(int32_t)) {
     throw EnvoyException("invalid buffer size");
@@ -385,8 +383,8 @@ std::string FieldImpl::toString() const {
   return "";
 }
 
-void DocumentImpl::fromBuffer(Buffer::Instance& data, uint32_t depth) {
-  if (depth > MaxDepth) {
+void DocumentImpl::fromBuffer(Buffer::Instance& data, uint32_t max_depth, uint32_t current_depth) {
+  if (current_depth > max_depth) {
     throw EnvoyException("BSON recursion limit exceeded");
   }
 
@@ -444,13 +442,13 @@ void DocumentImpl::fromBuffer(Buffer::Instance& data, uint32_t depth) {
 
     case Field::Type::Document: {
       ENVOY_LOG(trace, "BSON document");
-      addDocument(key, DocumentImpl::create(data, depth + 1));
+      addDocument(key, DocumentImpl::create(data, max_depth, current_depth + 1));
       break;
     }
 
     case Field::Type::Array: {
       ENVOY_LOG(trace, "BSON array");
-      addArray(key, DocumentImpl::create(data, depth + 1));
+      addArray(key, DocumentImpl::create(data, max_depth, current_depth + 1));
       break;
     }
 

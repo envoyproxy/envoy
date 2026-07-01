@@ -37,7 +37,7 @@ MessageImpl::documentListToString(const std::list<Bson::DocumentSharedPtr>& docu
   return out.str();
 }
 
-void GetMoreMessageImpl::fromBuffer(uint32_t, Buffer::Instance& data) {
+void GetMoreMessageImpl::fromBuffer(uint32_t, Buffer::Instance& data, uint32_t) {
   ENVOY_LOG(trace, "decoding get more message");
   Bson::BufferHelper::removeInt32(data); // "zero" (unused)
   full_collection_name_ = Bson::BufferHelper::removeCString(data);
@@ -59,7 +59,8 @@ std::string GetMoreMessageImpl::toString(bool) const {
       request_id_, response_to_, full_collection_name_, number_to_return_, cursor_id_);
 }
 
-void InsertMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data) {
+void InsertMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data,
+                                   uint32_t max_bson_depth) {
   ENVOY_LOG(trace, "decoding insert message");
   uint64_t original_buffer_length = data.length();
   ASSERT(message_length <= original_buffer_length);
@@ -67,7 +68,7 @@ void InsertMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& da
   flags_ = Bson::BufferHelper::removeInt32(data);
   full_collection_name_ = Bson::BufferHelper::removeCString(data);
   while (data.length() - (original_buffer_length - message_length) > 0) {
-    documents_.emplace_back(Bson::DocumentImpl::create(data));
+    documents_.emplace_back(Bson::DocumentImpl::create(data, max_bson_depth));
   }
 
   ENVOY_LOG(trace, "{}", toString(true));
@@ -98,7 +99,7 @@ std::string InsertMessageImpl::toString(bool full) const {
       full ? documentListToString(documents_) : std::to_string(documents_.size()));
 }
 
-void KillCursorsMessageImpl::fromBuffer(uint32_t, Buffer::Instance& data) {
+void KillCursorsMessageImpl::fromBuffer(uint32_t, Buffer::Instance& data, uint32_t) {
   ENVOY_LOG(trace, "decoding kill cursors message");
   Bson::BufferHelper::removeInt32(data); // zero
   number_of_cursor_ids_ = Bson::BufferHelper::removeInt32(data);
@@ -132,7 +133,8 @@ std::string KillCursorsMessageImpl::toString(bool) const {
       request_id_, response_to_, number_of_cursor_ids_, cursors.str());
 }
 
-void QueryMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data) {
+void QueryMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data,
+                                  uint32_t max_bson_depth) {
   ENVOY_LOG(trace, "decoding query message");
   uint64_t original_buffer_length = data.length();
   ASSERT(message_length <= original_buffer_length);
@@ -141,10 +143,10 @@ void QueryMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& dat
   full_collection_name_ = Bson::BufferHelper::removeCString(data);
   number_to_skip_ = Bson::BufferHelper::removeInt32(data);
   number_to_return_ = Bson::BufferHelper::removeInt32(data);
-  query_ = Bson::DocumentImpl::create(data);
+  query_ = Bson::DocumentImpl::create(data, max_bson_depth);
 
   if (data.length() - (original_buffer_length - message_length) > 0) {
-    return_fields_selector_ = Bson::DocumentImpl::create(data);
+    return_fields_selector_ = Bson::DocumentImpl::create(data, max_bson_depth);
   }
 
   ENVOY_LOG(trace, "{}", toString(true));
@@ -182,14 +184,14 @@ std::string QueryMessageImpl::toString(bool full) const {
       return_fields_selector_ ? return_fields_selector_->toString() : "{}");
 }
 
-void ReplyMessageImpl::fromBuffer(uint32_t, Buffer::Instance& data) {
+void ReplyMessageImpl::fromBuffer(uint32_t, Buffer::Instance& data, uint32_t max_bson_depth) {
   ENVOY_LOG(trace, "decoding reply message");
   flags_ = Bson::BufferHelper::removeInt32(data);
   cursor_id_ = Bson::BufferHelper::removeInt64(data);
   starting_from_ = Bson::BufferHelper::removeInt32(data);
   number_returned_ = Bson::BufferHelper::removeInt32(data);
   for (int32_t i = 0; i < number_returned_; i++) {
-    documents_.emplace_back(Bson::DocumentImpl::create(data));
+    documents_.emplace_back(Bson::DocumentImpl::create(data, max_bson_depth));
   }
 
   ENVOY_LOG(trace, "{}", toString(true));
@@ -224,21 +226,22 @@ std::string ReplyMessageImpl::toString(bool full) const {
 /*
  * OP_COMMAND mongo message implementation.
  */
-void CommandMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data) {
+void CommandMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data,
+                                    uint32_t max_bson_depth) {
   ENVOY_LOG(trace, "decoding COMMAND message");
   const uint64_t original_data_length = data.length();
   ASSERT(data.length() >= message_length); // See comment below about relationship.
 
   database_ = Bson::BufferHelper::removeCString(data);
   command_name_ = Bson::BufferHelper::removeCString(data);
-  metadata_ = Bson::DocumentImpl::create(data);
-  command_args_ = Bson::DocumentImpl::create(data);
+  metadata_ = Bson::DocumentImpl::create(data, max_bson_depth);
+  command_args_ = Bson::DocumentImpl::create(data, max_bson_depth);
 
   // There may be additional docs.
   // message_length is mongo message length. original_data_length contains
   // mongo message and possibly first few bytes of next message.
   while (data.length() - (original_data_length - message_length) > 0) {
-    input_docs_.emplace_back(Bson::DocumentImpl::create(data));
+    input_docs_.emplace_back(Bson::DocumentImpl::create(data, max_bson_depth));
   }
 
   ENVOY_LOG(trace, "{}", toString(true));
@@ -286,19 +289,20 @@ bool CommandMessageImpl::operator==(const CommandMessage& rhs) const {
 }
 
 // OP_COMMANDREPLY implementation.
-void CommandReplyMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data) {
+void CommandReplyMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data,
+                                         uint32_t max_bson_depth) {
   ENVOY_LOG(trace, "decoding COMMAND REPLY message");
   const uint64_t original_data_length = data.length();
   ASSERT(data.length() >= message_length); // See comment below about relationship.
 
-  metadata_ = Bson::DocumentImpl::create(data);
-  command_reply_ = Bson::DocumentImpl::create(data);
+  metadata_ = Bson::DocumentImpl::create(data, max_bson_depth);
+  command_reply_ = Bson::DocumentImpl::create(data, max_bson_depth);
 
   // There may be additional docs.
   // message_length is mongo message length. original_data_length contains
   // mongo message and possibly first few bytes of next message.
   while (data.length() - (original_data_length - message_length) > 0) {
-    output_docs_.emplace_back(Bson::DocumentImpl::create(data));
+    output_docs_.emplace_back(Bson::DocumentImpl::create(data, max_bson_depth));
   }
 
   ENVOY_LOG(trace, "{}", toString(true));
@@ -372,28 +376,28 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
   switch (op_code) {
   case Message::OpCode::Reply: {
     std::unique_ptr<ReplyMessageImpl> message(new ReplyMessageImpl(request_id, response_to));
-    message->fromBuffer(message_length, data);
+    message->fromBuffer(message_length, data, max_bson_depth_);
     callbacks_.decodeReply(std::move(message));
     break;
   }
 
   case Message::OpCode::Query: {
     std::unique_ptr<QueryMessageImpl> message(new QueryMessageImpl(request_id, response_to));
-    message->fromBuffer(message_length, data);
+    message->fromBuffer(message_length, data, max_bson_depth_);
     callbacks_.decodeQuery(std::move(message));
     break;
   }
 
   case Message::OpCode::GetMore: {
     std::unique_ptr<GetMoreMessageImpl> message(new GetMoreMessageImpl(request_id, response_to));
-    message->fromBuffer(message_length, data);
+    message->fromBuffer(message_length, data, max_bson_depth_);
     callbacks_.decodeGetMore(std::move(message));
     break;
   }
 
   case Message::OpCode::Insert: {
     std::unique_ptr<InsertMessageImpl> message(new InsertMessageImpl(request_id, response_to));
-    message->fromBuffer(message_length, data);
+    message->fromBuffer(message_length, data, max_bson_depth_);
     callbacks_.decodeInsert(std::move(message));
     break;
   }
@@ -401,14 +405,14 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
   case Message::OpCode::KillCursors: {
     std::unique_ptr<KillCursorsMessageImpl> message(
         new KillCursorsMessageImpl(request_id, response_to));
-    message->fromBuffer(message_length, data);
+    message->fromBuffer(message_length, data, max_bson_depth_);
     callbacks_.decodeKillCursors(std::move(message));
     break;
   }
 
   case Message::OpCode::Command: {
     std::unique_ptr<CommandMessageImpl> message(new CommandMessageImpl(request_id, response_to));
-    message->fromBuffer(message_length, data);
+    message->fromBuffer(message_length, data, max_bson_depth_);
     callbacks_.decodeCommand(std::move(message));
     break;
   }
@@ -416,7 +420,7 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
   case Message::OpCode::CommandReply: {
     std::unique_ptr<CommandReplyMessageImpl> message(
         new CommandReplyMessageImpl(request_id, response_to));
-    message->fromBuffer(message_length, data);
+    message->fromBuffer(message_length, data, max_bson_depth_);
     callbacks_.decodeCommandReply(std::move(message));
     break;
   }

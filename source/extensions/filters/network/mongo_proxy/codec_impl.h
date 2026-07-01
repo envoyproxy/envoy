@@ -18,7 +18,8 @@ public:
   MessageImpl(int32_t request_id, uint32_t response_to)
       : request_id_(request_id), response_to_(response_to) {}
 
-  virtual void fromBuffer(uint32_t message_length, Buffer::Instance& data) PURE;
+  virtual void fromBuffer(uint32_t message_length, Buffer::Instance& data,
+                          uint32_t max_bson_depth) PURE;
 
   // Mongo::Message
   int32_t requestId() const override { return request_id_; }
@@ -38,7 +39,8 @@ public:
   using MessageImpl::MessageImpl;
 
   // MessageImpl
-  void fromBuffer(uint32_t message_length, Buffer::Instance& data) override;
+  void fromBuffer(uint32_t message_length, Buffer::Instance& data,
+                  uint32_t max_bson_depth) override;
 
   // Mongo::Message
   std::string toString(bool full) const override;
@@ -68,7 +70,8 @@ public:
   using MessageImpl::MessageImpl;
 
   // MessageImpl
-  void fromBuffer(uint32_t message_length, Buffer::Instance& data) override;
+  void fromBuffer(uint32_t message_length, Buffer::Instance& data,
+                  uint32_t max_bson_depth) override;
 
   // Mongo::Message
   std::string toString(bool full) const override;
@@ -98,7 +101,8 @@ public:
   using MessageImpl::MessageImpl;
 
   // MessageImpl
-  void fromBuffer(uint32_t message_length, Buffer::Instance& data) override;
+  void fromBuffer(uint32_t message_length, Buffer::Instance& data,
+                  uint32_t max_bson_depth) override;
 
   // Mongo::Message
   std::string toString(bool full) const override;
@@ -129,7 +133,8 @@ public:
   using MessageImpl::MessageImpl;
 
   // MessageImpl
-  void fromBuffer(uint32_t message_length, Buffer::Instance& data) override;
+  void fromBuffer(uint32_t message_length, Buffer::Instance& data,
+                  uint32_t max_bson_depth) override;
 
   // Mongo::Message
   std::string toString(bool full) const override;
@@ -172,7 +177,8 @@ public:
   using MessageImpl::MessageImpl;
 
   // MessageImpl
-  void fromBuffer(uint32_t message_length, Buffer::Instance& data) override;
+  void fromBuffer(uint32_t message_length, Buffer::Instance& data,
+                  uint32_t max_bson_depth) override;
 
   // Mongo::Message
   std::string toString(bool full) const override;
@@ -209,7 +215,8 @@ public:
   using MessageImpl::MessageImpl;
 
   // MessageImpl.
-  void fromBuffer(uint32_t message_length, Buffer::Instance& data) override;
+  void fromBuffer(uint32_t message_length, Buffer::Instance& data,
+                  uint32_t max_bson_depth) override;
   std::string toString(bool full) const override;
 
   // CommandMessageImpl accessors.
@@ -246,7 +253,8 @@ public:
   using MessageImpl::MessageImpl;
 
   // MessageImpl.
-  void fromBuffer(uint32_t message_length, Buffer::Instance& data) override;
+  void fromBuffer(uint32_t message_length, Buffer::Instance& data,
+                  uint32_t max_bson_depth) override;
   std::string toString(bool full) const override;
 
   // CommandMessageReplyImpl accessors.
@@ -271,7 +279,8 @@ private:
 
 class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::mongo> {
 public:
-  DecoderImpl(DecoderCallbacks& callbacks) : callbacks_(callbacks) {}
+  DecoderImpl(DecoderCallbacks& callbacks, uint32_t max_bson_depth)
+      : callbacks_(callbacks), max_bson_depth_(max_bson_depth) {}
 
   // Mongo::Decoder
   void onData(Buffer::Instance& data) override;
@@ -280,6 +289,7 @@ private:
   bool decode(Buffer::Instance& data);
 
   DecoderCallbacks& callbacks_;
+  const uint32_t max_bson_depth_;
 };
 
 class EncoderImpl : public Encoder, Logger::Loggable<Logger::Id::mongo> {

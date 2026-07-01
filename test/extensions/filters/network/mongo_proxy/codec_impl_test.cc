@@ -45,7 +45,7 @@ public:
   Buffer::OwnedImpl output_;
   EncoderImpl encoder_{output_};
   NiceMock<TestDecoderCallbacks> callbacks_;
-  DecoderImpl decoder_{callbacks_};
+  DecoderImpl decoder_{callbacks_, 128};
 };
 
 TEST_F(MongoCodecImplTest, QueryEqual) {
