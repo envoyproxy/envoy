@@ -69,22 +69,20 @@ public:
 
     // Setup dynamic LDS config.
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      const bool is_delta = (this->sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
+                             this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta);
+      auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
+      ads_config->set_api_type(is_delta ? envoy::config::core::v3::ApiConfigSource::DELTA_GRPC
+                                        : envoy::config::core::v3::ApiConfigSource::GRPC);
+      auto* grpc_service = ads_config->add_grpc_services();
+      setGrpcService(*grpc_service, "fcds_cluster", getFcdsFakeUpstream().localAddress());
+
       listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
       listener_config_.set_name(listener_name_);
 
-      const bool is_delta = (this->sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
-                             this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta);
-      // Setup dynamic FCDS config on the listener template.
+      // Setup dynamic FCDS config on the listener template via ADS.
       auto* fcds_config = listener_config_.mutable_fcds_config();
-      fcds_config->mutable_config_source()->set_resource_api_version(
-          envoy::config::core::v3::ApiVersion::V3);
-      auto* api_config_source = fcds_config->mutable_config_source()->mutable_api_config_source();
-      api_config_source->set_api_type(is_delta
-                                          ? envoy::config::core::v3::ApiConfigSource::DELTA_GRPC
-                                          : envoy::config::core::v3::ApiConfigSource::GRPC);
-      api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-      auto* grpc_service = api_config_source->add_grpc_services();
-      setGrpcService(*grpc_service, "fcds_cluster", getFcdsFakeUpstream().localAddress());
+      fcds_config->mutable_config_source()->mutable_ads();
 
       // Add a dynamic filter chain reference.
       listener_config_.mutable_filter_chains()->Clear();
@@ -487,22 +485,20 @@ public:
 
     // Setup dynamic LDS config.
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      const bool is_delta = (this->sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
+                             this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta);
+      auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
+      ads_config->set_api_type(is_delta ? envoy::config::core::v3::ApiConfigSource::DELTA_GRPC
+                                        : envoy::config::core::v3::ApiConfigSource::GRPC);
+      auto* grpc_service = ads_config->add_grpc_services();
+      setGrpcService(*grpc_service, "fcds_cluster", getFcdsFakeUpstream().localAddress());
+
       listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
       listener_config_.set_name(listener_name_);
 
-      const bool is_delta = (this->sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
-                             this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta);
-      // Setup dynamic FCDS config on the listener template.
+      // Setup dynamic FCDS config on the listener template via ADS.
       auto* fcds_config = listener_config_.mutable_fcds_config();
-      fcds_config->mutable_config_source()->set_resource_api_version(
-          envoy::config::core::v3::ApiVersion::V3);
-      auto* api_config_source = fcds_config->mutable_config_source()->mutable_api_config_source();
-      api_config_source->set_api_type(is_delta
-                                          ? envoy::config::core::v3::ApiConfigSource::DELTA_GRPC
-                                          : envoy::config::core::v3::ApiConfigSource::GRPC);
-      api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-      auto* grpc_service = api_config_source->add_grpc_services();
-      setGrpcService(*grpc_service, "fcds_cluster", getFcdsFakeUpstream().localAddress());
+      fcds_config->mutable_config_source()->mutable_ads();
 
       // Add a dynamic filter chain reference.
       listener_config_.mutable_filter_chains()->Clear();

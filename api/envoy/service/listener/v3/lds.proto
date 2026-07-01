@@ -40,23 +40,6 @@ service ListenerDiscoveryService {
   }
 }
 
-service FilterChainDiscoveryService {
-  option (envoy.annotations.resource).type = "envoy.config.listener.v3.FilterChain";
-
-  rpc DeltaFilterChains(stream discovery.v3.DeltaDiscoveryRequest)
-      returns (stream discovery.v3.DeltaDiscoveryResponse) {
-  }
-
-  rpc StreamFilterChains(stream discovery.v3.DiscoveryRequest)
-      returns (stream discovery.v3.DiscoveryResponse) {
-  }
-
-  rpc FetchFilterChains(discovery.v3.DiscoveryRequest) returns (discovery.v3.DiscoveryResponse) {
-    option (google.api.http).post = "/v3/discovery:filter_chains";
-    option (google.api.http).body = "*";
-  }
-}
-
 // [#not-implemented-hide:] Not configuration. Workaround c++ protobuf issue with importing
 // services: https://github.com/google/protobuf/issues/4221 and protoxform to upgrade the file.
 message LdsDummy {
