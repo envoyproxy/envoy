@@ -192,7 +192,9 @@ private:
   void processRespValue(Common::Redis::RespValuePtr&& value, PendingRequest& request);
   // Drain any pending_request_value_ entries left in pending_requests_ after an external-auth
   // round trip resolved (called from onAuthenticateExternal). Walks the entire list in FIFO
-  // order, not just the front, and bails if a resumed entry starts a new round trip.
+  // order, not just the front; bails if a resumed entry starts a new round trip, and is
+  // reentrancy-guarded because a resumed AUTH can resolve synchronously (gRPC send() may fail
+  // inline) and re-enter this method from within processRespValue.
   void resumeAuthHeldRequests();
 
   Common::Redis::DecoderPtr decoder_;
@@ -213,6 +215,10 @@ private:
   uint32_t downstream_resp_version_{2};
   Common::Redis::Client::Transaction transaction_;
   bool connection_quit_;
+  // True while resumeAuthHeldRequests is draining. A resumed AUTH that resolves synchronously
+  // re-enters resumeAuthHeldRequests via onAuthenticateExternal; the nested call must not start
+  // a second drain loop over the same list.
+  bool resuming_held_requests_{false};
   ExternalAuth::ExternalAuthClientPtr auth_client_;
   ExternalAuthCallStatus external_auth_call_status_;
   long external_auth_expiration_epoch_;

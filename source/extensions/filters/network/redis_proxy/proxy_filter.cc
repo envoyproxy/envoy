@@ -274,21 +274,34 @@ void ProxyFilter::onAuthenticateExternal(CommandSplitter::SplitCallbacks& reques
 
 void ProxyFilter::resumeAuthHeldRequests() {
   // Replay every held entry in FIFO order, not just the front: a held command can sit behind
-  // a still-in-flight upstream request. Advancing ``it`` before processing keeps it valid
-  // across the synchronous self-pop in processRespValue (splitter emits onResponse → the
-  // entry is popped). If a resumed entry starts a new external-auth round trip, stop and let
-  // its onAuthenticateExternal re-enter this loop.
-  for (auto it = pending_requests_.begin(); it != pending_requests_.end();) {
-    if (external_auth_call_status_ == ExternalAuthCallStatus::Pending) {
-      return;
-    }
-    if (!it->pending_request_value_) {
-      ++it;
-      continue;
-    }
-    PendingRequest& held = *it++;
-    processRespValue(std::move(held.pending_request_value_), held);
+  // a still-in-flight upstream request. No iterator survives a processRespValue call: the
+  // onResponse flush loop pops every consecutive completed front entry (possibly several), and
+  // a resumed AUTH whose external-auth call resolves synchronously (gRPC send() can fail
+  // inline) re-enters this method and drains further entries. Re-scanning from begin() after
+  // every dispatch is therefore required for memory safety; the scan is bounded by how many
+  // commands the client pipelined during one auth round trip. The reentrancy guard keeps the
+  // outermost invocation as the single drain loop; the nested call returns immediately and the
+  // outer loop re-checks the auth status on its next pass.
+  if (resuming_held_requests_) {
+    return;
   }
+  resuming_held_requests_ = true;
+  while (external_auth_call_status_ != ExternalAuthCallStatus::Pending) {
+    auto it = std::find_if(
+        pending_requests_.begin(), pending_requests_.end(),
+        [](const PendingRequest& entry) { return entry.pending_request_value_ != nullptr; });
+    if (it == pending_requests_.end()) {
+      break;
+    }
+    PendingRequest& held = *it;
+    // Detach the value into a local FIRST so this entry is unconditionally cleared before the
+    // next find_if pass. processRespValue does not always consume its argument (the NOPROTO
+    // gate drops it; the split-request handle path leaves it untouched), and since the scan
+    // restarts from begin() each pass, an entry left non-null would be re-selected forever.
+    Common::Redis::RespValuePtr value = std::move(held.pending_request_value_);
+    processRespValue(std::move(value), held);
+  }
+  resuming_held_requests_ = false;
 }
 
 void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {
