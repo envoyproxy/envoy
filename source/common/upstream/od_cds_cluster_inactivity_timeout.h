@@ -2,16 +2,18 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -22,23 +24,46 @@ namespace Upstream {
 // active upstream requests and served no new requests for the whole timeout
 // duration.
 //
-// All methods must be called on the main thread, which is where ODCDS runs and
-// where ClusterManager cluster add/remove is safe.
+// The class does not depend on ClusterManager directly: idleness is observed
+// through an injected sampler that returns the cluster's live request counts,
+// and reclamation is delegated to an injected callback.
+//
+// All methods must be called on the main thread, where ODCDS runs and where
+// cluster add/remove is safe.
 class OdCdsClusterInactivityTimeout : Logger::Loggable<Logger::Id::upstream> {
 public:
-  OdCdsClusterInactivityTimeout(ClusterManager& cm, Event::Dispatcher& main_thread_dispatcher,
-                                TimeSource& time_source,
-                                std::chrono::milliseconds cluster_inactivity_timeout);
+  // Live request counts for a cluster, sampled on the main thread.
+  struct ClusterActivityStats {
+    uint64_t active_rq{0};
+    uint64_t total_rq{0};
+  };
 
-  // Begins, or refreshes, idle tracking for a cluster that was just
-  // (re-)delivered by ODCDS.
-  void onClusterDiscovered(absl::string_view cluster_name);
+  using PollClusterActivityStatsCb =
+      std::function<std::optional<ClusterActivityStats>(absl::string_view)>;
+  using ReclaimClusterCb = std::function<void(absl::string_view)>;
+
+  // sample_activity returns a cluster's live request counts, or nullopt if it is no longer an
+  // active cluster. reclaim_cluster is invoked when a cluster is reclaimed for inactivity, so the
+  // owner can remove the cluster and drop the ODCDS subscription's interest in the resource. Both
+  // are invoked on the main thread.
+  OdCdsClusterInactivityTimeout(Event::Dispatcher& main_thread_dispatcher, TimeSource& time_source,
+                                PollClusterActivityStatsCb sample_activity,
+                                ReclaimClusterCb reclaim_cluster);
+
+  // Begins, or refreshes, idle tracking for a cluster that was just (re-)delivered by ODCDS,
+  // using the inactivity timeout configured on the filter that discovered it. A
+  // non-positive timeout disables reclamation for the cluster (it is dropped
+  // from tracking if present).
+  void onClusterDiscovered(absl::string_view cluster_name,
+                           std::chrono::milliseconds cluster_inactivity_timeout);
 
   // Drops a cluster from tracking because the discovery server removed it.
   void onClusterRemoved(absl::string_view cluster_name);
 
 private:
   struct ClusterState {
+    // Idle timeout for this cluster, carried from the filter that discovered it.
+    std::chrono::milliseconds inactivity_timeout{};
     uint64_t last_rq_total{0};
     // Time of the most recent sweep at which the cluster was seen active. Removal fires
     // once (now - last_active) reaches this cluster's inactivity timeout.
@@ -53,11 +78,13 @@ private:
   // own inactivity timeout to be reclaimed.
   void armSweepTimer();
 
-  ClusterManager& cm_;
   TimeSource& time_source_;
+  PollClusterActivityStatsCb sample_activity_;
+  ReclaimClusterCb reclaim_cluster_;
   const Event::TimerPtr sweep_timer_;
-  const std::chrono::milliseconds cluster_inactivity_timeout_;
   absl::flat_hash_map<std::string, ClusterState> tracked_;
+  // Lazily-computed minimum of tracked_ values, or negative if invalidated.
+  std::chrono::milliseconds min_tracked_inactivity_timeout_;
 };
 
 using OdCdsClusterInactivityTimeoutPtr = std::unique_ptr<OdCdsClusterInactivityTimeout>;

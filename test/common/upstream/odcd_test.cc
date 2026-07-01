@@ -1,4 +1,7 @@
 #include <chrono>
+#include <functional>
+#include <optional>
+#include <utility>
 
 #include "envoy/api/api.h"
 #include "envoy/event/dispatcher.h"
@@ -6,8 +9,10 @@
 
 #include "source/common/common/thread.h"
 #include "source/common/config/xds_resource.h"
+#include "source/common/upstream/od_cds_cluster_inactivity_timeout.h"
 
 #include "test/common/upstream/cluster_manager_impl_test_common.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/upstream/od_cds_api.h"
 #include "test/test_common/utility.h"
 
@@ -16,11 +21,22 @@
 
 using testing::_;
 using testing::Invoke;
+using testing::NiceMock;
 using testing::Return;
 
 namespace Envoy {
 namespace Upstream {
 namespace {
+
+// OdCdsApiImpl::create takes a trailing cluster TTL that is not part of the
+// OdCdsCreationFunction signature allocateOdCdsApi expects. These tests only exercise handle
+// allocation, so adapt it with a disabled (zero) TTL.
+ClusterManager::OdCdsCreationFunction odCdsCreateNoTtl() {
+  return [](auto&&... args) {
+    return OdCdsApiImpl::create(std::forward<decltype(args)>(args)...,
+                                std::chrono::milliseconds::zero());
+  };
+}
 
 class ODCDTest : public ClusterManagerImplTest {
 public:
@@ -52,6 +68,24 @@ public:
         });
   }
 
+  // Activity sampler and reclamation hook for OdCdsClusterInactivityTimeout, backed by the
+  // fixture's real ClusterManager.
+  OdCdsClusterInactivityTimeout::PollClusterActivityStatsCb sampleActivity() {
+    return [this](absl::string_view name)
+               -> std::optional<OdCdsClusterInactivityTimeout::ClusterActivityStats> {
+      const auto cluster = cluster_manager_->getActiveCluster(std::string(name));
+      if (!cluster.has_value()) {
+        return std::nullopt;
+      }
+      const auto& stats = *cluster->info()->trafficStats();
+      return OdCdsClusterInactivityTimeout::ClusterActivityStats{stats.upstream_rq_active_.value(),
+                                                                 stats.upstream_rq_total_.value()};
+    };
+  }
+  OdCdsClusterInactivityTimeout::ReclaimClusterCb reclaimCluster() {
+    return [this](absl::string_view name) { cluster_manager_->removeCluster(std::string(name)); };
+  }
+
   MockOdCdsApiSharedPtr odcds_;
   OdCdsApiHandlePtr odcds_handle_;
   std::chrono::milliseconds timeout_ = std::chrono::milliseconds(5000);
@@ -72,7 +106,7 @@ TEST_F(ODCDTest, TestAllocate) {
       "static_cluster");
 
   auto handle =
-      *cluster_manager_->allocateOdCdsApi(&OdCdsApiImpl::create, config, locator, mock_visitor);
+      *cluster_manager_->allocateOdCdsApi(odCdsCreateNoTtl(), config, locator, mock_visitor);
   EXPECT_NE(handle, nullptr);
 }
 
@@ -92,7 +126,7 @@ TEST_F(ODCDTest, TestAllocateWithLocator) {
       Config::XdsResourceIdentifier::decodeUrl("xdstp://foo/envoy.config.cluster.v3.Cluster/bar")
           .value();
   auto handle =
-      *cluster_manager_->allocateOdCdsApi(&OdCdsApiImpl::create, config, locator, mock_visitor);
+      *cluster_manager_->allocateOdCdsApi(odCdsCreateNoTtl(), config, locator, mock_visitor);
   EXPECT_NE(handle, nullptr);
 }
 
@@ -307,6 +341,111 @@ TEST_F(ODCDTest, TestDestroyHandleFromWorkerThread) {
 
   worker_thread->join();
   EXPECT_TRUE(destruction_completed);
+}
+
+const std::chrono::milliseconds kNonzeroInactivityTimeout = std::chrono::milliseconds(100);
+
+// The inactivity-timeout reaper reclaims a cluster that stays idle for the whole timeout, and arms
+// its sweep at the configured cadence.
+TEST_F(ODCDTest, TestInactivityTimeoutReclaimsIdleCluster) {
+  ASSERT_TRUE(
+      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1").ok());
+  auto* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+  OdCdsClusterInactivityTimeout reaper(factory_.dispatcher_, time_system_, sampleActivity(),
+                                       reclaimCluster());
+
+  EXPECT_CALL(*timer, enableTimer(kNonzeroInactivityTimeout, _));
+  const auto start = time_system_.monotonicTime();
+  reaper.onClusterDiscovered("cluster_foo", kNonzeroInactivityTimeout);
+
+  time_system_.setMonotonicTime(start + kNonzeroInactivityTimeout);
+  timer->invokeCallback();
+  EXPECT_EQ(cluster_manager_->getActiveCluster("cluster_foo"), std::nullopt);
+}
+
+// A non-positive timeout disables reclamation: nothing is tracked and the sweep timer never arms.
+TEST_F(ODCDTest, TestInactivityTimeoutDisabled) {
+  auto* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+  OdCdsClusterInactivityTimeout reaper(factory_.dispatcher_, time_system_, sampleActivity(),
+                                       reclaimCluster());
+  reaper.onClusterDiscovered("cluster_foo", std::chrono::milliseconds::zero());
+  EXPECT_FALSE(timer->enabled());
+}
+
+// Requests served between sweeps (cumulative upstream_rq_total advancing) keep resetting the idle
+// clock, so the cluster is not reclaimed.
+TEST_F(ODCDTest, TestInactivityTimeoutActivityKeepsClusterAlive) {
+  ASSERT_TRUE(
+      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1").ok());
+  auto* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+  OdCdsClusterInactivityTimeout reaper(factory_.dispatcher_, time_system_, sampleActivity(),
+                                       reclaimCluster());
+
+  const auto start = time_system_.monotonicTime();
+  reaper.onClusterDiscovered("cluster_foo", kNonzeroInactivityTimeout);
+  for (int i = 1; i <= 3; ++i) {
+    cluster_manager_->getActiveCluster("cluster_foo")
+        ->info()
+        ->trafficStats()
+        ->upstream_rq_total_.inc();
+    time_system_.setMonotonicTime(start + kNonzeroInactivityTimeout * i);
+    timer->invokeCallback();
+  }
+  EXPECT_TRUE(cluster_manager_->getActiveCluster("cluster_foo").has_value());
+}
+
+// A persistent stream prevents the cluster from being reclaimed.
+TEST_F(ODCDTest, TestInactivityTimeoutStreamKeepsClusterAlive) {
+  ASSERT_TRUE(
+      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1").ok());
+  auto* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+  OdCdsClusterInactivityTimeout reaper(factory_.dispatcher_, time_system_, sampleActivity(),
+                                       reclaimCluster());
+
+  const auto start = time_system_.monotonicTime();
+  reaper.onClusterDiscovered("cluster_foo", kNonzeroInactivityTimeout);
+  cluster_manager_->getActiveCluster("cluster_foo")
+      ->info()
+      ->trafficStats()
+      ->upstream_rq_active_.inc();
+
+  for (int i = 1; i <= 3; ++i) {
+    time_system_.setMonotonicTime(start + kNonzeroInactivityTimeout * i);
+    timer->invokeCallback();
+  }
+  EXPECT_TRUE(cluster_manager_->getActiveCluster("cluster_foo").has_value());
+
+  // When the stream ends the cluster gets reclaimed.
+  cluster_manager_->getActiveCluster("cluster_foo")
+      ->info()
+      ->trafficStats()
+      ->upstream_rq_active_.dec();
+  time_system_.setMonotonicTime(start + kNonzeroInactivityTimeout * 4);
+  timer->invokeCallback();
+  EXPECT_FALSE(cluster_manager_->getActiveCluster("cluster_foo").has_value());
+}
+
+// The timeout is per cluster: two clusters discovered with different timeouts (e.g. by different
+// ODCDS filters sharing the singleton subscriptions manager) are each reclaimed on their own
+// timeout, not on whichever timeout the reaper was first given.
+TEST_F(ODCDTest, TestInactivityTimeoutIsPerCluster) {
+  ASSERT_TRUE(
+      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_short"), "version1").ok());
+  ASSERT_TRUE(
+      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_long"), "version1").ok());
+  auto* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+  OdCdsClusterInactivityTimeout reaper(factory_.dispatcher_, time_system_, sampleActivity(),
+                                       reclaimCluster());
+
+  const auto start = time_system_.monotonicTime();
+  reaper.onClusterDiscovered("cluster_short", kNonzeroInactivityTimeout);
+  reaper.onClusterDiscovered("cluster_long", 10 * kNonzeroInactivityTimeout);
+
+  // At the short cluster's timeout only it is reclaimed; the long-timeout cluster survives.
+  time_system_.setMonotonicTime(start + kNonzeroInactivityTimeout);
+  timer->invokeCallback();
+  EXPECT_EQ(cluster_manager_->getActiveCluster("cluster_short"), std::nullopt);
+  EXPECT_TRUE(cluster_manager_->getActiveCluster("cluster_long").has_value());
 }
 
 } // namespace

@@ -183,7 +183,9 @@ envoy_cc_test(
         ":cluster_manager_impl_test_common",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:xds_resource_lib",
+        "//source/common/upstream:od_cds_cluster_inactivity_timeout_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/upstream:od_cds_api_mocks",
     ],
 )
