@@ -1,7 +1,5 @@
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 
-#include <algorithm>
-
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
 #include "source/extensions/filters/network/common/redis/aws_iam_authenticator_impl.h"
@@ -19,12 +17,12 @@ namespace {
 // Shared no-op callbacks for internally-issued requests that bypass redirection (e.g. ASKING).
 Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
 
-// True when the HELLO 3 reply confirms RESP3 negotiation: a Map (or RESP2-fallback Array)
-// containing "proto" → 3. Anything else (bare "+OK", empty array, missing/wrong proto) means
-// the upstream did not acknowledge RESP3 and the connection must be torn down.
+// True when the HELLO 3 reply confirms RESP3 negotiation: a Map containing "proto" → 3. A
+// server that actually switched protocols always answers HELLO 3 with a RESP3 Map, so anything
+// else (RESP2-framed array, bare "+OK", missing/wrong proto) means the upstream did not
+// acknowledge RESP3 and the connection must be torn down.
 bool isHello3SuccessResponse(const Common::Redis::RespValue& value) {
-  if (value.type() != Common::Redis::RespType::Map &&
-      value.type() != Common::Redis::RespType::Array) {
+  if (value.type() != Common::Redis::RespType::Map) {
     return false;
   }
   const auto& kv = value.asArray();
@@ -445,7 +443,12 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
     connect_or_op_timer_->enableTimer(config_->opTimeout());
   }
 
-  putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestSuccess);
+  // A reply that failed the init handshake (dispatched just above) is not a success: the
+  // failure event was already recorded by onInitFailure, and reporting success here would let
+  // a host that persistently rejects HELLO 3 evade outlier ejection.
+  if (init_state_ != InitState::Failed) {
+    putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestSuccess);
+  }
 }
 
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, ClientCallbacks& callbacks,
@@ -576,6 +579,9 @@ void ClientImpl::onInitFailure() {
   if (init_state_ == InitState::Failed) {
     return; // idempotent — second-arriving init reply, or onEvent retry
   }
+  // Feed outlier detection so a host that persistently fails the handshake can be ejected;
+  // onRespValue suppresses its tail success event when the init state is Failed.
+  putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestFailed);
   setInitState(InitState::Failed); // drains non-replayed held requests via failHeldUserRequests
   // Only close if not already mid-teardown — onInitFailure can be re-entered via onEvent's
   // pending_requests_ drain, and a second close would double-fire close-time stats.
@@ -613,24 +619,23 @@ void ClientImpl::replayHeldUserRequests() {
 }
 
 void ClientImpl::failHeldUserRequests() {
-  // Drain non-replayed entries (live_request_ == nullptr); erase before firing the callback so
-  // re-entrant mutations (sibling cancel, recursive setInitState(Failed)) are safe. Replayed
-  // entries are owned by pending_requests_ and fail through onEvent's drain instead.
-  while (true) {
-    auto it = std::find_if(
-        held_user_requests_.begin(), held_user_requests_.end(),
-        [](const std::unique_ptr<HeldUserRequest>& h) { return h->live_request_ == nullptr; });
-    if (it == held_user_requests_.end()) {
-      return;
-    }
-    auto held = std::move(*it);
-    held_user_requests_.erase(it);
+  // Failure can only happen during init and replay only happens on Ready, so every entry here
+  // is expected to be non-replayed (live_request_ == nullptr) — a front-pop drain suffices and
+  // avoids the per-iteration rescan a skip-based drain needs. Pop before firing so re-entrant
+  // mutations (sibling cancel erasing its own node) cannot invalidate anything we hold. Should
+  // the invariant ever break, stop and leave the replayed remainder to fail through onEvent's
+  // pending_requests_ drain (their wrapper owns them there); the ASSERT flags that in debug.
+  while (!held_user_requests_.empty() &&
+         held_user_requests_.front()->live_request_ == nullptr) {
+    auto held = std::move(held_user_requests_.front());
+    held_user_requests_.pop_front();
     if (!held->canceled_) {
       held->original_callbacks_.onFailure();
     }
     // Canceled non-replayed: stat already incremented in HeldUserRequest::cancel(); no fire.
     // held destroyed here.
   }
+  ASSERT(held_user_requests_.empty(), "held entry replayed before init completed");
 }
 
 void ClientImpl::removeHeldUserRequest(HeldUserRequest* held) {
@@ -701,11 +706,16 @@ void ClientImpl::Hello3InitCallbacks::onResponse(Common::Redis::RespValuePtr&& v
     if (parent_.upstream_resp3_hello_failure_ != nullptr) {
       parent_.upstream_resp3_hello_failure_->inc();
     }
+    // Rate-limited: a host that persistently rejects HELLO 3 fails every reconnect attempt,
+    // and per-attempt warns would flood the log under load. The per-cluster
+    // upstream_resp3_hello_failure counter (and now outlier ejection) is the operational
+    // signal; the log carries the reason.
     if (is_error) {
-      ENVOY_LOG(warn, "redis: HELLO 3 negotiation failed: {}", absl::CHexEscape(value->asString()));
+      ENVOY_LOG_EVERY_POW_2(warn, "redis: HELLO 3 negotiation failed: {}",
+                            absl::CHexEscape(value->asString()));
     } else {
-      ENVOY_LOG(warn, "redis: HELLO 3 negotiation failed: unexpected reply shape "
-                      "(expected Map containing proto=3)");
+      ENVOY_LOG_EVERY_POW_2(warn, "redis: HELLO 3 negotiation failed: unexpected reply shape "
+                                  "(expected Map containing proto=3)");
     }
     parent_.onInitFailure();
     return;
@@ -716,7 +726,7 @@ void ClientImpl::Hello3InitCallbacks::onFailure() {
   if (parent_.upstream_resp3_hello_failure_ != nullptr) {
     parent_.upstream_resp3_hello_failure_->inc();
   }
-  ENVOY_LOG(warn, "redis: HELLO 3 negotiation failed (connection error)");
+  ENVOY_LOG_EVERY_POW_2(warn, "redis: HELLO 3 negotiation failed (connection error)");
   parent_.onInitFailure();
 }
 void ClientImpl::Hello3InitCallbacks::onRedirection(Common::Redis::RespValuePtr&& value,
@@ -726,8 +736,9 @@ void ClientImpl::Hello3InitCallbacks::onRedirection(Common::Redis::RespValuePtr&
   if (parent_.upstream_resp3_hello_failure_ != nullptr) {
     parent_.upstream_resp3_hello_failure_->inc();
   }
-  ENVOY_LOG(warn, "redis: HELLO 3 received {} redirection (treating as failure): {}",
-            ask_redirection ? "ASK" : "MOVED", value ? absl::CHexEscape(value->asString()) : "");
+  ENVOY_LOG_EVERY_POW_2(warn, "redis: HELLO 3 received {} redirection (treating as failure): {}",
+                        ask_redirection ? "ASK" : "MOVED",
+                        value ? absl::CHexEscape(value->asString()) : "");
   parent_.onInitFailure();
 }
 

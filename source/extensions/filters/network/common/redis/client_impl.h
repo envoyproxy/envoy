@@ -108,7 +108,7 @@ public:
   void close() override;
   PoolRequest* makeRequest(const RespValue& request, ClientCallbacks& callbacks) override;
   // Active for the conn pool's drain-vs-close decision: in-flight or init-held work.
-  bool active() override { return !pending_requests_.empty() || !held_user_requests_.empty(); }
+  bool active() override { return hasOutstandingWork(); }
   void flushBufferAndResetTimer();
   void initialize(const std::string& auth_username, const std::string& auth_password) override;
 
@@ -116,8 +116,9 @@ private:
   friend class RedisClientImplTest;
 
   // Init state machine for HELLO 3 / AUTH / READONLY / IAM-token negotiation. initialize()
-  // either snaps to Ready (RESP2 + no IAM + Primary) or walks the four negotiation states;
-  // isUserTrafficGated() gates makeRequest during those.
+  // either snaps to Ready (RESP2 + no IAM, any read policy — AUTH/READONLY go out
+  // fire-and-forget there) or walks the four negotiation states; isUserTrafficGated() gates
+  // makeRequest during those.
   enum class InitState : uint8_t {
     NotStarted,         // ctor default; initialize() has not been called yet
     WaitingForAwsToken, // AWS IAM token fetch in flight; held queue gates user requests
@@ -128,9 +129,10 @@ private:
     Failed,             // any failure; held queue drained with onFailure()
   };
 
-  // True only during the four async negotiation states. NotStarted is intentionally
-  // NOT gated: the synchronous RESP2-no-IAM path appends AUTH/READONLY directly before
-  // snapping to Ready.
+  // True only during the four async negotiation states. NotStarted is not gated: init
+  // commands go through makeRequestInternal (which never consults this gate), so gating
+  // NotStarted would only affect a user makeRequest issued before initialize() — a sequence
+  // the factory contract already forbids.
   static constexpr bool isUserTrafficGated(InitState s) {
     return s == InitState::WaitingForAwsToken || s == InitState::AwaitingHello ||
            s == InitState::AwaitingReadonly || s == InitState::AwaitingAuth;
