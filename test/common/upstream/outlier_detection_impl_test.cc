@@ -1826,7 +1826,7 @@ TEST_F(OutlierDetectorImplTest, EjectionActiveValueIsAccountedWithoutMetricStora
             cluster_.info_->stats_store_.counter("outlier_detection.ejections_overflow").value());
 }
 
-// Regression test for the degraded-host outlier-detection null-deref when a host is removed
+// Regression test for the degraded-host outlier-detection null dereference when a host is removed
 // while a cross-thread degrade post is in flight. setHostDegraded() posts to the main thread;
 // setHostDegradedMainThread() then does host_monitors_[host]->degrade(...). Unlike the eject path
 // (which guards `if (host_monitors_.count(host) == 0) return;`), the degrade path had no such
