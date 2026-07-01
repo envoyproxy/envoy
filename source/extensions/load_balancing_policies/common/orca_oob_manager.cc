@@ -4,10 +4,14 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/common/macros.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/grpc/common.h"
 #include "source/common/http/codec_client.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 
 #include "xds/service/orca/v3/orca.pb.h"
@@ -23,21 +27,53 @@ constexpr uint64_t kOobBackoffBaseIntervalMs = 1000;
 constexpr uint64_t kOobBackoffMaxIntervalMs = 30000;
 constexpr absl::string_view kOrcaOobServiceFullName = "xds.service.orca.v3.OpenRcaService";
 constexpr absl::string_view kStreamCoreMetricsMethod = "StreamCoreMetrics";
-// Multiplier on reporting_period_ used to size the per-session inactivity watchdog.
+// Multiplier on config_.reporting_period used to size the per-session inactivity watchdog.
 // 3x gives the server two missed reports of slack before we treat the stream as
 // stalled and reconnect via handleTransientFailure.
 constexpr uint64_t kInactivityWatchdogMultiplier = 3;
 
 // Max allowed size of a single gRPC frame accepted on an OOB OrcaLoadReport stream.
 constexpr uint32_t kMaxOrcaReportFrameBytes = 64 * 1024;
+
+// OOB reporting is always gRPC over HTTP/2; shared by all managers.
+const Network::TransportSocketOptionsConstSharedPtr& h2AlpnOptions() {
+  CONSTRUCT_ON_FIRST_USE(
+      Network::TransportSocketOptionsConstSharedPtr,
+      std::make_shared<const Network::TransportSocketOptionsImpl>(
+          /*override_server_name=*/"",
+          /*override_verify_san_list=*/std::vector<std::string>{},
+          /*override_alpn=*/std::vector<std::string>{Http::Utility::AlpnNames::get().Http2}));
+}
+
+OrcaOobManagerConfig sanitizeConfig(OrcaOobManagerConfig config) {
+  // Sessions jitter by random % period and arm watchdogs from it.
+  if (config.reporting_period.count() <= 0) {
+    config.reporting_period = std::chrono::milliseconds(kDefaultOobReportingPeriodMs);
+  }
+  return config;
+}
 } // namespace
 
-OrcaOobManager::OrcaOobManager(std::chrono::milliseconds reporting_period,
+void applyOrcaOobConnectionOverrides(
+    const envoy::extensions::load_balancing_policies::common::v3::OrcaOobReportingConfig& proto,
+    OrcaOobManagerConfig& config) {
+  config.port_value = proto.port_value();
+  config.authority = proto.authority();
+  if (proto.has_transport_socket_match_criteria()) {
+    auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+    (*metadata->mutable_filter_metadata())[Config::MetadataFilters::get()
+                                               .ENVOY_TRANSPORT_SOCKET_MATCH] =
+        proto.transport_socket_match_criteria();
+    config.transport_socket_match_metadata = std::move(metadata);
+  }
+}
+
+OrcaOobManager::OrcaOobManager(OrcaOobManagerConfig config,
                                const Upstream::PrioritySet& priority_set,
                                Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                                Stats::Scope& stats_scope,
                                OrcaLoadReportHandlerSharedPtr report_handler)
-    : dispatcher_(dispatcher), random_(random), reporting_period_(reporting_period),
+    : dispatcher_(dispatcher), random_(random), config_(sanitizeConfig(std::move(config))),
       priority_set_(priority_set), report_handler_(std::move(report_handler)),
       oob_stats_(generateOrcaOobStats(stats_scope)) {}
 
@@ -76,9 +112,8 @@ void OrcaOobManager::onHostsAdded(const Upstream::HostVector& hosts) {
     if (!inserted) {
       continue;
     }
-    const uint64_t period_ms = reporting_period_.count();
-    const std::chrono::milliseconds initial_delay(period_ms == 0 ? 0
-                                                                 : random_.random() % period_ms);
+    const uint64_t period_ms = config_.reporting_period.count();
+    const std::chrono::milliseconds initial_delay(random_.random() % period_ms);
     it->second = std::make_unique<OobSession>(*this, host, initial_delay);
   }
   if (oob_sessions_.size() != prior_size) {
@@ -226,8 +261,40 @@ void OrcaOobManager::OobSession::connectAndStream() {
   ASSERT(codec_client_ == nullptr);
   resetState();
 
+  // Hosts in a priority set always have a resolved address. Guard against a custom Host
+  // implementation returning nullptr by falling back to the primary address.
+  Network::Address::InstanceConstSharedPtr dial_address = host_->orcaReportingAddress();
+  if (dial_address == nullptr) {
+    dial_address = host_->address();
+  }
+  if (dial_address == nullptr) {
+    IS_ENVOY_BUG("ORCA OOB host has no resolvable address");
+    parent_.oob_stats_.stream_failures_.inc();
+    attempt_timer_->enableTimer(std::chrono::milliseconds(backoff_->nextBackOffMs()));
+    return;
+  }
+  if (parent_.config_.port_value != 0) {
+    if (dial_address->ip() != nullptr) {
+      dial_address =
+          Network::Utility::getAddressWithPort(*dial_address, parent_.config_.port_value);
+    } else {
+      ENVOY_LOG_ONCE(warn,
+                     "ORCA OOB port_value override ({}) ignored for host {} with non-IP address",
+                     parent_.config_.port_value, dial_address->asString());
+    }
+  }
+
+  // :scheme reflects the transport socket securing the OOB connection, which may
+  // differ from the cluster default via transport_socket_match_criteria.
+  const auto* match_metadata = parent_.config_.transport_socket_match_metadata.get();
+  Network::UpstreamTransportSocketFactory& transport_socket_factory =
+      match_metadata != nullptr
+          ? host_->resolveTransportSocketFactory(dial_address, match_metadata, h2AlpnOptions())
+          : host_->transportSocketFactory();
+  const bool secure_transport = transport_socket_factory.implementsSecureTransport();
+
   Upstream::Host::CreateConnectionData connection_data = host_->createOrcaReportingConnection(
-      parent_.dispatcher_, /*transport_socket_options=*/nullptr, /*metadata=*/nullptr);
+      parent_.dispatcher_, h2AlpnOptions(), transport_socket_factory, dial_address);
   codec_client_ = parent_.createCodecClient(connection_data);
   if (codec_client_ == nullptr) {
     parent_.oob_stats_.stream_failures_.inc();
@@ -242,12 +309,11 @@ void OrcaOobManager::OobSession::connectAndStream() {
   request_encoder_->getStream().addCallbacks(*this);
 
   auto headers_message =
-      Grpc::Common::prepareHeaders(authority(), std::string(kOrcaOobServiceFullName),
+      Grpc::Common::prepareHeaders(authority(*dial_address), std::string(kOrcaOobServiceFullName),
                                    std::string(kStreamCoreMetricsMethod), std::nullopt);
-  headers_message->headers().setReferenceScheme(
-      host_->transportSocketFactory().implementsSecureTransport()
-          ? Http::Headers::get().SchemeValues.Https
-          : Http::Headers::get().SchemeValues.Http);
+  headers_message->headers().setReferenceScheme(secure_transport
+                                                    ? Http::Headers::get().SchemeValues.Https
+                                                    : Http::Headers::get().SchemeValues.Http);
 
   const auto status =
       request_encoder_->encodeHeaders(headers_message->headers(), /*end_stream=*/false);
@@ -257,16 +323,12 @@ void OrcaOobManager::OobSession::connectAndStream() {
   }
 
   xds::service::orca::v3::OrcaLoadReportRequest request;
-  if (parent_.reporting_period_.count() > 0) {
-    *request.mutable_report_interval() =
-        Protobuf::util::TimeUtil::MillisecondsToDuration(parent_.reporting_period_.count());
-  }
+  *request.mutable_report_interval() =
+      Protobuf::util::TimeUtil::MillisecondsToDuration(parent_.config_.reporting_period.count());
 
   request_encoder_->encodeData(*Grpc::Common::serializeToGrpcFrame(request), /*end_stream=*/true);
 
-  if (parent_.reporting_period_.count() > 0) {
-    inactivity_timer_->enableTimer(parent_.reporting_period_ * kInactivityWatchdogMultiplier);
-  }
+  inactivity_timer_->enableTimer(parent_.config_.reporting_period * kInactivityWatchdogMultiplier);
 }
 void OrcaOobManager::OobSession::onConnectionEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::Connected ||
@@ -322,9 +384,7 @@ void OrcaOobManager::OobSession::onRpcComplete(Grpc::Status::GrpcStatus status,
 void OrcaOobManager::OobSession::onReport(const xds::data::orca::v3::OrcaLoadReport& report) {
   parent_.oob_stats_.reports_received_.inc();
   backoff_->reset();
-  if (parent_.reporting_period_.count() > 0) {
-    inactivity_timer_->enableTimer(parent_.reporting_period_ * kInactivityWatchdogMultiplier);
-  }
+  inactivity_timer_->enableTimer(parent_.config_.reporting_period * kInactivityWatchdogMultiplier);
   auto data_opt = host_->typedLbPolicyData<OrcaHostLbPolicyData>();
   if (!data_opt.has_value()) {
     parent_.oob_stats_.report_errors_.inc();
@@ -345,13 +405,18 @@ void OrcaOobManager::OobSession::resetState() {
   received_no_error_goaway_ = false;
 }
 
-std::string OrcaOobManager::OobSession::authority() const {
+std::string
+OrcaOobManager::OobSession::authority(const Network::Address::Instance& dial_address) const {
+  // Explicit policy-level authority wins over everything.
+  if (!parent_.config_.authority.empty()) {
+    return parent_.config_.authority;
+  }
   if (!host_->hostname().empty()) {
     return std::string(host_->hostname());
   }
   // For IP addresses, use the full address string which includes brackets for IPv6 and the port.
-  if (host_->address()->ip() != nullptr) {
-    return host_->address()->asString();
+  if (dial_address.ip() != nullptr) {
+    return dial_address.asString();
   }
   // Terminal fallback for non-IP addresses (e.g., UDS, Pipe) avoids using a
   // socket path as :authority.

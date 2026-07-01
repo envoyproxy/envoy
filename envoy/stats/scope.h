@@ -4,9 +4,11 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <string>
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
+#include "envoy/stats/refcount_ptr.h"
 #include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag.h"
 

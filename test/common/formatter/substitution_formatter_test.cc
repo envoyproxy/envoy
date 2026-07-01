@@ -3464,54 +3464,49 @@ TEST(SubstitutionFormatterTest, QueryParametersFormatter) {
   }
 
   {
-    QueryParametersFormatter formatter(QueryParametersFormatter::parseDecodeOption(""),
-                                       std::optional<size_t>());
+    auto formatter = QueryParametersFormatter::create("", std::optional<size_t>()).value();
     EXPECT_EQ("x=xxxxxx&y=yyyyy&z=zzz&encoded=%23",
-              formatter.format(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
+              formatter->format(formatter_context, stream_info));
+    EXPECT_THAT(formatter->formatValue(formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("x=xxxxxx&y=yyyyy&z=zzz&encoded=%23")));
   }
 
   {
 
-    QueryParametersFormatter formatter(QueryParametersFormatter::parseDecodeOption("ORIG"),
-                                       std::optional<size_t>());
+    auto formatter = QueryParametersFormatter::create("ORIG", std::optional<size_t>()).value();
     EXPECT_EQ("x=xxxxxx&y=yyyyy&z=zzz&encoded=%23",
-              formatter.format(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
+              formatter->format(formatter_context, stream_info));
+    EXPECT_THAT(formatter->formatValue(formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("x=xxxxxx&y=yyyyy&z=zzz&encoded=%23")));
   }
 
   {
 
-    QueryParametersFormatter formatter(QueryParametersFormatter::parseDecodeOption("DECODED"),
-                                       std::optional<size_t>());
-    EXPECT_EQ("x=xxxxxx&y=yyyyy&z=zzz&encoded=#", formatter.format(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
+    auto formatter = QueryParametersFormatter::create("DECODED", std::optional<size_t>()).value();
+    EXPECT_EQ("x=xxxxxx&y=yyyyy&z=zzz&encoded=#",
+              formatter->format(formatter_context, stream_info));
+    EXPECT_THAT(formatter->formatValue(formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("x=xxxxxx&y=yyyyy&z=zzz&encoded=#")));
   }
 
   {
-    QueryParametersFormatter formatter(QueryParametersFormatter::parseDecodeOption(""),
-                                       std::optional<size_t>(4));
-    EXPECT_EQ("x=xx", formatter.format(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
+    auto formatter = QueryParametersFormatter::create("", std::optional<size_t>(4)).value();
+    EXPECT_EQ("x=xx", formatter->format(formatter_context, stream_info));
+    EXPECT_THAT(formatter->formatValue(formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("x=xx")));
   }
 
   {
-    QueryParametersFormatter formatter(QueryParametersFormatter::parseDecodeOption("ORIG"),
-                                       std::optional<size_t>(4));
-    EXPECT_EQ("x=xx", formatter.format(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
+    auto formatter = QueryParametersFormatter::create("ORIG", std::optional<size_t>(4)).value();
+    EXPECT_EQ("x=xx", formatter->format(formatter_context, stream_info));
+    EXPECT_THAT(formatter->formatValue(formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("x=xx")));
   }
 
   {
-    QueryParametersFormatter formatter(QueryParametersFormatter::parseDecodeOption("DECODED"),
-                                       std::optional<size_t>(4));
-    EXPECT_EQ("x=xx", formatter.format(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
+    auto formatter = QueryParametersFormatter::create("DECODED", std::optional<size_t>(4)).value();
+    EXPECT_EQ("x=xx", formatter->format(formatter_context, stream_info));
+    EXPECT_THAT(formatter->formatValue(formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("x=xx")));
   }
 }
