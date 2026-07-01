@@ -631,14 +631,26 @@ Host::CreateConnectionData HostImplBase::createHealthCheckConnection(
 Host::CreateConnectionData HostImplBase::createOrcaReportingConnection(
     Event::Dispatcher& dispatcher,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-    const envoy::config::core::v3::Metadata* metadata) const {
-  const auto orca_address = orcaReportingAddress();
-  Network::UpstreamTransportSocketFactory& factory =
-      (metadata != nullptr)
-          ? resolveTransportSocketFactory(orca_address, metadata, transport_socket_options)
-          : transportSocketFactory();
-  return createConnection(dispatcher, cluster(), orca_address, addressListOrNull(), factory,
-                          /*options=*/nullptr, transport_socket_options, shared_from_this());
+    Network::UpstreamTransportSocketFactory& factory,
+    Network::Address::InstanceConstSharedPtr orca_address) const {
+  return createOrcaConnection(dispatcher, std::move(transport_socket_options), factory,
+                              std::move(orca_address), address(), addressListOrNull(),
+                              shared_from_this());
+}
+
+Host::CreateConnectionData HostImplBase::createOrcaConnection(
+    Event::Dispatcher& dispatcher,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+    Network::UpstreamTransportSocketFactory& factory,
+    Network::Address::InstanceConstSharedPtr orca_address,
+    const Network::Address::InstanceConstSharedPtr& host_address,
+    const SharedConstAddressVector& address_list, HostDescriptionConstSharedPtr host) const {
+  // The original-port address list applies only when dialing the host's own address. Compare
+  // by value: pointer identity doesn't survive LogicalHost re-resolution.
+  const bool use_address_list = *orca_address == *host_address;
+  return createConnection(dispatcher, cluster(), orca_address,
+                          use_address_list ? address_list : SharedConstAddressVector{}, factory,
+                          /*options=*/nullptr, transport_socket_options, std::move(host));
 }
 
 std::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetProxyRedirectAddress(
