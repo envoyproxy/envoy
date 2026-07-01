@@ -5,6 +5,7 @@
 #include "envoy/config/eds_resources_cache.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "source/common/protobuf/arena_wrapped_proto.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -31,8 +32,11 @@ public:
 private:
   // The value of the map, holds the resource and the removal callbacks.
   struct ResourceData {
-    envoy::config::endpoint::v3::ClusterLoadAssignment resource_;
+    ArenaWrappedProto<envoy::config::endpoint::v3::ClusterLoadAssignment> resource_;
     std::vector<EdsResourceRemovalCallback*> removal_cbs_;
+
+    ResourceData(ResourceData&&) = default;
+    ResourceData& operator=(ResourceData&&) = default;
 
     ResourceData(const envoy::config::endpoint::v3::ClusterLoadAssignment& resource)
         : resource_(resource) {}

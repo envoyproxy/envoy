@@ -96,6 +96,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "arena_wrapped_proto_lib",
+    hdrs = [
+        "arena_wrapped_proto.h",
+    ],
+    deps = [
+        "@com_google_protobuf//:protobuf",
+    ],
+)
+
+envoy_cc_library(
     name = "create_reflectable_message_lib",
     srcs = [
         "create_reflectable_message.cc",
