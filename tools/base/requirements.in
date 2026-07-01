@@ -21,6 +21,7 @@ protobuf<7.36.0
 ply
 pygithub
 pyjwt[crypto]==2.13.0
+cryptography==49.0.0
 pyyaml
 setuptools
 slack_sdk
