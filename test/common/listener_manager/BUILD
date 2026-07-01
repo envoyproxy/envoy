@@ -210,6 +210,7 @@ envoy_cc_test(
         "//test/mocks/server:listener_component_factory_mocks",
         "//test/mocks/server:listener_manager_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",

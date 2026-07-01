@@ -57,21 +57,19 @@ FcdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added
   if (added_resources.size() == 1) {
     if (removed_resources.size() > 0) {
       return absl::InvalidArgumentError(
-          "Invalid FCDS update: removed and updated the same resource");
+          "Invalid FCDS update: cannot add and remove in the same update");
     }
     updated_or_removed = makeOptRef(
         Protobuf::DynamicCastMessage<FilterChainProto>(added_resources[0].get().resource()));
     if (updated_or_removed->name() != filter_chain_name_) {
-      return absl::InvalidArgumentError(
-          "Invalid FCDS update: unexpected updated filter chain name");
+      return absl::InvalidArgumentError("Invalid FCDS update: invalid filter chain name");
     }
   } else {
     if (removed_resources.size() != 1 || added_resources.size() != 0) {
-      return absl::InvalidArgumentError("Invalid FCDS update: removed and added the same resource");
+      return absl::InvalidArgumentError("Invalid FCDS update: must remove exactly one resource");
     }
     if (removed_resources[0] != filter_chain_name_) {
-      return absl::InvalidArgumentError(
-          "Invalid FCDS update: unexpected removed filter chain name");
+      return absl::InvalidArgumentError("Invalid FCDS update: invalid removed filter chain name");
     }
   }
   if (updated_or_removed && config_ &&
@@ -86,10 +84,12 @@ FcdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added
     config_ = *updated_or_removed;
     warming_ = true;
   } else {
-    callbacks_.onFilterChainRemoved(std::move(filter_chain_));
-    filter_chain_ = nullptr;
-    config_ = {};
-    warming_ = false;
+    if (filter_chain_) {
+      callbacks_.onFilterChainRemoved(std::move(filter_chain_));
+      filter_chain_ = nullptr;
+      config_ = {};
+      warming_ = false;
+    }
     init_target_.ready();
   }
   return absl::OkStatus();
