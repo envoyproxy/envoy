@@ -129,8 +129,8 @@ public:
         .WillByDefault(testing::ReturnRef(store_.mockScope()));
     ON_CALL(context_, serverScope()).WillByDefault(testing::ReturnRef(store_.mockScope()));
 
-    EXPECT_CALL(store_.mockScope(), createScope_(_))
-        .WillRepeatedly(Invoke([this](const std::string& name) {
+    EXPECT_CALL(store_.mockScope(), createScope_(_, _))
+        .WillRepeatedly(Invoke([this](const std::string& name, const std::string&) {
           auto scope_name_storage =
               std::make_unique<Stats::StatNameDynamicStorage>(name, context_.store_.symbolTable());
           auto scope = std::make_shared<NiceMock<MockScopeWithGauge>>(

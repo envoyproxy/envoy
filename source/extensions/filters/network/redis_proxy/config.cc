@@ -4,6 +4,7 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
+#include "source/common/config/well_known_names.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 #include "source/extensions/common/redis/cluster_refresh_manager_impl.h"
 #include "source/extensions/filters/network/common/redis/aws_iam_authenticator_impl.h"
@@ -100,8 +101,11 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
       }
     }
 
-    Stats::ScopeSharedPtr stats_scope =
-        context.scope().createScope(fmt::format("cluster.{}.redis_cluster", cluster));
+    // cluster.(<cluster_name>.)*
+    Stats::ScopeSharedPtr stats_scope = context.scope().createScopeWithTaggedName(
+        "cluster.redis_cluster",
+        {Stats::TagStringView{Envoy::Config::TagNames::get().CLUSTER_NAME, cluster}},
+        fmt::format("cluster.{}.redis_cluster", cluster));
     // Get zone from LocalInfo for fallback when client_zone not explicitly configured
     const std::string& local_zone = server_context.localInfo().zoneName();
     auto conn_pool_ptr = std::make_shared<ConnPool::InstanceImpl>(

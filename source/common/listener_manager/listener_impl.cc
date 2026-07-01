@@ -289,9 +289,22 @@ generateListenerStatsScope(const envoy::config::listener::v3::Listener& config,
     }
   }
 
-  Stats::ScopeSharedPtr scope = stats.createScope("", false, {}, scope_matcher);
-  Stats::ScopeSharedPtr listener_scope = stats.createScope(
-      fmt::format("listener.{}.", listenerStatsScope(config)), false, {}, std::move(scope_matcher));
+  Stats::ScopeSharedPtr scope =
+      stats.createScopeWithTaggedName({}, {}, {}, false, {}, scope_matcher);
+
+  // listener.(<address|stat_prefix>.)*, but specifically excluding "admin"
+  const std::string observability_name = listenerStatsScope(config);
+  Stats::ScopeSharedPtr listener_scope;
+  if (observability_name != "admin") {
+    // TODO(wbpcode): for the 'admin' listener, we won't extract the listener address as a tag.
+    listener_scope = stats.createScopeWithTaggedName(
+        "listener",
+        {Stats::TagStringView{Config::TagNames::get().LISTENER_ADDRESS, observability_name}},
+        fmt::format("listener.{}.", observability_name), false, {}, std::move(scope_matcher));
+  } else {
+    listener_scope = stats.createScopeWithTaggedName("listener.admin.", {}, {}, false, {},
+                                                     std::move(scope_matcher));
+  }
 
   return std::make_pair(std::move(scope), std::move(listener_scope));
 }

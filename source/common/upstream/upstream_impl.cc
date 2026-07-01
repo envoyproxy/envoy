@@ -42,6 +42,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/utility.h"
@@ -465,10 +466,13 @@ generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
     }
   }
 
-  return stats.createScope(fmt::format("cluster.{}.", (!config.alt_stat_name().empty())
-                                                          ? config.alt_stat_name()
-                                                          : config.name()),
-                           false, {}, std::move(scope_matcher));
+  absl::string_view observability_name =
+      !config.alt_stat_name().empty() ? config.alt_stat_name() : config.name();
+
+  // cluster.(<cluster_name>.)*
+  return stats.createScopeWithTaggedName(
+      "cluster", {Stats::TagStringView{Config::TagNames::get().CLUSTER_NAME, observability_name}},
+      fmt::format("cluster.{}.", observability_name), false, {}, std::move(scope_matcher));
 }
 
 // TODO(pianiststickman): this implementation takes a lock on the hot path and puts a copy of the
