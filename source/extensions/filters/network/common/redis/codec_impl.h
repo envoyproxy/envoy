@@ -8,6 +8,8 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/network/common/redis/codec.h"
 
+#include "absl/types/span.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -48,8 +50,10 @@ public:
   static constexpr uint32_t kMaxConsecutiveAttributes = 32;
   // Cap on aggregate nesting depth. Without this, ``*1\r\n*1\r\n...`` grows pending_value_stack_
   // without bound even though each level's own kMaxRespElements check passes trivially. Tracked in
-  // a counter because std::forward_list has no O(1) size(). Matches upstream's
-  // ``MaxArrayNestingDepth``.
+  // a counter because std::forward_list has no O(1) size(). Same value as upstream's
+  // ``MaxArrayNestingDepth``; the accepted depth is one level tighter (128 vs upstream's 129)
+  // because the pre-push check rejects at ``>= kMaxNestingDepth`` where upstream used ``>``
+  // (both counts include the root frame).
   static constexpr uint32_t kMaxNestingDepth = 128;
   // Cap on cumulative RespValue slots reserved across all aggregate levels of one root value. No
   // upstream equivalent: an additional defense against multiplicative growth (kMaxNestingDepth *
@@ -141,7 +145,10 @@ public:
 
 private:
   RespProtocolVersion protocol_version_{RespProtocolVersion::Resp2};
-  void encodeArray(const std::vector<RespValue>& array, Buffer::Instance& out);
+  // Aggregate encoders take a span so a caller can pass either the stored vector directly or a
+  // truncated view of it (see the Map case in encode(), which enforces the even-length
+  // invariant once and hands both the RESP3 and RESP2 paths the same view).
+  void encodeArray(absl::Span<const RespValue> array, Buffer::Instance& out);
   void encodeCompositeArray(const RespValue::CompositeArray& array, Buffer::Instance& out);
   void encodeBulkString(const std::string& string, Buffer::Instance& out);
   void encodeError(const std::string& string, Buffer::Instance& out);
@@ -152,10 +159,10 @@ private:
   void encodeBigNumber(const std::string& value, Buffer::Instance& out);
   void encodeBlobError(const std::string& error, Buffer::Instance& out);
   void encodeVerbatimString(const std::string& string, Buffer::Instance& out);
-  void encodeAggregate(char prefix, const std::vector<RespValue>& array, Buffer::Instance& out);
-  void encodeMap(const std::vector<RespValue>& array, Buffer::Instance& out);
-  void encodeSet(const std::vector<RespValue>& array, Buffer::Instance& out);
-  void encodePush(const std::vector<RespValue>& array, Buffer::Instance& out);
+  void encodeAggregate(char prefix, absl::Span<const RespValue> array, Buffer::Instance& out);
+  void encodeMap(absl::Span<const RespValue> array, Buffer::Instance& out);
+  void encodeSet(absl::Span<const RespValue> array, Buffer::Instance& out);
+  void encodePush(absl::Span<const RespValue> array, Buffer::Instance& out);
   void encodeNull(Buffer::Instance& out);
 };
 

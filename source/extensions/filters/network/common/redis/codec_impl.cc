@@ -2,7 +2,6 @@
 
 #include <cmath>
 #include <cstdint>
-#include <cstring>
 #include <limits>
 #include <memory>
 #include <string>
@@ -14,7 +13,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 
-#include "absl/container/fixed_array.h"
+#include "absl/strings/ascii.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
 
@@ -203,10 +202,13 @@ const RespValue::CompositeArray& RespValue::asCompositeArray() const {
 
 double RespValue::asDouble() const {
   ASSERT(type_ == RespType::Double);
+  // The stored payload is validated at decode time (see the Double branch of the SimpleString
+  // state) and by setDouble, so parsing cannot fail here; ASSERT rather than throw, matching
+  // the other typed accessors. The zero-init keeps release builds deterministic in the
+  // impossible case.
   double result = 0.0;
-  if (!absl::SimpleAtod(string_, &result)) {
-    throw ProtocolError("invalid double value");
-  }
+  const bool parsed = absl::SimpleAtod(string_, &result);
+  ASSERT(parsed);
   return result;
 }
 
@@ -1089,11 +1091,27 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         // arbitrary-precision).
         RespValue& current_value = *pending_value_stack_.front().value_;
         if (current_value.type() == RespType::Double) {
+          // Reject whitespace and non-printable bytes up front. ``SimpleAtod`` tolerates
+          // surrounding ASCII whitespace, so without this an embedded space/tab (or, since
+          // only ``\r`` terminates this state, a bare ``\n``) would validate and then be
+          // re-emitted verbatim inside a line-framed RESP3 Double — desyncing strict
+          // downstream parsers. Legitimate Double tokens are printable, space-free ASCII
+          // (digits, sign, '.', 'e'/'E', "inf"/"nan").
+          const unsigned char c = static_cast<unsigned char>(buffer[0]);
+          if (absl::ascii_isspace(c) || !absl::ascii_isprint(c)) {
+            throw ProtocolError("invalid double value");
+          }
           if (pending_double_buf_.size() >= kMaxDoubleTokenLength) {
             throw ProtocolError("double value too long");
           }
           pending_double_buf_.push_back(buffer[0]);
         } else {
+          // SimpleString and Error grow their asString() uncapped here. Unlike Double/BigNumber
+          // (whose per-token caps bound a scalar that a small buffer easily holds), these carry
+          // arbitrary-length text, and their growth is strictly 1:1 with attacker bytes already
+          // counted against the connection read buffer — there is no multiplicative or
+          // cumulative amplification for a cap to defend against, so upstream leaves them
+          // uncapped and we match.
           if (current_value.type() == RespType::BigNumber &&
               current_value.asString().size() >= kMaxBigNumberTokenLength) {
             throw ProtocolError("big number value too long");
@@ -1270,12 +1288,19 @@ void EncoderImpl::encode(const RespValue& value, Buffer::Instance& out) {
     break;
   }
   case RespType::Map: {
-    // Storage is flat 2*N [k0,v0,k1,v1,...]. RESP3 wire count is N pairs (%N);
-    // RESP2 emits the flat array as-is (*2N) since RESP2 has no map type.
+    // Storage is flat 2*N [k0,v0,k1,v1,...]. RESP3 wire count is N pairs (%N); RESP2 emits the
+    // flat array as-is (*2N) since RESP2 has no map type. Both share the even-length invariant,
+    // so enforce it once here and hand both paths the same (truncated-to-even) view — otherwise
+    // an odd caller vector would frame differently per negotiated version (RESP3 dropped the
+    // stray element while RESP2 emitted it).
+    const std::vector<RespValue>& stored = value.asArray();
+    ENVOY_BUG(stored.size() % 2 == 0, "Map storage must have even length");
+    const absl::Span<const RespValue> pairs(stored.data(),
+                                            stored.size() & ~static_cast<size_t>(1));
     if (protocol_version_ == RespProtocolVersion::Resp3) {
-      encodeMap(value.asArray(), out);
+      encodeMap(pairs, out);
     } else {
-      encodeArray(value.asArray(), out);
+      encodeArray(pairs, out);
     }
     break;
   }
@@ -1294,8 +1319,7 @@ void EncoderImpl::encode(const RespValue& value, Buffer::Instance& out) {
   case RespType::Push: {
     // RESP3-only frame. On RESP3 emit `>N` natively; on RESP2 down-convert to Array (`*N`)
     // since the RESP2 pubsub wire form is itself a bulk-string array — emitting `>N` to a
-    // RESP2 reader would corrupt the next reply's framing. Unconditional rather than
-    // ASSERT-guarded to stay correct in release builds.
+    // RESP2 reader would corrupt the next reply's framing.
     if (protocol_version_ == RespProtocolVersion::Resp3) {
       encodePush(value.asArray(), out);
     } else {
@@ -1306,7 +1330,7 @@ void EncoderImpl::encode(const RespValue& value, Buffer::Instance& out) {
   }
 }
 
-void EncoderImpl::encodeAggregate(char prefix, const std::vector<RespValue>& array,
+void EncoderImpl::encodeAggregate(char prefix, absl::Span<const RespValue> array,
                                   Buffer::Instance& out) {
   char buffer[32];
   char* current = buffer;
@@ -1321,7 +1345,7 @@ void EncoderImpl::encodeAggregate(char prefix, const std::vector<RespValue>& arr
   }
 }
 
-void EncoderImpl::encodeArray(const std::vector<RespValue>& array, Buffer::Instance& out) {
+void EncoderImpl::encodeArray(absl::Span<const RespValue> array, Buffer::Instance& out) {
   encodeAggregate('*', array, out);
 }
 
@@ -1422,38 +1446,28 @@ void EncoderImpl::encodeVerbatimString(const std::string& string, Buffer::Instan
   out.add("\r\n", 2);
 }
 
-void EncoderImpl::encodeMap(const std::vector<RespValue>& array, Buffer::Instance& out) {
-  // Map storage MUST be a flat 2N k/v vector. An odd-sized vector is a
-  // caller bug — emitting it would write N+1 elements while declaring
-  // count = (N+1)/2 = N/2 on the wire, corrupting the decoder framing by
-  // dropping the trailing element from the count and shifting all
-  // subsequent frames by one position.
-  //
-  // Release-safe behavior: truncate to even (drop the trailing element)
-  // and emit a properly-framed Map. ENVOY_BUG flags the violation so
-  // it surfaces in debug builds and bumps the envoy_bugs stat in
-  // production without aborting the connection.
-  ENVOY_BUG(array.size() % 2 == 0, "Map storage must have even length");
-  const size_t safe_size = array.size() & ~static_cast<size_t>(1);
+void EncoderImpl::encodeMap(absl::Span<const RespValue> array, Buffer::Instance& out) {
+  // The even-length invariant is enforced by the caller (encode()'s Map case), so ``array`` is
+  // already a flat 2N k/v view; wire format count is N pairs.
+  ASSERT(array.size() % 2 == 0);
   char buffer[32];
   char* current = buffer;
   *current++ = '%';
-  // Map stores 2*N elements (key-value pairs); wire format count is N.
-  current += StringUtil::itoa(current, 21, safe_size / 2);
+  current += StringUtil::itoa(current, 21, array.size() / 2);
   *current++ = '\r';
   *current++ = '\n';
   out.add(buffer, current - buffer);
 
-  for (size_t i = 0; i < safe_size; ++i) {
-    encode(array[i], out);
+  for (const RespValue& value : array) {
+    encode(value, out);
   }
 }
 
-void EncoderImpl::encodeSet(const std::vector<RespValue>& array, Buffer::Instance& out) {
+void EncoderImpl::encodeSet(absl::Span<const RespValue> array, Buffer::Instance& out) {
   encodeAggregate('~', array, out);
 }
 
-void EncoderImpl::encodePush(const std::vector<RespValue>& array, Buffer::Instance& out) {
+void EncoderImpl::encodePush(absl::Span<const RespValue> array, Buffer::Instance& out) {
   encodeAggregate('>', array, out);
 }
 

@@ -192,7 +192,10 @@ public:
   const std::string& asString() const;
   int64_t& asInteger();
   int64_t asInteger() const;
-  // Parses the Double payload via ``absl::SimpleAtod``; throws ``ProtocolError`` on failure.
+  // Parses the stored Double payload via ``absl::SimpleAtod``. The payload is validated at decode
+  // time (and by ``setDouble``), so parsing cannot fail on a well-formed value; the impl ASSERTs
+  // that invariant (like the other typed accessors) and returns 0.0 in release if it is ever
+  // violated. Not for untrusted input — callers must not rely on it to reject bad bytes.
   double asDouble() const;
   // Synthesizing path: formats ``v`` (currently via ``{:.17g}``) and stores. NOT
   // byte-identical to Redis's ``d2string`` for all inputs.

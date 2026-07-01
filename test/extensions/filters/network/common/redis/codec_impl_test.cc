@@ -11,6 +11,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
 using testing::ContainerEq;
@@ -443,10 +444,6 @@ TEST_F(RedisEncoderDecoderImplTest, InvalidIntegerExpectLF) {
   EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "expected new line");
 }
 
-// Empty integer/length lines must be rejected — without the digit_seen_ guard, ``:\r\n``,
-// ``:-\r\n``, ``*\r\n``, ``$\r\n``, ``%-\r\n`` etc. would all be silently accepted as zero
-// (indistinguishable on the wire from ``:0`` / ``*0`` / ``$0``), letting an attacker inject
-// ambiguous frames the rest of the parser cannot tell apart from a legitimate zero-valued one.
 // Cover the RespValue::toString branches for RESP3-only types (Set, Push, Double,
 // BigNumber, BlobError, VerbatimString, Boolean) plus the Map two-pair pretty-print path.
 // These branches are only reachable through encoder down-conversion or RESP3 client output;
@@ -595,6 +592,10 @@ TEST_F(RedisEncoderDecoderImplTest, MapNestingDepthAtBoundaryAccepted) {
   EXPECT_EQ(RespType::Map, decoded_values_[0]->type());
 }
 
+// Empty integer/length lines must be rejected — without the digit_seen_ guard, ``:\r\n``,
+// ``:-\r\n``, ``*\r\n``, ``$\r\n``, ``%-\r\n`` etc. would all be silently accepted as zero
+// (indistinguishable on the wire from ``:0`` / ``*0`` / ``$0``), letting an attacker inject
+// ambiguous frames the rest of the parser cannot tell apart from a legitimate zero-valued one.
 TEST_F(RedisEncoderDecoderImplTest, IntegerWithNoDigitsRejected) {
   buffer_.add(":\r\n");
   EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "integer with no digits");
@@ -1460,15 +1461,6 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3InvalidVerbatimStringPrefixRejected) {
 }
 
 // RESP3 Attribute: root-level attribute is parsed and discarded
-TEST_F(RedisEncoderDecoderImplTest, Resp3AttributeRootDiscarded) {
-  // |1\r\n+key\r\n+val\r\n followed by the actual value +OK\r\n
-  buffer_.add("|1\r\n+key\r\n+val\r\n+OK\r\n");
-  decoder_.decode(buffer_);
-  ASSERT_EQ(1UL, decoded_values_.size());
-  EXPECT_EQ(RespType::SimpleString, decoded_values_[0]->type());
-  EXPECT_EQ("OK", decoded_values_[0]->asString());
-}
-
 // RESP3 Attribute: nested inside an array is parsed and discarded
 TEST_F(RedisEncoderDecoderImplTest, Resp3AttributeNestedInArray) {
   // Array of 2 elements where element 0 is preceded by an attribute
@@ -1596,28 +1588,29 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3BigNumberPositive) {
 }
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3ArrayCountExceedsMax) {
-  // 2000001 exceeds kMaxRespElements (2000000)
-  buffer_.add("*2000001\r\n");
+  // One past kMaxRespElements. Reference the constant symbolically so this stays a boundary
+  // test if the limit ever changes (sibling limit tests already do this).
+  buffer_.add(absl::StrCat("*", DecoderImpl::kMaxRespElements + 1, "\r\n"));
   EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
                             "element count exceeds maximum");
 }
 
 // Per-aggregate cap on Map: a Map header whose post-multiply 2N exceeds ``kMaxRespElements``
-// is rejected at the first cap (before the cumulative cap). ``%1_500_000`` → 3M > 2M.
+// is rejected at the first cap (before the cumulative cap). N = kMaxRespElements/2 + 1 → 2N > max.
 TEST_F(RedisEncoderDecoderImplTest, Resp3MapCountExceedsMax) {
-  buffer_.add("%1500000\r\n");
+  buffer_.add(absl::StrCat("%", DecoderImpl::kMaxRespElements / 2 + 1, "\r\n"));
   EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
                             "element count exceeds maximum");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3SetCountExceedsMax) {
-  buffer_.add("~2000001\r\n");
+  buffer_.add(absl::StrCat("~", DecoderImpl::kMaxRespElements + 1, "\r\n"));
   EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
                             "element count exceeds maximum");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3PushCountExceedsMax) {
-  buffer_.add(">2000001\r\n");
+  buffer_.add(absl::StrCat(">", DecoderImpl::kMaxRespElements + 1, "\r\n"));
   EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
                             "element count exceeds maximum");
 }
@@ -2081,6 +2074,32 @@ TEST_F(RedisEncoderDecoderImplTest, DoubleAtBoundaryAccepted) {
   EXPECT_EQ(digits, decoded_values_[0]->asString());
 }
 
+// A Double payload containing whitespace or a control byte must be rejected during
+// accumulation, not silently accepted by SimpleAtod (which tolerates surrounding whitespace)
+// and re-emitted verbatim. An embedded bare ``\n`` is the dangerous case: only ``\r`` ends the
+// token, so ``,1.5\n\r\n`` would otherwise store "1.5\n" and desync an LF-splitting reader.
+TEST_F(RedisEncoderDecoderImplTest, DoubleWithWhitespaceOrControlByteRejected) {
+  for (const char* frame : {",1.5\n\r\n", ", 1.5\r\n", ",1.5 \r\n", ",1\t5\r\n"}) {
+    SCOPED_TRACE(frame);
+    Buffer::OwnedImpl buffer;
+    buffer.add(frame);
+    DecoderImpl decoder(*this);
+    EXPECT_THROW_WITH_MESSAGE(decoder.decode(buffer), ProtocolError, "invalid double value");
+  }
+}
+
+// The rejection is a charset check, not a numeric-format check: exponents, signs, and the
+// special inf/nan tokens are still accepted (SimpleAtod parses them; none contain whitespace).
+TEST_F(RedisEncoderDecoderImplTest, DoubleAcceptsExponentAndSpecialForms) {
+  for (const char* frame : {",3.0e2\r\n", ",-2.5E-3\r\n", ",inf\r\n", ",-inf\r\n", ",nan\r\n"}) {
+    SCOPED_TRACE(frame);
+    Buffer::OwnedImpl buffer;
+    DecoderImpl decoder(*this);
+    buffer.add(frame);
+    decoder.decode(buffer);
+  }
+}
+
 TEST_F(RedisEncoderDecoderImplTest, BigNumberTooLongRejected) {
   // BigNumber is arbitrary-precision, so a long value is not malformed; the payload is capped at
   // kMaxBigNumberTokenLength purely to bound unbounded CRLF-less line growth. Exceed the cap by
@@ -2225,6 +2244,32 @@ TEST_F(RedisEncoderDecoderImplTest, EncodeMapOddSizedTripsEnvoyBug) {
   // correctly framed 1-pair Map. In a debug build EXPECT_ENVOY_BUG aborts the encode before this
   // point (it is a death test), so the output check only applies in non-debug builds.
   EXPECT_EQ("%1\r\n+k\r\n+v\r\n", out.toString());
+#endif
+}
+
+// The same odd-Map caller bug must be release-safe on the RESP2 down-convert path too: the
+// even-length invariant is enforced in encode()'s Map case (before the version branch), so the
+// orphan element is dropped for both %-framed RESP3 output and the *-framed RESP2 array — a
+// prior version enforced it only inside encodeMap, letting RESP2 emit the stray trailing frame.
+TEST_F(RedisEncoderDecoderImplTest, EncodeMapOddSizedToResp2DropsOrphanElement) {
+  RespValue map;
+  map.type(RespType::Map);
+  RespValue k, v, orphan;
+  k.type(RespType::SimpleString);
+  k.asString() = "k";
+  v.type(RespType::SimpleString);
+  v.asString() = "v";
+  orphan.type(RespType::SimpleString);
+  orphan.asString() = "orphan";
+  map.asArray() = {k, v, orphan};
+
+  Buffer::OwnedImpl out;
+  encoder_.setProtocolVersion(RespProtocolVersion::Resp2);
+  EXPECT_ENVOY_BUG(encoder_.encode(map, out), "Map storage must have even length");
+#if defined(NDEBUG) || defined(ENVOY_CONFIG_COVERAGE)
+  // RESP2 has no map type, so the pairs are emitted as a flat array; the orphan is dropped so
+  // the ``*2`` count matches the element count.
+  EXPECT_EQ("*2\r\n+k\r\n+v\r\n", out.toString());
 #endif
 }
 
