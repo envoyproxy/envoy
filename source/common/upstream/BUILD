@@ -65,6 +65,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "od_cds_cluster_inactivity_timeout_lib",
+    srcs = ["od_cds_cluster_inactivity_timeout.cc"],
+    hdrs = ["od_cds_cluster_inactivity_timeout.h"],
+    deps = [
+        "//envoy/common:time_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "cluster_discovery_manager_lib",
     srcs = ["cluster_discovery_manager.cc"],
     hdrs = ["cluster_discovery_manager.h"],
