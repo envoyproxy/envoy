@@ -1829,6 +1829,92 @@ TEST_F(RedisClientImplTest, Resp2AwsIamReplicaReadPolicySendsReadonlyAfterAuth) 
   client_->close();
 }
 
+// RESP2 + IAM regression guard: a READONLY error reply must NOT tear the connection down. A
+// standalone upstream (ElastiCache cluster-mode disabled) answers READONLY with
+// -ERR This instance has cluster support disabled; the legacy fire-and-forget path ignored
+// that, and the RESP2-no-IAM path still does, so the IAM state machine must be best-effort
+// here too — warn and continue to Ready — or every such config reconnect-loops forever.
+TEST_F(RedisClientImplTest, Resp2AwsIamReadonlyErrorIsBestEffortAndReachesReady) {
+  InSequence s;
+  enableAwsIam();
+  setup(std::make_shared<ConfigImpl>(
+      createConnPoolSettings(20, true, true, 100,
+                             envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
+                                 ConnPoolSettings::REPLICA)));
+
+  EXPECT_CALL(
+      *mock_aws_iam_authenticator_,
+      addCallbackIfCredentialsPending(An<Extensions::Common::Aws::CredentialsPendingCallback&&>()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*mock_aws_iam_authenticator_, getAuthToken("alice", _)).WillOnce(Return("iam_token"));
+
+  EXPECT_CALL(*encoder_, encode(Eq(Utility::AuthRequest("alice", "iam_token")), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->initialize("alice", "");
+  onConnected();
+
+  // AUTH +OK → READONLY goes out.
+  EXPECT_CALL(*encoder_, encode(Eq(Utility::ReadOnlyRequest::instance()), _));
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+  Common::Redis::RespValuePtr auth_ok{new Common::Redis::RespValue()};
+  auth_ok->type(Common::Redis::RespType::SimpleString);
+  auth_ok->asString() = "OK";
+  respondWith(std::move(auth_ok));
+
+  // READONLY -ERR → warn + Ready. No connection close: the close expectation below is
+  // sequence-bound to the explicit client_->close(), so a teardown here would fail the test.
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+  Common::Redis::RespValuePtr readonly_err{new Common::Redis::RespValue()};
+  readonly_err->type(Common::Redis::RespType::Error);
+  readonly_err->asString() = "ERR This instance has cluster support disabled";
+  respondWith(std::move(readonly_err));
+  EXPECT_FALSE(client_->active());
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+// RESP2 + IAM: an AUTH error reply (rejected/expired token) is likewise best-effort — the
+// legacy path sent AUTH fire-and-forget, so a rejected token left the connection up and
+// unauthenticated commands simply failed at the server. Warn and continue to Ready.
+TEST_F(RedisClientImplTest, Resp2AwsIamAuthErrorIsBestEffortAndReachesReady) {
+  InSequence s;
+  enableAwsIam();
+  setup();
+
+  EXPECT_CALL(
+      *mock_aws_iam_authenticator_,
+      addCallbackIfCredentialsPending(An<Extensions::Common::Aws::CredentialsPendingCallback&&>()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*mock_aws_iam_authenticator_, getAuthToken("alice", _)).WillOnce(Return("iam_token"));
+
+  EXPECT_CALL(*encoder_, encode(Eq(Utility::AuthRequest("alice", "iam_token")), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->initialize("alice", "");
+  onConnected();
+
+  // AUTH -ERR → warn + Ready (Primary read policy: no READONLY step follows).
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+  Common::Redis::RespValuePtr auth_err{new Common::Redis::RespValue()};
+  auth_err->type(Common::Redis::RespType::Error);
+  auth_err->asString() = "WRONGPASS invalid username-password pair or user is disabled.";
+  respondWith(std::move(auth_err));
+  EXPECT_FALSE(client_->active());
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
 // AWS IAM pending token: user makeRequest during WaitingForAwsToken is held. On token arrival,
 // HELLO 3 AUTH user token is encoded; held SET stays held. Closes the wire/pending mismatch
 // hazard that the held queue exists to fix.

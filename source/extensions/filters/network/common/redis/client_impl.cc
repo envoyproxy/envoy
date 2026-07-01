@@ -554,7 +554,9 @@ void ClientImpl::onInitStepSuccess(InitState completed_step) {
     // Both HELLO 3 (RESP3 path) and post-IAM AUTH (RESP2 + IAM path) finish the credentials
     // step; READONLY is the next phase whenever the read policy may target replicas. Skipping
     // it on RESP2+IAM would leave non-Primary reads pinned to the master and silently diverge
-    // from RESP2-no-IAM and RESP3 behavior.
+    // from RESP2-no-IAM and RESP3 behavior. Failure handling of these steps is version-split
+    // (see ReadOnlyInitCallbacks / AwsIamAuthInitCallbacks): best-effort on RESP2 to match the
+    // legacy fire-and-forget outcome, fatal on the new RESP3 handshake.
     if (config_->readPolicy() != Common::Redis::Client::ReadPolicy::Primary) {
       setInitState(InitState::AwaitingReadonly);
       sendReadonlyInit();
@@ -733,6 +735,18 @@ void ClientImpl::ReadOnlyInitCallbacks::onResponse(Common::Redis::RespValuePtr&&
   const bool is_error = value && (value->type() == Common::Redis::RespType::Error ||
                                   value->type() == Common::Redis::RespType::BlobError);
   if (is_error) {
+    if (parent_.upstream_protocol_version_ != Common::Redis::RespProtocolVersion::Resp3) {
+      // RESP2 + IAM: READONLY is best-effort, matching the fire-and-forget semantics the
+      // RESP2-no-IAM path still uses. A standalone upstream (e.g. ElastiCache cluster-mode
+      // disabled) answers READONLY with an error; failing hard here would reconnect-loop IAM
+      // configs that worked before the init state machine existed.
+      ENVOY_LOG(warn, "redis: READONLY init failed (continuing): {}",
+                absl::CHexEscape(value->asString()));
+      parent_.onInitStepSuccess(InitState::AwaitingReadonly);
+      return;
+    }
+    // RESP3: the negotiated handshake is new behavior, so fail fast — a replica that rejects
+    // READONLY must not silently serve reads.
     ENVOY_LOG(warn, "redis: READONLY init failed: {}", absl::CHexEscape(value->asString()));
     parent_.onInitFailure();
     return;
@@ -745,7 +759,13 @@ void ClientImpl::ReadOnlyInitCallbacks::onFailure() {
 }
 void ClientImpl::ReadOnlyInitCallbacks::onRedirection(Common::Redis::RespValuePtr&&,
                                                       const std::string&, bool) {
-  // READONLY does not honor redirection. Same reasoning as HELLO.
+  // READONLY does not honor redirection. Best-effort on RESP2, fatal on RESP3 — same split as
+  // the error-reply case above.
+  if (parent_.upstream_protocol_version_ != Common::Redis::RespProtocolVersion::Resp3) {
+    ENVOY_LOG(warn, "redis: READONLY init received redirection (continuing)");
+    parent_.onInitStepSuccess(InitState::AwaitingReadonly);
+    return;
+  }
   parent_.onInitFailure();
 }
 
@@ -753,9 +773,13 @@ void ClientImpl::AwsIamAuthInitCallbacks::onResponse(Common::Redis::RespValuePtr
   const bool is_error = value && (value->type() == Common::Redis::RespType::Error ||
                                   value->type() == Common::Redis::RespType::BlobError);
   if (is_error) {
-    ENVOY_LOG(warn, "redis: AWS IAM AUTH init failed: {}", absl::CHexEscape(value->asString()));
-    parent_.onInitFailure();
-    return;
+    // Non-fatal by design: before the init state machine, the IAM path sent AUTH
+    // fire-and-forget and ignored the reply, so a rejected token never tore the connection
+    // down. Keep that outcome for existing IAM deployments; the strict fail-fast contract is
+    // reserved for the RESP3 HELLO negotiation, which is new behavior. (This path only runs on
+    // RESP2 + IAM — with RESP3 the credentials travel inside HELLO 3 AUTH.)
+    ENVOY_LOG(warn, "redis: AWS IAM AUTH init failed (continuing unauthenticated): {}",
+              absl::CHexEscape(value->asString()));
   }
   parent_.onInitStepSuccess(InitState::AwaitingAuth);
 }
@@ -765,7 +789,10 @@ void ClientImpl::AwsIamAuthInitCallbacks::onFailure() {
 }
 void ClientImpl::AwsIamAuthInitCallbacks::onRedirection(Common::Redis::RespValuePtr&&,
                                                         const std::string&, bool) {
-  parent_.onInitFailure();
+  // AUTH does not honor redirection; treat like an error reply — non-fatal, matching the
+  // legacy fire-and-forget semantics.
+  ENVOY_LOG(warn, "redis: AWS IAM AUTH init received redirection (continuing)");
+  parent_.onInitStepSuccess(InitState::AwaitingAuth);
 }
 
 ClientFactoryImpl ClientFactoryImpl::instance_;
