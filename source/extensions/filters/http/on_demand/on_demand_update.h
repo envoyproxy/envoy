@@ -1,9 +1,13 @@
 #pragma once
 
+#include <chrono>
+
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.h"
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
+
+#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,34 +15,46 @@ namespace HttpFilters {
 namespace OnDemand {
 
 class OnDemandRouteUpdate;
-class DecodeHeadersBehavior;
-using DecodeHeadersBehaviorPtr = std::unique_ptr<DecodeHeadersBehavior>;
 
-// DecodeHeadersBehavior implementations are used by OnDemandRouteUpdate in its decodeHeaders
-// method.
 class DecodeHeadersBehavior {
 public:
   // The returned object will only perform route discovery if it's missing.
-  static DecodeHeadersBehaviorPtr rds();
+  static DecodeHeadersBehavior rds();
   // The returned object will perform route discovery if it's missing,
   // then after route is successfully discovered, it will proceed to
   // on-demand cluster discovery if the cluster is missing. The latter
   // discovery will be done with the passed OdCdsApi and timeout.
-  static DecodeHeadersBehaviorPtr cdsRds(Upstream::OdCdsApiHandlePtr odcds,
-                                         std::chrono::milliseconds timeout);
+  static DecodeHeadersBehavior cdsRds(Upstream::OdCdsApiHandlePtr odcds,
+                                      std::chrono::milliseconds timeout);
 
-  virtual ~DecodeHeadersBehavior() = default;
+  void decodeHeaders(OnDemandRouteUpdate& filter) const;
 
-  virtual void decodeHeaders(OnDemandRouteUpdate& filter) PURE;
+private:
+  // Performs only on-demand route discovery.
+  struct Rds {
+    void decodeHeaders(OnDemandRouteUpdate& filter) const;
+  };
+
+  // Performs on-demand route discovery followed by on-demand cluster discovery.
+  struct CdsRds {
+    void decodeHeaders(OnDemandRouteUpdate& filter) const;
+
+    Upstream::OdCdsApiHandlePtr odcds;
+    std::chrono::milliseconds timeout;
+  };
+
+  using Behavior = absl::variant<Rds, CdsRds>;
+
+  explicit DecodeHeadersBehavior(Behavior behavior) : behavior_(std::move(behavior)) {}
+
+  Behavior behavior_;
 };
-
-using DecodeHeadersBehaviorPtr = std::unique_ptr<DecodeHeadersBehavior>;
 
 // OnDemandFilterConfig contains information from either the extension's
 // proto config or the extension's per-route proto config.
 class OnDemandFilterConfig : public Router::RouteSpecificFilterConfig {
 public:
-  explicit OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior);
+  explicit OnDemandFilterConfig(DecodeHeadersBehavior behavior);
   // Constructs config from extension's proto config.
   OnDemandFilterConfig(
       const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
@@ -48,10 +64,10 @@ public:
       const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
       Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor);
 
-  DecodeHeadersBehavior& decodeHeadersBehavior() const { return *behavior_; }
+  const DecodeHeadersBehavior& decodeHeadersBehavior() const { return behavior_; }
 
 private:
-  DecodeHeadersBehaviorPtr behavior_;
+  DecodeHeadersBehavior behavior_;
 };
 
 using OnDemandFilterConfigSharedPtr = std::shared_ptr<OnDemandFilterConfig>;

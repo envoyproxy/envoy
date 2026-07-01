@@ -10,50 +10,39 @@
 #include "source/common/upstream/od_cds_api_impl.h"
 #include "source/extensions/filters/http/well_known_names.h"
 
+#include "absl/types/variant.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace OnDemand {
 
-namespace {
+void DecodeHeadersBehavior::Rds::decodeHeaders(OnDemandRouteUpdate& filter) const {
+  filter.handleMissingRoute();
+}
 
-class RdsDecodeHeadersBehavior : public DecodeHeadersBehavior {
-public:
-  void decodeHeaders(OnDemandRouteUpdate& filter) override { filter.handleMissingRoute(); }
-};
-
-class RdsCdsDecodeHeadersBehavior : public DecodeHeadersBehavior {
-public:
-  RdsCdsDecodeHeadersBehavior(Upstream::OdCdsApiHandlePtr odcds, std::chrono::milliseconds timeout)
-      : odcds_(std::move(odcds)), timeout_(timeout) {}
-
-  void decodeHeaders(OnDemandRouteUpdate& filter) override {
-    auto route = filter.handleMissingRoute();
-    if (!route.has_value()) {
-      return;
-    }
-    filter.handleOnDemandCds(route.value(), *odcds_, timeout_);
+void DecodeHeadersBehavior::CdsRds::decodeHeaders(OnDemandRouteUpdate& filter) const {
+  auto route = filter.handleMissingRoute();
+  if (!route.has_value()) {
+    return;
   }
-
-private:
-  Upstream::OdCdsApiHandlePtr odcds_;
-  std::chrono::milliseconds timeout_;
-};
-
-} // namespace
-
-DecodeHeadersBehaviorPtr DecodeHeadersBehavior::rds() {
-  return std::make_unique<RdsDecodeHeadersBehavior>();
+  filter.handleOnDemandCds(route.value(), *odcds, timeout);
 }
 
-DecodeHeadersBehaviorPtr DecodeHeadersBehavior::cdsRds(Upstream::OdCdsApiHandlePtr odcds,
-                                                       std::chrono::milliseconds timeout) {
-  return std::make_unique<RdsCdsDecodeHeadersBehavior>(std::move(odcds), timeout);
+void DecodeHeadersBehavior::decodeHeaders(OnDemandRouteUpdate& filter) const {
+  absl::visit([&filter](const auto& behavior) { behavior.decodeHeaders(filter); }, behavior_);
+}
+
+DecodeHeadersBehavior DecodeHeadersBehavior::rds() { return DecodeHeadersBehavior(Rds{}); }
+
+DecodeHeadersBehavior DecodeHeadersBehavior::cdsRds(Upstream::OdCdsApiHandlePtr odcds,
+                                                    std::chrono::milliseconds timeout) {
+  return DecodeHeadersBehavior(CdsRds{std::move(odcds), timeout});
 }
 
 namespace {
 
-DecodeHeadersBehaviorPtr createDecodeHeadersBehavior(
+DecodeHeadersBehavior createDecodeHeadersBehavior(
     OptRef<const envoy::extensions::filters::http::on_demand::v3::OnDemandCds> odcds_config,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor) {
   if (!odcds_config.has_value()) {
@@ -121,7 +110,7 @@ getOdCdsConfig(const ProtoConfig& proto_config) {
 
 } // namespace
 
-OnDemandFilterConfig::OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior)
+OnDemandFilterConfig::OnDemandFilterConfig(DecodeHeadersBehavior behavior)
     : behavior_(std::move(behavior)) {}
 
 OnDemandFilterConfig::OnDemandFilterConfig(
