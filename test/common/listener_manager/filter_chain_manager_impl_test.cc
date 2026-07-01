@@ -22,9 +22,11 @@
 #include "source/common/tls/ssl_socket.h"
 #include "source/server/configuration_impl.h"
 
+#include "test/mocks/config/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/drain_manager.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/listener_component_factory.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/server/utility.h"
 #include "test/test_common/environment.h"
@@ -347,6 +349,102 @@ TEST_P(FilterChainManagerImplTest, DuplicateFilterChainMatchFails) {
             "{\"destination_port\":10000,\"server_names\":[\"example.com\"]}"
 #endif
   );
+}
+
+class MockFcdsClientCallbacks : public FcdsClientCallbacks {
+public:
+  MOCK_METHOD(void, drainFilterChain, (Network::DrainableFilterChainSharedPtr draining),
+              (override));
+};
+
+TEST_P(FilterChainManagerImplTest, FcdsSharedFilterChainManagerBasic) {
+  NiceMock<MockListenerComponentFactory> listener_component_factory;
+
+  auto fcds_shared_manager = std::make_shared<FcdsSharedFilterChainManager>(
+      parent_context_.server_factory_context_, listener_component_factory);
+
+  envoy::config::core::v3::ConfigSource config_source;
+  config_source.mutable_api_config_source()->set_api_type(
+      envoy::config::core::v3::ApiConfigSource::GRPC);
+  config_source.mutable_api_config_source()->set_transport_api_version(
+      envoy::config::core::v3::ApiVersion::V3);
+
+  std::string filter_chain_name = "dynamic_chain";
+
+  Config::SubscriptionCallbacks* fcds_callbacks = nullptr;
+  auto subscription = std::make_unique<NiceMock<Config::MockSubscription>>();
+  auto* raw_subscription = subscription.get();
+
+  EXPECT_CALL(*raw_subscription, start(testing::ElementsAre(filter_chain_name)));
+
+  EXPECT_CALL(parent_context_.server_factory_context_.cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _))
+      .WillOnce(Invoke([&fcds_callbacks, &subscription](
+                           const envoy::config::core::v3::ConfigSource&, absl::string_view,
+                           Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
+                           Config::OpaqueResourceDecoderSharedPtr,
+                           const Config::SubscriptionOptions&) mutable
+                       -> absl::StatusOr<Config::SubscriptionPtr> {
+        fcds_callbacks = &callbacks;
+        return std::move(subscription);
+      }));
+
+  MockFcdsClientCallbacks callbacks;
+  auto handle_or_status =
+      fcds_shared_manager->subscribe(config_source, filter_chain_name, callbacks, init_manager_);
+  ASSERT_TRUE(handle_or_status.ok());
+  auto handle = std::move(handle_or_status).value();
+
+  Init::ExpectableWatcherImpl init_watcher;
+  EXPECT_CALL(init_watcher, ready());
+  init_manager_.initialize(init_watcher);
+
+  ASSERT_NE(fcds_callbacks, nullptr);
+
+  envoy::config::listener::v3::FilterChain filter_chain;
+  filter_chain.set_name(filter_chain_name);
+
+  EXPECT_CALL(listener_component_factory, createNetworkFilterFactoryList(_, _))
+      .WillOnce(Return(Filter::NetworkFilterFactoriesList{}));
+
+  const auto decoded_resources = TestUtility::decodeResources({filter_chain});
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+
+  EXPECT_TRUE(
+      fcds_callbacks->onConfigUpdate(decoded_resources.refvec_, removed_resources, "v1").ok());
+
+  const Network::FilterChain* active_chain =
+      fcds_shared_manager->findThreadLocalFilterChain(filter_chain_name);
+  ASSERT_NE(active_chain, nullptr);
+  EXPECT_TRUE(active_chain->addedViaApi());
+
+  envoy::config::listener::v3::FilterChain filter_chain_v2;
+  filter_chain_v2.set_name(filter_chain_name);
+  auto* filter = filter_chain_v2.add_filters();
+  filter->set_name("dummy_filter");
+
+  EXPECT_CALL(listener_component_factory, createNetworkFilterFactoryList(_, _))
+      .WillOnce(Return(Filter::NetworkFilterFactoriesList{}));
+
+  Network::DrainableFilterChainSharedPtr drained_chain;
+  EXPECT_CALL(callbacks, drainFilterChain(_))
+      .WillOnce(Invoke([&drained_chain](Network::DrainableFilterChainSharedPtr draining) {
+        drained_chain = draining;
+      }));
+
+  const auto decoded_resources_v2 = TestUtility::decodeResources({filter_chain_v2});
+  EXPECT_TRUE(
+      fcds_callbacks->onConfigUpdate(decoded_resources_v2.refvec_, removed_resources, "v2").ok());
+
+  EXPECT_EQ(drained_chain.get(), active_chain);
+
+  const Network::FilterChain* active_chain_v2 =
+      fcds_shared_manager->findThreadLocalFilterChain(filter_chain_name);
+  ASSERT_NE(active_chain_v2, nullptr);
+  EXPECT_NE(active_chain_v2, active_chain);
+  EXPECT_TRUE(active_chain_v2->addedViaApi());
+
+  handle.reset();
 }
 
 INSTANTIATE_TEST_SUITE_P(Matcher, FilterChainManagerImplTest, ::testing::Values(true, false));
