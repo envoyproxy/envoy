@@ -17,13 +17,20 @@ envoy_cc_library(
 envoy_cc_library(
     name = "tag_interface",
     hdrs = ["tag.h"],
+    deps = [
+        "@abseil-cpp//absl/container:inlined_vector",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
+    ],
 )
 
 envoy_cc_library(
     name = "store_interface",
     hdrs = ["store.h"],
     deps = [
+        ":scope_interface",
         ":stats_interface",
+        ":stats_matcher_interface",
         "//envoy/common:optref_lib",
         "//envoy/common:pure_lib",
         "//envoy/event:dispatcher_interface",
@@ -37,9 +44,18 @@ envoy_cc_library(
     deps = [
         ":refcount_ptr_interface",
         ":stats_interface",
+        ":stats_matcher_interface",
         ":tag_interface",
         "//envoy/common:pure_lib",
         "//source/common/stats:symbol_table_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "stats_matcher_interface",
+    hdrs = ["stats_matcher.h"],
+    deps = [
+        "//envoy/common:pure_lib",
     ],
 )
 
@@ -49,7 +65,6 @@ envoy_cc_library(
     hdrs = [
         "histogram.h",
         "stats.h",
-        "stats_matcher.h",
         "tag_extractor.h",
         "tag_producer.h",
     ],
@@ -57,9 +72,6 @@ envoy_cc_library(
         ":refcount_ptr_interface",
         ":tag_interface",
         "//envoy/common:interval_set_interface",
-        "//envoy/common:optref_lib",
-        "//envoy/common:time_interface",
-        "//source/common/stats:symbol_table_lib",
         "@abseil-cpp//absl/container:inlined_vector",
     ],
 )
