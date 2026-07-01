@@ -1,5 +1,6 @@
-#include "source/extensions/config_subscription/grpc/eds_resources_cache_impl.h"
 #include "source/common/event/libevent.h"
+#include "source/extensions/config_subscription/grpc/eds_resources_cache_impl.h"
+
 #include "test/benchmark/main.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -17,8 +18,9 @@ static bool initLibevent() {
   return true;
 }
 
-envoy::config::endpoint::v3::ClusterLoadAssignment buildComplexClusterLoadAssignment(
-    int num_localities, int num_endpoints_per_locality, int num_metadata_fields) {
+envoy::config::endpoint::v3::ClusterLoadAssignment
+buildComplexClusterLoadAssignment(int num_localities, int num_endpoints_per_locality,
+                                  int num_metadata_fields) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cla;
   cla.set_cluster_name("test_cluster");
 
@@ -49,8 +51,7 @@ class EdsResourcesCacheImplBenchmark {
 public:
   EdsResourcesCacheImplBenchmark()
       : api_((initLibevent(), Api::createApiForTest(time_system_))),
-        dispatcher_(api_->allocateDispatcher("benchmark_thread")),
-        resources_cache_(*dispatcher_) {}
+        dispatcher_(api_->allocateDispatcher("benchmark_thread")), resources_cache_(*dispatcher_) {}
 
   Event::SimulatedTimeSystemHelper time_system_;
   Api::ApiPtr api_;

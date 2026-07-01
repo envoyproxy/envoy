@@ -14,32 +14,34 @@ namespace Envoy {
  * allocated sub-messages (created via mutable_foo() accessors) reside on the
  * same arena, optimizing memory allocation and deallocation.
  */
-template <typename ProtoT>
-class ArenaWrappedProto {
- public:
+template <typename ProtoT> class ArenaWrappedProto {
+public:
   // Constructor: Creates the arena and allocates the proto on it.
   // Perfect forwards any arguments to the ProtoT constructor.
   template <typename... Args>
   explicit ArenaWrappedProto(Args&&... args)
       : arena_(std::make_unique<google::protobuf::Arena>()),
-        proto_(google::protobuf::Arena::Create<ProtoT>(arena_.get(),
-                                                       std::forward<Args>(args)...)) {}
-
-  // Creates the object by copying an existing proto.
-  // explicit ArenaWrappedProto(const ProtoT& p)
-  //     : arena_(),
-  //       proto_(protobuf::Arena::Create<ProtoT>(&arena_, p)) {}
+        proto_(google::protobuf::Arena::Create<ProtoT>(arena_.get(), std::forward<Args>(args)...)) {
+  }
 
   // Disallow copy (copying the arena is not supported/safe).
   ArenaWrappedProto(const ArenaWrappedProto&) = delete;
   ArenaWrappedProto& operator=(const ArenaWrappedProto&) = delete;
 
   // Allow move.
-  ArenaWrappedProto(ArenaWrappedProto&&) = default;
-  ArenaWrappedProto& operator=(ArenaWrappedProto&&) = default;
+  ArenaWrappedProto(ArenaWrappedProto&& other) noexcept
+      : arena_(std::move(other.arena_)), proto_(std::exchange(other.proto_, nullptr)) {}
 
-  ~ArenaWrappedProto() =
-      default; // Destructor of arena_ frees proto_ automatically.
+  ArenaWrappedProto& operator=(ArenaWrappedProto&& other) noexcept {
+    if (this != &other) {
+      // The current arena_ and its contents are automatically deallocated.
+      arena_ = std::move(other.arena_);
+      proto_ = std::exchange(other.proto_, nullptr);
+    }
+    return *this;
+  }
+
+  ~ArenaWrappedProto() = default; // Destructor of arena_ frees proto_ automatically.
 
   // --- Transparent Accessors ---
 
@@ -65,7 +67,7 @@ class ArenaWrappedProto {
   const ProtoT* get() const { return proto_; }
   google::protobuf::Arena* arena() { return arena_.get(); }
 
- private:
+private:
   std::unique_ptr<google::protobuf::Arena> arena_;
   ProtoT* proto_; // Points to memory owned by arena_
 };
