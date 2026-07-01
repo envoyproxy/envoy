@@ -83,7 +83,7 @@ TEST(SockKey, LayoutMatchesKernelContract) {
 TEST(CreateBpfDatapath, ReturnsNullWhenNotCompiledIn) {
   BpfDatapathConfig config;
   config.sockhash_max_entries = 1024;
-  config.accelerated_ports = {9211, 6060};
+  config.accelerated_ports = {{9211, 9212}, {6000, 6010}};
 
   EXPECT_EQ(createBpfDatapath(config), nullptr);
 

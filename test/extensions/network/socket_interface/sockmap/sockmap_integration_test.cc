@@ -32,7 +32,9 @@ bootstrap_extensions:
   - name: envoy.extensions.network.socket_interface.sockmap
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.network.socket_interface.sockmap.v3.Sockmap
-      accelerated_ports: [9211]
+      accelerated_ports:
+      - start: 9211
+        end: 9212
 default_socket_interface: "envoy.extensions.network.socket_interface.sockmap"
     )EOF");
   }

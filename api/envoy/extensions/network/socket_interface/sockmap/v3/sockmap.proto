@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.network.socket_interface.sockmap.v3;
 
+import "envoy/type/v3/range.proto";
+
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -52,13 +54,11 @@ message Sockmap {
   // without attaching the ``sock_ops`` program. If not specified, defaults to ``true``.
   google.protobuf.BoolValue register_user_space_sockets = 4;
 
-  // Proxy listener ports that scope which connections the ``sock_ops`` program adds to the
-  // ``sockhash``. When set, only a connection whose local or peer port is one of these is
-  // registered, so other same-host connections in the cgroup stay on the standard datapath. This
-  // applies only when ``cgroup_path`` is set. If empty, every such connection is registered. At
-  // most ``64`` ports are allowed.
-  repeated uint32 accelerated_ports = 5 [(validate.rules).repeated = {
-    max_items: 64
-    items {uint32 {lte: 65535 gte: 1}}
-  }];
+  // Proxy listener port ranges that scope which connections the ``sock_ops`` program adds to the
+  // ``sockhash``. Each range is half-open ``[start, end)`` with ``1 <= start < end <= 65536``, so a
+  // single port ``P`` is ``{ start: P, end: P + 1 }``. When set, only a connection whose local or
+  // peer port falls in one of these ranges is registered, so other same-host connections in the
+  // cgroup stay on the standard datapath. This applies only when ``cgroup_path`` is set. If empty,
+  // every such connection is registered. At most ``128`` ranges are allowed.
+  repeated type.v3.Int64Range accelerated_ports = 5 [(validate.rules).repeated = {max_items: 128}];
 }

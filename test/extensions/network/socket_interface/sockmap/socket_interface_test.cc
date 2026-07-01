@@ -10,7 +10,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::ElementsAre;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -91,8 +90,12 @@ TEST(SockmapSocketInterface, CreateBootstrapExtensionParsesExplicitValues) {
   config.set_cgroup_path("/sys/fs/cgroup/envoy");
   config.mutable_sockhash_max_entries()->set_value(1024);
   config.mutable_register_user_space_sockets()->set_value(true);
-  config.add_accelerated_ports(9211);
-  config.add_accelerated_ports(6060);
+  auto* single_port = config.add_accelerated_ports();
+  single_port->set_start(9211);
+  single_port->set_end(9212);
+  auto* range = config.add_accelerated_ports();
+  range->set_start(6000);
+  range->set_end(6010);
 
   Server::BootstrapExtensionPtr extension = interface.createBootstrapExtension(config, context);
   ASSERT_NE(extension, nullptr);
@@ -102,7 +105,11 @@ TEST(SockmapSocketInterface, CreateBootstrapExtensionParsesExplicitValues) {
   EXPECT_EQ(interface.lastConfig().bpf_program_path, "/tmp/sockmap.o");
   EXPECT_EQ(interface.lastConfig().cgroup_path, "/sys/fs/cgroup/envoy");
   EXPECT_EQ(interface.lastConfig().sockhash_max_entries, 1024U);
-  EXPECT_THAT(interface.lastConfig().accelerated_ports, ElementsAre(9211U, 6060U));
+  ASSERT_EQ(interface.lastConfig().accelerated_ports.size(), 2U);
+  EXPECT_EQ(interface.lastConfig().accelerated_ports[0].start, 9211U);
+  EXPECT_EQ(interface.lastConfig().accelerated_ports[0].end, 9212U);
+  EXPECT_EQ(interface.lastConfig().accelerated_ports[1].start, 6000U);
+  EXPECT_EQ(interface.lastConfig().accelerated_ports[1].end, 6010U);
   EXPECT_TRUE(sockmap_extension->registerUserSpaceSockets());
 
   // With a datapath loaded and registration enabled, IPv4 stream sockets use the accelerated
@@ -121,43 +128,75 @@ TEST(SockmapSocketInterface, CreateBootstrapExtensionRejectsZeroMaxEntries) {
   EXPECT_THROW(interface.createBootstrapExtension(config, context), EnvoyException);
 }
 
-TEST(SockmapSocketInterface, CreateBootstrapExtensionRejectsOutOfRangePort) {
+TEST(SockmapSocketInterface, CreateBootstrapExtensionRejectsInvalidPortRange) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SockmapSocketInterfacePeer interface;
 
-  envoy::extensions::network::socket_interface::sockmap::v3::Sockmap below_range;
-  below_range.add_accelerated_ports(0);
-  EXPECT_THROW(interface.createBootstrapExtension(below_range, context), EnvoyException);
-
-  envoy::extensions::network::socket_interface::sockmap::v3::Sockmap above_range;
-  above_range.add_accelerated_ports(70000);
-  EXPECT_THROW(interface.createBootstrapExtension(above_range, context), EnvoyException);
-}
-
-TEST(SockmapSocketInterface, CreateBootstrapExtensionAcceptsMaxPorts) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  SockmapSocketInterfacePeer interface;
-
-  envoy::extensions::network::socket_interface::sockmap::v3::Sockmap config;
-  for (uint32_t port = 1; port <= 64; ++port) {
-    config.add_accelerated_ports(port);
+  // start below 1.
+  {
+    envoy::extensions::network::socket_interface::sockmap::v3::Sockmap config;
+    auto* range = config.add_accelerated_ports();
+    range->set_start(0);
+    range->set_end(10);
+    EXPECT_THROW(interface.createBootstrapExtension(config, context), EnvoyException);
   }
-
-  Server::BootstrapExtensionPtr extension = interface.createBootstrapExtension(config, context);
-  ASSERT_NE(extension, nullptr);
-  EXPECT_EQ(interface.lastConfig().accelerated_ports.size(), 64U);
+  // end above 65536.
+  {
+    envoy::extensions::network::socket_interface::sockmap::v3::Sockmap config;
+    auto* range = config.add_accelerated_ports();
+    range->set_start(1);
+    range->set_end(65537);
+    EXPECT_THROW(interface.createBootstrapExtension(config, context), EnvoyException);
+  }
+  // start not less than end.
+  {
+    envoy::extensions::network::socket_interface::sockmap::v3::Sockmap config;
+    auto* range = config.add_accelerated_ports();
+    range->set_start(9211);
+    range->set_end(9211);
+    EXPECT_THROW(interface.createBootstrapExtension(config, context), EnvoyException);
+  }
+  // Every range is validated, not just the first.
+  {
+    envoy::extensions::network::socket_interface::sockmap::v3::Sockmap config;
+    auto* valid = config.add_accelerated_ports();
+    valid->set_start(9211);
+    valid->set_end(9212);
+    auto* invalid = config.add_accelerated_ports();
+    invalid->set_start(5);
+    invalid->set_end(5);
+    EXPECT_THROW(interface.createBootstrapExtension(config, context), EnvoyException);
+  }
 }
 
-TEST(SockmapSocketInterface, CreateBootstrapExtensionRejectsTooManyPorts) {
+TEST(SockmapSocketInterface, CreateBootstrapExtensionRejectsTooManyRanges) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SockmapSocketInterfacePeer interface;
 
   envoy::extensions::network::socket_interface::sockmap::v3::Sockmap config;
-  for (uint32_t port = 1; port <= 65; ++port) {
-    config.add_accelerated_ports(port);
+  for (uint32_t port = 1; port <= 129; ++port) {
+    auto* range = config.add_accelerated_ports();
+    range->set_start(port);
+    range->set_end(port + 1);
   }
 
   EXPECT_THROW(interface.createBootstrapExtension(config, context), EnvoyException);
+}
+
+TEST(SockmapSocketInterface, CreateBootstrapExtensionAcceptsFullPortRange) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  SockmapSocketInterfacePeer interface;
+
+  envoy::extensions::network::socket_interface::sockmap::v3::Sockmap config;
+  auto* range = config.add_accelerated_ports();
+  range->set_start(1);
+  range->set_end(65536);
+
+  Server::BootstrapExtensionPtr extension = interface.createBootstrapExtension(config, context);
+  ASSERT_NE(extension, nullptr);
+  ASSERT_EQ(interface.lastConfig().accelerated_ports.size(), 1U);
+  EXPECT_EQ(interface.lastConfig().accelerated_ports[0].start, 1U);
+  EXPECT_EQ(interface.lastConfig().accelerated_ports[0].end, 65536U);
 }
 
 TEST(SockmapSocketInterface, CreateBootstrapExtensionDisablesRegistration) {

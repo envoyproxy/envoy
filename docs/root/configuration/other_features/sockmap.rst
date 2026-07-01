@@ -91,9 +91,9 @@ established state inside the cgroup is added to the ``sockhash``, which accelera
 applications and Envoy that run in the same cgroup. Prefer a narrowly scoped cgroup over a broad
 one such as the root. When the cgroup must be broad, set :ref:`accelerated_ports
 <envoy_v3_api_field_extensions.network.socket_interface.sockmap.v3.Sockmap.accelerated_ports>` to the
-proxy listener ports so only connections to or from those ports are registered, leaving unrelated
-same-host connections in the cgroup on the standard datapath. If ``cgroup_path`` is not set, the
-``sock_ops`` program is not attached and application sockets are not tracked.
+proxy listener port ranges so only connections to or from those ports are registered, leaving
+unrelated same-host connections in the cgroup on the standard datapath. If ``cgroup_path`` is not
+set, the ``sock_ops`` program is not attached and application sockets are not tracked.
 
 Proxy-to-proxy hops
 ~~~~~~~~~~~~~~~~~~~
