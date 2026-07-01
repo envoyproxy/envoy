@@ -161,16 +161,31 @@ BpfDatapathSharedPtr LibbpfDatapath::create(const BpfDatapathConfig& config) {
         }
       }
       const int ports_fd = bpf_map__fd(ports_map);
+      bool populated = true;
       for (uint32_t word = 0; word < AccelBitmapWords; ++word) {
-        if (bitmap[word] != 0) {
-          bpf_map_update_elem(ports_fd, &word, &bitmap[word], BPF_ANY);
+        if (bitmap[word] == 0) {
+          continue;
+        }
+        if (bpf_map_update_elem(ports_fd, &word, &bitmap[word], BPF_ANY) != 0) {
+          populated = false;
+          break;
         }
       }
+      // Enable the filter only after the whole bitmap is written. A partial bitmap would silently
+      // drop application hops, so on failure the filter stays off and every same-host connection is
+      // registered.
       const uint32_t zero = 0;
       const uint32_t enabled = 1;
-      bpf_map_update_elem(bpf_map__fd(filter_map), &zero, &enabled, BPF_ANY);
-      ENVOY_LOG_MISC(info, "sockmap acceleration scoped to {} proxy port range(s)",
-                     config.accelerated_ports.size());
+      const int filter_fd = bpf_map__fd(filter_map);
+      if (populated && bpf_map_update_elem(filter_fd, &zero, &enabled, BPF_ANY) == 0) {
+        ENVOY_LOG_MISC(info, "sockmap acceleration scoped to {} proxy port range(s)",
+                       config.accelerated_ports.size());
+      } else {
+        ENVOY_LOG_MISC(warn,
+                       "sockmap could not populate the accelerated_ports allowlist, "
+                       "registering all same-host hops in the cgroup: {}",
+                       errorDetails(errno));
+      }
     }
   }
 
