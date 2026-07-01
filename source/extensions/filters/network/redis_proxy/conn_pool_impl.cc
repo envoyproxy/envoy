@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
@@ -295,7 +296,7 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
       client->redis_client_ = client_factory_.create(
           host, dispatcher_, config_, redis_command_stats_, *(stats_scope_), credentials.username,
           credentials.password, false, aws_iam_config_, aws_iam_authenticator_,
-          upstream_protocol_version_, &redis_cluster_stats_.upstream_resp3_hello_failure_);
+          upstream_protocol_version_, makeOptRef(redis_cluster_stats_.upstream_resp3_hello_failure_));
 
       client->redis_client_->addConnectionCallbacks(*client);
       // RESP3 HELLO 3 negotiation runs inside ClientImpl::initialize (driven by the
@@ -469,7 +470,7 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(Upstream::HostConstSharedPtr& h
         client_factory_.create(host, dispatcher_, config_, redis_command_stats_, *(stats_scope_),
                                auth_credentials.username, auth_credentials.password, true,
                                aws_iam_config_, aws_iam_authenticator_, upstream_protocol_version_,
-                               &redis_cluster_stats_.upstream_resp3_hello_failure_);
+                               makeOptRef(redis_cluster_stats_.upstream_resp3_hello_failure_));
     if (transaction.connection_cb_) {
       transaction.clients_[client_idx]->addConnectionCallbacks(*transaction.connection_cb_);
     }

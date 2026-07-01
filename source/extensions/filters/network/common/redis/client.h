@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "envoy/common/optref.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -236,10 +237,9 @@ public:
    *        connection. ``Resp3`` triggers a ``HELLO 3`` handshake from ``ClientImpl::initialize``;
    *        ``Resp2`` keeps the legacy behavior (no HELLO).
    * @param upstream_resp3_hello_failure optional counter incremented on every HELLO 3 negotiation
-   *        failure (error reply, wrong reply shape, redirection, network failure). Nullable so
-   *        callers that do not own a per-cluster RedisClusterStats (e.g. the redis health checker)
-   *        do not have to fabricate one. Increments are guarded by a nullptr check at the
-   *        increment site.
+   *        failure (error reply, wrong reply shape, redirection, network failure). Empty for
+   *        callers that do not own a per-cluster stat for it (e.g. the redis health checker and
+   *        cluster discovery, which always negotiate RESP2 and never trigger the counter).
    * @return ClientPtr a new connection pool client.
    */
   virtual ClientPtr create(
@@ -251,7 +251,7 @@ public:
       absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator,
       Common::Redis::RespProtocolVersion upstream_protocol_version,
-      Stats::Counter* upstream_resp3_hello_failure) PURE;
+      OptRef<Stats::Counter> upstream_resp3_hello_failure) PURE;
 };
 
 // A MULTI command sent when starting a transaction.

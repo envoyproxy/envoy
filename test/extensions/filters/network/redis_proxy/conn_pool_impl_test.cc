@@ -250,11 +250,11 @@ public:
          absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>,
          absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>,
          Common::Redis::RespProtocolVersion upstream_protocol_version,
-         Stats::Counter* upstream_resp3_hello_failure) override {
+         OptRef<Stats::Counter> upstream_resp3_hello_failure) override {
     EXPECT_EQ(auth_username_, username);
     EXPECT_EQ(auth_password_, password);
     last_upstream_protocol_version_ = upstream_protocol_version;
-    last_upstream_resp3_hello_failure_ = upstream_resp3_hello_failure;
+    last_upstream_resp3_hello_failure_ = upstream_resp3_hello_failure.ptr();
     last_is_transaction_client_ = is_transaction_client;
     return Common::Redis::Client::ClientPtr{create_(host)};
   }

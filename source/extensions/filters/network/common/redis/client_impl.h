@@ -87,7 +87,7 @@ public:
       absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator,
       Common::Redis::RespProtocolVersion upstream_protocol_version,
-      Stats::Counter* upstream_resp3_hello_failure);
+      OptRef<Stats::Counter> upstream_resp3_hello_failure);
 
   ClientImpl(
       Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
@@ -98,7 +98,7 @@ public:
       absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator,
       Common::Redis::RespProtocolVersion upstream_protocol_version,
-      Stats::Counter* upstream_resp3_hello_failure);
+      OptRef<Stats::Counter> upstream_resp3_hello_failure);
   ~ClientImpl() override;
 
   // Client
@@ -195,7 +195,7 @@ private:
   // ClientCallbacks for the HELLO 3 init reply. Validates Map containing
   // proto=3; on success transitions to AwaitingReadonly (when read_policy
   // != Primary) or Ready; on failure increments upstream_resp3_hello_failure_
-  // (if non-null) and triggers onInitFailure.
+  // (when the OptRef is engaged) and triggers onInitFailure.
   class Hello3InitCallbacks : public ClientCallbacks {
   public:
     explicit Hello3InitCallbacks(ClientImpl& parent) : parent_(parent) {}
@@ -305,9 +305,10 @@ private:
   // Per-connection upstream RESP version, captured from the conn pool at create time. Drives the
   // RESP3 branch in ClientImpl::initialize. ``Resp2`` keeps the legacy no-HELLO behavior.
   const Common::Redis::RespProtocolVersion upstream_protocol_version_;
-  // Nullable HELLO 3 failure counter, owned by the conn pool's RedisClusterStats. Increment site
-  // in Hello3InitCallbacks guards on nullptr so non-pool callers can pass nullptr.
-  Stats::Counter* upstream_resp3_hello_failure_;
+  // Optional HELLO 3 failure counter. Engaged when the creating conn pool owns a per-cluster
+  // stat for it; callers without one (health checker, cluster discovery — both RESP2-only)
+  // pass an empty OptRef and the Hello3InitCallbacks increment sites skip it.
+  OptRef<Stats::Counter> upstream_resp3_hello_failure_;
   // Init state — see enum comment.
   InitState init_state_{InitState::NotStarted};
   // Pre-init / IAM-pending user requests, replayed in FIFO when state→Ready or drained on Failed.
@@ -334,7 +335,7 @@ public:
       absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator,
       Common::Redis::RespProtocolVersion upstream_protocol_version,
-      Stats::Counter* upstream_resp3_hello_failure) override;
+      OptRef<Stats::Counter> upstream_resp3_hello_failure) override;
 
   static ClientFactoryImpl instance_;
 

@@ -103,7 +103,7 @@ ClientPtr ClientImpl::create(
     absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator,
     Common::Redis::RespProtocolVersion upstream_protocol_version,
-    Stats::Counter* upstream_resp3_hello_failure) {
+    OptRef<Stats::Counter> upstream_resp3_hello_failure) {
 
   auto client = std::make_unique<ClientImpl>(
       host, dispatcher, std::move(encoder), decoder_factory, config, redis_command_stats, scope,
@@ -185,7 +185,7 @@ ClientImpl::ClientImpl(
     absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator,
     Common::Redis::RespProtocolVersion upstream_protocol_version,
-    Stats::Counter* upstream_resp3_hello_failure)
+    OptRef<Stats::Counter> upstream_resp3_hello_failure)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() { onConnectOrOpTimeout(); })),
@@ -703,7 +703,7 @@ void ClientImpl::Hello3InitCallbacks::onResponse(Common::Redis::RespValuePtr&& v
   const bool is_error = value && (value->type() == Common::Redis::RespType::Error ||
                                   value->type() == Common::Redis::RespType::BlobError);
   if (is_error || !value || !isHello3SuccessResponse(*value)) {
-    if (parent_.upstream_resp3_hello_failure_ != nullptr) {
+    if (parent_.upstream_resp3_hello_failure_.has_value()) {
       parent_.upstream_resp3_hello_failure_->inc();
     }
     // Rate-limited: a host that persistently rejects HELLO 3 fails every reconnect attempt,
@@ -723,7 +723,7 @@ void ClientImpl::Hello3InitCallbacks::onResponse(Common::Redis::RespValuePtr&& v
   parent_.onInitStepSuccess(InitState::AwaitingHello);
 }
 void ClientImpl::Hello3InitCallbacks::onFailure() {
-  if (parent_.upstream_resp3_hello_failure_ != nullptr) {
+  if (parent_.upstream_resp3_hello_failure_.has_value()) {
     parent_.upstream_resp3_hello_failure_->inc();
   }
   ENVOY_LOG_EVERY_POW_2(warn, "redis: HELLO 3 negotiation failed (connection error)");
@@ -733,7 +733,7 @@ void ClientImpl::Hello3InitCallbacks::onRedirection(Common::Redis::RespValuePtr&
                                                     const std::string&, bool ask_redirection) {
   // HELLO does not honor redirection — Redis never returns MOVED/ASK for it. Treat as failure and
   // tear down so the next user request lands on a fresh connection that will retry the handshake.
-  if (parent_.upstream_resp3_hello_failure_ != nullptr) {
+  if (parent_.upstream_resp3_hello_failure_.has_value()) {
     parent_.upstream_resp3_hello_failure_->inc();
   }
   ENVOY_LOG_EVERY_POW_2(warn, "redis: HELLO 3 received {} redirection (treating as failure): {}",
@@ -816,7 +816,7 @@ ClientPtr ClientFactoryImpl::create(
     absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator,
     Common::Redis::RespProtocolVersion upstream_protocol_version,
-    Stats::Counter* upstream_resp3_hello_failure) {
+    OptRef<Stats::Counter> upstream_resp3_hello_failure) {
 
   ClientPtr client = ClientImpl::create(
       host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_, config,

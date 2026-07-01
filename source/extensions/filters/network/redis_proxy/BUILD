@@ -100,6 +100,8 @@ envoy_cc_library(
     deps = [
         ":config_interface",
         ":conn_pool_interface",
+        "//envoy/common:optref_lib",
+        "//envoy/event:dispatcher_interface",
         "//envoy/stats:stats_macros",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
