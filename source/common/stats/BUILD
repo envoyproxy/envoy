@@ -93,7 +93,10 @@ envoy_cc_library(
         ":null_text_readout_lib",
         ":stats_lib",
         ":tag_utility_lib",
+        "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
+        "//envoy/stats:stats_matcher_interface",
+        "//envoy/stats:store_interface",
         "//source/common/stats:allocator_lib",
     ],
 )
@@ -243,7 +246,7 @@ envoy_cc_library(
     hdrs = ["stats_matcher_impl.h"],
     deps = [
         ":symbol_table_lib",
-        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_matcher_interface",
         "//source/common/common:matchers_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
@@ -264,6 +267,7 @@ envoy_cc_library(
         ":stats_matcher_lib",
         ":tag_producer_lib",
         ":tag_utility_lib",
+        "//envoy/stats:stats_matcher_interface",
         "//envoy/thread_local:thread_local_interface",
     ],
 )
@@ -286,6 +290,7 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     deps = [
         ":symbol_table_lib",
+        "//envoy/stats:scope_interface",
         "//envoy/stats:stats_interface",
     ],
 )
