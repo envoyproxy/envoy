@@ -510,7 +510,7 @@ TEST_P(AggregateIntegrationTest, CircuitBreakerTestMaxRequests) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
 #if defined(__SANITIZE_ADDRESS__) || defined(ADDRESS_SANITIZER)
   if (version_ == Network::Address::IpVersion::v6 && deferred_cluster_creation_) {
-    GTEST_SKIP() << "Deferred cluster creation with IPv6 is flaky for max_requests circuit "
+    GTEST_SKIP() << "Deferred cluster creation with IPv6 is flaky for max-requests circuit "
                     "breaker checks";
   }
 #endif
