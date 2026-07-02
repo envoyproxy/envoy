@@ -76,5 +76,6 @@ HTTP filters
   tap_filter
   thrift_to_metadata_filter
   upstream_codec_filter
+  upstream_rbac_filter
   wasm_filter
   transform_filter
