@@ -4816,7 +4816,7 @@ void testSupportForSessionResumption(const std::string& server_ctx_yaml,
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
 
-  Stats::IsolatedStoreImpl server_stats_store;
+  Stats::IsolatedStoreImpl server_stats_store(server_factory_context.serverScope().symbolTable());
   Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
   NiceMock<Runtime::MockLoader> runtime;
   ON_CALL(transport_socket_factory_context.server_context_, api())
@@ -4842,7 +4842,7 @@ void testSupportForSessionResumption(const std::string& server_ctx_yaml,
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
 
-  Stats::IsolatedStoreImpl client_stats_store;
+  Stats::IsolatedStoreImpl client_stats_store(server_factory_context.serverScope().symbolTable());
   Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       client_factory_context;
