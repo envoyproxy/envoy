@@ -154,15 +154,25 @@ absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
     // Non-visible ASCII characters are always escaped by Http::Utility::PercentEncoding::encode,
     // in addition to the specified reserved characters.
     const std::string raw_value = jsonValueToString(*template_value_json);
+    const std::string quoted = RE2::QuoteMeta(element);
     // Wildcard variables `{name=.../*}` bind a multi-segment value (a Google-API resource name),
     // so `/` and `.` are preserved.
     std::string wildcard_value = Http::Utility::PercentEncoding::encode(raw_value, ReservedChars);
-    RE2::GlobalReplace(&base_url, "\\{" + RE2::QuoteMeta(element) + "=[^}]+\\}", wildcard_value);
-    // Simple variables `{id}` bind exactly one path segment, so also escape `/` and `.` to prevent
-    // path-segment and `..` traversal injection from an attacker-controlled value (issue #45931).
-    std::string single_segment_value =
-        Http::Utility::PercentEncoding::encode(raw_value, ReservedCharsSingleSegment);
-    RE2::GlobalReplace(&base_url, "\\{" + RE2::QuoteMeta(element) + "\\}", single_segment_value);
+    RE2::GlobalReplace(&base_url, "\\{" + quoted + "=[^}]+\\}", wildcard_value);
+    // Simple variables `{id}` bind exactly one path segment. Reject a value that spans multiple
+    // segments or is a `.`/`..` traversal segment rather than silently rewriting the upstream
+    // path, which is not re-normalized before setPath() (issue #45931).
+    const RE2 simple_var("\\{" + quoted + "\\}");
+    if (RE2::PartialMatch(base_url, simple_var)) {
+      if (raw_value.find('/') != std::string::npos || raw_value == "." || raw_value == "..") {
+        return absl::InvalidArgumentError(
+            absl::StrCat("value for path-template variable '", element,
+                         "' must be a single path segment (no '/', and not '.' or '..')"));
+      }
+      std::string single_segment_value =
+          Http::Utility::PercentEncoding::encode(raw_value, ReservedChars);
+      RE2::GlobalReplace(&base_url, simple_var, single_segment_value);
+    }
   }
   return base_url;
 }

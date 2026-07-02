@@ -17,12 +17,6 @@ namespace McpJsonRestBridge {
 // (e.g. `{name=projects/*}`), whose values are Google-API resource names that span path segments.
 inline constexpr absl::string_view ReservedChars = R"( !"#$%&'()*+,:;<=>?@[\]^`{|}~)";
 
-// Stricter set for *simple* template variables (e.g. `{id}`), which bind exactly one path segment.
-// Adds `.` and `/` so an attacker-supplied value cannot inject additional path segments or `..`
-// traversal into the upstream request path (see issue #45931).
-inline constexpr absl::string_view ReservedCharsSingleSegment =
-    R"( !"#$%&'()*+,./:;<=>?@[\]^`{|}~)";
-
 struct HttpRequest {
   std::string url;
   std::string method;
