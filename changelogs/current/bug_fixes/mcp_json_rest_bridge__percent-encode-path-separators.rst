@@ -1,5 +1,6 @@
-Fixed a path-segment injection issue in the ``mcp_json_rest_bridge`` filter. Values substituted from
-the (untrusted) JSON-RPC ``arguments`` object into the configured upstream REST URL path template
-were not percent-encoding ``.`` and ``/``, so a value such as ``../../admin`` could inject additional
-path segments into the upstream request path. Path separators in substituted path-template values are
-now percent-encoded.
+Fixed a path-segment injection issue in the ``mcp_json_rest_bridge`` filter. Values substituted into
+a *simple* path-template variable (e.g. ``{id}``) were not percent-encoding ``/`` or ``.``, so an
+attacker-supplied value such as ``../../admin`` could inject additional path segments or ``..``
+traversal into the upstream request path. Simple template variables now percent-encode ``/`` and
+``.`` to confine the value to a single segment; wildcard variables (e.g. ``{name=projects/*}``),
+whose values are intentionally multi-segment resource names, are unchanged.
