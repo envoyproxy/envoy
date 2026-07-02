@@ -135,7 +135,7 @@ public:
 
   // Detaches the manager from the filter chain: releases the external buffer,
   // unsubscribes from replay watermarks, and cancels the pending replay
-  // continuation, so async completions and replay re-entrancy become inert (they
+  // continuation, so async completions and replay reentrancy become inert (they
   // early-out on destroyed_). Must be called before the manager is destroyed, and
   // must NOT be followed by a synchronous destruction from within a replay callback:
   // onDestroy() can run on-stack while a replay is mid-inject (a downstream filter

@@ -153,7 +153,7 @@ TEST_P(AiProtocolManagerIntegrationTest, HeaderAndBodyAndTrailers) {
 }
 
 // The stream is torn down *during replay*: a buffer filter placed downstream of
-// the ai_protocol_manager trips its request-size limit as the offloaded body is
+// the AiProtocolManager trips its request-size limit as the offloaded body is
 // replayed back into the chain, so Envoy emits a 413 local reply from inside the
 // replay injection. That reaches the filter's onDestroy() on-stack, detaching the
 // BufferManager mid-replay (the manager is freed later, at the filter's deferred
@@ -165,7 +165,7 @@ TEST_P(AiProtocolManagerIntegrationTest, HeaderAndBodyAndTrailers) {
 // The round-trip must fail cleanly with 413 (and, under ASAN, without touching a
 // torn-down manager), and Envoy must stay healthy for a subsequent request.
 TEST_P(AiProtocolManagerIntegrationTest, LocalReplyDuringReplayTearsDownCleanly) {
-  // Order matters: ai_protocol_manager must run first (it offloads the body), the
+  // Order matters: AiProtocolManager must run first (it offloads the body), the
   // buffer filter after it (it sees the body only when the manager replays it).
   // prependFilter() inserts at the head, so add the buffer filter first.
   config_helper_.prependFilter(R"EOF(

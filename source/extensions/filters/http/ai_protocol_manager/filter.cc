@@ -28,7 +28,7 @@ void AiProtocolManagerFilter::onDestroy() {
     // the manager is mid-replay -- a downstream filter answering an injected frame
     // with a local reply reaches destroyFilters() on this very stack -- and freeing
     // the manager then would pull it out from under its own injectData()/read()
-    // re-entrancy. The manager is owned by unique_ptr and freed when this filter is
+    // reentrancy. The manager is owned by unique_ptr and freed when this filter is
     // (deferred-)destroyed, by which point the replay stack has unwound. This honors
     // BufferManager's onDestroy()-before-destruction contract (see buffer_manager.h).
     decode_manager_->onDestroy();
