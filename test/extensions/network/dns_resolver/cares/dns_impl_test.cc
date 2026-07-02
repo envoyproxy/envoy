@@ -447,7 +447,7 @@ protected:
     cares.mutable_qcache_max_ttl()->set_value(qcache_max_ttl);
 
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-    typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+    std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
     typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
     return typed_dns_resolver_config;
   }
