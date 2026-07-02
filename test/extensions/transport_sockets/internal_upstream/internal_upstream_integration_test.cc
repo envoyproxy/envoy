@@ -370,7 +370,7 @@ public:
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       envoy::extensions::bootstrap::internal_listener::v3::InternalListener config;
       auto* bootstrap_extension = bootstrap.add_bootstrap_extensions();
-      bootstrap_extension->mutable_typed_config()->PackFrom(config);
+      std::ignore = bootstrap_extension->mutable_typed_config()->PackFrom(config);
       bootstrap_extension->set_name("envoy.bootstrap.internal_listener");
 
       auto* static_resources = bootstrap.mutable_static_resources();
