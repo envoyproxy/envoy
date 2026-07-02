@@ -253,7 +253,9 @@ void appendBindAddressNoPortOption(UpstreamLocalAddress& upstream_local_address)
           "envoy.reloadable_features.upstream_bind_config_fix_port_exhaustion")) {
     return;
   }
-
+  if (!ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT.hasValue()) {
+    return;
+  }
   if (upstream_local_address.address_ != nullptr &&
       upstream_local_address.address_->ip() != nullptr &&
       upstream_local_address.address_->ip()->port() == 0) {
