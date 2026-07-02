@@ -152,6 +152,56 @@ TEST_P(AiProtocolManagerIntegrationTest, HeaderAndBodyAndTrailers) {
   }
 }
 
+// The stream is torn down *during replay*: a buffer filter placed downstream of
+// the ai_protocol_manager trips its request-size limit as the offloaded body is
+// replayed back into the chain, so Envoy emits a 413 local reply from inside the
+// replay injection. That reaches the filter's onDestroy() on-stack, detaching the
+// BufferManager mid-replay (the manager is freed later, at the filter's deferred
+// destruction -- see its onDestroy()-before-destruction contract). Since the filter
+// holds headers and data until replay completes, a downstream filter is the only
+// thing that can react to the replayed bytes, which makes this a deterministic
+// end-to-end exercise of the offload/replay teardown path: the manager must unwind
+// cleanly (guarding on destroyed_) rather than touch its released buffer/bridge.
+// The round-trip must fail cleanly with 413 (and, under ASAN, without touching a
+// torn-down manager), and Envoy must stay healthy for a subsequent request.
+TEST_P(AiProtocolManagerIntegrationTest, LocalReplyDuringReplayTearsDownCleanly) {
+  // Order matters: ai_protocol_manager must run first (it offloads the body), the
+  // buffer filter after it (it sees the body only when the manager replays it).
+  // prependFilter() inserts at the head, so add the buffer filter first.
+  config_helper_.prependFilter(R"EOF(
+name: envoy.filters.http.buffer
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
+  max_request_bytes: 1024
+)EOF");
+  prependFilter();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Several replay chunks (> ReadChunkSize, 64KiB), each far over max_request_bytes,
+  // so the buffer filter trips the 413 on the first replayed chunk while later
+  // chunks are still pending. That forces the manager to detach mid-range with reads
+  // outstanding -- the path that must stop rather than read from the released buffer.
+  const std::string body(256u * 1024u, 'a');
+  auto response = codec_client_->makeRequestWithBody(requestHeaders(), body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("413", response->headers().getStatusValue());
+  codec_client_->close();
+
+  // The worker survived the mid-replay teardown: a fresh request round-trips. A
+  // small body stays under the buffer filter's limit, so it replays and reaches
+  // the upstream normally.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto ok_response = codec_client_->makeRequestWithBody(requestHeaders(), "small");
+  waitForNextUpstreamRequest();
+  EXPECT_EQ("small", upstream_request_->body().toString());
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(ok_response->waitForEndStream());
+  EXPECT_EQ("200", ok_response->headers().getStatusValue());
+}
+
 // Trailers immediately after headers, with no body in between.
 TEST_P(AiProtocolManagerIntegrationTest, HeaderAndTrailersNoBody) {
   prependFilter();

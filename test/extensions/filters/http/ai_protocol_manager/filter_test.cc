@@ -58,6 +58,12 @@ public:
     ON_CALL(callbacks_, continueDecoding()).WillByDefault(Invoke([this]() { ++continue_calls_; }));
   }
 
+  // The manager the filter owns requires onDestroy() before destruction (see
+  // buffer_manager.h); Envoy guarantees that in production, so drive it here to
+  // detach decode_manager_ before ~filter_ frees it. Idempotent, so tests that
+  // already called onDestroy() are fine.
+  void TearDown() override { filter_.onDestroy(); }
+
   // Run all posted callbacks, including ones enqueued while draining.
   void drain() {
     while (!posted_.empty()) {
@@ -203,8 +209,12 @@ TEST_F(AiProtocolManagerFilterTest, ReplayPausesUnderUpstreamBackPressure) {
   EXPECT_EQ(inject_calls_, 0);
   EXPECT_FALSE(injected_end_stream_);
 
-  // Releasing back-pressure resumes replay to completion.
+  // Releasing back-pressure schedules the resume off the watermark callback stack
+  // (deferred so we never read/inject reentrantly from within it); firing the
+  // continuation runs replay to completion.
   watermark_cb_->onBelowWriteBufferLowWatermark();
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
   drain();
   EXPECT_TRUE(injected_end_stream_);
   EXPECT_EQ(injected_.length(), big.size());
@@ -228,9 +238,13 @@ TEST_F(AiProtocolManagerFilterTest, ReplayResumesMidStream) {
   EXPECT_FALSE(injected_end_stream_);
   EXPECT_LT(injected_.length(), big.size());
 
-  // Release back-pressure; replay resumes synchronously to completion.
+  // Release back-pressure; the resume is scheduled off the watermark callback
+  // stack (deferred to avoid reentrant read/inject) and the continuation runs
+  // replay to completion.
   ASSERT_NE(watermark_cb_, nullptr);
   watermark_cb_->onBelowWriteBufferLowWatermark();
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
   EXPECT_TRUE(injected_end_stream_);
   EXPECT_EQ(injected_.toString(), big);
 }
@@ -254,8 +268,11 @@ TEST_F(AiProtocolManagerFilterTest, NestedWatermarksRequireBalancedRelease) {
   EXPECT_EQ(inject_calls_, 0);
   EXPECT_FALSE(injected_end_stream_);
 
-  // Balanced release resumes replay.
+  // Balanced release schedules the resume off the watermark callback stack; the
+  // continuation runs replay to completion.
   watermark_cb_->onBelowWriteBufferLowWatermark();
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
   drain();
   EXPECT_TRUE(injected_end_stream_);
   EXPECT_EQ(injected_.toString(), big);

@@ -85,6 +85,8 @@ envoy_extension_cc_test(
     shard_count = 4,
     deps = [
         "//source/extensions/filters/http/ai_protocol_manager:config",
+        # A downstream buffer filter is used to trip a local reply during replay.
+        "//source/extensions/filters/http/buffer:config",
         "//test/integration:http_protocol_integration_lib",
     ],
 )

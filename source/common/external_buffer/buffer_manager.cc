@@ -159,6 +159,14 @@ void BufferManager::updateIngestBackpressure() {
 }
 
 void BufferManager::maybeReadNextChunk() {
+  // This is the only method that reads from buffer_, and onDestroy() releases the
+  // buffer while leaving the (detached) manager alive. Guard the dereference here so
+  // any caller that reaches us after a detach -- e.g. a replayed frame whose
+  // injection ended the stream -- stops rather than reading from the gone buffer,
+  // rather than relying on every caller to check first.
+  if (destroyed_) {
+    return;
+  }
   if (!replaying_ || read_in_flight_) {
     return;
   }
@@ -205,6 +213,12 @@ void BufferManager::maybeReadNextChunk() {
                 [this](ExternalBufferStatus status, Buffer::InstancePtr data) {
                   onReadComplete(status, std::move(data));
                 });
+  // A synchronous store completes this read on-stack (onReadComplete, and on the
+  // final chunk the replay-done callback) before read() returns, which may detach us
+  // via onDestroy(). Per the destruction contract we are only detached, never freed,
+  // so this manager is still alive -- and clearing in_read_ on a detached manager is
+  // harmless, so no destroyed_ guard is needed here (unlike onReadComplete, which
+  // would go on to read another chunk from the released buffer).
   in_read_ = false;
 }
 
@@ -240,7 +254,18 @@ void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::Instance
   // most one extra chunk (ReadChunkSize) overshoots before we pause, which keeps
   // the overshoot bounded. Always a non-terminal frame; the caller terminates the
   // stream from the replay-done callback.
+  //
+  // injectData() re-enters the filter chain: a downstream filter may end the stream
+  // synchronously (e.g. a local reply on a request-size limit), which detaches us
+  // via onDestroy() on-stack. Per the destruction contract we are still alive here
+  // (only the deferred free is pending), but detached. Stop before finishing the
+  // range: finishReplay() would run the caller's replay-done callback into a
+  // torn-down stream. (maybeReadNextChunk() below also self-guards on destroyed_, so
+  // the read path is covered either way.)
   bridge_->injectData(*data);
+  if (destroyed_) {
+    return;
+  }
   if (replay_offset_ >= replay_end_) {
     // Finish here rather than fall through to maybeReadNextChunk(): the inject
     // above may have raised the replay high watermark, and maybeReadNextChunk()

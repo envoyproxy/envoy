@@ -191,7 +191,16 @@ public:
     ON_CALL(dispatcher_, post(testing::_)).WillByDefault(Invoke([this](Event::PostCb cb) {
       posted_.push_back(std::move(cb));
     }));
-    manager_ = makeManager(factory_);
+    resetManager(factory_);
+  }
+
+  // The manager requires onDestroy() before destruction (see buffer_manager.h);
+  // detach the one still standing at end of test. Idempotent, so tests that already
+  // called onDestroy() are fine.
+  void TearDown() override {
+    if (manager_ != nullptr) {
+      manager_->onDestroy();
+    }
   }
 
   // Builds a BufferManager backed by `factory`, wiring a fresh FakeBridge and a
@@ -202,6 +211,15 @@ public:
     bridge_ = bridge.get();
     replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
     return std::make_unique<BufferManager>(factory, std::move(bridge));
+  }
+
+  // Swaps in a manager backed by `factory`, detaching the outgoing one first so it
+  // honors the onDestroy()-before-destruction contract when it is replaced.
+  void resetManager(ExternalBufferFactory& factory) {
+    if (manager_ != nullptr) {
+      manager_->onDestroy();
+    }
+    manager_ = makeManager(factory);
   }
 
   // Replays the whole offloaded payload, recording completion in replay_done_.
@@ -229,8 +247,10 @@ public:
   FailingExternalBufferFactory read_failing_factory_{FailingExternalBuffer::FailMode::Read};
   FakeBridge* bridge_{nullptr};
   // Owned by manager_; fire invokeCallback() to simulate the next event-loop
-  // iteration resuming replay after a per-iteration budget yield (or starting a
-  // replay that was deferred because the offload was already durable).
+  // iteration resuming replay after a per-iteration budget yield, starting a
+  // replay that was deferred because the offload was already durable, or resuming
+  // replay after chain back-pressure clears (deferred out of the watermark
+  // callback).
   NiceMock<Event::MockSchedulableCallback>* replay_cb_{nullptr};
   bool replay_done_{false};
   BufferManagerPtr manager_;
@@ -338,7 +358,7 @@ TEST_F(BufferManagerTest, ReplayYieldsAcrossIterationsForLargePayload) {
 // completion and never schedules an artificial yield -- the store paces itself.
 // Even a payload larger than ReplayChunksPerIteration replays without a yield.
 TEST_F(BufferManagerTest, AsyncStoreReplaysOneChunkPerCallWithoutYield) {
-  manager_ = makeManager(posting_factory_);
+  resetManager(posting_factory_);
 
   const std::string big(10 * 64 * 1024, 'x'); // 10 chunks > ReplayChunksPerIteration (8).
   Buffer::OwnedImpl body(big);
@@ -418,6 +438,35 @@ TEST_F(BufferManagerTest, DestroyBeforeReplay) {
   EXPECT_FALSE(replay_done_);
 }
 
+// A synchronous store completes its final replay read on-stack, so finishReplay()
+// invokes the caller's done() from inside buffer_->read(). That callback may end
+// the stream and detach the manager on-stack (onDestroy()) -- exactly what the real
+// filter does when the terminal end-of-stream injection triggers teardown. Per the
+// onDestroy()-before-destruction contract the manager is only detached here, not
+// freed, so the read loop must unwind cleanly (guarding on destroyed_) rather than
+// touch the released buffer/bridge. The actual free happens later (TearDown).
+TEST_F(BufferManagerTest, TerminalReplayDoneDetachesManagerSynchronously) {
+  Buffer::OwnedImpl body("payload");
+  manager_->onData(body);
+  manager_->endStream();
+
+  std::string injected;
+  bool done_ran = false;
+  // The write is still in flight (posted) when replay() is requested, so replay
+  // starts from the write completion during drain() and runs synchronously through
+  // the in-memory store into this done callback.
+  manager_->replay(0, manager_->length(), [&]() {
+    done_ran = true;
+    injected = bridge_->injected_.toString();
+    // Mirror the filter's teardown: detach on-stack, mid-read.
+    manager_->onDestroy();
+  });
+
+  drain();
+  EXPECT_TRUE(done_ran);
+  EXPECT_EQ(injected, "payload");
+}
+
 // The manager subscribes to replay watermarks on construction so it can observe
 // chain back-pressure during replay.
 TEST_F(BufferManagerTest, RegistersReplayWatermarks) { EXPECT_NE(bridge_->handler_, nullptr); }
@@ -475,7 +524,7 @@ TEST_F(BufferManagerTest, IngestBackpressureDrivesSourceFlowControl) {
 // Sub-threshold frames are batched: each is held in the queue rather than written
 // individually, and they coalesce into a single write flushed at endStream().
 TEST_F(BufferManagerTest, BatchesSmallFramesUntilEndStream) {
-  manager_ = makeManager(posting_factory_);
+  resetManager(posting_factory_);
 
   Buffer::OwnedImpl f1("aaa");
   Buffer::OwnedImpl f2("bbb");
@@ -507,7 +556,7 @@ TEST_F(BufferManagerTest, BatchesSmallFramesUntilEndStream) {
 // manager issues exactly one write at a time (asserted in the fake) and replays
 // the reassembled payload verbatim.
 TEST_F(BufferManagerTest, SerializesAndCoalescesQueuedWrites) {
-  manager_ = makeManager(posting_factory_);
+  resetManager(posting_factory_);
 
   // Each frame is exactly the flush threshold (WriteFlushThreshold == 64KiB), so
   // the first flushes at once.
@@ -556,8 +605,12 @@ TEST_F(BufferManagerTest, ReplayPausesUnderBackPressure) {
   EXPECT_EQ(bridge_->inject_calls_, 0);
   EXPECT_FALSE(replay_done_);
 
-  // Releasing back-pressure resumes replay to completion.
+  // Releasing back-pressure schedules the resume off the watermark callback stack
+  // (deferred so we never read/inject reentrantly from within it); firing the
+  // continuation runs replay to completion.
   bridge_->handler_->onReplayBelowLowWatermark();
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
   drain();
   EXPECT_TRUE(replay_done_);
   EXPECT_EQ(bridge_->injected_.length(), big.size());
@@ -583,9 +636,13 @@ TEST_F(BufferManagerTest, ReplayResumesMidStream) {
   EXPECT_FALSE(replay_done_);
   EXPECT_LT(bridge_->injected_.length(), big.size());
 
-  // Release back-pressure; replay resumes synchronously to completion.
+  // Release back-pressure; the resume is scheduled off the watermark callback
+  // stack (deferred to avoid reentrant read/inject) and the continuation runs
+  // replay to completion.
   ASSERT_NE(bridge_->handler_, nullptr);
   bridge_->handler_->onReplayBelowLowWatermark();
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
   EXPECT_TRUE(replay_done_);
   EXPECT_EQ(bridge_->injected_.toString(), big);
 }
@@ -611,8 +668,11 @@ TEST_F(BufferManagerTest, NestedWatermarksRequireBalancedRelease) {
   EXPECT_EQ(bridge_->inject_calls_, 0);
   EXPECT_FALSE(replay_done_);
 
-  // Balanced release resumes replay.
+  // Balanced release schedules the resume off the watermark callback stack; the
+  // continuation runs replay to completion.
   bridge_->handler_->onReplayBelowLowWatermark();
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
   drain();
   EXPECT_TRUE(replay_done_);
   EXPECT_EQ(bridge_->injected_.toString(), big);
@@ -621,7 +681,7 @@ TEST_F(BufferManagerTest, NestedWatermarksRequireBalancedRelease) {
 // A write that fails fails the stream: the manager surfaces the unrecoverable
 // error through the bridge and injects nothing. A pending replay never starts.
 TEST_F(BufferManagerTest, WriteErrorFailsStream) {
-  manager_ = makeManager(write_failing_factory_);
+  resetManager(write_failing_factory_);
 
   Buffer::OwnedImpl body("payload");
   manager_->onData(body);
@@ -641,7 +701,7 @@ TEST_F(BufferManagerTest, WriteErrorFailsStream) {
 // A read that fails during replay fails the stream: the manager reports the error
 // through the bridge and does not finish the replay or inject the failed chunk.
 TEST_F(BufferManagerTest, ReadErrorFailsStream) {
-  manager_ = makeManager(read_failing_factory_);
+  resetManager(read_failing_factory_);
 
   Buffer::OwnedImpl body("payload");
   manager_->onData(body);
@@ -659,7 +719,7 @@ TEST_F(BufferManagerTest, ReadErrorFailsStream) {
 // An external-buffer error delivered after onDestroy() is inert: the completion
 // handlers bail out and never touch the (detached) bridge.
 TEST_F(BufferManagerTest, ErrorAfterDestroyIsInert) {
-  manager_ = makeManager(write_failing_factory_);
+  resetManager(write_failing_factory_);
 
   Buffer::OwnedImpl body("payload");
   manager_->onData(body);

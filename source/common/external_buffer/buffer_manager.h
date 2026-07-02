@@ -8,6 +8,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/schedulable_cb.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/external_buffer/external_buffer.h"
 
@@ -100,6 +101,10 @@ class BufferManager : public ReplayWatermarkHandler, Logger::Loggable<Logger::Id
 public:
   BufferManager(ExternalBufferFactory& buffer_factory, FilterChainBridgePtr bridge);
 
+  // onDestroy() must run before destruction (see onDestroy()): it detaches the
+  // manager so nothing touches a half-torn-down bridge/buffer.
+  ~BufferManager() override { ASSERT(destroyed_); }
+
   // Offloads `data` into the external buffer (batching small frames). The caller
   // holds the filter chain (returns StopIteration*) while the body is buffered.
   void onData(Buffer::Instance& data);
@@ -128,8 +133,16 @@ public:
     return buffer_ == nullptr || buffer_->length() + pending_.length() + in_flight_write_size_ == 0;
   }
 
-  // Cancels in-flight work and detaches from the filter chain. After this the
-  // async completion handlers are inert.
+  // Detaches the manager from the filter chain: releases the external buffer,
+  // unsubscribes from replay watermarks, and cancels the pending replay
+  // continuation, so async completions and replay re-entrancy become inert (they
+  // early-out on destroyed_). Must be called before the manager is destroyed, and
+  // must NOT be followed by a synchronous destruction from within a replay callback:
+  // onDestroy() can run on-stack while a replay is mid-inject (a downstream filter
+  // may answer an injected frame with a stream-ending local reply), and the replay
+  // machinery relies on the manager still being alive-but-detached when that inject
+  // returns. Callers therefore detach here and free later (the owning filter frees
+  // it at its own deferred destruction). Idempotent.
   void onDestroy();
 
   // ReplayWatermarkHandler (replay side: filter-chain back-pressure).
@@ -276,8 +289,17 @@ private:
   // replay only when this returns to zero. Non-zero => replay paused.
   uint32_t replay_high_watermark_count_{0};
 
-  // Set in onDestroy(); guards the async completion handlers against touching
-  // the bridge after the stream is gone.
+  // Detachment latch: set in onDestroy() and checked wherever control returns to us
+  // after handing off to the filter chain and we would go on to touch the bridge or
+  // buffer -- the deferred completion handlers
+  // (onWriteComplete/onReadComplete/onReplayContinuation, entered from a
+  // posted/scheduled callback) and the on-stack re-entry after injectData(), where a
+  // downstream local reply can detach us before the call returns. onDestroy()
+  // releases the bridge and buffer but not the manager itself (see onDestroy()), so
+  // the object is always alive at these points; destroyed_ tells us it is detached
+  // so we must not touch the released bridge/buffer or read a further chunk. (No
+  // guard is needed after the replay read() in maybeReadNextChunk: the only work
+  // left there is clearing a flag, harmless on a detached-but-alive manager.)
   bool destroyed_{false};
 };
 
