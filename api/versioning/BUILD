@@ -325,7 +325,6 @@ proto_library(
         "//envoy/extensions/outlier_detection_monitors/consecutive_errors/v3:pkg",
         "//envoy/extensions/path/match/uri_template/v3:pkg",
         "//envoy/extensions/path/rewrite/uri_template/v3:pkg",
-        "//envoy/extensions/queue_strategy/common/v3:pkg",
         "//envoy/extensions/queue_strategy/fifo/v3:pkg",
         "//envoy/extensions/quic/client_writer_factory/v3:pkg",
         "//envoy/extensions/quic/connection_debug_visitor/quic_stats/v3:pkg",

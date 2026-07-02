@@ -337,9 +337,7 @@ protected:
   addPendingStream(Envoy::ConnectionPool::PendingStreamPtr&& pending_stream) {
     const auto stream_added = pending_streams_->add(std::move(pending_stream));
     cluster_connectivity_state_.incrPendingStreams(1);
-    if (pending_streams_->isOverloaded()) {
-      host_->cluster().trafficStats()->upstream_queue_overloaded_.inc();
-    }
+    updateQueueOverloadedGauge();
     return stream_added;
   }
 
@@ -386,10 +384,13 @@ private:
   void drainClients(std::list<ActiveClientPtr>& clients);
 
   void assertCapacityCountsAreCorrect();
+  void updateQueueOverloadedGauge();
+  void clearQueueOverloadedGauge();
 
   Upstream::ClusterConnectivityState& cluster_connectivity_state_;
 
   PendingStreamQueuePtr pending_streams_;
+  bool queue_overloaded_{false};
 
   // The number of streams that can be immediately dispatched from the current
   // `ready_clients_` plus `connecting_stream_capacity_`.

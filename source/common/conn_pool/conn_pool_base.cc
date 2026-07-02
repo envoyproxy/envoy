@@ -45,8 +45,8 @@ PendingStreamQueuePtr createPendingStreamQueue(
     factory_config = factory->createEmptyConfigProto();
   }
 
-  auto queue = factory->createQueueStrategy(
-      *factory_config, "cluster." + std::string(DefaultQueueStrategy), validation_visitor);
+  auto queue = factory->createQueueStrategy(*factory_config, "cluster." + factory->name(),
+                                            validation_visitor);
   RELEASE_ASSERT(queue.ok(), queue.status().ToString());
   return std::move(*queue);
 }
@@ -103,6 +103,29 @@ ConnPoolImplBase::~ConnPoolImplBase() {
   ENVOY_BUG(isIdleImpl(), dumpState());
   ENVOY_BUG(connecting_stream_capacity_ == 0, dumpState());
   ENVOY_BUG(connecting_and_connected_stream_capacity_ == 0, dumpState());
+}
+
+void ConnPoolImplBase::updateQueueOverloadedGauge() {
+  const bool queue_overloaded = pending_streams_->isOverloaded();
+  if (queue_overloaded == queue_overloaded_) {
+    return;
+  }
+
+  queue_overloaded_ = queue_overloaded;
+  if (queue_overloaded_) {
+    host_->cluster().trafficStats()->upstream_queue_overloaded_.inc();
+  } else {
+    host_->cluster().trafficStats()->upstream_queue_overloaded_.dec();
+  }
+}
+
+void ConnPoolImplBase::clearQueueOverloadedGauge() {
+  if (!queue_overloaded_) {
+    return;
+  }
+
+  queue_overloaded_ = false;
+  host_->cluster().trafficStats()->upstream_queue_overloaded_.dec();
 }
 
 void ConnPoolImplBase::deleteIsPendingImpl() {
@@ -437,21 +460,16 @@ void ConnPoolImplBase::onUpstreamReady() {
     ActiveClientPtr& client = ready_clients_.front();
     ENVOY_CONN_LOG(debug, "attaching to next stream", *client);
     // Pending streams are pushed onto the front, so pull from the back.
-    const bool queue_overloaded = pending_streams_->isOverloaded();
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_fix_reentrancy")) {
       PendingStreamPtr pending_stream = pending_streams_->remove(*stream);
       cluster_connectivity_state_.decrPendingStreams(1);
-      if (queue_overloaded) {
-        host_->cluster().trafficStats()->upstream_queue_overloaded_.dec();
-      }
+      updateQueueOverloadedGauge();
       attachStreamToClient(*client, pending_stream->context());
     } else {
       attachStreamToClient(*client, stream->context());
       cluster_connectivity_state_.decrPendingStreams(1);
-      if (queue_overloaded) {
-        host_->cluster().trafficStats()->upstream_queue_overloaded_.dec();
-      }
       pending_streams_->remove(*stream);
+      updateQueueOverloadedGauge();
     }
   }
   if (!pending_streams_->empty()) {
@@ -748,9 +766,7 @@ void ConnPoolImplBase::purgePendingStreams(
   // NOTE: We move the existing pending streams to a temporary list. This is done so that
   //       if retry logic submits a new stream to the pool, we don't fail it inline.
   cluster_connectivity_state_.decrPendingStreams(pending_streams_->size());
-  if (pending_streams_->isOverloaded()) {
-    host_->cluster().trafficStats()->upstream_queue_overloaded_.set(0);
-  }
+  clearQueueOverloadedGauge();
   pending_streams_to_purge_ = std::move(*pending_streams_);
   pending_streams_ = createPendingStreamQueue(host_->cluster().queueStrategyConfig());
   while (!pending_streams_to_purge_.empty()) {
@@ -783,16 +799,11 @@ void ConnPoolImplBase::onPendingStreamCancel(PendingStream& stream,
     // with-in a onPoolFailure callback invoked in purgePendingStreams (i.e. purgePendingStreams
     // is down in the call stack). Remove this stream from the list as it is cancelled,
     // and there is no need to call its onPoolFailure callback.
-    if (pending_streams_->isOverloaded()) {
-      host_->cluster().trafficStats()->upstream_queue_overloaded_.dec();
-    }
     stream.removeFromList(pending_streams_to_purge_);
   } else {
     cluster_connectivity_state_.decrPendingStreams(1);
-    if (pending_streams_->isOverloaded()) {
-      host_->cluster().trafficStats()->upstream_queue_overloaded_.dec();
-    }
     pending_streams_->remove(stream);
+    updateQueueOverloadedGauge();
   }
   if (policy == Envoy::ConnectionPool::CancelPolicy::CloseExcess) {
     if (!connecting_clients_.empty() &&
@@ -842,7 +853,6 @@ void ConnPoolImplBase::incrConnectingAndConnectedStreamCapacity(uint32_t delta,
 
 void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
   ASSERT(!client.hasHandshakeCompleted() && client.readyForStream());
-  // Check pending streams backward for safe request.
   // Note that this is a O(n) search, but the expected size of pending_streams_ should be small. If
   // this becomes a problem, we could split pending_streams_ into 2 lists.
   auto it = pending_streams_->begin();
@@ -852,21 +862,16 @@ void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
     ++it;
     if (stream.can_send_early_data_) {
       ENVOY_CONN_LOG(debug, "creating stream for early data.", client);
-      const bool queue_overloaded = pending_streams_->isOverloaded();
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_fix_reentrancy")) {
         PendingStreamPtr pending_stream = pending_streams_->remove(stream);
         cluster_connectivity_state_.decrPendingStreams(1);
-        if (queue_overloaded) {
-          host_->cluster().trafficStats()->upstream_queue_overloaded_.dec();
-        }
+        updateQueueOverloadedGauge();
         attachStreamToClient(client, pending_stream->context());
       } else {
         attachStreamToClient(client, stream.context());
         cluster_connectivity_state_.decrPendingStreams(1);
-        if (queue_overloaded) {
-          host_->cluster().trafficStats()->upstream_queue_overloaded_.dec();
-        }
         pending_streams_->remove(stream);
+        updateQueueOverloadedGauge();
       }
     }
   }

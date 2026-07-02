@@ -6634,6 +6634,23 @@ TEST_F(ClusterInfoImplTest, MaxRequestsPerConnectionValidation) {
                             "HttpProtocolOptions can be specified");
 }
 
+TEST_F(ClusterInfoImplTest, InvalidQueueStrategyConfig) {
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  queue_strategy_config:
+    name: envoy.queue_strategy.invalid
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      makeCluster(yaml), EnvoyException,
+      "Didn't find a registered implementation for 'envoy.queue_strategy.invalid' with type URL: "
+      "'google.protobuf.Struct'");
+}
+
 TEST_F(ClusterInfoImplTest, DeprecatedMaxRequestsPerConnection) {
   const std::string yaml = R"EOF(
   name: cluster1

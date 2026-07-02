@@ -92,7 +92,7 @@ public:
   using Iterator = QueueBase<PendingStream>::Iterator;
 
   const ItemPtrType& next() const override { return this->items_.back(); }
-  bool isOverloaded() const override { return false; }
+  bool isOverloaded() const override { return this->items_.size() > 1; }
 
   Iterator begin() override {
     auto it = this->items_.rbegin();
@@ -192,14 +192,37 @@ TEST(ConnPoolImplBaseConfigTest, UsesConfiguredQueueStrategy) {
   cluster->resetResourceManager(1024, 1024, 1024, 1, 1);
 
   NiceMock<Event::MockDispatcher> dispatcher;
-  auto* upstream_ready_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher);
+  new NiceMock<Event::MockSchedulableCallback>(&dispatcher);
   NiceMock<Server::MockOverloadManager> overload_manager;
   Upstream::ClusterConnectivityState state;
   Upstream::HostSharedPtr host = Upstream::makeTestHost(cluster, "tcp://127.0.0.1:80");
 
   TestConnPoolImplBase pool(host, Upstream::ResourcePriority::Default, dispatcher, nullptr, nullptr,
                             state, overload_manager);
-  EXPECT_NE(nullptr, upstream_ready_cb);
+}
+
+TEST_F(ConnPoolImplBaseTest, QueueOverloadedGaugeTracksTransitions) {
+  EXPECT_EQ(0, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+
+  auto* first = pool_.newPendingStream(context_, /*can_send_early_data=*/false);
+  EXPECT_EQ(0, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+
+  AttachContext second_context;
+  auto* second = pool_.newPendingStream(second_context, /*can_send_early_data=*/false);
+  EXPECT_EQ(1, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+
+  AttachContext third_context;
+  auto* third = pool_.newPendingStream(third_context, /*can_send_early_data=*/false);
+  EXPECT_EQ(1, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+
+  third->cancel(ConnectionPool::CancelPolicy::Default);
+  EXPECT_EQ(1, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+
+  second->cancel(ConnectionPool::CancelPolicy::Default);
+  EXPECT_EQ(0, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+
+  first->cancel(ConnectionPool::CancelPolicy::Default);
+  EXPECT_EQ(0, cluster_->trafficStats()->upstream_queue_overloaded_.value());
 }
 
 class ConnPoolImplDispatcherBaseTest : public testing::Test {

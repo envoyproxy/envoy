@@ -32,7 +32,7 @@ public:
   QueueBase() = default;
   virtual ~QueueBase() = default;
 
-  virtual uint32_t size() const { return items_.size(); }
+  virtual size_t size() const { return items_.size(); }
 
   virtual bool empty() const { return items_.empty(); }
 
@@ -64,26 +64,26 @@ public:
     Iterator(QueueBase::ListType::reverse_iterator&& itor) : itor_(std::move(itor)) {}
 
     Iterator& operator++() {
-      if (absl::holds_alternative<typename QueueBase::ListType::iterator>(itor_)) {
-        ++(absl::get<typename QueueBase::ListType::iterator>(itor_));
-        return *this;
+      if (auto* it = absl::get_if<typename QueueBase::ListType::iterator>(&itor_)) {
+        ++(*it);
       } else {
         ++(absl::get<typename QueueBase::ListType::reverse_iterator>(itor_));
-        return *this;
       }
+      return *this;
     }
+
     Iterator& operator--() {
-      if (absl::holds_alternative<typename QueueBase::ListType::iterator>(itor_)) {
-        --(absl::get<typename QueueBase::ListType::iterator>(itor_));
-        return *this;
+      if (auto* it = absl::get_if<typename QueueBase::ListType::iterator>(&itor_)) {
+        --(*it);
       } else {
         --(absl::get<typename QueueBase::ListType::reverse_iterator>(itor_));
-        return *this;
       }
+      return *this;
     }
+
     ItemPtrType& operator*() const {
-      if (absl::holds_alternative<typename QueueBase::ListType::iterator>(itor_)) {
-        return *(absl::get<typename QueueBase::ListType::iterator>(itor_));
+      if (auto* it = absl::get_if<typename QueueBase::ListType::iterator>(&itor_)) {
+        return **it;
       } else {
         return *(absl::get<typename QueueBase::ListType::reverse_iterator>(itor_));
       }

@@ -53,6 +53,7 @@
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/queue_strategy/queue_strategy_base.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/config_utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -68,6 +69,9 @@
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
+namespace ConnectionPool {
+class PendingStream;
+}
 namespace Upstream {
 namespace {
 const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
@@ -80,6 +84,24 @@ defaultHappyEyeballsConfig() {
         default_config.mutable_first_address_family_count()->set_value(1);
         return default_config;
       }());
+}
+
+absl::Status validateQueueStrategyConfig(
+    const envoy::config::core::v3::TypedExtensionConfig& queue_strategy_config,
+    Server::Configuration::ServerFactoryContext& server_context) {
+  using PendingStreamQueueFactory =
+      Extensions::QueueStrategy::QueueStrategyFactory<ConnectionPool::PendingStream>;
+
+  try {
+    PendingStreamQueueFactory& factory =
+        Config::Utility::getAndCheckFactory<PendingStreamQueueFactory>(queue_strategy_config);
+    std::ignore = Config::Utility::translateToFactoryConfig(
+        queue_strategy_config, server_context.messageValidationVisitor(), factory);
+  } catch (const EnvoyException& e) {
+    return absl::InvalidArgumentError(e.what());
+  }
+
+  return absl::OkStatus();
 }
 
 std::string addressToString(Network::Address::InstanceConstSharedPtr address) {
@@ -1315,6 +1337,12 @@ ClusterInfoImpl::ClusterInfoImpl(
         absl::InvalidArgumentError("Only one of max_requests_per_connection from Cluster or "
                                    "HttpProtocolOptions can be specified");
     return;
+  }
+
+  if (config.has_queue_strategy_config()) {
+    SET_AND_RETURN_IF_NOT_OK(
+        validateQueueStrategyConfig(config.queue_strategy_config(), server_context),
+        creation_status);
   }
 
   if (config.has_load_balancing_policy() ||

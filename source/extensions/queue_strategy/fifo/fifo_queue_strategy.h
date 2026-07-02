@@ -10,8 +10,7 @@ namespace Envoy {
 namespace Extensions {
 namespace QueueStrategy {
 
-template <class ItemType>
-class FifoQueue : public virtual Extensions::QueueStrategy::QueueBase<ItemType> {
+template <class ItemType> class FifoQueue : public Extensions::QueueStrategy::QueueBase<ItemType> {
 
   using ItemPtrType = std::unique_ptr<ItemType>;
   using Iterator = typename QueueBase<ItemType>::Iterator;
