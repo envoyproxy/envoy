@@ -27,8 +27,11 @@ UpstreamProxyProtocolSocketConfigFactory::createTransportSocketFactory(
   auto factory_or_error =
       inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
   RETURN_IF_NOT_OK_REF(factory_or_error.status());
+  auto dynamic_tlvs_or_error = parseDynamicTLVs(outer_config.config(), context);
+  RETURN_IF_NOT_OK_REF(dynamic_tlvs_or_error.status());
   return std::make_unique<UpstreamProxyProtocolSocketFactory>(
-      std::move(factory_or_error.value()), outer_config.config(), context.statsScope());
+      std::move(factory_or_error.value()), outer_config.config(), context.statsScope(),
+      std::move(dynamic_tlvs_or_error.value()));
 }
 
 ProtobufTypes::MessagePtr UpstreamProxyProtocolSocketConfigFactory::createEmptyConfigProto() {

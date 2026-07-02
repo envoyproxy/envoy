@@ -13,6 +13,7 @@
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -47,7 +48,8 @@ public:
     inner_socket_ = inner_socket.get();
     ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
     proxy_protocol_socket_ = std::make_unique<UpstreamProxyProtocolSocket>(
-        std::move(inner_socket), socket_options, config, stats_);
+        std::move(inner_socket), socket_options, config, stats_,
+        parseDynamicTLVs(config, factory_context_).value());
     proxy_protocol_socket_->setTransportSocketCallbacks(transport_callbacks_);
     proxy_protocol_socket_->onConnected();
   }
@@ -58,6 +60,7 @@ public:
   NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks_;
   Stats::TestUtil::TestStore stats_store_;
   UpstreamProxyProtocolStats stats_;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
 };
 
 // Test injects PROXY protocol header only once
@@ -755,6 +758,82 @@ TEST_F(ProxyProtocolTest, V2CustomTLVsFromConfig) {
   EXPECT_EQ(resp.bytes_processed_, expected_buff.length());
 }
 
+// Test verifies that a custom TLV with a format_string is evaluated and emitted (#45130).
+TEST_F(ProxyProtocolTest, V2CustomTLVsFromConfigFormatString) {
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));
+  auto dst_addr = Network::Address::InstanceConstSharedPtr(
+      new Network::Address::Ipv6Instance("1:100:200:3::", 2));
+  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, {'a', 'b', 'c'}}};
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, tlv_vector};
+  Network::TransportSocketOptionsConstSharedPtr socket_options =
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
+          std::optional<Network::ProxyProtocolData>(proxy_proto_data));
+  transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setLocalAddress(*Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000"));
+  transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setRemoteAddress(*Network::Utility::resolveUrl("tcp://[e:b:c:f::]:8080"));
+
+  // The format_string is parsed into a formatter and evaluated per connection; its output is
+  // emitted as the TLV value. End-to-end evaluation against real stream info (e.g. a
+  // %DOWNSTREAM_*% substitution) is covered by the integration test, since resolving those
+  // commands requires a full factory context.
+  const std::string expected_value = "dynamic";
+  absl::flat_hash_set<uint8_t> pass_through_tlvs{};
+  std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs = {
+      {0x96, std::vector<unsigned char>(expected_value.begin(), expected_value.end())},
+  };
+  Buffer::OwnedImpl expected_buff{};
+  EXPECT_TRUE(Common::ProxyProtocol::generateV2Header(proxy_proto_data, expected_buff, false,
+                                                      pass_through_tlvs, custom_tlvs));
+
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  auto added_tlv = config.add_added_tlvs();
+  added_tlv->set_type(0x96);
+  added_tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string("dynamic");
+  initialize(config, socket_options);
+
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return {length, Api::IoError::none()};
+      }));
+  auto msg = Buffer::OwnedImpl("some data");
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
+
+  auto resp = proxy_protocol_socket_->doWrite(msg, false);
+  EXPECT_EQ(resp.bytes_processed_, expected_buff.length());
+}
+
+// Test verifies that a TLV setting both value and format_string is rejected.
+TEST_F(ProxyProtocolTest, TLVWithValueAndFormatStringRejected) {
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  auto added_tlv = config.add_added_tlvs();
+  added_tlv->set_type(0x96);
+  added_tlv->set_value("moredata");
+  added_tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string("dynamic");
+  auto result = parseDynamicTLVs(config, factory_context_);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().message(),
+            "Invalid TLV configuration: only one of 'value' or 'format_string' may be set.");
+}
+
+// Test verifies that a TLV setting neither value nor format_string is rejected.
+TEST_F(ProxyProtocolTest, TLVWithNeitherValueNorFormatStringRejected) {
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  auto added_tlv = config.add_added_tlvs();
+  added_tlv->set_type(0x96);
+  auto result = parseDynamicTLVs(config, factory_context_);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().message(),
+            "Invalid TLV configuration: one of 'value' or 'format_string' must be set.");
+}
+
 // Test verifies the happy path for TLVs added from host metadata.
 TEST_F(ProxyProtocolTest, V2CustomTLVsFromHostMetadata) {
   auto src_addr =
@@ -1276,7 +1355,8 @@ public:
     auto inner_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
     inner_factory_ = inner_factory.get();
     factory_ = std::make_unique<UpstreamProxyProtocolSocketFactory>(
-        std::move(inner_factory), ProxyProtocolConfig(), *stats_store_.rootScope());
+        std::move(inner_factory), ProxyProtocolConfig(), *stats_store_.rootScope(),
+        std::make_shared<std::vector<TlvFormatter>>());
   }
 
   NiceMock<Network::MockTransportSocketFactory>* inner_factory_;
