@@ -74,43 +74,49 @@ ReverseTunnelUpstreamCodecFactory::createProtocolOptionsConfig(
                  typed_config.enable_drain_with_goaway());
 
   auto& server_context = context.serverFactoryContext();
-  auto registry = server_context.singletonManager().getTyped<UpstreamCodecDrainRegistry>(
-      SINGLETON_MANAGER_REGISTERED_NAME(reverse_tunnel_upstream_codec_drain), [&server_context] {
-        return std::make_shared<UpstreamCodecDrainRegistry>(server_context.threadLocal());
-      });
 
-  // Register the admin trigger once (subsequent clusters get addHandler() == false, which is fine).
-  // The captured registry shared_ptr keeps it alive for the handler's lifetime.
-  if (auto admin = server_context.admin(); admin.has_value()) {
-    // Default the rotation grace window to the server's configured drain time (--drain-time-s) so
-    // in-flight requests get the same window to finish as a normal drain; overridable per call via
-    // the drain_time_ms query param.
-    const uint64_t default_drain_time_ms =
-        std::chrono::duration_cast<std::chrono::milliseconds>(server_context.options().drainTime())
-            .count();
-    admin->addHandler(
-        "/reverse_tunnel/drain_clusters",
-        "gracefully drain reverse-tunnel upstream client codecs; optional query params: "
-        "cluster=<name> (default: all), drain_time_ms=<n> (default: server drain time)",
-        [registry, default_drain_time_ms](Envoy::Http::ResponseHeaderMap&,
-                                          Buffer::Instance& response,
-                                          Server::AdminStream& admin_stream) -> Envoy::Http::Code {
-          const auto params = admin_stream.queryParams();
-          const std::string cluster = params.getFirstValue("cluster").value_or("");
-          uint64_t drain_time_ms = default_drain_time_ms;
-          if (auto v = params.getFirstValue("drain_time_ms"); v.has_value()) {
-            uint64_t parsed = 0;
-            if (absl::SimpleAtoi(v.value(), &parsed)) {
-              drain_time_ms = parsed;
+  // The drain registry and its admin trigger only matter when the drain-aware codec is enabled;
+  // when disabled the codec is never installed, so skip both and leave the registry null.
+  UpstreamCodecDrainRegistrySharedPtr registry;
+  if (typed_config.enable_drain_with_goaway()) {
+    registry = server_context.singletonManager().getTyped<UpstreamCodecDrainRegistry>(
+        SINGLETON_MANAGER_REGISTERED_NAME(reverse_tunnel_upstream_codec_drain), [&server_context] {
+          return std::make_shared<UpstreamCodecDrainRegistry>(server_context.threadLocal());
+        });
+
+    // Register the admin trigger once (subsequent clusters get addHandler() == false, which is
+    // fine). The captured registry shared_ptr keeps it alive for the handler's lifetime.
+    if (auto admin = server_context.admin(); admin.has_value()) {
+      // Default the rotation grace window to the server's configured drain time (--drain-time-s) so
+      // in-flight requests get the same window to finish as a normal drain; overridable per call
+      // via the drain_time_ms query param.
+      const uint64_t default_drain_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                                 server_context.options().drainTime())
+                                                 .count();
+      admin->addHandler(
+          "/reverse_tunnel/drain_clusters",
+          "gracefully drain reverse-tunnel upstream client codecs; optional query params: "
+          "cluster=<name> (default: all), drain_time_ms=<n> (default: server drain time)",
+          [registry,
+           default_drain_time_ms](Envoy::Http::ResponseHeaderMap&, Buffer::Instance& response,
+                                  Server::AdminStream& admin_stream) -> Envoy::Http::Code {
+            const auto params = admin_stream.queryParams();
+            const std::string cluster = params.getFirstValue("cluster").value_or("");
+            uint64_t drain_time_ms = default_drain_time_ms;
+            if (auto v = params.getFirstValue("drain_time_ms"); v.has_value()) {
+              if (!absl::SimpleAtoi(v.value(), &drain_time_ms)) {
+                response.add("reverse_tunnel: invalid drain_time_ms query param\n");
+                return Envoy::Http::Code::BadRequest;
+              }
             }
-          }
-          registry->drainCluster(cluster, std::chrono::milliseconds(drain_time_ms));
-          response.add(absl::StrCat("reverse_tunnel: draining upstream codecs (cluster='",
-                                    cluster.empty() ? "<all>" : cluster,
-                                    "', drain_time_ms=", drain_time_ms, ")\n"));
-          return Envoy::Http::Code::OK;
-        },
-        /*removable=*/false, /*mutates_server_state=*/true);
+            registry->drainCluster(cluster, std::chrono::milliseconds(drain_time_ms));
+            response.add(absl::StrCat("reverse_tunnel: draining upstream codecs (cluster='",
+                                      cluster.empty() ? "<all>" : cluster,
+                                      "', drain_time_ms=", drain_time_ms, ")\n"));
+            return Envoy::Http::Code::OK;
+          },
+          /*removable=*/false, /*mutates_server_state=*/true);
+    }
   }
 
   auto stats = ReverseTunnelUpstreamCodecStats::generate(server_context.scope());

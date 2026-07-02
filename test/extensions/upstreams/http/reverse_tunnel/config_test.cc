@@ -360,6 +360,34 @@ TEST_F(ReverseTunnelUpstreamCodecTest, FactoryCreatesOptionsAndRegistersAdminHan
   EXPECT_EQ(Envoy::Http::Code::OK,
             captured_handler(response_headers, default_response, admin_stream));
   EXPECT_TRUE(absl::StrContains(default_response.toString(), "drain_time_ms=30000"));
+
+  // A non-numeric drain_time_ms is rejected with 400 Bad Request.
+  Envoy::Http::Utility::QueryParamsMulti bad_params;
+  bad_params.add("drain_time_ms", "not-a-number");
+  ON_CALL(admin_stream, queryParams()).WillByDefault(Return(bad_params));
+  Buffer::OwnedImpl bad_response;
+  EXPECT_EQ(Envoy::Http::Code::BadRequest,
+            captured_handler(response_headers, bad_response, admin_stream));
+}
+
+// With the feature disabled the factory neither creates the drain registry nor registers the admin
+// trigger, but still returns a usable options object.
+TEST_F(ReverseTunnelUpstreamCodecTest, FactoryDoesNotRegisterAdminHandlerWhenDisabled) {
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  auto& admin = factory_context.server_context_.admin_;
+  ON_CALL(factory_context, serverFactoryContext())
+      .WillByDefault(ReturnRef(factory_context.server_context_));
+  ON_CALL(factory_context.server_context_, admin())
+      .WillByDefault(Return(OptRef<Server::Admin>{admin}));
+
+  EXPECT_CALL(admin, addHandler(_, _, _, _, _, _)).Times(0);
+
+  ReverseTunnelUpstreamCodecFactory factory;
+  auto proto = makeProto(false);
+  auto result = factory.createProtocolOptionsConfig(proto, factory_context);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  ASSERT_NE(result.value(), nullptr);
+  EXPECT_TRUE(result.value()->upstreamHttpClientCodecFactory().has_value());
 }
 
 } // namespace
