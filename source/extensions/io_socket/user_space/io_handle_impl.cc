@@ -71,7 +71,7 @@ Api::IoCallUint64Result IoHandleImpl::close() {
     // Fire pre-close callbacks before notifying the peer or tearing down the
     // file event. This lets the owning connection (e.g. inside the internal
     // listener) capture filter state into the shared PassthroughState while
-    // the connection's stream info is still queryable.
+    // the connection's stream info is still accessible.
     auto callbacks = std::move(pre_close_callbacks_);
     for (auto& cb : callbacks) {
       cb();

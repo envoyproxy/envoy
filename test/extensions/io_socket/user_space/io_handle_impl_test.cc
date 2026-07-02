@@ -83,10 +83,9 @@ TEST(IoHandleImplPreCloseCallback, FiresExactlyOnceOnClose) {
   pair.first->addOnPreCloseCallback([&call_count]() { ++call_count; });
   pair.first->close();
   EXPECT_EQ(call_count, 1);
-  // A second close (e.g. via dtor) must not refire callbacks because close()
+  // A second close (e.g. via dtor) must not run the callbacks again because close()
   // asserts !closed_; pair.first will be destroyed at end of scope with closed_=true.
 }
-
 
 constexpr int CONNECTED = 0;
 

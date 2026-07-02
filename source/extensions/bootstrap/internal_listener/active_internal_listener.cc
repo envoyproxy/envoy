@@ -93,14 +93,13 @@ void ActiveInternalListener::newActiveConnection(
     // Capture filter_state by value so the lambda remains safe if it fires
     // from the IoHandle destructor after the owning Connection has gone away.
     auto& connection = *active_connection->connection_;
-    auto* io_handle =
-        dynamic_cast<Extensions::IoSocket::UserSpace::IoHandle*>(&connection.getSocket()->ioHandle());
+    auto* io_handle = dynamic_cast<Extensions::IoSocket::UserSpace::IoHandle*>(
+        &connection.getSocket()->ioHandle());
     if (io_handle != nullptr && io_handle->passthroughState()) {
-      io_handle->addOnPreCloseCallback(
-          [passthrough_state = io_handle->passthroughState(),
-           filter_state = connection.streamInfo().filterState()]() {
-            passthrough_state->captureReverse(*filter_state);
-          });
+      io_handle->addOnPreCloseCallback([passthrough_state = io_handle->passthroughState(),
+                                        filter_state = connection.streamInfo().filterState()]() {
+        passthrough_state->captureReverse(*filter_state);
+      });
     }
 
     LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);

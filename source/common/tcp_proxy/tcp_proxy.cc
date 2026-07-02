@@ -1061,8 +1061,7 @@ void TunnelingConfigHelperImpl::propagateResponseTrailers(
     return;
   }
   filter_state->setData(
-      TunnelResponseTrailers::key(),
-      std::make_shared<TunnelResponseTrailers>(std::move(trailers)),
+      TunnelResponseTrailers::key(), std::make_shared<TunnelResponseTrailers>(std::move(trailers)),
       StreamInfo::FilterState::LifeSpan::Connection,
       StreamInfo::StreamSharingMayImpactPooling::SharedWithDownstreamConnectionOnClose);
 }

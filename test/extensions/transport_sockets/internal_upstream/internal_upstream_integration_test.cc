@@ -428,8 +428,7 @@ public:
               ->mutable_routes(0)
               ->mutable_route()
               ->set_cluster("internal_listener");
-          TestUtility::loadFromYaml(
-              fmt::format(R"EOF(
+          TestUtility::loadFromYaml(fmt::format(R"EOF(
           name: envoy.file_access_log
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
@@ -438,8 +437,8 @@ public:
               text_format_source:
                 inline_string: "%UPSTREAM_FILTER_STATE(envoy.tcp_proxy.propagate_response_headers:TYPED)%\n"
           )EOF",
-                          access_log_name_),
-              *hcm.add_access_log());
+                                                access_log_name_),
+                                    *hcm.add_access_log());
         });
 
     HttpIntegrationTest::initialize();
