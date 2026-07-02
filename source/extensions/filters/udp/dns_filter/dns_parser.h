@@ -49,6 +49,8 @@ public:
       : BaseDnsRecord(rec_name, rec_type, rec_class) {}
   bool serialize(Buffer::OwnedImpl& output) override;
 
+  // Name used for matching configured domains; may be normalized while name_ keeps original case.
+  std::string lookup_name_;
   std::unique_ptr<Stats::HistogramCompletableTimespanImpl> query_time_ms_;
 };
 
