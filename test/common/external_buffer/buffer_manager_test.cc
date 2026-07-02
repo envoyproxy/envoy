@@ -238,6 +238,15 @@ public:
     }
   }
 
+  // Runs exactly one posted callback (FIFO), leaving the rest queued -- lets a test
+  // pause with a write or read still in flight.
+  void runOnePosted() {
+    ASSERT_FALSE(posted_.empty());
+    Event::PostCb cb = std::move(posted_.front());
+    posted_.pop_front();
+    cb();
+  }
+
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::deque<Event::PostCb> posted_;
   InMemoryExternalBufferFactory factory_;
@@ -731,6 +740,37 @@ TEST_F(BufferManagerTest, ErrorAfterDestroyIsInert) {
   // the buffer is reset in onDestroy(); no error reaches the bridge.
   drain();
   EXPECT_EQ(bridge_->error_calls_, 0);
+}
+
+// With an asynchronous store, a replay resumed by a watermark drain while a read is
+// still in flight must not issue an overlapping read -- it waits for the in-flight
+// read to complete.
+TEST_F(BufferManagerTest, ResumeSkipsReadWhileOneInFlight) {
+  resetManager(posting_factory_);
+
+  const std::string big(200 * 1024, 'x'); // Multiple chunks.
+  Buffer::OwnedImpl body(big);
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
+
+  // Run just the write completion: replay starts and posts its first read (now in
+  // flight, not yet completed).
+  runOnePosted();
+
+  // A watermark cycle schedules a resume while the read is still in flight.
+  ASSERT_NE(bridge_->handler_, nullptr);
+  bridge_->handler_->onReplayAboveHighWatermark();
+  bridge_->handler_->onReplayBelowLowWatermark();
+  ASSERT_TRUE(replay_cb_->enabled());
+  // The continuation finds a read in flight and returns without issuing another.
+  replay_cb_->invokeCallback();
+
+  // Draining the in-flight read (and its successors) still completes the replay
+  // with the payload intact -- no read was dropped or duplicated.
+  drain();
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), big);
 }
 
 } // namespace

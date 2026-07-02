@@ -289,17 +289,16 @@ private:
   // replay only when this returns to zero. Non-zero => replay paused.
   uint32_t replay_high_watermark_count_{0};
 
-  // Detachment latch: set in onDestroy() and checked wherever control returns to us
-  // after handing off to the filter chain and we would go on to touch the bridge or
-  // buffer -- the deferred completion handlers
-  // (onWriteComplete/onReadComplete/onReplayContinuation, entered from a
-  // posted/scheduled callback) and the on-stack re-entry after injectData(), where a
-  // downstream local reply can detach us before the call returns. onDestroy()
-  // releases the bridge and buffer but not the manager itself (see onDestroy()), so
-  // the object is always alive at these points; destroyed_ tells us it is detached
-  // so we must not touch the released bridge/buffer or read a further chunk. (No
-  // guard is needed after the replay read() in maybeReadNextChunk: the only work
-  // left there is clearing a flag, harmless on a detached-but-alive manager.)
+  // Detachment latch: set in onDestroy(), which releases the bridge and buffer but
+  // not the manager itself (see onDestroy()), so the object stays alive-but-detached
+  // until its owner frees it. The deferred entry points
+  // (onWriteComplete/onReadComplete/onReplayContinuation) and maybeReadNextChunk()
+  // cannot legitimately run once detached -- a conforming store cancels pending
+  // completions, onDestroy() cancels replay_cb_, and replay never outlasts a detach
+  // -- so they ASSERT(!destroyed_) rather than branch on it. The one place a detach
+  // races live code is inside onReadComplete(), where injecting a replayed frame can
+  // end the stream and detach us before the call returns; that single spot checks
+  // destroyed_ at runtime and bails.
   bool destroyed_{false};
 };
 

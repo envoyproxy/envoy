@@ -107,9 +107,9 @@ void BufferManager::maybeIssueWrite() {
 }
 
 void BufferManager::onWriteComplete(ExternalBufferStatus status) {
-  if (destroyed_) {
-    return;
-  }
+  // A conforming store cancels pending completions when it is destroyed in
+  // onDestroy() (see ExternalBuffer), so this never fires once detached.
+  ASSERT(!destroyed_);
   if (status != ExternalBufferStatus::Ok) {
     onExternalBufferError();
     return;
@@ -159,14 +159,12 @@ void BufferManager::updateIngestBackpressure() {
 }
 
 void BufferManager::maybeReadNextChunk() {
-  // This is the only method that reads from buffer_, and onDestroy() releases the
-  // buffer while leaving the (detached) manager alive. Guard the dereference here so
-  // any caller that reaches us after a detach -- e.g. a replayed frame whose
-  // injection ended the stream -- stops rather than reading from the gone buffer,
-  // rather than relying on every caller to check first.
-  if (destroyed_) {
-    return;
-  }
+  // This is the only method that reads from buffer_, which onDestroy() releases.
+  // Every path here runs while a replay is live, and a replay cannot outlast a
+  // detach: onReadComplete() bails right after the inject that would detach us, and
+  // the other callers assert !destroyed_ before reaching us. So buffer_ is always
+  // valid below.
+  ASSERT(!destroyed_);
   if (!replaying_ || read_in_flight_) {
     return;
   }
@@ -223,9 +221,8 @@ void BufferManager::maybeReadNextChunk() {
 }
 
 void BufferManager::onReplayContinuation() {
-  if (destroyed_) {
-    return;
-  }
+  // onDestroy() cancels replay_cb_, so the continuation never fires once detached.
+  ASSERT(!destroyed_);
   // Off the caller's stack: either start replay deferred from replay() (the
   // offload was already durable when the caller requested it), resume after the
   // per-iteration burst budget was spent, or resume after chain back-pressure
@@ -240,9 +237,10 @@ void BufferManager::onReplayContinuation() {
 }
 
 void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::InstancePtr data) {
-  if (destroyed_) {
-    return;
-  }
+  // A conforming store cancels pending completions on destruction, so we never enter
+  // here already detached. (destroyed_ can still flip mid-method when the inject
+  // below ends the stream -- handled by the runtime check after injectData().)
+  ASSERT(!destroyed_);
   read_in_flight_ = false;
   if (status != ExternalBufferStatus::Ok) {
     onExternalBufferError();
@@ -258,10 +256,10 @@ void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::Instance
   // injectData() re-enters the filter chain: a downstream filter may end the stream
   // synchronously (e.g. a local reply on a request-size limit), which detaches us
   // via onDestroy() on-stack. Per the destruction contract we are still alive here
-  // (only the deferred free is pending), but detached. Stop before finishing the
-  // range: finishReplay() would run the caller's replay-done callback into a
-  // torn-down stream. (maybeReadNextChunk() below also self-guards on destroyed_, so
-  // the read path is covered either way.)
+  // (only the deferred free is pending), but detached. This runtime check stops us
+  // before finishing the range (finishReplay() would run the caller's replay-done
+  // callback into a torn-down stream) or reading another chunk from the released
+  // buffer -- and it is what keeps maybeReadNextChunk()'s ASSERT(!destroyed_) valid.
   bridge_->injectData(*data);
   if (destroyed_) {
     return;
