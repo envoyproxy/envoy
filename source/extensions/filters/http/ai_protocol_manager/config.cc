@@ -2,7 +2,7 @@
 
 #include "envoy/registry/registry.h"
 
-#include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
+#include "source/common/external_buffer/external_buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter.h"
 
 namespace Envoy {
@@ -15,7 +15,7 @@ Http::FilterFactoryCb AiProtocolManagerFilterConfigFactory::createFilterFactoryF
     const std::string&, Server::Configuration::FactoryContext&) {
   // One factory is shared by every stream on the chain. The in-memory
   // implementation is stateless, so a single shared instance is safe.
-  auto buffer_factory = std::make_shared<InMemoryExternalBufferFactory>();
+  auto buffer_factory = std::make_shared<ExternalBuffer::InMemoryExternalBufferFactory>();
   return [buffer_factory](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<AiProtocolManagerFilter>(*buffer_factory));
   };

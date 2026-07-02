@@ -2,7 +2,7 @@
 
 #include "envoy/http/filter.h"
 
-#include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
+#include "source/common/external_buffer/buffer_manager.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -13,7 +13,8 @@ namespace AiProtocolManager {
 // methods onto StreamDecoderFilterCallbacks, and forwards upstream-request
 // watermarks into the BufferManager's ReplayWatermarkHandler so replay is paced
 // against upstream back-pressure.
-class DecoderFilterChainBridge : public FilterChainBridge, public Http::UpstreamWatermarkCallbacks {
+class DecoderFilterChainBridge : public ExternalBuffer::FilterChainBridge,
+                                 public Http::UpstreamWatermarkCallbacks {
 public:
   explicit DecoderFilterChainBridge(Http::StreamDecoderFilterCallbacks& callbacks)
       : callbacks_(callbacks) {}
@@ -26,7 +27,7 @@ public:
   }
   void pauseSource() override { callbacks_.onDecoderFilterAboveWriteBufferHighWatermark(); }
   void resumeSource() override { callbacks_.onDecoderFilterBelowWriteBufferLowWatermark(); }
-  void registerReplayWatermarks(ReplayWatermarkHandler& handler) override;
+  void registerReplayWatermarks(ExternalBuffer::ReplayWatermarkHandler& handler) override;
   void unregisterReplayWatermarks() override;
   void onUnrecoverableError() override;
 
@@ -44,7 +45,7 @@ public:
 
 private:
   Http::StreamDecoderFilterCallbacks& callbacks_;
-  ReplayWatermarkHandler* handler_{nullptr};
+  ExternalBuffer::ReplayWatermarkHandler* handler_{nullptr};
   // Whether *this is currently registered as an UpstreamWatermarkCallbacks.
   bool registered_{false};
 };
@@ -57,7 +58,7 @@ private:
 //
 // Provided so the encode path is trivial to wire later; not yet constructed by
 // the filter.
-class EncoderFilterChainBridge : public FilterChainBridge,
+class EncoderFilterChainBridge : public ExternalBuffer::FilterChainBridge,
                                  public Http::DownstreamWatermarkCallbacks {
 public:
   EncoderFilterChainBridge(Http::StreamEncoderFilterCallbacks& encoder_callbacks,
@@ -72,7 +73,7 @@ public:
   }
   void pauseSource() override { encoder_callbacks_.onEncoderFilterAboveWriteBufferHighWatermark(); }
   void resumeSource() override { encoder_callbacks_.onEncoderFilterBelowWriteBufferLowWatermark(); }
-  void registerReplayWatermarks(ReplayWatermarkHandler& handler) override;
+  void registerReplayWatermarks(ExternalBuffer::ReplayWatermarkHandler& handler) override;
   void unregisterReplayWatermarks() override;
   void onUnrecoverableError() override;
 
@@ -91,7 +92,7 @@ public:
 private:
   Http::StreamEncoderFilterCallbacks& encoder_callbacks_;
   Http::StreamDecoderFilterCallbacks& decoder_callbacks_;
-  ReplayWatermarkHandler* handler_{nullptr};
+  ExternalBuffer::ReplayWatermarkHandler* handler_{nullptr};
   // Whether *this is currently registered as a DownstreamWatermarkCallbacks.
   bool registered_{false};
 };

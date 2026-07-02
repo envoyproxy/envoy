@@ -9,14 +9,12 @@
 #include "envoy/event/schedulable_cb.h"
 
 #include "source/common/common/logger.h"
-#include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
+#include "source/common/external_buffer/external_buffer.h"
 
 #include "absl/functional/any_invocable.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace HttpFilters {
-namespace AiProtocolManager {
+namespace ExternalBuffer {
 
 // Invoked once a replay() range has been fully injected into the filter chain. The
 // caller can start to stream further sub-ranges or to terminate the stream.
@@ -33,6 +31,7 @@ public:
 
   // The chain we replay into is backed up; pause issuing reads/injects.
   virtual void onReplayAboveHighWatermark() PURE;
+
   // The chain has drained; replay may resume.
   virtual void onReplayBelowLowWatermark() PURE;
 };
@@ -50,20 +49,27 @@ public:
 
   // Dispatcher the external buffer should use for completion/watermark callbacks.
   virtual Event::Dispatcher& dispatcher() PURE;
+
   // High watermark for in-flight ingest data (the configured decoder/encoder
   // buffer limit).
   virtual uint32_t bufferLimit() PURE;
+
   // Re-injects a replayed data frame into the filter chain. Always a non-terminal
   // frame: end-of-stream is the caller's concern (see ReplayDoneCallback).
   virtual void injectData(Buffer::Instance& data) PURE;
+
   // Pushes ingest back-pressure toward the data source (the filter's own
   // write-buffer high/low watermark on this path).
   virtual void pauseSource() PURE;
+
   virtual void resumeSource() PURE;
+
   // Subscribes/unsubscribes `handler` to the path's replay back-pressure
   // (upstream watermarks on decode, downstream watermarks on encode).
   virtual void registerReplayWatermarks(ReplayWatermarkHandler& handler) PURE;
+
   virtual void unregisterReplayWatermarks() PURE;
+
   // Fails the stream after an unrecoverable external-buffer error.
   virtual void onUnrecoverableError() PURE;
 };
@@ -97,9 +103,11 @@ public:
   // Offloads `data` into the external buffer (batching small frames). The caller
   // holds the filter chain (returns StopIteration*) while the body is buffered.
   void onData(Buffer::Instance& data);
+
   // Signals that the full body has been offloaded, flushing any batched backlog to
   // the buffer so all of it becomes durable, and is ready to replay.
   void endStream();
+
   // Replays the byte range [offset, offset+length) back into the filter chain as
   // data frames, invoking `done` once the whole range has been injected. The
   // caller may stream further sub-ranges with another replay(). Only one replay may be in flight
@@ -107,22 +115,26 @@ public:
   //
   // Only call after endStream(). It may wait until all write is done before start streaming.
   void replay(uint64_t offset, uint64_t length, ReplayDoneCallback done);
+
   // Total number of bytes offloaded so far (durable, queued, and in-flight). The
   // caller uses this to size replay ranges; it is final once endStream() has been
   // called.
   uint64_t length() const {
     return (buffer_ == nullptr ? 0 : buffer_->length()) + pending_.length() + in_flight_write_size_;
   }
+
   // True until the first onData().
   bool empty() const {
     return buffer_ == nullptr || buffer_->length() + pending_.length() + in_flight_write_size_ == 0;
   }
+
   // Cancels in-flight work and detaches from the filter chain. After this the
   // async completion handlers are inert.
   void onDestroy();
 
   // ReplayWatermarkHandler (replay side: filter-chain back-pressure).
   void onReplayAboveHighWatermark() override;
+
   void onReplayBelowLowWatermark() override;
 
 private:
@@ -132,36 +144,44 @@ private:
   // write() (honoring the single-writer contract); anything that arrives
   // afterwards waits in pending_ for the next write.
   void maybeIssueWrite();
+
   // Completion handler for a write() issued by maybeIssueWrite(). Drains the next
   // queued write or, once the queue is empty and a replay has been requested,
   // begins it.
   void onWriteComplete(ExternalBufferStatus status);
+
   // Begins the requested replay range if every accepted byte is durable (no write
   // in flight, nothing queued). Idempotent. Starts replay synchronously, so it
   // must only be called from a context where injecting into the filter chain is
   // safe: a write completion or the scheduled continuation, never directly from
   // replay(), which can be called in decodeData or encodeData of a filter.
   void maybeStartReplay();
+
   // Recomputes ingest back-pressure from the not-yet-durable byte count (queued
   // plus in-flight write) and pauses/resumes the data source via the bridge as
   // it crosses the high/low watermark.
   void updateIngestBackpressure();
+
   // Ends the current replay range: clears the active flag and invokes the caller's
   // done callback (which may start the next range or terminate the stream).
   void finishReplay();
+
   // Issues the next replay read and injects it (via onReadComplete). A
   // synchronous store completes the read on-stack and re-enters here, chaining
   // chunks until the burst hits ReplayChunksPerIteration, at which point it yields
   // via replay_cb_ and resumes next iteration. An asynchronous store drives one
   // chunk per completion and paces itself.
   void maybeReadNextChunk();
+
   // Target of replay_cb_. Runs off the caller's stack to either start replay
   // deferred from replay() (the caller may invoke it from a data callback, where
   // injecting reentrantly is unsafe) or resume replay after the per-iteration
   // chunk budget was spent.
   void onReplayContinuation();
+
   // Completion handler for a read() issued during replay.
   void onReadComplete(ExternalBufferStatus status, Buffer::InstancePtr data);
+
   // Fails the stream when an external-buffer operation errors out.
   void onExternalBufferError();
 
@@ -260,7 +280,5 @@ private:
 
 using BufferManagerPtr = std::unique_ptr<BufferManager>;
 
-} // namespace AiProtocolManager
-} // namespace HttpFilters
-} // namespace Extensions
+} // namespace ExternalBuffer
 } // namespace Envoy

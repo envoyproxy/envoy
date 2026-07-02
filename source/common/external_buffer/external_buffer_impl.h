@@ -3,12 +3,10 @@
 #include <memory>
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
+#include "source/common/external_buffer/external_buffer.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace HttpFilters {
-namespace AiProtocolManager {
+namespace ExternalBuffer {
 
 // A pure in-memory ExternalBuffer. The bytes are held in an owned buffer on the
 // heap; there is no real backing store.
@@ -49,7 +47,5 @@ public:
   }
 };
 
-} // namespace AiProtocolManager
-} // namespace HttpFilters
-} // namespace Extensions
+} // namespace ExternalBuffer
 } // namespace Envoy

@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
+#include "source/common/external_buffer/external_buffer_impl.h"
 
 #include <memory>
 #include <utility>
@@ -6,9 +6,7 @@
 #include "source/common/common/assert.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace HttpFilters {
-namespace AiProtocolManager {
+namespace ExternalBuffer {
 
 InMemoryExternalBuffer::InMemoryExternalBuffer(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
@@ -52,7 +50,5 @@ void InMemoryExternalBuffer::read(uint64_t offset, uint64_t length, ReadCallback
   cb(ExternalBufferStatus::Ok, std::move(out));
 }
 
-} // namespace AiProtocolManager
-} // namespace HttpFilters
-} // namespace Extensions
+} // namespace ExternalBuffer
 } // namespace Envoy

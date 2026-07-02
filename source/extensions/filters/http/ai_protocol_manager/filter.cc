@@ -17,7 +17,7 @@ void AiProtocolManagerFilter::setDecoderFilterCallbacks(
   // watermarks (via the bridge) so replay can be paced against upstream
   // back-pressure; subscribing may immediately deliver high-watermark callbacks
   // if the upstream is already backed up.
-  decode_manager_ = std::make_unique<BufferManager>(
+  decode_manager_ = std::make_unique<ExternalBuffer::BufferManager>(
       buffer_factory_, std::make_unique<DecoderFilterChainBridge>(*decoder_callbacks_));
 }
 

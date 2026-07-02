@@ -4,8 +4,8 @@
 #include <vector>
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
-#include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
+#include "source/common/external_buffer/buffer_manager.h"
+#include "source/common/external_buffer/external_buffer_impl.h"
 
 #include "test/mocks/event/mocks.h"
 
@@ -16,9 +16,7 @@ using testing::Invoke;
 using testing::NiceMock;
 
 namespace Envoy {
-namespace Extensions {
-namespace HttpFilters {
-namespace AiProtocolManager {
+namespace ExternalBuffer {
 namespace {
 
 // Hand-written FilterChainBridge that records everything the BufferManager does
@@ -676,7 +674,5 @@ TEST_F(BufferManagerTest, ErrorAfterDestroyIsInert) {
 }
 
 } // namespace
-} // namespace AiProtocolManager
-} // namespace HttpFilters
-} // namespace Extensions
+} // namespace ExternalBuffer
 } // namespace Envoy

@@ -3,7 +3,7 @@
 #include <string>
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
+#include "source/common/external_buffer/external_buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter.h"
 
 #include "test/mocks/event/mocks.h"
@@ -68,7 +68,7 @@ public:
   }
 
   std::deque<Event::PostCb> posted_;
-  InMemoryExternalBufferFactory factory_;
+  ExternalBuffer::InMemoryExternalBufferFactory factory_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::UpstreamWatermarkCallbacks* watermark_cb_{};
   // Owned by the manager the filter builds; present so createSchedulableCallback()

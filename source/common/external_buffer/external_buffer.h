@@ -10,9 +10,7 @@
 #include "absl/functional/any_invocable.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace HttpFilters {
-namespace AiProtocolManager {
+namespace ExternalBuffer {
 
 // Status of a completed external-buffer I/O operation.
 enum class ExternalBufferStatus {
@@ -79,7 +77,5 @@ public:
 using ExternalBufferFactoryPtr = std::unique_ptr<ExternalBufferFactory>;
 using ExternalBufferFactorySharedPtr = std::shared_ptr<ExternalBufferFactory>;
 
-} // namespace AiProtocolManager
-} // namespace HttpFilters
-} // namespace Extensions
+} // namespace ExternalBuffer
 } // namespace Envoy

@@ -18,7 +18,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
-        "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
+        "//source/common/external_buffer:external_buffer_impl_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -30,8 +30,8 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
-        "//source/extensions/filters/http/ai_protocol_manager:buffer_manager_lib",
-        "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
+        "//source/common/external_buffer:buffer_manager_lib",
+        "//source/common/external_buffer:external_buffer_impl_lib",
         "//test/mocks/event:event_mocks",
         "//test/test_common:utility_lib",
     ],
@@ -44,7 +44,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
-        "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
+        "//source/common/external_buffer:external_buffer_impl_lib",
         "//source/extensions/filters/http/ai_protocol_manager:filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
