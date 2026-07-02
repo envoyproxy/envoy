@@ -62,7 +62,7 @@ message ServerInfo {
   bool hot_restart_initializing = 8;
 }
 
-// [#next-free-field: 44]
+// [#next-free-field: 43]
 message CommandLineOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v2alpha.CommandLineOptions";

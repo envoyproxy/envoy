@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // MongoDB :ref:`configuration overview <config_network_filters_mongo_proxy>`.
 // [#extension: envoy.filters.network.mongo_proxy]
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message MongoProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.mongo_proxy.v2.MongoProxy";
