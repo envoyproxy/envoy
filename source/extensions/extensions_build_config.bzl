@@ -291,6 +291,7 @@ EXTENSIONS = {
 
     "envoy.filters.udp.session.http_capsule":           "//source/extensions/filters/udp/udp_proxy/session_filters/http_capsule:config",
     "envoy.filters.udp.session.dynamic_forward_proxy":  "//source/extensions/filters/udp/udp_proxy/session_filters/dynamic_forward_proxy:config",
+    "envoy.filters.udp.session.dynamic_modules":        "//source/extensions/filters/udp/udp_proxy/session_filters/dynamic_modules:config",
 
     #
     # Resource monitors
