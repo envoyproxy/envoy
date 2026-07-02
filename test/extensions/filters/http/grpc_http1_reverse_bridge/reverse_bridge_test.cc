@@ -1011,7 +1011,8 @@ TEST_F(ReverseBridgeTest, WithholdGrpcFramesStreamsWithContentLength) {
   decoder_callbacks_.is_grpc_request_ = true;
 
   {
-    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(testing::Return(nullptr));
+    EXPECT_CALL(decoder_callbacks_, route())
+        .WillRepeatedly(Return(OptRef<const Router::Route>{}));
     EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
     Http::TestRequestHeaderMapImpl headers({{"content-type", "application/grpc"},
                                             {"content-length", "25"},
@@ -1069,7 +1070,8 @@ TEST_F(ReverseBridgeTest, WithholdGrpcFramesContentLengthMismatch) {
   decoder_callbacks_.is_grpc_request_ = true;
 
   {
-    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(testing::Return(nullptr));
+    EXPECT_CALL(decoder_callbacks_, route())
+        .WillRepeatedly(Return(OptRef<const Router::Route>{}));
     EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
     Http::TestRequestHeaderMapImpl headers({{"content-type", "application/grpc"},
                                             {"content-length", "25"},
