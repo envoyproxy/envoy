@@ -49,41 +49,6 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-class MockXdsConfigTracker : public XdsConfigTracker {
-public:
-  MOCK_METHOD(void, onConfigAccepted,
-              (const absl::string_view type_url, const std::vector<DecodedResourcePtr>& resources),
-              (override));
-  MOCK_METHOD(void, onConfigAccepted,
-              (const absl::string_view type_url,
-               absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
-               const Protobuf::RepeatedPtrField<std::string>& removed_resources),
-              (override));
-  MOCK_METHOD(void, onConfigRejected,
-              (const envoy::service::discovery::v3::DiscoveryResponse& message,
-               const absl::string_view error_detail),
-              (override));
-  MOCK_METHOD(void, onConfigRejected,
-              (const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
-               const absl::string_view error_detail),
-              (override));
-};
-
-class MockXdsResourcesDelegate : public XdsResourcesDelegate {
-public:
-  MOCK_METHOD(std::vector<envoy::service::discovery::v3::Resource>, getResources,
-              (const XdsSourceId& source_id,
-               const absl::flat_hash_set<std::string>& resource_names),
-              (const, override));
-  MOCK_METHOD(void, onConfigUpdated,
-              (const XdsSourceId& source_id, const std::vector<DecodedResourceRef>& resources),
-              (override));
-  MOCK_METHOD(void, onResourceLoadFailed,
-              (const XdsSourceId& source_id, const std::string& resource_name,
-               const std::optional<EnvoyException>& exception),
-              (override));
-};
-
 // We test some mux specific stuff below, other unit test coverage for singleton use of GrpcMuxImpl
 // is provided in [grpc_]subscription_impl_test.cc.
 class GrpcMuxImplTestBase : public testing::TestWithParam<bool> {
@@ -1746,6 +1711,7 @@ TEST_P(GrpcMuxImplTest, XdsConfigTrackerOnConfigAccepted) {
   expectSendMessage(type_url, {"x"}, "", true);
   grpc_mux_->start();
 
+  // Sets up a normal, valid response for cluster "x".
   auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   response->set_type_url(type_url);
   response->set_version_info("1");
@@ -1782,6 +1748,7 @@ TEST_P(GrpcMuxImplTest, XdsConfigTrackerOnConfigRejected) {
   expectSendMessage(type_url, {"x"}, "", true);
   grpc_mux_->start();
 
+  // Sets up an invalid response for cluster "x".
   auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   response->set_type_url(type_url);
   response->set_version_info("1");
@@ -1857,6 +1824,7 @@ TEST_P(GrpcMuxImplTest, XdsResourcesDelegateOnConfigUpdated) {
   expectSendMessage(type_url, {"x"}, "", true);
   grpc_mux_->start();
 
+  // Sets up a normal, valid response for cluster "x".
   auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   response->set_type_url(type_url);
   response->set_version_info("1");

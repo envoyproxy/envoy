@@ -50,41 +50,6 @@ namespace {
 
 enum class LegacyOrUnified { Legacy, Unified };
 
-class MockXdsConfigTracker : public XdsConfigTracker {
-public:
-  MOCK_METHOD(void, onConfigAccepted,
-              (const absl::string_view type_url, const std::vector<DecodedResourcePtr>& resources),
-              (override));
-  MOCK_METHOD(void, onConfigAccepted,
-              (const absl::string_view type_url,
-               absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
-               const Protobuf::RepeatedPtrField<std::string>& removed_resources),
-              (override));
-  MOCK_METHOD(void, onConfigRejected,
-              (const envoy::service::discovery::v3::DiscoveryResponse& message,
-               const absl::string_view error_detail),
-              (override));
-  MOCK_METHOD(void, onConfigRejected,
-              (const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
-               const absl::string_view error_detail),
-              (override));
-};
-
-class MockXdsResourcesDelegate : public XdsResourcesDelegate {
-public:
-  MOCK_METHOD(std::vector<envoy::service::discovery::v3::Resource>, getResources,
-              (const XdsSourceId& source_id,
-               const absl::flat_hash_set<std::string>& resource_names),
-              (const, override));
-  MOCK_METHOD(void, onConfigUpdated,
-              (const XdsSourceId& source_id, const std::vector<DecodedResourceRef>& resources),
-              (override));
-  MOCK_METHOD(void, onResourceLoadFailed,
-              (const XdsSourceId& source_id, const std::string& resource_name,
-               const std::optional<EnvoyException>& exception),
-              (override));
-};
-
 // We test some mux specific stuff below, other unit test coverage for singleton use of
 // NewGrpcMuxImpl is provided in [grpc_]subscription_impl_test.cc.
 class NewGrpcMuxImplTestBase : public testing::TestWithParam<std::tuple<LegacyOrUnified, bool>> {
@@ -120,11 +85,11 @@ public:
         /*scope_=*/*stats_.rootScope(),
         /*config_validators_=*/std::move(config_validators_),
         /*xds_resources_delegate_=*/
-            use_resources_delegate_ ? OptRef<XdsResourcesDelegate>(resources_delegate_)
-                                    : OptRef<XdsResourcesDelegate>(),
+        use_resources_delegate_ ? OptRef<XdsResourcesDelegate>(resources_delegate_)
+                                : OptRef<XdsResourcesDelegate>(),
         /*xds_config_tracker_=*/
-            use_config_tracker_ ? OptRef<XdsConfigTracker>(config_tracker_)
-                                : OptRef<XdsConfigTracker>(),
+        use_config_tracker_ ? OptRef<XdsConfigTracker>(config_tracker_)
+                            : OptRef<XdsConfigTracker>(),
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",
         /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
