@@ -82,7 +82,7 @@ public:
       common_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
       setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                      fake_upstreams_.back()->localAddress());
-      access_log->mutable_typed_config()->PackFrom(access_log_config);
+      std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
     });
     BaseIntegrationTest::initialize();
   }
@@ -102,7 +102,7 @@ public:
           listener->mutable_filter_chains(0)->mutable_filters(0)->mutable_typed_config();
 
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy_config;
-      tcp_proxy->UnpackTo(&tcp_proxy_config);
+      std::ignore = tcp_proxy->UnpackTo(&tcp_proxy_config);
 
       auto* access_log = tcp_proxy_config.add_access_log();
       access_log->set_name("grpc_accesslog");
@@ -112,13 +112,13 @@ public:
       common_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
       setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                      fake_upstreams_.back()->localAddress());
-      access_log->mutable_typed_config()->PackFrom(access_log_config);
+      std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
 
       tcp_proxy_config.mutable_access_log_options()
           ->mutable_access_log_flush_interval()
           ->set_seconds(1); // 1s
 
-      tcp_proxy->PackFrom(tcp_proxy_config);
+      std::ignore = tcp_proxy->PackFrom(tcp_proxy_config);
     });
     BaseIntegrationTest::initialize();
   }
@@ -135,7 +135,7 @@ public:
       auto* filter = filter_chain->mutable_filters(0);
       envoy::extensions::filters::network::echo::v3::Echo echo;
       filter->set_name("envoy.filters.network.echo");
-      filter->mutable_typed_config()->PackFrom(echo);
+      std::ignore = filter->mutable_typed_config()->PackFrom(echo);
     });
     if (server_ssl_options.has_value()) {
       config_helper_.addSslConfig(server_ssl_options.value());

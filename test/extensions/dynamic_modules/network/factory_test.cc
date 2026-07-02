@@ -72,7 +72,8 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfigWithFilterConfig) {
   envoy::extensions::filters::network::dynamic_modules::v3::DynamicModuleNetworkFilter config;
   config.mutable_dynamic_module_config()->set_name("network_no_op");
   config.set_filter_name("test_filter");
-  config.mutable_filter_config()->PackFrom(ValueUtil::stringValue("test_config_value"));
+  std::ignore =
+      config.mutable_filter_config()->PackFrom(ValueUtil::stringValue("test_config_value"));
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
   EXPECT_TRUE(result.ok()) << result.status().message();

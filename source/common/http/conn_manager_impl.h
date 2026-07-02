@@ -244,6 +244,12 @@ private:
     }
 
     // FilterManagerCallbacks
+    OptRef<WebTransportSession> webTransportSession() override {
+      if (response_encoder_ == nullptr) {
+        return {};
+      }
+      return response_encoder_->getStream().webTransportSession();
+    }
     void encodeHeaders(ResponseHeaderMap& response_headers, bool end_stream) override;
     void encode1xxHeaders(ResponseHeaderMap& response_headers) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -318,6 +324,7 @@ private:
     Router::RouteConstSharedPtr routeSharedPtr(const Router::RouteCallback& cb) override;
     void clearRouteCache() override;
     void refreshRouteCluster() override;
+    void recreateClusterInfo() override;
     void requestRouteConfigUpdate(
         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
 

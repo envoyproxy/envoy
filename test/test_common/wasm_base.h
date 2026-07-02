@@ -77,7 +77,7 @@ public:
     vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
     Protobuf::StringValue vm_configuration_string;
     vm_configuration_string.set_value(vm_configuration_);
-    vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
+    std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
     vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
 
     plugin_ = std::make_shared<Extensions::Common::Wasm::Plugin>(

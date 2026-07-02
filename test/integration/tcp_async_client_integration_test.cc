@@ -41,7 +41,7 @@ public:
           auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
           auto* filter_chain = listener->mutable_filter_chains(0);
           auto* filter = filter_chain->mutable_filters(0);
-          filter->mutable_typed_config()->PackFrom(proto_config);
+          std::ignore = filter->mutable_typed_config()->PackFrom(proto_config);
 
           auto* access_log = listener->add_access_log();
           access_log->set_name("envoy.access_loggers.file");
@@ -50,7 +50,7 @@ public:
           access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
               "DS_CLOSE_TYPE=%DOWNSTREAM_DETECTED_CLOSE_TYPE% "
               "US_CLOSE_TYPE=%UPSTREAM_DETECTED_CLOSE_TYPE%\n");
-          access_log->mutable_typed_config()->PackFrom(access_log_config);
+          std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
         });
 
     BaseIntegrationTest::initialize();

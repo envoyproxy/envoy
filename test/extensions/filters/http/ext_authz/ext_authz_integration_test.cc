@@ -186,7 +186,7 @@ public:
 
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
       ext_authz_filter.set_name(ExtAuthzFilterName);
-      ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+      std::ignore = ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
       ext_authz_filter.set_disabled(opts.filter_disabled_by_default);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
 
@@ -206,7 +206,7 @@ public:
 
         envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;
         logging_filter.set_name("logging_filter");
-        logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
+        std::ignore = logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
         config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(logging_filter));
       }
     });
@@ -883,7 +883,7 @@ public:
 
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
-      ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+      std::ignore = ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
 
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
     });
@@ -1141,7 +1141,8 @@ TEST_P(ExtAuthzGrpcIntegrationTest, HttpFilterDefaultDisabledPerRouteEnabled) {
                                             ->mutable_virtual_hosts(0)
                                             ->mutable_routes(0)
                                             ->mutable_typed_per_filter_config();
-        (*per_filter_typed_config)["envoy.filters.http.ext_authz"].PackFrom(per_route);
+        std::ignore =
+            (*per_filter_typed_config)["envoy.filters.http.ext_authz"].PackFrom(per_route);
       });
   GrpcInitializeConfigOpts opts;
   // Request is never sent; stats will not be emitted.
@@ -1802,7 +1803,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, DeniedResponseHeadersForwarding) {
 
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
     ext_authz_filter.set_name("envoy.filters.http.ext_authz");
-    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+    std::ignore = ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
 
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
   });
@@ -1893,7 +1894,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, DeniedResponseMultipleSetCookieHeaders) {
 
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
     ext_authz_filter.set_name("envoy.filters.http.ext_authz");
-    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+    std::ignore = ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
 
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
   });
@@ -1968,7 +1969,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, SuccessResponseHeadersForwarding) {
 
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
     ext_authz_filter.set_name("envoy.filters.http.ext_authz");
-    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+    std::ignore = ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
 
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
   });
@@ -2063,7 +2064,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, SuccessResponseMultipleSetCookieHeaders) {
 
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
     ext_authz_filter.set_name("envoy.filters.http.ext_authz");
-    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+    std::ignore = ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
 
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
   });
@@ -2153,7 +2154,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, SuccessClientHeadersIndependentOfUpstreamHea
 
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
     ext_authz_filter.set_name("envoy.filters.http.ext_authz");
-    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+    std::ignore = ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
 
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
   });
@@ -2251,7 +2252,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, SuccessNoClientHeadersWhenNotConfigured) {
 
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
     ext_authz_filter.set_name("envoy.filters.http.ext_authz");
-    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+    std::ignore = ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
 
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
   });
@@ -2339,7 +2340,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, DeniedResponseDefaultHeadersAutoIncluded) {
 
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
     ext_authz_filter.set_name("envoy.filters.http.ext_authz");
-    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+    std::ignore = ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
 
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
   });
@@ -2430,7 +2431,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, HttpRetryPolicy) {
 
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
     ext_authz_filter.set_name("envoy.filters.http.ext_authz");
-    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+    std::ignore = ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
 
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
   });
@@ -2524,7 +2525,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, HttpRetryPolicyRespectedNotOverridden) {
 
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
     ext_authz_filter.set_name("envoy.filters.http.ext_authz");
-    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+    std::ignore = ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
 
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
   });
@@ -2625,7 +2626,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, HttpRetryPolicyOldBehaviorWithFlagDisabled) 
 
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
     ext_authz_filter.set_name("envoy.filters.http.ext_authz");
-    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+    std::ignore = ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
 
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
   });
@@ -2712,7 +2713,7 @@ TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedHeaderTest) {
 
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
     ext_authz_filter.set_name("envoy.filters.http.ext_authz");
-    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config);
+    std::ignore = ext_authz_filter.mutable_typed_config()->PackFrom(proto_config);
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
   });
 
@@ -2796,7 +2797,7 @@ TEST_P(ExtAuthzLocalReplyIntegrationTest, AsyncClientSendLocalReply) {
 
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
     ext_authz_filter.set_name("envoy.filters.http.ext_authz");
-    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config);
+    std::ignore = ext_authz_filter.mutable_typed_config()->PackFrom(proto_config);
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
   });
 
@@ -3333,8 +3334,9 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ExtensionWithMatcherDynamicMetadata) {
     // Build the ExtensionWithMatcher wrapper.
     envoy::extensions::common::matching::v3::ExtensionWithMatcher extension_with_matcher;
     extension_with_matcher.mutable_extension_config()->set_name("envoy.filters.http.ext_authz");
-    extension_with_matcher.mutable_extension_config()->mutable_typed_config()->PackFrom(
-        ext_authz_config);
+    std::ignore =
+        extension_with_matcher.mutable_extension_config()->mutable_typed_config()->PackFrom(
+            ext_authz_config);
 
     // Build the matcher with DynamicMetadataInput using matcher list.
     auto* matcher_list = extension_with_matcher.mutable_xds_matcher()->mutable_matcher_list();
@@ -3346,24 +3348,27 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ExtensionWithMatcherDynamicMetadata) {
     metadata_input.set_filter("envoy.filters.http.ext_authz");
     metadata_input.add_path()->set_key("require_auth");
     single_predicate->mutable_input()->set_name("envoy.matching.inputs.dynamic_metadata");
-    single_predicate->mutable_input()->mutable_typed_config()->PackFrom(metadata_input);
+    std::ignore =
+        single_predicate->mutable_input()->mutable_typed_config()->PackFrom(metadata_input);
 
     // Set up the metadata input matcher to match when value equals "false".
     envoy::extensions::matching::input_matchers::metadata::v3::Metadata meta_matcher;
     meta_matcher.mutable_value()->mutable_string_match()->set_exact("false");
     single_predicate->mutable_custom_match()->set_name("envoy.matching.matchers.metadata_matcher");
-    single_predicate->mutable_custom_match()->mutable_typed_config()->PackFrom(meta_matcher);
+    std::ignore =
+        single_predicate->mutable_custom_match()->mutable_typed_config()->PackFrom(meta_matcher);
 
     // Set up the on_match action to skip the filter when metadata matches "false".
     envoy::extensions::filters::common::matcher::action::v3::SkipFilter skip_action;
     field_matcher->mutable_on_match()->mutable_action()->set_name("skip");
-    field_matcher->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
-        skip_action);
+    std::ignore =
+        field_matcher->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
+            skip_action);
 
     // Create the HttpFilter with ExtensionWithMatcher as typed_config.
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter http_filter;
     http_filter.set_name("ext-authz-with-matcher");
-    http_filter.mutable_typed_config()->PackFrom(extension_with_matcher);
+    std::ignore = http_filter.mutable_typed_config()->PackFrom(extension_with_matcher);
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(http_filter));
 
     // Add Lua filter before ext_authz to set dynamic metadata.

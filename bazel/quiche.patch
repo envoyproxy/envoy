@@ -1,0 +1,141 @@
+==== a/quiche/quic/core/qpack/qpack_decoded_headers_accumulator.cc#22 - b/quiche/quic/core/qpack/qpack_decoded_headers_accumulator.cc ====
+--- a/quiche/quic/core/qpack/qpack_decoded_headers_accumulator.cc	2024-08-13 01:14:34.000000000 +0000
++++ b/quiche/quic/core/qpack/qpack_decoded_headers_accumulator.cc	2026-05-29 18:25:02.000000000 +0000
+@@ -11,13 +11,16 @@
+ #include "quiche/quic/core/qpack/qpack_header_table.h"
+ #include "quiche/quic/platform/api/quic_bug_tracker.h"
+ #include "quiche/quic/platform/api/quic_flags.h"
++#include "quiche/common/platform/api/quiche_flag_utils.h"
++#include "quiche/common/platform/api/quiche_flags.h"
+
+ namespace quic {
+
+ QpackDecodedHeadersAccumulator::QpackDecodedHeadersAccumulator(
+     QuicStreamId id, QpackDecoder* qpack_decoder, Visitor* visitor,
+     size_t max_header_list_size)
+-    : decoder_(qpack_decoder->CreateProgressiveDecoder(id, this)),
++    : decoder_(qpack_decoder->CreateProgressiveDecoder(id, max_header_list_size,
++                                                       this)),
+       visitor_(visitor),
+       max_header_list_size_(max_header_list_size),
+       uncompressed_header_bytes_including_overhead_(0),
+==== a/quiche/quic/core/qpack/qpack_decoded_headers_accumulator_test.cc#32 - b/quiche/quic/core/qpack/qpack_decoded_headers_accumulator_test.cc ====
+--- a/quiche/quic/core/qpack/qpack_decoded_headers_accumulator_test.cc	2024-07-17 01:21:36.000000000 +0000
++++ b/quiche/quic/core/qpack/qpack_decoded_headers_accumulator_test.cc	2026-05-29 18:25:02.000000000 +0000
+@@ -169,6 +169,10 @@
+
+ // Test that header list limit enforcement works with blocked encoding.
+ TEST_F(QpackDecodedHeadersAccumulatorTest, ExceedLimitBlocked) {
++  if (GetQuicheReloadableFlag(quic_enforce_qpack_buffer_limit)) {
++    // TODO(b/517763140): Fix this test.
++    return;
++  }
+
+   std::string encoded_data;
+   // Total length of header list exceeds kMaxHeaderListSize.
+==== a/quiche/quic/core/qpack/qpack_decoder.cc#64 - b/quiche/quic/core/qpack/qpack_decoder.cc ====
+--- a/quiche/quic/core/qpack/qpack_decoder.cc	2024-07-17 01:21:36.000000000 +0000
++++ b/quiche/quic/core/qpack/qpack_decoder.cc	2026-05-29 18:25:02.000000000 +0000
+@@ -158,12 +158,18 @@
+                                                        error_message);
+ }
+
+-std::unique_ptr<QpackProgressiveDecoder> QpackDecoder::CreateProgressiveDecoder(
+-    QuicStreamId stream_id,
+-    QpackProgressiveDecoder::HeadersHandlerInterface* handler) {
+-  return std::make_unique<QpackProgressiveDecoder>(stream_id, this, this,
+-                                                   &header_table_, handler);
+-}
++std::unique_ptr<QpackProgressiveDecoder> QpackDecoder::CreateProgressiveDecoder(
++    QuicStreamId stream_id,
++    QpackProgressiveDecoder::HeadersHandlerInterface* handler) {
++  return CreateProgressiveDecoder(stream_id, 0, handler);
++}
++
++std::unique_ptr<QpackProgressiveDecoder> QpackDecoder::CreateProgressiveDecoder(
++    QuicStreamId stream_id, QuicByteCount max_buffered_data,
++    QpackProgressiveDecoder::HeadersHandlerInterface* handler) {
++  return std::make_unique<QpackProgressiveDecoder>(
++      stream_id, max_buffered_data, this, this, &header_table_, handler);
++}
+
+ void QpackDecoder::FlushDecoderStream() { decoder_stream_sender_.Flush(); }
+
+==== a/quiche/quic/core/qpack/qpack_decoder.h#42 - b/quiche/quic/core/qpack/qpack_decoder.h ====
+--- a/quiche/quic/core/qpack/qpack_decoder.h	2024-05-22 15:24:29.000000000 +0000
++++ b/quiche/quic/core/qpack/qpack_decoder.h	2026-05-29 18:25:02.000000000 +0000
+@@ -78,6 +78,9 @@
+   // block.  |handler| must remain valid until the returned
+   // QpackProgressiveDecoder instance is destroyed or the decoder calls
+   // |handler->OnHeaderBlockEnd()|.
++  std::unique_ptr<QpackProgressiveDecoder> CreateProgressiveDecoder(
++      QuicStreamId stream_id, QuicByteCount max_buffered_data,
++      QpackProgressiveDecoder::HeadersHandlerInterface* handler);
+   std::unique_ptr<QpackProgressiveDecoder> CreateProgressiveDecoder(
+       QuicStreamId stream_id,
+       QpackProgressiveDecoder::HeadersHandlerInterface* handler);
+==== a/quiche/quic/core/qpack/qpack_progressive_decoder.cc#34 - b/quiche/quic/core/qpack/qpack_progressive_decoder.cc ====
+--- a/quiche/quic/core/qpack/qpack_progressive_decoder.cc	2024-05-21 18:52:48.000000000 +0000
++++ b/quiche/quic/core/qpack/qpack_progressive_decoder.cc	2026-05-29 18:25:02.000000000 +0000
+@@ -29,10 +29,11 @@
+ }  // anonymous namespace
+
+ QpackProgressiveDecoder::QpackProgressiveDecoder(
++    QuicStreamId stream_id, QuicByteCount max_buffered_data,
++    BlockedStreamLimitEnforcer* enforcer, DecodingCompletedVisitor* visitor,
++    QpackDecoderHeaderTable* header_table, HeadersHandlerInterface* handler)
+-    QuicStreamId stream_id, BlockedStreamLimitEnforcer* enforcer,
+-    DecodingCompletedVisitor* visitor, QpackDecoderHeaderTable* header_table,
+-    HeadersHandlerInterface* handler)
+     : stream_id_(stream_id),
++      max_buffered_data_(max_buffered_data),
+       prefix_decoder_(std::make_unique<QpackInstructionDecoder>(
+           QpackPrefixLanguage(), this)),
+       instruction_decoder_(QpackRequestStreamLanguage(), this),
+@@ -82,6 +94,14 @@
+   }
+
+   if (blocked_) {
++    if (max_buffered_data_ > 0 &&
++        buffer_.size() + data.size() > max_buffered_data_) {
++      QUIC_CODE_COUNT(quic_qpack_buffered_data_over_limit);
++      if (GetQuicheReloadableFlag(quic_enforce_qpack_buffer_limit)) {
++        OnError(QUIC_QPACK_DECOMPRESSION_FAILED, "Too much buffered data.");
++        return;
++      }
++    }
+     buffer_.append(data.data(), data.size());
+   } else {
+     QUICHE_DCHECK(buffer_.empty());
+==== a/quiche/quic/core/qpack/qpack_progressive_decoder.h#22 - b/quiche/quic/core/qpack/qpack_progressive_decoder.h ====
+--- a/quiche/quic/core/qpack/qpack_progressive_decoder.h	2024-05-22 15:24:29.000000000 +0000
++++ b/quiche/quic/core/qpack/qpack_progressive_decoder.h	2026-05-29 18:25:02.000000000 +0000
+@@ -82,6 +82,7 @@
+
+   QpackProgressiveDecoder() = delete;
+   QpackProgressiveDecoder(QuicStreamId stream_id,
++                          QuicByteCount max_buffered_data,
+                           BlockedStreamLimitEnforcer* enforcer,
+                           DecodingCompletedVisitor* visitor,
+                           QpackDecoderHeaderTable* header_table,
+@@ -135,6 +137,9 @@
+   bool DeltaBaseToBase(bool sign, uint64_t delta_base, uint64_t* base);
+
+   const QuicStreamId stream_id_;
++  // Maximum amount of data which can be stored in `buffer_` before the
++  // connection will be closed.
++  const QuicByteCount max_buffered_data_;
+
+   // |prefix_decoder_| only decodes a handful of bytes then it can be
+   // destroyed to conserve memory.  |instruction_decoder_|, on the other hand,
+==== a/quiche/quiche/common/quiche_feature_flags_list.h#277 - b/quiche/quiche/common/quiche_feature_flags_list.h ====
+--- a/quiche/common/quiche_feature_flags_list.h	2026-05-26 15:04:22.000000000 +0000
++++ b/quiche/common/quiche_feature_flags_list.h	2026-05-29 18:25:02.000000000 +0000
+@@ -39,6 +39,7 @@
+ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_enable_server_on_wire_ping, true, true, "If true, enable server retransmittable on wire PING.")
+ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_enable_spin_bit, false, false, "When true, enable the QUIC latency spin bit (RFC 9000 section 17.3) on 3/4 of QUIC connections.")
+ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_enable_version_rfcv2, false, false, "When true, support RFC9369.")
++QUICHE_FLAG(bool, quiche_reloadable_flag_quic_enforce_qpack_buffer_limit, true, true, "If true, the QPACK decoder will restrict the amount of buffered data.")
+ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_enforce_immediate_goaway, false, true, "If true, QUIC will support sending immediate GOAWAYS and will refuse streams above the limit.")
+ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_enobufs_blocked, true, true, "If true, ENOBUFS socket errors are reported as socket blocked instead of socket failure.")
+ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_fin_before_completed_http_headers, false, true, "If true, close the connection with error if FIN is received before finish receiving the whole HTTP headers.")

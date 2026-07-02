@@ -5504,6 +5504,7 @@ envoy_cc_library(
     ],
     copts = quiche_copts,
     repository = "@envoy",
+    visibility = ["//visibility:public"],
     deps = [
         ":common_http_http_header_block_lib",
         ":quiche_common_callbacks",

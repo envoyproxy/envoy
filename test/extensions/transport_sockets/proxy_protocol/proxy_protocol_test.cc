@@ -783,7 +783,7 @@ TEST_F(ProxyProtocolTest, V2CustomTLVsFromHostMetadata) {
   host_added_tlvs->set_value("moredata");
 
   Protobuf::Any typed_metadata;
-  typed_metadata.PackFrom(host_metadata_config);
+  std::ignore = typed_metadata.PackFrom(host_metadata_config);
   metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, typed_metadata));
   EXPECT_CALL(*host, metadata()).Times(testing::AnyNumber()).WillRepeatedly(Return(metadata));
   transport_callbacks_.connection_.streamInfo().upstreamInfo()->setUpstreamHost(host);
@@ -846,7 +846,7 @@ TEST_F(ProxyProtocolTest, V2CombinedPrecedenceHostConfigPassthrough) {
   host_added_tlvs->set_value("hostValue");
 
   Protobuf::Any typed_metadata;
-  typed_metadata.PackFrom(host_metadata_config);
+  std::ignore = typed_metadata.PackFrom(host_metadata_config);
   metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, typed_metadata));
   EXPECT_CALL(*host, metadata()).WillRepeatedly(Return(metadata));
   transport_callbacks_.connection_.streamInfo().upstreamInfo()->setUpstreamHost(host);
@@ -935,7 +935,7 @@ TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperly) {
   duplicate_host_entry->set_type(host_config_tlv);
   duplicate_host_entry->set_value("d2");
   Protobuf::Any typed_metadata;
-  typed_metadata.PackFrom(host_metadata_config);
+  std::ignore = typed_metadata.PackFrom(host_metadata_config);
   metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, typed_metadata));
   EXPECT_CALL(*host, metadata()).WillRepeatedly(Return(metadata));
   transport_callbacks_.connection_.streamInfo().upstreamInfo()->setUpstreamHost(host);
@@ -1110,7 +1110,7 @@ TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperlyNoDup
   duplicate_host_entry->set_type(0x98);
   duplicate_host_entry->set_value("d2"); // Last duplicate value
   Protobuf::Any typed_metadata;
-  typed_metadata.PackFrom(host_metadata_config);
+  std::ignore = typed_metadata.PackFrom(host_metadata_config);
   metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, typed_metadata));
   EXPECT_CALL(*host, metadata()).WillRepeatedly(Return(metadata));
   transport_callbacks_.connection_.streamInfo().upstreamInfo()->setUpstreamHost(host);
@@ -1183,7 +1183,7 @@ TEST_F(ProxyProtocolTest, V2CustomTLVMetadataInvalidFormat) {
   addr_proto.mutable_socket_address()->set_address("0.0.0.0");
   addr_proto.mutable_socket_address()->set_port_value(1234);
   Protobuf::Any typed_metadata;
-  typed_metadata.PackFrom(addr_proto);
+  std::ignore = typed_metadata.PackFrom(addr_proto);
   metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, typed_metadata));
   EXPECT_CALL(*host, metadata()).Times(testing::AnyNumber()).WillRepeatedly(Return(metadata));
   transport_callbacks_.connection_.streamInfo().upstreamInfo()->setUpstreamHost(host);
@@ -1238,7 +1238,7 @@ filter_metadata:
 )EOF",
                             socket_match_metadata);
   Protobuf::Any typed_metadata;
-  typed_metadata.PackFrom(socket_match_metadata);
+  std::ignore = typed_metadata.PackFrom(socket_match_metadata);
 
   auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();

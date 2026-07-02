@@ -385,7 +385,7 @@ absl::Status InstanceUtil::loadBootstrapConfig(
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
 #else
     // Treat the yaml as proto
-    Protobuf::TextFormat::ParseFromString(config_yaml, &bootstrap_override);
+    std::ignore = Protobuf::TextFormat::ParseFromString(config_yaml, &bootstrap_override);
 #endif
     bootstrap.MergeFrom(bootstrap_override);
   }

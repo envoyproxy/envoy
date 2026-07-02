@@ -111,7 +111,7 @@ void Coverage::printMissingTests(const std::set<std::string>& all_route_names,
     for (const auto& route : host.routes()) {
       if (missing_route_names.find(route.name()) != missing_route_names.end()) {
         std::string route_text;
-        Protobuf::TextFormat::PrintToString(route.match(), &route_text);
+        std::ignore = Protobuf::TextFormat::PrintToString(route.match(), &route_text);
         std::cout << "Missing test for host: " << host.name() << ", route: " << route_text
                   << std::endl;
       }

@@ -74,7 +74,8 @@ TEST_F(DynamicModuleListenerFilterFactoryTest, ValidConfigWithFilterConfig) {
   envoy::extensions::filters::listener::dynamic_modules::v3::DynamicModuleListenerFilter config;
   config.mutable_dynamic_module_config()->set_name("listener_no_op");
   config.set_filter_name("test_filter");
-  config.mutable_filter_config()->PackFrom(ValueUtil::stringValue("test_config_value"));
+  std::ignore =
+      config.mutable_filter_config()->PackFrom(ValueUtil::stringValue("test_config_value"));
 
   auto result = factory_.createListenerFilterFactoryFromProto(config, nullptr, context_);
   EXPECT_NE(nullptr, result);

@@ -174,6 +174,9 @@ public:
   Upstream::HostDescriptionConstSharedPtr host() const override {
     return Envoy::ConnectionPool::ConnPoolImplBase::host();
   }
+  const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() override {
+    return Envoy::ConnectionPool::ConnPoolImplBase::socketOptions();
+  }
   Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override;
   void onPoolReady(Envoy::ConnectionPool::ActiveClient& client,
                    Envoy::ConnectionPool::AttachContext& context) override;
