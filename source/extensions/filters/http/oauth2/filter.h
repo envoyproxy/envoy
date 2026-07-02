@@ -26,6 +26,7 @@
 #include "source/extensions/filters/http/oauth2/oauth.h"
 #include "source/extensions/filters/http/oauth2/oauth_client.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 
@@ -249,6 +250,9 @@ public:
     return code_verifier_cookie_settings_;
   }
   bool disableTokenEncryption() const { return disable_token_encryption_; }
+  const std::string& jwtSigningAlgorithm() const { return jwt_signing_algorithm_; }
+  std::chrono::seconds jwtAssertionLifetime() const { return jwt_assertion_lifetime_; }
+  const std::string& tokenEndpointUrl() const { return oauth_token_endpoint_.uri(); }
 
 private:
   static FilterStats generateStats(const std::string& prefix,
@@ -280,6 +284,9 @@ private:
   const std::chrono::seconds default_refresh_token_expires_in_;
   const std::chrono::seconds csrf_token_expires_in_;
   const std::chrono::seconds code_verifier_token_expires_in_;
+  // Always initialized even for non-JWT auth types; minimal overhead (a string + 8 bytes).
+  const std::string jwt_signing_algorithm_;
+  const std::chrono::seconds jwt_assertion_lifetime_;
   const bool forward_bearer_token_ : 1;
   const bool preserve_authorization_header_ : 1;
   const bool use_refresh_token_ : 1;
@@ -471,6 +478,7 @@ private:
   std::string encryptToken(const std::string& token) const;
   std::string decryptToken(const std::string& encrypted_token) const;
   void removeOAuthFlowCookies(Http::RequestHeaderMap& headers) const;
+  absl::StatusOr<std::string> getClientCredential();
   void removeOAuthTokenCookies(Http::RequestHeaderMap& headers) const;
   bool shouldAllowFailed(const Http::RequestHeaderMap& headers) const;
   bool shouldDenyRedirect(const Http::RequestHeaderMap& headers) const;
