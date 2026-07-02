@@ -209,6 +209,51 @@ body: "*"
             })json"));
 }
 
+// Regression for https://github.com/envoyproxy/envoy/issues/45931: a "simple" path-template
+// variable such as {id} must not be able to inject '..' path-traversal segments into the
+// constructed upstream path. Before the fix this returned "/v1/users/../../admin/secrets/profile".
+TEST(HttpRequestBuilderTest, ConstructBaseUrlSimpleVariableRejectsPathTraversal) {
+  json arguments = json::parse(R"json({"id": "../../admin/secrets"})json");
+  EXPECT_THAT(constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+// A simple variable's '/' is confined to a single segment (percent-encoded), not treated as a
+// path separator that could bypass the intended route prefix.
+TEST(HttpRequestBuilderTest, ConstructBaseUrlSimpleVariableEncodesSlash) {
+  json arguments = json::parse(R"json({"id": "a/b"})json");
+  absl::StatusOr<std::string> url = constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments);
+  ASSERT_TRUE(url.ok());
+  EXPECT_THAT(*url, StrEq("/v1/users/a%2Fb/profile"));
+}
+
+// A benign single-segment value still substitutes unchanged.
+TEST(HttpRequestBuilderTest, ConstructBaseUrlSimpleVariableAllowsSingleSegment) {
+  json arguments = json::parse(R"json({"id": "alice"})json");
+  absl::StatusOr<std::string> url = constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments);
+  ASSERT_TRUE(url.ok());
+  EXPECT_THAT(*url, StrEq("/v1/users/alice/profile"));
+}
+
+// A wildcard variable ({var=pattern}) may legitimately span multiple segments, so its '/' is
+// preserved and left as the operator's explicit choice.
+TEST(HttpRequestBuilderTest, ConstructBaseUrlWildcardVariablePreservesSlash) {
+  json arguments = json::parse(R"json({"parent": "projects/123456789"})json");
+  absl::StatusOr<std::string> url =
+      constructBaseUrl("/v1/{parent=projects/*}/shelves", {"parent"}, arguments);
+  ASSERT_TRUE(url.ok());
+  EXPECT_THAT(*url, StrEq("/v1/projects/123456789/shelves"));
+}
+
+// #45931 defense-in-depth: a '..' traversal segment is rejected even for a wildcard variable, whose
+// value is equally attacker-controlled. Before the broadened check this produced
+// "/v1/../../admin/secrets/shelves".
+TEST(HttpRequestBuilderTest, ConstructBaseUrlWildcardVariableRejectsPathTraversal) {
+  json arguments = json::parse(R"json({"name": "../../admin/secrets"})json");
+  EXPECT_THAT(constructBaseUrl("/v1/{name=projects/*}/shelves", {"name"}, arguments),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
 TEST(HttpRequestBuilderTest, PathTemplateNotInArgumentsReturnError) {
   HttpRule http_rule;
   TestUtility::loadFromYaml(R"yaml(
