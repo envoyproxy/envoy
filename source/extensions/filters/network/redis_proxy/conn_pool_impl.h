@@ -187,7 +187,7 @@ private:
                               Upstream::ThreadLocalClusterCommand& get_cluster) override {
       onClusterAddOrUpdateNonVirtual(cluster_name, get_cluster);
     }
-    void onClusterRemoval(const std::string& cluster_name) override;
+    void onClusterRemoval(absl::string_view cluster_name) override;
 
     void onRequestCompleted();
 

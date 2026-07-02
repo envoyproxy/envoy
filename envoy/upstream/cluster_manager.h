@@ -78,7 +78,7 @@ public:
    * onClusterRemoval is called when a cluster is removed; the argument is the cluster name.
    * @param cluster_name is the name of the removed cluster.
    */
-  virtual void onClusterRemoval(const std::string& cluster_name) PURE;
+  virtual void onClusterRemoval(absl::string_view cluster_name) PURE;
 };
 
 /**

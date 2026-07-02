@@ -123,14 +123,16 @@ void AggregateClusterLoadBalancer::onClusterAddOrUpdate(
   }
 }
 
-void AggregateClusterLoadBalancer::onClusterRemoval(const std::string& cluster_name) {
+void AggregateClusterLoadBalancer::onClusterRemoval(absl::string_view cluster_name) {
   //  The onClusterRemoval callback is called before the thread local cluster is removed. There
   //  will be a dangling pointer to the thread local cluster if the deleted cluster is not skipped
   //  when we refresh the load balancer.
   if (std::find(clusters_->begin(), clusters_->end(), cluster_name) != clusters_->end()) {
     ENVOY_LOG(debug, "removing cluster '{}' from aggregate cluster '{}'", cluster_name,
               parent_info_->name());
-    refresh(cluster_name);
+    // refresh() takes OptRef<const std::string>; materialize once for the (rare) removal path.
+    const std::string excluded_cluster{cluster_name};
+    refresh(excluded_cluster);
   }
 }
 
