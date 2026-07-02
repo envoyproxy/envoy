@@ -175,8 +175,9 @@ private:
 
   // Target of replay_cb_. Runs off the caller's stack to either start replay
   // deferred from replay() (the caller may invoke it from a data callback, where
-  // injecting reentrantly is unsafe) or resume replay after the per-iteration
-  // chunk budget was spent.
+  // injecting reentrantly is unsafe), resume replay after the per-iteration chunk
+  // budget was spent, or resume replay after chain back-pressure drained (deferred
+  // out of the watermark callback, where injecting/erroring reentrantly is unsafe).
   void onReplayContinuation();
 
   // Completion handler for a read() issued during replay.
@@ -212,8 +213,10 @@ private:
   // Reschedules replay work out of the current call stack: starts it when replay()
   // is requested after the offload is already durable (deferred to later in the
   // same event-loop pass so we never inject reentrantly from the caller's
-  // context) and resumes it on the next iteration once the per-iteration chunk
-  // budget is spent, so a large replay cannot monopolize the worker.
+  // context), resumes it on the next iteration once the per-iteration chunk
+  // budget is spent (so a large replay cannot monopolize the worker), and resumes
+  // it when chain back-pressure drains (deferred out of the watermark callback so
+  // we never inject/error reentrantly from within it).
   Event::SchedulableCallbackPtr replay_cb_;
 
   // True once endStream() has been called; gates flushing the batched backlog (the

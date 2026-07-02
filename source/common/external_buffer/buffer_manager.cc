@@ -213,10 +213,11 @@ void BufferManager::onReplayContinuation() {
     return;
   }
   // Off the caller's stack: either start replay deferred from replay() (the
-  // offload was already durable when the caller requested it) or resume after the
-  // per-iteration burst budget was spent. maybeStartReplay() already drives the
-  // first read, so dispatch on whether replay is underway to avoid advancing a
-  // fresh burst twice.
+  // offload was already durable when the caller requested it), resume after the
+  // per-iteration burst budget was spent, or resume after chain back-pressure
+  // drained (deferred out of the watermark callback). maybeStartReplay() already
+  // drives the first read, so dispatch on whether replay is underway to avoid
+  // advancing a fresh burst twice.
   if (!replaying_) {
     maybeStartReplay();
   } else {
@@ -282,8 +283,12 @@ void BufferManager::onReplayBelowLowWatermark() {
   ENVOY_LOG(debug, "ai_protocol_manager: replay low watermark (depth={})",
             replay_high_watermark_count_);
   if (replay_high_watermark_count_ == 0) {
-    // Drained: resume replay where we paused.
-    maybeReadNextChunk();
+    // resume replay where we paused. Defer via replay_cb_ rather than reading which may potentially
+    // error out or inject data synchronously. this is an Envoy watermark callback, and injecting a
+    // chunk (or failing the stream on a buffer error) can re-enter the watermark callbacks during
+    // router cleanup, which is unsafe. The continuation runs once this callback unwinds. If a
+    // replay_cb_ was already scheduled (e.g. a per-iteration yield), this is idempotent.
+    replay_cb_->scheduleCallbackCurrentIteration();
   }
 }
 
