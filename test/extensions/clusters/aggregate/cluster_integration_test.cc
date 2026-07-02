@@ -508,6 +508,12 @@ TEST_P(AggregateIntegrationTest, CircuitBreakerTestMaxConnections) {
 // After completing the request, cluster1's circuit breaker closes again.
 TEST_P(AggregateIntegrationTest, CircuitBreakerTestMaxRequests) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
+#if defined(__SANITIZE_ADDRESS__) || defined(ADDRESS_SANITIZER)
+  if (version_ == Network::Address::IpVersion::v6 && deferred_cluster_creation_) {
+    GTEST_SKIP() << "Deferred cluster creation with IPv6 is flaky for max_requests circuit "
+                    "breaker checks";
+  }
+#endif
 
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
