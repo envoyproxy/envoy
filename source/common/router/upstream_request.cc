@@ -196,9 +196,7 @@ void UpstreamRequest::cleanUp() {
   }
   cleaned_up_ = true;
 
-  upstream_read_pause_tracker_.onDestruction(
-      parent_.callbacks()->dispatcher().timeSource(),
-      parent_.cluster()->trafficStats()->upstream_flow_control_combined_reading_delay_micros_);
+  upstream_read_pause_tracker_.onDestruction();
 
   filter_manager_->destroyFilters();
 
@@ -804,14 +802,14 @@ void UpstreamRequest::readDisableOrDefer(bool disable) {
 }
 
 void UpstreamRequest::recordUpstreamReadPaused() {
-  upstream_read_pause_tracker_.onPaused(parent_.callbacks()->dispatcher().timeSource());
+  upstream_read_pause_tracker_.onPaused(
+      parent_.callbacks()->dispatcher().timeSource(),
+      parent_.cluster()->trafficStats()->upstream_flow_control_combined_reading_delay_micros_);
   parent_.cluster()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
 }
 
 void UpstreamRequest::recordUpstreamReadResumed() {
-  upstream_read_pause_tracker_.onResumed(
-      parent_.callbacks()->dispatcher().timeSource(),
-      parent_.cluster()->trafficStats()->upstream_flow_control_combined_reading_delay_micros_);
+  upstream_read_pause_tracker_.onResumed();
   parent_.cluster()->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
 }
 

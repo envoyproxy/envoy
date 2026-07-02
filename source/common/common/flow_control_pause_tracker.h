@@ -12,13 +12,15 @@ class Counter;
 
 class FlowControlPauseTracker {
 public:
-  void onPaused(TimeSource& time_source);
-  void onResumed(TimeSource& time_source, Stats::Counter& paused_micros_total);
-  void onDestruction(TimeSource& time_source, Stats::Counter& paused_micros_total);
+  void onPaused(TimeSource& time_source, Stats::Counter& paused_micros_total);
+  void onResumed();
+  void onDestruction();
 
 private:
   uint32_t pause_count_{0};
   MonotonicTime pause_start_;
+  TimeSource* time_source_{};
+  Stats::Counter* paused_micros_total_{};
 };
 
 } // namespace Envoy

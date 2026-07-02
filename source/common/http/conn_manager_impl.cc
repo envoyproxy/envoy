@@ -1020,9 +1020,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 }
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
-  downstream_read_pause_tracker_.onDestruction(
-      connection_manager_.timeSource(),
-      connection_manager_.stats_.named_.downstream_flow_control_combined_reading_delay_micros_);
+  downstream_read_pause_tracker_.onDestruction();
 }
 
 void ConnectionManagerImpl::ActiveStream::log(AccessLog::AccessLogType type) {
@@ -2097,16 +2095,16 @@ void ConnectionManagerImpl::ActiveStream::onDecoderFilterBelowWriteBufferLowWate
   if (!filter_manager_.destroyed()) {
     response_encoder_->getStream().readDisable(false);
   }
-  downstream_read_pause_tracker_.onResumed(
-      connection_manager_.timeSource(),
-      connection_manager_.stats_.named_.downstream_flow_control_combined_reading_delay_micros_);
+  downstream_read_pause_tracker_.onResumed();
   connection_manager_.stats_.named_.downstream_flow_control_resumed_reading_total_.inc();
 }
 
 void ConnectionManagerImpl::ActiveStream::onDecoderFilterAboveWriteBufferHighWatermark() {
   ENVOY_STREAM_LOG(debug, "Read-disabling downstream stream due to filter callbacks.", *this);
   response_encoder_->getStream().readDisable(true);
-  downstream_read_pause_tracker_.onPaused(connection_manager_.timeSource());
+  downstream_read_pause_tracker_.onPaused(
+      connection_manager_.timeSource(),
+      connection_manager_.stats_.named_.downstream_flow_control_combined_reading_delay_micros_);
   connection_manager_.stats_.named_.downstream_flow_control_paused_reading_total_.inc();
 }
 

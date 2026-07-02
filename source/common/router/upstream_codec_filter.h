@@ -45,6 +45,9 @@ public:
   // Http::StreamFilterBase
   void onDestroy() override;
 
+  void recordUpstreamReadPaused();
+  void recordUpstreamReadResumed();
+
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;

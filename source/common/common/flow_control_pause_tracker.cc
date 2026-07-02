@@ -18,14 +18,16 @@ void recordElapsedPause(TimeSource& time_source, MonotonicTime pause_start,
 
 } // namespace
 
-void FlowControlPauseTracker::onPaused(TimeSource& time_source) {
+void FlowControlPauseTracker::onPaused(TimeSource& time_source,
+                                       Stats::Counter& paused_micros_total) {
   if (pause_count_++ == 0) {
     pause_start_ = time_source.monotonicTime();
+    time_source_ = &time_source;
+    paused_micros_total_ = &paused_micros_total;
   }
 }
 
-void FlowControlPauseTracker::onResumed(TimeSource& time_source,
-                                        Stats::Counter& paused_micros_total) {
+void FlowControlPauseTracker::onResumed() {
   if (pause_count_ == 0) {
     return;
   }
@@ -35,17 +37,20 @@ void FlowControlPauseTracker::onResumed(TimeSource& time_source,
     return;
   }
 
-  recordElapsedPause(time_source, pause_start_, paused_micros_total);
+  recordElapsedPause(*time_source_, pause_start_, *paused_micros_total_);
+  time_source_ = nullptr;
+  paused_micros_total_ = nullptr;
 }
 
-void FlowControlPauseTracker::onDestruction(TimeSource& time_source,
-                                            Stats::Counter& paused_micros_total) {
+void FlowControlPauseTracker::onDestruction() {
   if (pause_count_ == 0) {
     return;
   }
 
-  recordElapsedPause(time_source, pause_start_, paused_micros_total);
+  recordElapsedPause(*time_source_, pause_start_, *paused_micros_total_);
   pause_count_ = 0;
+  time_source_ = nullptr;
+  paused_micros_total_ = nullptr;
 }
 
 } // namespace Envoy

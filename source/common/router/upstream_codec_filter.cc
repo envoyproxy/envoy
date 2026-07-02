@@ -28,27 +28,33 @@ namespace Envoy {
 namespace Router {
 
 void UpstreamCodecFilter::onDestroy() {
-  upstream_read_pause_tracker_.onDestruction(
-      callbacks_->dispatcher().timeSource(),
-      callbacks_->clusterInfo()
-          ->trafficStats()
-          ->upstream_flow_control_combined_reading_delay_micros_);
+  upstream_read_pause_tracker_.onDestruction();
   callbacks_->removeDownstreamWatermarkCallbacks(*this);
 }
 
-void UpstreamCodecFilter::onBelowWriteBufferLowWatermark() {
-  upstream_read_pause_tracker_.onResumed(
+void UpstreamCodecFilter::recordUpstreamReadPaused() {
+  const auto cluster_info = callbacks_->clusterInfo();
+  ASSERT(cluster_info.has_value());
+  upstream_read_pause_tracker_.onPaused(
       callbacks_->dispatcher().timeSource(),
-      callbacks_->clusterInfo()
-          ->trafficStats()
-          ->upstream_flow_control_combined_reading_delay_micros_);
-  callbacks_->clusterInfo()->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
+      cluster_info->trafficStats()->upstream_flow_control_combined_reading_delay_micros_);
+  cluster_info->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
+}
+
+void UpstreamCodecFilter::recordUpstreamReadResumed() {
+  upstream_read_pause_tracker_.onResumed();
+  const auto cluster_info = callbacks_->clusterInfo();
+  ASSERT(cluster_info.has_value());
+  cluster_info->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
+}
+
+void UpstreamCodecFilter::onBelowWriteBufferLowWatermark() {
+  recordUpstreamReadResumed();
   callbacks_->upstreamCallbacks()->upstream()->readDisable(false);
 }
 
 void UpstreamCodecFilter::onAboveWriteBufferHighWatermark() {
-  upstream_read_pause_tracker_.onPaused(callbacks_->dispatcher().timeSource());
-  callbacks_->clusterInfo()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
+  recordUpstreamReadPaused();
   callbacks_->upstreamCallbacks()->upstream()->readDisable(true);
 }
 
