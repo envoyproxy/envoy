@@ -21,13 +21,24 @@ cc_library(
 )
 
 envoy_cc_library(
+    name = "ai_request_handlers_lib",
+    srcs = ["ai_request_handlers.cc"],
+    hdrs = ["ai_request_handlers.h"],
+    deps = [
+        ":wuffs_json_cursor_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:numbers",
+    ],
+)
+
+envoy_cc_library(
     name = "wuffs_json_cursor_lib",
     srcs = ["wuffs_json_cursor.cc"],
     hdrs = ["wuffs_json_cursor.h"],
     deps = [
         ":wuffs_impl",
         "@abseil-cpp//absl/base:nullability",
-        "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
         "@wuffs",

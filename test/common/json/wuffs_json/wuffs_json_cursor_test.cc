@@ -1,4 +1,6 @@
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "source/common/json/wuffs_json/wuffs_json_cursor.h"
@@ -98,6 +100,28 @@ public:
   absl::Status onNumber(absl::string_view, absl::string_view, int, size_t, size_t) override {
     return absl::InternalError("handler abort");
   }
+};
+
+// Duplicate-rejecting handler
+// Tracks seen keys per depth and returns InvalidArgumentError on the first duplicate.
+// Models the handler-level duplicate detection that Option 3 delegates to the handler.
+class DuplicateRejectingHandler : public CapturingHandler {
+public:
+  absl::Status onKey(absl::string_view key, int depth, size_t token_start) override {
+    auto& seen = seen_per_depth_[depth];
+    if (!seen.insert(std::string(key)).second) {
+      return absl::InvalidArgumentError(absl::StrCat("duplicate key: ", key));
+    }
+    return CapturingHandler::onKey(key, depth, token_start);
+  }
+  void onContainerOpen(absl::string_view key, bool is_dict, int depth,
+                       size_t token_start) override {
+    seen_per_depth_.erase(depth);
+    CapturingHandler::onContainerOpen(key, is_dict, depth, token_start);
+  }
+
+private:
+  std::unordered_map<int, std::unordered_set<std::string>> seen_per_depth_;
 };
 
 // Byte-range handler
@@ -329,14 +353,22 @@ TEST(WuffsJsonCursorTest, TrailingGarbageInDifferentDataChunk) {
   EXPECT_FALSE(cursor.feed("random_garbage)", /*closed=*/true).ok());
 }
 
-TEST(WuffsJsonCursorTest, DuplicateKeyRejected) {
-  CapturingHandler h;
+// Duplicate-key detection is delegated to the handler (Option 3).
+// The cursor passes all keys through; the handler returns non-OK on duplicate.
+TEST(WuffsJsonCursorTest, DuplicateKeyRejectedByHandler) {
+  DuplicateRejectingHandler h;
   EXPECT_FALSE(parse(R"({"model":"gpt-4","model":"gpt-4o"})", h).ok());
 }
 
-TEST(WuffsJsonCursorTest, DuplicateKeyInNestedObjectRejected) {
-  CapturingHandler h;
+TEST(WuffsJsonCursorTest, DuplicateKeyInNestedObjectRejectedByHandler) {
+  DuplicateRejectingHandler h;
   EXPECT_FALSE(parse(R"({"x":{"a":1,"a":2}})", h).ok());
+}
+
+// Without a rejecting handler, the cursor itself allows duplicate keys.
+TEST(WuffsJsonCursorTest, DuplicateKeyAllowedWhenHandlerDoesNotReject) {
+  CapturingHandler h;
+  EXPECT_TRUE(parse(R"({"model":"gpt-4","model":"gpt-4o"})", h).ok());
 }
 
 // Same key name at different nesting depths must not trigger a false positive.
