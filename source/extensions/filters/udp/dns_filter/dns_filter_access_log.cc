@@ -5,6 +5,7 @@
 #include "source/extensions/filters/udp/dns_filter/dns_parser.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -89,7 +90,7 @@ public:
     const auto& provider_table = providerFuncTable();
     const auto func_it = provider_table.find(std::string(command));
     if (func_it == provider_table.end()) {
-      return nullptr;
+      return absl::InvalidArgumentError(absl::StrCat("Invalid format substitution: ", command));
     }
     return func_it->second(command_arg, max_length);
   }

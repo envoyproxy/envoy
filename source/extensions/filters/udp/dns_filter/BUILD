@@ -49,6 +49,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/upstream:cluster_manager_lib",
+        "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
         "@c-ares//:ares",
         "@envoy_api//envoy/extensions/filters/udp/dns_filter/v3:pkg_cc_proto",
