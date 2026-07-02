@@ -258,7 +258,7 @@ protected:
   Network::MockFilterChainManager filter_chain_manager_;
   Network::MockListenSocket listen_socket_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
-  Server::Configuration::MockServerFactoryContext factory_context_;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{factory_context_};
   Ssl::MockServerContextConfig* mock_context_config_;
   std::function<absl::Status()> secret_update_callback_;

@@ -13,6 +13,7 @@
 #include "envoy/admin/v3/certs.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 #include "envoy/stats/scope.h"
 #include "envoy/type/matcher/v3/string.pb.h"
@@ -59,6 +60,57 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+SINGLETON_MANAGER_REGISTRATION(tls_builtin_stat_names);
+
+TlsBuiltinStatNames::TlsBuiltinStatNames(Stats::SymbolTable& symbol_table)
+    : stat_name_set_(symbol_table.makeSet("TransportSockets::Tls")),
+      unknown_ssl_cipher_(stat_name_set_->add("unknown_ssl_cipher")),
+      unknown_ssl_curve_(stat_name_set_->add("unknown_ssl_curve")),
+      unknown_ssl_algorithm_(stat_name_set_->add("unknown_ssl_algorithm")),
+      unknown_ssl_version_(stat_name_set_->add("unknown_ssl_version")),
+      ssl_ciphers_(stat_name_set_->add("ssl.ciphers")),
+      ssl_versions_(stat_name_set_->add("ssl.versions")),
+      ssl_curves_(stat_name_set_->add("ssl.curves")),
+      ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")) {
+  // Register stat names based on lists reported by BoringSSL. These are compile-time constant
+  // tables, so the resulting set is identical for every TLS context in the process.
+  std::vector<const char*> list(SSL_get_all_cipher_names(nullptr, 0));
+  SSL_get_all_cipher_names(list.data(), list.size());
+  stat_name_set_->rememberBuiltins(list);
+
+  list.resize(SSL_get_all_curve_names(nullptr, 0));
+  SSL_get_all_curve_names(list.data(), list.size());
+  stat_name_set_->rememberBuiltins(list);
+
+  list.resize(SSL_get_all_signature_algorithm_names(nullptr, 0));
+  SSL_get_all_signature_algorithm_names(list.data(), list.size());
+  stat_name_set_->rememberBuiltins(list);
+
+  list.resize(SSL_get_all_version_names(nullptr, 0));
+  SSL_get_all_version_names(list.data(), list.size());
+  stat_name_set_->rememberBuiltins(list);
+}
+
+namespace {
+// Returns the server-wide shared TLS builtin stat names, creating them on first use. The set is
+// owned by the singleton manager (per-server, hence tied to a single symbol table) and kept alive
+// by the returned shared_ptr held by each ContextImpl.
+std::shared_ptr<TlsBuiltinStatNames>
+getTlsBuiltinStatNames(Stats::Scope& scope,
+                       Server::Configuration::CommonFactoryContext& factory_context) {
+  // Share the singleton set when scope shares the server's SymbolTable. Unit tests using isolated
+  // test scopes allocate a separate TlsBuiltinStatNames on scope.symbolTable() for SymbolTable
+  // safety.
+  if (&scope.symbolTable() == &factory_context.serverScope().symbolTable()) {
+    return factory_context.singletonManager().getTyped<TlsBuiltinStatNames>(
+        SINGLETON_MANAGER_REGISTERED_NAME(tls_builtin_stat_names), [&factory_context] {
+          return std::make_shared<TlsBuiltinStatNames>(factory_context.serverScope().symbolTable());
+        });
+  }
+  return std::make_shared<TlsBuiltinStatNames>(scope.symbolTable());
+}
+} // namespace
+
 int ContextImpl::sslExtendedSocketInfoIndex() {
   CONSTRUCT_ON_FIRST_USE(int, []() -> int {
     int ssl_context_index = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
@@ -74,16 +126,9 @@ ContextImpl::ContextImpl(
     Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status)
     : scope_(scope), stats_(generateSslStats(scope)), factory_context_(factory_context),
       tls_max_version_(config.maxProtocolVersion()),
-      stat_name_set_(scope.symbolTable().makeSet("TransportSockets::Tls")),
-      unknown_ssl_cipher_(stat_name_set_->add("unknown_ssl_cipher")),
-      unknown_ssl_curve_(stat_name_set_->add("unknown_ssl_curve")),
-      unknown_ssl_algorithm_(stat_name_set_->add("unknown_ssl_algorithm")),
-      unknown_ssl_version_(stat_name_set_->add("unknown_ssl_version")),
-      ssl_ciphers_(stat_name_set_->add("ssl.ciphers")),
-      ssl_versions_(stat_name_set_->add("ssl.versions")),
-      ssl_curves_(stat_name_set_->add("ssl.curves")),
-      ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")), capabilities_(config.capabilities()),
-      tls_keylog_local_(config.tlsKeyLogLocal()), tls_keylog_remote_(config.tlsKeyLogRemote()) {
+      builtin_stat_names_(getTlsBuiltinStatNames(scope, factory_context)),
+      capabilities_(config.capabilities()), tls_keylog_local_(config.tlsKeyLogLocal()),
+      tls_keylog_remote_(config.tlsKeyLogRemote()) {
 
   auto cert_validator_name = getCertValidatorName(config.certificateValidationContext());
   auto cert_validator_factory =
@@ -332,23 +377,6 @@ ContextImpl::ContextImpl(
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols(), creation_status);
   RETURN_ONLY_IF_NOT_OK_REF(creation_status);
 
-  // Register stat names based on lists reported by BoringSSL.
-  std::vector<const char*> list(SSL_get_all_cipher_names(nullptr, 0));
-  SSL_get_all_cipher_names(list.data(), list.size());
-  stat_name_set_->rememberBuiltins(list);
-
-  list.resize(SSL_get_all_curve_names(nullptr, 0));
-  SSL_get_all_curve_names(list.data(), list.size());
-  stat_name_set_->rememberBuiltins(list);
-
-  list.resize(SSL_get_all_signature_algorithm_names(nullptr, 0));
-  SSL_get_all_signature_algorithm_names(list.data(), list.size());
-  stat_name_set_->rememberBuiltins(list);
-
-  list.resize(SSL_get_all_version_names(nullptr, 0));
-  SSL_get_all_version_names(list.data(), list.size());
-  stat_name_set_->rememberBuiltins(list);
-
   // As late as possible, run the custom SSL_CTX configuration callback on each
   // SSL_CTX, if set.
   if (auto sslctx_cb = config.sslctxCb(); sslctx_cb) {
@@ -563,7 +591,8 @@ ValidationResults ContextImpl::customVerifyCertChain(
 
 void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value,
                              const Stats::StatName fallback) const {
-  const Stats::StatName value_stat_name = stat_name_set_->getBuiltin(value, fallback);
+  const Stats::StatName value_stat_name =
+      builtin_stat_names_->statNameSet().getBuiltin(value, fallback);
   ENVOY_BUG(value_stat_name != fallback,
             absl::StrCat("Unexpected ", scope_.symbolTable().toString(name), " value: ", value));
   Stats::Utility::counterFromElements(scope_, {name, value_stat_name}).inc();
@@ -576,18 +605,22 @@ void ContextImpl::logHandshake(SSL* ssl) const {
     stats_.session_reused_.inc();
   }
 
-  incCounter(ssl_ciphers_, SSL_get_cipher_name(ssl), unknown_ssl_cipher_);
-  incCounter(ssl_versions_, SSL_get_version(ssl), unknown_ssl_version_);
+  incCounter(builtin_stat_names_->ssl_ciphers_, SSL_get_cipher_name(ssl),
+             builtin_stat_names_->unknown_ssl_cipher_);
+  incCounter(builtin_stat_names_->ssl_versions_, SSL_get_version(ssl),
+             builtin_stat_names_->unknown_ssl_version_);
 
   const uint16_t curve_id = SSL_get_curve_id(ssl);
   if (curve_id) {
-    incCounter(ssl_curves_, SSL_get_curve_name(curve_id), unknown_ssl_curve_);
+    incCounter(builtin_stat_names_->ssl_curves_, SSL_get_curve_name(curve_id),
+               builtin_stat_names_->unknown_ssl_curve_);
   }
 
   const uint16_t sigalg_id = SSL_get_peer_signature_algorithm(ssl);
   if (sigalg_id) {
     const char* sigalg = SSL_get_signature_algorithm_name(sigalg_id, 1 /* include curve */);
-    incCounter(ssl_sigalgs_, sigalg, unknown_ssl_algorithm_);
+    incCounter(builtin_stat_names_->ssl_sigalgs_, sigalg,
+               builtin_stat_names_->unknown_ssl_algorithm_);
   }
 
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
