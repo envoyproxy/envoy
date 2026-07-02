@@ -402,7 +402,12 @@ void PassthroughStateImpl::mergeInto(envoy::config::core::v3::Metadata& metadata
 }
 
 void PassthroughStateImpl::captureReverse(const StreamInfo::FilterState& filter_state) {
-  ASSERT(reverse_state_ == ReverseState::Created);
+  // Close ordering across the internal-listener boundary is not guaranteed, so
+  // this hook may run after mergeReverse has already finalized the shared state.
+  // Capture only on the first invocation while still in the initial state.
+  if (reverse_state_ != ReverseState::Created) {
+    return;
+  }
   auto objects = filter_state.objectsSharedWithDownstreamConnectionOnClose();
   if (objects) {
     reverse_filter_state_objects_ = std::move(*objects);
