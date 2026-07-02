@@ -150,6 +150,8 @@ private:
     ClientImpl& parent_;
   };
 
+  class HeldUserRequest;
+
   struct PendingRequest : public PoolRequest {
     PendingRequest(ClientImpl& parent, ClientCallbacks& callbacks, Stats::StatName stat_name);
     ~PendingRequest() override;
@@ -161,6 +163,11 @@ private:
     ClientCallbacks& callbacks_;
     Stats::StatName command_;
     bool canceled_{};
+    // Set at replay time when ``callbacks_`` is a client-owned HeldUserRequest wrapper; null for
+    // ordinary requests whose ``callbacks_`` is an external object the conn pool may free at
+    // cancel time. Only the wrapper gets a cancel-complete cleanup call — dispatching through
+    // ``callbacks_`` on a canceled ordinary request would touch freed memory.
+    HeldUserRequest* held_wrapper_{nullptr};
     Stats::TimespanPtr aggregate_request_timer_;
     Stats::TimespanPtr command_request_timer_;
   };
@@ -182,7 +189,10 @@ private:
     void onFailure() override;
     void onRedirection(Common::Redis::RespValuePtr&& value, const std::string& host_address,
                        bool ask_redirection) override;
-    void onCancelComplete() override;
+    // Cleanup hook invoked directly by the live PendingRequest's canceled branch (via
+    // PendingRequest::held_wrapper_), not through the ClientCallbacks vtable — the wrapper self-
+    // destructs here once the live PendingRequest that referenced it has been popped.
+    void onCancelComplete();
 
     ClientImpl& parent_;
     ClientCallbacks& original_callbacks_;

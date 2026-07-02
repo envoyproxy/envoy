@@ -678,6 +678,43 @@ TEST_F(RedisClientImplTest, Cancel) {
   EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_cancelled_.value());
 }
 
+// Regression: a canceled ORDINARY request (callbacks_ is an external object, not a held-request
+// wrapper) whose upstream reply arrives after cancel must NOT dispatch anything through
+// callbacks_. The conn pool frees its PendingRequest at cancel time while the client's
+// PendingRequest lives on, so a callback dispatch here is a use-after-free — modeled by
+// destroying the callbacks object before the reply. Only the cancel stat fires. (ASAN catches
+// the pre-fix behavior, which virtual-called callbacks_.onCancelComplete() through freed memory.)
+TEST_F(RedisClientImplTest, CanceledOrdinaryRequestDoesNotDispatchThroughFreedCallbacks) {
+  InSequence s;
+  setup();
+
+  auto callbacks = std::make_unique<MockClientCallbacks>();
+  Common::Redis::RespValue request;
+  EXPECT_CALL(*encoder_, encode(Ref(request), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  PoolRequest* handle = client_->makeRequest(request, *callbacks);
+  ASSERT_NE(nullptr, handle);
+
+  onConnected();
+
+  handle->cancel();
+  // Free the callbacks object, as the conn pool does when its PendingRequest is canceled.
+  callbacks.reset();
+
+  Common::Redis::RespValuePtr response(new Common::Redis::RespValue());
+  response->type(Common::Redis::RespType::SimpleString);
+  response->asString() = "OK";
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+  respondWith(std::move(response));
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_cancelled_.value());
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
 TEST_F(RedisClientImplTest, FailAll) {
   InSequence s;
 

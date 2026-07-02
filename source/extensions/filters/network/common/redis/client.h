@@ -57,15 +57,6 @@ public:
    */
   virtual void onRedirection(RespValuePtr&& value, const std::string& host_address,
                              bool ask_redirection) PURE;
-
-  /**
-   * Called when a canceled PendingRequest is processed (popped without firing onResponse /
-   * onFailure / onRedirection). Default no-op — most callbacks have no per-cancel cleanup.
-   * Wrapper callbacks (e.g. ClientImpl::HeldUserRequest) override this to release themselves
-   * after the live PendingRequest that referenced them is gone, avoiding a dangling reference
-   * in PendingRequest::callbacks_ between the cancel and the eventual processing.
-   */
-  virtual void onCancelComplete() {}
 };
 
 /**
@@ -78,7 +69,6 @@ public:
   void onResponse(Common::Redis::RespValuePtr&&) override {}
   void onFailure() override {}
   void onRedirection(Common::Redis::RespValuePtr&&, const std::string&, bool) override {}
-  // onCancelComplete inherits the base no-op.
 };
 
 /**

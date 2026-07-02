@@ -347,7 +347,11 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
         request.callbacks_.onFailure();
       } else {
         host_->cluster().trafficStats()->upstream_rq_cancelled_.inc();
-        request.callbacks_.onCancelComplete(); // wrapper cleanup hook (default no-op)
+        // Only a client-owned wrapper needs cleanup here; an ordinary request's callbacks_ may
+        // already be freed by the conn pool at cancel time, so never dispatch through it.
+        if (request.held_wrapper_ != nullptr) {
+          request.held_wrapper_->onCancelComplete();
+        }
       }
       pending_requests_.pop_front();
     }
@@ -390,6 +394,10 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   }
   PendingRequest& request = pending_requests_.front();
   const bool canceled = request.canceled_;
+  // Captured before the pop below because ``request`` dangles afterward. Non-null only when
+  // callbacks_ is a client-owned HeldUserRequest wrapper (set at replay); ordinary requests'
+  // callbacks_ may be freed at cancel time so must not be dispatched through here.
+  HeldUserRequest* const held_wrapper = request.held_wrapper_;
 
   if (config_->enableCommandStats()) {
     bool success = !canceled && (value->type() != Common::Redis::RespType::Error) &&
@@ -406,9 +414,12 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   pending_requests_.pop_front();
   if (canceled) {
     host_->cluster().trafficStats()->upstream_rq_cancelled_.inc();
-    // Wrapper callbacks (e.g. HeldUserRequest) may need to release themselves now that the live
-    // PendingRequest that referenced them is gone. Default base impl is a no-op.
-    callbacks.onCancelComplete();
+    // Only a client-owned wrapper needs cleanup now that the live PendingRequest that referenced
+    // it is gone; an ordinary request's callbacks_ may already be freed, so never dispatch
+    // through it on the canceled path.
+    if (held_wrapper != nullptr) {
+      held_wrapper->onCancelComplete();
+    }
   } else if (config_->enableRedirection() && !is_transaction_client_ &&
              (value->type() == Common::Redis::RespType::Error ||
               value->type() == Common::Redis::RespType::BlobError)) {
@@ -613,6 +624,9 @@ void ClientImpl::replayHeldUserRequests() {
     ASSERT(!held_ptr->canceled_);
     auto* live = static_cast<PendingRequest*>(makeRequestInternal(*held_ptr->request_, *held_ptr));
     held_ptr->live_request_ = live;
+    // Back-link so the live request's canceled branch runs this wrapper's cleanup directly,
+    // rather than virtual-dispatching through callbacks_ (see PendingRequest::held_wrapper_).
+    live->held_wrapper_ = held_ptr.get();
   }
   queue_enabled_ = false;
   flushBufferAndResetTimer();
