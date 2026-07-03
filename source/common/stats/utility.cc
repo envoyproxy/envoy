@@ -80,49 +80,54 @@ ScopeSharedPtr scopeFromStatNames(Scope& scope, const StatNameVec& elements) {
 Counter& counterFromElements(Scope& scope, const ElementVec& elements,
                              StatNameTagVectorOptConstRef tags) {
   ElementVisitor visitor(scope.symbolTable(), elements);
-  return scope.counterFromTaggedName(visitor.statName(), Scope::toTagSpan(tags), {});
+  return scope.counterFromTaggedName(visitor.statName(), Scope::toTagSpan(tags), StatName());
 }
 
 Counter& counterFromStatNames(Scope& scope, const StatNameVec& elements,
                               StatNameTagVectorOptConstRef tags) {
   SymbolTable::StoragePtr joined = scope.symbolTable().join(elements);
-  return scope.counterFromTaggedName(StatName(joined.get()), Scope::toTagSpan(tags), {});
+  return scope.counterFromTaggedName(StatName(joined.get()), Scope::toTagSpan(tags), StatName());
 }
 
 Gauge& gaugeFromElements(Scope& scope, const ElementVec& elements, Gauge::ImportMode import_mode,
                          StatNameTagVectorOptConstRef tags) {
   ElementVisitor visitor(scope.symbolTable(), elements);
-  return scope.gaugeFromTaggedName(visitor.statName(), Scope::toTagSpan(tags), {}, import_mode);
+  return scope.gaugeFromTaggedName(visitor.statName(), Scope::toTagSpan(tags), StatName(),
+                                   import_mode);
 }
 
 Gauge& gaugeFromStatNames(Scope& scope, const StatNameVec& elements, Gauge::ImportMode import_mode,
                           StatNameTagVectorOptConstRef tags) {
   SymbolTable::StoragePtr joined = scope.symbolTable().join(elements);
-  return scope.gaugeFromTaggedName(StatName(joined.get()), Scope::toTagSpan(tags), {}, import_mode);
+  return scope.gaugeFromTaggedName(StatName(joined.get()), Scope::toTagSpan(tags), StatName(),
+                                   import_mode);
 }
 
 Histogram& histogramFromElements(Scope& scope, const ElementVec& elements, Histogram::Unit unit,
                                  StatNameTagVectorOptConstRef tags) {
   ElementVisitor visitor(scope.symbolTable(), elements);
-  return scope.histogramFromTaggedName(visitor.statName(), Scope::toTagSpan(tags), {}, unit);
+  return scope.histogramFromTaggedName(visitor.statName(), Scope::toTagSpan(tags), StatName(),
+                                       unit);
 }
 
 Histogram& histogramFromStatNames(Scope& scope, const StatNameVec& elements, Histogram::Unit unit,
                                   StatNameTagVectorOptConstRef tags) {
   SymbolTable::StoragePtr joined = scope.symbolTable().join(elements);
-  return scope.histogramFromTaggedName(StatName(joined.get()), Scope::toTagSpan(tags), {}, unit);
+  return scope.histogramFromTaggedName(StatName(joined.get()), Scope::toTagSpan(tags), StatName(),
+                                       unit);
 }
 
 TextReadout& textReadoutFromElements(Scope& scope, const ElementVec& elements,
                                      StatNameTagVectorOptConstRef tags) {
   ElementVisitor visitor(scope.symbolTable(), elements);
-  return scope.textReadoutFromTaggedName(visitor.statName(), Scope::toTagSpan(tags), {});
+  return scope.textReadoutFromTaggedName(visitor.statName(), Scope::toTagSpan(tags), StatName());
 }
 
 TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
                                       StatNameTagVectorOptConstRef tags) {
   SymbolTable::StoragePtr joined = scope.symbolTable().join(elements);
-  return scope.textReadoutFromTaggedName(StatName(joined.get()), Scope::toTagSpan(tags), {});
+  return scope.textReadoutFromTaggedName(StatName(joined.get()), Scope::toTagSpan(tags),
+                                         StatName());
 }
 
 } // namespace Utility

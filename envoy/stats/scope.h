@@ -231,7 +231,9 @@ public:
    * @param name The name of the stat, obtained from the SymbolTable.
    * @return a counter within the scope's namespace.
    */
-  Counter& counterFromStatName(const StatName& name) { return counterFromTaggedName(name, {}, {}); }
+  Counter& counterFromStatName(const StatName& name) {
+    return counterFromTaggedName(name, std::nullopt, StatName());
+  }
   /**
    * Creates a Counter from the stat name and tags. If tags are not provided, tag extraction
    * will be performed on the name.
@@ -257,7 +259,7 @@ public:
    * @return a gauge within the scope's namespace.
    */
   Gauge& gaugeFromStatName(const StatName& name, Gauge::ImportMode import_mode) {
-    return gaugeFromTaggedName(name, {}, {}, import_mode);
+    return gaugeFromTaggedName(name, std::nullopt, StatName(), import_mode);
   }
 
   /**
@@ -288,7 +290,7 @@ public:
    * @return a histogram within the scope's namespace with a particular value type.
    */
   Histogram& histogramFromStatName(const StatName& name, Histogram::Unit unit) {
-    return histogramFromTaggedName(name, {}, {}, unit);
+    return histogramFromTaggedName(name, std::nullopt, StatName(), unit);
   }
 
   /**
@@ -318,7 +320,7 @@ public:
    * @return a text readout within the scope's namespace.
    */
   TextReadout& textReadoutFromStatName(const StatName& name) {
-    return textReadoutFromTaggedName(name, {}, {});
+    return textReadoutFromTaggedName(name, std::nullopt, StatName());
   }
 
   /**
