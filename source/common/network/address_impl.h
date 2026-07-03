@@ -148,11 +148,6 @@ public:
   }
 
   /**
-   * @return the v4-mapped sockaddr_in6 representation of this address
-   */
-  sockaddr_in6 v4MappedSockAddr() const;
-
-  /**
    * Convenience function to convert an IPv4 address to canonical string format.
    * @note This works similarly to inet_ntop() but is faster.
    * @param addr address to format.
