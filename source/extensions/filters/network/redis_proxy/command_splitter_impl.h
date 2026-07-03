@@ -559,8 +559,6 @@ private:
   void onInvalidRequest(SplitCallbacks& callbacks);
 
   RouterPtr router_;
-  // Initialized before the command handlers, which may keep a reference to it.
-  absl::flat_hash_set<std::string> custom_commands_;
   CommandHandlerFactory<SimpleRequest> simple_command_handler_;
   CommandHandlerFactory<EvalRequest> eval_command_handler_;
   CommandHandlerFactory<ObjectRequest> object_command_handler_;
@@ -570,6 +568,8 @@ private:
   CommandHandlerFactory<ShardInfoRequest> shard_info_handler_;
   CommandHandlerFactory<RandomShardRequest> random_shard_handler_;
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
+  // Initialized before transaction_handler_, which keeps a reference to it.
+  absl::flat_hash_set<std::string> custom_commands_;
   TransactionCommandHandlerFactory transaction_handler_;
   CommandHandlerFactory<ClusterScopeCmdRequest> cluster_scope_handler_;
   RadixTree<HandlerDataPtr> handler_lookup_table_;
