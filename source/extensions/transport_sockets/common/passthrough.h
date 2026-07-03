@@ -77,6 +77,13 @@ public:
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   void onConnected() override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
+  // Forward kTLS bytestream info to the wrapped socket so a wrapper (e.g. the upstream
+  // http_11_proxy transport socket) does not hide an inner kTLS socket from a higher layer such as
+  // the kTLS body-splice that wants to splice() on the fd. Without this forward the base default
+  // reports "not kTLS" and the splice never engages on a wrapped upstream.
+  OptRef<const Network::KtlsBytestreamInfo> ktlsBytestreamInfo() const override {
+    return transport_socket_->ktlsBytestreamInfo();
+  }
   // startSecureTransport method should not be called for this transport socket.
   bool startSecureTransport() override { return false; }
   void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,

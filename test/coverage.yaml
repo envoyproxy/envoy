@@ -19,6 +19,7 @@ directories:
   source/common/network/dns_resolver: 91.4   # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
   source/common/quic: 93.5
   source/common/signal: 87.4  # Death tests don't report LCOV
+  source/common/tcp_proxy: 90.0
   source/common/thread: 0.0  # Death tests don't report LCOV
   source/common/tls: 94.3  # FIPS code paths impossible to trigger on non-FIPS builds and vice versa
   source/common/tls/cert_validator: 95.1

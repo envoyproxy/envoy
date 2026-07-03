@@ -1655,6 +1655,51 @@ TEST_F(Http1ServerConnectionImplTest, PostWithContentLength) {
   EXPECT_EQ(0U, buffer.length());
 }
 
+TEST_F(Http1ServerConnectionImplTest, CompleteSplicedRequestFinalizesAndResetsParser) {
+  initialize();
+
+  // Set up both request decoder mocks before the sequence so their getRequestDecoderHandle()
+  // expectations are not themselves sequenced (they fire whenever a stream is created).
+  MockRequestDecoder decoder;
+  MockRequestDecoder second_decoder;
+  setupRequestDecoderMock(decoder);
+  setupRequestDecoderMock(second_decoder);
+
+  InSequence sequence;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  // Deliver only the request headers. The 100000-byte body would be spliced out-of-band, so it
+  // never passes through the parser or the decode path.
+  EXPECT_CALL(decoder, decodeHeaders_(_, false));
+  Buffer::OwnedImpl headers_buffer(
+      "POST / HTTP/1.1\r\nhost: host\r\ncontent-length: 100000\r\n\r\n");
+  auto status = codec_->dispatch(headers_buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0, headers_buffer.length());
+
+  // Finalize the spliced request. The decoder observes the terminal end-of-stream with no body.
+  EXPECT_CALL(decoder, decodeData(_, true));
+  response_encoder->completeSplicedRequest(100000);
+
+  // Send the response to complete the request/response cycle, which clears the active request so
+  // the connection can parse the next pipelined request.
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"content-length", "0"}};
+  response_encoder->encodeHeaders(response_headers, true);
+
+  // The connection is keep-alive ready. A second request parses cleanly on a fresh stream, proving
+  // the parser was rebuilt rather than left stuck mid-body.
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(second_decoder));
+  EXPECT_CALL(second_decoder, decodeHeaders_(_, true));
+  Buffer::OwnedImpl second_request("GET /next HTTP/1.1\r\nhost: host\r\n\r\n");
+  status = codec_->dispatch(second_request);
+  EXPECT_TRUE(status.ok());
+}
+
 // Verify that headers and body with content length are processed correctly and data is merged
 // before the decodeData call even if delivered in a buffer that holds 1 byte per slice.
 TEST_F(Http1ServerConnectionImplTest, PostWithContentLengthFragmentedBuffer) {
@@ -2671,6 +2716,41 @@ TEST_F(Http1ClientConnectionImplTest, SimpleGet) {
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
   EXPECT_EQ("GET / HTTP/1.1\r\n\r\n", output);
+}
+
+// completeSplicedResponse() finalizes a Content-Length response whose body was relayed out-of-band
+// by the kTLS body-splice fast path. It delivers the terminal end-of-stream to the decoder and
+// leaves the connection ready to parse the next keep-alive response.
+TEST_F(Http1ClientConnectionImplTest, CompleteSplicedResponseFinalizesAndResetsParser) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(request_headers, true).ok());
+
+  // Deliver only the response headers. The 100000-byte body would be spliced out-of-band, so it
+  // never passes through the parser or the decode path.
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  Buffer::OwnedImpl headers_buffer("HTTP/1.1 200 OK\r\ncontent-length: 100000\r\n\r\n");
+  auto status = codec_->dispatch(headers_buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0, headers_buffer.length());
+
+  // Finalize the spliced response. The decoder observes the terminal end-of-stream with no body.
+  EXPECT_CALL(response_decoder, decodeData(_, true));
+  request_encoder.completeSplicedResponse(100000);
+
+  // The connection is keep-alive ready. A second response parses cleanly on a fresh stream, proving
+  // the parser was rebuilt rather than left stuck mid-body.
+  NiceMock<MockResponseDecoder> second_response_decoder;
+  Http::RequestEncoder& second_request_encoder = codec_->newStream(second_response_decoder);
+  EXPECT_TRUE(second_request_encoder.encodeHeaders(request_headers, true).ok());
+  EXPECT_CALL(second_response_decoder, decodeHeaders_(_, true));
+  Buffer::OwnedImpl second_response("HTTP/1.1 204 No Content\r\n\r\n");
+  status = codec_->dispatch(second_response);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ClientConnectionImplTest, SimpleGetWithHeaderCasing) {

@@ -41,6 +41,8 @@ public:
   MOCK_METHOD(Envoy::Http::StreamDecoderFilterCallbacks*, callbacks, ());
   MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, cluster, ());
   MOCK_METHOD(FilterConfig&, config, ());
+  MOCK_METHOD(void, disableRetries, ());
+  MOCK_METHOD(bool, shadowStreamsActive, (), (const));
   MOCK_METHOD(TimeoutData, timeout, ());
   MOCK_METHOD(std::optional<std::chrono::milliseconds>, dynamicMaxStreamDuration, (), (const));
   MOCK_METHOD(Envoy::Http::RequestHeaderMap*, downstreamHeaders, ());

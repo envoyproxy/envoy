@@ -29,6 +29,7 @@ public:
   MOCK_METHOD(Status, encodeHeaders, (const RequestHeaderMap& headers, bool end_stream));
   MOCK_METHOD(void, encodeTrailers, (const RequestTrailerMap& trailers));
   MOCK_METHOD(void, enableTcpTunneling, ());
+  MOCK_METHOD(void, completeSplicedResponse, (uint64_t response_body_bytes));
 
   // Http::StreamEncoder
   MOCK_METHOD(void, encodeData, (Buffer::Instance & data, bool end_stream));
@@ -54,6 +55,7 @@ public:
                Http::ResponseHeaderMapConstSharedPtr response_header_map,
                Http::ResponseTrailerMapConstSharedPtr response_trailer_map,
                StreamInfo::StreamInfo& stream_info));
+  MOCK_METHOD(void, completeSplicedRequest, (uint64_t request_body_bytes));
 
   // Http::StreamEncoder
   MOCK_METHOD(void, encodeData, (Buffer::Instance & data, bool end_stream));

@@ -35,6 +35,12 @@ namespace Network {
 class Connection;
 enum class ConnectionEvent;
 
+// Reports whether kTLS is installed and trusted for body-splice.
+struct KtlsBytestreamInfo {
+  bool installed{false};
+  bool trusted_peer{false};
+};
+
 /**
  * Result of each I/O event.
  */
@@ -189,6 +195,13 @@ public:
    * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
    */
   virtual Ssl::ConnectionInfoConstSharedPtr ssl() const PURE;
+
+  /**
+   * @return kTLS bytestream info (installed plus trusted-peer state) if this transport socket has
+   * installed kernel TLS and can be spliced on directly, otherwise an empty OptRef. The base
+   * returns empty.
+   */
+  virtual OptRef<const KtlsBytestreamInfo> ktlsBytestreamInfo() const { return {}; }
 
   /**
    * Instructs a transport socket to start using secure transport.

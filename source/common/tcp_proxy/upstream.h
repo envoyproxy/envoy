@@ -361,6 +361,10 @@ public:
   Router::FilterConfig& config() override {
     return const_cast<Router::FilterConfig&>(config_.routerFilterConfig());
   }
+  // The L7 kTLS body-splice is a router-only fast path and never engages on a tcp_proxy tunnel, so
+  // these are unused here and exist only to satisfy the interface.
+  void disableRetries() override {}
+  bool shadowStreamsActive() const override { return false; }
   Router::TimeoutData timeout() override { return {}; }
   std::optional<std::chrono::milliseconds> dynamicMaxStreamDuration() const override {
     return std::nullopt;

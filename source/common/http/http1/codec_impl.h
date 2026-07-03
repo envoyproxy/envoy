@@ -68,6 +68,10 @@ public:
   uint32_t bufferLimit() const override;
   absl::string_view responseDetails() override { return details_; }
   const Network::ConnectionInfoProvider& connectionInfoProvider() override;
+  // HTTP/1.1 owns its connection one stream at a time, so the backing socket can be borrowed for
+  // the kTLS body-splice fast path. Defined out-of-line because it dereferences the
+  // forward-declared ConnectionImpl.
+  OptRef<Network::Connection> connectionForSplice() override;
   void setFlushTimeout(std::chrono::milliseconds) override {
     // HTTP/1 has one stream per connection, thus any data encoded is immediately written to the
     // connection, invoking any watermarks as necessary. There is no internal buffering that would
@@ -178,6 +182,9 @@ public:
   // TODO(paulsohn): Enable H/1 codec to get a pointer to the new
   // request decoder on recreateStream, here or elsewhere.
   void setRequestDecoder(Http::RequestDecoder& /*decoder*/) override {}
+  // Defined out-of-line because it dispatches to the owning ServerConnectionImpl, which is declared
+  // later in this header.
+  void completeSplicedRequest(uint64_t request_body_bytes) override;
 
   // Http1::StreamEncoderImpl
   void resetStream(StreamResetReason reason) override;
@@ -202,6 +209,9 @@ public:
   Status encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const RequestTrailerMap& trailers) override { encodeTrailersBase(trailers); }
   void enableTcpTunneling() override { is_tcp_tunneling_ = true; }
+  // Defined out-of-line because it dispatches to the owning ClientConnectionImpl, which is declared
+  // later in this header.
+  void completeSplicedResponse(uint64_t response_body_bytes) override;
 
 private:
   bool upgrade_request_{};
@@ -463,6 +473,12 @@ public:
                        Server::OverloadManager& overload_manager);
   bool supportsHttp10() override { return codec_settings_.accept_http_10_; }
 
+  // Finalizes a request whose Content-Length body was relayed out-of-band by the kTLS body-splice
+  // fast path. Mirrors onMessageCompleteBase() for a Content-Length body, then rebuilds the parser
+  // (which is otherwise stuck mid-body because the spliced bytes bypassed it) so the connection can
+  // carry the next keep-alive request.
+  void completeSplicedRequest(uint64_t request_body_bytes);
+
 protected:
   /**
    * An active HTTP/1.1 request.
@@ -584,6 +600,12 @@ public:
                        bool passing_through_proxy = false);
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
+
+  // Finalizes a response whose Content-Length body was relayed out-of-band by the kTLS body-splice
+  // fast path. Mirrors onMessageCompleteBase() for a Content-Length body, then rebuilds the parser
+  // (which is otherwise stuck mid-body because the spliced bytes bypassed it) so the connection can
+  // carry the next keep-alive response.
+  void completeSplicedResponse(uint64_t response_body_bytes);
 
 private:
   struct PendingResponse {

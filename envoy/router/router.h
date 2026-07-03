@@ -1679,6 +1679,17 @@ public:
    * Get the bytes meter for this stream.
    */
   virtual const StreamInfo::BytesMeterSharedPtr& bytesMeter() PURE;
+
+  /**
+   * @return upstream HTTP/1.1 connection available for kTLS body-splice, or empty.
+   */
+  virtual OptRef<Network::Connection> upstreamConnectionForSplice() { return {}; }
+
+  /**
+   * Finalize a Content-Length response body relayed by kTLS body-splice.
+   * @param response_body_bytes the number of body bytes spliced.
+   */
+  virtual void completeSplicedResponse(uint64_t /* response_body_bytes */) {}
 };
 
 /*

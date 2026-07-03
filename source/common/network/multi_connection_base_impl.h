@@ -115,6 +115,9 @@ public:
   std::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
   // Note, this might change before connect finishes.
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
+  OptRef<const KtlsBytestreamInfo> ktlsBytestreamInfo() const override;
+  void reinstallFileEvents() override;
+  void extractPendingWriteForSplice(Buffer::Instance& dst) override;
   State state() const override;
   bool connecting() const override;
   uint32_t bufferLimit() const override;
@@ -136,7 +139,13 @@ public:
   void hashKey(std::vector<uint8_t>& hash_key) const override;
   void dumpState(std::ostream& os, int indent_level) const override;
 
-  const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
+  // After connect, connections_ holds only the selected connection (same invariant ssl() and
+  // nextProtocol() rely on above), so its socket is well-defined. The kTLS body-splice queries this
+  // post-connect to splice() on the upstream kTLS fd. Without it the splice would panic on a Happy
+  // Eyeballs (DNS-cluster) upstream.
+  const Network::ConnectionSocketPtr& getSocket() const override {
+    return connections_[0]->getSocket();
+  }
 
 private:
   // ConnectionCallbacks which will be set on an ClientConnection which

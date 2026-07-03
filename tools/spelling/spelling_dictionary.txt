@@ -1038,6 +1038,7 @@ keepalives
 keyset
 ketama
 keyder
+kTLS
 kqueue
 kubernetes
 kv
@@ -1619,6 +1620,7 @@ useragent
 userdata
 userinfo
 username
+userspace
 usr
 util
 utils
@@ -1755,3 +1757,9 @@ datasets
 smartptr
 JA3
 JA4
+AEAD
+iters
+ktls
+middlebox
+reinstalls
+spliceable

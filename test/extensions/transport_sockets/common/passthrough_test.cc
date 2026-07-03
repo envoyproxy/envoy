@@ -95,6 +95,19 @@ TEST_F(PassthroughTest, SslDefersToInnerSocket) {
   passthrough_socket_->ssl();
 }
 
+// Test ktlsBytestreamInfo method defers to inner socket so a wrapped kTLS socket stays visible.
+TEST_F(PassthroughTest, KtlsBytestreamInfoDefersToInnerSocket) {
+  Network::KtlsBytestreamInfo info;
+  info.installed = true;
+  info.trusted_peer = true;
+  EXPECT_CALL(*inner_socket_, ktlsBytestreamInfo())
+      .WillOnce(testing::Return(OptRef<const Network::KtlsBytestreamInfo>(info)));
+  const auto result = passthrough_socket_->ktlsBytestreamInfo();
+  ASSERT_TRUE(result.has_value());
+  EXPECT_TRUE(result->installed);
+  EXPECT_TRUE(result->trusted_peer);
+}
+
 // Test invoking startSecureTransport.
 TEST_F(PassthroughTest, FailOnStartSecureTransport) {
   EXPECT_FALSE(passthrough_socket_->startSecureTransport());

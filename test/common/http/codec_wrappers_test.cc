@@ -87,6 +87,14 @@ TEST(RequestEncoderWrapper, HeaderOnlyEncode) {
   EXPECT_TRUE(wrapper.encodeComplete());
 }
 
+TEST(RequestEncoderWrapper, CompleteSplicedResponseForwardsToInner) {
+  // The kTLS body-splice finalizes the response through this wrapper stack, so the call must reach
+  // the inner encoder. A silent no-op here would strand the spliced stream.
+  MockRequestEncoderWrapper wrapper;
+  EXPECT_CALL(wrapper.innerEncoder(), completeSplicedResponse(12345));
+  wrapper.completeSplicedResponse(12345);
+}
+
 TEST(RequestEncoderWrapper, HeaderAndBodyEncode) {
   MockRequestEncoderWrapper wrapper;
 

@@ -216,6 +216,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_rx_queue_overflow_soc
 // TODO(abeyad): Flip to true after prod testing.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_ip_packet_info_socket_options);
 
+// L7 HTTP/1.1 kTLS body-splice fast path, disabled by default.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_http1_ktls_body_splice);
+
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);

@@ -34,6 +34,7 @@ namespace Router {
 class GenericUpstream;
 class GenericConnectionPoolCallbacks;
 class RouterFilterInterface;
+class SpliceCoordinator;
 class UpstreamRequest;
 class UpstreamRequestFilterManagerCallbacks;
 class UpstreamFilterManager;
@@ -180,6 +181,11 @@ private:
   friend class UpstreamFilterManager;
   friend class UpstreamCodecFilter;
   friend class UpstreamRequestFilterManagerCallbacks;
+  friend class SpliceCoordinator;
+  // Test-only friend that lets the splice coordinator unit test set the private members the
+  // coordinator reads (upstream_, router_sent_end_stream_) and observe
+  // on_reset_stream_in_progress_.
+  friend class SpliceCoordinatorTest;
   StreamInfo::UpstreamTiming& upstreamTiming() {
     return stream_info_.upstreamInfo()->upstreamTiming();
   }
@@ -229,6 +235,12 @@ private:
   std::unique_ptr<UpstreamRequestFilterManagerCallbacks> filter_manager_callbacks_;
   std::unique_ptr<Http::FilterManager> filter_manager_;
 
+  // Drives the L7 kTLS body-splice fast path for this request in either direction, the response
+  // body (download) or the request body (upload, which read-disables the downstream source while it
+  // waits to engage). Lazily created when a message first becomes splice-eligible. Null on every
+  // connection that never qualifies.
+  std::unique_ptr<SpliceCoordinator> splice_coordinator_;
+
   // The number of outstanding readDisable to be called with parameter value true.
   // When downstream send buffers get above high watermark before response headers arrive, we
   // increment this counter instead of immediately calling readDisable on upstream stream. This is
@@ -257,6 +269,10 @@ private:
   bool paused_for_connect_ : 1 = false;
   bool paused_for_websocket_ : 1 = false;
   bool reset_stream_ : 1 = false;
+  // Guards onResetStream against re-entry. The splice no-progress watchdog calls onResetStream
+  // directly, and reset() force-closes the upstream inline, whose codec reset cascade re-enters
+  // onResetStream. The nested call must be a no-op so the request leaves the parent list once.
+  bool on_reset_stream_in_progress_ : 1 = false;
 
   // Sentinel to indicate if timeout budget tracking is configured for the cluster,
   // and if so, if the per-try histogram should record a value.

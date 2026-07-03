@@ -575,6 +575,28 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "splice_coordinator_test",
+    srcs = ["splice_coordinator_test.cc"],
+    rbe_pool = "6gig",
+    # The fixture rebuilds the full UpstreamRequest mock graph per case, which is slow under MSAN;
+    # shard so no single shard exceeds the test timeout.
+    shard_count = 4,
+    deps = [
+        "//source/common/network:utility_lib",
+        "//source/common/router:router_lib",
+        "//source/common/tcp_proxy:splice_pump_lib",
+        "//test/common/http:common_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/router:router_filter_interface",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "delegating_route_impl_test",
     srcs = ["delegating_route_impl_test.cc"],
     rbe_pool = "6gig",

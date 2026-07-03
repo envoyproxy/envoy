@@ -207,6 +207,23 @@ Ssl::ConnectionInfoConstSharedPtr MultiConnectionBaseImpl::ssl() const {
   return connections_[0]->ssl();
 }
 
+// Delegate to the active connection so the kTLS body-splice can discover the inner kTLS socket and
+// splice() on its fd. Without this the Happy Eyeballs wrapper used for DNS clusters reports the
+// base default "not kTLS" and the splice never engages on a hostname upstream.
+OptRef<const KtlsBytestreamInfo> MultiConnectionBaseImpl::ktlsBytestreamInfo() const {
+  return connections_[0]->ktlsBytestreamInfo();
+}
+
+// Delegate to the active connection so the kTLS body-splice re-arms the inner socket it borrowed
+// (getSocket() and ktlsBytestreamInfo() above resolve to the same connection). Without this a
+// Happy Eyeballs (DNS-cluster) upstream would keep the base no-op and never resume reads after a
+// bounded splice completes.
+void MultiConnectionBaseImpl::reinstallFileEvents() { connections_[0]->reinstallFileEvents(); }
+
+void MultiConnectionBaseImpl::extractPendingWriteForSplice(Buffer::Instance& dst) {
+  connections_[0]->extractPendingWriteForSplice(dst);
+}
+
 Connection::State MultiConnectionBaseImpl::state() const {
   if (!connect_finished_) {
     ASSERT(connections_[0]->state() == Connection::State::Open);
