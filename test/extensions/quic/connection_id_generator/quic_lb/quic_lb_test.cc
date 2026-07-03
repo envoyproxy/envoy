@@ -374,8 +374,9 @@ TEST(QuicLbTest, WorkerSelector) {
   } else {
     ASSERT_OK(bpf_tester);
   }
-  const uint32_t default_host = bpf_tester.ok() ? bpf_tester->defaultHost() : UINT32_MAX;
-  const uint32_t non_default_host = bpf_tester.ok() ? bpf_tester->nonDefaultHost() : UINT32_MAX;
+  const uint32_t default_host = bpf_tester.ok() ? bpf_tester->defaultHost() : UINT32_MAX / 2;
+  const uint32_t non_default_host =
+      bpf_tester.ok() ? bpf_tester->nonDefaultHost() : (default_host + 1) % concurrency;
 
   Buffer::OwnedImpl buffer;
 
