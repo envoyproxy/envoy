@@ -73,6 +73,17 @@ namespace Utility {
 std::string sanitizeStatsName(absl::string_view name);
 
 /**
+ * Sanitizes a stat name and writes it to the provided buffer. The buffer is
+ * used to hold the sanitized name, and the returned string_view points to the
+ * buffer. The buffer is not modified if the name does not need sanitization.
+ * @param name the stat name to sanitize.
+ * @param buffer the buffer to write the sanitized name to.
+ * @return a string_view pointing to the sanitized name in the buffer, or the
+ * original name if no sanitization was needed.
+ */
+absl::string_view sanitizeStatsName(absl::string_view name, std::string& buffer);
+
+/**
  * Finds a metric tag with the specified name.
  *
  * @param metric The metric in which the tag is expected to exist.

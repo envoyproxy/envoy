@@ -26,6 +26,27 @@ std::string Utility::sanitizeStatsName(absl::string_view name) {
                                    });
 }
 
+absl::string_view Utility::sanitizeStatsName(absl::string_view name, std::string& buffer) {
+  if (absl::EndsWith(name, ".")) {
+    name.remove_suffix(1);
+  }
+  if (absl::StartsWith(name, ".")) {
+    name.remove_prefix(1);
+  }
+
+  // Check if the name needs sanitization.
+  if (name.find(':') != absl::string_view::npos || name.find('\0') != absl::string_view::npos) {
+    buffer = absl::StrReplaceAll(name, {
+                                           {"://", "_"},
+                                           {":/", "_"},
+                                           {":", "_"},
+                                           {absl::string_view("\0", 1), "_"},
+                                       });
+    return buffer;
+  }
+  return name;
+}
+
 std::optional<StatName> Utility::findTag(const Metric& metric, StatName find_tag_name) {
   std::optional<StatName> value;
   metric.iterateTagStatNames(

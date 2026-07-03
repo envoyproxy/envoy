@@ -172,20 +172,24 @@ ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScopeWithTaggedName(
     absl::string_view base_name, TagStringViewSpan name_tags, absl::string_view tagged_name,
     bool evictable, const ScopeStatsLimitSettings& limits, StatsMatcherSharedPtr matcher) {
   if (useExplicitTags()) {
+    std::string sanitize_buffer;
     StatNamePool tag_pool(symbolTable());
-    StatName stat_name = tag_pool.add(Utility::sanitizeStatsName(base_name));
+    StatName stat_name = tag_pool.add(Utility::sanitizeStatsName(base_name, sanitize_buffer));
     StatName stat_tagged_name;
     if (!name_tags.empty()) {
       // The tagged name is only meaningful when there are tags to interleave; otherwise it is
       // ignored.
       stat_tagged_name =
-          tagged_name.empty() ? StatName() : tag_pool.add(Utility::sanitizeStatsName(tagged_name));
+          tagged_name.empty()
+              ? StatName()
+              : tag_pool.add(Utility::sanitizeStatsName(tagged_name, sanitize_buffer));
     }
 
     StatNameTagVec stat_name_tags;
     stat_name_tags.reserve(name_tags.size());
     for (const auto& [tag, value] : name_tags) {
-      stat_name_tags.emplace_back(tag_pool.add(tag), tag_pool.add(value));
+      stat_name_tags.emplace_back(tag_pool.add(Utility::sanitizeStatsName(tag, sanitize_buffer)),
+                                  tag_pool.add(Utility::sanitizeStatsName(value, sanitize_buffer)));
     }
     return scopeFromTaggedName(stat_name, stat_name_tags, stat_tagged_name, evictable, limits,
                                std::move(matcher));
