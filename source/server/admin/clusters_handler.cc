@@ -221,6 +221,9 @@ void ClustersHandler::writeClustersAsJson(const std::optional<const re2::RE2>& f
     // Render a cluster's synthetic admin endpoints (not load-balanced hosts) as host statuses.
     if (const auto* provider = cluster.adminEndpointProvider()) {
       for (const auto& endpoint : provider->adminEndpoints()) {
+        if (endpoint.address == nullptr) {
+          continue;
+        }
         envoy::admin::v3::HostStatus& host_status = *cluster_status.add_host_statuses();
         Network::Utility::addressToProtobufAddress(*endpoint.address,
                                                    *host_status.mutable_address());
@@ -315,6 +318,9 @@ void ClustersHandler::writeClustersAsText(const std::optional<const re2::RE2>& f
     // Render a cluster's synthetic admin endpoints (not load-balanced hosts) as host statuses.
     if (const auto* provider = cluster.adminEndpointProvider()) {
       for (const auto& endpoint : provider->adminEndpoints()) {
+        if (endpoint.address == nullptr) {
+          continue;
+        }
         const std::string address = endpoint.address->asString();
         for (const auto& [gauge_name, gauge_value] : endpoint.gauges) {
           response.add(

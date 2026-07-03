@@ -93,6 +93,10 @@ std::string ReverseConnectionUtility::buildClusterScopedIdentifier(absl::string_
                                                                    absl::string_view cluster_id) {
   // cluster_id carries the tenant prefix; prefixing the base node yields "[tenant:]cluster:node".
   const TenantScopedIdentifierView node = splitTenantScopedIdentifier(node_id);
+  // Without a cluster, keep the node's own tenant so isolation is preserved.
+  if (cluster_id.empty()) {
+    return buildTenantScopedIdentifier(node.tenant, node.identifier);
+  }
   return buildTenantScopedIdentifier(cluster_id, node.identifier);
 }
 

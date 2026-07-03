@@ -450,6 +450,10 @@ ReverseTunnelAcceptorExtension::reachableTunnels() const {
     // Recover the scoped node and cluster ids from the "[tenant:]cluster:node" suffix.
     auto [node_id, cluster_id] =
         ReverseConnectionUtility::splitClusterScopedIdentifier(name.substr(start + prefix.size()));
+    // Skip malformed names that yield no node.
+    if (node_id.empty()) {
+      return true;
+    }
     result.push_back({std::move(node_id), std::move(cluster_id), gauge->value()});
     return true;
   };
