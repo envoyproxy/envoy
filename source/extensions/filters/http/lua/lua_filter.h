@@ -37,7 +37,7 @@ struct LuaFilterStats {
 class PerLuaCodeSetup : Logger::Loggable<Logger::Id::lua> {
 public:
   PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
-                  Stats::Gauge* vm_count_gauge = nullptr, uint32_t concurrency = 0);
+                  Stats::Gauge& vm_count_gauge, uint32_t concurrency);
   ~PerLuaCodeSetup();
 
   Extensions::Filters::Common::Lua::CoroutinePtr createCoroutine() {
@@ -55,7 +55,7 @@ private:
   uint64_t response_function_slot_{};
 
   Filters::Common::Lua::ThreadLocalState lua_state_;
-  Stats::Gauge* vm_count_gauge_{};
+  Stats::Gauge& vm_count_gauge_;
   uint32_t vm_count_delta_{};
 };
 

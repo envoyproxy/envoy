@@ -205,7 +205,7 @@ Stats::Gauge& lookupLuaVmCountGauge(Stats::Scope& server_scope) {
 } // namespace
 
 PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
-                                 Stats::Gauge* vm_count_gauge, uint32_t concurrency)
+                                 Stats::Gauge& vm_count_gauge, uint32_t concurrency)
     : lua_state_(lua_code, tls), vm_count_gauge_(vm_count_gauge), vm_count_delta_(concurrency + 1) {
   lua_state_.registerType<Filters::Common::Lua::BufferWrapper>();
   lua_state_.registerType<Filters::Common::Lua::MetadataMapWrapper>();
@@ -253,16 +253,10 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
     ENVOY_LOG(info, "envoy_on_response() function not found. Lua filter will not hook responses.");
   }
 
-  if (vm_count_gauge_ != nullptr) {
-    vm_count_gauge_->add(vm_count_delta_);
-  }
+  vm_count_gauge_.add(vm_count_delta_);
 }
 
-PerLuaCodeSetup::~PerLuaCodeSetup() {
-  if (vm_count_gauge_ != nullptr) {
-    vm_count_gauge_->sub(vm_count_delta_);
-  }
-}
+PerLuaCodeSetup::~PerLuaCodeSetup() { vm_count_gauge_.sub(vm_count_delta_); }
 
 StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
                                          Http::RequestOrResponseHeaderMap& headers, bool end_stream,
@@ -874,17 +868,17 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
     const std::string code = THROW_OR_RETURN_VALUE(
         Config::DataSource::read(proto_config.default_source_code(), true, api), std::string);
     default_lua_code_setup_ =
-        std::make_unique<PerLuaCodeSetup>(code, tls, &vm_count_gauge, concurrency);
+        std::make_unique<PerLuaCodeSetup>(code, tls, vm_count_gauge, concurrency);
   } else if (!proto_config.inline_code().empty()) {
     default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(proto_config.inline_code(), tls,
-                                                                &vm_count_gauge, concurrency);
+                                                                vm_count_gauge, concurrency);
   }
 
   for (const auto& source : proto_config.source_codes()) {
     const std::string code =
         THROW_OR_RETURN_VALUE(Config::DataSource::read(source.second, true, api), std::string);
     auto per_lua_code_setup_ptr =
-        std::make_unique<PerLuaCodeSetup>(code, tls, &vm_count_gauge, concurrency);
+        std::make_unique<PerLuaCodeSetup>(code, tls, vm_count_gauge, concurrency);
     if (!per_lua_code_setup_ptr) {
       continue;
     }
@@ -905,7 +899,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(
         Config::DataSource::read(config.source_code(), true, context.api()), std::string);
     Stats::Gauge& vm_count_gauge = lookupLuaVmCountGauge(context.api().rootScope());
     per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(
-        code_str, context.threadLocal(), &vm_count_gauge, context.options().concurrency());
+        code_str, context.threadLocal(), vm_count_gauge, context.options().concurrency());
   }
 }
 
