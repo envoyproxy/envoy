@@ -19,12 +19,6 @@ namespace QueueStrategy {
 // Base class that handles queuing for objects.
 template <class ItemType> class QueueBase {
 
-  // static_assert(std::is_base_of<ConnectionPool::Cancellable, ItemType>::value,
-  //             "Queue item type must inherit from ConnectionPool::Cancellable");
-
-  // static_assert(std::is_base_of<LinkedObject<ItemType>, ItemType>::value,
-  //           "Queue item type must inherit from LinkedObject");
-
   using ItemPtrType = std::unique_ptr<ItemType>;
   using ListType = std::list<ItemPtrType>;
 
@@ -36,12 +30,9 @@ public:
 
   virtual bool empty() const { return items_.empty(); }
 
-  virtual ConnectionPool::Cancellable* add(ItemPtrType&& item) {
-    LinkedList::moveIntoList(std::move(item), items_);
-    return items_.front().get();
-  }
+  virtual ConnectionPool::Cancellable* add(ItemPtrType&& item) PURE;
 
-  ItemPtrType remove(ItemType& item) { return item.removeFromList(items_); }
+  virtual ItemPtrType remove(ItemType& item) PURE;
 
   // Move constructor.
   QueueBase(QueueBase<ItemType>&& other) noexcept : items_(std::move(other.items_)) {}

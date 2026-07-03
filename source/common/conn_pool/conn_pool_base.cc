@@ -7,6 +7,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/queue_strategy/fifo_queue_strategy.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -14,8 +15,6 @@
 namespace Envoy {
 namespace ConnectionPool {
 namespace {
-constexpr absl::string_view DefaultQueueStrategy = "envoy.queue_strategy.fifo";
-
 int64_t currentUnusedCapacity(const std::list<ActiveClientPtr>& connecting_clients) {
   int64_t ret = 0;
   for (const auto& client : connecting_clients) {
@@ -26,27 +25,21 @@ int64_t currentUnusedCapacity(const std::list<ActiveClientPtr>& connecting_clien
 
 PendingStreamQueuePtr createPendingStreamQueue(
     const OptRef<const envoy::config::core::v3::TypedExtensionConfig> queue_strategy_config) {
-  using PendingStreamQueueFactory = Extensions::QueueStrategy::QueueStrategyFactory<PendingStream>;
-
-  PendingStreamQueueFactory* factory = nullptr;
-  ProtobufMessage::ValidationVisitor& validation_visitor =
-      ProtobufMessage::getStrictValidationVisitor();
-  ProtobufTypes::MessagePtr factory_config;
-  if (queue_strategy_config.has_value()) {
-    factory = &Config::Utility::getAndCheckFactory<PendingStreamQueueFactory>(
-        queue_strategy_config.value().get());
-    factory_config = Config::Utility::translateToFactoryConfig(queue_strategy_config.value().get(),
-                                                               validation_visitor, *factory);
-  } else {
-    factory = Config::Utility::getFactoryByName<PendingStreamQueueFactory>(DefaultQueueStrategy);
-    RELEASE_ASSERT(
-        factory != nullptr,
-        fmt::format("Default queue strategy factory is not registered: {}", DefaultQueueStrategy));
-    factory_config = factory->createEmptyConfigProto();
+  if (!queue_strategy_config.has_value()) {
+    return std::make_shared<Extensions::QueueStrategy::FifoQueue<PendingStream>>();
   }
 
-  auto queue = factory->createQueueStrategy(*factory_config, "cluster." + factory->name(),
-                                            validation_visitor);
+  using PendingStreamQueueFactory = Extensions::QueueStrategy::QueueStrategyFactory<PendingStream>;
+  ProtobufMessage::ValidationVisitor& validation_visitor =
+      ProtobufMessage::getStrictValidationVisitor();
+  PendingStreamQueueFactory& factory =
+      Config::Utility::getAndCheckFactory<PendingStreamQueueFactory>(
+          queue_strategy_config.value().get());
+  ProtobufTypes::MessagePtr factory_config = Config::Utility::translateToFactoryConfig(
+      queue_strategy_config.value().get(), validation_visitor, factory);
+
+  auto queue =
+      factory.createQueueStrategy(*factory_config, "cluster." + factory.name(), validation_visitor);
   RELEASE_ASSERT(queue.ok(), queue.status().ToString());
   return std::move(*queue);
 }
@@ -459,7 +452,7 @@ void ConnPoolImplBase::onUpstreamReady() {
     auto& stream = pending_streams_->next();
     ActiveClientPtr& client = ready_clients_.front();
     ENVOY_CONN_LOG(debug, "attaching to next stream", *client);
-    // Pending streams are pushed onto the front, so pull from the back.
+    // FIFO pending streams are pulled from the front, where the oldest stream is stored.
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_fix_reentrancy")) {
       PendingStreamPtr pending_stream = pending_streams_->remove(*stream);
       cluster_connectivity_state_.decrPendingStreams(1);

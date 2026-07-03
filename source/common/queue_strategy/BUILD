@@ -10,7 +10,10 @@ envoy_package()
 
 envoy_cc_library(
     name = "queue_strategy_base_lib",
-    hdrs = ["queue_strategy_base.h"],
+    hdrs = [
+        "fifo_queue_strategy.h",
+        "queue_strategy_base.h",
+    ],
     deps = [
         "//envoy/common:conn_pool_interface",
         "//envoy/config:typed_config_interface",

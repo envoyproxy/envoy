@@ -91,16 +91,23 @@ public:
   using ItemPtrType = std::unique_ptr<PendingStream>;
   using Iterator = QueueBase<PendingStream>::Iterator;
 
-  const ItemPtrType& next() const override { return this->items_.back(); }
+  ConnectionPool::Cancellable* add(ItemPtrType&& item) override {
+    LinkedList::moveIntoListBack(std::move(item), this->items_);
+    return this->items_.back().get();
+  }
+
+  ItemPtrType remove(PendingStream& item) override { return item.removeFromList(this->items_); }
+
+  const ItemPtrType& next() const override { return this->items_.front(); }
   bool isOverloaded() const override { return this->items_.size() > 1; }
 
   Iterator begin() override {
-    auto it = this->items_.rbegin();
+    auto it = this->items_.begin();
     return Iterator(std::move(it));
   }
 
   Iterator end() override {
-    auto it = this->items_.rend();
+    auto it = this->items_.end();
     return Iterator(std::move(it));
   }
 };
@@ -123,6 +130,18 @@ public:
 
 REGISTER_FACTORY(TestPendingStreamQueueFactory,
                  Extensions::QueueStrategy::QueueStrategyFactory<PendingStream>);
+
+std::shared_ptr<Upstream::MockClusterInfo> makeClusterWithTestQueueStrategy() {
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  envoy::extensions::queue_strategy::fifo::v3::FifoQueueStrategyConfig fifo_config;
+  cluster->queue_strategy_config_ =
+      std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
+  cluster->queue_strategy_config_->set_name("envoy.queue_strategy.fifo");
+  std::ignore = cluster->queue_strategy_config_->mutable_typed_config()->PackFrom(fifo_config);
+  cluster->resetResourceManager(1024, 1024, 1024, 1, 1);
+
+  return cluster;
+}
 
 class TestConnPoolImplBase : public ConnPoolImplBase {
 public:
@@ -182,13 +201,30 @@ public:
   std::vector<TestActiveClient*> clients_;
 };
 
+class ConnPoolImplBaseQueueStrategyTest : public testing::Test {
+public:
+  ConnPoolImplBaseQueueStrategyTest()
+      : upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
+        pool_(host_, Upstream::ResourcePriority::Default, dispatcher_, nullptr, nullptr, state_,
+              overload_manager_) {}
+
+  Upstream::ClusterConnectivityState state_;
+  std::shared_ptr<Upstream::MockClusterInfo> cluster_{makeClusterWithTestQueueStrategy()};
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
+  Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80")};
+  TestConnPoolImplBase pool_;
+  AttachContext context_;
+};
+
 TEST(ConnPoolImplBaseConfigTest, UsesConfiguredQueueStrategy) {
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   envoy::extensions::queue_strategy::fifo::v3::FifoQueueStrategyConfig fifo_config;
   cluster->queue_strategy_config_ =
       std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   cluster->queue_strategy_config_->set_name("envoy.queue_strategy.fifo");
-  cluster->queue_strategy_config_->mutable_typed_config()->PackFrom(fifo_config);
+  std::ignore = cluster->queue_strategy_config_->mutable_typed_config()->PackFrom(fifo_config);
   cluster->resetResourceManager(1024, 1024, 1024, 1, 1);
 
   NiceMock<Event::MockDispatcher> dispatcher;
@@ -201,7 +237,7 @@ TEST(ConnPoolImplBaseConfigTest, UsesConfiguredQueueStrategy) {
                             state, overload_manager);
 }
 
-TEST_F(ConnPoolImplBaseTest, QueueOverloadedGaugeTracksTransitions) {
+TEST_F(ConnPoolImplBaseQueueStrategyTest, QueueOverloadedGaugeTracksTransitions) {
   EXPECT_EQ(0, cluster_->trafficStats()->upstream_queue_overloaded_.value());
 
   auto* first = pool_.newPendingStream(context_, /*can_send_early_data=*/false);

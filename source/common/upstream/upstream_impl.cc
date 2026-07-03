@@ -91,17 +91,17 @@ absl::Status validateQueueStrategyConfig(
     Server::Configuration::ServerFactoryContext& server_context) {
   using PendingStreamQueueFactory =
       Extensions::QueueStrategy::QueueStrategyFactory<ConnectionPool::PendingStream>;
-
-  try {
+  absl::Status resolve_status = absl::OkStatus();
+  TRY_ASSERT_MAIN_THREAD {
     PendingStreamQueueFactory& factory =
         Config::Utility::getAndCheckFactory<PendingStreamQueueFactory>(queue_strategy_config);
     std::ignore = Config::Utility::translateToFactoryConfig(
         queue_strategy_config, server_context.messageValidationVisitor(), factory);
-  } catch (const EnvoyException& e) {
-    return absl::InvalidArgumentError(e.what());
   }
+  END_TRY
+  CATCH(EnvoyException & e, { resolve_status = absl::InvalidArgumentError(e.what()); });
 
-  return absl::OkStatus();
+  return resolve_status;
 }
 
 std::string addressToString(Network::Address::InstanceConstSharedPtr address) {
