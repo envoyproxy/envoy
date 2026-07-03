@@ -86,7 +86,7 @@ struct OrcaHostLbPolicyData : public Envoy::Upstream::HostLbPolicyData {
 
   bool receivesOrcaLoadReport() const override { return true; }
   absl::Status onOrcaLoadReport(const Upstream::OrcaLoadReport& report,
-                                const StreamInfo::StreamInfo& stream_info) override;
+                                OptRef<const StreamInfo::StreamInfo> stream_info) override;
 
   // Update the weight and timestamps for first and last update time.
   void updateWeightNow(uint32_t weight, const MonotonicTime& now) {

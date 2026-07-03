@@ -39,6 +39,23 @@ using ::testing::AtLeast;
 using ::testing::NiceMock;
 using ::testing::Return;
 
+// Minimal HostLbPolicyData that records delivered reports; proves the OOB manager delivers to any
+// HostLbPolicyData (not just OrcaHostLbPolicyData) via the standard onOrcaLoadReport entry point.
+class RecordingLbPolicyData : public Upstream::HostLbPolicyData {
+public:
+  explicit RecordingLbPolicyData(absl::Status status = absl::OkStatus()) : status_(status) {}
+  bool receivesOrcaLoadReport() const override { return true; }
+  absl::Status onOrcaLoadReport(const Upstream::OrcaLoadReport& report,
+                                OptRef<const StreamInfo::StreamInfo>) override {
+    ++calls_;
+    last_util_ = report.application_utilization();
+    return status_;
+  }
+  int calls_ = 0;
+  double last_util_ = -1.0;
+  absl::Status status_;
+};
+
 // MOCK_METHOD returns a raw Http::CodecClient*; createCodecClient wraps in unique_ptr to
 // transfer ownership to OobSession.
 class TestOrcaOobManager : public OrcaOobManager {
@@ -90,7 +107,7 @@ protected:
 
   std::unique_ptr<TestOrcaOobManager> makeManager(const OrcaOobManagerConfig& config) {
     return std::make_unique<TestOrcaOobManager>(config, priority_set_, dispatcher_, random_,
-                                                *stats_store_.rootScope(), report_handler_);
+                                                *stats_store_.rootScope());
   }
 
   uint64_t activeOobSessions() {
@@ -505,9 +522,9 @@ TEST_F(OrcaOobManagerWireTest, GoAwayOtherIsImmediateTransient) {
 }
 
 TEST_F(OrcaOobManagerWireTest, ReportWithoutLbPolicyDataIncrementsReportErrors) {
-  // Host has no OrcaHostLbPolicyData attached (would be done by OrcaWeightManager
-  // in production; this test simulates the init-order race the architecture
-  // documents as v1-acceptable). onReport increments report_errors and bails.
+  // A report that finds no ORCA-interested recipient on the host is counted as a report error
+  // (e.g. an init-order gap where interested data is not yet attached). reports_received still
+  // bumps before the delivery attempt.
   auto manager = makeManager();
   ASSERT_OK(manager->initialize());
 
@@ -525,8 +542,70 @@ TEST_F(OrcaOobManagerWireTest, ReportWithoutLbPolicyDataIncrementsReportErrors) 
   report.set_application_utilization(0.5);
   report.set_rps_fractional(1000);
   respondReport(*attempt, report);
+  EXPECT_EQ(oobCounter("reports_received"), 1);
   EXPECT_EQ(oobCounter("report_errors"), 1);
-  EXPECT_EQ(oobCounter("reports_received"), 1); // counter still bumps before the data check
+
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  manager.reset();
+}
+
+TEST_F(OrcaOobManagerWireTest, ReportDeliveredToArbitraryLbPolicyData) {
+  // The manager is policy-agnostic: any HostLbPolicyData attached to the host (not just
+  // OrcaHostLbPolicyData or the weight manager) receives every decoded report via the standard
+  // onOrcaLoadReport entry point.
+  auto manager = makeManager();
+  ASSERT_OK(manager->initialize());
+
+  auto* attempt_timer = installAttemptTimer();
+  auto host = makeWiredHost();
+  auto data = std::make_unique<RecordingLbPolicyData>();
+  auto* data_ptr = data.get();
+  host->addLbPolicyData(std::move(data));
+  priority_set_.runUpdateCallbacks(0, {host}, {});
+
+  auto attempt = makeAttempt();
+  wireConnectionFor(host, *attempt);
+  expectCreateCodecClient(*manager, *attempt);
+  attempt_timer->invokeCallback();
+
+  respondHeadersOk(*attempt);
+  xds::data::orca::v3::OrcaLoadReport report;
+  report.set_application_utilization(0.75);
+  respondReport(*attempt, report);
+
+  EXPECT_EQ(data_ptr->calls_, 1);
+  EXPECT_DOUBLE_EQ(data_ptr->last_util_, 0.75);
+  EXPECT_EQ(oobCounter("reports_received"), 1);
+  EXPECT_EQ(oobCounter("report_errors"), 0);
+
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  manager.reset();
+}
+
+TEST_F(OrcaOobManagerWireTest, LbPolicyDataErrorIncrementsReportErrors) {
+  // Any non-OK onOrcaLoadReport return is counted as a report_error; the manager does not
+  // inspect the reason.
+  auto manager = makeManager();
+  ASSERT_OK(manager->initialize());
+
+  auto* attempt_timer = installAttemptTimer();
+  auto host = makeWiredHost();
+  host->addLbPolicyData(
+      std::make_unique<RecordingLbPolicyData>(absl::InternalError("sink rejected report")));
+  priority_set_.runUpdateCallbacks(0, {host}, {});
+
+  auto attempt = makeAttempt();
+  wireConnectionFor(host, *attempt);
+  expectCreateCodecClient(*manager, *attempt);
+  attempt_timer->invokeCallback();
+
+  respondHeadersOk(*attempt);
+  xds::data::orca::v3::OrcaLoadReport report;
+  report.set_application_utilization(0.5);
+  respondReport(*attempt, report);
+
+  EXPECT_EQ(oobCounter("reports_received"), 1);
+  EXPECT_EQ(oobCounter("report_errors"), 1);
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   manager.reset();

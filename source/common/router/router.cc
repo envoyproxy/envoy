@@ -2565,12 +2565,8 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
 
   // Inline capacity of 2 covers the typical case of 1-2 LB policies per host.
   absl::InlinedVector<Upstream::HostLbPolicyData*, 2> orca_recipients;
-  for (size_t i = 0; i < upstream_host->lbPolicyDataCount(); ++i) {
-    auto host_lb_policy_data = upstream_host->lbPolicyDataAt(i);
-    if (host_lb_policy_data.has_value() && host_lb_policy_data->receivesOrcaLoadReport()) {
-      orca_recipients.push_back(host_lb_policy_data.ptr());
-    }
-  }
+  Upstream::forEachOrcaLoadReportRecipient(
+      *upstream_host, [&](Upstream::HostLbPolicyData& data) { orca_recipients.push_back(&data); });
 
   if (!cluster_->lrsReportMetricNames().has_value() && orca_recipients.empty()) {
     // If the cluster doesn't have LRS metric names configured then there is no need to

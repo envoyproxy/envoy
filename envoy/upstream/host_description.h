@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -114,10 +115,11 @@ public:
    * Please ensure that the implementation is thread-safe.
    *
    * @param report supplies the ORCA load report of this upstream host.
-   * @param stream_info supplies the downstream stream info.
+   * @param stream_info carries the downstream stream info for in-band reports and is empty for
+   *        out-of-band (OOB) reports.
    */
   virtual absl::Status onOrcaLoadReport(const OrcaLoadReport& /*report*/,
-                                        const StreamInfo::StreamInfo& /*stream_info*/) {
+                                        OptRef<const StreamInfo::StreamInfo> /*stream_info*/) {
     return absl::OkStatus();
   }
 };
@@ -353,6 +355,22 @@ public:
 
 using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;
 using HostDescriptionOptConstRef = OptRef<const Upstream::HostDescription>;
+
+using OrcaLoadReportRecipientCb = std::function<void(HostLbPolicyData&)>;
+
+/**
+ * Invokes `callback(HostLbPolicyData&)` for each load-balancing-policy data entry on `host` whose
+ * receivesOrcaLoadReport() is true.
+ */
+inline void forEachOrcaLoadReportRecipient(const HostDescription& host,
+                                           const OrcaLoadReportRecipientCb& callback) {
+  for (size_t i = 0; i < host.lbPolicyDataCount(); ++i) {
+    OptRef<HostLbPolicyData> data = host.lbPolicyDataAt(i);
+    if (data.has_value() && data->receivesOrcaLoadReport()) {
+      callback(*data);
+    }
+  }
+}
 
 #define ALL_TRANSPORT_SOCKET_MATCH_STATS(COUNTER) COUNTER(total_match_count)
 
