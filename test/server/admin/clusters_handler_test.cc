@@ -494,5 +494,45 @@ TEST_P(AdminInstanceTest, ClustersAdminEndpoints) {
   }
 }
 
+// An AdminEndpoint with a null address is skipped in both JSON and text rendering.
+TEST_P(AdminInstanceTest, ClustersAdminEndpointsNullAddressSkipped) {
+  Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
+  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_maps));
+
+  FakeAdminEndpointProvider provider;
+  // Null-address endpoint: must be skipped.
+  provider.endpoints_.emplace_back();
+  // Valid endpoint: must still be rendered.
+  Upstream::AdminEndpointProvider::AdminEndpoint valid;
+  valid.address =
+      std::make_shared<Network::Address::EnvoyInternalInstance>("none:cluster-a", "node-a");
+  valid.hostname = "node-a";
+  provider.endpoints_.push_back(valid);
+
+  NiceMock<MockClusterWithAdminEndpoints> cluster;
+  cluster.provider_ = &provider;
+  cluster_maps.active_clusters_.emplace(cluster.info_->name_, cluster);
+
+  {
+    Buffer::OwnedImpl response;
+    Http::TestResponseHeaderMapImpl header_map;
+    EXPECT_EQ(Http::Code::OK, getCallback("/clusters?format=json", header_map, response));
+    envoy::admin::v3::Clusters output;
+    TestUtility::loadFromJson(response.toString(), output);
+    ASSERT_EQ(1, output.cluster_statuses_size());
+    // Only the valid endpoint is rendered.
+    ASSERT_EQ(1, output.cluster_statuses(0).host_statuses_size());
+    EXPECT_EQ("node-a", output.cluster_statuses(0).host_statuses(0).hostname());
+  }
+
+  {
+    Buffer::OwnedImpl response;
+    Http::TestResponseHeaderMapImpl header_map;
+    EXPECT_EQ(Http::Code::OK, getCallback("/clusters", header_map, response));
+    EXPECT_THAT(response.toString(),
+                testing::HasSubstr("envoy://none:cluster-a/node-a::hostname::node-a"));
+  }
+}
+
 } // namespace Server
 } // namespace Envoy
