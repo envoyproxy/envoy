@@ -137,7 +137,7 @@ public:
                                           ->add_config_validators();
       envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator config;
       config.set_min_clusters_num(threshold);
-      config_validator_config->mutable_typed_config()->PackFrom(config);
+      std::ignore = config_validator_config->mutable_typed_config()->PackFrom(config);
       config_validator_config->set_name("minimum_cluster_validator");
     });
   }

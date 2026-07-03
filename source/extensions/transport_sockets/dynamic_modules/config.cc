@@ -5,6 +5,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/transport_sockets/dynamic_modules/transport_socket.h"
 
@@ -24,24 +25,36 @@ createDynamicModuleConfig(const Protobuf::Message& message,
                                            v3::DynamicModuleTransportSocket&>(
           message, context.messageValidationVisitor());
 
+  Server::Configuration::ServerFactoryContext& server_context = context.serverFactoryContext();
   const auto& module_config = proto_config.dynamic_module_config();
   // Transport sockets do not support remote module sources, so no init manager or async callback is
   // passed; only the synchronous local-file and by-name paths can succeed here.
   auto load_result = Envoy::Extensions::DynamicModules::newDynamicModuleByConfig(
-      module_config, proto_config.transport_socket_name(), context.serverFactoryContext());
+      module_config, proto_config.transport_socket_name(), server_context);
   RETURN_IF_NOT_OK_REF(load_result.status());
   auto dynamic_module = std::move(load_result->loaded);
 
   std::string socket_config;
   if (proto_config.has_transport_socket_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.transport_socket_config());
-    RETURN_IF_NOT_OK_REF(config_or_error.status());
+    if (!config_or_error.ok()) {
+      Envoy::Extensions::DynamicModules::incrementLoadFailure(
+          server_context, proto_config.transport_socket_name(),
+          Envoy::Extensions::DynamicModules::ConfigInitErrorStat);
+      return config_or_error.status();
+    }
     socket_config = std::move(config_or_error.value());
   }
 
-  return newDynamicModuleTransportSocketConfig(
+  auto socket_config_or_error = newDynamicModuleTransportSocketConfig(
       proto_config.transport_socket_name(), socket_config, is_upstream,
       proto_config.implements_secure_transport(), std::move(dynamic_module));
+  if (!socket_config_or_error.ok()) {
+    Envoy::Extensions::DynamicModules::incrementLoadFailure(
+        server_context, proto_config.transport_socket_name(),
+        Envoy::Extensions::DynamicModules::ConfigInitErrorStat);
+  }
+  return socket_config_or_error;
 }
 
 } // namespace

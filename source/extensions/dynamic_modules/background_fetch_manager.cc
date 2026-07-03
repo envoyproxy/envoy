@@ -1,6 +1,9 @@
 #include "source/extensions/dynamic_modules/background_fetch_manager.h"
 
+#include "source/common/common/assert.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+
+#include "absl/algorithm/container.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,16 +19,17 @@ BackgroundFetchManager::singleton(Singleton::Manager& manager) {
       /*pin=*/true);
 }
 
-void BackgroundFetchManager::erase(absl::string_view sha256) { background_fetches_.erase(sha256); }
+void BackgroundFetchManager::erase(absl::string_view sha256) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  background_fetches_.erase(sha256);
+}
 
 void BackgroundFetchManager::fetchIfNeeded(
     absl::string_view sha256, Upstream::ClusterManager& cm,
     const envoy::config::core::v3::RemoteDataSource& source) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  absl::erase_if(background_fetches_, [](const auto& entry) { return entry.second->completed_; });
   auto it = background_fetches_.find(sha256);
-  if (it != background_fetches_.end() && it->second->completed_) {
-    background_fetches_.erase(it);
-    it = background_fetches_.end();
-  }
   if (it == background_fetches_.end()) {
     background_fetches_.emplace(sha256, std::make_unique<BackgroundFetchState>(cm, source));
   }

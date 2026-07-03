@@ -97,7 +97,7 @@ protected:
       auto* to_add = added_resources.Add();
       to_add->set_name(config.name());
       to_add->set_version(version);
-      to_add->mutable_resource()->PackFrom(config);
+      std::ignore = to_add->mutable_resource()->PackFrom(config);
     }
     return added_resources;
   }

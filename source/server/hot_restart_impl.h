@@ -109,7 +109,7 @@ public:
       std::shared_ptr<Network::UdpListenerConfig> listener_config) override;
   OptRef<Network::ParentDrainedCallbackRegistrar> parentDrainedCallbackRegistrar() override;
   void initialize(Event::Dispatcher& dispatcher, Server::Instance& server) override;
-  absl::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() override;
+  std::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() override;
   void sendParentTerminateRequest() override;
   ServerStatsFromParent mergeParentStatsIfAny(Stats::StoreRoot& stats_store) override;
   void shutdown() override;

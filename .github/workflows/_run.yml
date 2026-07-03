@@ -321,7 +321,7 @@ jobs:
     # HACK/WORKAROUND for cache scope issue (https://github.com/envoyproxy/envoy/issues/37603)
     - if: ${{ inputs.cache-build-image }}
       id: cache-lookup
-      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+      uses: actions/cache/restore@2c8a9bd7457de244a408f35966fab2fb45fda9c8  # v6.0.0
       with:
         lookup-only: true
         path: /tmp/cache

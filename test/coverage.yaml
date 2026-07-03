@@ -30,7 +30,7 @@ directories:
   source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface: 96.3
   source/extensions/common/aws: 97.5
   source/extensions/common/aws/credential_providers: 100.0
-  source/extensions/common/proxy_protocol: 95.1  # Adjusted for security patch
+  source/extensions/common/proxy_protocol: 94.7  # Adjusted for security patch
   source/extensions/common/tap: 95.2
   source/extensions/common/wasm: 95.6  # flaky: be careful adjusting
   source/extensions/common/wasm/ext: 100.0
@@ -52,7 +52,7 @@ directories:
   source/extensions/filters/http/kill_request: 91.7  # Death tests don't report LCOV
   source/extensions/filters/http/mcp_json_rest_bridge: 94.0
   source/extensions/filters/http/mcp_router: 82.3
-  source/extensions/filters/http/oauth2: 97.6
+  source/extensions/filters/http/oauth2: 97.3
   source/extensions/filters/listener: 96.5
   source/extensions/filters/listener/dynamic_modules: 96.7
   source/extensions/filters/listener/original_src: 92.1

@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -13,7 +14,6 @@
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -75,6 +75,7 @@ public:
   // Actual bucket belongs to the factory and is reset at create-time,
   // so maybeReset is a no-op.
   void maybeReset(uint64_t) override{};
+  std::chrono::milliseconds fillInterval() const;
 
 private:
   const std::string tenant_name_;
@@ -141,6 +142,7 @@ public:
 
   uint64_t requestTokens(Client& client, uint64_t want_tokens);
   void clientDestroyed(Client& client);
+  std::chrono::milliseconds fillInterval() const { return fill_interval_; }
 
 private:
   void clientDrained(Client& client) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);

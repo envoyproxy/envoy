@@ -656,7 +656,7 @@ void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
   // In UHV mode the :status header at this point can be malformed, as it is validated
   // later on in the response_decoder_.decodeHeaders() call.
   // Account for this here.
-  absl::optional<uint64_t> status_opt = Http::Utility::getResponseStatusOrNullopt(*headers);
+  std::optional<uint64_t> status_opt = Http::Utility::getResponseStatusOrNullopt(*headers);
   if (!status_opt.has_value()) {
     // In case the status is invalid or missing, the response_decoder_.decodeHeaders() will fail the
     // request
@@ -2225,6 +2225,16 @@ ConnectionImpl::Http2Options::Http2Options(
   // 512 is chosen to accommodate Envoy's 8Mb max limit of max_request_headers_kb
   // in both headers and trailers
   nghttp2_option_set_max_continuations(options_, 512);
+
+  // Configure the RST_STREAM rate limiter (CVE-2023-44487 / HTTP/2 Rapid Reset protection).
+  // nghttp2 defaults: burst=1000, rate=33/sec. Allow operators to tune these when legitimate
+  // workloads (e.g. gRPC with many short-lived streams that get RST_STREAM on RESOURCE_EXHAUSTED)
+  // exhaust the default token budget faster than it replenishes.
+  if (http2_options.has_stream_reset_burst() || http2_options.has_stream_reset_rate()) {
+    const uint64_t burst = PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, stream_reset_burst, 1000);
+    const uint64_t rate = PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, stream_reset_rate, 33);
+    nghttp2_option_set_stream_reset_rate_limit(options_, burst, rate);
+  }
 #endif
 }
 
@@ -2547,7 +2557,7 @@ Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   return ConnectionImpl::dispatch(data);
 }
 
-absl::optional<int> ServerConnectionImpl::checkHeaderNameForUnderscores(
+std::optional<int> ServerConnectionImpl::checkHeaderNameForUnderscores(
     [[maybe_unused]] absl::string_view header_name) {
 #ifndef ENVOY_ENABLE_UHV
   // This check has been moved to UHV
@@ -2569,7 +2579,7 @@ absl::optional<int> ServerConnectionImpl::checkHeaderNameForUnderscores(
   // Workaround for gcc not understanding [[maybe_unused]] for class members.
   (void)headers_with_underscores_action_;
 #endif
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 } // namespace Http2

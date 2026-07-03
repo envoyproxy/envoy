@@ -450,7 +450,7 @@ LocalRefUniquePtr<jbyteArray> protoToJavaByteArray(JniHelper& jni_helper,
   size_t size = source.ByteSizeLong();
   LocalRefUniquePtr<jbyteArray> byte_array = jni_helper.newByteArray(size);
   auto bytes = jni_helper.getByteArrayElements(byte_array.get(), nullptr);
-  source.SerializeToArray(bytes.get(), size);
+  std::ignore = source.SerializeToArray(bytes.get(), size);
   return byte_array;
 }
 

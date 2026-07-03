@@ -3,6 +3,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/bootstrap/dynamic_modules/factory.h"
 
+#include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -22,6 +23,9 @@ protected:
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
 };
+
+// Pull the shared dynamic-modules test helper into scope.
+using ::Envoy::Extensions::DynamicModules::failureCounter;
 
 TEST(FactoryTest, Name) {
   DynamicModuleBootstrapExtensionFactory factory;
@@ -46,6 +50,8 @@ TEST_F(FactoryTestBase, DynamicModuleLoadFail) {
   EXPECT_THROW_WITH_REGEX(factory.createBootstrapExtension(proto_config, context_), EnvoyException,
                           "Failed to load dynamic module:.*");
 
+  EXPECT_EQ(1U, failureCounter(context_.serverScope(), "module_load_error", "test"));
+
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
 }
 
@@ -60,6 +66,8 @@ TEST_F(FactoryTestBase, ExtensionConfigCreateFail) {
 
   EXPECT_THROW_WITH_REGEX(factory.createBootstrapExtension(proto_config, context_), EnvoyException,
                           "Failed to create extension config:.*");
+
+  EXPECT_EQ(1U, failureCounter(context_.serverScope(), "config_init_error", "test"));
 
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
 }
@@ -82,6 +90,8 @@ TEST_F(FactoryTestBase, InvalidExtensionConfig) {
 
   EXPECT_THROW_WITH_REGEX(factory.createBootstrapExtension(proto_config, context_), EnvoyException,
                           "Failed to parse extension config:.*");
+
+  EXPECT_EQ(1U, failureCounter(context_.serverScope(), "config_init_error", "test"));
 
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
 }

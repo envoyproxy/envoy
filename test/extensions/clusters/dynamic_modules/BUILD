@@ -62,6 +62,7 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//test/extensions/dynamic_modules:util",
         "//test/integration:http_integration_lib",
+        "//test/test_common:logging_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/dynamic_modules/v3:pkg_cc_proto",

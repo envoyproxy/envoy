@@ -188,7 +188,7 @@ void WatchMap::onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
       if (interesting_resources[resource_idx]) {
         const auto& resource = resources[resource_idx];
         const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
-            dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
+            Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
                 resource.get()->resource());
         eds_resources_cache_->setResource(resource.get()->name(), cluster_load_assignment);
       }
@@ -294,7 +294,7 @@ void WatchMap::onConfigUpdate(
     // Add/update the watched resources to/in the cache.
     for (const auto& resource : decoded_resources) {
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
-          dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
+          Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
               resource->resource());
       eds_resources_cache_->setResource(resource->name(), cluster_load_assignment);
     }

@@ -1085,6 +1085,13 @@ public:
     assertEq((uint32_t)res.second, (uint32_t)MetricsResult::Success, "h2");
     ids.epVals = res.first;
 
+    // Emit a metric directly from the config context (no per-stream filter), exercising the
+    // config-scoped emission path. This would typically be done from a scheduled background task.
+    auto config_total = handle.defineCounter("config_total");
+    assertEq((uint32_t)config_total.second, (uint32_t)MetricsResult::Success, "c3");
+    assertEq((uint32_t)handle.incrementCounterValue(config_total.first, 1),
+             (uint32_t)MetricsResult::Success, "c3i");
+
     return std::make_unique<StatsCallbacksFilterFactory>(ids);
   }
 };

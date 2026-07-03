@@ -79,7 +79,7 @@ void copyOkResponseMutations(ResponsePtr& response,
 }
 
 GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
-                               const absl::optional<std::chrono::milliseconds>& timeout)
+                               const std::optional<std::chrono::milliseconds>& timeout)
     : async_client_(async_client), timeout_(timeout),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.auth.v3.Authorization.Check")) {}

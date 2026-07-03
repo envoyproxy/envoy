@@ -19,6 +19,34 @@ index 1f8801df..64ad71b5 100644
      ],
  )
    """,
+diff --git a/common/allocator.h b/common/allocator.h
+index 81d56b096c..bf022c4e11 100644
+--- a/common/allocator.h
++++ b/common/allocator.h
+@@ -31,4 +31,11 @@
+ #include "internal/new.h"
+ #include "google/protobuf/arena.h"
+-
++
++#if defined(__clang__)
++// CEL 0.14.0 has partially annotated pointer APIs. Suppress Clang's
++// completeness diagnostic until upstream adds annotations.
++#pragma clang diagnostic push
++#pragma clang diagnostic ignored "-Wnullability-completeness"
++#endif
++
+ namespace cel {
+@@ -603,4 +610,8 @@ inline Allocator<T> ArenaAllocatorFor(
+-
++
+ }  // namespace cel
+-
++
++#if defined(__clang__)
++#pragma clang diagnostic pop
++#endif
++
+ #endif  // THIRD_PARTY_CEL_CPP_COMMON_ALLOCATOR_H_
 diff --git a/common/internal/byte_string.cc b/common/internal/byte_string.cc
 index b9f47922..9d096424 100644
 --- a/common/internal/byte_string.cc
