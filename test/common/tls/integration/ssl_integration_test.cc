@@ -105,7 +105,7 @@ TEST_P(SslIntegrationTest, StatsTagExtraction) {
   upstream_tls_ = true;
   setUpstreamProtocol(Http::CodecType::HTTP2);
   config_helper_.configureUpstreamTls(
-      false, false, absl::nullopt,
+      false, false, std::nullopt,
       [](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& upstream_ctx) {
         auto& ctx = *upstream_ctx.mutable_common_tls_context();
         auto& params = *ctx.mutable_tls_params();
@@ -174,9 +174,11 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
 
 TEST_P(SslIntegrationTest, Http1StreamInfoDownstreamHandshakeTiming) {
   ASSERT_TRUE(downstreamProtocol() == Http::CodecType::HTTP1);
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   initialize();
   codec_client_ = makeHttpConnection(makeSslClientConnection({}));
@@ -190,9 +192,11 @@ TEST_P(SslIntegrationTest, Http1StreamInfoDownstreamHandshakeTiming) {
 TEST_P(SslIntegrationTest, Http2StreamInfoDownstreamHandshakeTiming) {
   // See MultiplexedIntegrationTest for equivalent test for HTTP/3.
   setDownstreamProtocol(Http::CodecType::HTTP2);
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   initialize();
   codec_client_ = makeHttpConnection(makeSslClientConnection({}));
@@ -327,7 +331,11 @@ TEST_P(SslIntegrationTest, AdminCertEndpoint) {
 }
 
 TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponseWithSni) {
-  config_helper_.addFilter("name: sni-to-header-filter");
+  config_helper_.addFilter(R"EOF(
+    name: sni-to-header-filter
+    typed_config:
+      "@type": type.googleapis.com/test.common.tls.integration.SniToHeaderFilterConfig
+  )EOF");
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(ClientSslTransportOptions().setSni("host.com"));
   };
@@ -353,7 +361,11 @@ TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponseWithSni) {
 
 TEST_P(SslIntegrationTest, LogPeerIpSanUnsupportedIpVersion) {
   useListenerAccessLog("%DOWNSTREAM_PEER_IP_SAN%");
-  config_helper_.addFilter("name: sni-to-header-filter");
+  config_helper_.addFilter(R"EOF(
+    name: sni-to-header-filter
+    typed_config:
+      "@type": type.googleapis.com/test.common.tls.integration.SniToHeaderFilterConfig
+  )EOF");
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(ClientSslTransportOptions().setSni("host.com"));
   };
@@ -455,7 +467,7 @@ typed_config:
   const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
       connection->ssl().get());
   ASSERT(socket);
-  while (socket->state() == Ssl::SocketState::PreHandshake) {
+  while (socket->state() == Ssl::SocketState::HandshakeWaitingForConnectionData) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   ASSERT_EQ(connection->state(), Network::Connection::State::Open);
@@ -509,7 +521,7 @@ typed_config:
   const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
       connection->ssl().get());
   ASSERT(socket);
-  while (socket->state() == Ssl::SocketState::PreHandshake) {
+  while (socket->state() == Ssl::SocketState::HandshakeWaitingForConnectionData) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   ASSERT_EQ(connection->state(), Network::Connection::State::Open);
@@ -550,7 +562,7 @@ typed_config:
   const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
       connection->ssl().get());
   ASSERT(socket);
-  while (socket->state() == Ssl::SocketState::PreHandshake) {
+  while (socket->state() == Ssl::SocketState::HandshakeWaitingForConnectionData) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =
@@ -600,7 +612,7 @@ typed_config:
   const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
       connection->ssl().get());
   ASSERT(socket);
-  while (socket->state() == Ssl::SocketState::PreHandshake) {
+  while (socket->state() == Ssl::SocketState::HandshakeWaitingForConnectionData) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =
@@ -879,7 +891,7 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnly) {
   server_ecdsa_cert_ = true;
   initialize();
   auto codec_client =
-      makeRawHttpConnection(makeSslClientConnection(rsaOnlyClientOptions()), absl::nullopt);
+      makeRawHttpConnection(makeSslClientConnection(rsaOnlyClientOptions()), std::nullopt);
   EXPECT_FALSE(codec_client->connected());
   const std::string counter_name = listenerStatPrefix("ssl.connection_error");
   Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
@@ -898,7 +910,7 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnlyWithAccessLog) {
   server_ecdsa_cert_ = true;
   initialize();
   auto codec_client =
-      makeRawHttpConnection(makeSslClientConnection(rsaOnlyClientOptions()), absl::nullopt);
+      makeRawHttpConnection(makeSslClientConnection(rsaOnlyClientOptions()), std::nullopt);
   EXPECT_FALSE(codec_client->connected());
 
   auto log_result = waitForAccessLog(listener_access_log_name_);
@@ -948,7 +960,7 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaClientEcdsaOnly) {
   client_ecdsa_cert_ = true;
   initialize();
   EXPECT_FALSE(
-      makeRawHttpConnection(makeSslClientConnection(ecdsaOnlyClientOptions()), absl::nullopt)
+      makeRawHttpConnection(makeSslClientConnection(ecdsaOnlyClientOptions()), std::nullopt)
           ->connected());
   const std::string counter_name = listenerStatPrefix("ssl.connection_error");
   Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
@@ -1465,6 +1477,38 @@ typed_config:
                                TestUtility::DefaultTimeout, dispatcher_.get());
 
   connection.reset();
+}
+
+// Verifies that when the downstream connection is closed while the handshake
+// is paused on async cert selection, the `SelectionHandle` returned by the
+// selector is destroyed.
+BORINGSSL_TEST_P(SslIntegrationTest, AsyncCertSelectionCancellationObservedOnDownstreamClose) {
+  tls_cert_selector_yaml_ = R"EOF(
+name: test-tls-context-provider
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.StringValue
+  value: cancel
+  )EOF";
+  initialize();
+
+  Network::ClientConnectionPtr connection = makeSslClientConnection({});
+  ConnectionStatusCallbacks callbacks;
+  connection->addConnectionCallbacks(callbacks);
+  connection->connect();
+  const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+      connection->ssl().get());
+  ASSERT(socket);
+
+  test_server_->waitForCounter("aysnc_cert_selection.cert_selection_cancel", Eq(1),
+                               TestUtility::DefaultTimeout, dispatcher_.get());
+  EXPECT_EQ(test_server_->counter("aysnc_cert_selection.cert_selection_cancelled")->value(), 0);
+
+  ASSERT_EQ(connection->state(), Network::Connection::State::Open);
+  connection->close(Network::ConnectionCloseType::NoFlush);
+  connection.reset();
+
+  test_server_->waitForCounter("aysnc_cert_selection.cert_selection_cancelled", Eq(1),
+                               std::chrono::seconds(2), dispatcher_.get());
 }
 
 } // namespace Ssl

@@ -7,6 +7,7 @@
 #include "source/common/http/utility.h"
 
 #include "test/mocks/common.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/overload_manager.h"
 
 #include "quiche/http2/adapter/http2_adapter.h"
@@ -30,10 +31,10 @@ public:
 class TestCodecSettingsProvider {
 public:
   // Returns the value of the SETTINGS parameter keyed by |identifier| sent by the remote endpoint.
-  absl::optional<uint32_t> getRemoteSettingsParameterValue(int32_t identifier) const {
+  std::optional<uint32_t> getRemoteSettingsParameterValue(int32_t identifier) const {
     const auto it = settings_.find(identifier);
     if (it == settings_.end()) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     return it->second;
   }
@@ -91,11 +92,12 @@ public:
       Random::RandomGenerator& random, uint32_t max_request_headers_kb,
       uint32_t max_request_headers_count,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-          headers_with_underscores_action)
+          headers_with_underscores_action,
+      OptRef<Runtime::Loader> runtime = std::nullopt)
       : TestCodecStatsProvider(scope),
         ServerConnectionImpl(connection, callbacks, http2CodecStats(), random, http2_options,
                              max_request_headers_kb, max_request_headers_count,
-                             headers_with_underscores_action, overload_manager_) {}
+                             headers_with_underscores_action, overload_manager_, runtime) {}
 
   http2::adapter::Http2Adapter* adapter() { return adapter_.get(); }
   using ServerConnectionImpl::getStream;

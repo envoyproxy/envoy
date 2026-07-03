@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/event/dispatcher.h"
@@ -17,7 +18,6 @@
 #include "source/extensions/access_loggers/common/grpc_access_logger_utils.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -135,6 +135,7 @@ public:
     } else {
       // Clear out the stream data due to stream creation failure.
       stream_.reset();
+      return false;
     }
     return true;
   }

@@ -39,6 +39,7 @@ MockHostDescription::MockHostDescription()
     return absl::string_view(observability_name_);
   }));
   ON_CALL(*this, address()).WillByDefault(Return(address_));
+  ON_CALL(*this, orcaReportingAddress()).WillByDefault(Invoke([this]() { return address(); }));
   ON_CALL(*this, outlierDetector()).WillByDefault(ReturnRef(outlier_detector_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
   ON_CALL(*this, loadMetricStats()).WillByDefault(ReturnRef(load_metric_stats_));
@@ -81,6 +82,7 @@ MockHost::MockHost() : socket_factory_(new testing::NiceMock<Network::MockTransp
     return absl::string_view(observability_name_);
   }));
   ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
+  ON_CALL(*this, orcaReportingAddress()).WillByDefault(Invoke([this]() { return address(); }));
   ON_CALL(*this, outlierDetector()).WillByDefault(ReturnRef(outlier_detector_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
   ON_CALL(*this, loadMetricStats()).WillByDefault(ReturnRef(load_metric_stats_));

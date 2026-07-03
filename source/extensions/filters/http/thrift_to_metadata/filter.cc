@@ -49,9 +49,9 @@ ThriftMetadataToProtobufValue Rule::getValueExtractorFromField(
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::http::thrift_to_metadata::v3::METHOD_NAME:
     return [](MessageMetadataSharedPtr metadata,
-              const ThriftDecoderHandler&) -> absl::optional<Protobuf::Value> {
+              const ThriftDecoderHandler&) -> std::optional<Protobuf::Value> {
       if (!metadata->hasMethodName()) {
-        return absl::nullopt;
+        return std::nullopt;
       }
       Protobuf::Value value;
       value.set_string_value(metadata->methodName());
@@ -59,23 +59,23 @@ ThriftMetadataToProtobufValue Rule::getValueExtractorFromField(
     };
   case envoy::extensions::filters::http::thrift_to_metadata::v3::PROTOCOL:
     return [](MessageMetadataSharedPtr,
-              const ThriftDecoderHandler& handler) -> absl::optional<Protobuf::Value> {
+              const ThriftDecoderHandler& handler) -> std::optional<Protobuf::Value> {
       Protobuf::Value value;
       value.set_string_value(handler.protocolName());
       return value;
     };
   case envoy::extensions::filters::http::thrift_to_metadata::v3::TRANSPORT:
     return [](MessageMetadataSharedPtr,
-              const ThriftDecoderHandler& handler) -> absl::optional<Protobuf::Value> {
+              const ThriftDecoderHandler& handler) -> std::optional<Protobuf::Value> {
       Protobuf::Value value;
       value.set_string_value(handler.transportName());
       return value;
     };
   case envoy::extensions::filters::http::thrift_to_metadata::v3::HEADER_FLAGS:
     return [](MessageMetadataSharedPtr metadata,
-              const ThriftDecoderHandler&) -> absl::optional<Protobuf::Value> {
+              const ThriftDecoderHandler&) -> std::optional<Protobuf::Value> {
       if (!metadata->hasHeaderFlags()) {
-        return absl::nullopt;
+        return std::nullopt;
       }
       Protobuf::Value value;
       value.set_number_value(metadata->headerFlags());
@@ -83,9 +83,9 @@ ThriftMetadataToProtobufValue Rule::getValueExtractorFromField(
     };
   case envoy::extensions::filters::http::thrift_to_metadata::v3::SEQUENCE_ID:
     return [](MessageMetadataSharedPtr metadata,
-              const ThriftDecoderHandler&) -> absl::optional<Protobuf::Value> {
+              const ThriftDecoderHandler&) -> std::optional<Protobuf::Value> {
       if (!metadata->hasSequenceId()) {
-        return absl::nullopt;
+        return std::nullopt;
       }
       Protobuf::Value value;
       value.set_number_value(metadata->sequenceId());
@@ -93,9 +93,9 @@ ThriftMetadataToProtobufValue Rule::getValueExtractorFromField(
     };
   case envoy::extensions::filters::http::thrift_to_metadata::v3::MESSAGE_TYPE:
     return [](MessageMetadataSharedPtr metadata,
-              const ThriftDecoderHandler&) -> absl::optional<Protobuf::Value> {
+              const ThriftDecoderHandler&) -> std::optional<Protobuf::Value> {
       if (!metadata->hasMessageType()) {
-        return absl::nullopt;
+        return std::nullopt;
       }
       Protobuf::Value value;
       value.set_string_value(MessageTypeNames::get().fromType(metadata->messageType()));
@@ -103,9 +103,9 @@ ThriftMetadataToProtobufValue Rule::getValueExtractorFromField(
     };
   case envoy::extensions::filters::http::thrift_to_metadata::v3::REPLY_TYPE:
     return [](MessageMetadataSharedPtr metadata,
-              const ThriftDecoderHandler&) -> absl::optional<Protobuf::Value> {
+              const ThriftDecoderHandler&) -> std::optional<Protobuf::Value> {
       if (!metadata->hasReplyType()) {
-        return absl::nullopt;
+        return std::nullopt;
       }
       Protobuf::Value value;
       value.set_string_value(ReplyTypeNames::get().fromType(metadata->replyType()));
@@ -387,7 +387,7 @@ void Filter::processMetadata(MessageMetadataSharedPtr metadata, const Rules& rul
       }
       continue;
     }
-    absl::optional<Protobuf::Value> val_opt = rule.extractValue(metadata, *handler);
+    std::optional<Protobuf::Value> val_opt = rule.extractValue(metadata, *handler);
 
     if (val_opt.has_value()) {
       handleOnPresent(std::move(val_opt).value(), rule);

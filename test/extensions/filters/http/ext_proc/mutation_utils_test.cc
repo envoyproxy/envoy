@@ -829,6 +829,131 @@ TEST_F(MutationUtilsTest, InvalidStatusRejected) {
               HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_set_headers_failed"));
 }
 
+TEST_F(MutationUtilsTest, TestApplyMutationsFailures) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {"x-remove-me", "yes"},
+      {"x-keep-me", "yes"},
+  };
+
+  HeaderMutationRules rules;
+  rules.mutable_disallow_is_error()->set_value(true);
+  rules.mutable_disallow_all()->set_value(true);
+  Checker checker(rules, regex_engine_);
+  Envoy::Stats::MockCounter rejections;
+  Effect effect = Effect::None;
+
+  // 1. CheckResult::FAIL for remove_headers
+  {
+    envoy::service::ext_proc::v3::HeaderMutation mutation;
+    mutation.add_remove_headers("x-remove-me");
+    EXPECT_CALL(rejections, inc());
+    EXPECT_THAT(
+        MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections, effect),
+        HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_remove_headers_failed"));
+    EXPECT_THAT(effect, Effect::MutationFailed);
+  }
+
+  // 2. CheckResult::FAIL for set_headers
+  {
+    envoy::service::ext_proc::v3::HeaderMutation mutation;
+    auto* s = mutation.add_set_headers();
+    s->mutable_header()->set_key("x-new-header");
+    s->mutable_header()->set_raw_value("value");
+    EXPECT_CALL(rejections, inc());
+    EXPECT_THAT(
+        MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections, effect),
+        HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_set_headers_failed"));
+    EXPECT_THAT(effect, Effect::MutationFailed);
+  }
+
+  // 3. CheckResult::IGNORE for remove_headers
+  {
+    HeaderMutationRules rules_ignore;
+    rules_ignore.mutable_disallow_all()->set_value(true);
+    rules_ignore.mutable_disallow_is_error()->set_value(false);
+    Checker checker_ignore(rules_ignore, regex_engine_);
+    envoy::service::ext_proc::v3::HeaderMutation mutation;
+    mutation.add_remove_headers("x-remove-me");
+    EXPECT_CALL(rejections, inc());
+    EXPECT_OK(MutationUtils::applyHeaderMutations(mutation, headers, false, checker_ignore,
+                                                  rejections, effect));
+    EXPECT_THAT(effect, Effect::None);
+    EXPECT_EQ(headers.get(LowerCaseString("x-remove-me"))[0]->value(), "yes");
+  }
+
+  // 4. CheckResult::IGNORE for set_headers
+  {
+    HeaderMutationRules rules_ignore;
+    rules_ignore.mutable_disallow_all()->set_value(true);
+    rules_ignore.mutable_disallow_is_error()->set_value(false);
+    Checker checker_ignore(rules_ignore, regex_engine_);
+    envoy::service::ext_proc::v3::HeaderMutation mutation;
+    auto* s = mutation.add_set_headers();
+    s->mutable_header()->set_key("x-new-header");
+    s->mutable_header()->set_raw_value("value");
+    EXPECT_CALL(rejections, inc());
+    EXPECT_OK(MutationUtils::applyHeaderMutations(mutation, headers, false, checker_ignore,
+                                                  rejections, effect));
+    EXPECT_THAT(effect, Effect::None);
+    EXPECT_TRUE(headers.get(LowerCaseString("x-new-header")).empty());
+  }
+
+  // 5. Special handling for :method when replacing_message is true
+  {
+    HeaderMutationRules rules_method;
+    rules_method.mutable_disallow_all()->set_value(true);
+    rules_method.mutable_disallow_is_error()->set_value(true);
+    Checker checker_method(rules_method, regex_engine_);
+    envoy::service::ext_proc::v3::HeaderMutation mutation;
+    auto* s = mutation.add_set_headers();
+    s->mutable_header()->set_key(":method");
+    s->mutable_header()->set_raw_value("POST");
+    // replacing_message = true should allow :method even if disallowed by rules
+    EXPECT_OK(MutationUtils::applyHeaderMutations(mutation, headers, true, checker_method,
+                                                  rejections, effect));
+    EXPECT_THAT(effect, Effect::MutationApplied);
+    EXPECT_EQ(headers.Method()->value(), "POST");
+  }
+}
+
+TEST_F(MutationUtilsTest, TestProtoToHeadersFailures) {
+  Http::TestResponseHeaderMapImpl headers;
+  Envoy::Stats::MockCounter rejections;
+
+  HeaderMutationRules rules;
+  rules.mutable_disallow_all()->set_value(true);
+  rules.mutable_disallow_is_error()->set_value(true);
+  Checker checker(rules, regex_engine_);
+
+  // 1. CheckResult::FAIL for set_headers in protoToHeaders
+  {
+    envoy::config::core::v3::HeaderMap proto_headers;
+    auto* h = proto_headers.add_headers();
+    h->set_key("x-new-header");
+    h->set_raw_value("value");
+    EXPECT_CALL(rejections, inc());
+    EXPECT_THAT(
+        MutationUtils::protoToHeaders(proto_headers, headers, checker, rejections),
+        HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_set_headers_failed"));
+  }
+
+  // 2. CheckResult::IGNORE for set_headers in protoToHeaders
+  {
+    HeaderMutationRules rules_ignore;
+    rules_ignore.mutable_disallow_all()->set_value(true);
+    rules_ignore.mutable_disallow_is_error()->set_value(false);
+    Checker checker_ignore(rules_ignore, regex_engine_);
+    envoy::config::core::v3::HeaderMap proto_headers;
+    auto* h = proto_headers.add_headers();
+    h->set_key("x-new-header-2");
+    h->set_raw_value("value");
+    EXPECT_CALL(rejections, inc());
+    EXPECT_OK(MutationUtils::protoToHeaders(proto_headers, headers, checker_ignore, rejections));
+    EXPECT_TRUE(headers.get(LowerCaseString("x-new-header-2")).empty());
+  }
+}
+
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters

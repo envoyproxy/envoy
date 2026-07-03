@@ -45,6 +45,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "config_test",
     size = "large",
+    coverage = False,
     data = [
         "configs_test_setup.sh",
         ":configs",

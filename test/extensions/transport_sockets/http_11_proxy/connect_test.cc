@@ -16,6 +16,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -47,7 +48,7 @@ public:
   static inline const std::string ConnectRequestWithHostname = absl::StrCat(
       "CONNECT ", TestHostname, ":443 HTTP/1.1\r\nHost: ", TestHostname, ":443\r\n\r\n");
 
-  void initialize(bool no_proxy_protocol = false, absl::optional<uint32_t> target_port = {}) {
+  void initialize(bool no_proxy_protocol = false, std::optional<uint32_t> target_port = {}) {
     initializeInternal(no_proxy_protocol, false, target_port);
   }
 
@@ -104,7 +105,7 @@ public:
 
 private:
   void initializeInternal(bool no_proxy_protocol, bool use_metadata_proxy_addr,
-                          absl::optional<uint32_t> target_port, bool with_hostname = false,
+                          std::optional<uint32_t> target_port, bool with_hostname = false,
                           bool use_default_proxy_addr = false) {
     std::string address_string =
         absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
@@ -115,7 +116,7 @@ private:
     const std::string proxy_info_hostname = absl::StrCat("www.foo.com", port);
     auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
     std::unique_ptr<Network::TransportSocketOptions::Http11ProxyInfo> info;
-    absl::optional<Network::TransportSocketOptions::Http11ProxyInfo> default_proxy_info;
+    std::optional<Network::TransportSocketOptions::Http11ProxyInfo> default_proxy_info;
 
     if (!no_proxy_protocol) {
       if (use_metadata_proxy_addr) {
@@ -126,7 +127,7 @@ private:
         addr_proto.mutable_socket_address()->set_address(proxy_info_hostname);
         addr_proto.mutable_socket_address()->set_port_value(1234);
         Protobuf::Any anypb;
-        anypb.PackFrom(addr_proto);
+        std::ignore = anypb.PackFrom(addr_proto);
         metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, anypb));
         EXPECT_CALL(*host, metadata()).Times(AnyNumber()).WillRepeatedly(Return(metadata));
 
@@ -163,7 +164,7 @@ private:
 
     options_ = std::make_shared<const Network::TransportSocketOptionsImpl>(
         "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-        absl::nullopt, nullptr, std::move(info));
+        std::nullopt, nullptr, std::move(info));
 
     auto inner_socket = std::make_unique<NiceMock<Network::MockTransportSocket>>();
     inner_socket_ = inner_socket.get();
@@ -323,9 +324,9 @@ TEST_P(Http11ConnectTest, StipsHeaderOnce) {
         memcpy(buffer, initial_data.data(), initial_data.length());
         return Api::IoCallUint64Result(initial_data.length(), Api::IoError::none());
       }));
-  absl::optional<uint64_t> expected_bytes(connect.length());
+  std::optional<uint64_t> expected_bytes(connect.length());
   EXPECT_CALL(io_handle_, read(_, expected_bytes))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, absl::optional<uint64_t>) {
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, std::optional<uint64_t>) {
         buffer.add(connect);
         return Api::IoCallUint64Result(connect.length(), Api::IoError::none());
       }));
@@ -346,7 +347,7 @@ TEST_P(Http11ConnectTest, InsufficientData) {
         memcpy(buffer, initial_data.data(), initial_data.length());
         return Api::IoCallUint64Result(initial_data.length(), Api::IoError::none());
       }));
-  absl::optional<uint64_t> expected_bytes(connect.length());
+  std::optional<uint64_t> expected_bytes(connect.length());
   Buffer::OwnedImpl buffer("");
   auto result = connect_socket_->doRead(buffer);
   EXPECT_EQ(Network::PostIoAction::KeepOpen, result.action_);
@@ -379,7 +380,7 @@ TEST_P(Http11ConnectTest, ReadFail) {
         memcpy(buffer, initial_data.data(), initial_data.length());
         return Api::IoCallUint64Result(initial_data.length(), Api::IoError::none());
       }));
-  absl::optional<uint64_t> expected_bytes(connect.length());
+  std::optional<uint64_t> expected_bytes(connect.length());
   EXPECT_CALL(io_handle_, read(_, expected_bytes))
       .WillOnce(Return(ByMove(Api::IoCallUint64Result(
           connect.length(), Network::IoSocketError::create(EADDRNOTAVAIL)))));
@@ -401,7 +402,7 @@ TEST_P(Http11ConnectTest, ShortRead) {
         memcpy(buffer, initial_data.data(), initial_data.length());
         return Api::IoCallUint64Result(initial_data.length(), Api::IoError::none());
       }));
-  absl::optional<uint64_t> expected_bytes(connect.length());
+  std::optional<uint64_t> expected_bytes(connect.length());
   EXPECT_CALL(io_handle_, read(_, expected_bytes))
       .WillOnce(
           Return(ByMove(Api::IoCallUint64Result(connect.length() - 1, Api::IoError::none()))));
@@ -677,7 +678,7 @@ TEST_P(Http11ConnectTest, RuntimeGuardLegacyBehaviorTransportSocketOpts) {
         return Api::IoCallUint64Result(connect_response.length(), Api::IoError::none());
       }));
   EXPECT_CALL(io_handle_, read(_, Optional(connect_response.length())))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, absl::optional<uint64_t>) {
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, std::optional<uint64_t>) {
         buffer.add(connect_response);
         return Api::IoCallUint64Result(connect_response.length(), Api::IoError::none());
       }));
@@ -727,7 +728,7 @@ TEST_P(Http11ConnectTest, RuntimeGuardLegacyBehaviorEndpointMetadata) {
         return Api::IoCallUint64Result(connect_response.length(), Api::IoError::none());
       }));
   EXPECT_CALL(io_handle_, read(_, Optional(connect_response.length())))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, absl::optional<uint64_t>) {
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, std::optional<uint64_t>) {
         buffer.add(connect_response);
         return Api::IoCallUint64Result(connect_response.length(), Api::IoError::none());
       }));
@@ -776,7 +777,7 @@ TEST_P(Http11ConnectTest, WriteFlushedAfterConnectRead) {
         return Api::IoCallUint64Result(connect_response.length(), Api::IoError::none());
       }));
   EXPECT_CALL(io_handle_, read(_, Optional(connect_response.length())))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, absl::optional<uint64_t>) {
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, std::optional<uint64_t>) {
         buffer.add(connect_response);
         return Api::IoCallUint64Result(connect_response.length(), Api::IoError::none());
       }));
@@ -841,7 +842,7 @@ TEST_P(Http11ConnectTest, FragmentedConnectResponse) {
 
   // Socket consumes the full headers.
   EXPECT_CALL(io_handle_, read(_, Optional(full_response.length())))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, absl::optional<uint64_t>) {
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, std::optional<uint64_t>) {
         buffer.add(full_response);
         return Api::IoCallUint64Result(full_response.length(), Api::IoError::none());
       }));

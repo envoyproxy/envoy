@@ -12,7 +12,7 @@ public:
   MockLoadBalancerContext();
   ~MockLoadBalancerContext() override;
 
-  MOCK_METHOD(absl::optional<uint64_t>, computeHashKey, ());
+  MOCK_METHOD(std::optional<uint64_t>, computeHashKey, ());
   MOCK_METHOD(Router::MetadataMatchCriteria*, metadataMatchCriteria, ());
   MOCK_METHOD(const Network::Connection*, downstreamConnection, (), (const));
   MOCK_METHOD(StreamInfo::StreamInfo*, requestStreamInfo, (), (const));

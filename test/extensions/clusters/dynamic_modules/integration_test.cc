@@ -9,6 +9,7 @@
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/logging.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -69,10 +70,10 @@ public:
       const std::string config_value = cluster_config.empty() ? upstream_address : cluster_config;
       Protobuf::StringValue config_proto;
       config_proto.set_value(config_value);
-      dec_config.mutable_cluster_config()->PackFrom(config_proto);
+      std::ignore = dec_config.mutable_cluster_config()->PackFrom(config_proto);
 
       cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
-      cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(dec_config);
+      std::ignore = cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(dec_config);
     });
 
     HttpIntegrationTest::initialize();
@@ -138,6 +139,67 @@ TEST_P(DynamicModuleClusterIntegrationTest, SchedulerHostUpdate) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Test the main→worker push pipeline end-to-end. The Rust fixture publishes an
+// Arc<Snapshot{multiplier=5}> from main and posts run_on_all_workers(event_id=7); each worker
+// reads the snapshot back and increments a counter by event_id * multiplier. With concurrency=4
+// the final counter must be exactly 4 * 7 * 5 = 140 — which proves the fan-out fired once per
+// worker, the event_id passed through, the typed payload survived FFI, and main was excluded.
+TEST_P(DynamicModuleClusterIntegrationTest, RunOnAllWorkersFiresOnEachWorker) {
+  concurrency_ = 4;
+  initializeWithDecCluster("run_on_all_workers");
+
+  test_server_->waitForCounter("dynamicmodulescustom.worker_events_applied_total",
+                               testing::Eq(140));
+
+  // Cluster should remain functional for normal traffic after the fan-out.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Exercises the worker local priority set path across multiple workers end to end. Each worker
+// load balancer learns the added host through get_member_update_host, confirms its worker local set
+// agrees, and routes a request to the upstream through that host pointer.
+TEST_P(DynamicModuleClusterIntegrationTest, WorkerLocalPrioritySetRebuild) {
+  concurrency_ = 2;
+  initializeWithDecCluster("worker_local_rebuild");
+
+  // Each worker increments the counter once its worker local set converges, so wait for all of
+  // them before routing.
+  test_server_->waitForCounter("dynamicmodulescustom.membership_hosts_total", testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Drives the packed member-update address getter end to end. Each worker load balancer reads the
+// added host's address both as a string and as packed integers and confirms they agree before
+// incrementing the counter, so this runs the real packing under both IPv4 and IPv6 params.
+TEST_P(DynamicModuleClusterIntegrationTest, MemberUpdatePackedAddress) {
+  concurrency_ = 2;
+  initializeWithDecCluster("member_update_packed_address");
+
+  // Each worker increments the counter once its packed address matches the formatted address.
+  test_server_->waitForCounter("dynamicmodulescustom.packed_address_verified_total",
+                               testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 // Verifies that the cluster lifecycle callbacks fire correctly during cluster
 // initialization.
 TEST_P(DynamicModuleClusterIntegrationTest, LifecycleCallbacks) {
@@ -153,6 +215,29 @@ TEST_P(DynamicModuleClusterIntegrationTest, LifecycleCallbacks) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Drives the per-worker timer ABI end to end. The first request arms a 50ms repeating worker timer
+// from choose_host (which exercises enable/enabled/disable and increments timer_armed_total). The
+// timer then fires repeatedly on the worker dispatcher and re-arms itself, so timer_fired_total
+// keeps climbing without further requests — proving the timer is created on the worker dispatcher,
+// fires on the worker thread, and re-arms.
+TEST_P(DynamicModuleClusterIntegrationTest, WorkerTimerArmsFiresAndReArms) {
+  initializeWithDecCluster("worker_timer");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  // The first request runs choose_host, which captures the worker dispatcher and arms the timer.
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // The timer is armed exactly once, with enabled()/disable() observed as expected.
+  test_server_->waitForCounter("dynamicmodulescustom.timer_armed_total", testing::Eq(1));
+
+  // The timer fires on the worker dispatcher and re-arms, so the counter keeps climbing.
+  test_server_->waitForCounter("dynamicmodulescustom.timer_fired_total", testing::Ge(3));
 }
 
 // =============================================================================
@@ -202,10 +287,11 @@ typed_config:
 
       Protobuf::StringValue config_proto;
       config_proto.set_value(upstream_address);
-      reader_config.mutable_cluster_config()->PackFrom(config_proto);
+      std::ignore = reader_config.mutable_cluster_config()->PackFrom(config_proto);
 
       cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
-      cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(reader_config);
+      std::ignore =
+          cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(reader_config);
     });
 
     HttpIntegrationTest::initialize();

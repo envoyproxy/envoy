@@ -145,8 +145,8 @@ protected:
 
 private:
   const Protobuf::MethodDescriptor& service_method_;
-  absl::optional<std::string> service_name_;
-  absl::optional<std::string> authority_value_;
+  std::optional<std::string> service_name_;
+  std::optional<std::string> authority_value_;
   Router::HeaderParserPtr request_headers_parser_;
 };
 

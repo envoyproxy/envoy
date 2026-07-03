@@ -29,7 +29,7 @@ using ContextProcessingFunc = std::function<void(grpc::ServerContext*)>;
 // in integration tests.
 class ProcessorWrapper : public envoy::service::ext_proc::v3::ExternalProcessor::Service {
 public:
-  ProcessorWrapper(ProcessingFunc& cb, absl::optional<ContextProcessingFunc> context_cb)
+  ProcessorWrapper(ProcessingFunc& cb, std::optional<ContextProcessingFunc> context_cb)
       : callback_(cb), context_callback_(context_cb) {}
 
   grpc::Status Process(
@@ -39,7 +39,7 @@ public:
 
 private:
   ProcessingFunc callback_;
-  absl::optional<ContextProcessingFunc> context_callback_;
+  std::optional<ContextProcessingFunc> context_callback_;
 };
 
 // This class starts a gRPC server supporting the ExternalProcessor service.
@@ -51,7 +51,7 @@ public:
   // All new streams will be delegated to the specified function. The function
   // will be invoked in a background thread controlled by the gRPC server.
   void start(const Network::Address::IpVersion ip_version, ProcessingFunc cb,
-             absl::optional<ContextProcessingFunc> context_cb = absl::nullopt);
+             std::optional<ContextProcessingFunc> context_cb = std::nullopt);
 
   // Stop the processor from listening once all streams are closed, and exit
   // the listening threads.

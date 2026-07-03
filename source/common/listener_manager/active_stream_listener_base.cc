@@ -152,6 +152,45 @@ ActiveConnections& OwnedActiveStreamListenerBase::getOrCreateActiveConnections(
   return *connections;
 }
 
+void OwnedActiveStreamListenerBase::onFilterChainDrainStart(
+    const std::list<const Network::FilterChain*>& draining_filter_chains) {
+  // A drain callback may synchronously close the current connection, which removes it from
+  // `connections_` via removeConnection(). Capture `next` before invoking onDrain() so the
+  // std::list iteration survives erasure of the current node. Pin `is_deleting_` while
+  // iterating so removeConnection() does not also erase the map entry mid-loop if the
+  // filter chain's last connection closes.
+  const bool was_deleting = is_deleting_;
+  is_deleting_ = true;
+  for (const auto* filter_chain : draining_filter_chains) {
+    auto map_iter = connections_by_context_.find(filter_chain);
+    if (map_iter == connections_by_context_.end()) {
+      continue;
+    }
+    auto& connections = map_iter->second->connections_;
+    for (auto it = connections.begin(); it != connections.end();) {
+      auto next = std::next(it);
+      (*it)->connection_->onDrain();
+      it = next;
+    }
+  }
+  is_deleting_ = was_deleting;
+}
+
+void OwnedActiveStreamListenerBase::onListenerDrainStart() {
+  // See onFilterChainDrainStart for why `next` is captured and `is_deleting_` is pinned.
+  const bool was_deleting = is_deleting_;
+  is_deleting_ = true;
+  for (auto& entry : connections_by_context_) {
+    auto& connections = entry.second->connections_;
+    for (auto it = connections.begin(); it != connections.end();) {
+      auto next = std::next(it);
+      (*it)->connection_->onDrain();
+      it = next;
+    }
+  }
+  is_deleting_ = was_deleting;
+}
+
 void OwnedActiveStreamListenerBase::removeFilterChain(const Network::FilterChain* filter_chain) {
   auto iter = connections_by_context_.find(filter_chain);
   if (iter == connections_by_context_.end()) {

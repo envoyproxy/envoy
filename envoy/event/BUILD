@@ -32,17 +32,11 @@ envoy_cc_library(
         "//envoy/common:scope_tracker_interface",
         "//envoy/common:time_interface",
         "//envoy/filesystem:watcher_interface",
-        "//envoy/network:connection_handler_interface",
         "//envoy/network:connection_interface",
-        "//envoy/network:dns_interface",
         "//envoy/network:listen_socket_interface",
-        "//envoy/network:listener_interface",
         "//envoy/network:transport_socket_interface",
         "//envoy/server:watchdog_interface",
-        "//envoy/server/overload:thread_local_overload_state",
-        "//envoy/thread:thread_interface",
         "@abseil-cpp//absl/functional:any_invocable",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -63,6 +57,7 @@ envoy_cc_library(
     name = "scaled_range_timer_manager_interface",
     hdrs = ["scaled_range_timer_manager.h"],
     deps = [
+        ":dispatcher_interface",
         ":scaled_timer",
         ":timer_interface",
     ],

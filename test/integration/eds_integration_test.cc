@@ -90,10 +90,10 @@ public:
     uint32_t healthy_endpoints = 0;
     uint32_t degraded_endpoints = 0;
     uint32_t disable_active_hc_endpoints = 0;
-    absl::optional<uint32_t> load_balancing_weight = absl::nullopt;
-    absl::optional<bool> weighted_priority_health = absl::nullopt;
-    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt;
-    absl::optional<uint32_t> drop_overload_numerator = absl::nullopt;
+    std::optional<uint32_t> load_balancing_weight = std::nullopt;
+    std::optional<bool> weighted_priority_health = std::nullopt;
+    std::optional<uint32_t> overprovisioning_factor = std::nullopt;
+    std::optional<uint32_t> drop_overload_numerator = std::nullopt;
   };
 
   // We need to supply the endpoints via EDS to provide health status. Use a
@@ -694,7 +694,11 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
 }
 
 TEST_P(EdsIntegrationTest, StatsReadyFilter) {
-  config_helper_.prependFilter("name: eds-ready-filter");
+  config_helper_.prependFilter(R"EOF(
+    name: eds-ready-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.EdsReadyFilterConfig
+  )EOF");
   initializeTest(false);
 
   // Initial state: no healthy endpoints

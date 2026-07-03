@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -18,8 +19,6 @@
 #include "source/extensions/filters/network/thrift_proxy/router/router_ratelimit_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/router/upstream_request.h"
 #include "source/extensions/filters/network/thrift_proxy/thrift_object.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -192,10 +191,10 @@ private:
 
 class RouteMatcher {
 public:
-  // validation_clusters = absl::nullopt means that clusters are not validated.
+  // validation_clusters = std::nullopt means that clusters are not validated.
   RouteMatcher(
       const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config,
-      const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters,
+      const std::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters,
       Server::Configuration::CommonFactoryContext& context);
 
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const;

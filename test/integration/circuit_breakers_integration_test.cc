@@ -272,7 +272,7 @@ TEST_P(OutlierDetectionIntegrationTest, NoClusterOverwrite) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
 
-  codec_client_->close();
+  cleanupUpstreamAndDownstream();
 }
 
 // Test verifies that non-5xx codes defined in cluster's protocol options
@@ -362,7 +362,7 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteNon5xxAsErrors) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
 
-  codec_client_->close();
+  cleanupUpstreamAndDownstream();
 }
 // Test verifies that 5xx gateway errors configured in cluster protocol options are
 // forwarded to outlier detection in the original form and are not converted to code 500.
@@ -436,7 +436,7 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteGatewayErrors) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
 
-  codec_client_->close();
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace

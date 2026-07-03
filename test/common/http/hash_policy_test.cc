@@ -29,7 +29,7 @@ protected:
 };
 
 class HashableObj : public StreamInfo::FilterState::Object, public Hashable {
-  absl::optional<uint64_t> hash() const override { return 1234567; };
+  std::optional<uint64_t> hash() const override { return 1234567; };
 };
 
 // HeaderHashMethod: Verify hash is calculated correctly for a single header value
@@ -41,7 +41,7 @@ TEST_F(HashPolicyImplTest, HeaderHashForSingleHeaderValue) {
 
   headers_.addCopy("x-test-header", "test-value");
 
-  absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, {}, {});
+  std::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, {}, {});
   ASSERT_TRUE(hash.has_value());
   EXPECT_EQ(hash.value(), HashUtil::xxHash64("test-value"));
 }
@@ -56,7 +56,7 @@ TEST_F(HashPolicyImplTest, MultipleHeaderValues) {
   headers_.addCopy("x-multi-header", "value1");
   headers_.addCopy("x-multi-header", "value2");
 
-  absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, {}, {});
+  std::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, {}, {});
   ASSERT_TRUE(hash.has_value());
 
   absl::InlinedVector<absl::string_view, 1> sorted_header_values = {"value1", "value2"};
@@ -74,14 +74,14 @@ TEST_F(HashPolicyImplTest, HeaderHashMethodSameHashForDifferentHeaderOrder) {
   headers_.addCopy("x-reorder-header", "value1");
   headers_.addCopy("x-reorder-header", "value2");
 
-  absl::optional<uint64_t> hash1 = hash_policy_impl_->generateHash(headers_, {}, {});
+  std::optional<uint64_t> hash1 = hash_policy_impl_->generateHash(headers_, {}, {});
   ASSERT_TRUE(hash1.has_value());
 
   headers_.remove("x-reorder-header");
   headers_.addCopy("x-reorder-header", "value2");
   headers_.addCopy("x-reorder-header", "value1");
 
-  absl::optional<uint64_t> hash2 = hash_policy_impl_->generateHash(headers_, {}, {});
+  std::optional<uint64_t> hash2 = hash_policy_impl_->generateHash(headers_, {}, {});
   ASSERT_TRUE(hash2.has_value());
 
   EXPECT_EQ(hash1.value(), hash2.value());
@@ -95,11 +95,11 @@ TEST_F(HashPolicyImplTest, HeaderNotPresent) {
   setupHashPolicy(header_policy);
 
   {
-    absl::optional<uint64_t> hash = hash_policy_impl_->generateHash({}, {}, {});
+    std::optional<uint64_t> hash = hash_policy_impl_->generateHash({}, {}, {});
     EXPECT_FALSE(hash.has_value());
   }
   {
-    absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, {}, {});
+    std::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, {}, {});
     EXPECT_FALSE(hash.has_value());
   }
 }
@@ -120,7 +120,7 @@ TEST_F(HashPolicyImplTest, RegexRewriteApplied) {
 
   headers_.addCopy("x-test-header", "test-value");
 
-  absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, {}, {});
+  std::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, {}, {});
   ASSERT_TRUE(hash.has_value());
   EXPECT_EQ(hash.value(), HashUtil::xxHash64("replaced-value"));
 }
@@ -135,7 +135,7 @@ TEST_F(HashPolicyImplTest, CookieHashForPresentCookie) {
 
   headers_.setCopy(Http::LowerCaseString("cookie"), "test-cookie=cookie-value");
 
-  absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, {}, {});
+  std::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, {}, {});
   ASSERT_TRUE(hash.has_value());
   EXPECT_EQ(hash.value(), HashUtil::xxHash64("cookie-value"));
 }
@@ -154,7 +154,7 @@ TEST_F(HashPolicyImplTest, CookieHashForAbsentCookieWithTTL) {
       [](absl::string_view, absl::string_view, std::chrono::seconds,
          absl::Span<const CookieAttribute>) -> std::string { return "new-cookie-value"; };
 
-  absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, {}, add_cookie);
+  std::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, {}, add_cookie);
   ASSERT_TRUE(hash.has_value());
   EXPECT_EQ(hash.value(), HashUtil::xxHash64("new-cookie-value"));
 }
@@ -167,7 +167,7 @@ TEST_F(HashPolicyImplTest, CookieHashForAbsentCookieWithoutTTL) {
 
   setupHashPolicy(cookie_policy);
 
-  absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, {}, {});
+  std::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, {}, {});
   ASSERT_FALSE(hash.has_value());
 }
 
@@ -183,7 +183,7 @@ TEST_F(HashPolicyImplTest, IpHashForValidIp) {
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.downstream_connection_info_provider_->setRemoteAddress(downstream_address);
 
-  absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, stream_info, nullptr);
+  std::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, stream_info, nullptr);
   ASSERT_TRUE(hash.has_value());
   EXPECT_EQ(hash.value(), HashUtil::xxHash64("192.168.1.1"));
 }
@@ -209,7 +209,7 @@ TEST_F(HashPolicyImplTest, QueryParameterHashForExistingParameter) {
 
   headers_.setPath("/test?test-param=param-value");
 
-  absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, {}, {});
+  std::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, {}, {});
   ASSERT_TRUE(hash.has_value());
   EXPECT_EQ(hash.value(), HashUtil::xxHash64("param-value"));
 }
@@ -250,7 +250,7 @@ TEST_F(HashPolicyImplTest, FilterStateHashForExistingKey) {
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.filter_state_ = filter_state;
 
-  absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, stream_info, {});
+  std::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, stream_info, {});
   ASSERT_TRUE(hash.has_value());
   EXPECT_EQ(hash.value(), 1234567UL);
 }

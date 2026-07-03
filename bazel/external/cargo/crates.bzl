@@ -14,7 +14,7 @@ def raze_fetch_remote_crates():
     maybe(
         http_archive,
         name = "raze__protobuf__2_24_1",
-        url = "https://crates.io/api/v1/crates/protobuf/2.24.1/download",
+        url = "https://static.crates.io/crates/protobuf/protobuf-2.24.1.crate",
         type = "tar.gz",
         sha256 = "db50e77ae196458ccd3dc58a31ea1a90b0698ab1b7928d89f644c25d72070267",
         strip_prefix = "protobuf-2.24.1",

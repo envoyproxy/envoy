@@ -143,7 +143,7 @@ void GaugeKey::makeOwned() {
          "Both borrowed and owned tags are present in GaugeKey::makeOwned");
   if (borrowed_tags_.has_value() && !owned_tags_.has_value()) {
     owned_tags_ = borrowed_tags_.value().get();
-    borrowed_tags_ = absl::nullopt;
+    borrowed_tags_ = std::nullopt;
   }
 }
 
@@ -335,10 +335,9 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
 }
 
 namespace {
-absl::optional<uint64_t> getFormatValue(const Formatter::FormatterProvider& formatter,
-                                        const Formatter::Context& context,
-                                        const StreamInfo::StreamInfo& stream_info,
-                                        bool is_percent) {
+std::optional<uint64_t> getFormatValue(const Formatter::FormatterProvider& formatter,
+                                       const Formatter::Context& context,
+                                       const StreamInfo::StreamInfo& stream_info, bool is_percent) {
   Protobuf::Value computed_value = formatter.formatValue(context, stream_info);
   double value;
   if (computed_value.has_number_value()) {
@@ -348,13 +347,13 @@ absl::optional<uint64_t> getFormatValue(const Formatter::FormatterProvider& form
       ENVOY_LOG_PERIODIC_MISC(error, std::chrono::seconds(10),
                               "Stats access logger formatted a string that isn't a number: {}",
                               computed_value.string_value());
-      return absl::nullopt;
+      return std::nullopt;
     }
   } else {
     ENVOY_LOG_PERIODIC_MISC(error, std::chrono::seconds(10),
                             "Stats access logger computed non-number value: {}",
                             computed_value.DebugString());
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   if (is_percent) {
@@ -378,7 +377,7 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
       continue;
     }
 
-    absl::optional<uint64_t> computed_value_opt =
+    std::optional<uint64_t> computed_value_opt =
         getFormatValue(*histogram.value_formatter_, context, stream_info,
                        histogram.unit_ == Stats::Histogram::Unit::Percent);
     if (!computed_value_opt.has_value()) {
@@ -401,7 +400,7 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
 
     uint64_t value;
     if (counter.value_formatter_ != nullptr) {
-      absl::optional<uint64_t> computed_value_opt =
+      std::optional<uint64_t> computed_value_opt =
           getFormatValue(*counter.value_formatter_, context, stream_info, false);
       if (!computed_value_opt.has_value()) {
         continue;
@@ -436,7 +435,7 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
 
   uint64_t value;
   if (gauge.value_formatter_ != nullptr) {
-    absl::optional<uint64_t> computed_value_opt =
+    std::optional<uint64_t> computed_value_opt =
         getFormatValue(*gauge.value_formatter_, context, stream_info, false);
     if (!computed_value_opt.has_value()) {
       return;

@@ -196,7 +196,7 @@ public:
         proactive_resources_(proactive_resources) {}
 
   const OverloadActionState& getState(const std::string& action) override {
-    if (const auto symbol = action_symbol_table_.lookup(action); symbol != absl::nullopt) {
+    if (const auto symbol = action_symbol_table_.lookup(action); symbol != std::nullopt) {
       return actions_[symbol->index()];
     }
     return always_inactive_;
@@ -268,12 +268,12 @@ NamedOverloadActionSymbolTable::get(absl::string_view string) {
   return Symbol(index);
 }
 
-absl::optional<NamedOverloadActionSymbolTable::Symbol>
+std::optional<NamedOverloadActionSymbolTable::Symbol>
 NamedOverloadActionSymbolTable::lookup(absl::string_view string) const {
   if (auto it = table_.find(string); it != table_.end()) {
     return Symbol(it->second);
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 const absl::string_view NamedOverloadActionSymbolTable::name(Symbol symbol) const {

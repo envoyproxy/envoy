@@ -99,9 +99,8 @@ std::string CidrRange::asString() const {
 }
 
 // static
-absl::StatusOr<CidrRange>
-CidrRange::create(InstanceConstSharedPtr address, int length,
-                  absl::optional<absl::string_view> original_address_str) {
+absl::StatusOr<CidrRange> CidrRange::create(InstanceConstSharedPtr address, int length,
+                                            std::optional<absl::string_view> original_address_str) {
   InstanceConstSharedPtr ptr = truncateIpAddressAndLength(std::move(address), &length);
   if (!ptr) {
     return absl::InvalidArgumentError(absl::StrCat(

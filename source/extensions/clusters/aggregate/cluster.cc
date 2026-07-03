@@ -134,7 +134,7 @@ void AggregateClusterLoadBalancer::onClusterRemoval(const std::string& cluster_n
   }
 }
 
-absl::optional<uint32_t> AggregateClusterLoadBalancer::LoadBalancerImpl::hostToLinearizedPriority(
+std::optional<uint32_t> AggregateClusterLoadBalancer::LoadBalancerImpl::hostToLinearizedPriority(
     const Upstream::HostDescription& host) const {
   auto it = priority_context_.cluster_and_priority_to_linearized_priority_.find(
       std::make_pair(host.cluster().name(), host.priority()));
@@ -143,7 +143,7 @@ absl::optional<uint32_t> AggregateClusterLoadBalancer::LoadBalancerImpl::hostToL
     return it->second;
   } else {
     // The HostSet can change due to CDS/EDS updates between retries.
-    return absl::nullopt;
+    return std::nullopt;
   }
 }
 
@@ -187,14 +187,14 @@ AggregateClusterLoadBalancer::peekAnotherHost(Upstream::LoadBalancerContext* con
   return nullptr;
 }
 
-absl::optional<Upstream::SelectedPoolAndConnection>
+std::optional<Upstream::SelectedPoolAndConnection>
 AggregateClusterLoadBalancer::selectExistingConnection(Upstream::LoadBalancerContext* context,
                                                        const Upstream::Host& host,
                                                        std::vector<uint8_t>& hash_key) {
   if (load_balancer_) {
     return load_balancer_->selectExistingConnection(context, host, hash_key);
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
