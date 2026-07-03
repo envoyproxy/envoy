@@ -5,6 +5,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/access_log/access_log.h"
@@ -31,8 +32,6 @@
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Formatter {
@@ -176,14 +175,14 @@ public:
   virtual const std::string& maxAge() const PURE;
 
   /**
-   * @return const absl::optional<bool>& Whether access-control-allow-credentials should be true.
+   * @return const std::optional<bool>& Whether access-control-allow-credentials should be true.
    */
-  virtual const absl::optional<bool>& allowCredentials() const PURE;
+  virtual const std::optional<bool>& allowCredentials() const PURE;
 
   /**
-   * @return const absl::optional<bool>& How to handle access-control-request-private-network.
+   * @return const std::optional<bool>& How to handle access-control-request-private-network.
    */
-  virtual const absl::optional<bool>& allowPrivateNetworkAccess() const PURE;
+  virtual const std::optional<bool>& allowPrivateNetworkAccess() const PURE;
 
   /**
    * @return bool Whether CORS is enabled for the route or virtual host.
@@ -199,7 +198,7 @@ public:
    * @return bool whether preflight requests with origin not matching
    * configured allowed origins should be forwarded upstream.
    */
-  virtual const absl::optional<bool>& forwardNotMatchingPreflights() const PURE;
+  virtual const std::optional<bool>& forwardNotMatchingPreflights() const PURE;
 };
 
 /**
@@ -213,7 +212,7 @@ public:
    * Iterate over the headers, choose the first one that matches by name, and try to parse its
    * value.
    */
-  virtual absl::optional<std::chrono::milliseconds>
+  virtual std::optional<std::chrono::milliseconds>
   parseInterval(TimeSource& time_source, const Http::HeaderMap& headers) const PURE;
 };
 
@@ -313,14 +312,14 @@ public:
   virtual const std::vector<Http::HeaderMatcherSharedPtr>& retriableRequestHeaders() const PURE;
 
   /**
-   * @return absl::optional<std::chrono::milliseconds> base retry interval
+   * @return std::optional<std::chrono::milliseconds> base retry interval
    */
-  virtual absl::optional<std::chrono::milliseconds> baseInterval() const PURE;
+  virtual std::optional<std::chrono::milliseconds> baseInterval() const PURE;
 
   /**
-   * @return absl::optional<std::chrono::milliseconds> maximum retry interval
+   * @return std::optional<std::chrono::milliseconds> maximum retry interval
    */
-  virtual absl::optional<std::chrono::milliseconds> maxInterval() const PURE;
+  virtual std::optional<std::chrono::milliseconds> maxInterval() const PURE;
 
   /**
    * @return std::vector<Http::ResetHeaderParserSharedPtr>& list of reset header
@@ -445,7 +444,7 @@ public:
    * interval directly, or in the form of a unix timestamp relative to the current system time.
    * @return the interval if parsing was successful.
    */
-  virtual absl::optional<std::chrono::milliseconds>
+  virtual std::optional<std::chrono::milliseconds>
   parseResetInterval(const Http::ResponseHeaderMap& response_headers) const PURE;
 
   /**
@@ -591,7 +590,7 @@ public:
   /**
    * @return true if the trace span should be sampled.
    */
-  virtual absl::optional<bool> traceSampled() const PURE;
+  virtual std::optional<bool> traceSampled() const PURE;
 
   /**
    * @return true if host name should be suffixed with "-shadow".
@@ -669,7 +668,7 @@ public:
   /**
    * @return the string name of the virtual cluster.
    */
-  virtual const absl::optional<std::string>& name() const PURE;
+  virtual const std::optional<std::string>& name() const PURE;
 
   /**
    * @return the stat-name of the virtual cluster.
@@ -864,13 +863,13 @@ public:
   /**
    * @return bool indicating whether the client presented credentials.
    */
-  virtual const absl::optional<bool>& presented() const PURE;
+  virtual const std::optional<bool>& presented() const PURE;
 
   /**
    * @return bool indicating whether the client credentials successfully validated against the TLS
    * context validation context.
    */
-  virtual const absl::optional<bool>& validated() const PURE;
+  virtual const std::optional<bool>& validated() const PURE;
 };
 
 using TlsContextMatchCriteriaConstPtr = std::unique_ptr<const TlsContextMatchCriteria>;
@@ -1083,13 +1082,13 @@ public:
    * @return optional<std::chrono::milliseconds> the route's idle timeout. Zero indicates a
    *         disabled idle timeout, while nullopt indicates deference to the global timeout.
    */
-  virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+  virtual std::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
    * @return optional<std::chrono::milliseconds> the route's flush timeout. Zero indicates a
    *         disabled idle timeout, while nullopt indicates deference to the global timeout.
    */
-  virtual absl::optional<std::chrono::milliseconds> flushTimeout() const PURE;
+  virtual std::optional<std::chrono::milliseconds> flushTimeout() const PURE;
 
   /**
    * @return true if new style max_stream_duration config should be used over the old style.
@@ -1099,32 +1098,32 @@ public:
   /**
    * @return optional<std::chrono::milliseconds> the route's maximum stream duration.
    */
-  virtual absl::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
+  virtual std::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
 
   /**
    * @return optional<std::chrono::milliseconds> the max grpc-timeout this route will allow.
    */
-  virtual absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const PURE;
+  virtual std::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const PURE;
 
   /**
    * @return optional<std::chrono::milliseconds> the delta between grpc-timeout and enforced grpc
    *         timeout.
    */
-  virtual absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const PURE;
+  virtual std::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const PURE;
 
   /**
-   * @return absl::optional<std::chrono::milliseconds> the maximum allowed timeout value derived
+   * @return std::optional<std::chrono::milliseconds> the maximum allowed timeout value derived
    * from 'grpc-timeout' header of a gRPC request. Non-present value disables use of 'grpc-timeout'
    * header, while 0 represents infinity.
    */
-  virtual absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const PURE;
+  virtual std::optional<std::chrono::milliseconds> maxGrpcTimeout() const PURE;
 
   /**
-   * @return absl::optional<std::chrono::milliseconds> the timeout offset to apply to the timeout
+   * @return std::optional<std::chrono::milliseconds> the timeout offset to apply to the timeout
    * provided by the 'grpc-timeout' header of a gRPC request. This value will be positive and should
    * be subtracted from the value provided by the header.
    */
-  virtual absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const PURE;
+  virtual std::optional<std::chrono::milliseconds> grpcTimeoutOffset() const PURE;
 
   /**
    * @return bool true if the :authority header should be overwritten with the upstream hostname.
@@ -1317,7 +1316,7 @@ public:
    * @return true if the filter is disabled for this route, false if the filter is enabled.
    *         nullopt if no decision can be made explicitly for the filter.
    */
-  virtual absl::optional<bool> filterDisabled(absl::string_view config_name) const PURE;
+  virtual std::optional<bool> filterDisabled(absl::string_view config_name) const PURE;
 
   /**
    * This is a helper to get the route's per-filter config if it exists, up along the config
@@ -1610,7 +1609,7 @@ public:
                            Upstream::HostDescriptionConstSharedPtr host,
                            const Network::ConnectionInfoProvider& connection_info_provider,
                            StreamInfo::StreamInfo& info,
-                           absl::optional<Http::Protocol> protocol) PURE;
+                           std::optional<Http::Protocol> protocol) PURE;
 
   // @return the UpstreamToDownstream interface for this stream.
   //
@@ -1701,7 +1700,7 @@ public:
   virtual GenericConnPoolPtr createGenericConnPool(
       Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
       GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
-      Upstream::ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
+      Upstream::ResourcePriority priority, std::optional<Http::Protocol> downstream_protocol,
       Upstream::LoadBalancerContext* ctx, const Protobuf::Message& config) const PURE;
 };
 

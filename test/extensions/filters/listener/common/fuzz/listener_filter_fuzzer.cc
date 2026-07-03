@@ -34,7 +34,7 @@ ListenerFilterWithDataFuzzer::ListenerFilterWithDataFuzzer()
       dispatcher_(api_->allocateDispatcher("test_thread")),
       socket_(std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
           Network::Test::getCanonicalLoopbackAddress(Network::Address::IpVersion::v4))),
-      connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
+      connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, std::nullopt)),
       name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
       init_manager_(nullptr),
       listener_info_(std::make_shared<NiceMock<Network::MockListenerInfo>>()) {
@@ -48,7 +48,7 @@ ListenerFilterWithDataFuzzer::ListenerFilterWithDataFuzzer()
   EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
               getListenSocket(_))
       .WillOnce(Return(socket_));
-  connection_handler_->addListener(absl::nullopt, *this, runtime_, random_);
+  connection_handler_->addListener(std::nullopt, *this, runtime_, random_);
   conn_ = dispatcher_->createClientConnection(
       socket_->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr, nullptr);

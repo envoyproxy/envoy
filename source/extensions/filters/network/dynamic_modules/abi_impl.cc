@@ -52,6 +52,22 @@ void fillBufferChunks(const Buffer::Instance& buffer,
   }
 }
 
+// Returns the mutable dynamic metadata struct for the namespace, creating it if absent. The
+// connection stream info is always available while the filter is processing.
+Protobuf::Struct*
+getDynamicMetadataNamespace(envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+                            envoy_dynamic_module_type_module_buffer ns) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  auto& stream_info = filter->connection().streamInfo();
+  auto* metadata = stream_info.dynamicMetadata().mutable_filter_metadata();
+  absl::string_view namespace_view{ns.ptr, ns.length};
+  auto metadata_namespace = metadata->find(namespace_view);
+  if (metadata_namespace == metadata->end()) {
+    metadata_namespace = metadata->emplace(namespace_view, Protobuf::Struct{}).first;
+  }
+  return &metadata_namespace->second;
+}
+
 } // namespace
 
 extern "C" {
@@ -529,19 +545,12 @@ void envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
-  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto& stream_info = filter->connection().streamInfo();
-
-  std::string namespace_str(filter_namespace.ptr, filter_namespace.length);
+  auto* metadata_namespace = getDynamicMetadataNamespace(filter_envoy_ptr, filter_namespace);
   absl::string_view key_view(key.ptr, key.length);
   absl::string_view value_view(value.ptr, value.length);
-
-  // Get or create the metadata for this namespace.
-  Protobuf::Struct metadata(
-      (*stream_info.dynamicMetadata().mutable_filter_metadata())[namespace_str]);
-  auto& fields = *metadata.mutable_fields();
-  fields[std::string(key_view)].set_string_value(std::string(value_view));
-  stream_info.setDynamicMetadata(namespace_str, metadata);
+  Protobuf::Struct metadata_value;
+  (*metadata_value.mutable_fields())[key_view].set_string_value(value_view);
+  metadata_namespace->MergeFrom(metadata_value);
 }
 
 bool envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
@@ -581,18 +590,11 @@ void envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer key, double value) {
-  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto& stream_info = filter->connection().streamInfo();
-
-  std::string namespace_str(filter_namespace.ptr, filter_namespace.length);
+  auto* metadata_namespace = getDynamicMetadataNamespace(filter_envoy_ptr, filter_namespace);
   absl::string_view key_view(key.ptr, key.length);
-
-  // Get or create the metadata for this namespace.
-  Protobuf::Struct metadata(
-      (*stream_info.dynamicMetadata().mutable_filter_metadata())[namespace_str]);
-  auto& fields = *metadata.mutable_fields();
-  fields[std::string(key_view)].set_number_value(value);
-  stream_info.setDynamicMetadata(namespace_str, metadata);
+  Protobuf::Struct metadata_value;
+  (*metadata_value.mutable_fields())[key_view].set_number_value(value);
+  metadata_namespace->MergeFrom(metadata_value);
 }
 
 bool envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
@@ -629,18 +631,11 @@ void envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer key, bool value) {
-  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto& stream_info = filter->connection().streamInfo();
-
-  std::string namespace_str(filter_namespace.ptr, filter_namespace.length);
+  auto* metadata_namespace = getDynamicMetadataNamespace(filter_envoy_ptr, filter_namespace);
   absl::string_view key_view(key.ptr, key.length);
-
-  // Get or create the metadata for this namespace.
-  Protobuf::Struct metadata(
-      (*stream_info.dynamicMetadata().mutable_filter_metadata())[namespace_str]);
-  auto& fields = *metadata.mutable_fields();
-  fields[std::string(key_view)].set_bool_value(value);
-  stream_info.setDynamicMetadata(namespace_str, metadata);
+  Protobuf::Struct metadata_value;
+  (*metadata_value.mutable_fields())[key_view].set_bool_value(value);
+  metadata_namespace->MergeFrom(metadata_value);
 }
 
 bool envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(
@@ -671,6 +666,26 @@ bool envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(
 
   *result = field_it->second.bool_value();
   return true;
+}
+
+void envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size) {
+  if (entries_size == 0) {
+    // An empty batch is a no-op and must not create the namespace.
+    return;
+  }
+  auto* metadata_namespace = getDynamicMetadataNamespace(filter_envoy_ptr, filter_namespace);
+  Protobuf::Struct metadata_value;
+  auto* fields = metadata_value.mutable_fields();
+  for (size_t i = 0; i < entries_size; i++) {
+    const auto& entry = entries[i];
+    absl::string_view key_view(entry.key_ptr, entry.key_length);
+    absl::string_view value_view(entry.value_ptr, entry.value_length);
+    (*fields)[key_view].set_string_value(value_view);
+  }
+  metadata_namespace->MergeFrom(metadata_value);
 }
 
 envoy_dynamic_module_type_http_callout_init_result
@@ -934,6 +949,71 @@ envoy_dynamic_module_callback_network_filter_record_histogram_value(
     uint64_t value) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   auto histogram = filter->getFilterConfig().getHistogramById(id);
+  if (!histogram.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  histogram->recordValue(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_increment_counter(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
+  auto counter = config->getCounterById(id);
+  if (!counter.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  counter->add(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_increment_gauge(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
+  auto gauge = config->getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->add(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_decrement_gauge(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
+  auto gauge = config->getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->sub(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_set_gauge(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
+  auto gauge = config->getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->set(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_record_histogram_value(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
+  auto histogram = config->getHistogramById(id);
   if (!histogram.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }

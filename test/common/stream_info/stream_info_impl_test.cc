@@ -32,7 +32,7 @@ REGISTER_CUSTOM_RESPONSE_FLAG(CF, CustomFlag);
 REGISTER_CUSTOM_RESPONSE_FLAG(CF2, CustomFlag2);
 
 std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
-                                       absl::optional<std::chrono::nanoseconds> timing) {
+                                       std::optional<std::chrono::nanoseconds> timing) {
   EXPECT_TRUE(timing);
   EXPECT_LE(last, timing.value());
   return timing.value();
@@ -47,7 +47,9 @@ protected:
         // with --config=docker-clang
         sizeof(stream_info) == 776 ||
         // with --config=docker-clang-libc++
-        sizeof(stream_info) == 728)
+        sizeof(stream_info) == 728 ||
+        // with protobuf v35
+        sizeof(stream_info) == 736 || sizeof(stream_info) == 760)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -412,7 +414,7 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
 TEST_F(StreamInfoImplTest, CodecStreamId) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
                              FilterState::LifeSpan::FilterChain);
-  EXPECT_EQ(absl::nullopt, stream_info.codecStreamId());
+  EXPECT_EQ(std::nullopt, stream_info.codecStreamId());
   stream_info.setCodecStreamId(12345);
   EXPECT_EQ(12345, stream_info.codecStreamId());
 }
@@ -460,7 +462,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   s1.addPacketsRetransmitted(1);
 
   // setFrom
-  s1.setVirtualClusterName(absl::optional<std::string>("bar"));
+  s1.setVirtualClusterName(std::optional<std::string>("bar"));
   s1.setResponseCode(200);
   s1.setResponseCodeDetails("OK");
   s1.setConnectionTerminationDetails("baz");

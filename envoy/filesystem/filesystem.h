@@ -3,6 +3,7 @@
 #include <bitset>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/api/io_error.h"
@@ -12,7 +13,6 @@
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Filesystem {
@@ -27,14 +27,14 @@ struct FileInfo {
   const std::string name_;
   // the size of the file in bytes, or `nullopt` if the size could not be determined
   //         (e.g. for directories, or windows symlinks.)
-  const absl::optional<uint64_t> size_;
+  const std::optional<uint64_t> size_;
   // Note that if the file represented by name_ is a symlink, type_ will be the file type of the
   // target. For example, if name_ is a symlink to a directory, its file type will be Directory.
   // A broken symlink on posix will have `FileType::Regular`.
   const FileType file_type_;
-  const absl::optional<SystemTime> time_created_;
-  const absl::optional<SystemTime> time_last_accessed_;
-  const absl::optional<SystemTime> time_last_modified_;
+  const std::optional<SystemTime> time_created_;
+  const std::optional<SystemTime> time_last_accessed_;
+  const std::optional<SystemTime> time_last_modified_;
 };
 
 /**
@@ -233,7 +233,7 @@ struct DirectoryEntry {
 
   // The file size in bytes for regular files. nullopt for FileType::Directory and FileType::Other,
   // and, on Windows, also nullopt for symlinks, and on Linux nullopt for broken symlinks.
-  absl::optional<uint64_t> size_bytes_;
+  std::optional<uint64_t> size_bytes_;
 
   bool operator==(const DirectoryEntry& rhs) const {
     return name_ == rhs.name_ && type_ == rhs.type_ && size_bytes_ == rhs.size_bytes_;
@@ -246,7 +246,7 @@ class DirectoryIteratorImpl;
 // and after each increment, if error-handling is desired.
 class DirectoryIterator {
 public:
-  DirectoryIterator() : entry_({"", FileType::Other, absl::nullopt}) {}
+  DirectoryIterator() : entry_({"", FileType::Other, std::nullopt}) {}
   virtual ~DirectoryIterator() = default;
 
   const DirectoryEntry& operator*() const { return entry_; }

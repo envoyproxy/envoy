@@ -182,7 +182,6 @@ envoy_cc_library(
         "//source/extensions/filters/network/generic_proxy/interface:stream_interface",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 

@@ -23,7 +23,7 @@ DirectoryIteratorImpl::DirectoryIteratorImpl(const std::string& directory_path)
   if (status_.ok()) {
     entry_ = makeEntry(find_data);
   } else {
-    entry_ = {"", FileType::Other, absl::nullopt};
+    entry_ = {"", FileType::Other, std::nullopt};
   }
 }
 
@@ -39,7 +39,7 @@ DirectoryIteratorImpl& DirectoryIteratorImpl::operator++() {
   const DWORD err = ::GetLastError();
 
   if (ret == 0) {
-    entry_ = {"", FileType::Other, absl::nullopt};
+    entry_ = {"", FileType::Other, std::nullopt};
     if (err != ERROR_NO_MORE_FILES) {
       status_ = absl::UnknownError(fmt::format("unable to iterate directory: {}", err));
     }
@@ -58,12 +58,12 @@ DirectoryEntry DirectoryIteratorImpl::makeEntry(const WIN32_FIND_DATA& find_data
       !(find_data.dwReserved0 & IO_REPARSE_TAG_SYMLINK)) {
     // The file is reparse point and not a symlink, so it can't be
     // a regular file or a directory
-    return {std::string(find_data.cFileName), FileType::Other, absl::nullopt};
+    return {std::string(find_data.cFileName), FileType::Other, std::nullopt};
   } else if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-    return {std::string(find_data.cFileName), FileType::Directory, absl::nullopt};
+    return {std::string(find_data.cFileName), FileType::Directory, std::nullopt};
   } else if ((find_data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) &&
              (find_data.dwReserved0 & IO_REPARSE_TAG_SYMLINK)) {
-    return {std::string(find_data.cFileName), FileType::Regular, absl::nullopt};
+    return {std::string(find_data.cFileName), FileType::Regular, std::nullopt};
   } else {
     ULARGE_INTEGER file_size;
     file_size.LowPart = find_data.nFileSizeLow;

@@ -70,7 +70,7 @@ struct StatsParams {
   std::shared_ptr<re2::RE2> re2_filter_;
   Utility::HistogramBucketsMode histogram_buckets_mode_{Utility::HistogramBucketsMode::Unset};
   // If set, emit native histograms with at most this many buckets per histogram.
-  absl::optional<uint32_t> native_histogram_max_buckets_;
+  std::optional<uint32_t> native_histogram_max_buckets_;
   Http::Utility::QueryParamsMulti query_;
 
   /**

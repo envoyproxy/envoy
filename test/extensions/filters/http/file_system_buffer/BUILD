@@ -40,6 +40,7 @@ envoy_extension_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:logging_lib",
     ],
 )
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/network/connection_handler.h"
+
 #include "source/common/common/hash.h"
 #include "source/server/hot_restarting_base.h"
 

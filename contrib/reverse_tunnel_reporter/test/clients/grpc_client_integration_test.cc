@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
@@ -47,7 +48,7 @@ using envoy::extensions::upstreams::http::v3::HttpProtocolOptions;
 class TestingService final : public ReverseTunnelReportingService::Service {
   absl::flat_hash_map<std::string, ReverseTunnelEvent::Connected> state_;
   std::atomic<std::size_t> num_events_;
-  absl::optional<std::chrono::milliseconds> newInterval;
+  std::optional<std::chrono::milliseconds> newInterval;
 
 public:
   grpc::Status StreamReverseTunnels(
@@ -172,7 +173,7 @@ protected:
         Protobuf::util::TimeUtil::MillisecondsToDuration(sendInterval);
     grpc_cfg.set_max_retries(maxRetries);
     grpc_cfg.set_max_buffer_count(1'000'000);
-    client->mutable_typed_config()->PackFrom(grpc_cfg);
+    std::ignore = client->mutable_typed_config()->PackFrom(grpc_cfg);
 
     return cfg;
   }

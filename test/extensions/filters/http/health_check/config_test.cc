@@ -135,7 +135,8 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterWithEmptyProto) {
   HealthCheckFilterConfig healthCheckFilterConfig;
   NiceMock<Server::Configuration::MockFactoryContext> context;
   envoy::extensions::filters::http::health_check::v3::HealthCheck config =
-      *dynamic_cast<envoy::extensions::filters::http::health_check::v3::HealthCheck*>(
+      *Envoy::Protobuf::DynamicCastMessage<
+          envoy::extensions::filters::http::health_check::v3::HealthCheck>(
           healthCheckFilterConfig.createEmptyConfigProto().get());
 
   config.mutable_pass_through_mode()->set_value(false);
@@ -154,8 +155,8 @@ void testHealthCheckHeaderMatch(
   HealthCheckFilterConfig healthCheckFilterConfig;
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ProtobufTypes::MessagePtr config_msg = healthCheckFilterConfig.createEmptyConfigProto();
-  auto config = dynamic_cast<envoy::extensions::filters::http::health_check::v3::HealthCheck*>(
-      config_msg.get());
+  auto config = Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::filters::http::health_check::v3::HealthCheck>(config_msg.get());
   ASSERT_NE(config, nullptr);
 
   *config = input_config;

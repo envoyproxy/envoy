@@ -22,7 +22,7 @@ public:
                                           ->mutable_connection_debug_visitor_config();
 
           envoy::extensions::quic::connection_debug_visitor::quic_stats::v3::Config config;
-          debug_visitor_config->mutable_typed_config()->PackFrom(config);
+          std::ignore = debug_visitor_config->mutable_typed_config()->PackFrom(config);
           debug_visitor_config->set_name("envoy.quic.connection_debug_visitor.quic_stats");
 
           listener->set_stat_prefix("test");
@@ -115,7 +115,7 @@ TEST_P(QuicStatsIntegrationTest, CertChainTooLong) {
     cert->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/long_serverkey.pem"));
 
-    ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+    std::ignore = ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
   });
 
   testRouterHeaderOnlyRequestAndResponse();

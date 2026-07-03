@@ -133,8 +133,8 @@ public:
 
 private:
   const AccessLog::FilterPtr filter_;
-  absl::optional<Http::Code> status_code_;
-  absl::optional<std::string> body_;
+  std::optional<Http::Code> status_code_;
+  std::optional<std::string> body_;
   HeaderParserPtr header_parser_;
   BodyFormatterPtr body_formatter_;
 };

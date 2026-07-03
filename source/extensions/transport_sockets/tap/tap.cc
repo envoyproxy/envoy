@@ -31,9 +31,14 @@ TransportTapStats TapSocket::generateStats(Stats::Scope& stats_scope, const std:
 void TapSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   ASSERT(!tapper_);
   transport_socket_->setTransportSocketCallbacks(callbacks);
-  tapper_ = config_
-                ? config_->createPerSocketTapper(socket_tap_config_, stats_, callbacks.connection())
-                : nullptr;
+  if (config_ != nullptr) {
+    if (config_->shouldRecord()) {
+      tapper_ = config_->createPerSocketTapper(socket_tap_config_, stats_, callbacks.connection());
+    } else {
+      // Sampling rejected this connection. Track for observability.
+      stats_.cx_sampled_out_.inc();
+    }
+  }
 }
 
 void TapSocket::closeSocket(Network::ConnectionEvent event, bool abort_reset) {

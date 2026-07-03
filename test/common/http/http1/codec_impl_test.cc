@@ -91,7 +91,7 @@ Buffer::OwnedImpl createBufferWithNByteSlices(absl::string_view input, size_t ma
 
 struct HTTPStringTestCase {
   const absl::string_view http_version_;
-  const absl::optional<absl::string_view> expected_error_;
+  const std::optional<absl::string_view> expected_error_;
 };
 
 // Tests in this suite observe request headers produced by the codec
@@ -138,7 +138,7 @@ public:
                                ? Code::NotImplemented
                                : Code::BadRequest;
       sendLocalReply(response_code, Http::CodeUtility::toString(response_code), nullptr,
-                     absl::nullopt, failure_details);
+                     std::nullopt, failure_details);
       if (response_encoder_) {
         response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
       }
@@ -1052,7 +1052,7 @@ TEST_F(Http1ServerConnectionImplTest, HttpVersion) {
   // SPELLCHECKER(on)
 
   for (const auto& test_case : kRequestHTTPStringTestCases) {
-    const absl::optional<absl::string_view>& expected_error = test_case.expected_error_;
+    const std::optional<absl::string_view>& expected_error = test_case.expected_error_;
     initialize();
 
     MockRequestDecoder decoder;
@@ -1256,7 +1256,7 @@ TEST_F(Http1ServerConnectionImplTest, ProtocolStreamId) {
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   auto status = codec_->dispatch(buffer);
-  EXPECT_EQ(absl::nullopt, response_encoder->getStream().codecStreamId());
+  EXPECT_EQ(std::nullopt, response_encoder->getStream().codecStreamId());
 }
 
 // Test that if the stream is not created at the time an error is detected, it
@@ -4148,7 +4148,7 @@ TEST_F(Http1ClientConnectionImplTest, HttpVersion) {
   // SPELLCHECKER(on)
 
   for (const auto& test_case : kResponseHTTPStringTestCases) {
-    const absl::optional<absl::string_view>& expected_error = test_case.expected_error_;
+    const std::optional<absl::string_view>& expected_error = test_case.expected_error_;
 
     initialize();
 

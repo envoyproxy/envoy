@@ -60,7 +60,7 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     return Http::Code::BadRequest;
   }
 
-  const absl::optional<std::string> hidden_value = query_.getFirstValue("hidden");
+  const std::optional<std::string> hidden_value = query_.getFirstValue("hidden");
   if (hidden_value.has_value() && !hidden_value.value().empty()) {
     if (hidden_value.value() == "include") {
       hidden_ = HiddenFlag::Include;
@@ -74,7 +74,7 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     }
   }
 
-  const absl::optional<std::string> format_value = Utility::formatParam(query_);
+  const std::optional<std::string> format_value = Utility::formatParam(query_);
   if (format_value.has_value() && !format_value.value().empty()) {
     if (format_value.value() == "prometheus") {
       format_ = StatsFormat::Prometheus;
