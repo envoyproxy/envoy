@@ -27,7 +27,7 @@ absl::Status InferenceBodyHandler::onKey(absl::string_view key, int depth, size_
   else if (key == "top_p")
     seen = &seen_top_p_;
   else if (key == "n")
-    seen = &seen_n_;
+    seen = &seen_num_completions_;
   else if (key == "seed")
     seen = &seen_seed_;
   else if (key == "messages")
@@ -83,7 +83,7 @@ absl::Status InferenceBodyHandler::onNumber(absl::string_view key, absl::string_
       if (key == "max_tokens")
         max_tokens_ = v;
       else if (key == "n")
-        n_ = v;
+        num_completions_ = v;
       else
         seed_ = v;
     }

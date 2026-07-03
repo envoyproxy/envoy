@@ -39,17 +39,21 @@ struct ByteRange {
 class InferenceBodyHandler : public WuffsJsonCursor::Handler {
 public:
   // Accessors (valid after cursor.feed(chunk, closed=true) returns ok).
-  const std::string& model() const { return model_; }
+  // Name of the model to invoke (e.g. "gpt-4o", "claude-sonnet-4-6").
+  std::string model() const { return model_; }
   bool hasModel() const { return seen_model_; }
 
+  // Whether to stream the response back token-by-token.
   bool stream() const { return stream_; }
   bool hasStream() const { return seen_stream_; }
 
-  std::optional<double> temperature() const { return temperature_; }
-  std::optional<int64_t> maxTokens() const { return max_tokens_; }
-  std::optional<double> topP() const { return top_p_; }
-  std::optional<int64_t> n() const { return n_; }
-  std::optional<int64_t> seed() const { return seed_; }
+  // Sampling parameters — absent (nullopt) means use the server default.
+  std::optional<double>  temperature() const { return temperature_; }
+  std::optional<int64_t> maxTokens()   const { return max_tokens_; }
+  std::optional<double>  topP()        const { return top_p_; }
+  // Number of independent completions to generate per request.
+  std::optional<int64_t> numCompletions() const { return num_completions_; }
+  std::optional<int64_t> seed()        const { return seed_; }
 
   // Byte ranges for messages[] and tools[] elements in the raw body stream.
   const std::vector<ByteRange>& messages() const { return messages_; }
@@ -66,7 +70,7 @@ private:
   std::optional<double> temperature_;
   std::optional<int64_t> max_tokens_;
   std::optional<double> top_p_;
-  std::optional<int64_t> n_;
+  std::optional<int64_t> num_completions_;
   std::optional<int64_t> seed_;
 
   // Byte-range recorded fields
@@ -85,7 +89,7 @@ private:
   bool seen_temperature_{false};
   bool seen_max_tokens_{false};
   bool seen_top_p_{false};
-  bool seen_n_{false};
+  bool seen_num_completions_{false};
   bool seen_seed_{false};
   bool seen_messages_{false};
   bool seen_tools_{false};
@@ -125,10 +129,10 @@ private:
 class AgentBodyHandler : public WuffsJsonCursor::Handler {
 public:
   // Root-level fields
-  const std::string& jsonrpc() const { return jsonrpc_; }
-  const std::string& method() const { return method_; }
+  std::string jsonrpc() const { return jsonrpc_; }
+  std::string method() const { return method_; }
   // id as its raw JSON representation (string value or number digits).
-  const std::string& id() const { return id_; }
+  std::string id() const { return id_; }
 
   bool isValidJsonRpc() const { return jsonrpc_ == "2.0"; }
   // True when "result" or "error" key was seen at depth=1 (JSON-RPC response).
@@ -136,19 +140,19 @@ public:
   bool hasDuplicateKeys() const { return has_duplicate_keys_; }
 
   // params.* fields — populated based on the method
-  const std::string& paramsName() const { return params_name_; }
-  const std::string& paramsUri() const { return params_uri_; }
-  const std::string& paramsLevel() const { return params_level_; }
-  const std::string& paramsProtocolVersion() const { return params_protocol_version_; }
-  const std::string& paramsRequestId() const { return params_request_id_; }
+  std::string paramsName() const { return params_name_; }
+  std::string paramsUri() const { return params_uri_; }
+  std::string paramsLevel() const { return params_level_; }
+  std::string paramsProtocolVersion() const { return params_protocol_version_; }
+  std::string paramsRequestId() const { return params_request_id_; }
 
   // params.clientInfo.name — for initialize
-  const std::string& clientInfoName() const { return client_info_name_; }
+  std::string clientInfoName() const { return client_info_name_; }
 
   // params._meta — trace context forwarded from MCP client
-  const std::string& metaTraceparent() const { return meta_traceparent_; }
-  const std::string& metaTracestate() const { return meta_tracestate_; }
-  const std::string& metaBaggage() const { return meta_baggage_; }
+  std::string metaTraceparent() const { return meta_traceparent_; }
+  std::string metaTracestate() const { return meta_tracestate_; }
+  std::string metaBaggage() const { return meta_baggage_; }
 
   // Byte range for params.arguments (MCP tools/call argument blob, A2A payloads).
   // Empty optional if "arguments" was not present.
