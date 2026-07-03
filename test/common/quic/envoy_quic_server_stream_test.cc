@@ -74,7 +74,7 @@ public:
     EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
         .WillRepeatedly(
             Invoke([](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
-                      quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
+                      quic::StreamSendingState state, bool, std::optional<quic::EncryptionLevel>) {
               return quic::QuicConsumedData{write_length, state != quic::NO_FIN};
             }));
     EXPECT_CALL(writer_, WritePacket(_, _, _, _, _, _))
@@ -324,7 +324,7 @@ TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
 }
 
 TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
-  EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
+  EXPECT_EQ(std::nullopt, quic_stream_->http1StreamEncoderOptions());
   receiveRequest(request_body_, true, request_body_.size() * 2);
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
 
@@ -335,7 +335,7 @@ TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
 }
 
 TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithMemSliceReleasor) {
-  EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
+  EXPECT_EQ(std::nullopt, quic_stream_->http1StreamEncoderOptions());
   receiveRequest(request_body_, true, request_body_.size() * 2);
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
   quic_stream_->encodeTrailers(response_trailers_);
@@ -409,7 +409,7 @@ TEST_F(EnvoyQuicServerStreamTest, EncodeTrailersOnClosedStream) {
 }
 
 TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithAccounting) {
-  EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
+  EXPECT_EQ(std::nullopt, quic_stream_->http1StreamEncoderOptions());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->wireBytesReceived());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->headerBytesReceived());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->decompressedHeaderBytesReceived());
@@ -743,7 +743,7 @@ TEST_F(EnvoyQuicServerStreamTest, HeadersContributeToWatermarkIquic) {
   EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
       .WillOnce(
           Invoke([](quic::QuicStreamId, size_t /*write_length*/, quic::QuicStreamOffset,
-                    quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
+                    quic::StreamSendingState state, bool, std::optional<quic::EncryptionLevel>) {
             return quic::QuicConsumedData{0u, state != quic::NO_FIN};
           }));
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
@@ -761,7 +761,7 @@ TEST_F(EnvoyQuicServerStreamTest, HeadersContributeToWatermarkIquic) {
   EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
       .WillOnce(
           Invoke([](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
-                    quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
+                    quic::StreamSendingState state, bool, std::optional<quic::EncryptionLevel>) {
             return quic::QuicConsumedData{write_length, state != quic::NO_FIN};
           }));
   EXPECT_CALL(stream_callbacks_, onBelowWriteBufferLowWatermark());
@@ -775,7 +775,7 @@ TEST_F(EnvoyQuicServerStreamTest, HeadersContributeToWatermarkIquic) {
   EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
       .WillOnce(
           Invoke([](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
-                    quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
+                    quic::StreamSendingState state, bool, std::optional<quic::EncryptionLevel>) {
             return quic::QuicConsumedData{write_length, state != quic::NO_FIN};
           }));
   quic_session_.OnCanWrite();
@@ -784,7 +784,7 @@ TEST_F(EnvoyQuicServerStreamTest, HeadersContributeToWatermarkIquic) {
   EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
       .WillRepeatedly(
           Invoke([](quic::QuicStreamId, size_t, quic::QuicStreamOffset,
-                    quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
+                    quic::StreamSendingState state, bool, std::optional<quic::EncryptionLevel>) {
             return quic::QuicConsumedData{0u, state != quic::NO_FIN};
           }));
   // Send more data. If watermark bytes counting were not cleared in previous
@@ -851,7 +851,7 @@ TEST_F(EnvoyQuicServerStreamTest, ConnectionCloseDuringEncoding) {
       .Times(testing::AtLeast(1u))
       .WillRepeatedly(
           Invoke([this](quic::QuicStreamId, size_t data_size, quic::QuicStreamOffset,
-                        quic::StreamSendingState, bool, absl::optional<quic::EncryptionLevel>) {
+                        quic::StreamSendingState, bool, std::optional<quic::EncryptionLevel>) {
             if (data_size < 10) {
               // Ietf QUIC sends a small data frame header before sending the data frame payload.
               return quic::QuicConsumedData{data_size, false};
@@ -889,7 +889,7 @@ TEST_F(EnvoyQuicServerStreamTest, ConnectionCloseDuringEncodingEndStream) {
       .Times(testing::AtLeast(1u))
       .WillRepeatedly(
           Invoke([this](quic::QuicStreamId, size_t data_size, quic::QuicStreamOffset,
-                        quic::StreamSendingState, bool, absl::optional<quic::EncryptionLevel>) {
+                        quic::StreamSendingState, bool, std::optional<quic::EncryptionLevel>) {
             if (data_size < 10) {
               // Ietf QUIC sends a small data frame header before sending the data frame payload.
               return quic::QuicConsumedData{data_size, false};
@@ -924,7 +924,7 @@ TEST_F(EnvoyQuicServerStreamTest, ConnectionCloseAfterEndStreamEncoded) {
   EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
       .WillOnce(
           Invoke([this](quic::QuicStreamId, size_t, quic::QuicStreamOffset,
-                        quic::StreamSendingState, bool, absl::optional<quic::EncryptionLevel>) {
+                        quic::StreamSendingState, bool, std::optional<quic::EncryptionLevel>) {
             quic_connection_.CloseConnection(
                 quic::QUIC_INTERNAL_ERROR, "Closed in WriteHeaders",
                 quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);

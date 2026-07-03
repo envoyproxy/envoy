@@ -76,7 +76,7 @@ public:
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "worker."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "worker."))}),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()),
-        connection_handler_(*dispatcher_, absl::nullopt),
+        connection_handler_(*dispatcher_, std::nullopt),
         connection_id_generator_(quic::kQuicDefaultConnectionIdLength),
         envoy_quic_dispatcher_(
             &crypto_config_, quic_config_, &version_manager_,

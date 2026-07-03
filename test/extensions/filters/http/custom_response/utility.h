@@ -207,7 +207,7 @@ public:
                 "envoy.filters.http.custom_response");
     if (!filter_state) {
       decoder_callbacks_->sendLocalReply(::Envoy::Http::Code::InternalServerError, "", nullptr,
-                                         absl::nullopt, "");
+                                         std::nullopt, "");
       return ::Envoy::Http::FilterHeadersStatus::StopIteration;
     }
     return ::Envoy::Http::FilterHeadersStatus::Continue;
@@ -229,7 +229,7 @@ public:
                                 "envoy.filters.http.custom_response");
     if (!filter_state) {
       encoder_callbacks_->sendLocalReply(::Envoy::Http::Code::InternalServerError, "", nullptr,
-                                         absl::nullopt, "");
+                                         std::nullopt, "");
       return ::Envoy::Http::FilterHeadersStatus::StopIteration;
     }
     return ::Envoy::Http::FilterHeadersStatus::Continue;

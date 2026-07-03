@@ -84,7 +84,6 @@ envoy_cc_library(
     hdrs = envoy_select_enable_http3(["scone_state.h"]),
     deps = envoy_select_enable_http3([
         "@abseil-cpp//absl/strings:string_view",
-        "@abseil-cpp//absl/types:optional",
         "//envoy/stream_info:filter_state_interface",
     ]),
 )
@@ -317,7 +316,6 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:session_idle_list_lib",
         "@quiche//:quic_server_http_spdy_session_lib",
-        "@abseil-cpp//absl/types:optional",
     ]) + envoy_select_enable_http_datagrams([
         ":http_datagram_handler",
     ]),

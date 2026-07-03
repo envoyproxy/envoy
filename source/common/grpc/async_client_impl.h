@@ -114,7 +114,7 @@ private:
   void streamError(Status::GrpcStatus grpc_status) { streamError(grpc_status, EMPTY_STRING); }
 
   void cleanup();
-  void trailerResponse(absl::optional<Status::GrpcStatus> grpc_status,
+  void trailerResponse(std::optional<Status::GrpcStatus> grpc_status,
                        const std::string& grpc_message);
 
   // Deliver notification and update span when the connection closes.

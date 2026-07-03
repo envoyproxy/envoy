@@ -63,14 +63,14 @@ public:
 
   State state() { return state_; }
   GcpAuthnFilterStats& stats() { return stats_; }
-  const absl::optional<std::string>& fingerprint() const { return client_cert_fingerprint_; }
+  const std::optional<std::string>& fingerprint() const { return client_cert_fingerprint_; }
 
   ~GcpAuthnFilter() override = default;
 
 private:
   friend class GcpAuthnFilterTest;
 
-  absl::optional<std::string> getClientCertFingerprint(Upstream::ThreadLocalCluster* cluster);
+  std::optional<std::string> getClientCertFingerprint(Upstream::ThreadLocalCluster* cluster);
 
   GcpAuthnFilterStats generateStats(const std::string& stats_prefix, Stats::Scope& scope) {
     return {ALL_GCP_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, stats_prefix))};
@@ -88,7 +88,7 @@ private:
   bool initiating_call_{};
   State state_{State::NotStarted};
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience_;
-  absl::optional<std::string> client_cert_fingerprint_;
+  std::optional<std::string> client_cert_fingerprint_;
   const CertFingerprinterSharedPtr cert_fingerprinter_;
   // This cache is optional (it will be nullptr if no cache configuration) and not owned by the
   // filter (thread local storage).

@@ -595,7 +595,7 @@ TEST_F(EventReporterFactoryTest, CreateReporterWithRegisteredClient) {
 
   auto* client_entry = reporter_config.add_clients();
   client_entry->set_name("mock_client_factory");
-  client_entry->mutable_typed_config()->PackFrom(Protobuf::Struct());
+  std::ignore = client_entry->mutable_typed_config()->PackFrom(Protobuf::Struct());
 
   auto reporter = factory_.createReporter(context_, std::move(config));
   EXPECT_NE(nullptr, reporter);
@@ -610,7 +610,7 @@ TEST_F(EventReporterFactoryTest, CreateClientWithUnknownFactoryThrows) {
 
   auto* client_entry = reporter_config.add_clients();
   client_entry->set_name("nonexistent_client_factory");
-  client_entry->mutable_typed_config()->PackFrom(Protobuf::Struct());
+  std::ignore = client_entry->mutable_typed_config()->PackFrom(Protobuf::Struct());
 
   EXPECT_THROW_WITH_REGEX(factory_.createReporter(context_, std::move(config)), EnvoyException,
                           "Unknown Reporter Client Factory: 'nonexistent_client_factory'");

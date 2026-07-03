@@ -1,12 +1,11 @@
 #pragma once
 
 #include <chrono>
+#include <optional>
 #include <string>
 
 #include "envoy/common/pure.h"
 #include "envoy/type/v3/percent.pb.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,7 +26,7 @@ public:
   virtual std::chrono::milliseconds delayMs() const PURE;
   virtual const std::vector<std::string> commands() const PURE;
   virtual envoy::type::v3::FractionalPercent defaultValue() const PURE;
-  virtual absl::optional<std::string> runtimeKey() const PURE;
+  virtual std::optional<std::string> runtimeKey() const PURE;
 };
 
 using FaultSharedPtr = std::shared_ptr<const Fault>;

@@ -57,7 +57,7 @@ struct ConfigOptions {
   FilterSetup filter_setup = FilterSetup::kDownstream;
   bool valid_grpc_server = true;
   bool add_logging_filter = false;
-  absl::optional<LoggingTestFilterConfig> logging_filter_config = absl::nullopt;
+  std::optional<LoggingTestFilterConfig> logging_filter_config = std::nullopt;
   bool http1_codec = false;
   bool add_metadata = false;
   bool add_response_processor = false;
@@ -117,10 +117,10 @@ protected:
   void twoExtProcFiltersFullDuplexConfig();
 
   IntegrationStreamDecoderPtr sendDownstreamRequest(
-      absl::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers);
+      std::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers);
   IntegrationStreamDecoderPtr sendDownstreamRequestWithBody(
       absl::string_view body,
-      absl::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers,
+      std::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers,
       bool add_content_length = false);
   IntegrationStreamDecoderPtr sendDownstreamRequestWithBodyAndTrailer(absl::string_view body);
 
@@ -134,34 +134,34 @@ protected:
 
   void processGenericMessage(
       FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const ProcessingRequest&, ProcessingResponse&)>> cb);
+      std::optional<std::function<bool(const ProcessingRequest&, ProcessingResponse&)>> cb);
   void processRequestHeadersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb);
+      std::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb);
   void processRequestTrailersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb);
+      std::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb);
   void processResponseHeadersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb);
+      std::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb);
   void
   processRequestBodyMessage(FakeUpstream& grpc_upstream, bool first_message,
-                            absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb,
+                            std::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb,
                             bool check_downstream_flow_control = false);
-  void processResponseBodyMessage(
-      FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb);
+  void
+  processResponseBodyMessage(FakeUpstream& grpc_upstream, bool first_message,
+                             std::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb);
   void processResponseTrailersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb);
+      std::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb);
   void processAndRespondImmediately(FakeUpstream& grpc_upstream, bool first_message,
-                                    absl::optional<std::function<void(ImmediateResponse&)>> cb);
+                                    std::optional<std::function<void(ImmediateResponse&)>> cb);
   // Packing two ProcessingResponses into one gRPC message.
   // If @param immediate_response is true, the 1st ProcessingResponse is an immediate_response.
   // Otherwise, the 1st ProcessingResponse is an empty request_trailers response.
   // The 2nd ProcessingResponse is an empty response_trailers response.
   void packTwoResponsesInOneMessage(FakeUpstream& grpc_upstream, bool immediate_response,
-                                    absl::optional<std::function<void(ImmediateResponse&)>> cb);
+                                    std::optional<std::function<void(ImmediateResponse&)>> cb);
 
   // ext_proc server sends back a response to tell Envoy to stop the
   // original timer and start a new timer.

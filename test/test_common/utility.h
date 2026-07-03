@@ -937,10 +937,10 @@ public:
       }
     }
   }
-  absl::optional<absl::string_view> get(absl::string_view key) const override {
+  std::optional<absl::string_view> get(absl::string_view key) const override {
     auto iter = context_map_.find(key);
     if (iter == context_map_.end()) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     return iter->second;
   }
@@ -974,13 +974,13 @@ public:
       return Http::HeaderMap::Iterate::Break;
     });
   }
-  absl::optional<absl::string_view> get(absl::string_view key) const override {
+  std::optional<absl::string_view> get(absl::string_view key) const override {
     Http::LowerCaseString lower_key{std::string(key)};
     const auto entry = request_headers_.get(lower_key);
     if (!entry.empty()) {
       return entry[0]->value().getStringView();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
   void set(absl::string_view, absl::string_view) override {}
   void remove(absl::string_view) override {}

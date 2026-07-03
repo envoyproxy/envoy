@@ -122,6 +122,7 @@ QatzipCompressorLibraryFactory::createCompressorFactoryFromProto(
           const envoy::extensions::compression::qatzip::compressor::v3alpha::Qatzip&>(
           proto_config, context.messageValidationVisitor());
 #ifdef QAT_DISABLED
+  static_cast<void>(config);
   throw EnvoyException("X86_64 architecture is required for QAT.");
 #else
   return createCompressorFactoryFromProtoTyped(config, context);

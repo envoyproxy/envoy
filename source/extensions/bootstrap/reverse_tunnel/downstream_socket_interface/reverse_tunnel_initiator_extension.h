@@ -5,6 +5,8 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.validate.h"
 #include "envoy/formatter/substitution_formatter.h"
@@ -99,6 +101,17 @@ public:
   Stats::Scope& getStatsScope() const { return context_.scope(); }
 
   /**
+   * @return the server's thread-safe random generator, used to apply jitter to the reconnect
+   * maintenance timer and the per-host reconnect backoff.
+   */
+  Random::RandomGenerator& randomGenerator() const { return context_.api().randomGenerator(); }
+
+  /**
+   * @return the configured upper bound on the per-host reconnect backoff, in milliseconds.
+   */
+  uint64_t maxReconnectBackoffMs() const { return max_reconnect_backoff_ms_; }
+
+  /**
    * @return reference to the configured HTTP handshake request path.
    */
   const std::string& handshakeRequestPath() const { return handshake_request_path_; }
@@ -174,6 +187,7 @@ private:
   ThreadLocal::TypedSlotPtr<DownstreamSocketThreadLocal> tls_slot_;
   std::string stat_prefix_; // Reverse connection stats prefix
   bool enable_detailed_stats_{false};
+  uint64_t max_reconnect_backoff_ms_{};
   std::string handshake_request_path_;
   std::vector<envoy::config::core::v3::HeaderValueOption> additional_headers_;
   bool use_http_upgrade_{false};

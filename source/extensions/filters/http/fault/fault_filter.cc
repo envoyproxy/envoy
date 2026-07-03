@@ -164,7 +164,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
 }
 
 bool FaultFilter::maybeSetupDelay(const Http::RequestHeaderMap& request_headers) {
-  absl::optional<std::chrono::milliseconds> duration = delayDuration(request_headers);
+  std::optional<std::chrono::milliseconds> duration = delayDuration(request_headers);
   if (duration.has_value() && tryIncActiveFaults()) {
     delay_timer_ = decoder_callbacks_->dispatcher().createTimer(
         [this, &request_headers]() -> void { postDelayInjection(request_headers); });
@@ -181,8 +181,8 @@ bool FaultFilter::maybeSetupDelay(const Http::RequestHeaderMap& request_headers)
 }
 
 bool FaultFilter::maybeDoAbort(const Http::RequestHeaderMap& request_headers) {
-  absl::optional<Http::Code> http_status;
-  absl::optional<Grpc::Status::GrpcStatus> grpc_status;
+  std::optional<Http::Code> http_status;
+  std::optional<Grpc::Status::GrpcStatus> grpc_status;
   std::tie(http_status, grpc_status) = abortStatus(request_headers);
 
   if (http_status.has_value() && tryIncActiveFaults()) {
@@ -198,7 +198,7 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& requ
     return;
   }
 
-  absl::optional<uint64_t> rate_kbps =
+  std::optional<uint64_t> rate_kbps =
       fault_settings_->responseRateLimit()->rateKbps(&request_headers);
   if (!rate_kbps.has_value()) {
     return;
@@ -279,9 +279,9 @@ bool FaultFilter::isResponseRateLimitEnabled(const Http::RequestHeaderMap& reque
       fault_settings_->responseRateLimit()->percentage(&request_headers));
 }
 
-absl::optional<std::chrono::milliseconds>
+std::optional<std::chrono::milliseconds>
 FaultFilter::delayDuration(const Http::RequestHeaderMap& request_headers) {
-  absl::optional<std::chrono::milliseconds> ret;
+  std::optional<std::chrono::milliseconds> ret;
 
   if (!isDelayEnabled(request_headers)) {
     return ret;
@@ -312,13 +312,13 @@ FaultFilter::delayDuration(const Http::RequestHeaderMap& request_headers) {
 
 AbortHttpAndGrpcStatus FaultFilter::abortStatus(const Http::RequestHeaderMap& request_headers) {
   if (!isAbortEnabled(request_headers)) {
-    return AbortHttpAndGrpcStatus{absl::nullopt, absl::nullopt};
+    return AbortHttpAndGrpcStatus{std::nullopt, std::nullopt};
   }
 
   auto http_status = abortHttpStatus(request_headers);
   // If http status code is set, then gRPC status won't be used.
   if (http_status.has_value()) {
-    return AbortHttpAndGrpcStatus{http_status, absl::nullopt};
+    return AbortHttpAndGrpcStatus{http_status, std::nullopt};
   }
 
   auto grpc_status = abortGrpcStatus(request_headers);
@@ -327,16 +327,16 @@ AbortHttpAndGrpcStatus FaultFilter::abortStatus(const Http::RequestHeaderMap& re
     return AbortHttpAndGrpcStatus{Http::Code::OK, grpc_status};
   }
 
-  return AbortHttpAndGrpcStatus{absl::nullopt, absl::nullopt};
+  return AbortHttpAndGrpcStatus{std::nullopt, std::nullopt};
 }
 
-absl::optional<Http::Code>
+std::optional<Http::Code>
 FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
   // See if the configured abort provider has a default status code, if not there is no abort status
   // code (e.g., header configuration and no/invalid header).
   auto http_status = fault_settings_->requestAbort()->httpStatusCode(&request_headers);
   if (!http_status.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   auto default_http_status_code = static_cast<uint64_t>(http_status.value());
@@ -351,11 +351,11 @@ FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
   return static_cast<Http::Code>(runtime_http_status_code);
 }
 
-absl::optional<Grpc::Status::GrpcStatus>
+std::optional<Grpc::Status::GrpcStatus>
 FaultFilter::abortGrpcStatus(const Http::RequestHeaderMap& request_headers) {
   auto grpc_status = fault_settings_->requestAbort()->grpcStatusCode(&request_headers);
   if (!grpc_status.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   auto default_grpc_status_code = static_cast<uint64_t>(grpc_status.value());
@@ -448,8 +448,8 @@ void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_heade
   resetTimerState();
 
   // Delays can be followed by aborts
-  absl::optional<Http::Code> http_status;
-  absl::optional<Grpc::Status::GrpcStatus> grpc_status;
+  std::optional<Http::Code> http_status;
+  std::optional<Grpc::Status::GrpcStatus> grpc_status;
   std::tie(http_status, grpc_status) = abortStatus(request_headers);
 
   if (http_status.has_value()) {
@@ -471,7 +471,7 @@ void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_heade
 }
 
 void FaultFilter::abortWithStatus(Http::Code http_status_code,
-                                  absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
+                                  std::optional<Grpc::Status::GrpcStatus> grpc_status) {
   recordAbortsInjectedStats();
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected);
   auto& dynamic_metadata = decoder_callbacks_->streamInfo().dynamicMetadata();

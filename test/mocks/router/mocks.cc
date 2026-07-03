@@ -114,7 +114,7 @@ MockRouteEntry::MockRouteEntry()
   ON_CALL(*this, upgradeMap()).WillByDefault(ReturnRef(upgrade_map_));
   ON_CALL(*this, hedgePolicy()).WillByDefault(ReturnRef(hedge_policy_));
   ON_CALL(*this, connectConfig()).WillByDefault(Invoke([this]() {
-    return connect_config_.has_value() ? makeOptRef(connect_config_.value()) : absl::nullopt;
+    return connect_config_.has_value() ? makeOptRef(connect_config_.value()) : std::nullopt;
   }));
   ON_CALL(*this, earlyDataPolicy()).WillByDefault(ReturnRef(early_data_policy_));
   ON_CALL(*this, pathMatcher()).WillByDefault(ReturnRef(path_matcher_));
@@ -188,7 +188,7 @@ MockRoute::MockRoute() {
   ON_CALL(*this, connectConfig()).WillByDefault(Invoke([this]() {
     return route_entry_.connect_config_.has_value()
                ? makeOptRef(route_entry_.connect_config_.value())
-               : absl::nullopt;
+               : std::nullopt;
   }));
   ON_CALL(*this, earlyDataPolicy()).WillByDefault(ReturnRef(route_entry_.early_data_policy_));
   ON_CALL(*this, pathMatcher()).WillByDefault(ReturnRef(route_entry_.path_matcher_));

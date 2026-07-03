@@ -44,8 +44,13 @@ ClientSideWeightedRoundRobinLbConfig::ClientSideWeightedRoundRobinLbConfig(
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(lb_proto, weight_update_period, 1000));
 
   enable_oob_load_report = lb_proto.enable_oob_load_report().value();
-  oob_reporting_period =
-      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(lb_proto, oob_reporting_period, 10000));
+  oob_manager_config.reporting_period = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
+      lb_proto, oob_reporting_period,
+      Extensions::LoadBalancingPolicies::Common::kDefaultOobReportingPeriodMs));
+  if (lb_proto.has_oob_reporting_config()) {
+    Extensions::LoadBalancingPolicies::Common::applyOrcaOobConnectionOverrides(
+        lb_proto.oob_reporting_config(), oob_manager_config);
+  }
 
   if (lb_proto.has_slow_start_config()) {
     *round_robin_overrides_.mutable_slow_start_config() = lb_proto.slow_start_config();
@@ -126,7 +131,7 @@ ClientSideWeightedRoundRobinLoadBalancer::ClientSideWeightedRoundRobinLoadBalanc
   if (typed_lb_config->enable_oob_load_report) {
     orca_oob_manager_ =
         std::make_unique<Extensions::LoadBalancingPolicies::Common::ProdOrcaOobManager>(
-            typed_lb_config->oob_reporting_period, priority_set,
+            typed_lb_config->oob_manager_config, priority_set,
             typed_lb_config->main_thread_dispatcher_, random, cluster_info.statsScope(),
             orca_weight_manager_->reportHandler());
   }

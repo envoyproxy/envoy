@@ -172,12 +172,12 @@ private:
     static absl::StatusOr<std::unique_ptr<RedisHost>>
     create(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
            Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary,
-           const absl::optional<std::string>& zone = absl::nullopt);
+           const std::optional<std::string>& zone = std::nullopt);
 
     // Constructor with optional zone - creates locality with zone set if non-empty
     RedisHost(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
               Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary,
-              const absl::optional<std::string>& zone, absl::Status& creation_status)
+              const std::optional<std::string>& zone, absl::Status& creation_status)
         : Upstream::HostImpl(
               creation_status, cluster, hostname, address,
               // TODO(zyfjeff): Created through metadata shared pool
@@ -198,7 +198,7 @@ private:
     // Returns shared copy of base locality if zone is nullopt.
     static std::shared_ptr<const envoy::config::core::v3::Locality>
     makeLocalityWithZone(const envoy::config::core::v3::Locality& base_locality,
-                         const absl::optional<std::string>& zone);
+                         const std::optional<std::string>& zone);
 
     const bool primary_;
   };

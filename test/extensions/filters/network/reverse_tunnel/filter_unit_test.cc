@@ -881,7 +881,7 @@ TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderSendLocalReplyHeaderModifier) 
   decoder.sendLocalReply(
       Http::Code::Forbidden, "",
       [](Http::ResponseHeaderMap& h) { h.addCopy(Http::LowerCaseString("x-custom-mod"), "v"); },
-      absl::nullopt, "test");
+      std::nullopt, "test");
 
   EXPECT_TRUE(saw_custom_header);
 }

@@ -190,7 +190,7 @@ private:
     StreamInfo::StreamInfo& streamInfo() override { return filter_manager_.streamInfo(); }
     void sendLocalReply(Code code, absl::string_view body,
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                        const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details) override {
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
@@ -329,7 +329,7 @@ private:
     void setVirtualHostRoute(Router::VirtualHostRoute route);
     // Set cached route. This method should never be called directly. This is only called in the
     // setRoute(), clearRouteCache(), and refreshCachedRoute() methods.
-    void setCachedRoute(absl::optional<Router::RouteConstSharedPtr>&& route);
+    void setCachedRoute(std::optional<Router::RouteConstSharedPtr>&& route);
     // Block the route cache and clear the snapped route config. By doing this the route cache will
     // not be updated. And if the route config is updated by the RDS, the snapped route config may
     // be freed before the stream is destroyed.
@@ -342,7 +342,7 @@ private:
       return route_cache_blocked_;
     }
 
-    absl::optional<Router::ConfigConstSharedPtr> routeConfig();
+    std::optional<Router::ConfigConstSharedPtr> routeConfig();
     void traceRequest();
 
     // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope is
@@ -516,7 +516,7 @@ private:
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
     // This is used to track the route that has been cached in the request. And we will keep this
     // route alive until the request is finished.
-    absl::optional<Router::RouteConstSharedPtr> cached_route_;
+    std::optional<Router::RouteConstSharedPtr> cached_route_;
     // This is used to track whether the route has been blocked. If the route is blocked, we can not
     // clear it or refresh it.
     bool route_cache_blocked_{false};
@@ -535,8 +535,8 @@ private:
     // the lifetime of the route config by itself easily, we could remove this hack.
     absl::InlinedVector<Router::RouteConstSharedPtr, 3> cleared_cached_routes_;
 
-    absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
-    absl::optional<std::unique_ptr<RouteConfigUpdateRequester>> route_config_update_requester_;
+    std::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
+    std::optional<std::unique_ptr<RouteConfigUpdateRequester>> route_config_update_requester_;
     Http::ServerHeaderValidatorPtr header_validator_;
 
     friend FilterManager;
@@ -587,8 +587,8 @@ private:
     HttpStreamIdProviderImpl(ActiveStream& parent) : parent_(parent) {}
 
     // StreamInfo::StreamIdProvider
-    absl::optional<absl::string_view> toStringView() const override;
-    absl::optional<uint64_t> toInteger() const override;
+    std::optional<absl::string_view> toStringView() const override;
+    std::optional<uint64_t> toInteger() const override;
 
     ActiveStream& parent_;
   };
@@ -612,7 +612,7 @@ private:
    */
   void doEndStream(ActiveStream& stream, bool check_for_deferred_close = true);
 
-  void resetAllStreams(absl::optional<StreamInfo::CoreResponseFlag> response_flag,
+  void resetAllStreams(std::optional<StreamInfo::CoreResponseFlag> response_flag,
                        absl::string_view details);
   void onIdleTimeout();
   void onConnectionDurationTimeout();
@@ -623,8 +623,8 @@ private:
                             StreamInfo::CoreResponseFlag response_flag);
   void handleCodecError(absl::string_view error);
   void handleCodecOverloadError(absl::string_view error);
-  void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
-                         absl::optional<StreamInfo::CoreResponseFlag> response_flag,
+  void doConnectionClose(std::optional<Network::ConnectionCloseType> close_type,
+                         std::optional<StreamInfo::CoreResponseFlag> response_flag,
                          absl::string_view details);
   void sendGoAwayAndClose(bool graceful = false);
 

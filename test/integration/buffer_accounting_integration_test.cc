@@ -1182,7 +1182,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
           ABSL_EXCLUSIVE_LOCKS_REQUIRED(tee.mutex_) -> Http::FilterDataStatus {
     if (tee.response_body_.length() > 9000) {
       encoder_cbs->sendLocalReply(Http::Code::InternalServerError, "Response size was over 9000!",
-                                  nullptr, absl::nullopt, "");
+                                  nullptr, std::nullopt, "");
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
     return Http::FilterDataStatus::Continue;

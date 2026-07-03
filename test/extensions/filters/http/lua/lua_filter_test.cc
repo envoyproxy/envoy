@@ -2000,11 +2000,11 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
         .WillOnce(Invoke([&immediate_response_headers](
                              Http::Code code, absl::string_view body,
                              std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                             const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                             const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                              absl::string_view details) {
           EXPECT_EQ(Http::Code::ServiceUnavailable, code);
           EXPECT_EQ("nope", body);
-          EXPECT_EQ(grpc_status, absl::nullopt);
+          EXPECT_EQ(grpc_status, std::nullopt);
           EXPECT_EQ(details, "lua_response");
           modify_headers(immediate_response_headers);
         }));
@@ -2049,11 +2049,11 @@ TEST_F(LuaHttpFilterTest, ImmediateResponseWithSendLocalReply) {
       .WillOnce(Invoke([&immediate_response_headers](
                            Http::Code code, absl::string_view body,
                            std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                           const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                            absl::string_view details) {
         EXPECT_EQ(Http::Code::ServiceUnavailable, code);
         EXPECT_EQ("nope", body);
-        EXPECT_EQ(grpc_status, absl::nullopt);
+        EXPECT_EQ(grpc_status, std::nullopt);
         EXPECT_EQ(details, "lua_response");
         modify_headers(immediate_response_headers);
       }));

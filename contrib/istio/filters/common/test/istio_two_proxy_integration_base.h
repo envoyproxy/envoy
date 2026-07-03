@@ -163,7 +163,7 @@ typed_config:
 
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter filter;
     filter.set_name("envoy.filters.http.peer_metadata");
-    filter.mutable_typed_config()->PackFrom(config);
+    std::ignore = filter.mutable_typed_config()->PackFrom(config);
     return MessageUtil::getJsonStringFromMessageOrError(filter);
   }
 

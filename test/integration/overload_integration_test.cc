@@ -27,9 +27,8 @@ using testing::HasSubstr;
 class OverloadIntegrationTest : public BaseOverloadIntegrationTest,
                                 public HttpProtocolIntegrationTest {
 protected:
-  void
-  initializeOverloadManager(const envoy::config::overload::v3::OverloadAction& overload_action,
-                            absl::optional<bool> append_local_overload_header = absl::nullopt) {
+  void initializeOverloadManager(const envoy::config::overload::v3::OverloadAction& overload_action,
+                                 std::optional<bool> append_local_overload_header = std::nullopt) {
     setupOverloadManagerConfig(overload_action);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
@@ -239,8 +238,7 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   IntegrationStreamDecoderPtr response;
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
     // For HTTP/3, excess connections are force-rejected.
-    codec_client_ =
-        makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt);
+    codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))), std::nullopt);
     EXPECT_TRUE(codec_client_->disconnected());
   } else {
     // For HTTP/2 and below, excess connection won't be accepted, but will hang out
@@ -652,9 +650,9 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHa
   test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
                              Ge(50));
   // Create an HTTP connection without finishing the handshake.
-  codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt,
-                                        absl::nullopt,
-                                        /*wait_till_connected=*/false);
+  codec_client_ =
+      makeRawHttpConnection(makeClientConnection((lookupPort("http"))), std::nullopt, std::nullopt,
+                            /*wait_till_connected=*/false);
   EXPECT_FALSE(codec_client_->connected());
 
   // Advancing past the minimum time shouldn't close the connection.
@@ -670,8 +668,8 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHa
 
   // Create another HTTP connection without finishing handshake.
   IntegrationCodecClientPtr codec_client2 =
-      makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt,
-                            absl::nullopt, /*wait_till_connected=*/false);
+      makeRawHttpConnection(makeClientConnection((lookupPort("http"))), std::nullopt, std::nullopt,
+                            /*wait_till_connected=*/false);
   EXPECT_FALSE(codec_client2->connected());
   // Advancing past the minimum time and wait for the proxy to notice and close both connections.
   timeSystem().advanceTimeWait(std::chrono::seconds(3));
@@ -723,9 +721,9 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseMaxDurationHttpConnectionsD
   test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
                              Ge(50));
   // Create an HTTP connection without finishing the handshake.
-  codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt,
-                                        absl::nullopt,
-                                        /*wait_till_connected=*/false);
+  codec_client_ =
+      makeRawHttpConnection(makeClientConnection((lookupPort("http"))), std::nullopt, std::nullopt,
+                            /*wait_till_connected=*/false);
   EXPECT_FALSE(codec_client_->connected());
 
   // Advancing past the minimum time shouldn't close the connection.
@@ -741,8 +739,8 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseMaxDurationHttpConnectionsD
 
   // Create another HTTP connection without finishing handshake.
   IntegrationCodecClientPtr codec_client2 =
-      makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt,
-                            absl::nullopt, /*wait_till_connected=*/false);
+      makeRawHttpConnection(makeClientConnection((lookupPort("http"))), std::nullopt, std::nullopt,
+                            /*wait_till_connected=*/false);
   EXPECT_FALSE(codec_client2->connected());
   // Advancing past the minimum time and wait for the proxy to notice and close both connections.
   timeSystem().advanceTimeWait(std::chrono::seconds(3));

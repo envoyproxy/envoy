@@ -33,7 +33,6 @@ envoy_cc_library(
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:str_format",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -48,6 +47,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
         "//source/server:generic_factory_context_lib",
+        "@abseil-cpp//absl/status:statusor",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
