@@ -460,6 +460,43 @@ TEST_P(WasmCommonTest, Stats) {
   wasm->start(plugin);
 }
 
+// The wasm_vm_count gauge is process-wide, updated once per Wasm VM instance regardless of the
+// runtime or the scope/prefix the plugin config uses.
+TEST_P(WasmCommonTest, WasmVmCountGauge) {
+  auto vm_configuration = "vm_count_gauge";
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  *plugin_config.mutable_vm_config()->mutable_runtime() =
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
+  plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
+
+  std::string code;
+  if (std::get<0>(GetParam()) != "null") {
+    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+        absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
+  } else {
+    // The name of the Null VM plugin.
+    code = "CommonWasmTestCpp";
+  }
+  EXPECT_FALSE(code.empty());
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_);
+  auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
+
+  EXPECT_EQ(
+      0, stats_store_.gauge("wasm.wasm_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
+
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
+      plugin->wasmConfig(), vm_key, scope_, *api_, cluster_manager_, *dispatcher_);
+  EXPECT_NE(wasm, nullptr);
+  EXPECT_EQ(
+      1, stats_store_.gauge("wasm.wasm_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
+
+  wasm.reset();
+  EXPECT_EQ(
+      0, stats_store_.gauge("wasm.wasm_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
+}
+
 TEST_P(WasmCommonTest, Foreign) {
   auto vm_configuration = "foreign";
 
