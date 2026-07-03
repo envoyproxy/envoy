@@ -8448,7 +8448,7 @@ class TestOrcaLoadReportLbData : public Upstream::HostLbPolicyData {
 public:
   bool receivesOrcaLoadReport() const override { return true; }
   MOCK_METHOD(absl::Status, onOrcaLoadReport,
-              (const Upstream::OrcaLoadReport&, const StreamInfo::StreamInfo&), (override));
+              (const Upstream::OrcaLoadReport&, OptRef<const StreamInfo::StreamInfo>), (override));
 };
 
 TEST_F(RouterTest, OrcaLoadReportCallbacks) {
@@ -8472,7 +8472,7 @@ TEST_F(RouterTest, OrcaLoadReportCallbacks) {
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
   EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _))
       .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
-                           const StreamInfo::StreamInfo&) {
+                           OptRef<const StreamInfo::StreamInfo>) {
         received_orca_load_report = orca_load_report;
         return absl::OkStatus();
       }));
@@ -8526,7 +8526,7 @@ TEST_F(RouterTest, OrcaLoadReportCallbackReturnsError) {
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
   EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _))
       .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
-                           const StreamInfo::StreamInfo&) {
+                           OptRef<const StreamInfo::StreamInfo>) {
         received_orca_load_report = orca_load_report;
         // Return an error that gets logged by router filter.
         return absl::InvalidArgumentError("Unexpected ORCA load Report");
@@ -8628,7 +8628,8 @@ TEST_F(RouterTest, OrcaLoadReportSkipsEntriesNotInterestedInOrca) {
   public:
     bool receivesOrcaLoadReport() const override { return false; }
     MOCK_METHOD(absl::Status, onOrcaLoadReport,
-                (const Upstream::OrcaLoadReport&, const StreamInfo::StreamInfo&), (override));
+                (const Upstream::OrcaLoadReport&, OptRef<const StreamInfo::StreamInfo>),
+                (override));
   };
 
   auto non_orca_data = std::make_unique<NonOrcaLbData>();

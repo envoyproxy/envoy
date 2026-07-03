@@ -66,7 +66,6 @@ envoy_cc_library(
     srcs = ["orca_oob_manager.cc"],
     hdrs = ["orca_oob_manager.h"],
     deps = [
-        ":orca_weight_manager_lib",
         "//envoy/common:random_generator_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
