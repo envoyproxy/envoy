@@ -2390,7 +2390,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
     if (active_health_check_flag_changed) {
       hosts_with_active_health_check_flag_changed.emplace(existing_host->first);
     }
-    
     const bool endpoint_hostname_changed =
         (existing_host_found && host->hostname() != existing_host->second->hostname());
     const bool health_check_hostname_changed =
