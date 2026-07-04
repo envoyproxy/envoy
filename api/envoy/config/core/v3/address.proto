@@ -191,6 +191,10 @@ message BindConfig {
   // eager validation would wrongly reject such configurations. If a namespace is unavailable when
   // a connection is created, the connection attempt fails gracefully.
   //
+  // Listener addresses do not need an equivalent option: a listener creates and binds its socket
+  // in the configured network namespace when the listener configuration is loaded, so an
+  // unavailable namespace always rejects the listener configuration.
+  //
   // .. attention::
   //     Network namespaces are only configurable on Linux. Otherwise, this field has no effect.
   bool validate_network_namespaces = 7;
