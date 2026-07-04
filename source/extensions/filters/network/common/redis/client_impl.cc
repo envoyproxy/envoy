@@ -407,7 +407,9 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   }
   request.aggregate_request_timer_->complete();
 
-  ClientCallbacks& callbacks = request.callbacks_;
+  // Bound only for live dispatch: a canceled ordinary request's callbacks_ may already be freed
+  // by the conn pool, so do not even form a reference to it on the canceled path.
+  ClientCallbacks* const callbacks = canceled ? nullptr : &request.callbacks_;
 
   // We need to ensure the request is popped before calling the callback, since the callback might
   // result in closing the connection.
@@ -428,21 +430,21 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
         (err[0] == RedirectionResponse::get().MOVED || err[0] == RedirectionResponse::get().ASK)) {
       // MOVED and ASK redirection errors have the following substrings: MOVED or ASK (err[0]), hash
       // key slot (err[1]), and IP address and TCP port separated by a colon (err[2])
-      callbacks.onRedirection(std::move(value), std::string(err[2]),
-                              err[0] == RedirectionResponse::get().ASK);
+      callbacks->onRedirection(std::move(value), std::string(err[2]),
+                               err[0] == RedirectionResponse::get().ASK);
     } else {
       // splitToken with keep_empty_string=false returns an empty vector for
       // an empty/whitespace-only error string. Guard before err[0] — an
       // empty Error/BlobError reply ("-\r\n" / "!0\r\n\r\n") would otherwise
       // dereference past the end of the vector.
       if (!err.empty() && err[0] == RedirectionResponse::get().CLUSTER_DOWN) {
-        callbacks.onFailure();
+        callbacks->onFailure();
       } else {
-        callbacks.onResponse(std::move(value));
+        callbacks->onResponse(std::move(value));
       }
     }
   } else {
-    callbacks.onResponse(std::move(value));
+    callbacks->onResponse(std::move(value));
   }
 
   // If there are no remaining ops in the pipeline we need to disable the timer.

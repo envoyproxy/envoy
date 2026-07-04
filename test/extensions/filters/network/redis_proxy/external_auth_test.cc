@@ -243,6 +243,58 @@ TEST_F(GrpcExternalAuthClientTest, CallbackCanReenterAuthenticateExternal) {
   client_->cancel();
 }
 
+// Re-entry from inside send() itself: per the Grpc::AsyncClient contract, a request that cannot
+// be started invokes onFailure() inline and send() returns nullptr. If that inline onFailure()
+// resumes a held AUTH that re-enters authenticateExternal(), the reentrant call publishes a live
+// handle into request_ while the FIRST send() is still on the stack — and the first call's
+// pending `request_ = <nullptr>` assignment must not clobber it. Pre-fix, cancel() then
+// dereferenced the nulled request_ (release-build crash) and leaked the live second request.
+TEST_F(GrpcExternalAuthClientTest, InlineSendFailureReentryPreservesSecondRequestHandle) {
+  initialize();
+
+  // Second round trip: a DIFFERENT pending request (a resumed held AUTH is a distinct
+  // PendingRequest in production; the identity check in authenticateExternal relies on that).
+  CommandSplitter::MockSplitCallbacks second_pending_request;
+  envoy::service::redis_auth::v3::RedisProxyExternalAuthRequest second;
+  second.set_username("bob");
+  second.set_password("secret2");
+  Grpc::MockAsyncRequest second_async_request;
+  EXPECT_CALL(*async_client_,
+              sendRaw(_, _, Grpc::ProtoBufferEq(second), Ref(*(client_.get())), _, _))
+      .WillOnce(Return(&second_async_request));
+
+  // First send fails inline: onFailure() runs synchronously, then sendRaw returns nullptr.
+  envoy::service::redis_auth::v3::RedisProxyExternalAuthRequest first;
+  first.set_username("alice");
+  first.set_password("secret");
+  EXPECT_CALL(*async_client_,
+              sendRaw(_, _, Grpc::ProtoBufferEq(first), Ref(*(client_.get())), _, _))
+      .WillOnce(Invoke([this](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
+                              Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                              const Http::AsyncClient::RequestOptions&) -> Grpc::AsyncRequest* {
+        client_->onFailure(Grpc::Status::WellKnownGrpcStatus::Unavailable, "cluster gone", span_);
+        return nullptr;
+      }));
+  EXPECT_CALL(span_, setTag(Eq("redis_auth_status"), Eq("redis_auth_error")));
+
+  // The inline failure's callback re-enters authenticateExternal for the held request.
+  EXPECT_CALL(request_callback_, onAuthenticateExternal_(Ref(pending_request_), _))
+      .WillOnce(Invoke([this, &second_pending_request](CommandSplitter::SplitCallbacks&,
+                                                       AuthenticateResponsePtr& response) {
+        EXPECT_EQ(AuthenticationRequestStatus::Error, response->status);
+        client_->authenticateExternal(request_callback_, second_pending_request, stream_info_,
+                                      "bob", "secret2");
+      }));
+
+  client_->authenticateExternal(request_callback_, pending_request_, stream_info_, "alice",
+                                "secret");
+
+  // The surviving in-flight registration must be the SECOND request: cancel() has to cancel its
+  // handle. Pre-fix request_ was nulled by the first send()'s return value.
+  EXPECT_CALL(second_async_request, cancel());
+  client_->cancel();
+}
+
 } // namespace ExternalAuth
 } // namespace RedisProxy
 } // namespace NetworkFilters

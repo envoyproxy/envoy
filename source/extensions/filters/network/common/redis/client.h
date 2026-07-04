@@ -219,7 +219,8 @@ public:
    * @param config supplies the connection pool configuration.
    * @param redis_command_stats supplies the redis command stats.
    * @param scope supplies the stats scope.
-   * @param auth password for upstream host.
+   * @param auth_username auth username for upstream host (empty when unused).
+   * @param auth_password auth password for upstream host (empty when unused).
    * @param is_transaction_client true if this client was created to relay a transaction.
    * @param aws_iam_config supplies the AWS IAM configuration from protobuf
    * @param aws_iam_authenticator supplies the AWS IAM authenticator created during config
