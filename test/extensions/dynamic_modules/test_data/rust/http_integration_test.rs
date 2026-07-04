@@ -210,12 +210,16 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateObjectRecreateFilter {
         sender.send(0xABCD).unwrap();
         let object =
           Box::into_raw(Box::new(LiveExchange { sender, receiver })) as *mut std::ffi::c_void;
-        assert!(envoy_filter.set_filter_state_object(
-          LIVE_OBJECT_KEY,
-          object,
-          drop_live_exchange,
-          abi::envoy_dynamic_module_type_filter_state_life_span::Request,
-        ));
+        // SAFETY: `object` is a freshly boxed LiveExchange and `drop_live_exchange` frees exactly
+        // that type without unwinding.
+        assert!(unsafe {
+          envoy_filter.set_filter_state_object(
+            LIVE_OBJECT_KEY,
+            object,
+            drop_live_exchange,
+            abi::envoy_dynamic_module_type_filter_state_life_span::Request,
+          )
+        });
         assert!(envoy_filter.recreate_stream(None));
         abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
       },

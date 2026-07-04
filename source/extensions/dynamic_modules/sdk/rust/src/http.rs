@@ -1321,9 +1321,15 @@ pub trait EnvoyHttpFilter {
   /// Ownership transfers to Envoy on every path: the destructor runs exactly once, either when the
   /// entry is destroyed or before this returns `false`, so a failed store never leaks the object.
   ///
-  /// Returns true if the operation is successful, false if the filter state is not accessible or
-  /// the key already exists and is read-only.
-  fn set_filter_state_object(
+  /// Returns true if stored. Returns false, after running the destructor, if the filter state is
+  /// not accessible or the key already holds an entry at a different `life_span`.
+  ///
+  /// # Safety
+  ///
+  /// `object` must be a valid pointer that `destructor` can free, and `destructor` must free it
+  /// without unwinding: it runs on the teardown path, and a panic crossing the FFI boundary is
+  /// undefined behavior. Use an `extern "C"` destructor, which aborts rather than unwinds.
+  unsafe fn set_filter_state_object(
     &mut self,
     key: &[u8],
     object: *mut c_void,
@@ -1333,6 +1339,11 @@ pub trait EnvoyHttpFilter {
 
   /// Borrow the opaque object previously stored under `key`, or `None` if absent. Ownership stays
   /// with Envoy; the module must not free the returned pointer.
+  ///
+  /// The pointer is valid only on the worker thread owning the stream, and only until the entry is
+  /// destroyed or overwritten. It is shared: the rebuilt filter after a `recreate_stream`, or
+  /// another filter on the same stream, can hold it too, so the module must synchronize any
+  /// interior mutability through it.
   fn get_filter_state_object(&self, key: &[u8]) -> Option<*mut c_void>;
 
   /// Get the received request body (the request body pieces received in the latest event).
@@ -2989,9 +3000,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  // Envoy takes ownership of `object` and only stores it; the caller transfers a valid pointer.
-  #[allow(clippy::not_unsafe_ptr_arg_deref)]
-  fn set_filter_state_object(
+  unsafe fn set_filter_state_object(
     &mut self,
     key: &[u8],
     object: *mut c_void,

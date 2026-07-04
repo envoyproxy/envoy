@@ -2435,7 +2435,10 @@ typedef enum envoy_dynamic_module_type_filter_state_life_span {
 typedef void* envoy_dynamic_module_type_filter_state_object_module_ptr;
 
 // Destructor for a filter state object. Envoy calls it exactly once, on the worker thread, when the
-// entry is destroyed (stream/connection end per life_span, or overwrite of the same key).
+// entry is destroyed (stream/connection end per life_span, or overwrite of the same key). It runs
+// on the teardown path outside any module callback guard, so it must not unwind: a panic crossing
+// this boundary is undefined behavior. The Rust SDK enforces this by requiring an
+// ``extern "C"`` destructor, which aborts on unwind.
 typedef void (*envoy_dynamic_module_type_filter_state_object_destructor)(
     envoy_dynamic_module_type_filter_state_object_module_ptr module_object);
 
@@ -2452,10 +2455,12 @@ typedef void (*envoy_dynamic_module_type_filter_state_object_destructor)(
  * @param key is the key of the filter state.
  * @param module_object is the opaque object to store. Ownership transfers to Envoy.
  * @param destructor is called exactly once with module_object when the entry is destroyed, or
- * before returning false so a failed store never leaks the object.
- * @param life_span is the lifespan of the entry.
- * @return true if the operation is successful, false if the stream info is not available or the key
- * already exists and is marked as read-only.
+ * before returning false so a failed store never leaks the object. It must not unwind; see the
+ * destructor typedef.
+ * @param life_span is the lifespan of the entry. A Connection-lifespan entry may outlive the
+ * stream, so its object and destructor must remain valid until the connection ends.
+ * @return true if stored. Returns false, after running the destructor, if the stream info or filter
+ * state is not available, or if the key already holds an entry at a different life_span.
  */
 bool envoy_dynamic_module_callback_http_set_filter_state_object(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,

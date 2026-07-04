@@ -3947,12 +3947,16 @@ fn test_http_filter_state_object_round_trip() {
     raw_ptr: std::ptr::null_mut(),
   };
   let object = Box::into_raw(Box::new(Live)) as *mut std::ffi::c_void;
-  assert!(envoy_filter.set_filter_state_object(
-    b"key",
-    object,
-    destructor,
-    abi::envoy_dynamic_module_type_filter_state_life_span::Request,
-  ));
+  // SAFETY: `object` is a freshly boxed Live and `destructor` frees exactly that type without
+  // unwinding.
+  assert!(unsafe {
+    envoy_filter.set_filter_state_object(
+      b"key",
+      object,
+      destructor,
+      abi::envoy_dynamic_module_type_filter_state_life_span::Request,
+    )
+  });
 
   // The rebuilt filter recovers the same pointer across recreate_stream.
   let recovered = envoy_filter.get_filter_state_object(b"key");

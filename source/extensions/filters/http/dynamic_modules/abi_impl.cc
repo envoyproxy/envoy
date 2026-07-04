@@ -474,13 +474,15 @@ getMutableDynamicMetadataListValue(envoy_dynamic_module_type_http_filter_envoy_p
 
 // Wraps an opaque, module-owned object in filter state and calls the module destructor exactly once
 // on destruction. Non-serializable: it declines serialization and field support so it is never
-// written to bytes.
+// written to bytes. Holds a shared_ptr to the filter config so the module .so cannot unload while
+// this live destructor pointer into it exists; a Connection-lifespan entry may outlive the stream.
 class DynamicModuleFilterStateObject : public StreamInfo::FilterState::Object {
 public:
   DynamicModuleFilterStateObject(
+      DynamicModuleHttpFilterConfigSharedPtr config,
       envoy_dynamic_module_type_filter_state_object_module_ptr object,
       envoy_dynamic_module_type_filter_state_object_destructor destructor)
-      : object_(object), destructor_(destructor) {}
+      : config_(std::move(config)), object_(object), destructor_(destructor) {}
   ~DynamicModuleFilterStateObject() override {
     if (destructor_ != nullptr) {
       destructor_(object_);
@@ -489,6 +491,7 @@ public:
   envoy_dynamic_module_type_filter_state_object_module_ptr object() const { return object_; }
 
 private:
+  const DynamicModuleHttpFilterConfigSharedPtr config_;
   envoy_dynamic_module_type_filter_state_object_module_ptr object_;
   envoy_dynamic_module_type_filter_state_object_destructor destructor_;
 };
@@ -496,13 +499,15 @@ private:
 StreamInfo::FilterState::LifeSpan
 toFilterStateLifeSpan(envoy_dynamic_module_type_filter_state_life_span life_span) {
   switch (life_span) {
+  case envoy_dynamic_module_type_filter_state_life_span_FilterChain:
+    return StreamInfo::FilterState::LifeSpan::FilterChain;
   case envoy_dynamic_module_type_filter_state_life_span_Request:
     return StreamInfo::FilterState::LifeSpan::Request;
   case envoy_dynamic_module_type_filter_state_life_span_Connection:
     return StreamInfo::FilterState::LifeSpan::Connection;
-  default:
-    return StreamInfo::FilterState::LifeSpan::FilterChain;
   }
+  IS_ENVOY_BUG("unknown filter state life_span");
+  return StreamInfo::FilterState::LifeSpan::FilterChain;
 }
 
 } // namespace
@@ -1609,20 +1614,35 @@ bool envoy_dynamic_module_callback_http_set_filter_state_object(
     envoy_dynamic_module_type_filter_state_life_span life_span) {
   auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto* stream_info = filter->streamInfo();
-  if (!stream_info) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        "stream info is not available");
-    // Ownership transferred to Envoy; free the object rather than leak it.
+  // Ownership transferred to Envoy; on every failure path free the object rather than leak it.
+  auto free_object = [&]() {
     if (destructor != nullptr) {
       destructor(module_object);
     }
+  };
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    free_object();
+    return false;
+  }
+  const auto& filter_state = stream_info->filterState();
+  if (!filter_state) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "filter state is not available");
+    free_object();
     return false;
   }
   absl::string_view key_view(key.ptr, key.length);
-  stream_info->filterState()->setData(
-      key_view, std::make_shared<DynamicModuleFilterStateObject>(module_object, destructor),
-      toFilterStateLifeSpan(life_span));
-  return true;
+  filter_state->setData(key_view,
+                        std::make_shared<DynamicModuleFilterStateObject>(
+                            filter->getFilterConfigSharedPtr(), module_object, destructor),
+                        toFilterStateLifeSpan(life_span));
+  // setData is a no-op when the key already exists at a conflicting life_span. The wrapper is then
+  // destroyed and the destructor has already freed the object. Confirm our object was stored by
+  // pointer identity (an address compare, never a dereference) and report a failed store otherwise.
+  auto* stored = filter_state->getDataMutable<DynamicModuleFilterStateObject>(key_view);
+  return stored != nullptr && stored->object() == module_object;
 }
 
 envoy_dynamic_module_type_filter_state_object_module_ptr
@@ -1636,9 +1656,14 @@ envoy_dynamic_module_callback_http_get_filter_state_object(
                         "stream info is not available");
     return nullptr;
   }
+  const auto& filter_state = stream_info->filterState();
+  if (!filter_state) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "filter state is not available");
+    return nullptr;
+  }
   absl::string_view key_view(key.ptr, key.length);
-  auto* object =
-      stream_info->filterState()->getDataMutable<DynamicModuleFilterStateObject>(key_view);
+  auto* object = filter_state->getDataMutable<DynamicModuleFilterStateObject>(key_view);
   if (object == nullptr) {
     return nullptr;
   }

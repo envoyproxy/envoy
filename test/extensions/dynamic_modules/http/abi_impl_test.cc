@@ -1752,6 +1752,63 @@ TEST(ABIImpl, filter_state_object_destructor_runs_once) {
   EXPECT_EQ(2, filter_state_object_destructor_calls);
 }
 
+TEST(ABIImpl, filter_state_object_conflicting_life_span) {
+  filter_state_object_destructor_calls = 0;
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  // Leaf filter state is at FilterChain (the production leaf), so Request and Connection resolve to
+  // distinct parent levels and re-storing the same key at a different one is a genuine conflict.
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  const std::string key_str = "envoy.test.object";
+  auto* first = new int(1);
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_object(
+      &filter, {key_str.data(), key_str.size()}, first, filterStateObjectDestructor,
+      envoy_dynamic_module_type_filter_state_life_span_Request));
+
+  // Re-storing the same key at a different life_span does not store (an ENVOY_BUG in FilterState).
+  // The new object is freed, the call reports failure, and the original entry is untouched. All
+  // assertions live inside EXPECT_ENVOY_BUG because in debug the ENVOY_BUG aborts inside setData,
+  // so the graceful-return path only exists in release/coverage where the macro runs in-process.
+  EXPECT_ENVOY_BUG(
+      {
+        EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_object(
+            &filter, {key_str.data(), key_str.size()}, new int(2), filterStateObjectDestructor,
+            envoy_dynamic_module_type_filter_state_life_span_Connection));
+        EXPECT_EQ(1, filter_state_object_destructor_calls);
+        EXPECT_EQ(first, envoy_dynamic_module_callback_http_get_filter_state_object(
+                             &filter, {key_str.data(), key_str.size()}));
+      },
+      "conflicting life_span");
+}
+
+TEST(ABIImpl, filter_state_object_no_filter_state) {
+  filter_state_object_destructor_calls = 0;
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  // Null filter state: set frees the object and fails, get returns null; neither dereferences it.
+  stream_info.filter_state_ = nullptr;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  const std::string key_str = "envoy.test.object";
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_object(
+      &filter, {key_str.data(), key_str.size()}, new int(1), filterStateObjectDestructor,
+      envoy_dynamic_module_type_filter_state_life_span_Request));
+  EXPECT_EQ(1, filter_state_object_destructor_calls);
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_http_get_filter_state_object(
+                         &filter, {key_str.data(), key_str.size()}));
+}
+
 std::string
 bufferVectorToString(const std::vector<envoy_dynamic_module_type_envoy_buffer>& buffer_vector) {
   std::string result;
