@@ -90,7 +90,7 @@ private:
   Event::Dispatcher& dispatcher_;
   absl::variant<double, EnvoyException> response_;
   bool update_async_ = false;
-  absl::optional<std::reference_wrapper<ResourceUpdateCallbacks>> callbacks_;
+  std::optional<std::reference_wrapper<ResourceUpdateCallbacks>> callbacks_;
 };
 
 class FakeProactiveResourceMonitor : public ProactiveResourceMonitor {
@@ -1006,7 +1006,7 @@ TEST_F(OverloadManagerImplTest, ProactiveResourceAllocateAndDeallocateResourceTe
 
   auto monitor = manager->getThreadLocalOverloadState().getProactiveResourceMonitorForTest(
       Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections);
-  EXPECT_NE(absl::nullopt, monitor);
+  EXPECT_NE(std::nullopt, monitor);
   EXPECT_EQ(1, monitor->currentResourceUsage());
   resource_allocated = manager->getThreadLocalOverloadState().tryAllocateResource(
       Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 3);

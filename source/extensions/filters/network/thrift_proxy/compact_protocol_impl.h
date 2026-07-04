@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <stack>
 #include <string>
 
@@ -8,8 +9,6 @@
 
 #include "source/extensions/filters/network/thrift_proxy/protocol.h"
 #include "source/extensions/filters/network/thrift_proxy/thrift.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -96,17 +95,17 @@ private:
   CompactFieldType convertFieldType(FieldType field_type);
 
   void writeFieldBeginInternal(Buffer::Instance& buffer, FieldType field_type, int16_t field_id,
-                               absl::optional<CompactFieldType> field_type_override);
+                               std::optional<CompactFieldType> field_type_override);
 
   std::stack<int16_t> last_field_id_stack_;
   int16_t last_field_id_{0};
 
   // Compact protocol encodes boolean struct fields as true/false *types* with no data.
   // This tracks the last boolean struct field's value for readBool.
-  absl::optional<bool> bool_value_;
+  std::optional<bool> bool_value_;
 
   // Similarly, track the field id for writeBool.
-  absl::optional<int16_t> bool_field_id_;
+  std::optional<int16_t> bool_field_id_;
 
   const static uint16_t Magic;
   const static uint16_t MagicMask;

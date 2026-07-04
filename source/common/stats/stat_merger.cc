@@ -82,8 +82,8 @@ void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& count
     StatName stat_name = dynamic_context.makeDynamicStatName(name, dynamic_map);
 
     // If the parent transmitted tag metadata for this counter, re-create it with the original
-    // tags. The counter was created on the parent via counterFromStatNameWithTags, which inlines
-    // the tag values into the name; without re-supplying the tags, the merge would create the
+    // tags. The counter was created on the parent with programmatic tags, whose values are
+    // embedded in the flat name; without re-supplying the tags, the merge would create the
     // counter with no tags and that no-tags counter would win the central-cache slot, so the
     // child's later tagged write would return the mangled counter. See the TODO this resolves.
     auto tags_iter = tags_map.find(name);
@@ -96,7 +96,9 @@ void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& count
       for (const auto& tag : parent_tags.tags_) {
         stat_name_tags.emplace_back(pool.add(tag.first), pool.add(tag.second));
       }
-      temp_scope_->counterFromMergedStatName(stat_name, tag_extracted_name, stat_name_tags)
+      temp_scope_
+          ->counterFromMergedStatName(stat_name, tag_extracted_name,
+                                      StatNameTagSpan(stat_name_tags))
           .add(counter.second);
     } else {
       temp_scope_->counterFromStatName(stat_name).add(counter.second);
@@ -155,8 +157,8 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges,
       for (const auto& tag : parent_tags.tags_) {
         stat_name_tags.emplace_back(pool.add(tag.first), pool.add(tag.second));
       }
-      return temp_scope_->gaugeFromMergedStatName(stat_name, tag_extracted_name, stat_name_tags,
-                                                  import_mode);
+      return temp_scope_->gaugeFromMergedStatName(stat_name, tag_extracted_name,
+                                                  StatNameTagSpan(stat_name_tags), import_mode);
     };
     auto& gauge_ref = make_gauge();
     if (gauge_ref.importMode() == Gauge::ImportMode::NeverImport) {

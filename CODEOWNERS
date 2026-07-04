@@ -290,6 +290,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/network/dns_resolver/apple @yanavlasov @mattklein123
 /*/extensions/network/dns_resolver/getaddrinfo @fredyw @mattklein123
 /*/extensions/network/dns_resolver/hickory @agrawroh @yanavlasov @wbpcode
+# sockmap socket interface
+/*/extensions/network/socket_interface/sockmap/ @agrawroh @wbpcode @yanavlasov
 # compression code
 /*/extensions/filters/http/decompressor @kbaichoo @mattklein123
 /*/extensions/filters/http/compressor @kbaichoo @mattklein123
@@ -311,6 +313,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # rbac
 /*/extensions/filters/network/rbac @yangminzhu @yanavlasov
 /*/extensions/filters/http/rbac @yangminzhu @yanavlasov
+/*/extensions/filters/http/upstream_rbac @yangminzhu @yanavlasov @fl0Lec
 /*/extensions/filters/common/rbac @yangminzhu @yanavlasov
 # tap
 /*/extensions/filters/http/tap @mattklein123 @xu1zhou
@@ -391,6 +394,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/load_balancing_policies/client_side_weighted_round_robin @wbpcode @adisuissa @efimki
 /*/extensions/load_balancing_policies/override_host @yanavlasov @tonya11en
 /*/extensions/load_balancing_policies/wrr_locality @wbpcode @adisuissa @efimki
+/*/extensions/load_balancing_policies/load_aware_locality @tonya11en @jukie @nezdolik
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @tyxia
 # Network matching extensions
@@ -454,7 +458,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/network/common @UNOWNED @UNOWNED
 /*/extensions/clusters/static @UNOWNED @UNOWNED
 /*/extensions/clusters/strict_dns @UNOWNED @UNOWNED
-/*/extensions/clusters/original_dst @UNOWNED @UNOWNED
+/*/extensions/clusters/original_dst @nezdolik @tonya11en @jronak
 /*/extensions/clusters/logical_dns/ @UNOWNED @UNOWNED
 /*/extensions/clusters/common/ @UNOWNED @UNOWNED
 /*/extensions/clusters/eds/ @UNOWNED @UNOWNED

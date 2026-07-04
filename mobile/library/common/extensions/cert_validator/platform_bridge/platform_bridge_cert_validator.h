@@ -40,7 +40,7 @@ public:
                                 unsigned /*hash_length*/) override {
     IS_ENVOY_BUG("Should not be reached");
   }
-  absl::optional<uint32_t> daysUntilFirstCertExpires() const override { return absl::nullopt; }
+  std::optional<uint32_t> daysUntilFirstCertExpires() const override { return std::nullopt; }
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override { return nullptr; }
   // Return empty string
   std::string getCaFileName() const override { return ""; }
@@ -107,7 +107,7 @@ private:
   absl::flat_hash_map<Thread::ThreadId, ValidationJob> validation_jobs_;
   std::shared_ptr<size_t> alive_indicator_{new size_t(1)};
   Thread::PosixThreadFactoryPtr thread_factory_;
-  absl::optional<int> thread_priority_;
+  std::optional<int> thread_priority_;
 };
 
 } // namespace Tls

@@ -63,7 +63,7 @@ absl::StatusOr<BridgeConfigSharedPtr> getOrCreateBridgeConfig(
 Router::GenericConnPoolPtr DynamicModuleGenericConnPoolFactory::createGenericConnPool(
     Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
     Router::GenericConnPoolFactory::UpstreamProtocol, Upstream::ResourcePriority priority,
-    absl::optional<Envoy::Http::Protocol>, Upstream::LoadBalancerContext* ctx,
+    std::optional<Envoy::Http::Protocol>, Upstream::LoadBalancerContext* ctx,
     const Protobuf::Message& config) const {
   const auto& typed_config =
       dynamic_cast<const envoy::extensions::upstreams::http::dynamic_modules::v3::Config&>(config);

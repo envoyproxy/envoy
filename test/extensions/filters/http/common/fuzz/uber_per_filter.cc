@@ -52,7 +52,7 @@ void addBookstoreProtoDescriptor(Protobuf::Message* message) {
   // Create a set to keep track of descriptors as they are added.
   absl::flat_hash_set<absl::string_view> added_descriptors;
   addFileDescriptorsRecursively(*file_descriptor, descriptor_set, added_descriptors);
-  descriptor_set.SerializeToString(config.mutable_proto_descriptor_bin());
+  std::ignore = descriptor_set.SerializeToString(config.mutable_proto_descriptor_bin());
 }
 
 void addBookstoreDescriptorReverseTranscoder(Protobuf::Message* message) {
@@ -69,7 +69,7 @@ void addBookstoreDescriptorReverseTranscoder(Protobuf::Message* message) {
   // Create a set to keep track of descriptors as they are added.
   absl::flat_hash_set<absl::string_view> added_descriptors;
   addFileDescriptorsRecursively(*file_descriptor, descriptor_set, added_descriptors);
-  descriptor_set.SerializeToString(config.mutable_descriptor_binary());
+  std::ignore = descriptor_set.SerializeToString(config.mutable_descriptor_binary());
 }
 } // namespace
 

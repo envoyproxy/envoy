@@ -3,13 +3,16 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
+#include <string>
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
+#include "envoy/stats/refcount_ptr.h"
 #include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag.h"
 
-#include "absl/types/optional.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Stats {
@@ -22,22 +25,22 @@ class Scope;
 class Store;
 class TextReadout;
 
-using CounterOptConstRef = absl::optional<std::reference_wrapper<const Counter>>;
-using GaugeOptConstRef = absl::optional<std::reference_wrapper<const Gauge>>;
-using HistogramOptConstRef = absl::optional<std::reference_wrapper<const Histogram>>;
-using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextReadout>>;
+using CounterOptConstRef = std::optional<std::reference_wrapper<const Counter>>;
+using GaugeOptConstRef = std::optional<std::reference_wrapper<const Gauge>>;
+using HistogramOptConstRef = std::optional<std::reference_wrapper<const Histogram>>;
+using TextReadoutOptConstRef = std::optional<std::reference_wrapper<const TextReadout>>;
 using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
 
 // Settings for limiting the number of counters, gauges and histograms allowed
 // in a scope. This currently only supports thread local stats.
 struct ScopeStatsLimitSettings {
-  // Max number of counters allowed in this scope. absl::nullopt means no limit.
-  absl::optional<uint32_t> max_counters = absl::nullopt;
-  // Max number of gauges allowed in this scope. absl::nullopt means no limit.
-  absl::optional<uint32_t> max_gauges = absl::nullopt;
-  // Max number of histograms allowed in this scope. absl::nullopt means no limit.
-  absl::optional<uint32_t> max_histograms = absl::nullopt;
+  // Max number of counters allowed in this scope. std::nullopt means no limit.
+  std::optional<uint32_t> max_counters = std::nullopt;
+  // Max number of gauges allowed in this scope. std::nullopt means no limit.
+  std::optional<uint32_t> max_gauges = std::nullopt;
+  // Max number of histograms allowed in this scope. std::nullopt means no limit.
+  std::optional<uint32_t> max_histograms = std::nullopt;
 };
 
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
@@ -96,9 +99,33 @@ public:
    * NOTE: If the scope specific matcher is set, then the sub scope will inherit the same matcher
    * unless another matcher is explicitly set.
    */
-  virtual ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
-                                     const ScopeStatsLimitSettings& limits = {},
-                                     StatsMatcherSharedPtr matcher = nullptr) PURE;
+  ScopeSharedPtr createScope(absl::string_view name, bool evictable = false,
+                             const ScopeStatsLimitSettings& limits = {},
+                             StatsMatcherSharedPtr matcher = nullptr) {
+    return createScopeWithTaggedName(name, {}, absl::string_view{}, evictable, limits,
+                                     std::move(matcher));
+  }
+
+  /**
+   * Allocate a new scope, optionally supplying tags and a pre-built tagged name (with tag values
+   * interleaved). NOTE: The behavior is implementation-defined for now because both legacy and
+   * tag-aware scopes are still supported.
+   *
+   * @param base_name supplies the scope's tag-extracted name.
+   * @param name_tags tags to associate with (and propagate from) the scope, as string_view pairs.
+   * @param tagged_name tagged_name optional explicit flat name with tag values included in the
+   * specified order. If tagged_name is empty, the scope implementation may derive the tagged name
+   * by joining the base_name and name_tags.
+   * @param evictable whether unused metrics can be deleted from the scope caches.
+   * @param limits metric limits for counters, gauges and histograms allowed in this scope.
+   * @param matcher optional per-scope stats matcher; replaces the store-level matcher when set.
+   */
+  virtual ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name,
+                                                   TagStringViewSpan name_tags,
+                                                   absl::string_view tagged_name,
+                                                   bool evictable = false,
+                                                   const ScopeStatsLimitSettings& limits = {},
+                                                   StatsMatcherSharedPtr matcher = nullptr) PURE;
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
@@ -113,9 +140,93 @@ public:
    * NOTE: If the scope specific matcher is set, then the sub scope will inherit the same matcher
    * unless another matcher is explicitly set.
    */
-  virtual ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
-                                           const ScopeStatsLimitSettings& limits = {},
-                                           StatsMatcherSharedPtr matcher = nullptr) PURE;
+  ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
+                                   const ScopeStatsLimitSettings& limits = {},
+                                   StatsMatcherSharedPtr matcher = nullptr) {
+    return scopeFromTaggedName(name, {}, StatName(), evictable, limits, std::move(matcher));
+  }
+
+  /**
+   * Allocate a new scope from a StatName, optionally supplying tags and a pre-built tagged name
+   * (with tag values interleaved). See the `createScopeWithTaggedName` variant for details and
+   * notes.
+   *
+   * @param base_name supplies the scope's tag-extracted name.
+   * @param name_tags tags to associate with (and propagate from) the scope.
+   * @param tagged_name tagged_name optional explicit flat name with tag values included in the
+   * specified order. If tagged_name is empty, the scope implementation may derive the tagged name
+   * by joining the base_name and name_tags.
+   * @param evictable whether unused metrics can be deleted from the scope caches.
+   * @param limits metric limits for counters, gauges and histograms allowed in this scope.
+   * @param matcher optional per-scope stats matcher; replaces the store-level matcher when set.
+   */
+  virtual ScopeSharedPtr scopeFromTaggedName(StatName base_name, StatNameTagSpan name_tags,
+                                             StatName tagged_name, bool evictable = false,
+                                             const ScopeStatsLimitSettings& limits = {},
+                                             StatsMatcherSharedPtr matcher = nullptr) PURE;
+
+  /**
+   * Creates a Counter from the tag-extracted name, tags and an optional pre-built tagged name.
+   * @param base_name The tag-extracted name of the stat, obtained from the SymbolTable.
+   * @param name_tags optionally specified tags.
+   * @param tagged_name tagged_name optional explicit flat name with tag values included in the
+   * specified order. If tagged_name is empty, the scope implementation may derive the tagged name
+   * by joining the base_name and name_tags.
+   *
+   * @return a counter within the scope's namespace.
+   */
+  virtual Counter& counterFromTaggedName(StatName base_name,
+                                         std::optional<StatNameTagSpan> name_tags,
+                                         StatName tagged_name) PURE;
+
+  /**
+   * Creates a Gauge from the tag-extracted name, tags and an optional pre-built tagged name.
+   * See the `counterFromTaggedName` variant for details and notes on name_tags and tagged_name.
+   *
+   * @param base_name The tag-extracted name of the stat (no tag values), obtained from the
+   * SymbolTable.
+   * @param name_tags optionally specified tags.
+   * @param tagged_name tagged_name optional explicit flat name with tag values included in the
+   * specified order. If tagged_name is empty, the scope implementation may derive the tagged name
+   * by joining the base_name and name_tags.
+   * @param import_mode Whether hot-restart should accumulate this value.
+   * @return a gauge within the scope's namespace.
+   */
+  virtual Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                                     StatName tagged_name, Gauge::ImportMode import_mode) PURE;
+
+  /**
+   * Creates a Histogram from the tag-extracted name, tags and an optional pre-built tagged name.
+   * See the `counterFromTaggedName` variant for details and notes on name_tags and tagged_name.
+   *
+   * @param base_name The tag-extracted name of the stat (no tag values), obtained from the
+   * SymbolTable.
+   * @param name_tags optionally specified tags.
+   * @param tagged_name tagged_name optional explicit flat name with tag values included in the
+   * specified order. If tagged_name is empty, the scope implementation may derive the tagged name
+   * by joining the base_name and name_tags.
+   * @param unit The unit of measurement.
+   * @return a histogram within the scope's namespace with a particular value type.
+   */
+  virtual Histogram& histogramFromTaggedName(StatName base_name,
+                                             std::optional<StatNameTagSpan> name_tags,
+                                             StatName tagged_name, Histogram::Unit unit) PURE;
+
+  /**
+   * Creates a TextReadout from the tag-extracted name, tags and an optional pre-built tagged name.
+   * See the `counterFromTaggedName` variant for details and notes on name_tags and tagged_name.
+   *
+   * @param base_name The tag-extracted name of the stat (no tag values), obtained from the
+   * SymbolTable.
+   * @param name_tags optionally specified tags.
+   * @param tagged_name tagged_name optional explicit flat name with tag values included in the
+   * specified order. If tagged_name is empty, the scope implementation may derive the tagged name
+   * by joining the base_name and name_tags.
+   * @return a text readout within the scope's namespace.
+   */
+  virtual TextReadout& textReadoutFromTaggedName(StatName base_name,
+                                                 std::optional<StatNameTagSpan> name_tags,
+                                                 StatName tagged_name) PURE;
 
   /**
    * Creates a Counter from the stat name. Tag extraction will be performed on the name.
@@ -123,7 +234,7 @@ public:
    * @return a counter within the scope's namespace.
    */
   Counter& counterFromStatName(const StatName& name) {
-    return counterFromStatNameWithTags(name, absl::nullopt);
+    return counterFromStatNameWithTags(name, std::nullopt);
   }
   /**
    * Creates a Counter from the stat name and tags. If tags are not provided, tag extraction
@@ -132,28 +243,37 @@ public:
    * @param tags optionally specified tags.
    * @return a counter within the scope's namespace.
    */
-  virtual Counter& counterFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef tags) PURE;
+  Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags) {
+    return counterFromTaggedName(name, toTagSpan(tags), StatName());
+  }
 
   /**
    * Re-materializes a Counter during hot restart stat merging from a fully-resolved stat name
    * together with the tag-extracted name and tags captured from the parent process, WITHOUT
-   * re-deriving tags from the name. Counters created via counterFromStatNameWithTags inline their
-   * tag values into the name; the parent transmits the tag metadata so the child can re-create the
-   * counter with identical labels instead of letting the merge create it with empty tags, which
-   * would otherwise win the central-cache slot and permanently strip the programmatic tags. Stores
-   * that do not override this fall back to counterFromStatName(full_name), preserving legacy
-   * behavior (tags then survive only if recoverable from the name via stats_tags regexes).
-   * @param full_name the complete stat name (with inlined tag values) recovered from the parent,
+   * re-deriving tags from the name. Counters created with programmatic tags embed their tag
+   * values in the flat name; the parent transmits the tag metadata so the child can re-create
+   * the counter with identical labels instead of letting the merge create it with empty tags,
+   * which would otherwise win the central-cache slot and permanently strip the programmatic
+   * tags.
+   *
+   * The default delegates to counterFromTaggedName, which retains the metadata on tag-aware
+   * scope implementations. Legacy scope implementations intentionally drop tag metadata on that
+   * path (they cannot compose tag-extracted names with their prefix in general), so they
+   * override this to honor the components, which arrive fully resolved.
+   * @param full_name the complete flat stat name (with tag values) recovered from the parent,
    *                  matching what the child independently creates for the same stat.
    * @param tag_extracted_name the stat name with tag values removed.
    * @param tags the tag name/value pairs.
    * @return a counter within the scope's namespace.
    */
-  virtual Counter& counterFromMergedStatName(const StatName& full_name,
-                                             const StatName& /*tag_extracted_name*/,
-                                             StatNameTagVectorOptConstRef /*tags*/) {
-    return counterFromStatName(full_name);
+  virtual Counter& counterFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+                                             std::optional<StatNameTagSpan> tags) {
+    if (!tags.has_value() || tags->empty()) {
+      // Without tags the flat name is the only meaningful component; tags may be re-derived from
+      // it by extraction as usual.
+      return counterFromTaggedName(full_name, std::nullopt, StatName());
+    }
+    return counterFromTaggedName(tag_extracted_name, tags, full_name);
   }
 
   /**
@@ -170,7 +290,7 @@ public:
    * @return a gauge within the scope's namespace.
    */
   Gauge& gaugeFromStatName(const StatName& name, Gauge::ImportMode import_mode) {
-    return gaugeFromStatNameWithTags(name, absl::nullopt, import_mode);
+    return gaugeFromStatNameWithTags(name, std::nullopt, import_mode);
   }
 
   /**
@@ -181,25 +301,31 @@ public:
    * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.
    */
-  virtual Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Gauge::ImportMode import_mode) PURE;
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                   Gauge::ImportMode import_mode) {
+    return gaugeFromTaggedName(name, toTagSpan(tags), StatName(), import_mode);
+  }
 
   /**
    * Re-materializes a Gauge during hot restart stat merging from a fully-resolved stat name
    * together with the tag-extracted name and tags captured from the parent process, WITHOUT
-   * re-deriving tags from the name. See counterFromMergedStatName for the rationale. Stores that do
-   * not override this fall back to gaugeFromStatName(full_name, import_mode).
-   * @param full_name the complete stat name (with inlined tag values) recovered from the parent.
+   * re-deriving tags from the name. See counterFromMergedStatName for the rationale and the
+   * default/override contract.
+   * @param full_name the complete flat stat name (with tag values) recovered from the parent.
    * @param tag_extracted_name the stat name with tag values removed.
    * @param tags the tag name/value pairs.
    * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.
    */
-  virtual Gauge& gaugeFromMergedStatName(const StatName& full_name,
-                                         const StatName& /*tag_extracted_name*/,
-                                         StatNameTagVectorOptConstRef /*tags*/,
+  virtual Gauge& gaugeFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+                                         std::optional<StatNameTagSpan> tags,
                                          Gauge::ImportMode import_mode) {
-    return gaugeFromStatName(full_name, import_mode);
+    if (!tags.has_value() || tags->empty()) {
+      // Without tags the flat name is the only meaningful component; tags may be re-derived from
+      // it by extraction as usual.
+      return gaugeFromTaggedName(full_name, std::nullopt, StatName(), import_mode);
+    }
+    return gaugeFromTaggedName(tag_extracted_name, tags, full_name, import_mode);
   }
 
   /**
@@ -217,7 +343,7 @@ public:
    * @return a histogram within the scope's namespace with a particular value type.
    */
   Histogram& histogramFromStatName(const StatName& name, Histogram::Unit unit) {
-    return histogramFromStatNameWithTags(name, absl::nullopt, unit);
+    return histogramFromStatNameWithTags(name, std::nullopt, unit);
   }
 
   /**
@@ -228,9 +354,10 @@ public:
    * @param unit The unit of measurement.
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogramFromStatNameWithTags(const StatName& name,
-                                                   StatNameTagVectorOptConstRef tags,
-                                                   Histogram::Unit unit) PURE;
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                           Histogram::Unit unit) {
+    return histogramFromTaggedName(name, toTagSpan(tags), StatName(), unit);
+  }
 
   /**
    * TODO(#6667): this variant is deprecated: use histogramFromStatName.
@@ -246,7 +373,7 @@ public:
    * @return a text readout within the scope's namespace.
    */
   TextReadout& textReadoutFromStatName(const StatName& name) {
-    return textReadoutFromStatNameWithTags(name, absl::nullopt);
+    return textReadoutFromStatNameWithTags(name, std::nullopt);
   }
 
   /**
@@ -256,8 +383,10 @@ public:
    * @param tags optionally specified tags.
    * @return a text readout within the scope's namespace.
    */
-  virtual TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                                       StatNameTagVectorOptConstRef tags) PURE;
+  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
+                                               StatNameTagVectorOptConstRef tags) {
+    return textReadoutFromTaggedName(name, toTagSpan(tags), StatName());
+  }
 
   /**
    * TODO(#6667): this variant is deprecated: use textReadoutFromStatName.
@@ -345,6 +474,17 @@ public:
    */
   virtual Store& store() PURE;
   virtual const Store& constStore() const PURE;
+
+  // Converts the legacy optional-vector-reference tag representation accepted by the deprecated
+  // *FromStatNameWithTags convenience methods into the span representation taken by the new
+  // *FromStatName virtual methods. The returned span aliases the caller-owned vector and must only
+  // be used for the duration of the (synchronous) call.
+  static std::optional<StatNameTagSpan> toTagSpan(StatNameTagVectorOptConstRef tags) {
+    if (tags.has_value()) {
+      return StatNameTagSpan(tags->get());
+    }
+    return std::nullopt;
+  }
 };
 
 } // namespace Stats

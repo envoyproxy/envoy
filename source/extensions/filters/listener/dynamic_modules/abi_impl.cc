@@ -744,29 +744,6 @@ bool envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes(
   return true;
 }
 
-void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(
-    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer filter_namespace,
-    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
-  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
-  auto* callbacks = filter->callbacks();
-
-  if (callbacks == nullptr || filter_namespace.ptr == nullptr || key.ptr == nullptr ||
-      value.ptr == nullptr) {
-    return;
-  }
-
-  std::string ns(filter_namespace.ptr, filter_namespace.length);
-  std::string key_str(key.ptr, key.length);
-  std::string value_str(value.ptr, value.length);
-
-  Protobuf::Struct metadata;
-  auto& fields = *metadata.mutable_fields();
-  fields[key_str].set_string_value(value_str);
-
-  callbacks->setDynamicMetadata(ns, metadata);
-}
-
 bool envoy_dynamic_module_callback_listener_filter_set_filter_state(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
@@ -961,6 +938,31 @@ void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(
   Protobuf::Struct metadata;
   auto& fields = *metadata.mutable_fields();
   fields[key_str].set_number_value(value);
+
+  callbacks->setDynamicMetadata(ns, metadata);
+}
+
+void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr || filter_namespace.ptr == nullptr || entries_size == 0) {
+    // An empty batch is a no-op and must not create the namespace.
+    return;
+  }
+
+  std::string ns(filter_namespace.ptr, filter_namespace.length);
+  Protobuf::Struct metadata;
+  auto& fields = *metadata.mutable_fields();
+  for (size_t i = 0; i < entries_size; i++) {
+    const auto& entry = entries[i];
+    absl::string_view key_view(entry.key_ptr, entry.key_length);
+    absl::string_view value_view(entry.value_ptr, entry.value_length);
+    fields[key_view].set_string_value(value_view);
+  }
 
   callbacks->setDynamicMetadata(ns, metadata);
 }

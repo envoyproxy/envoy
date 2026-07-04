@@ -4,6 +4,7 @@
 #include "source/common/common/bit_array.h"
 #include "source/common/common/random_generator.h"
 
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"

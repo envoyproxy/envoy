@@ -1,11 +1,22 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
+#include <list>
+#include <memory>
+#include <optional>
+#include <string>
 
-#include "envoy/event/dispatcher.h"
+#include "envoy/common/optref.h"
+#include "envoy/common/pure.h"
+#include "envoy/common/random_generator.h"
+#include "envoy/network/connection_handler.h"
+#include "envoy/network/filter.h"
+#include "envoy/network/listener.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/overload/overload_manager.h"
+#include "envoy/stats/scope.h"
 
 namespace Envoy {
 namespace Server {
@@ -34,7 +45,7 @@ public:
    * @param runtime, supplies the runtime for the server
    * @param random, supplies a random number generator
    */
-  virtual void addListener(absl::optional<uint64_t> overridden_listener,
+  virtual void addListener(std::optional<uint64_t> overridden_listener,
                            Network::ListenerConfig& listener, AddListenerCompletion completion,
                            Runtime::Loader& runtime, Random::RandomGenerator& random) PURE;
 
@@ -47,8 +58,10 @@ public:
    * Start the worker thread.
    * @param guard_dog supplies the optional guard dog to use for thread watching.
    * @param cb a callback to run when the worker thread starts running.
+   * @param cpu_id an optional CPU to pin the worker thread to for CPU locality.
    */
-  virtual void start(OptRef<GuardDog> guard_dog, const std::function<void()>& cb) PURE;
+  virtual void start(OptRef<GuardDog> guard_dog, const std::function<void()>& cb,
+                     std::optional<uint32_t> cpu_id) PURE;
 
   /**
    * Initialize stats for this worker's dispatcher, if available. The worker will output

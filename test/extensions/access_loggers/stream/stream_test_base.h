@@ -35,7 +35,7 @@ protected:
     TestUtility::loadFromYaml(yaml, fal_config);
 
     envoy::config::accesslog::v3::AccessLog config;
-    config.mutable_typed_config()->PackFrom(fal_config);
+    std::ignore = config.mutable_typed_config()->PackFrom(fal_config);
 
     auto file = std::make_shared<AccessLog::MockAccessLogFile>();
     Filesystem::FilePathAndType file_info{destination_type, ""};

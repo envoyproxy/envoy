@@ -132,7 +132,7 @@ void FileSystemBufferFilter::filterError(absl::string_view err) {
   aborted_ = true;
   ENVOY_STREAM_LOG(error, "{}", *request_callbacks_, err);
   request_callbacks_->sendLocalReply(Http::Code::InternalServerError, "buffer filter error",
-                                     nullptr, absl::nullopt, "");
+                                     nullptr, std::nullopt, "");
 }
 
 Http::FilterDataStatus FileSystemBufferFilter::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -142,7 +142,7 @@ Http::FilterDataStatus FileSystemBufferFilter::decodeData(Buffer::Instance& data
     if (request_state_.injecting_content_length_header_ ||
         request_state_.config_->behavior().alwaysFullyBuffer()) {
       request_callbacks_->sendLocalReply(Http::Code::PayloadTooLarge, "buffer limit exceeded",
-                                         nullptr, absl::nullopt, "");
+                                         nullptr, std::nullopt, "");
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
   }
@@ -195,7 +195,7 @@ Http::FilterDataStatus FileSystemBufferFilter::encodeData(Buffer::Instance& data
     if (response_state_.injecting_content_length_header_ ||
         response_state_.config_->behavior().alwaysFullyBuffer()) {
       response_callbacks_->sendLocalReply(Http::Code::InternalServerError, "buffer limit exceeded",
-                                          nullptr, absl::nullopt, "");
+                                          nullptr, std::nullopt, "");
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
   }

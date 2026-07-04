@@ -58,7 +58,7 @@ private:
   absl::flat_hash_map<std::string, TtlSet::iterator> ttl_lookup_;
 
   Event::TimerPtr timer_;
-  absl::optional<MonotonicTime> last_scheduled_time_;
+  std::optional<MonotonicTime> last_scheduled_time_;
   uint8_t scoped_update_counter_{};
 
   std::function<void(const std::vector<std::string>&)> callback_;

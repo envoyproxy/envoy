@@ -1,40 +1,45 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
 #include <cstdlib>
+#include <initializer_list>
 #include <list>
-#include <random>
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "envoy/api/api.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/time.h"
+#include "envoy/config/subscription.h"
 #include "envoy/network/address.h"
+#include "envoy/network/dns.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/primitive_stats.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
-#include "envoy/thread/thread.h"
 #include "envoy/tracing/trace_context.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/c_smart_ptr.h"
+#include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
-#include "source/common/common/thread.h"
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/common/config/opaque_resource_decoder_impl.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/stats/symbol_table.h"
 
-#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_random_generator.h"
 #include "test/test_common/test_time_system.h"
-#include "test/test_common/thread_factory_for_test.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
 #include "gmock/gmock.h"
@@ -672,7 +677,7 @@ public:
   static std::string getProtobufBinaryStringFromMessage(const Protobuf::Message& message) {
     std::string pb_binary_str;
     pb_binary_str.reserve(message.ByteSizeLong());
-    message.SerializeToString(&pb_binary_str);
+    std::ignore = message.SerializeToString(&pb_binary_str);
     return pb_binary_str;
   }
 
@@ -932,10 +937,10 @@ public:
       }
     }
   }
-  absl::optional<absl::string_view> get(absl::string_view key) const override {
+  std::optional<absl::string_view> get(absl::string_view key) const override {
     auto iter = context_map_.find(key);
     if (iter == context_map_.end()) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     return iter->second;
   }
@@ -969,13 +974,13 @@ public:
       return Http::HeaderMap::Iterate::Break;
     });
   }
-  absl::optional<absl::string_view> get(absl::string_view key) const override {
+  std::optional<absl::string_view> get(absl::string_view key) const override {
     Http::LowerCaseString lower_key{std::string(key)};
     const auto entry = request_headers_.get(lower_key);
     if (!entry.empty()) {
       return entry[0]->value().getStringView();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
   void set(absl::string_view, absl::string_view) override {}
   void remove(absl::string_view) override {}

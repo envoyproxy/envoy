@@ -103,8 +103,8 @@ public:
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       RequestValidationOptions request_validation_options_;
 
-  absl::optional<uint32_t> max_request_body_size_;
-  absl::optional<uint32_t> max_response_body_size_;
+  std::optional<uint32_t> max_request_body_size_;
+  std::optional<uint32_t> max_response_body_size_;
 
   void addBuiltinSymbolDescriptor(const std::string& symbol_name);
 

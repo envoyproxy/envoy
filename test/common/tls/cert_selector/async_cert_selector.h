@@ -14,6 +14,21 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+// SelectionHandle subclass used by the "cancel" mode to observe handshake
+// cancellation.
+class CancellableSelectionHandle : public Ssl::SelectionHandle {
+public:
+  CancellableSelectionHandle(Stats::Counter& cancelled_counter,
+                             Ssl::CertificateSelectionCallbackPtr cb, Event::TimerPtr timer)
+      : cancelled_counter_(cancelled_counter), cb_(std::move(cb)), timer_(std::move(timer)) {}
+  ~CancellableSelectionHandle() override { cancelled_counter_.inc(); }
+
+private:
+  Stats::Counter& cancelled_counter_;
+  Ssl::CertificateSelectionCallbackPtr cb_;
+  Event::TimerPtr timer_;
+};
+
 class AsyncTlsCertificateSelector : public Ssl::TlsCertificateSelector,
                                     protected Logger::Loggable<Logger::Id::connection> {
 public:
@@ -67,7 +82,7 @@ public:
       return absl::InvalidArgumentError("does not support for quic");
     }
 
-    auto& string_value = dynamic_cast<const Protobuf::StringValue&>(config);
+    auto& string_value = Envoy::Protobuf::DynamicCastMessage<Protobuf::StringValue>(config);
     std::string mode = string_value.value();
     if (mode.empty()) {
       return absl::InvalidArgumentError("invalid cert selection mode");

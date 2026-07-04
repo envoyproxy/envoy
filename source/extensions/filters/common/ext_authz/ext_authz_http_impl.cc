@@ -1,5 +1,7 @@
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 
+#include <optional>
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
@@ -16,7 +18,6 @@
 #include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 
 #include "absl/strings/str_cat.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -371,7 +372,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                        .setTimeout(config_->timeout())
                        .setParentSpan(parent_span)
                        .setChildSpanName(config_->tracingName())
-                       .setSampled(absl::nullopt);
+                       .setSampled(std::nullopt);
 
     options.setSendXff(false);
 

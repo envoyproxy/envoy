@@ -174,13 +174,13 @@ protected:
       return ConstSingleton<StaticLookupTable>::get().size_;
     }
 
-    static absl::optional<StaticLookupResponse> lookup(HeaderMapImpl& header_map,
-                                                       absl::string_view key) {
+    static std::optional<StaticLookupResponse> lookup(HeaderMapImpl& header_map,
+                                                      absl::string_view key) {
       const auto& entry = ConstSingleton<StaticLookupTable>::get().find(key);
       if (entry != nullptr) {
         return entry(header_map);
       } else {
-        return absl::nullopt;
+        return std::nullopt;
       }
     }
 
@@ -335,7 +335,7 @@ protected:
   void updateSize(uint64_t from_size, uint64_t to_size);
   void addSize(uint64_t size);
   void subtractSize(uint64_t size);
-  virtual absl::optional<StaticLookupResponse> staticLookup(absl::string_view) PURE;
+  virtual std::optional<StaticLookupResponse> staticLookup(absl::string_view) PURE;
   virtual void clearInline() PURE;
   virtual HeaderEntryImpl** inlineHeaders() PURE;
 
@@ -472,7 +472,7 @@ public:
   }
 
 protected:
-  absl::optional<StaticLookupResponse> staticLookup(absl::string_view key) override {
+  std::optional<StaticLookupResponse> staticLookup(absl::string_view key) override {
     return StaticLookupTable<Interface>::lookup(*this, key);
   }
   virtual const HeaderEntryImpl* const* constInlineHeaders() const PURE;

@@ -67,10 +67,12 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         ":common_lib",
+        "//envoy/http:client_codec_factory_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:codec_client_lib",
         "//source/common/http:exception_lib",
+        "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/upstream:upstream_includes",
@@ -570,6 +572,7 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:overload_manager_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:test_runtime_lib",
         "//test/common/quic:test_utils_lib",
@@ -598,6 +601,7 @@ envoy_cc_test(
         ":common_lib",
         "//source/common/http:http_server_properties_cache",
         "//test/mocks:common_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
 )

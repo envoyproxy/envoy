@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/network/connection.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -55,6 +56,15 @@ public:
 
   static void applySslQuietClose(Network::Connection& conn);
 
+  /**
+   * @param interval_ms the base interval in milliseconds.
+   * @param jitter_percent the maximum upward jitter as a percentage of the interval.
+   * @param random the random generator.
+   * @return the jittered interval in milliseconds.
+   */
+  static uint64_t addJitter(uint64_t interval_ms, uint64_t jitter_percent,
+                            Random::RandomGenerator& random);
+
 private:
   ReverseConnectionUtility() = delete;
 };
@@ -81,6 +91,14 @@ inline const Http::LowerCaseString& reverseTunnelTenantIdHeader() {
 inline const Http::LowerCaseString& reverseTunnelUpstreamClusterNameHeader() {
   static const Http::LowerCaseString kHeader{
       absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-upstream-cluster-name")};
+  return kHeader;
+}
+
+// Epoch milliseconds when the tunnel agent initiated the connection.
+// Used for end-to-end propagation latency measurement.
+inline const Http::LowerCaseString& reverseTunnelInitiationTimeHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-initiation-time")};
   return kHeader;
 }
 

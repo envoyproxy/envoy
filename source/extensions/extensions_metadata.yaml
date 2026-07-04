@@ -152,6 +152,13 @@ envoy.extensions.http.cache_v2.simple:
   status: wip
   type_urls:
   - envoy.extensions.http.cache_v2.simple_http_cache.v3.SimpleHttpCacheV2Config
+envoy.extensions.network.socket_interface.sockmap:
+  categories:
+  - envoy.bootstrap
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.network.socket_interface.sockmap.v3.Sockmap
 envoy.clusters.aggregate:
   categories:
   - envoy.clusters
@@ -209,6 +216,8 @@ envoy.clusters.original_dst:
   - envoy.clusters
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+  type_urls:
+  - envoy.extensions.clusters.original_dst.v3.OriginalDstCluster
 envoy.clusters.eds:
   categories:
   - envoy.clusters
@@ -339,6 +348,13 @@ envoy.filters.http.bandwidth_limit:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.bandwidth_limit.v3.BandwidthLimit
+envoy.filters.http.bandwidth_share:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.http.bandwidth_share.v3.BandwidthShare
 envoy.filters.http.basic_auth:
   categories:
   - envoy.filters.http
@@ -408,6 +424,14 @@ envoy.filters.http.upstream_codec:
   status_upstream: stable
   type_urls:
   - envoy.extensions.filters.http.upstream_codec.v3.UpstreamCodec
+envoy.filters.http.upstream_rbac:
+  categories:
+  - envoy.filters.http.upstream
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  status_upstream: alpha
+  type_urls:
+  - envoy.extensions.filters.http.rbac.v3.RBAC
 envoy.filters.http.composite:
   categories:
   - envoy.filters.http
@@ -2103,6 +2127,13 @@ envoy.load_balancing_policies.least_request:
   status: stable
   type_urls:
   - envoy.extensions.load_balancing_policies.least_request.v3.LeastRequest
+envoy.load_balancing_policies.load_aware_locality:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality
 envoy.load_balancing_policies.random:
   categories:
   - envoy.load_balancing_policies

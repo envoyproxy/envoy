@@ -166,6 +166,7 @@ EXTENSIONS = {
     "envoy.filters.http.aws_lambda":                    "//source/extensions/filters/http/aws_lambda:config",
     "envoy.filters.http.aws_request_signing":           "//source/extensions/filters/http/aws_request_signing:config",
     "envoy.filters.http.bandwidth_limit":               "//source/extensions/filters/http/bandwidth_limit:config",
+    "envoy.filters.http.bandwidth_share":               "//source/extensions/filters/http/bandwidth_share:config",
     "envoy.filters.http.basic_auth":                    "//source/extensions/filters/http/basic_auth:config",
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cache":                         "//source/extensions/filters/http/cache:config",
@@ -217,6 +218,7 @@ EXTENSIONS = {
     "envoy.filters.http.proto_api_scrubber":            "//source/extensions/filters/http/proto_api_scrubber:config",
     "envoy.filters.http.ratelimit":                     "//source/extensions/filters/http/ratelimit:config",
     "envoy.filters.http.rbac":                          "//source/extensions/filters/http/rbac:config",
+    "envoy.filters.http.upstream_rbac":                 "//source/extensions/filters/http/upstream_rbac:config",
     "envoy.filters.http.router":                        "//source/extensions/filters/http/router:config",
     "envoy.filters.http.set_filter_state":              "//source/extensions/filters/http/set_filter_state:config",
     "envoy.filters.http.set_metadata":                  "//source/extensions/filters/http/set_metadata:config",
@@ -550,6 +552,12 @@ EXTENSIONS = {
     "envoy.network.dns_resolver.hickory":              "//source/extensions/network/dns_resolver/hickory:config",
 
     #
+    # Socket interfaces
+    #
+
+    "envoy.extensions.network.socket_interface.sockmap": "//source/extensions/network/socket_interface/sockmap:config",
+
+    #
     # Address Resolvers
     #
 
@@ -583,6 +591,7 @@ EXTENSIONS = {
     # Load balancing policies for upstream
     #
     "envoy.load_balancing_policies.least_request":     "//source/extensions/load_balancing_policies/least_request:config",
+    "envoy.load_balancing_policies.load_aware_locality": "//source/extensions/load_balancing_policies/load_aware_locality:config",
     "envoy.load_balancing_policies.random":            "//source/extensions/load_balancing_policies/random:config",
     "envoy.load_balancing_policies.round_robin":       "//source/extensions/load_balancing_policies/round_robin:config",
     "envoy.load_balancing_policies.maglev":            "//source/extensions/load_balancing_policies/maglev:config",

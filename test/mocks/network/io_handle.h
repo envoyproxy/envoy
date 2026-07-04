@@ -26,7 +26,7 @@ public:
   MOCK_METHOD(Api::IoCallUint64Result, readv,
               (uint64_t max_length, Buffer::RawSlice* slices, uint64_t num_slice));
   MOCK_METHOD(Api::IoCallUint64Result, read,
-              (Buffer::Instance & buffer, absl::optional<uint64_t> max_length));
+              (Buffer::Instance & buffer, std::optional<uint64_t> max_length));
   MOCK_METHOD(Api::IoCallUint64Result, writev,
               (const Buffer::RawSlice* slices, uint64_t num_slice));
   MOCK_METHOD(Api::IoCallUint64Result, write, (Buffer::Instance & buffer));
@@ -51,7 +51,7 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, getOption,
               (int level, int optname, void* optval, socklen_t* optlen));
   MOCK_METHOD(Api::SysCallIntResult, setBlocking, (bool blocking));
-  MOCK_METHOD(absl::optional<int>, domain, ());
+  MOCK_METHOD(std::optional<int>, domain, ());
   MOCK_METHOD(absl::StatusOr<Address::InstanceConstSharedPtr>, localAddress, ());
   MOCK_METHOD(absl::StatusOr<Address::InstanceConstSharedPtr>, peerAddress, ());
   MOCK_METHOD(IoHandlePtr, duplicate, ());
@@ -62,11 +62,11 @@ public:
   MOCK_METHOD(void, enableFileEvents, (uint32_t events));
   MOCK_METHOD(void, resetFileEvents, ());
   MOCK_METHOD(Api::SysCallIntResult, shutdown, (int how));
-  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, ());
-  MOCK_METHOD(absl::optional<uint64_t>, congestionWindowInBytes, (), (const));
+  MOCK_METHOD(std::optional<std::chrono::milliseconds>, lastRoundTripTime, ());
+  MOCK_METHOD(std::optional<uint64_t>, congestionWindowInBytes, (), (const));
   MOCK_METHOD(Api::SysCallIntResult, ioctl,
               (unsigned long, void*, unsigned long, void*, unsigned long, unsigned long*));
-  MOCK_METHOD(absl::optional<std::string>, interfaceName, ());
+  MOCK_METHOD(std::optional<std::string>, interfaceName, ());
 };
 
 } // namespace Network
