@@ -1,6 +1,10 @@
 #include "source/extensions/filters/listener/local_ratelimit/local_ratelimit.h"
 
+#include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/stats/utility.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,8 +28,12 @@ FilterConfig::FilterConfig(
 bool FilterConfig::canCreateConnection() { return rate_limiter_.requestAllowed({}).allowed; }
 
 LocalRateLimitStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
-  static constexpr absl::string_view kPrefix = "listener_local_ratelimit.";
-  return {ALL_LOCAL_RATE_LIMIT_STATS(POOL_COUNTER_PREFIX(scope, absl::StrCat(kPrefix, prefix)))};
+  // listener_local_ratelimit.(<stat_prefix>.)
+  Stats::TaggedStatName stat_prefix(
+      scope.symbolTable(), "listener_local_ratelimit",
+      {{Envoy::Config::TagNames::get().LOCAL_LISTENER_RATELIMIT_PREFIX, prefix}},
+      absl::StrCat("listener_local_ratelimit.", prefix, "."));
+  return {ALL_LOCAL_RATE_LIMIT_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
 }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {

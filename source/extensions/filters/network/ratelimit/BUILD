@@ -22,6 +22,8 @@ envoy_cc_library(
         "//envoy/ratelimit:ratelimit_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/stats:stats_macros",
+        "//source/common/config:well_known_names",
+        "//source/common/stats:utility_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
         "//source/extensions/filters/network:well_known_names",

@@ -5,6 +5,7 @@
 #include "envoy/filter/config_provider_manager.h"
 #include "envoy/server/filter_config.h"
 
+#include "source/common/config/well_known_names.h"
 #include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 namespace Envoy {
@@ -175,9 +176,12 @@ public:
 private:
   static UdpProxyDownstreamStats generateStats(const std::string& stat_prefix,
                                                Stats::Scope& scope) {
-    const auto final_prefix = absl::StrCat("udp.", stat_prefix);
-    return {ALL_UDP_PROXY_DOWNSTREAM_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                                           POOL_GAUGE_PREFIX(scope, final_prefix))};
+    // udp.(<stat_prefix>.)*
+    Stats::TaggedStatName stat_name_prefix(
+        scope.symbolTable(), "udp", {{Envoy::Config::TagNames::get().UDP_PREFIX, stat_prefix}},
+        absl::StrCat("udp.", stat_prefix, "."));
+    return {ALL_UDP_PROXY_DOWNSTREAM_STATS(POOL_COUNTER_TAGGED(scope, stat_name_prefix),
+                                           POOL_GAUGE_TAGGED(scope, stat_name_prefix))};
   }
 
   std::shared_ptr<UdpSessionFilterConfigProviderManager>
