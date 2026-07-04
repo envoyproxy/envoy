@@ -29,7 +29,7 @@ public:
   MOCK_METHOD(Network::SocketPtr, duplicate, (), (override));
   MOCK_METHOD(Socket::Type, socketType, (), (const, override));
   MOCK_METHOD(Address::Type, addressType, (), (const, override));
-  MOCK_METHOD(absl::optional<Address::IpVersion>, ipVersion, (), (const, override));
+  MOCK_METHOD(std::optional<Address::IpVersion>, ipVersion, (), (const, override));
   MOCK_METHOD(void, close, (), (override));
   MOCK_METHOD(bool, isOpen, (), (const, override));
   MOCK_METHOD(const OptionsSharedPtr&, options, (), (const, override));

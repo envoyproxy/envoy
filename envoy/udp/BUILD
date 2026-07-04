@@ -13,6 +13,5 @@ envoy_cc_library(
     hdrs = ["hash_policy.h"],
     deps = [
         "//envoy/network:address_interface",
-        "@abseil-cpp//absl/types:optional",
     ],
 )

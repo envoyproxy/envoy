@@ -3,12 +3,12 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <thread>
 #include <vector>
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "include/proxy-wasm/bytecode_util.h"
 #include "include/proxy-wasm/pairs_util.h"
 #include "include/proxy-wasm/sdk.h"
@@ -69,7 +69,7 @@ int main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
 
-  absl::optional<std::string> serialized_module = vm->serialize(stripped_module);
+  std::optional<std::string> serialized_module = vm->serialize(stripped_module);
   if (!serialized_module) {
     return EXIT_FAILURE;
   }

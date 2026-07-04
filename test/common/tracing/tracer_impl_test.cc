@@ -159,7 +159,7 @@ TEST_F(FinalizerImplTest, TestAll) {
   const auto start_timestamp =
       SystemTime{std::chrono::duration_cast<SystemTime::duration>(std::chrono::hours{123})};
   EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(start_timestamp));
-  const absl::optional<std::chrono::nanoseconds> nanoseconds = std::chrono::nanoseconds{10};
+  const std::optional<std::chrono::nanoseconds> nanoseconds = std::chrono::nanoseconds{10};
   const MonotonicTime time = MonotonicTime(nanoseconds.value());
   MockTimeSystem time_system;
   EXPECT_CALL(time_system, monotonicTime())
@@ -277,7 +277,7 @@ TEST_F(FinalizerImplTest, TestAllWithLegacyRequestHeader) {
   const auto start_timestamp =
       SystemTime{std::chrono::duration_cast<SystemTime::duration>(std::chrono::hours{123})};
   EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(start_timestamp));
-  const absl::optional<std::chrono::nanoseconds> nanoseconds = std::chrono::nanoseconds{10};
+  const std::optional<std::chrono::nanoseconds> nanoseconds = std::chrono::nanoseconds{10};
   const MonotonicTime time = MonotonicTime(nanoseconds.value());
   MockTimeSystem time_system;
   EXPECT_CALL(time_system, monotonicTime())
@@ -443,8 +443,8 @@ TEST_F(TracerImplTest, ChildGrpcUpstreamSpanTest) {
   const auto remote_address = Network::Address::InstanceConstSharedPtr{
       new Network::Address::Ipv4Instance(expected_ip, 0, nullptr)};
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
-  absl::optional<uint32_t> response_code(200);
+  std::optional<Http::Protocol> protocol = Http::Protocol::Http2;
+  std::optional<uint32_t> response_code(200);
   const std::string cluster_name = "fake cluster";
   const std::string ob_cluster_name = "ob fake cluster";
   EXPECT_CALL(stream_info_, responseCode()).WillRepeatedly(ReturnPointee(&response_code));

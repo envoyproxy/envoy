@@ -99,8 +99,8 @@ ClientPtr ClientImpl::create(
     DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
     const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
     bool is_transaction_client,
-    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
-    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+    std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+    std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator,
     Common::Redis::RespProtocolVersion upstream_protocol_version,
     OptRef<Stats::Counter> upstream_resp3_hello_failure) {
@@ -181,8 +181,8 @@ ClientImpl::ClientImpl(
     DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
     const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
     bool is_transaction_client,
-    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
-    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+    std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+    std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator,
     Common::Redis::RespProtocolVersion upstream_protocol_version,
     OptRef<Stats::Counter> upstream_resp3_hello_failure)
@@ -825,8 +825,8 @@ ClientPtr ClientFactoryImpl::create(
     Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, const ConfigSharedPtr& config,
     const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
     const std::string& auth_username, const std::string& auth_password, bool is_transaction_client,
-    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
-    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+    std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+    std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator,
     Common::Redis::RespProtocolVersion upstream_protocol_version,
     OptRef<Stats::Counter> upstream_resp3_hello_failure) {

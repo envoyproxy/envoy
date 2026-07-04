@@ -10,12 +10,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-absl::optional<std::string>
+std::optional<std::string>
 StringValueFormatterProvider::format(const FormatterContext& context,
                                      const StreamInfo::StreamInfo& stream_info) const {
   auto optional_str = value_extractor_(context, stream_info);
   if (!optional_str) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   if (max_length_.has_value()) {
     if (optional_str->length() > max_length_.value()) {
@@ -30,10 +30,10 @@ StringValueFormatterProvider::formatValue(const FormatterContext& context,
   return ValueUtil::optionalStringValue(format(context, stream_info));
 }
 
-absl::optional<std::string>
+std::optional<std::string>
 GenericStatusCodeFormatterProvider::format(const FormatterContext& context,
                                            const StreamInfo::StreamInfo&) const {
-  CHECK_DATA_OR_RETURN(context, response_, absl::nullopt);
+  CHECK_DATA_OR_RETURN(context, response_, std::nullopt);
   const int code = checked_data->response_->status().code();
   return std::to_string(code);
 }
@@ -49,13 +49,13 @@ GenericStatusCodeFormatterProvider::formatValue(const FormatterContext& context,
 class GenericProxyCommandParser : public Formatter::CommandParser {
 public:
   using ProviderFunc =
-      std::function<FormatterProviderPtr(absl::string_view, absl::optional<size_t> max_length)>;
+      std::function<FormatterProviderPtr(absl::string_view, std::optional<size_t> max_length)>;
   using ProviderFuncTable = absl::flat_hash_map<std::string, ProviderFunc>;
 
   // CommandParser
   absl::StatusOr<Formatter::FormatterProviderPtr>
   parse(absl::string_view command, absl::string_view command_arg,
-        absl::optional<size_t> max_length) const override {
+        std::optional<size_t> max_length) const override {
     const auto& provider_func_table = providerFuncTable();
     const auto func_iter = provider_func_table.find(std::string(command));
     if (func_iter == provider_func_table.end()) {
@@ -70,72 +70,72 @@ private:
         ProviderFuncTable,
         {
             {"METHOD",
-             [](absl::string_view, absl::optional<size_t>) -> FormatterProviderPtr {
+             [](absl::string_view, std::optional<size_t>) -> FormatterProviderPtr {
                return std::make_unique<StringValueFormatterProvider>(
                    [](const FormatterContext& context,
-                      const StreamInfo::StreamInfo&) -> absl::optional<std::string> {
-                     CHECK_DATA_OR_RETURN(context, request_, absl::nullopt);
+                      const StreamInfo::StreamInfo&) -> std::optional<std::string> {
+                     CHECK_DATA_OR_RETURN(context, request_, std::nullopt);
                      return std::string(checked_data->request_->method());
                    });
              }},
             {"HOST",
-             [](absl::string_view, absl::optional<size_t>) -> FormatterProviderPtr {
+             [](absl::string_view, std::optional<size_t>) -> FormatterProviderPtr {
                return std::make_unique<StringValueFormatterProvider>(
                    [](const FormatterContext& context,
-                      const StreamInfo::StreamInfo&) -> absl::optional<std::string> {
-                     CHECK_DATA_OR_RETURN(context, request_, absl::nullopt);
+                      const StreamInfo::StreamInfo&) -> std::optional<std::string> {
+                     CHECK_DATA_OR_RETURN(context, request_, std::nullopt);
                      return std::string(checked_data->request_->host());
                    });
              }},
             {"PATH",
-             [](absl::string_view, absl::optional<size_t>) -> FormatterProviderPtr {
+             [](absl::string_view, std::optional<size_t>) -> FormatterProviderPtr {
                return std::make_unique<StringValueFormatterProvider>(
                    [](const FormatterContext& context,
-                      const StreamInfo::StreamInfo&) -> absl::optional<std::string> {
-                     CHECK_DATA_OR_RETURN(context, request_, absl::nullopt);
+                      const StreamInfo::StreamInfo&) -> std::optional<std::string> {
+                     CHECK_DATA_OR_RETURN(context, request_, std::nullopt);
                      return std::string(checked_data->request_->path());
                    });
              }},
             {"PROTOCOL",
-             [](absl::string_view, absl::optional<size_t>) -> FormatterProviderPtr {
+             [](absl::string_view, std::optional<size_t>) -> FormatterProviderPtr {
                return std::make_unique<StringValueFormatterProvider>(
                    [](const FormatterContext& context,
-                      const StreamInfo::StreamInfo&) -> absl::optional<std::string> {
-                     CHECK_DATA_OR_RETURN(context, request_, absl::nullopt);
+                      const StreamInfo::StreamInfo&) -> std::optional<std::string> {
+                     CHECK_DATA_OR_RETURN(context, request_, std::nullopt);
                      return std::string(checked_data->request_->protocol());
                    });
              }},
             {"REQUEST_PROPERTY",
-             [](absl::string_view command_arg, absl::optional<size_t>) -> FormatterProviderPtr {
+             [](absl::string_view command_arg, std::optional<size_t>) -> FormatterProviderPtr {
                return std::make_unique<StringValueFormatterProvider>(
                    [key = std::string(command_arg)](
                        const FormatterContext& context,
-                       const StreamInfo::StreamInfo&) -> absl::optional<std::string> {
-                     CHECK_DATA_OR_RETURN(context, request_, absl::nullopt);
+                       const StreamInfo::StreamInfo&) -> std::optional<std::string> {
+                     CHECK_DATA_OR_RETURN(context, request_, std::nullopt);
 
                      auto optional_view = checked_data->request_->get(key);
                      if (!optional_view.has_value()) {
-                       return absl::nullopt;
+                       return std::nullopt;
                      }
                      return std::string(optional_view.value());
                    });
              }},
             {"RESPONSE_PROPERTY",
-             [](absl::string_view command_arg, absl::optional<size_t>) -> FormatterProviderPtr {
+             [](absl::string_view command_arg, std::optional<size_t>) -> FormatterProviderPtr {
                return std::make_unique<StringValueFormatterProvider>(
                    [key = std::string(command_arg)](
                        const FormatterContext& context,
-                       const StreamInfo::StreamInfo&) -> absl::optional<std::string> {
-                     CHECK_DATA_OR_RETURN(context, response_, absl::nullopt);
+                       const StreamInfo::StreamInfo&) -> std::optional<std::string> {
+                     CHECK_DATA_OR_RETURN(context, response_, std::nullopt);
                      auto optional_view = checked_data->response_->get(key);
                      if (!optional_view.has_value()) {
-                       return absl::nullopt;
+                       return std::nullopt;
                      }
                      return std::string(optional_view.value());
                    });
              }},
             {"GENERIC_RESPONSE_CODE",
-             [](absl::string_view, absl::optional<size_t>) -> FormatterProviderPtr {
+             [](absl::string_view, std::optional<size_t>) -> FormatterProviderPtr {
                return std::make_unique<GenericStatusCodeFormatterProvider>();
              }},
         });

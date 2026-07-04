@@ -50,7 +50,7 @@ template <class DataType> struct DomainMatcherConfig {
 template <class DataType> class DomainTrieMatcher : public MatchTree<DataType> {
 public:
   DomainTrieMatcher(DataInputPtr<DataType>&& data_input,
-                    absl::optional<OnMatch<DataType>> on_no_match,
+                    std::optional<OnMatch<DataType>> on_no_match,
                     std::shared_ptr<DomainMatcherConfig<DataType>> config)
       : data_input_(std::move(data_input)), on_no_match_(std::move(on_no_match)),
         config_(std::move(config)) {
@@ -67,7 +67,7 @@ public:
       return ActionMatchResult::insufficientData();
     }
 
-    absl::optional<absl::string_view> domain = input.stringData();
+    std::optional<absl::string_view> domain = input.stringData();
     if (!domain) {
       return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
     }
@@ -149,7 +149,7 @@ private:
   }
 
   const DataInputPtr<DataType> data_input_;
-  const absl::optional<OnMatch<DataType>> on_no_match_;
+  const std::optional<OnMatch<DataType>> on_no_match_;
   const std::shared_ptr<DomainMatcherConfig<DataType>> config_;
 };
 
@@ -160,7 +160,7 @@ public:
   createCustomMatcherFactoryCb(const Protobuf::Message& config,
                                Server::Configuration::ServerFactoryContext& factory_context,
                                DataInputFactoryCb<DataType> data_input,
-                               absl::optional<OnMatchFactoryCb<DataType>> on_no_match,
+                               std::optional<OnMatchFactoryCb<DataType>> on_no_match,
                                OnMatchFactory<DataType>& on_match_factory) override {
     auto typed_config = std::make_shared<xds::type::matcher::v3::ServerNameMatcher>(
         MessageUtil::downcastAndValidate<const xds::type::matcher::v3::ServerNameMatcher&>(
@@ -175,7 +175,7 @@ public:
 
     return [data_input, domain_config, on_no_match]() {
       return std::make_unique<DomainTrieMatcher<DataType>>(
-          data_input(), on_no_match ? absl::make_optional(on_no_match.value()()) : absl::nullopt,
+          data_input(), on_no_match ? std::make_optional(on_no_match.value()()) : std::nullopt,
           domain_config);
     };
   }

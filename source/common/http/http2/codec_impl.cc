@@ -656,7 +656,7 @@ void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
   // In UHV mode the :status header at this point can be malformed, as it is validated
   // later on in the response_decoder_.decodeHeaders() call.
   // Account for this here.
-  absl::optional<uint64_t> status_opt = Http::Utility::getResponseStatusOrNullopt(*headers);
+  std::optional<uint64_t> status_opt = Http::Utility::getResponseStatusOrNullopt(*headers);
   if (!status_opt.has_value()) {
     // In case the status is invalid or missing, the response_decoder_.decodeHeaders() will fail the
     // request
@@ -2557,7 +2557,7 @@ Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   return ConnectionImpl::dispatch(data);
 }
 
-absl::optional<int> ServerConnectionImpl::checkHeaderNameForUnderscores(
+std::optional<int> ServerConnectionImpl::checkHeaderNameForUnderscores(
     [[maybe_unused]] absl::string_view header_name) {
 #ifndef ENVOY_ENABLE_UHV
   // This check has been moved to UHV
@@ -2579,7 +2579,7 @@ absl::optional<int> ServerConnectionImpl::checkHeaderNameForUnderscores(
   // Workaround for gcc not understanding [[maybe_unused]] for class members.
   (void)headers_with_underscores_action_;
 #endif
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 } // namespace Http2

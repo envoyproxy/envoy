@@ -55,7 +55,7 @@ public:
   RateLimitGrpcClientTest()
       : async_client_(new Grpc::MockAsyncClient()),
         client_(Grpc::RawAsyncClientPtr{async_client_},
-                absl::optional<std::chrono::milliseconds>()) {}
+                std::optional<std::chrono::milliseconds>()) {}
 
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncRequest async_request_;

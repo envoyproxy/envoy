@@ -51,8 +51,8 @@ InstanceImpl::InstanceImpl(
     const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
     Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager,
     const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
-    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
-    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+    std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+    std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator,
     const std::string& local_zone, Common::Redis::RespProtocolVersion protocol_version)
     : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
@@ -113,8 +113,8 @@ InstanceImpl::makeRequestToShard(uint16_t shard_index, RespVariant&& request,
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(
     std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher, std::string cluster_name,
     Api::Api& api, const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
-    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
-    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+    std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+    std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator)
     : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)), api_(api),
       dns_cache_(dns_cache),
@@ -198,7 +198,7 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   is_redis_cluster_ = cluster_type.has_value() && cluster_type->name() == "envoy.clusters.redis";
 }
 
-void InstanceImpl::ThreadLocalPool::onClusterRemoval(const std::string& cluster_name) {
+void InstanceImpl::ThreadLocalPool::onClusterRemoval(absl::string_view cluster_name) {
   if (cluster_name != cluster_name_) {
     return;
   }

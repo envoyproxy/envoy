@@ -109,7 +109,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
 
   auto* engine =
       new Envoy::InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
-                                /*network_thread_priority*/ absl::nullopt);
+                                /*network_thread_priority*/ std::nullopt);
   engine->disableDnsRefreshOnNetworkChange(disable_dns_refresh_on_network_change == JNI_TRUE);
   return reinterpret_cast<jlong>(engine);
 }

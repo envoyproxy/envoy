@@ -69,8 +69,8 @@ public:
       const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
       Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager,
       const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
-      absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
-      absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+      std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+      std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator,
       const std::string& local_zone, Common::Redis::RespProtocolVersion protocol_version);
   uint16_t shardSize() override;
@@ -161,8 +161,8 @@ private:
         std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher,
         std::string cluster_name, Api::Api& api,
         const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
-        absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
-        absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+        std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+        std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
             aws_iam_authenticator);
     ~ThreadLocalPool() override;
     ThreadLocalActiveClientPtr& threadLocalActiveClient(Upstream::HostConstSharedPtr host);
@@ -190,7 +190,7 @@ private:
                               Upstream::ThreadLocalClusterCommand& get_cluster) override {
       onClusterAddOrUpdateNonVirtual(cluster_name, get_cluster);
     }
-    void onClusterRemoval(const std::string& cluster_name) override;
+    void onClusterRemoval(absl::string_view cluster_name) override;
 
     void onRequestCompleted();
 
@@ -224,9 +224,9 @@ private:
     Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
     RedisClusterStats redis_cluster_stats_;
     const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
-    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+    std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator_;
-    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
+    std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
     std::string client_zone_; // Zone from node.locality.zone
     // Mirrors InstanceImpl::protocol_version_; drives upstream HELLO 3 emission.
     Common::Redis::RespProtocolVersion upstream_protocol_version_;
@@ -245,9 +245,9 @@ private:
   RedisClusterStats redis_cluster_stats_;
   const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_{nullptr};
-  absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+  std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
       aws_iam_authenticator_;
-  absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
+  std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
   const std::string local_zone_; // Zone from node.locality.zone
   // Listener-level RESP version, mirrored into each ThreadLocalPool on slot creation.
   const Common::Redis::RespProtocolVersion protocol_version_;

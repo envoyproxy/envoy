@@ -38,7 +38,7 @@ public:
   void encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const Http::ResponseTrailerMap& trailers) override;
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
-    return absl::nullopt;
+    return std::nullopt;
   }
   bool streamErrorOnInvalidHttpMessage() const override {
     return http3_options_.override_stream_error_on_invalid_http_message().value();
@@ -64,7 +64,7 @@ public:
 
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
-  absl::optional<uint32_t> codecStreamId() const override { return id(); }
+  std::optional<uint32_t> codecStreamId() const override { return id(); }
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   // Exposes the downstream WebTransport session (created by QUICHE for a negotiated WebTransport
   // CONNECT) so the upstream codec can bridge it to the upstream session. See
@@ -127,7 +127,7 @@ protected:
   bool hasPendingData() override;
 
   void
-  onStreamError(absl::optional<bool> should_close_connection,
+  onStreamError(std::optional<bool> should_close_connection,
                 quic::QuicRstStreamErrorCode rst = quic::QUIC_BAD_APPLICATION_PAYLOAD) override;
 
 private:

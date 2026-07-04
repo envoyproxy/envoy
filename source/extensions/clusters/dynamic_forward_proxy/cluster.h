@@ -49,7 +49,7 @@ public:
                                              Upstream::LoadBalancerContext* context) const;
 
   // Extensions::Common::DynamicForwardProxy::DfpCluster
-  std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>
+  std::pair<bool, std::optional<envoy::config::cluster::v3::Cluster>>
   createSubClusterConfig(const std::string& cluster_name, const std::string& host,
                          const int port) override;
   bool touch(const std::string& cluster_name) override;
@@ -108,7 +108,7 @@ private:
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* context, const Upstream::Host& host,
                              std::vector<uint8_t>& hash_key) override;
     OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override;
@@ -276,7 +276,7 @@ private:
 
   // Optional DNS configuration for dynamically created sub clusters. When set, sub clusters are
   // created using the DnsCluster extension rather than the legacy STRICT_DNS discovery type.
-  const absl::optional<envoy::extensions::clusters::dns::v3::DnsCluster> sub_cluster_dns_config_;
+  const std::optional<envoy::extensions::clusters::dns::v3::DnsCluster> sub_cluster_dns_config_;
 
   friend class ClusterFactory;
   friend class ClusterTest;

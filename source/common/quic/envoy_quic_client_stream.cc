@@ -227,7 +227,7 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     }
   }
 
-  const absl::optional<uint64_t> optional_status =
+  const std::optional<uint64_t> optional_status =
       Http::Utility::getResponseStatusOrNullopt(*headers);
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
@@ -539,13 +539,13 @@ void EnvoyQuicClientStream::OnMetadataComplete(size_t /*frame_len*/,
   }
 }
 
-void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_connection,
+void EnvoyQuicClientStream::onStreamError(std::optional<bool> should_close_connection,
                                           quic::QuicRstStreamErrorCode rst_code) {
   if (details_.empty()) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
   }
   bool close_connection_upon_invalid_header;
-  if (should_close_connection != absl::nullopt) {
+  if (should_close_connection != std::nullopt) {
     close_connection_upon_invalid_header = should_close_connection.value();
   } else {
     close_connection_upon_invalid_header =
@@ -622,7 +622,7 @@ void EnvoyQuicClientStream::flushPendingHeaders() {
 #endif
 
 void EnvoyQuicClientStream::OnInvalidHeaders() {
-  onStreamError(absl::nullopt, quic::QUIC_BAD_APPLICATION_PAYLOAD);
+  onStreamError(std::nullopt, quic::QUIC_BAD_APPLICATION_PAYLOAD);
 }
 
 void EnvoyQuicClientStream::onResponseDecoderDead() const {

@@ -44,7 +44,7 @@ public:
   }
 
   template <class DataType2, class ActionFactoryContext> friend class MatchTreeFactory;
-  MapMatcher(DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match,
+  MapMatcher(DataInputPtr<DataType>&& data_input, std::optional<OnMatch<DataType>> on_no_match,
              absl::Status& creation_status)
       : data_input_(std::move(data_input)), on_no_match_(std::move(on_no_match)) {
     auto input_type = data_input_->dataInputType();
@@ -56,7 +56,7 @@ public:
   }
 
   const DataInputPtr<DataType> data_input_;
-  const absl::optional<OnMatch<DataType>> on_no_match_;
+  const std::optional<OnMatch<DataType>> on_no_match_;
 
   // The inner match method. Attempts to match against the resulting data string.
   // If a match is found, handleRecursionAndSkips must be called on it.

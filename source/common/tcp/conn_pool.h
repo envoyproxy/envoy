@@ -89,7 +89,7 @@ public:
 
   ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent,
                   const Upstream::HostConstSharedPtr& host, uint32_t concurrent_stream_limit,
-                  absl::optional<std::chrono::milliseconds> idle_timeout);
+                  std::optional<std::chrono::milliseconds> idle_timeout);
   ~ActiveTcpClient() override;
 
   // Override the default's of Envoy::ConnectionPool::ActiveClient for class-specific functions.
@@ -110,7 +110,7 @@ public:
   void readEnableIfNew();
 
   void initializeReadFilters() override { connection_->initializeReadFilters(); }
-  absl::optional<Http::Protocol> protocol() const override { return {}; }
+  std::optional<Http::Protocol> protocol() const override { return {}; }
   void
   close(Envoy::Network::ConnectionCloseType type = Envoy::Network::ConnectionCloseType::NoFlush,
         absl::string_view details = "") override;
@@ -139,7 +139,7 @@ public:
   ConnectionPool::ConnectionStatePtr connection_state_;
   TcpConnectionData* tcp_connection_data_{};
   bool associated_before_{};
-  absl::optional<std::chrono::milliseconds> idle_timeout_;
+  std::optional<std::chrono::milliseconds> idle_timeout_;
   Event::TimerPtr idle_timer_;
 };
 
@@ -151,7 +151,7 @@ public:
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                Upstream::ClusterConnectivityState& state,
-               absl::optional<std::chrono::milliseconds> idle_timeout,
+               std::optional<std::chrono::milliseconds> idle_timeout,
                Server::OverloadManager& overload_manager)
       : Envoy::ConnectionPool::ConnPoolImplBase(host, priority, dispatcher, options,
                                                 transport_socket_options, state, overload_manager),
@@ -188,7 +188,7 @@ public:
   virtual void onConnReleased(Envoy::ConnectionPool::ActiveClient&) {}
   virtual void onConnDestroyed() {}
 
-  absl::optional<std::chrono::milliseconds> idle_timeout_;
+  std::optional<std::chrono::milliseconds> idle_timeout_;
 };
 
 } // namespace Tcp

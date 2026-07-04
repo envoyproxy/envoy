@@ -515,7 +515,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, MissThresholdOneMarksDeadOnFirstInval
   NiceMock<Network::MockIoHandle> mock_read_handle;
   EXPECT_CALL(mock_read_handle, fdDoNotUse()).WillRepeatedly(testing::Return(123));
   EXPECT_CALL(mock_read_handle, read(testing::_, testing::_))
-      .WillOnce(testing::Invoke([](Buffer::Instance& buffer, absl::optional<uint64_t>) {
+      .WillOnce(testing::Invoke([](Buffer::Instance& buffer, std::optional<uint64_t>) {
         buffer.add("XXXXX"); // 5 bytes, not RPING
         return Api::IoCallUint64Result{5, Api::IoError::none()};
       }));

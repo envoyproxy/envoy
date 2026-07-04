@@ -373,7 +373,7 @@ ValidationResults SPIFFEValidator::doVerifyCertChain(
   if (sk_X509_num(&cert_chain) == 0) {
     stats_.fail_verify_error_.inc();
     return {ValidationResults::ValidationStatus::Failed,
-            Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt,
+            Envoy::Ssl::ClientValidationStatus::NotValidated, std::nullopt,
             "verify cert failed: empty cert chain"};
   }
   X509* leaf_cert = sk_X509_value(&cert_chain, 0);
@@ -400,10 +400,10 @@ ValidationResults SPIFFEValidator::doVerifyCertChain(
       verifyCertChainUsingTrustBundleStore(*leaf_cert, &cert_chain, SSL_CTX_get0_param(&ssl_ctx),
                                            workload_trust_domain, error_details, validated_chain);
   return verified ? ValidationResults{ValidationResults::ValidationStatus::Successful,
-                                      Envoy::Ssl::ClientValidationStatus::Validated, absl::nullopt,
-                                      absl::nullopt, std::move(validated_chain)}
+                                      Envoy::Ssl::ClientValidationStatus::Validated, std::nullopt,
+                                      std::nullopt, std::move(validated_chain)}
                   : ValidationResults{ValidationResults::ValidationStatus::Failed,
-                                      Envoy::Ssl::ClientValidationStatus::Failed, absl::nullopt,
+                                      Envoy::Ssl::ClientValidationStatus::Failed, std::nullopt,
                                       error_details};
 }
 
@@ -508,16 +508,16 @@ void SPIFFEValidator::initializeCertExpirationStats(Stats::Scope& scope,
   }
 }
 
-absl::optional<uint32_t> SPIFFEValidator::daysUntilFirstCertExpires() const {
+std::optional<uint32_t> SPIFFEValidator::daysUntilFirstCertExpires() const {
   auto spiffe_data = getSpiffeData();
   if (spiffe_data->ca_certs_.empty()) {
-    return absl::make_optional(std::numeric_limits<uint32_t>::max());
+    return std::make_optional(std::numeric_limits<uint32_t>::max());
   }
-  absl::optional<uint32_t> ret = absl::make_optional(std::numeric_limits<uint32_t>::max());
+  std::optional<uint32_t> ret = std::make_optional(std::numeric_limits<uint32_t>::max());
   for (auto& cert : spiffe_data->ca_certs_) {
-    const absl::optional<uint32_t> tmp = Utility::getDaysUntilExpiration(cert.get(), time_source_);
+    const std::optional<uint32_t> tmp = Utility::getDaysUntilExpiration(cert.get(), time_source_);
     if (!tmp.has_value()) {
-      return absl::nullopt;
+      return std::nullopt;
     } else if (tmp.value() < ret.value()) {
       ret = tmp;
     }

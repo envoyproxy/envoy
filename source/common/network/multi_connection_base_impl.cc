@@ -198,7 +198,7 @@ ConnectionInfoProviderSharedPtr MultiConnectionBaseImpl::connectionInfoProviderS
   return connections_[0]->connectionInfoProviderSharedPtr();
 }
 
-absl::optional<Connection::UnixDomainSocketPeerCredentials>
+std::optional<Connection::UnixDomainSocketPeerCredentials>
 MultiConnectionBaseImpl::unixSocketPeerCredentials() const {
   return connections_[0]->unixSocketPeerCredentials();
 }
@@ -323,12 +323,12 @@ bool MultiConnectionBaseImpl::startSecureTransport() {
   return ret;
 }
 
-absl::optional<std::chrono::milliseconds> MultiConnectionBaseImpl::lastRoundTripTime() const {
+std::optional<std::chrono::milliseconds> MultiConnectionBaseImpl::lastRoundTripTime() const {
   // Note, this might change before connect finishes.
   return connections_[0]->lastRoundTripTime();
 }
 
-absl::optional<uint64_t> MultiConnectionBaseImpl::congestionWindowInBytes() const {
+std::optional<uint64_t> MultiConnectionBaseImpl::congestionWindowInBytes() const {
   // Note, this value changes constantly even within the same connection.
   return connections_[0]->congestionWindowInBytes();
 }

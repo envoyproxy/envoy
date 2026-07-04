@@ -1,6 +1,7 @@
 #include "source/common/access_log/access_log_impl.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 #include "envoy/common/time.h"
@@ -23,8 +24,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/stream_info/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace AccessLog {
@@ -117,7 +116,7 @@ bool StatusCodeFilter::evaluate(const Formatter::Context&,
 }
 
 bool DurationFilter::evaluate(const Formatter::Context&, const StreamInfo::StreamInfo& info) const {
-  absl::optional<std::chrono::nanoseconds> duration = info.currentDuration();
+  std::optional<std::chrono::nanoseconds> duration = info.currentDuration();
   if (!duration.has_value()) {
     return false;
   }

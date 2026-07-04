@@ -213,7 +213,7 @@ public:
   // Helper method to set either untyped or typed connection metadata
   void setConnectionMetadata(const std::string& namespace_name,
                              const std::map<std::string, std::string>& untyped_values,
-                             const absl::optional<std::string>& typed_value = absl::nullopt) {
+                             const std::optional<std::string>& typed_value = std::nullopt) {
     config_helper_.addConfigModifier([namespace_name, untyped_values, typed_value](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Find the metadata_setter filter

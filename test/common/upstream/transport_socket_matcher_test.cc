@@ -655,7 +655,7 @@ on_no_match:
     auto shared_objects = downstream_filter_state->objectsSharedWithUpstreamConnection();
     auto transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
         "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-        absl::nullopt, std::move(shared_objects));
+        std::nullopt, std::move(shared_objects));
 
     // Resolve transport socket - should select namespace_a_socket.
     auto result = matcher_->resolve(nullptr, nullptr, transport_socket_options);
@@ -677,7 +677,7 @@ on_no_match:
     auto shared_objects = downstream_filter_state->objectsSharedWithUpstreamConnection();
     auto transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
         "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-        absl::nullopt, std::move(shared_objects));
+        std::nullopt, std::move(shared_objects));
 
     auto result = matcher_->resolve(nullptr, nullptr, transport_socket_options);
     const auto& factory = dynamic_cast<const FakeTransportSocketFactory&>(result.factory_);
@@ -700,7 +700,7 @@ on_no_match:
     auto shared_objects = downstream_filter_state->objectsSharedWithUpstreamConnection();
     auto transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
         "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-        absl::nullopt, std::move(shared_objects));
+        std::nullopt, std::move(shared_objects));
 
     auto result = matcher_->resolve(nullptr, nullptr, transport_socket_options);
     const auto& factory = dynamic_cast<const FakeTransportSocketFactory&>(result.factory_);

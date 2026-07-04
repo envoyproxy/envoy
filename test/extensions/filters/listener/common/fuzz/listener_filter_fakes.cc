@@ -12,10 +12,10 @@ Network::Address::Type FakeConnectionSocket::addressType() const {
   return connection_info_provider_->localAddress()->type();
 }
 
-absl::optional<Network::Address::IpVersion> FakeConnectionSocket::ipVersion() const {
+std::optional<Network::Address::IpVersion> FakeConnectionSocket::ipVersion() const {
   if (connection_info_provider_->localAddress() == nullptr ||
       addressType() != Network::Address::Type::Ip) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return connection_info_provider_->localAddress()->ip()->version();
@@ -82,7 +82,7 @@ Api::SysCallIntResult FakeConnectionSocket::getSocketOption([[maybe_unused]] int
 #endif
 }
 
-absl::optional<std::chrono::milliseconds> FakeConnectionSocket::lastRoundTripTime() { return {}; }
+std::optional<std::chrono::milliseconds> FakeConnectionSocket::lastRoundTripTime() { return {}; }
 
 } // namespace ListenerFilters
 } // namespace Extensions

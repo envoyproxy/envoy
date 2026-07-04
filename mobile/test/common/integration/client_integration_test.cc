@@ -46,14 +46,14 @@ namespace {
 // www.lyft.com -> fake test upstream.
 class TestKeyValueStore : public Envoy::Platform::KeyValueStore {
 public:
-  absl::optional<std::string> read(const std::string&) override {
+  std::optional<std::string> read(const std::string&) override {
     ASSERT(!value_.empty());
     return value_;
   }
   void save(std::string, std::string) override {}
   void remove(const std::string&) override {}
-  void addOrUpdate(absl::string_view, absl::string_view, absl::optional<std::chrono::seconds>) {}
-  absl::optional<absl::string_view> get(absl::string_view) { return {}; }
+  void addOrUpdate(absl::string_view, absl::string_view, std::optional<std::chrono::seconds>) {}
+  std::optional<absl::string_view> get(absl::string_view) { return {}; }
   void flush() {}
   void iterate(::Envoy::KeyValueStore::ConstIterateCb) const {}
   void setValue(std::string value) { value_ = value; }

@@ -846,17 +846,17 @@ void ConnectionImpl::onReadReady() {
   }
 }
 
-absl::optional<Connection::UnixDomainSocketPeerCredentials>
+std::optional<Connection::UnixDomainSocketPeerCredentials>
 ConnectionImpl::unixSocketPeerCredentials() const {
   // TODO(snowp): Support non-linux platforms.
 #ifndef SO_PEERCRED
-  return absl::nullopt;
+  return std::nullopt;
 #else
   struct ucred ucred;
   socklen_t ucred_size = sizeof(ucred);
   int rc = socket_->getSocketOption(SOL_SOCKET, SO_PEERCRED, &ucred, &ucred_size).return_value_;
   if (SOCKET_FAILURE(rc)) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return {{ucred.pid, ucred.uid, ucred.gid}};
@@ -1009,7 +1009,7 @@ absl::string_view ConnectionImpl::transportFailureReason() const {
   return transport_socket_->failureReason();
 }
 
-absl::optional<std::chrono::milliseconds> ConnectionImpl::lastRoundTripTime() const {
+std::optional<std::chrono::milliseconds> ConnectionImpl::lastRoundTripTime() const {
   return socket_->lastRoundTripTime();
 }
 
@@ -1018,7 +1018,7 @@ void ConnectionImpl::configureInitialCongestionWindow(uint64_t bandwidth_bits_pe
   return transport_socket_->configureInitialCongestionWindow(bandwidth_bits_per_sec, rtt);
 }
 
-absl::optional<uint64_t> ConnectionImpl::congestionWindowInBytes() const {
+std::optional<uint64_t> ConnectionImpl::congestionWindowInBytes() const {
   return socket_->congestionWindowInBytes();
 }
 

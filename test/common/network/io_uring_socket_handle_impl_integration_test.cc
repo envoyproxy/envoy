@@ -61,7 +61,7 @@ public:
     fd_ = Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, IPPROTO_TCP).return_value_;
     EXPECT_GE(fd_, 0);
     io_uring_socket_handle_ = std::make_unique<IoUringSocketHandleImpl>(
-        *io_uring_worker_factory_, fd_, false, absl::nullopt, false);
+        *io_uring_worker_factory_, fd_, false, std::nullopt, false);
 
     // Listen within the io_uring handle.
     auto local_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0);
@@ -81,7 +81,7 @@ public:
     fd_ = Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, IPPROTO_TCP).return_value_;
     EXPECT_GE(fd_, 0);
     io_uring_socket_handle_ = std::make_unique<IoUringSocketHandleImpl>(
-        *io_uring_worker_factory_, fd_, false, absl::nullopt, true);
+        *io_uring_worker_factory_, fd_, false, std::nullopt, true);
   }
 
   void createClientConnection() {
@@ -110,7 +110,7 @@ public:
     fd_ = Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, IPPROTO_TCP).return_value_;
     EXPECT_GE(fd_, 0);
     io_uring_socket_handle_ = std::make_unique<IoUringSocketHandleImpl>(
-        *io_uring_worker_factory_, fd_, false, absl::nullopt, false);
+        *io_uring_worker_factory_, fd_, false, std::nullopt, false);
 
     int error = -1;
     socklen_t error_size = sizeof(error);
@@ -260,7 +260,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, ConnectError) {
   fd_ = Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, IPPROTO_TCP).return_value_;
   EXPECT_GE(fd_, 0);
   io_uring_socket_handle_ = std::make_unique<IoUringSocketHandleImpl>(
-      *io_uring_worker_factory_, fd_, false, absl::nullopt, false);
+      *io_uring_worker_factory_, fd_, false, std::nullopt, false);
 
   int original_error = -1;
   socklen_t original_error_size = sizeof(original_error);
@@ -308,11 +308,11 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Read) {
       *dispatcher_,
       [this, &read_buffer, &data](uint32_t event) {
         EXPECT_EQ(event, Event::FileReadyType::Read);
-        auto ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
+        auto ret = io_uring_socket_handle_->read(read_buffer, std::nullopt);
         EXPECT_EQ(ret.return_value_, data.size());
 
         // Read again would expect the EAGAIN returned.
-        ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
+        ret = io_uring_socket_handle_->read(read_buffer, std::nullopt);
         EXPECT_TRUE(ret.wouldBlock());
         return absl::OkStatus();
       },
@@ -351,7 +351,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, ReadContinuity) {
           EXPECT_EQ(ret.return_value_, 5);
         } else {
           EXPECT_EQ(event, Event::FileReadyType::Read);
-          auto ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
+          auto ret = io_uring_socket_handle_->read(read_buffer, std::nullopt);
         }
         return absl::OkStatus();
       },
@@ -393,7 +393,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, ReadActively) {
   Buffer::OwnedImpl read_buffer;
 
   // Read actively.
-  auto ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
+  auto ret = io_uring_socket_handle_->read(read_buffer, std::nullopt);
   EXPECT_EQ(ret.wouldBlock(), true);
 
   // Close safely.
@@ -520,7 +520,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Write) {
       *dispatcher_,
       [this, &read_buffer, &data](uint32_t event) {
         EXPECT_EQ(event, Event::FileReadyType::Read);
-        auto ret = io_socket_handle_->read(read_buffer, absl::nullopt);
+        auto ret = io_socket_handle_->read(read_buffer, std::nullopt);
         EXPECT_EQ(ret.return_value_, data.size());
         return absl::OkStatus();
       },
@@ -558,7 +558,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Writev) {
       *dispatcher_,
       [this, &read_buffer, &data](uint32_t event) {
         EXPECT_EQ(event, Event::FileReadyType::Read);
-        auto ret = io_socket_handle_->read(read_buffer, absl::nullopt);
+        auto ret = io_socket_handle_->read(read_buffer, std::nullopt);
         EXPECT_EQ(ret.return_value_, data.size());
         return absl::OkStatus();
       },
@@ -636,7 +636,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Bind) {
   fd_ = Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, IPPROTO_TCP).return_value_;
   EXPECT_GE(fd_, 0);
   io_uring_socket_handle_ = std::make_unique<IoUringSocketHandleImpl>(
-      *io_uring_worker_factory_, fd_, false, absl::nullopt, false);
+      *io_uring_worker_factory_, fd_, false, std::nullopt, false);
   auto local_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0);
   io_uring_socket_handle_->bind(local_addr);
 
@@ -689,7 +689,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, ActivateReadEvent) {
       [this](uint32_t event) {
         EXPECT_EQ(event, Event::FileReadyType::Read);
         Buffer::OwnedImpl read_buffer;
-        auto ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
+        auto ret = io_uring_socket_handle_->read(read_buffer, std::nullopt);
         EXPECT_TRUE(ret.wouldBlock());
         return absl::OkStatus();
       },
@@ -740,9 +740,9 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Shutdown) {
       Event::FileReadyType::Read);
 
   io_uring_socket_handle_->shutdown(SHUT_WR);
-  auto ret = io_socket_handle_->read(read_buffer, absl::nullopt);
+  auto ret = io_socket_handle_->read(read_buffer, std::nullopt);
   while (ret.wouldBlock()) {
-    ret = io_socket_handle_->read(read_buffer, absl::nullopt);
+    ret = io_socket_handle_->read(read_buffer, std::nullopt);
   }
   EXPECT_EQ(ret.return_value_, 0);
 
@@ -768,7 +768,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest,
       *dispatcher_,
       [this, &read_buffer, &got_write_event](uint32_t event) {
         EXPECT_EQ(event, Event::FileReadyType::Write);
-        auto ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
+        auto ret = io_uring_socket_handle_->read(read_buffer, std::nullopt);
         EXPECT_TRUE(ret.ok());
         EXPECT_EQ(0, ret.return_value_);
         io_uring_socket_handle_->close();
@@ -801,12 +801,12 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, RemoteCloseWithCloseEventDisabled
       *dispatcher_,
       [this, &read_buffer, &data](uint32_t event) {
         EXPECT_EQ(event, Event::FileReadyType::Read);
-        auto ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
+        auto ret = io_uring_socket_handle_->read(read_buffer, std::nullopt);
         if (ret.return_value_ > 0) {
           EXPECT_EQ(ret.return_value_, data.size());
 
           // Read again would expect the EAGAIN returned.
-          ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
+          ret = io_uring_socket_handle_->read(read_buffer, std::nullopt);
           EXPECT_TRUE(ret.wouldBlock());
         } else if (ret.return_value_ == 0) {
           io_uring_socket_handle_->close();
@@ -841,14 +841,14 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, RemoteCloseWithCloseEventEnabled)
       *dispatcher_,
       [this, &read_buffer, &data](uint32_t event) {
         if (event & Event::FileReadyType::Read) {
-          auto ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
+          auto ret = io_uring_socket_handle_->read(read_buffer, std::nullopt);
           EXPECT_EQ(ret.return_value_, data.size());
 
           // Read again would expect the EAGAIN returned.
-          ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
+          ret = io_uring_socket_handle_->read(read_buffer, std::nullopt);
           EXPECT_TRUE(ret.wouldBlock());
         } else if (event & Event::FileReadyType::Closed) {
-          auto ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
+          auto ret = io_uring_socket_handle_->read(read_buffer, std::nullopt);
           EXPECT_EQ(0, ret.return_value_);
           io_uring_socket_handle_->close();
         }
@@ -882,11 +882,11 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, CloseIoUringSocketOnDestruction) 
       *dispatcher_,
       [this, &read_buffer, &data](uint32_t event) {
         EXPECT_EQ(event, Event::FileReadyType::Read);
-        auto ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
+        auto ret = io_uring_socket_handle_->read(read_buffer, std::nullopt);
         EXPECT_EQ(ret.return_value_, data.size());
 
         // Read again would expect the EAGAIN returned.
-        ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
+        ret = io_uring_socket_handle_->read(read_buffer, std::nullopt);
         EXPECT_TRUE(ret.wouldBlock());
         return absl::OkStatus();
       },
@@ -899,7 +899,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, CloseIoUringSocketOnDestruction) 
   }
   EXPECT_EQ(read_buffer.toString(), data);
   io_uring_socket_handle_.reset();
-  while (io_socket_handle_->read(read_buffer, absl::nullopt).return_value_ != 0) {
+  while (io_socket_handle_->read(read_buffer, std::nullopt).return_value_ != 0) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
@@ -957,7 +957,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, MigrateServerSocketBetweenThreads
         *second_dispatcher,
         [this, &read_buffer, &data, &read_in_new_thread](uint32_t event) {
           EXPECT_EQ(event, Event::FileReadyType::Read);
-          auto ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
+          auto ret = io_uring_socket_handle_->read(read_buffer, std::nullopt);
           // For the next read.
           if (read_buffer.length() > data.substr(5).length()) {
             read_in_new_thread = true;

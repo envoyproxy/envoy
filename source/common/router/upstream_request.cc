@@ -63,7 +63,7 @@ public:
   // Local replies will not be seen by upstream HTTP filters.
   void sendLocalReply(Http::Code code, absl::string_view body,
                       const std::function<void(Http::ResponseHeaderMap& headers)>& modify_headers,
-                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override {
     state().decoder_filter_chain_aborted_ = true;
     state().encoder_filter_chain_aborted_ = true;
@@ -635,7 +635,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                                   Upstream::HostDescriptionConstSharedPtr host,
                                   const Network::ConnectionInfoProvider& address_provider,
                                   StreamInfo::StreamInfo& info,
-                                  absl::optional<Http::Protocol> protocol) {
+                                  std::optional<Http::Protocol> protocol) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
@@ -710,7 +710,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   // the encoder.
   parent_.callbacks()->addDownstreamWatermarkCallbacks(downstream_watermark_manager_);
 
-  absl::optional<std::chrono::milliseconds> max_stream_duration;
+  std::optional<std::chrono::milliseconds> max_stream_duration;
   if (parent_.dynamicMaxStreamDuration().has_value()) {
     max_stream_duration = parent_.dynamicMaxStreamDuration().value();
   } else if (upstream_host_->cluster()

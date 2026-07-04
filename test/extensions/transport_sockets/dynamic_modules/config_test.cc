@@ -211,9 +211,8 @@ public:
     ON_CALL(callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
   }
 
-  Network::TransportSocketPtr
-  createSocket(const std::string& socket_name,
-               absl::optional<std::string> config_bytes = absl::nullopt) {
+  Network::TransportSocketPtr createSocket(const std::string& socket_name,
+                                           std::optional<std::string> config_bytes = std::nullopt) {
     auto config = buildProtoConfig(kReferenceModule, socket_name);
     if (config_bytes.has_value()) {
       Protobuf::BytesValue bytes_value;

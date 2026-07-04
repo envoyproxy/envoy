@@ -2684,7 +2684,7 @@ TEST(RedisClientFactoryImplTest, Basic) {
   const std::string auth_password;
   ClientPtr client =
       factory.create(host, dispatcher, config, redis_command_stats, *stats_.rootScope(),
-                     auth_username, auth_password, false, absl::nullopt, absl::nullopt,
+                     auth_username, auth_password, false, std::nullopt, std::nullopt,
                      Common::Redis::RespProtocolVersion::Resp2, absl::nullopt);
   client->close();
 }

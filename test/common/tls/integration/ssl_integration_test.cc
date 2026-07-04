@@ -105,7 +105,7 @@ TEST_P(SslIntegrationTest, StatsTagExtraction) {
   upstream_tls_ = true;
   setUpstreamProtocol(Http::CodecType::HTTP2);
   config_helper_.configureUpstreamTls(
-      false, false, absl::nullopt,
+      false, false, std::nullopt,
       [](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& upstream_ctx) {
         auto& ctx = *upstream_ctx.mutable_common_tls_context();
         auto& params = *ctx.mutable_tls_params();
@@ -891,7 +891,7 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnly) {
   server_ecdsa_cert_ = true;
   initialize();
   auto codec_client =
-      makeRawHttpConnection(makeSslClientConnection(rsaOnlyClientOptions()), absl::nullopt);
+      makeRawHttpConnection(makeSslClientConnection(rsaOnlyClientOptions()), std::nullopt);
   EXPECT_FALSE(codec_client->connected());
   const std::string counter_name = listenerStatPrefix("ssl.connection_error");
   Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
@@ -910,7 +910,7 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnlyWithAccessLog) {
   server_ecdsa_cert_ = true;
   initialize();
   auto codec_client =
-      makeRawHttpConnection(makeSslClientConnection(rsaOnlyClientOptions()), absl::nullopt);
+      makeRawHttpConnection(makeSslClientConnection(rsaOnlyClientOptions()), std::nullopt);
   EXPECT_FALSE(codec_client->connected());
 
   auto log_result = waitForAccessLog(listener_access_log_name_);
@@ -960,7 +960,7 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaClientEcdsaOnly) {
   client_ecdsa_cert_ = true;
   initialize();
   EXPECT_FALSE(
-      makeRawHttpConnection(makeSslClientConnection(ecdsaOnlyClientOptions()), absl::nullopt)
+      makeRawHttpConnection(makeSslClientConnection(ecdsaOnlyClientOptions()), std::nullopt)
           ->connected());
   const std::string counter_name = listenerStatPrefix("ssl.connection_error");
   Stats::CounterSharedPtr counter = test_server_->counter(counter_name);

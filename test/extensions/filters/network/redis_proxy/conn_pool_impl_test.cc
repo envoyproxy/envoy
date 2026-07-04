@@ -101,7 +101,7 @@ public:
         Common::Redis::Client::createConnPoolSettings(20, hashtagging, true, max_unknown_conns,
                                                       read_policy_, redis_cx_rate_limit_per_sec),
         api_, store_.rootScope(), redis_command_stats, cluster_refresh_manager_, dns_cache,
-        absl::nullopt, absl::nullopt, /*local_zone=*/"", protocol_version);
+        std::nullopt, std::nullopt, /*local_zone=*/"", protocol_version);
     conn_pool_impl->init();
     // Set the authentication password for this connection pool.
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_username_ = auth_username_;
@@ -247,8 +247,8 @@ public:
          const Common::Redis::Client::ConfigSharedPtr&,
          const Common::Redis::RedisCommandStatsSharedPtr&, Stats::Scope&,
          const std::string& username, const std::string& password, bool is_transaction_client,
-         absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>,
-         absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>,
+         std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>,
+         std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>,
          Common::Redis::RespProtocolVersion upstream_protocol_version,
          OptRef<Stats::Counter> upstream_resp3_hello_failure) override {
     EXPECT_EQ(auth_username_, username);
@@ -1468,7 +1468,7 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionFailedWithDNSOverflow) {
                                LoadDnsCacheEntryCallbacks&) {
         return Extensions::Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult{
             Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Overflow,
-            nullptr, absl::nullopt};
+            nullptr, std::nullopt};
       }));
 
   EXPECT_CALL(callbacks, onResponse_(_));
@@ -1507,7 +1507,7 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionSuccessWithDNSEntryViaCallback) {
   // DNS entry is not cached.
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
-  absl::optional<std::reference_wrapper<
+  std::optional<std::reference_wrapper<
       Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks>>
       saved_callbacks;
 
@@ -1518,7 +1518,7 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionSuccessWithDNSEntryViaCallback) {
         saved_callbacks = callbacks;
         return Extensions::Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult{
             Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Loading,
-            handle, absl::nullopt};
+            handle, std::nullopt};
       }));
 
   client->client_callbacks_.back()->onRedirection(std::move(moved_response), "foo:6379", false);
@@ -1568,7 +1568,7 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionFailedWithDNSEntryViaCallback) {
   // DNS entry is not cached.
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
-  absl::optional<std::reference_wrapper<
+  std::optional<std::reference_wrapper<
       Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks>>
       saved_callbacks;
 
@@ -1579,7 +1579,7 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionFailedWithDNSEntryViaCallback) {
         saved_callbacks = callbacks;
         return Extensions::Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult{
             Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Loading,
-            handle, absl::nullopt};
+            handle, std::nullopt};
       }));
 
   client->client_callbacks_.back()->onRedirection(std::move(moved_response), "foo:6379", false);
@@ -1744,8 +1744,8 @@ TEST_F(RedisConnPoolImplTest, MakeRequestAndRedirectFollowedByDelete) {
   conn_pool_ = std::make_shared<InstanceImpl>(
       cluster_name_, cm_, *this, tls_,
       Common::Redis::Client::createConnPoolSettings(20, true, true, 100, read_policy_), api_,
-      store_.rootScope(), redis_command_stats, cluster_refresh_manager_, nullptr, absl::nullopt,
-      absl::nullopt, /*local_zone=*/"", Common::Redis::RespProtocolVersion::Resp2);
+      store_.rootScope(), redis_command_stats, cluster_refresh_manager_, nullptr, std::nullopt,
+      std::nullopt, /*local_zone=*/"", Common::Redis::RespProtocolVersion::Resp2);
   conn_pool_->init();
 
   auto& local_pool = threadLocalPool();

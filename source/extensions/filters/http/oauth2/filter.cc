@@ -23,6 +23,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/retry_policy_impl.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/filters/http/oauth2/client_assertion.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
@@ -151,9 +152,9 @@ bool cookieNameMatchesBase(absl::string_view cookie_name, absl::string_view base
   return cookie_name.starts_with(absl::StrCat(base_name, CookieSuffixDelimiter));
 }
 
-absl::optional<std::string> readCookieValueWithSuffix(const Http::RequestHeaderMap& headers,
-                                                      absl::string_view base_name,
-                                                      absl::string_view suffix) {
+std::optional<std::string> readCookieValueWithSuffix(const Http::RequestHeaderMap& headers,
+                                                     absl::string_view base_name,
+                                                     absl::string_view suffix) {
   const std::string suffixed_name = cookieNameWithSuffix(base_name, suffix);
   std::string value = Http::Utility::parseCookieValue(headers, suffixed_name);
   if (!value.empty()) {
@@ -167,7 +168,7 @@ absl::optional<std::string> readCookieValueWithSuffix(const Http::RequestHeaderM
   if (!value.empty()) {
     return value;
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 std::string findValue(const absl::flat_hash_map<std::string, std::string>& map,
@@ -186,6 +187,9 @@ getAuthType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType 
   case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
       OAuth2Config_AuthType_TLS_CLIENT_AUTH:
     return AuthType::TlsClientAuth;
+  case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+      OAuth2Config_AuthType_PRIVATE_KEY_JWT:
+    return AuthType::PrivateKeyJwt;
   case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
       OAuth2Config_AuthType_URL_ENCODED_BODY:
   default:
@@ -673,6 +677,11 @@ FilterConfig::FilterConfig(
                                                              DEFAULT_CSRF_TOKEN_EXPIRES_IN)),
       code_verifier_token_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(
           proto_config, code_verifier_token_expires_in, DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN)),
+      jwt_signing_algorithm_(
+          envoy::extensions::filters::http::oauth2::v3::PrivateKeyJwtConfig::SigningAlgorithm_Name(
+              proto_config.private_key_jwt_config().signing_algorithm())),
+      jwt_assertion_lifetime_(std::chrono::seconds(PROTOBUF_GET_SECONDS_OR_DEFAULT(
+          proto_config.private_key_jwt_config(), assertion_lifetime, 60))),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       preserve_authorization_header_(proto_config.preserve_authorization_header()),
       use_refresh_token_(FilterConfig::shouldUseRefreshToken(proto_config)),
@@ -992,8 +1001,14 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
                        *decoder_callbacks_);
 
       // try to update access token by refresh token
+      auto client_credential = getClientCredential();
+      if (!client_credential.ok()) {
+        sendUnauthorizedResponse(fmt::format("Failed to obtain client credential: {}",
+                                             client_credential.status().message()));
+        return Http::FilterHeadersStatus::StopIteration;
+      }
       oauth_client_->asyncRefreshAccessToken(validator_->refreshToken(), config_->clientId(),
-                                             config_->clientSecret(), config_->authType());
+                                             client_credential.value(), config_->authType());
       const auto state = oauth_client_->getState();
       if (state == OAuth2Client::OAuthState::FailureContinue) {
         return Http::FilterHeadersStatus::Continue;
@@ -1036,7 +1051,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
   const auto redirect_uri = formatter->format({&headers}, decoder_callbacks_->streamInfo());
 
-  absl::optional<std::string> encrypted_code_verifier =
+  std::optional<std::string> encrypted_code_verifier =
       readCookieValueWithSuffix(headers, config_->cookieNames().code_verifier_, result.flow_id_);
   if (!encrypted_code_verifier.has_value()) {
     sendUnauthorizedResponse("Code verifier cookie is missing in the request");
@@ -1055,7 +1070,13 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   }
   std::string code_verifier = decrypt_result.plaintext;
 
-  oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
+  auto client_credential = getClientCredential();
+  if (!client_credential.ok()) {
+    sendUnauthorizedResponse(fmt::format("Failed to obtain client credential: {}",
+                                         client_credential.status().message()));
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+  oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), client_credential.value(),
                                      redirect_uri, code_verifier, config_->authType());
   const auto state = oauth_client_->getState();
   if (state == OAuth2Client::OAuthState::FailureContinue) {
@@ -1066,6 +1087,20 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   // pause while we await the next step from the OAuth server
   return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+}
+
+absl::StatusOr<std::string> OAuth2Filter::getClientCredential() {
+  if (config_->authType() != AuthType::PrivateKeyJwt) {
+    return config_->clientSecret();
+  }
+
+  auto assertion_result = ClientAssertion::create(
+      config_->clientId(), config_->tokenEndpointUrl(), config_->clientSecret(),
+      config_->jwtSigningAlgorithm(), config_->jwtAssertionLifetime(), time_source_, random_);
+  if (!assertion_result.ok()) {
+    return assertion_result.status();
+  }
+  return std::move(assertion_result.value());
 }
 
 Http::FilterHeadersStatus OAuth2Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
@@ -1720,7 +1755,7 @@ void OAuth2Filter::sendUnauthorizedResponse(const std::string& details) {
           addFlowCookieDeletionHeaders(headers, flow_id_);
         }
       },
-      absl::nullopt, details);
+      std::nullopt, details);
 }
 
 void OAuth2Filter::sendSecretsNotReadyResponse(const std::string& details) {
@@ -1728,7 +1763,7 @@ void OAuth2Filter::sendSecretsNotReadyResponse(const std::string& details) {
                    details);
   config_->stats().oauth_failure_.inc();
   decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, ServiceUnavailableBodyMessage,
-                                     nullptr, absl::nullopt, details);
+                                     nullptr, std::nullopt, details);
 }
 
 bool OAuth2Filter::shouldAllowFailed(const Http::RequestHeaderMap& headers) const {
@@ -1880,7 +1915,7 @@ CallbackValidationResult OAuth2Filter::validateState(const Http::RequestHeaderMa
 bool OAuth2Filter::validateCsrfToken(const Http::RequestHeaderMap& headers,
                                      const std::string& csrf_token,
                                      absl::string_view flow_id) const {
-  absl::optional<std::string> cookie_value =
+  std::optional<std::string> cookie_value =
       readCookieValueWithSuffix(headers, config_->cookieNames().oauth_nonce_, flow_id);
   if (!cookie_value.has_value()) {
     return false;

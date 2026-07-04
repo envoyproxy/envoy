@@ -218,6 +218,7 @@ EXTENSIONS = {
     "envoy.filters.http.proto_api_scrubber":            "//source/extensions/filters/http/proto_api_scrubber:config",
     "envoy.filters.http.ratelimit":                     "//source/extensions/filters/http/ratelimit:config",
     "envoy.filters.http.rbac":                          "//source/extensions/filters/http/rbac:config",
+    "envoy.filters.http.upstream_rbac":                 "//source/extensions/filters/http/upstream_rbac:config",
     "envoy.filters.http.router":                        "//source/extensions/filters/http/router:config",
     "envoy.filters.http.set_filter_state":              "//source/extensions/filters/http/set_filter_state:config",
     "envoy.filters.http.set_metadata":                  "//source/extensions/filters/http/set_metadata:config",
@@ -549,6 +550,12 @@ EXTENSIONS = {
     "envoy.network.dns_resolver.getaddrinfo":          "//source/extensions/network/dns_resolver/getaddrinfo:config",
     # Hickory DNS resolver extension uses a Rust-based DNS library with support for DoT, DoH, and `DNSSEC`.
     "envoy.network.dns_resolver.hickory":              "//source/extensions/network/dns_resolver/hickory:config",
+
+    #
+    # Socket interfaces
+    #
+
+    "envoy.extensions.network.socket_interface.sockmap": "//source/extensions/network/socket_interface/sockmap:config",
 
     #
     # Address Resolvers

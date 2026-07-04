@@ -78,24 +78,24 @@ class ClientImpl : public Client,
 public:
   // Static factory. Does not take auth_username/auth_password — both flow into ClientImpl via
   // initialize(), which is called by ClientFactoryImpl::create after this returns.
-  static ClientPtr create(
-      Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
-      DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
-      const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-      bool is_transaction_client,
-      absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
-      absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
-          aws_iam_authenticator,
-      Common::Redis::RespProtocolVersion upstream_protocol_version,
-      OptRef<Stats::Counter> upstream_resp3_hello_failure);
+  static ClientPtr
+  create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
+         DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
+         const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
+         bool is_transaction_client,
+         std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+         std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+             aws_iam_authenticator,
+         Common::Redis::RespProtocolVersion upstream_protocol_version,
+         OptRef<Stats::Counter> upstream_resp3_hello_failure);
 
   ClientImpl(
       Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
       DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
       const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
       bool is_transaction_client,
-      absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
-      absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+      std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+      std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator,
       Common::Redis::RespProtocolVersion upstream_protocol_version,
       OptRef<Stats::Counter> upstream_resp3_hello_failure);
@@ -309,8 +309,8 @@ private:
   Stats::Scope& scope_;
   bool is_transaction_client_;
   bool queue_enabled_{false};
-  absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
-  absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+  std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
+  std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
       aws_iam_authenticator_;
   // Per-connection upstream RESP version, captured from the conn pool at create time. Drives the
   // RESP3 branch in ClientImpl::initialize. ``Resp2`` keeps the legacy no-HELLO behavior.
@@ -336,16 +336,16 @@ private:
 class ClientFactoryImpl : public ClientFactory, public Logger::Loggable<Logger::Id::redis> {
 public:
   // RedisProxy::ConnPool::ClientFactoryImpl
-  ClientPtr create(
-      Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-      const ConfigSharedPtr& config, const RedisCommandStatsSharedPtr& redis_command_stats,
-      Stats::Scope& scope, const std::string& auth_username, const std::string& auth_password,
-      bool is_transaction_client,
-      absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
-      absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
-          aws_iam_authenticator,
-      Common::Redis::RespProtocolVersion upstream_protocol_version,
-      OptRef<Stats::Counter> upstream_resp3_hello_failure) override;
+  ClientPtr
+  create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+         const ConfigSharedPtr& config, const RedisCommandStatsSharedPtr& redis_command_stats,
+         Stats::Scope& scope, const std::string& auth_username, const std::string& auth_password,
+         bool is_transaction_client,
+         std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+         std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+             aws_iam_authenticator,
+         Common::Redis::RespProtocolVersion upstream_protocol_version,
+         OptRef<Stats::Counter> upstream_resp3_hello_failure) override;
 
   static ClientFactoryImpl instance_;
 

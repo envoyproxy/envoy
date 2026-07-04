@@ -174,7 +174,7 @@ ValidationResults DynamicModuleCertValidator::doVerifyCertChain(
     const char* error = "verify cert failed: empty cert chain";
     ENVOY_LOG(debug, error);
     return {ValidationResults::ValidationStatus::Failed,
-            Envoy::Ssl::ClientValidationStatus::NoClientCertificate, absl::nullopt, error};
+            Envoy::Ssl::ClientValidationStatus::NoClientCertificate, std::nullopt, error};
   }
 
   // Encode certificates to DER.
@@ -189,7 +189,7 @@ ValidationResults DynamicModuleCertValidator::doVerifyCertChain(
       const char* error = "verify cert failed: DER encoding error";
       ENVOY_LOG(debug, error);
       return {ValidationResults::ValidationStatus::Failed,
-              Envoy::Ssl::ClientValidationStatus::Failed, absl::nullopt, error};
+              Envoy::Ssl::ClientValidationStatus::Failed, std::nullopt, error};
     }
     der_certs[i].assign(der, der + der_len);
     OPENSSL_free(der);
@@ -237,7 +237,7 @@ ValidationResults DynamicModuleCertValidator::doVerifyCertChain(
     break;
   }
 
-  absl::optional<uint8_t> tls_alert;
+  std::optional<uint8_t> tls_alert;
   if (result.has_tls_alert) {
     tls_alert = result.tls_alert;
   }
@@ -278,8 +278,8 @@ void DynamicModuleCertValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX
   (void)hash_length;
 }
 
-absl::optional<uint32_t> DynamicModuleCertValidator::daysUntilFirstCertExpires() const {
-  return absl::nullopt;
+std::optional<uint32_t> DynamicModuleCertValidator::daysUntilFirstCertExpires() const {
+  return std::nullopt;
 }
 
 std::string DynamicModuleCertValidator::getCaFileName() const { return ""; }

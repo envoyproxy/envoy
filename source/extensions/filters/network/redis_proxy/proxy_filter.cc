@@ -1,5 +1,7 @@
 #include "source/extensions/filters/network/redis_proxy/proxy_filter.h"
 
+#include <openssl/mem.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <memory>
@@ -414,7 +416,8 @@ ProxyFilter::attemptDownstreamAuthInline(PendingRequest& request, const std::str
 
 bool ProxyFilter::checkPassword(const std::string& password) {
   for (const auto& p : config_->downstream_auth_passwords_) {
-    if (password == p) {
+    if (password.length() == p.length() &&
+        CRYPTO_memcmp(password.data(), p.data(), p.length()) == 0) {
       return true;
     }
   }

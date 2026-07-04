@@ -23,7 +23,7 @@ namespace Network {
 namespace {
 [[maybe_unused]] bool hasIoUringWorkerFactory(Io::IoUringWorkerFactory* io_uring_worker_factory) {
   return io_uring_worker_factory != nullptr && io_uring_worker_factory->currentThreadRegistered() &&
-         io_uring_worker_factory->getIoUringWorker() != absl::nullopt;
+         io_uring_worker_factory->getIoUringWorker() != std::nullopt;
 }
 } // namespace
 
@@ -34,7 +34,7 @@ void DefaultSocketInterfaceExtension::onWorkerThreadInitialized() {
 }
 
 IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
-    int socket_fd, bool socket_v6only, absl::optional<int> domain,
+    int socket_fd, bool socket_v6only, std::optional<int> domain,
     const SocketCreationOptions& options,
     [[maybe_unused]] Io::IoUringWorkerFactory* io_uring_worker_factory) {
   if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
@@ -54,7 +54,7 @@ IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
 }
 
 IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
-                                            Socket::Type socket_type, absl::optional<int> domain,
+                                            Socket::Type socket_type, std::optional<int> domain,
                                             const SocketCreationOptions& options) const {
   if (socket_type == Socket::Type::Datagram) {
     return makePlatformSpecificSocket(socket_fd, socket_v6only, domain, options, nullptr);

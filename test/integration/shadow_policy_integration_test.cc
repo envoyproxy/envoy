@@ -120,7 +120,7 @@ public:
   }
 
   const bool streaming_shadow_ = std::get<1>(GetParam());
-  absl::optional<int> cluster_with_custom_filter_;
+  std::optional<int> cluster_with_custom_filter_;
   std::string filter_name_ = "on-local-reply-filter";
   std::unique_ptr<Http::TestRequestHeaderMapImpl> upstream_headers_;
   std::unique_ptr<Http::TestRequestHeaderMapImpl> mirror_headers_;
