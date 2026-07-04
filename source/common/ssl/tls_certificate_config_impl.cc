@@ -4,13 +4,14 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/server/transport_socket_config.h"
 
-#include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
 #include "source/common/config/datasource.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
-#include "openssl/tls1.h"
+#include "openssl/ssl.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -44,26 +45,6 @@ std::vector<uint8_t> maybeReadOcspStaple(const envoy::config::core::v3::DataSour
   }
 
   return {staple.begin(), staple.end()};
-}
-
-unsigned tlsVersionFromProto(
-    const envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol& version,
-    unsigned default_version) {
-  switch (version) {
-    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO:
-    return default_version;
-  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0:
-    return TLS1_VERSION;
-  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_1:
-    return TLS1_1_VERSION;
-  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2:
-    return TLS1_2_VERSION;
-  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3:
-    return TLS1_3_VERSION;
-  }
-  IS_ENVOY_BUG("unexpected tls version provided");
-  return default_version;
 }
 
 } // namespace
@@ -153,17 +134,74 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
   if (config.has_tls_params()) {
     using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
     const auto& p = config.tls_params();
+    if (p.compliance_policies_size() > 1) {
+      creation_status = absl::InvalidArgumentError(
+          "Only one compliance policy may be specified per certificate tls_params");
+      return;
+    }
     tls_params_ = TlsParams{
-        .min_protocol_version = tlsVersionFromProto(p.tls_minimum_protocol_version(), 0),
-        .max_protocol_version = tlsVersionFromProto(p.tls_maximum_protocol_version(), 0),
+        .min_protocol_version = p.tls_minimum_protocol_version(),
+        .max_protocol_version = p.tls_maximum_protocol_version(),
         .cipher_suites = absl::StrJoin(p.cipher_suites(), ":"),
         .ecdh_curves = absl::StrJoin(p.ecdh_curves(), ":"),
         .signature_algorithms = absl::StrJoin(p.signature_algorithms(), ":"),
         .compliance_policy =
             p.compliance_policies_size() > 0
-                ? absl::optional<TlsProto::CompliancePolicy>(p.compliance_policies(0))
-                : absl::nullopt,
+                ? std::optional<TlsProto::CompliancePolicy>(p.compliance_policies(0))
+                : std::nullopt,
     };
+    bssl::UniquePtr<SSL_CTX> validation_ctx(SSL_CTX_new(TLS_method()));
+    if (!tls_params_->cipher_suites.empty() &&
+        !SSL_CTX_set_strict_cipher_list(validation_ctx.get(), tls_params_->cipher_suites.c_str())) {
+      std::vector<absl::string_view> ciphers =
+          StringUtil::splitToken(tls_params_->cipher_suites, ":+![|]", false);
+      std::vector<std::string> bad_ciphers;
+      for (const auto& cipher : ciphers) {
+        std::string cipher_str(cipher);
+        if (absl::StartsWith(cipher_str, "-")) {
+          cipher_str.erase(cipher_str.begin());
+        }
+        if (!SSL_CTX_set_strict_cipher_list(validation_ctx.get(), cipher_str.c_str())) {
+          bad_ciphers.push_back(cipher_str);
+        }
+      }
+      creation_status = absl::InvalidArgumentError(fmt::format(
+          "Failed to initialize cipher suites {}. The following ciphers were rejected when tried "
+          "individually: {}",
+          tls_params_->cipher_suites, absl::StrJoin(bad_ciphers, ", ")));
+      return;
+    }
+    if (!tls_params_->ecdh_curves.empty() &&
+        !SSL_CTX_set1_curves_list(validation_ctx.get(), tls_params_->ecdh_curves.c_str())) {
+      creation_status = absl::InvalidArgumentError(
+          absl::StrCat("Failed to initialize ECDH curves ", tls_params_->ecdh_curves));
+      return;
+    }
+    if (!tls_params_->signature_algorithms.empty() &&
+        !SSL_CTX_set1_sigalgs_list(validation_ctx.get(),
+                                   tls_params_->signature_algorithms.c_str())) {
+      creation_status = absl::InvalidArgumentError(absl::StrCat(
+          "Failed to initialize TLS signature algorithms ", tls_params_->signature_algorithms));
+      return;
+    }
+    if (tls_params_->compliance_policy.has_value()) {
+      using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+      switch (tls_params_->compliance_policy.value()) {
+      case TlsProto::FIPS_202205:
+        if (SSL_CTX_set_compliance_policy(validation_ctx.get(),
+                                          ssl_compliance_policy_fips_202205) != 1) {
+          creation_status = absl::InvalidArgumentError(
+              "Failed to apply FIPS_202205 compliance policy in per-certificate tls_params");
+          return;
+        }
+        break;
+      // New policy values must be explicitly handled here before being accepted.
+      default:
+        creation_status =
+            absl::InvalidArgumentError("Unknown compliance policy in per-certificate tls_params");
+        return;
+      }
+    }
   }
 }
 

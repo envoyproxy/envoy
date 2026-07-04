@@ -6,12 +6,69 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/http/headers.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/tls/aws_lc_compat.h"
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/utility.h"
+
+#include "openssl/tls1.h"
 
 using Envoy::Network::PostIoAction;
 
 namespace Envoy {
+namespace {
+
+// Applies per-certificate TLS parameters directly to a SSL* after SSL_set_SSL_CTX, which only
+// transfers certificate material and does not propagate cipher/version/curve settings.
+void applyTlsParamsToSsl(const Ssl::TlsParams& p, SSL* ssl) {
+  using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+  auto toVersion = [](TlsProto::TlsProtocol proto) -> uint16_t {
+    switch (proto) {
+    case TlsProto::TLS_AUTO:
+      return 0;
+    case TlsProto::TLSv1_0:
+      return TLS1_VERSION;
+    case TlsProto::TLSv1_1:
+      return TLS1_1_VERSION;
+    case TlsProto::TLSv1_2:
+      return TLS1_2_VERSION;
+    case TlsProto::TLSv1_3:
+      return TLS1_3_VERSION;
+    default:
+      return 0;
+    }
+  };
+  if (p.min_protocol_version != TlsProto::TLS_AUTO) {
+    RELEASE_ASSERT(SSL_set_min_proto_version(ssl, toVersion(p.min_protocol_version)) == 1, "");
+  }
+  if (p.max_protocol_version != TlsProto::TLS_AUTO) {
+    RELEASE_ASSERT(SSL_set_max_proto_version(ssl, toVersion(p.max_protocol_version)) == 1, "");
+  }
+  if (!p.cipher_suites.empty()) {
+    RELEASE_ASSERT(SSL_set_strict_cipher_list(ssl, p.cipher_suites.c_str()) == 1, "");
+  }
+  if (!p.ecdh_curves.empty()) {
+    RELEASE_ASSERT(SSL_set1_curves_list(ssl, p.ecdh_curves.c_str()) == 1, "");
+  }
+  if (!p.signature_algorithms.empty()) {
+    RELEASE_ASSERT(SSL_set1_sigalgs_list(ssl, p.signature_algorithms.c_str()) == 1, "");
+  }
+  // Compliance policy must be applied last.
+  if (p.compliance_policy.has_value()) {
+    switch (p.compliance_policy.value()) {
+    case TlsProto::FIPS_202205:
+      if (!FIPS_mode()) {
+        ENVOY_LOG_MISC(warn, "FIPS conformance policy applied on a non-FIPS build");
+      }
+      RELEASE_ASSERT(SSL_set_compliance_policy(ssl, ssl_compliance_policy_fips_202205) == 1, "");
+      break;
+    default:
+      RELEASE_ASSERT(false, "Unknown compliance policy");
+    }
+  }
+}
+
+} // namespace
+
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
@@ -98,6 +155,9 @@ void SslExtendedSocketInfoImpl::onCertificateSelectionCompleted(
     // This will only return NULL if memory allocation fails.
     RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_handshaker_.ssl(), selected_ctx->ssl_ctx_.get()) != nullptr,
                    "");
+    if (selected_ctx->tls_params.has_value()) {
+      applyTlsParamsToSsl(*selected_ctx->tls_params, ssl_handshaker_.ssl());
+    }
 
     if (staple) {
       // We avoid setting the OCSP response if the client didn't request it, but doing so is safe.

@@ -60,7 +60,6 @@ envoy_cc_library(
     hdrs = ["tls_certificate_config.h"],
     deps = [
         "//envoy/ssl/private_key:private_key_interface",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

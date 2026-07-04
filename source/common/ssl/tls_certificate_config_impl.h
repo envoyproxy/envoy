@@ -1,13 +1,12 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "envoy/api/api.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/tls_certificate_config.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -57,7 +56,7 @@ private:
   const std::vector<uint8_t> ocsp_staple_;
   const std::string ocsp_staple_path_;
   Envoy::Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_;
-  absl::optional<TlsParams> tls_params_;
+  std::optional<TlsParams> tls_params_;
 };
 
 } // namespace Ssl
