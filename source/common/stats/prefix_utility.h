@@ -28,13 +28,11 @@ namespace Stats {
  * @param prefix the parent prefix, whose well-known variable segment is extracted as a tag when
  *        the prefix ends with a trailing '.' (e.g. "http.<hcm>." / "cluster.<name>."); may be
  *        empty.
- * @param base_name the tag-extracted own name (every own tag value removed), with no leading or
- *        trailing dot.
+ * @param base_name the tag-extracted own name (every own tag value removed).
  * @param tags one {tag_name, value} per variable segment of the own name. When empty,
  *        `name` is ignored and `base_name` is used for both forms.
- * @param name the tagged own name (own tag values interleaved), with no leading or trailing
- *        dot. Combined with `prefix` this must equal the legacy flat prefix. Ignored when
- *        `tags` is empty.
+ * @param name the tagged own name (own tag values interleaved). Combined with `prefix` this must
+ *        equal the legacy flat prefix. Ignored when `tags` is empty.
  */
 TaggedStatName mergeStatPrefix(SymbolTable& symbol_table, absl::string_view prefix,
                                absl::string_view base_name, TagStringViewSpan tags = {},
