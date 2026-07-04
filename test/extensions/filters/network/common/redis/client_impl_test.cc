@@ -1980,7 +1980,7 @@ TEST_F(RedisClientImplTest, Resp2AwsIamSyncTokenSendsAuth) {
 }
 
 // RESP2 + IAM with a non-Primary read policy must follow AUTH with READONLY, matching the
-// RESP2-no-IAM and RESP3 init paths. Without this, replicas-targeted reads land on the master
+// RESP2-no-IAM and RESP3 init paths. Without this, replicas-targeted reads land on the primary
 // instead of the replica because the connection was never marked READONLY.
 TEST_F(RedisClientImplTest, Resp2AwsIamReplicaReadPolicySendsReadonlyAfterAuth) {
   InSequence s;

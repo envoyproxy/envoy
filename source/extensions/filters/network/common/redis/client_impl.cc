@@ -560,7 +560,7 @@ void ClientImpl::onInitStepSuccess(InitState completed_step) {
   case InitState::AwaitingAuth:
     // Both HELLO 3 (RESP3 path) and post-IAM AUTH (RESP2 + IAM path) finish the credentials
     // step; READONLY is the next phase whenever the read policy may target replicas. Skipping
-    // it on RESP2+IAM would leave non-Primary reads pinned to the master and silently diverge
+    // it on RESP2+IAM would leave non-Primary reads pinned to the primary and silently diverge
     // from RESP2-no-IAM and RESP3 behavior. Failure handling: HELLO 3 failures are fatal (the
     // negotiated handshake is new behavior); READONLY and IAM AUTH *reply* errors are
     // best-effort on every version, matching the legacy fire-and-forget outcome (see

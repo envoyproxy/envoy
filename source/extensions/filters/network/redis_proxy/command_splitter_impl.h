@@ -579,7 +579,9 @@ private:
   // HELLO is answered locally (handleHelloCommand) and does not route through
   // handler_lookup_table_, but the ``command.hello.*`` stats its old cluster-scope registration
   // emitted must survive for operators alarming on them. Latency exists for schema parity and
-  // is not recorded — the local reply has no round trip to time.
+  // is not recorded — the local reply has no round trip to time. One intended gap: the deferred
+  // external-auth path (AuthAttempt::ImplOwnsResponse) is total-only, since success/error
+  // resolve inside the filter after the round trip (see handleHelloCommand).
   std::optional<CommandStats> hello_command_stats_;
 };
 
