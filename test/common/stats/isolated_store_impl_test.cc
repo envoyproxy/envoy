@@ -241,8 +241,7 @@ TEST_F(StatsIsolatedStoreImplTest, CounterWithTag) {
   EXPECT_EQ("counter.tag1.tag1Value2", c2.name());
   EXPECT_EQ("counter", c2.tagExtractedName());
   EXPECT_THAT(c2.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value2"}));
-  // Verify that counterFromStatNameWithTags with the same params returns
-  // the existing stat object.
+  // Verify that counterFromTaggedName with the same params returns the existing stat object.
   EXPECT_EQ(&c1, &scope_->counterFromTaggedName(base, StatNameTagSpan(tags), {}));
 }
 
@@ -262,8 +261,7 @@ TEST_F(StatsIsolatedStoreImplTest, GaugeWithTags) {
   EXPECT_EQ("gauge.tag2.tag2Value", g2.name());
   EXPECT_EQ("gauge", g2.tagExtractedName());
   EXPECT_THAT(g2.tags(), testing::ElementsAre(Tag{"tag2", "tag2Value"}));
-  // Verify that gaugeFromStatNameWithTags with the same params returns
-  // the existing stat object.
+  // Verify that gaugeFromTaggedName with the same params returns the existing stat object.
   EXPECT_EQ(&g1, &scope_->gaugeFromTaggedName(base, StatNameTagSpan(tags), {},
                                               Gauge::ImportMode::Accumulate));
 }
@@ -280,8 +278,7 @@ TEST_F(StatsIsolatedStoreImplTest, TextReadoutWithTag) {
   EXPECT_EQ("textreadout.tag1.tag1Value2", b2.name());
   EXPECT_EQ("textreadout", b2.tagExtractedName());
   EXPECT_THAT(b2.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value2"}));
-  // Verify that textReadoutFromStatNameWithTags with the same params returns
-  // the existing stat object.
+  // Verify that textReadoutFromTaggedName with the same params returns the existing stat object.
   EXPECT_EQ(&b1, &scope_->textReadoutFromTaggedName(base, StatNameTagSpan(tags), {}));
 }
 
@@ -299,8 +296,7 @@ TEST_F(StatsIsolatedStoreImplTest, HistogramWithTag) {
   EXPECT_EQ("histogram.tag1.tag1Value2", h2.name());
   EXPECT_EQ("histogram", h2.tagExtractedName());
   EXPECT_THAT(h2.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value2"}));
-  // Verify that histogramFromStatNameWithTags with the same params returns
-  // the existing stat object.
+  // Verify that histogramFromTaggedName with the same params returns the existing stat object.
   EXPECT_EQ(&h1, &scope_->histogramFromTaggedName(base, StatNameTagSpan(tags), {},
                                                   Stats::Histogram::Unit::Unspecified));
 }
