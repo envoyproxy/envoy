@@ -158,6 +158,12 @@ credentials (``downstream_auth_passwords`` / ``downstream_auth_username``) and a
 auth provider; the latter defers the round trip and emits the deferred ``HELLO`` Map (or
 error) when the provider responds.
 
+When a ``HELLO`` is resolved by an external auth provider, its outcome is emitted from the
+filter after the deferred round trip, so only ``command.hello.total`` is incremented —
+``command.hello.success`` and ``command.hello.error`` are not. For ``HELLO`` alone, therefore,
+``total`` may exceed ``success + error``; the authentication result stays observable through
+the external auth provider's own metrics and the downstream reply.
+
 The ``HELLO`` reply returned to the downstream client is **synthesized locally** by the proxy;
 it is not proxied from, and does not reflect, any upstream Redis server. Several fields therefore
 carry fixed proxy-specific values rather than a backend's: ``server`` is ``envoy-redis-proxy``,
