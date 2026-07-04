@@ -161,7 +161,7 @@ error) when the provider responds.
 The ``HELLO`` reply returned to the downstream client is **synthesized locally** by the proxy;
 it is not proxied from, and does not reflect, any upstream Redis server. Several fields therefore
 carry fixed proxy-specific values rather than a backend's: ``server`` is ``envoy-redis-proxy``,
-``version`` is a fixed Redis-compatibility version (``7.0.0``) advertised for client-library
+``version`` is a fixed Redis-compatibility version (``6.0.0``) advertised for client-library
 compatibility rather than the Envoy build version, ``id`` is ``0``, ``mode`` is ``standalone``,
 ``role`` is ``master``, and ``modules`` is empty. Only ``proto`` is dynamic — it reflects the
 negotiated version (``2`` or ``3``). Clients that key behavior off these fields (for example a

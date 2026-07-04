@@ -654,7 +654,7 @@ std::string makeBulkStringArray(std::vector<std::string>&& command_strings) {
 std::string resp3HelloMapReply() {
   return "%7\r\n"
          "$6\r\nserver\r\n$17\r\nenvoy-redis-proxy\r\n"
-         "$7\r\nversion\r\n$5\r\n7.0.0\r\n"
+         "$7\r\nversion\r\n$5\r\n6.0.0\r\n"
          "$5\r\nproto\r\n:3\r\n"
          "$2\r\nid\r\n:0\r\n"
          "$4\r\nmode\r\n$10\r\nstandalone\r\n"
@@ -1498,7 +1498,7 @@ TEST_P(RedisProxyIntegrationTest, Resp2ListenerRejectsHello3) {
 TEST_P(RedisProxyIntegrationTest, Resp2ListenerHello2RepliesFlatArray) {
   const std::string hello2_flat_reply = "*14\r\n"
                                         "$6\r\nserver\r\n$17\r\nenvoy-redis-proxy\r\n"
-                                        "$7\r\nversion\r\n$5\r\n7.0.0\r\n"
+                                        "$7\r\nversion\r\n$5\r\n6.0.0\r\n"
                                         "$5\r\nproto\r\n:2\r\n"
                                         "$2\r\nid\r\n:0\r\n"
                                         "$4\r\nmode\r\n$10\r\nstandalone\r\n"

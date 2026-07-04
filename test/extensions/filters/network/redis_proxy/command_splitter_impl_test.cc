@@ -1173,6 +1173,49 @@ TEST_F(RedisSingleServerRequestTest, HelloLocalExplicit3FlipsEncoder) {
   EXPECT_TRUE(saw_mode_standalone);
 }
 
+// Pin the two fixed identity fields of the locally synthesized HELLO reply: ``server`` and the
+// Redis-compatibility ``version`` (kHelloRedisCompatVersion). Both values are advertised verbatim
+// in docs/root/configuration/listeners/network_filters/redis_proxy_filter.rst and byte-pinned by
+// the integration suite; this unit-level pin catches a constant change that forgets those
+// dependents without needing the (Docker-only) integration run.
+TEST_F(RedisSingleServerRequestTest, HelloLocalReplyPinsServerAndCompatVersion) {
+  InSequence s;
+  callbacks_.downstream_resp_version_ = 2;
+  callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp2;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"hello", "2"});
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  Common::Redis::RespValuePtr captured;
+  EXPECT_CALL(callbacks_, onResponse_(_)).WillOnce([&captured](Common::Redis::RespValuePtr& v) {
+    captured = std::move(v);
+  });
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+
+  ASSERT_NE(nullptr, captured);
+  ASSERT_EQ(Common::Redis::RespType::Map, captured->type());
+  const auto& kv = captured->asArray();
+  bool saw_server = false;
+  bool saw_version = false;
+  for (size_t i = 0; i + 1 < kv.size(); i += 2) {
+    if (kv[i].type() != Common::Redis::RespType::BulkString ||
+        kv[i + 1].type() != Common::Redis::RespType::BulkString) {
+      continue;
+    }
+    if (kv[i].asString() == "server") {
+      EXPECT_EQ("envoy-redis-proxy", kv[i + 1].asString());
+      saw_server = true;
+    } else if (kv[i].asString() == "version") {
+      EXPECT_EQ("6.0.0", kv[i + 1].asString());
+      saw_version = true;
+    }
+  }
+  EXPECT_TRUE(saw_server);
+  EXPECT_TRUE(saw_version);
+}
+
 // RESP2 listener accepts HELLO 2 and reaffirms the downstream encoder at version 2.
 TEST_F(RedisSingleServerRequestTest, HelloLocalExplicit2OnResp2Listener) {
   InSequence s;
