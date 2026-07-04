@@ -13736,6 +13736,281 @@ void envoy_dynamic_module_callback_stat_sink_config_scheduler_commit(
 void envoy_dynamic_module_callback_stat_sink_config_scheduler_delete(
     envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr scheduler_module_ptr);
 
+// =============================================================================
+// ============================== Health Checker ===============================
+// =============================================================================
+
+// =============================================================================
+// Health Checker Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_health_checker_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleHealthCheckerConfig class in Envoy. A single config is shared by all per-host
+ * sessions of one configured custom health checker.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_health_checker_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_health_checker_config_module_ptr is a pointer to an in-module health
+ * checker configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can
+ * be released when envoy_dynamic_module_on_health_checker_config_destroy is called for the same
+ * pointer.
+ */
+typedef const void* envoy_dynamic_module_type_health_checker_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_health_checker_session_envoy_ptr is a raw pointer to the
+ * DynamicModuleActiveHealthCheckSession class in Envoy. There is one session per checked host.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ *
+ * THREADING: This pointer is only valid on the main thread during a health checker event hook
+ * (e.g. envoy_dynamic_module_on_health_checker_session_on_interval). The module must NOT store it
+ * for use from another thread or after the hook returns. To deliver a result from another thread,
+ * create a scheduler with envoy_dynamic_module_callback_health_checker_scheduler_new and use it
+ * instead. The host info callbacks (address/metadata/health) accept this pointer and must only be
+ * called on the main thread during an event hook.
+ */
+typedef void* envoy_dynamic_module_type_health_checker_session_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_health_checker_session_module_ptr is a pointer to an in-module health
+ * check session corresponding to a single checked host.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can
+ * be released when envoy_dynamic_module_on_health_checker_session_destroy is called for the same
+ * pointer.
+ */
+typedef const void* envoy_dynamic_module_type_health_checker_session_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_health_checker_scheduler_module_ptr is a raw pointer to the
+ * DynamicModuleHealthCheckerScheduler class in Envoy. It is a thread-safe handle used to report a
+ * health check result back to the main thread from any thread (including ones managed by the
+ * module).
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. It must be explicitly destroyed by the module with
+ * envoy_dynamic_module_callback_health_checker_scheduler_delete when no longer needed. Reporting a
+ * result through a scheduler whose session has already been destroyed is safe and is a no-op.
+ * Since its lifecycle is owned/managed by the module, this has the _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_health_checker_scheduler_module_ptr;
+
+// =============================================================================
+// Health Checker Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_health_checker_config_new is called when a new custom health checker
+ * configuration is created. This is called on the main thread.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleHealthCheckerConfig object.
+ * @param name is the health checker name from the configuration.
+ * @param config is the configuration bytes for the health checker.
+ * @return a pointer to the in-module health checker configuration. Returning nullptr indicates a
+ *         failure to initialize the module, and the configuration will be rejected.
+ */
+envoy_dynamic_module_type_health_checker_config_module_ptr
+envoy_dynamic_module_on_health_checker_config_new(
+    envoy_dynamic_module_type_health_checker_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_health_checker_config_destroy is called when the custom health checker
+ * configuration is destroyed. This is called on the main thread.
+ *
+ * @param config_module_ptr is a pointer to the in-module health checker configuration.
+ */
+void envoy_dynamic_module_on_health_checker_config_destroy(
+    envoy_dynamic_module_type_health_checker_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_health_checker_session_new is called to create a new per-host health
+ * check session. This is called on the main thread, once for each host that is health checked.
+ *
+ * @param config_module_ptr is the pointer to the in-module health checker configuration.
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ *        It is only valid on the main thread during this call and may be used to read host info.
+ * @return a pointer to the in-module session instance. Returning nullptr will cause the host to
+ *         be left in its current health state and no checks will be performed for it.
+ */
+envoy_dynamic_module_type_health_checker_session_module_ptr
+envoy_dynamic_module_on_health_checker_session_new(
+    envoy_dynamic_module_type_health_checker_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_health_checker_session_on_interval is called on the main thread each time
+ * the health check interval timer fires for the host. The module should start a health check here
+ * (it may perform the actual work on its own thread) and eventually report the result through a
+ * scheduler created with envoy_dynamic_module_callback_health_checker_scheduler_new.
+ *
+ * The session_envoy_ptr is only valid on the main thread during this call. The module should read
+ * any required host info (address/metadata/health) here before going asynchronous.
+ *
+ * @param session_module_ptr is the pointer to the in-module session instance.
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ */
+void envoy_dynamic_module_on_health_checker_session_on_interval(
+    envoy_dynamic_module_type_health_checker_session_module_ptr session_module_ptr,
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_health_checker_session_on_timeout is called on the main thread when the
+ * health check timeout fires before a result was reported. Envoy automatically records a timeout
+ * failure for the host; this hook gives the module a chance to cancel any in-flight work.
+ *
+ * This is optional. If not implemented by the module, Envoy will skip calling it.
+ *
+ * @param session_module_ptr is the pointer to the in-module session instance.
+ */
+void envoy_dynamic_module_on_health_checker_session_on_timeout(
+    envoy_dynamic_module_type_health_checker_session_module_ptr session_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_health_checker_session_destroy is called on the main thread when the
+ * per-host session is destroyed (e.g. the host was removed or the cluster is being torn down).
+ *
+ * @param session_module_ptr is the pointer to the in-module session instance.
+ */
+void envoy_dynamic_module_on_health_checker_session_destroy(
+    envoy_dynamic_module_type_health_checker_session_module_ptr session_module_ptr);
+
+// =============================================================================
+// Health Checker Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_health_checker_scheduler_new is called by the module to create a
+ * new health checker scheduler for a session. The scheduler is a thread-safe handle used to report
+ * a health check result back to the session on the main thread from any thread.
+ *
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ *        This must be called on the main thread.
+ * @return envoy_dynamic_module_type_health_checker_scheduler_module_ptr is the pointer to the
+ *         created scheduler.
+ *
+ * NOTE: it is the caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_health_checker_scheduler_delete when it is no longer needed.
+ */
+envoy_dynamic_module_type_health_checker_scheduler_module_ptr
+envoy_dynamic_module_callback_health_checker_scheduler_new(
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_health_checker_scheduler_report is called by the module to report a
+ * health check result for the session associated with the scheduler. This may be called from any
+ * thread. The result is applied on the main thread: Healthy and Degraded are treated as a
+ * successful check (Degraded marks the host degraded), and Unhealthy is treated as an active health
+ * check failure.
+ *
+ * If the underlying session has already been destroyed, this call is a safe no-op.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler created by
+ *        envoy_dynamic_module_callback_health_checker_scheduler_new.
+ * @param health is the reported health status of the host.
+ */
+void envoy_dynamic_module_callback_health_checker_scheduler_report(
+    envoy_dynamic_module_type_health_checker_scheduler_module_ptr scheduler_module_ptr,
+    envoy_dynamic_module_type_host_health health);
+
+/**
+ * envoy_dynamic_module_callback_health_checker_scheduler_delete is called by the module to delete a
+ * scheduler created by envoy_dynamic_module_callback_health_checker_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler to delete.
+ */
+void envoy_dynamic_module_callback_health_checker_scheduler_delete(
+    envoy_dynamic_module_type_health_checker_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_health_checker_get_host_address returns the resolved address
+ * (ip:port) of the host being checked by the session.
+ *
+ * This must be called on the main thread during a health checker event hook.
+ *
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ * @param result is the output for the host address as a string. The buffer is owned by Envoy and
+ *        is valid until the end of the current event hook.
+ * @return true if the address was available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_health_checker_get_host_address(
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_health_checker_get_host_metadata_string is called by the module to
+ * get the string value of the host's endpoint metadata by looking up the given filter name and
+ * key. If the key does not exist or the value is not a string, this returns false.
+ *
+ * This must be called on the main thread during a health checker event hook.
+ *
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ * @param filter_name is the filter namespace to look up (e.g., ``envoy.lb``).
+ * @param key is the key within the filter namespace.
+ * @param result is the output for the string value. The buffer is owned by Envoy and is valid
+ *        until the end of the current event hook.
+ * @return true if the key was found and the value is a string, false otherwise.
+ */
+bool envoy_dynamic_module_callback_health_checker_get_host_metadata_string(
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_health_checker_get_host_metadata_number is called by the module to
+ * get the number value of the host's endpoint metadata by looking up the given filter name and
+ * key. If the key does not exist or the value is not a number, this returns false.
+ *
+ * This must be called on the main thread during a health checker event hook.
+ *
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ * @param filter_name is the filter namespace to look up (e.g., ``envoy.lb``).
+ * @param key is the key within the filter namespace.
+ * @param result is the output for the number value.
+ * @return true if the key was found and the value is a number, false otherwise.
+ */
+bool envoy_dynamic_module_callback_health_checker_get_host_metadata_number(
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, double* result);
+
+/**
+ * envoy_dynamic_module_callback_health_checker_get_host_metadata_bool is called by the module to
+ * get the bool value of the host's endpoint metadata by looking up the given filter name and key.
+ * If the key does not exist or the value is not a bool, this returns false.
+ *
+ * This must be called on the main thread during a health checker event hook.
+ *
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ * @param filter_name is the filter namespace to look up (e.g., ``envoy.lb``).
+ * @param key is the key within the filter namespace.
+ * @param result is the output for the bool value.
+ * @return true if the key was found and the value is a bool, false otherwise.
+ */
+bool envoy_dynamic_module_callback_health_checker_get_host_metadata_bool(
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, bool* result);
+
+/**
+ * envoy_dynamic_module_callback_health_checker_get_host_health returns the current health status of
+ * the host being checked by the session, as currently known to Envoy.
+ *
+ * This must be called on the main thread during a health checker event hook.
+ *
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ * @return the current health status of the host.
+ */
+envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_health_checker_get_host_health(
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr);
+
 #ifdef __cplusplus
 }
 #endif
