@@ -21,6 +21,12 @@ namespace Redis {
  */
 enum class RespProtocolVersion { Resp2, Resp3 };
 
+/**
+ * Maps the RESP wire version integer (the ``N`` of ``HELLO N``) to RespProtocolVersion. This is
+ * a total conversion, not a validator: every value other than 3 (including 0 and values a HELLO
+ * handler would reject) maps to Resp2. Callers are expected to pass versions already validated
+ * at the negotiation boundary.
+ */
 inline RespProtocolVersion toRespProtocolVersion(uint32_t version) {
   return version == 3 ? RespProtocolVersion::Resp3 : RespProtocolVersion::Resp2;
 }

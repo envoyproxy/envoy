@@ -152,6 +152,7 @@ envoy_cc_library(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/config:datasource_lib",
         "//source/common/config:utility_lib",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",

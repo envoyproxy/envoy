@@ -9,6 +9,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/datasource.h"
 #include "source/common/config/utility.h"
@@ -290,6 +291,7 @@ void ProxyFilter::resumeAuthHeldRequests() {
     return;
   }
   resuming_held_requests_ = true;
+  Cleanup reset_resuming_flag([this]() { resuming_held_requests_ = false; });
   while (external_auth_call_status_ != ExternalAuthCallStatus::Pending) {
     auto it = std::find_if(
         pending_requests_.begin(), pending_requests_.end(),
@@ -299,13 +301,13 @@ void ProxyFilter::resumeAuthHeldRequests() {
     }
     PendingRequest& held = *it;
     // Detach the value into a local FIRST so this entry is unconditionally cleared before the
-    // next find_if pass. processRespValue does not always consume its argument (the NOPROTO
-    // gate drops it; the split-request handle path leaves it untouched), and since the scan
-    // restarts from begin() each pass, an entry left non-null would be re-selected forever.
+    // next find_if pass. processRespValue does not always consume its argument (the
+    // ``NOPROTO`` gate drops it; the split-request handle path leaves it untouched), and since
+    // the scan restarts from begin() each pass, an entry left non-null would be re-selected
+    // forever.
     Common::Redis::RespValuePtr value = std::move(held.pending_request_value_);
     processRespValue(std::move(value), held);
   }
-  resuming_held_requests_ = false;
 }
 
 void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {

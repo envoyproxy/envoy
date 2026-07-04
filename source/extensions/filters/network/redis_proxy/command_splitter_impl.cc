@@ -1138,8 +1138,10 @@ SplitRequestPtr InstanceImpl::handleHelloCommand(const Common::Redis::RespValue&
   // Parse remaining options. Only AUTH (3 tokens) and SETNAME (2 tokens)
   // are recognized; SETNAME is accepted and ignored because the proxy has
   // no per-client identity tracking. Anything else is a syntax error. A
-  // repeated AUTH or SETNAME is rejected rather than silently last-wins,
-  // matching real Redis's HELLO option parsing.
+  // repeated AUTH or SETNAME is rejected rather than silently last-wins;
+  // this is stricter than real Redis (which processes repeated options in
+  // order, so the last one wins) and keeps the proxy's handling of a
+  // malformed handshake deterministic.
   bool seen_setname = false;
   while (i < args.size()) {
     const std::string opt = absl::AsciiStrToUpper(args[i].asString());

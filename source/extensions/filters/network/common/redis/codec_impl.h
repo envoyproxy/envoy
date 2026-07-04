@@ -115,8 +115,10 @@ private:
   PendingInteger pending_integer_;
   RespValuePtr pending_value_root_;
   std::forward_list<PendingValue> pending_value_stack_;
-  // Scratch buffer for the RESP3 Double payload bytes (``,`` re-uses the SimpleString
-  // accumulator). Validated and moved into ``RespValue::asString()`` at ValueComplete.
+  // Scratch buffer for the RESP3 Double (``,``) payload, which re-uses the SimpleString parse
+  // states but accumulates here. Whitespace and non-printable bytes are rejected and the length
+  // cap enforced as each byte is accumulated; the terminating CR validates numeric syntax and
+  // moves the buffer into ``RespValue::asString()``.
   std::string pending_double_buf_;
   uint32_t consecutive_attributes_{0};    // counts toward kMaxConsecutiveAttributes
   uint32_t pending_value_stack_depth_{0}; // counts toward kMaxNestingDepth
