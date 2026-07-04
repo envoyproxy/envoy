@@ -51,6 +51,7 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/socket_option_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
@@ -248,6 +249,22 @@ buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_con
   return cluster_options;
 }
 
+// Validates that an upstream bind source address with a configured network namespace can actually
+// be entered. This is only done at config load time when the bind config opts in via
+// `validate_network_namespaces`, so that a misconfigured (e.g. non-existent) network namespace is
+// rejected here rather than causing a connection failure later.
+absl::Status
+validateBindNetworkNamespace(const Network::Address::InstanceConstSharedPtr& address) {
+#if defined(__linux__)
+  if (address != nullptr && address->networkNamespace().has_value()) {
+    return Network::Utility::validateNetworkNamespace(*address->networkNamespace());
+  }
+#else
+  (void)address;
+#endif
+  return absl::OkStatus();
+}
+
 absl::StatusOr<std::vector<::Envoy::Upstream::UpstreamLocalAddress>>
 parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_config,
                 const std::optional<std::string>& cluster_name,
@@ -264,6 +281,9 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
           ::Envoy::Network::Address::resolveProtoSocketAddress(bind_config->source_address());
       RETURN_IF_NOT_OK_REF(address_or_error.status());
       upstream_local_address.address_ = address_or_error.value();
+      if (bind_config->validate_network_namespaces()) {
+        RETURN_IF_NOT_OK(validateBindNetworkNamespace(upstream_local_address.address_));
+      }
     }
     upstream_local_address.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
 
@@ -280,6 +300,9 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
           ::Envoy::Network::Address::resolveProtoSocketAddress(extra_source_address.address());
       RETURN_IF_NOT_OK_REF(address_or_error.status());
       extra_upstream_local_address.address_ = address_or_error.value();
+      if (bind_config->validate_network_namespaces()) {
+        RETURN_IF_NOT_OK(validateBindNetworkNamespace(extra_upstream_local_address.address_));
+      }
 
       extra_upstream_local_address.socket_options_ =
           std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
@@ -304,6 +327,9 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
           ::Envoy::Network::Address::resolveProtoSocketAddress(additional_source_address);
       RETURN_IF_NOT_OK_REF(address_or_error.status());
       additional_upstream_local_address.address_ = address_or_error.value();
+      if (bind_config->validate_network_namespaces()) {
+        RETURN_IF_NOT_OK(validateBindNetworkNamespace(additional_upstream_local_address.address_));
+      }
       additional_upstream_local_address.socket_options_ =
           std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
       ::Envoy::Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
