@@ -253,8 +253,7 @@ buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_con
 // be entered. This is only done at config load time when the bind config opts in via
 // `validate_network_namespaces`, so that a misconfigured (e.g. non-existent) network namespace is
 // rejected here rather than causing a connection failure later.
-absl::Status
-validateBindNetworkNamespace(const Network::Address::InstanceConstSharedPtr& address) {
+absl::Status validateBindNetworkNamespace(const Network::Address::InstanceConstSharedPtr& address) {
 #if defined(__linux__)
   if (address != nullptr && address->networkNamespace().has_value()) {
     return Network::Utility::validateNetworkNamespace(*address->networkNamespace());
