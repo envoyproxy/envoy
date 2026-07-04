@@ -483,18 +483,17 @@ TEST_P(WasmCommonTest, WasmVmCountGauge) {
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_);
   auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
 
-  EXPECT_EQ(
-      0, stats_store_.gauge("wasm.wasm_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
+  EXPECT_EQ(nullptr, TestUtility::findGauge(stats_store_, "wasm.wasm_vm_count"));
 
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       plugin->wasmConfig(), vm_key, scope_, *api_, cluster_manager_, *dispatcher_);
   EXPECT_NE(wasm, nullptr);
-  EXPECT_EQ(
-      1, stats_store_.gauge("wasm.wasm_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
+  auto gauge = TestUtility::findGauge(stats_store_, "wasm.wasm_vm_count");
+  ASSERT_NE(nullptr, gauge);
+  EXPECT_EQ(1, gauge->value());
 
   wasm.reset();
-  EXPECT_EQ(
-      0, stats_store_.gauge("wasm.wasm_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
+  EXPECT_EQ(0, gauge->value());
 }
 
 TEST_P(WasmCommonTest, Foreign) {
