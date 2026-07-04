@@ -1435,7 +1435,7 @@ TEST_F(RedisClientImplTest, Resp3InitSendsBareHelloThenAwaitsReply) {
 }
 
 // A REMOTE close (the upstream dropping the connection) while HELLO is in flight IS an upstream
-// negotiation failure and DOES count — pins the other side of the local-vs-remote split.
+// negotiation failure and DOES count — pins the other side of the deliberate-vs-caused split.
 TEST_F(RedisClientImplTest, Resp3InitRemoteCloseDuringHelloCountsFailure) {
   InSequence s;
   enableResp3();
@@ -1448,6 +1448,32 @@ TEST_F(RedisClientImplTest, Resp3InitRemoteCloseDuringHelloCountsFailure) {
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(1UL, hello3_failure_counter_->value());
+}
+
+// A connect/op TIMEOUT while HELLO is in flight also counts: the close is locally initiated but
+// upstream-caused (a hung upstream that never answers HELLO is exactly the misconfigured-upstream
+// case the counter documents — "network failure"). Only ClientImpl::close(), the deliberate
+// teardown entry point, suppresses the counter.
+TEST_F(RedisClientImplTest, Resp3InitOpTimeoutDuringHelloCountsFailure) {
+  InSequence s;
+  enableResp3();
+  setup();
+
+  EXPECT_CALL(*encoder_, encode(Eq(makeBareHello3Request()), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->initialize("", "");
+  onConnected();
+
+  // Firing the op timer closes the connection; the mock close raises LocalClose synchronously,
+  // whose drain runs Hello3InitCallbacks::onFailure — which must count despite the local close.
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  connect_or_op_timer_->invokeCallback();
+
+  EXPECT_EQ(1UL, hello3_failure_counter_->value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_timeout_.value());
 }
 
 // HELLO 3 AUTH user pass — single combined command.

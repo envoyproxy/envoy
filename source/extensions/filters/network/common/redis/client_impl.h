@@ -328,11 +328,13 @@ private:
   Stats::Scope& scope_;
   bool is_transaction_client_;
   bool queue_enabled_{false};
-  // True while onEvent drains a locally-initiated close (downstream teardown, pool drain).
-  // Hello3InitCallbacks::onFailure consults it so that a local close of a connection with a
-  // HELLO 3 still in flight does not count toward upstream_resp3_hello_failure — that counter
-  // is documented as a misconfigured-upstream signal and must not be polluted by client churn.
-  bool local_close_{false};
+  // Set by close() — the deliberate-teardown entry point (pool drain, transaction close,
+  // downstream churn). Hello3InitCallbacks::onFailure consults it so that tearing down a
+  // connection with a HELLO 3 still in flight does not count toward
+  // upstream_resp3_hello_failure. Deliberately NOT set for other locally-initiated closes
+  // (connect/op timeout, decode protocol error): those are upstream-caused negotiation
+  // failures and must keep counting, per the counter's "network failure" contract.
+  bool deliberate_close_{false};
   std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
   std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
       aws_iam_authenticator_;

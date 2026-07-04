@@ -213,7 +213,13 @@ ClientImpl::~ClientImpl() {
   host_->stats().cx_active_.dec();
 }
 
-void ClientImpl::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
+void ClientImpl::close() {
+  // Deliberate teardown (pool drain, transaction close, downstream churn) — see
+  // deliberate_close_. Timeout/protocol-error closes bypass this method on purpose so a hung
+  // or garbage-speaking upstream still counts as a HELLO 3 negotiation failure.
+  deliberate_close_ = true;
+  connection_->close(Network::ConnectionCloseType::NoFlush);
+}
 
 void ClientImpl::flushBufferAndResetTimer() {
   if (flush_timer_->enabled()) {
@@ -317,10 +323,6 @@ void ClientImpl::putOutlierEvent(Upstream::Outlier::Result result) {
 void ClientImpl::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    // Recorded for Hello3InitCallbacks::onFailure: a local close draining a pending HELLO must
-    // not count toward the misconfigured-upstream counter.
-    local_close_ = (event == Network::ConnectionEvent::LocalClose);
-
     // Transition to Failed FIRST so any init callback invoked by the pending_requests_ drain
     // sees state==Failed in onInitFailure and short-circuits the recursive close. This also
     // drains any held user requests that never made it to pending_requests_.
@@ -559,9 +561,10 @@ void ClientImpl::onInitStepSuccess(InitState completed_step) {
     // Both HELLO 3 (RESP3 path) and post-IAM AUTH (RESP2 + IAM path) finish the credentials
     // step; READONLY is the next phase whenever the read policy may target replicas. Skipping
     // it on RESP2+IAM would leave non-Primary reads pinned to the master and silently diverge
-    // from RESP2-no-IAM and RESP3 behavior. Failure handling of these steps is version-split
-    // (see ReadOnlyInitCallbacks / AwsIamAuthInitCallbacks): best-effort on RESP2 to match the
-    // legacy fire-and-forget outcome, fatal on the new RESP3 handshake.
+    // from RESP2-no-IAM and RESP3 behavior. Failure handling: HELLO 3 failures are fatal (the
+    // negotiated handshake is new behavior); READONLY and IAM AUTH *reply* errors are
+    // best-effort on every version, matching the legacy fire-and-forget outcome (see
+    // ReadOnlyInitCallbacks / AwsIamAuthInitCallbacks); connection errors are always fatal.
     if (config_->readPolicy() != Common::Redis::Client::ReadPolicy::Primary) {
       setInitState(InitState::AwaitingReadonly);
       sendReadonlyInit();
@@ -724,10 +727,12 @@ void ClientImpl::Hello3InitCallbacks::onResponse(Common::Redis::RespValuePtr&& v
   parent_.onInitStepSuccess(InitState::AwaitingHello);
 }
 void ClientImpl::Hello3InitCallbacks::onFailure() {
-  // A locally-initiated close (downstream teardown, pool drain) is not an upstream negotiation
-  // failure: the counter is documented as a misconfigured-upstream signal, so only count
-  // failures the upstream caused (error/shape/redirect replies above, or a remote close here).
-  if (!parent_.local_close_ && parent_.upstream_resp3_hello_failure_.has_value()) {
+  // A deliberate teardown (ClientImpl::close(): pool drain, transaction close, downstream
+  // churn) is not an upstream negotiation failure and must not pollute the
+  // misconfigured-upstream signal. Everything else — remote close, connect/op timeout, decode
+  // protocol error — is upstream-caused and counts, per the counter's "network failure"
+  // contract in client.h.
+  if (!parent_.deliberate_close_ && parent_.upstream_resp3_hello_failure_.has_value()) {
     parent_.upstream_resp3_hello_failure_->inc();
   }
   ENVOY_LOG_EVERY_POW_2(warn, "redis: HELLO 3 negotiation failed (connection error)");

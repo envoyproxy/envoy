@@ -46,7 +46,9 @@ public:
   // value is not malformed; the cap (16 KiB, room for a ~54k-bit integer) only bounds unbounded
   // CRLF-less line growth without rejecting legitimate values.
   static constexpr size_t kMaxBigNumberTokenLength = 16ULL * 1024;
-  // Cap on consecutive RESP3 Attributes (|0\r\n|0\r\n...) to defeat empty-attribute floods.
+  // Cap on consecutive RESP3 Attributes, empty (``|0``) or not — child values completing
+  // INSIDE an attribute do not reset the run (see ValueComplete), so ``|1 <k> <v>`` chains are
+  // bounded the same way an empty-attribute flood is.
   static constexpr uint32_t kMaxConsecutiveAttributes = 32;
   // Cap on aggregate nesting depth. Without this, ``*1\r\n*1\r\n...`` grows pending_value_stack_
   // without bound even though each level's own kMaxRespElements check passes trivially. Tracked in

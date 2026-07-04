@@ -1219,7 +1219,10 @@ SplitRequestPtr InstanceImpl::handleHelloCommand(const Common::Redis::RespValue&
       return nullptr;
     case AuthAttempt::ImplOwnsResponse:
       // Outcome resolves inside the filter (deferred external auth or an already-emitted
-      // synchronous error); only ``total`` is counted for this path.
+      // synchronous error), so ``command.hello.success``/``error`` are intentionally NOT
+      // incremented here — only ``total``. Wiring the deferred outcome back would need a
+      // filter→splitter stats channel for a niche path whose result is already observable
+      // through the external-auth provider's own signals and the downstream reply.
       // The implementation owns the response; the splitter emits nothing here and yields control.
       // Either external auth is in flight — the impl later emits the deferred HELLO reply (Map on
       // success, error on failure) plus the downstream RESP version flip, and ProxyFilter queues
@@ -1333,9 +1336,9 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   if (command_name == Common::Redis::SupportedCommands::client() &&
       custom_commands_.find(command_name) == custom_commands_.end()) {
     // Deployments that predate local CLIENT handling may proxy CLIENT upstream via
-    // ``custom_commands``; that explicit operator opt-in wins over the local ``SETNAME`` /
-    // ``SETINFO``
-    // interception — the generic handler lookup below then routes it like any simple command.
+    // ``custom_commands``; that explicit operator opt-in wins over the proxy's local
+    // interception of the ``SETNAME`` and ``SETINFO`` subcommands — the generic handler
+    // lookup below then routes CLIENT like any simple command.
     if (callbacks.transaction().active_) {
       callbacks.onResponse(Common::Redis::Utility::makeError(
           fmt::format("'{}' command is not supported within transaction", command_name)));

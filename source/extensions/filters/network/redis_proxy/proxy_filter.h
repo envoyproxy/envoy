@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"

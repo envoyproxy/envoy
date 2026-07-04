@@ -929,6 +929,11 @@ TEST_F(RedisSingleServerRequestTest, HelloWithAuthOptionImplOwnsResponseEmitsNot
   EXPECT_EQ("alice", callbacks_.last_inline_auth_username_);
   EXPECT_EQ("secret", callbacks_.last_inline_auth_password_);
   EXPECT_EQ(3u, callbacks_.last_inline_auth_requested_version_);
+  // Deferred-outcome path is intentionally total-only: success/error resolve inside the
+  // filter after the external-auth round trip, out of the splitter's sight.
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.total").value());
+  EXPECT_EQ(0UL, store_.counter("redis.foo.command.hello.success").value());
+  EXPECT_EQ(0UL, store_.counter("redis.foo.command.hello.error").value());
 }
 
 // HELLO 2 SETNAME ... is now recognized: name is accepted and ignored, the
