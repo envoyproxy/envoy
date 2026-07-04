@@ -72,8 +72,7 @@ public:
   void mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
                   const Protobuf::Map<std::string, uint64_t>& gauges,
                   const DynamicsMap& dynamics = DynamicsMap(),
-                  const TagsMap& counter_tags = TagsMap(),
-                  const TagsMap& gauge_tags = TagsMap());
+                  const TagsMap& counter_tags = TagsMap(), const TagsMap& gauge_tags = TagsMap());
 
   /**
    * Indicates that a gauge's value from the hot-restart parent should be

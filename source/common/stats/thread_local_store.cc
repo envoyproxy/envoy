@@ -480,7 +480,7 @@ public:
     if (!stat_name_tags) {
       TagVector tags;
       tag_extracted_name_ =
-          pool_.add(tls.tagProducer().produceTags(tls.symbolTable().toString(name), tags));
+          pool_.add(tls.tagProducer()->produceTags(tls.symbolTable().toString(name), tags));
       StatName empty;
       for (const auto& tag : tags) {
         StatName tag_name = tls.wellKnownTags().getBuiltin(tag.name_, empty);
@@ -709,9 +709,10 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromTaggedName(
   return getOrCreateGaugeBase(joiner, import_mode);
 }
 
-Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromMergedStatName(
-    StatName full_name, StatName tag_extracted_name, std::optional<StatNameTagSpan> tags,
-    Gauge::ImportMode import_mode) {
+Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromMergedStatName(StatName full_name,
+                                                                StatName tag_extracted_name,
+                                                                std::optional<StatNameTagSpan> tags,
+                                                                Gauge::ImportMode import_mode) {
   if (!tags.has_value() || tags->empty()) {
     // Without tags the full name is the only meaningful component; derive tags from it as usual.
     return gaugeFromTaggedName(full_name, std::nullopt, StatName(), import_mode);
@@ -1516,7 +1517,7 @@ void ThreadLocalStoreImpl::extractAndAppendTags(StatName name, StatNamePool& poo
 void ThreadLocalStoreImpl::extractAndAppendTags(absl::string_view name, StatNamePool& pool,
                                                 StatNameTagVector& stat_tags) {
   TagVector tags;
-  tagProducer().produceTags(name, tags);
+  tagProducer()->produceTags(name, tags);
   for (const auto& tag : tags) {
     stat_tags.emplace_back(pool.add(tag.name_), pool.add(tag.value_));
   }

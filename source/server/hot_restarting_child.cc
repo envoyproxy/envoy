@@ -275,6 +275,7 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
       [](const Protobuf::Map<std::string, HotRestartMessage::Reply::Stats::TaggedMetric>&
              proto_tags) {
         Stats::StatMerger::TagsMap tags_map;
+        tags_map.reserve(proto_tags.size());
         for (const auto& iter : proto_tags) {
           Stats::StatMerger::ParentTags& parent_tags = tags_map[iter.first];
           parent_tags.tag_extracted_name_ = iter.second.tag_extracted_name();

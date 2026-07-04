@@ -373,8 +373,8 @@ StatNameTagVector aetherTags(StatNamePool& pool) {
   };
 }
 
-// A counter created with programmatic tags (counterFromStatNameWithTags) inlines its tag values
-// into the full name. Across a hot restart, StatMerger re-creates such a counter from the name
+// A counter created with programmatic tags (counterFromStatNameWithTags) embeds its tag values
+// in the full name. Across a hot restart, StatMerger re-creates such a counter from the name
 // alone, which used to drop the tags (collapsing them into the metric name with empty labels).
 // With the parent now transmitting the tag metadata, the merged counter must retain its tags, and
 // the child's later tagged write must resolve to the same counter rather than a mangled one.
@@ -455,6 +455,48 @@ TEST_F(StatMergerThreadLocalTest, ProgrammaticTagsLostWithoutMetadata) {
   // Tags collapsed into the name: the tag-extracted name is the full mangled name, no labels.
   EXPECT_EQ(merged->tagExtractedName(), full_name);
   EXPECT_TRUE(merged->tags().empty());
+}
+
+// The gauge path mirrors the counter path: tag metadata transmitted by the parent must be
+// re-applied to merged gauges, and the child's own tagged creation must resolve to the merged
+// gauge.
+TEST_F(StatMergerThreadLocalTest, ProgrammaticGaugeTagsSurviveMerge) {
+  SymbolTableImpl parent_symbol_table;
+  Allocator parent_alloc{parent_symbol_table};
+  ThreadLocalStoreImpl parent_store{parent_alloc};
+  StatNamePool parent_pool(parent_symbol_table);
+  StatNameTagVector parent_tags = aetherTags(parent_pool);
+  Gauge& parent_gauge = parent_store.rootScope()->gaugeFromStatNameWithTags(
+      parent_pool.add("aether.active_connections"), parent_tags, Gauge::ImportMode::Accumulate);
+  parent_gauge.set(11);
+  ASSERT_EQ(parent_gauge.tagExtractedName(), "aether.active_connections");
+  const std::string full_name = parent_gauge.name();
+
+  Protobuf::Map<std::string, uint64_t> gauges;
+  gauges[full_name] = 11;
+  StatMerger::TagsMap gauge_tags;
+  StatMerger::ParentTags& parent_tag_entry = gauge_tags[full_name];
+  parent_tag_entry.tag_extracted_name_ = parent_gauge.tagExtractedName();
+  for (const auto& tag : parent_gauge.tags()) {
+    parent_tag_entry.tags_.emplace_back(tag.name_, tag.value_);
+  }
+
+  StatMerger stat_merger(store_);
+  stat_merger.mergeStats(Protobuf::Map<std::string, uint64_t>(), gauges, StatMerger::DynamicsMap(),
+                         StatMerger::TagsMap(), gauge_tags);
+
+  GaugeSharedPtr merged = TestUtility::findGauge(store_, full_name);
+  ASSERT_NE(merged, nullptr);
+  EXPECT_EQ(merged->value(), 11);
+  EXPECT_EQ(merged->tagExtractedName(), "aether.active_connections");
+  EXPECT_EQ(merged->tags().size(), 6);
+
+  StatNamePool child_pool(store_.symbolTable());
+  StatNameTagVector child_tags = aetherTags(child_pool);
+  Gauge& child_gauge = store_.rootScope()->gaugeFromStatNameWithTags(
+      child_pool.add("aether.active_connections"), child_tags, Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(&child_gauge, merged.get());
+  EXPECT_EQ(child_gauge.value(), 11);
 }
 
 // Verify that if we create a stat in the child process which then gets merged

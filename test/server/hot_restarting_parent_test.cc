@@ -1,6 +1,11 @@
 #include <memory>
 
+#include "envoy/config/metrics/v3/stats.pb.h"
+
 #include "source/common/network/address_impl.h"
+#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/server/hot_restarting_child.h"
 #include "source/server/hot_restarting_parent.h"
 
@@ -8,6 +13,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_manager.h"
 #include "test/server/utility.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
 
@@ -403,6 +409,138 @@ TEST_F(HotRestartingParentTest, RetainDynamicStats) {
     EXPECT_EQ(123, g1.value());
     EXPECT_EQ(42, g2.value());
   }
+}
+
+// Tag metadata is exported only for stats whose tags the child could NOT re-derive from the
+// name: regex-extracted tags are reproduced by the child's own tag extraction during the merge,
+// so re-transmitting them would only bloat the transfer. Programmatic tags (whose values are
+// embedded in the flat name) are the ones that need the metadata.
+TEST_F(HotRestartingParentTest, ExportsTagMetadataOnlyWhenNotRederivable) {
+  MockListenerManager listener_manager;
+  EXPECT_CALL(server_, listenerManager()).WillRepeatedly(ReturnRef(listener_manager));
+  EXPECT_CALL(listener_manager, numConnections()).WillRepeatedly(Return(0));
+
+  Stats::SymbolTableImpl symbol_table;
+  Stats::AllocatorImpl alloc(symbol_table);
+  Stats::ThreadLocalStoreImpl store(alloc);
+  // Install a tag producer with the default extraction regexes, as the production bootstrap does.
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  auto producer_or = Stats::TagProducerImpl::createTagProducer(stats_config, {});
+  ASSERT_TRUE(producer_or.ok());
+  store.setTagProducer(std::move(*producer_or));
+  EXPECT_CALL(server_, stats()).WillRepeatedly(ReturnRef(store));
+
+  // Tags produced by regex extraction: re-derivable, so no metadata is expected.
+  Stats::Counter& extracted_counter =
+      store.rootScope()->counterFromString("cluster.foo.upstream_cx_total");
+  extracted_counter.inc();
+  ASSERT_FALSE(extracted_counter.tags().empty()); // Sanity check: extraction produced tags.
+
+  // Programmatic tags: not re-derivable, so metadata is expected.
+  Stats::StatNamePool pool(symbol_table);
+  const Stats::StatNameTagVector tags{{pool.add("source"), pool.add("svc-a")}};
+  Stats::Counter& programmatic_counter =
+      store.rootScope()->counterFromStatNameWithTags(pool.add("custom.requests_total"), tags);
+  programmatic_counter.inc();
+  Stats::Gauge& programmatic_gauge = store.rootScope()->gaugeFromStatNameWithTags(
+      pool.add("custom.active_connections"), tags, Stats::Gauge::ImportMode::Accumulate);
+  programmatic_gauge.set(5);
+
+  HotRestartMessage::Reply::Stats stats;
+  hot_restarting_parent_.exportStatsToChild(&stats);
+
+  EXPECT_EQ(stats.counter_tags().end(), stats.counter_tags().find(extracted_counter.name()));
+
+  auto counter_iter = stats.counter_tags().find(programmatic_counter.name());
+  ASSERT_NE(stats.counter_tags().end(), counter_iter);
+  EXPECT_EQ("custom.requests_total", counter_iter->second.tag_extracted_name());
+  ASSERT_EQ(1, counter_iter->second.tags_size());
+  EXPECT_EQ("source", counter_iter->second.tags(0).name());
+  EXPECT_EQ("svc-a", counter_iter->second.tags(0).value());
+
+  auto gauge_iter = stats.gauge_tags().find(programmatic_gauge.name());
+  ASSERT_NE(stats.gauge_tags().end(), gauge_iter);
+  EXPECT_EQ("custom.active_connections", gauge_iter->second.tag_extracted_name());
+  ASSERT_EQ(1, gauge_iter->second.tags_size());
+}
+
+// End-to-end through the export/merge protocol: programmatic tags recorded by the parent are
+// re-applied to the stats the child creates during the merge, and the child's own tagged
+// creation resolves to the merged stat.
+TEST_F(HotRestartingParentTest, TagMetadataAppliedToMergedStats) {
+  MockListenerManager listener_manager;
+  EXPECT_CALL(server_, listenerManager()).WillRepeatedly(ReturnRef(listener_manager));
+  EXPECT_CALL(listener_manager, numConnections()).WillRepeatedly(Return(0));
+
+  Stats::SymbolTableImpl parent_symbol_table;
+  Stats::AllocatorImpl parent_alloc(parent_symbol_table);
+  Stats::ThreadLocalStoreImpl parent_store(parent_alloc);
+  EXPECT_CALL(server_, stats()).WillRepeatedly(ReturnRef(parent_store));
+
+  Stats::StatNamePool parent_pool(parent_symbol_table);
+  const Stats::StatNameTagVector parent_tags{{parent_pool.add("source"), parent_pool.add("svc-a")}};
+  Stats::Counter& parent_counter = parent_store.rootScope()->counterFromStatNameWithTags(
+      parent_pool.add("custom.requests_total"), parent_tags);
+  parent_counter.add(7);
+  const std::string full_name = parent_counter.name();
+
+  HotRestartMessage::Reply::Stats stats_proto;
+  hot_restarting_parent_.exportStatsToChild(&stats_proto);
+
+  Stats::SymbolTableImpl child_symbol_table;
+  Stats::TestUtil::TestStore child_store(child_symbol_table);
+  HotRestartingChild hot_restarting_child(0, 0, testDomainSocketName(), 0, false, false);
+  hot_restarting_child.mergeParentStats(child_store, stats_proto);
+
+  Stats::StatNamePool child_pool(child_symbol_table);
+  const Stats::StatNameTagVector child_tags{{child_pool.add("source"), child_pool.add("svc-a")}};
+  Stats::Counter& child_counter = child_store.rootScope()->counterFromStatNameWithTags(
+      child_pool.add("custom.requests_total"), child_tags);
+  EXPECT_EQ(full_name, child_counter.name());
+  EXPECT_EQ(7, child_counter.value());
+  EXPECT_EQ("custom.requests_total", child_counter.tagExtractedName());
+  ASSERT_EQ(1, child_counter.tags().size());
+  EXPECT_EQ("source", child_counter.tags()[0].name_);
+  EXPECT_EQ("svc-a", child_counter.tags()[0].value_);
+}
+
+// With the runtime feature disabled the child ignores the transmitted tag metadata and falls
+// back to the legacy name-derived behavior: the tags collapse into the metric name.
+TEST_F(HotRestartingParentTest, TagMetadataIgnoredWhenRuntimeFlagDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.hot_restart_propagate_stat_tags", "false"}});
+
+  MockListenerManager listener_manager;
+  EXPECT_CALL(server_, listenerManager()).WillRepeatedly(ReturnRef(listener_manager));
+  EXPECT_CALL(listener_manager, numConnections()).WillRepeatedly(Return(0));
+
+  Stats::SymbolTableImpl parent_symbol_table;
+  Stats::AllocatorImpl parent_alloc(parent_symbol_table);
+  Stats::ThreadLocalStoreImpl parent_store(parent_alloc);
+  EXPECT_CALL(server_, stats()).WillRepeatedly(ReturnRef(parent_store));
+
+  Stats::StatNamePool parent_pool(parent_symbol_table);
+  const Stats::StatNameTagVector parent_tags{{parent_pool.add("source"), parent_pool.add("svc-a")}};
+  Stats::Counter& parent_counter = parent_store.rootScope()->counterFromStatNameWithTags(
+      parent_pool.add("custom.requests_total"), parent_tags);
+  parent_counter.add(7);
+  const std::string full_name = parent_counter.name();
+
+  HotRestartMessage::Reply::Stats stats_proto;
+  hot_restarting_parent_.exportStatsToChild(&stats_proto);
+  EXPECT_EQ(1, stats_proto.counter_tags().size());
+
+  Stats::SymbolTableImpl child_symbol_table;
+  Stats::TestUtil::TestStore child_store(child_symbol_table);
+  HotRestartingChild hot_restarting_child(0, 0, testDomainSocketName(), 0, false, false);
+  hot_restarting_child.mergeParentStats(child_store, stats_proto);
+
+  // Legacy behavior: the merged counter is keyed by the full mangled name with no tags.
+  Stats::Counter& merged = child_store.counter(full_name);
+  EXPECT_EQ(7, merged.value());
+  EXPECT_EQ(full_name, merged.tagExtractedName());
+  EXPECT_TRUE(merged.tags().empty());
 }
 
 MATCHER_P(UdpPacketHandlerPtrIs, expected_handler, "") {

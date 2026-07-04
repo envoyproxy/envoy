@@ -231,7 +231,7 @@ public:
   bool decHistogramRefCount(ParentHistogramImpl& histogram, std::atomic<uint32_t>& ref_count);
   void releaseHistogramCrossThread(uint64_t histogram_id);
 
-  const TagProducer& tagProducer() const { return *tag_producer_; }
+  const TagProducer* tagProducer() const override { return tag_producer_.get(); }
   void extractAndAppendTags(StatName name, StatNamePool& pool, StatNameTagVector& tags) override;
   void extractAndAppendTags(absl::string_view name, StatNamePool& pool,
                             StatNameTagVector& tags) override;
