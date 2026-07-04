@@ -217,6 +217,14 @@ public:
   RespType type() const { return type_; }
   void type(RespType type);
 
+  /**
+   * @return whether this value is an error reply: a RESP2 Error or a RESP3 BlobError. The two
+   *         differ only in framing (line vs length-prefixed), so reply-handling code should
+   *         treat them uniformly; testing only ``RespType::Error`` silently mishandles RESP3
+   *         blob errors.
+   */
+  bool isError() const { return type_ == RespType::Error || type_ == RespType::BlobError; }
+
 private:
   // Double shares ``string_`` with BigNumber/VerbatimString — see ``asString()``.
   union {

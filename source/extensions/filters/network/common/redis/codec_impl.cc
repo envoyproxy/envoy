@@ -69,20 +69,26 @@ bool isValidResp3VerbatimString(absl::string_view value) {
   return value.size() >= 4 && value[3] == ':';
 }
 
+// Debug-print body shared by the Array/Set/Push arms of RespValue::toString(), which differ
+// only in the type marker before the opening bracket.
+std::string joinAggregate(const char* prefix, const std::vector<RespValue>& values) {
+  std::string ret(prefix);
+  ret += "[";
+  for (uint64_t i = 0; i < values.size(); i++) {
+    ret += values[i].toString();
+    if (i != values.size() - 1) {
+      ret += ", ";
+    }
+  }
+  return ret + "]";
+}
+
 } // namespace
 
 std::string RespValue::toString() const {
   switch (type_) {
-  case RespType::Array: {
-    std::string ret = "[";
-    for (uint64_t i = 0; i < asArray().size(); i++) {
-      ret += asArray()[i].toString();
-      if (i != asArray().size() - 1) {
-        ret += ", ";
-      }
-    }
-    return ret + "]";
-  }
+  case RespType::Array:
+    return joinAggregate("", asArray());
   case RespType::CompositeArray: {
     std::string ret = "[";
     uint64_t i = 0;
@@ -127,26 +133,10 @@ std::string RespValue::toString() const {
     }
     return ret + "}";
   }
-  case RespType::Set: {
-    std::string ret = "~[";
-    for (uint64_t i = 0; i < asArray().size(); i++) {
-      ret += asArray()[i].toString();
-      if (i != asArray().size() - 1) {
-        ret += ", ";
-      }
-    }
-    return ret + "]";
-  }
-  case RespType::Push: {
-    std::string ret = ">[";
-    for (uint64_t i = 0; i < asArray().size(); i++) {
-      ret += asArray()[i].toString();
-      if (i != asArray().size() - 1) {
-        ret += ", ";
-      }
-    }
-    return ret + "]";
-  }
+  case RespType::Set:
+    return joinAggregate("~", asArray());
+  case RespType::Push:
+    return joinAggregate(">", asArray());
   }
 
   return "";
@@ -662,6 +652,13 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
           state_ = State::InlineString;
         }
 
+        // Inline commands carry no element-count header, so the per-aggregate cap that
+        // ``*``-framed arrays get at IntegerLF must be enforced per appended word here —
+        // otherwise an endless space-separated word stream (no CRLF) allocates one RespValue
+        // per word without bound.
+        if (pending_value_stack_.front().value_->asArray().size() >= kMaxRespElements) {
+          throw ProtocolError("inline command element count exceeds maximum");
+        }
         size_t n = pending_value_stack_.front().value_->asArray().size();
         pending_value_stack_.front().value_->asArray().push_back(*pending_value);
         pending_value_stack_.push_front({&pending_value_stack_.front().value_->asArray()[n], n});
@@ -1151,7 +1148,11 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
       --pending_value_stack_depth_;
       if (pending_value_stack_.empty()) {
         if (was_attribute) {
-          // Root-level attribute discarded. Parse the actual value next.
+          // Root-level attribute discarded. Parse the actual value next. Discarding released
+          // the attribute's element storage, so the following value gets a fresh cumulative
+          // budget (same as ValueRootStart) — a legitimately large value must not be rejected
+          // because a large attribute preceded it.
+          total_elements_ = 0;
           pending_value_root_ = std::make_unique<RespValue>();
           pending_value_stack_.push_front({pending_value_root_.get(), 0});
           pending_value_stack_depth_ = 1;
@@ -1362,16 +1363,21 @@ void EncoderImpl::encodeCompositeArray(const RespValue::CompositeArray& composit
   }
 }
 
-void EncoderImpl::encodeBulkString(const std::string& string, Buffer::Instance& out) {
+void EncoderImpl::encodeLengthPrefixed(char prefix, const std::string& string,
+                                       Buffer::Instance& out) {
   char buffer[32];
   char* current = buffer;
-  *current++ = '$';
+  *current++ = prefix;
   current += StringUtil::itoa(current, 21, string.size());
   *current++ = '\r';
   *current++ = '\n';
   out.add(buffer, current - buffer);
   out.add(string);
   out.add("\r\n", 2);
+}
+
+void EncoderImpl::encodeBulkString(const std::string& string, Buffer::Instance& out) {
+  encodeLengthPrefixed('$', string, out);
 }
 
 void EncoderImpl::encodeError(const std::string& string, Buffer::Instance& out) {
@@ -1422,27 +1428,11 @@ void EncoderImpl::encodeBigNumber(const std::string& value, Buffer::Instance& ou
 }
 
 void EncoderImpl::encodeBlobError(const std::string& error, Buffer::Instance& out) {
-  char buffer[32];
-  char* current = buffer;
-  *current++ = '!';
-  current += StringUtil::itoa(current, 21, error.size());
-  *current++ = '\r';
-  *current++ = '\n';
-  out.add(buffer, current - buffer);
-  out.add(error);
-  out.add("\r\n", 2);
+  encodeLengthPrefixed('!', error, out);
 }
 
 void EncoderImpl::encodeVerbatimString(const std::string& string, Buffer::Instance& out) {
-  char buffer[32];
-  char* current = buffer;
-  *current++ = '=';
-  current += StringUtil::itoa(current, 21, string.size());
-  *current++ = '\r';
-  *current++ = '\n';
-  out.add(buffer, current - buffer);
-  out.add(string);
-  out.add("\r\n", 2);
+  encodeLengthPrefixed('=', string, out);
 }
 
 void EncoderImpl::encodeMap(absl::Span<const RespValue> array, Buffer::Instance& out) {

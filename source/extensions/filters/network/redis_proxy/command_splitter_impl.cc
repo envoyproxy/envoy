@@ -677,8 +677,7 @@ void ShardInfoRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint
   ASSERT(num_pending_responses_ > 0);
   ENVOY_LOG(debug, "shard info response from shard {}: '{}'", index, value->toString());
 
-  updateStats(value->type() != Common::Redis::RespType::Error &&
-              value->type() != Common::Redis::RespType::BlobError);
+  updateStats(!value->isError());
   callbacks_.onResponse(std::move(value));
 }
 
@@ -759,8 +758,7 @@ void RandomShardRequest::onChildResponse(Common::Redis::RespValuePtr&& value, ui
   // index is the shard_index that responded (can be any value 0 to shard_size-1)
   ENVOY_LOG(debug, "random shard response from shard {}: '{}'", index, value->toString());
 
-  updateStats(value->type() != Common::Redis::RespType::Error &&
-              value->type() != Common::Redis::RespType::BlobError);
+  updateStats(!value->isError());
   callbacks_.onResponse(std::move(value));
 }
 

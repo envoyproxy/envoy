@@ -169,8 +169,7 @@ void BaseClusterScopeResponseHandler::storeResponse(Common::Redis::RespValuePtr&
   }
 
   // Track errors using handler's own state
-  if (value && (value->type() == Common::Redis::RespType::Error ||
-                value->type() == Common::Redis::RespType::BlobError)) {
+  if (value && value->isError()) {
     error_count_++;
   }
 
@@ -183,8 +182,7 @@ void BaseClusterScopeResponseHandler::handleErrorResponses(ClusterScopeCmdReques
 
   // Find and return the first error response
   for (auto& resp : pending_responses_) {
-    if (resp && (resp->type() == Common::Redis::RespType::Error ||
-                 resp->type() == Common::Redis::RespType::BlobError)) {
+    if (resp && resp->isError()) {
       ENVOY_LOG(debug, "Error response received: '{}'", resp->toString());
       request.sendResponse(std::move(resp));
       return;

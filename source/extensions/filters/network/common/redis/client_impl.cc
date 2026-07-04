@@ -400,8 +400,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   HeldUserRequest* const held_wrapper = request.held_wrapper_;
 
   if (config_->enableCommandStats()) {
-    bool success = !canceled && (value->type() != Common::Redis::RespType::Error) &&
-                   (value->type() != Common::Redis::RespType::BlobError);
+    bool success = !canceled && !value->isError();
     redis_command_stats_->updateStats(scope_, request.command_, success);
     request.command_request_timer_->complete();
   }
@@ -422,9 +421,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
     if (held_wrapper != nullptr) {
       held_wrapper->onCancelComplete();
     }
-  } else if (config_->enableRedirection() && !is_transaction_client_ &&
-             (value->type() == Common::Redis::RespType::Error ||
-              value->type() == Common::Redis::RespType::BlobError)) {
+  } else if (config_->enableRedirection() && !is_transaction_client_ && value->isError()) {
     std::vector<absl::string_view> err = StringUtil::splitToken(value->asString(), " ", false);
     if (err.size() == 3 &&
         (err[0] == RedirectionResponse::get().MOVED || err[0] == RedirectionResponse::get().ASK)) {
@@ -715,8 +712,7 @@ void ClientImpl::HeldUserRequest::onRedirection(Common::Redis::RespValuePtr&& va
 }
 
 void ClientImpl::Hello3InitCallbacks::onResponse(Common::Redis::RespValuePtr&& value) {
-  const bool is_error = value && (value->type() == Common::Redis::RespType::Error ||
-                                  value->type() == Common::Redis::RespType::BlobError);
+  const bool is_error = value && value->isError();
   if (is_error || !value || !isHello3SuccessResponse(*value)) {
     if (parent_.upstream_resp3_hello_failure_.has_value()) {
       parent_.upstream_resp3_hello_failure_->inc();
@@ -758,8 +754,7 @@ void ClientImpl::Hello3InitCallbacks::onRedirection(Common::Redis::RespValuePtr&
 }
 
 void ClientImpl::ReadOnlyInitCallbacks::onResponse(Common::Redis::RespValuePtr&& value) {
-  const bool is_error = value && (value->type() == Common::Redis::RespType::Error ||
-                                  value->type() == Common::Redis::RespType::BlobError);
+  const bool is_error = value && value->isError();
   if (is_error) {
     if (parent_.upstream_protocol_version_ != Common::Redis::RespProtocolVersion::Resp3) {
       // RESP2 + IAM: READONLY is best-effort, matching the fire-and-forget semantics the
@@ -796,8 +791,7 @@ void ClientImpl::ReadOnlyInitCallbacks::onRedirection(Common::Redis::RespValuePt
 }
 
 void ClientImpl::AwsIamAuthInitCallbacks::onResponse(Common::Redis::RespValuePtr&& value) {
-  const bool is_error = value && (value->type() == Common::Redis::RespType::Error ||
-                                  value->type() == Common::Redis::RespType::BlobError);
+  const bool is_error = value && value->isError();
   if (is_error) {
     // Non-fatal by design: before the init state machine, the IAM path sent AUTH
     // fire-and-forget and ignored the reply, so a rejected token never tore the connection

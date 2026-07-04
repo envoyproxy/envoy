@@ -1595,6 +1595,50 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3ArrayCountExceedsMax) {
                             "element count exceeds maximum");
 }
 
+// Inline commands carry no element-count header, so the per-aggregate cap is enforced per
+// appended word instead (the ``*``-framed equivalent is rejected at its length line above).
+// Without the cap, an endless space-separated word stream with no CRLF allocates one RespValue
+// per word without bound. kMaxRespElements words fill the array to the cap; word cap+1 throws.
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandElementCountExceedsMax) {
+  std::string words((DecoderImpl::kMaxRespElements + 1) * 2, 'a');
+  for (size_t i = 1; i < words.size(); i += 2) {
+    words[i] = ' ';
+  }
+  buffer_.add(words);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "inline command element count exceeds maximum");
+}
+
+// A discarded root-level attribute releases its element storage, so the cumulative element
+// budget must reset for the value that follows. A single aggregate is capped at
+// kMaxRespElements — too small to cross the cumulative budget together with one more
+// maximum-count array — so the attribute uses one level of nesting to consume
+// 2 + 2*kNested slots. Combined with the trailing maximum-count array header this crosses
+// kMaxTotalElements; before the reset that header was rejected with "total element count
+// exceeds maximum" even though the attribute's storage was already freed.
+TEST_F(RedisEncoderDecoderImplTest, Resp3RootAttributeDiscardResetsTotalElementBudget) {
+  constexpr uint64_t kNested = 1097152;
+  static_assert(kNested <= DecoderImpl::kMaxRespElements,
+                "each aggregate must individually satisfy the per-aggregate cap");
+  static_assert(2 + 2 * kNested + DecoderImpl::kMaxRespElements > DecoderImpl::kMaxTotalElements,
+                "attribute + array must cross the cumulative budget for this test to bite");
+  // |1 -> [key = null, value = outer array(kNested) whose first element is inner
+  // array(kNested)]; the remaining slots are filled with nulls.
+  buffer_.add(absl::StrCat("|1\r\n_\r\n*", kNested, "\r\n*", kNested, "\r\n"));
+  std::string nulls;
+  nulls.reserve((2 * kNested - 1) * 3);
+  for (uint64_t i = 0; i < 2 * kNested - 1; i++) {
+    nulls += "_\r\n";
+  }
+  buffer_.add(nulls);
+  decoder_.decode(buffer_); // The attribute completes and is discarded; nothing is delivered.
+  EXPECT_TRUE(decoded_values_.empty());
+
+  buffer_.add(absl::StrCat("*", DecoderImpl::kMaxRespElements, "\r\n_\r\n"));
+  decoder_.decode(buffer_); // Must not throw; the large array is still buffering.
+  EXPECT_TRUE(decoded_values_.empty());
+}
+
 // Per-aggregate cap on Map: a Map header whose post-multiply 2N exceeds ``kMaxRespElements``
 // is rejected at the first cap (before the cumulative cap). N = kMaxRespElements/2 + 1 → 2N > max.
 TEST_F(RedisEncoderDecoderImplTest, Resp3MapCountExceedsMax) {

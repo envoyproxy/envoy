@@ -153,6 +153,10 @@ private:
   void encodeArray(absl::Span<const RespValue> array, Buffer::Instance& out);
   void encodeCompositeArray(const RespValue::CompositeArray& array, Buffer::Instance& out);
   void encodeBulkString(const std::string& string, Buffer::Instance& out);
+  // Shared body of the three length-prefixed scalar frames — ``$`` bulk string, ``!`` blob
+  // error, ``=`` verbatim string — which differ only in the type marker:
+  // <prefix><length>CRLF<payload>CRLF.
+  void encodeLengthPrefixed(char prefix, const std::string& string, Buffer::Instance& out);
   void encodeError(const std::string& string, Buffer::Instance& out);
   void encodeInteger(int64_t integer, Buffer::Instance& out);
   void encodeSimpleString(const std::string& string, Buffer::Instance& out);
