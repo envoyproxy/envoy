@@ -804,6 +804,13 @@ public:
   void clear();
 
   /**
+   * Pre-allocates capacity in the underlying storage for at least `count` StatNames. This avoids
+   * incremental re-allocations when the number of names to be added is known up-front.
+   * @param count the number of StatNames the pool is expected to hold.
+   */
+  void reserve(size_t count) { storage_vector_.reserve(count); }
+
+  /**
    * @param name the name to add the container.
    * @return the StatName held in the container for this name.
    */
