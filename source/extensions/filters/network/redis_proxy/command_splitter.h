@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/common/pure.h"
@@ -11,8 +12,6 @@
 #include "source/common/singleton/const_singleton.h"
 #include "source/extensions/filters/network/common/redis/client.h"
 #include "source/extensions/filters/network/common/redis/codec.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -158,12 +157,12 @@ public:
   /**
    * Consume the pending ``HELLO N`` version stashed when an inline ``HELLO N AUTH ...`` was
    * deferred to an external auth provider (see ``attemptDownstreamAuthInline`` returning
-   * ImplOwnsResponse). Returns the requested version and clears the stash; ``absl::nullopt`` when
+   * ImplOwnsResponse). Returns the requested version and clears the stash; ``std::nullopt`` when
    * the deferred auth came from a stand-alone ``AUTH`` command rather than ``HELLO``. Lets the
    * external-auth completion path build the right reply (HELLO Map vs +OK) without
    * downcasting the callback to a concrete implementation type.
    */
-  virtual absl::optional<uint32_t> takePendingHelloAuthVersion() PURE;
+  virtual std::optional<uint32_t> takePendingHelloAuthVersion() PURE;
 };
 
 /**

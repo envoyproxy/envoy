@@ -120,7 +120,11 @@ private:
   // cap enforced as each byte is accumulated; the terminating CR validates numeric syntax and
   // moves the buffer into ``RespValue::asString()``.
   std::string pending_double_buf_;
-  uint32_t consecutive_attributes_{0};    // counts toward kMaxConsecutiveAttributes
+  uint32_t consecutive_attributes_{0}; // counts toward kMaxConsecutiveAttributes
+  // Number of attribute frames currently open on pending_value_stack_. Values completing while
+  // this is non-zero belong to a frame that will itself be discarded, so they must not reset
+  // the consecutive-attribute counter (see ValueComplete).
+  uint32_t open_attribute_frames_{0};
   uint32_t pending_value_stack_depth_{0}; // counts toward kMaxNestingDepth
   uint64_t total_elements_{0};            // counts toward kMaxTotalElements
 };

@@ -165,14 +165,9 @@ void ClientImpl::onAwsCredentialsReady(
     // when the AUTH ack arrives.
     setInitState(InitState::AwaitingAuth);
     Utility::AuthRequest auth_request(auth_username, auth_password);
-    // Suppress makeRequestInternal's auto-flush so the threshold=0 case doesn't fire two
-    // writes (one for the AUTH command + one for the empty post-flush buffer); a single
-    // explicit flush after restoring queue_enabled_ keeps both threshold=0 and threshold>0
-    // configurations on one wire write.
-    queue_enabled_ = true;
+    // BatchFlushGuard keeps both threshold=0 and threshold>0 configurations on one wire write.
+    BatchFlushGuard batch(*this);
     makeRequestInternal(auth_request, awsiam_auth_init_callbacks_);
-    queue_enabled_ = false;
-    flushBufferAndResetTimer();
   }
 }
 
@@ -322,6 +317,9 @@ void ClientImpl::putOutlierEvent(Upstream::Outlier::Result result) {
 void ClientImpl::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
+    // Recorded for Hello3InitCallbacks::onFailure: a local close draining a pending HELLO must
+    // not count toward the misconfigured-upstream counter.
+    local_close_ = (event == Network::ConnectionEvent::LocalClose);
 
     // Transition to Failed FIRST so any init callback invoked by the pending_requests_ drain
     // sees state==Failed in onInitFailure and short-circuits the recursive close. This also
@@ -538,22 +536,16 @@ void ClientImpl::sendResp3InitCommands(const std::string& auth_username,
     hello_args.push_back(auth_password);
   }
   auto hello = Utility::makeRequest("HELLO", hello_args);
-  // Suppress makeRequestInternal's auto-flush; one explicit flush below pushes HELLO as a
-  // single wire write across both threshold=0 and threshold>0 configurations. READONLY is
-  // NOT sent yet — strict phases: if HELLO fails we never want READONLY on an unnegotiated
-  // connection.
-  queue_enabled_ = true;
+  // READONLY is NOT sent yet — strict phases: if HELLO fails we never want READONLY on an
+  // unnegotiated connection.
+  BatchFlushGuard batch(*this);
   makeRequestInternal(hello, hello_init_callbacks_);
-  queue_enabled_ = false;
-  flushBufferAndResetTimer();
 }
 
 void ClientImpl::sendReadonlyInit() {
   ASSERT(init_state_ == InitState::AwaitingReadonly);
-  queue_enabled_ = true;
+  BatchFlushGuard batch(*this);
   makeRequestInternal(Utility::ReadOnlyRequest::instance(), readonly_init_callbacks_);
-  queue_enabled_ = false;
-  flushBufferAndResetTimer();
 }
 
 void ClientImpl::onInitStepSuccess(InitState completed_step) {
@@ -615,10 +607,10 @@ void ClientImpl::replayHeldUserRequests() {
   if (held_user_requests_.empty()) {
     return;
   }
-  // Batch all replayed entries behind queue_enabled_ for a single flush at the end. Pre-
-  // replay cancel erases entries eagerly (see HeldUserRequest::cancel), so every entry here
-  // is live; replayed entries self-clean via the HeldUserRequest callbacks.
-  queue_enabled_ = true;
+  // Batch all replayed entries for a single flush at the end. Pre-replay cancel erases entries
+  // eagerly (see HeldUserRequest::cancel), so every entry here is live; replayed entries
+  // self-clean via the HeldUserRequest callbacks.
+  BatchFlushGuard batch(*this);
   for (auto& held_ptr : held_user_requests_) {
     ASSERT(!held_ptr->canceled_);
     auto* live = static_cast<PendingRequest*>(makeRequestInternal(*held_ptr->request_, *held_ptr));
@@ -627,8 +619,6 @@ void ClientImpl::replayHeldUserRequests() {
     // rather than virtual-dispatching through callbacks_ (see PendingRequest::held_wrapper_).
     live->held_wrapper_ = held_ptr.get();
   }
-  queue_enabled_ = false;
-  flushBufferAndResetTimer();
 }
 
 void ClientImpl::failHeldUserRequests() {
@@ -734,7 +724,10 @@ void ClientImpl::Hello3InitCallbacks::onResponse(Common::Redis::RespValuePtr&& v
   parent_.onInitStepSuccess(InitState::AwaitingHello);
 }
 void ClientImpl::Hello3InitCallbacks::onFailure() {
-  if (parent_.upstream_resp3_hello_failure_.has_value()) {
+  // A locally-initiated close (downstream teardown, pool drain) is not an upstream negotiation
+  // failure: the counter is documented as a misconfigured-upstream signal, so only count
+  // failures the upstream caused (error/shape/redirect replies above, or a remote close here).
+  if (!parent_.local_close_ && parent_.upstream_resp3_hello_failure_.has_value()) {
     parent_.upstream_resp3_hello_failure_->inc();
   }
   ENVOY_LOG_EVERY_POW_2(warn, "redis: HELLO 3 negotiation failed (connection error)");
@@ -756,21 +749,15 @@ void ClientImpl::Hello3InitCallbacks::onRedirection(Common::Redis::RespValuePtr&
 void ClientImpl::ReadOnlyInitCallbacks::onResponse(Common::Redis::RespValuePtr&& value) {
   const bool is_error = value && value->isError();
   if (is_error) {
-    if (parent_.upstream_protocol_version_ != Common::Redis::RespProtocolVersion::Resp3) {
-      // RESP2 + IAM: READONLY is best-effort, matching the fire-and-forget semantics the
-      // RESP2-no-IAM path still uses. A standalone upstream (e.g. ElastiCache cluster-mode
-      // disabled) answers READONLY with an error; failing hard here would reconnect-loop IAM
-      // configs that worked before the init state machine existed.
-      ENVOY_LOG(warn, "redis: READONLY init failed (continuing): {}",
-                absl::CHexEscape(value->asString()));
-      parent_.onInitStepSuccess(InitState::AwaitingReadonly);
-      return;
-    }
-    // RESP3: the negotiated handshake is new behavior, so fail fast — a replica that rejects
-    // READONLY must not silently serve reads.
-    ENVOY_LOG(warn, "redis: READONLY init failed: {}", absl::CHexEscape(value->asString()));
-    parent_.onInitFailure();
-    return;
+    // READONLY reply errors are best-effort on every protocol version. The only upstream that
+    // answers READONLY with an error in practice is a standalone instance ("-ERR This instance
+    // has cluster support disabled"), where READONLY is meaningless and the node serves reads
+    // anyway; a genuine cluster replica accepts it. Both RESP2 paths (legacy fire-and-forget
+    // and IAM) already tolerate this, and flipping protocol_version to RESP3 on the same
+    // topology must not turn a working non-Primary read policy into a reconnect loop.
+    // Connection failures (onFailure below) remain fatal on all versions.
+    ENVOY_LOG(warn, "redis: READONLY init failed (continuing): {}",
+              absl::CHexEscape(value->asString()));
   }
   parent_.onInitStepSuccess(InitState::AwaitingReadonly);
 }
@@ -780,14 +767,10 @@ void ClientImpl::ReadOnlyInitCallbacks::onFailure() {
 }
 void ClientImpl::ReadOnlyInitCallbacks::onRedirection(Common::Redis::RespValuePtr&&,
                                                       const std::string&, bool) {
-  // READONLY does not honor redirection. Best-effort on RESP2, fatal on RESP3 — same split as
-  // the error-reply case above.
-  if (parent_.upstream_protocol_version_ != Common::Redis::RespProtocolVersion::Resp3) {
-    ENVOY_LOG(warn, "redis: READONLY init received redirection (continuing)");
-    parent_.onInitStepSuccess(InitState::AwaitingReadonly);
-    return;
-  }
-  parent_.onInitFailure();
+  // READONLY does not honor redirection; treat it like an error reply — best-effort on every
+  // version (see onResponse above).
+  ENVOY_LOG(warn, "redis: READONLY init received redirection (continuing)");
+  parent_.onInitStepSuccess(InitState::AwaitingReadonly);
 }
 
 void ClientImpl::AwsIamAuthInitCallbacks::onResponse(Common::Redis::RespValuePtr&& value) {

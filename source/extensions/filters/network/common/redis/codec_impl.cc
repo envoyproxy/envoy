@@ -29,20 +29,6 @@ namespace Redis {
 
 namespace {
 
-// Synthesizing formatter for ``RespValue::setDouble``. ``{:.17g}`` round-trips back to the
-// same double. Byte shape coincides with Redis's ``d2string`` integer fast path for values
-// that emit as bare decimals (e.g. ``1.0`` → ``"1"``) but NOT for exponent form (e.g.
-// ``1e17`` → ``"1e+17"``) or non-integers.
-std::string formatDoubleForWire(double value) {
-  if (std::isinf(value)) {
-    return value > 0 ? "inf" : "-inf";
-  }
-  if (std::isnan(value)) {
-    return "nan";
-  }
-  return fmt::format("{:.17g}", value);
-}
-
 bool isValidResp3BigNumber(absl::string_view value) {
   if (value.empty()) {
     return false;
@@ -188,23 +174,6 @@ RespValue::CompositeArray& RespValue::asCompositeArray() {
 const RespValue::CompositeArray& RespValue::asCompositeArray() const {
   ASSERT(type_ == RespType::CompositeArray);
   return composite_array_;
-}
-
-double RespValue::asDouble() const {
-  ASSERT(type_ == RespType::Double);
-  // The stored payload is validated at decode time (see the Double branch of the SimpleString
-  // state) and by setDouble, so parsing cannot fail here; ASSERT rather than throw, matching
-  // the other typed accessors. The zero-init keeps release builds deterministic in the
-  // impossible case.
-  double result = 0.0;
-  const bool parsed = absl::SimpleAtod(string_, &result);
-  ASSERT(parsed);
-  return result;
-}
-
-void RespValue::setDouble(double v) {
-  ASSERT(type_ == RespType::Double);
-  string_ = formatDoubleForWire(v);
 }
 
 bool RespValue::asBoolean() const {
@@ -621,6 +590,7 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         state_ = State::IntegerStart;
         pending_value_stack_.front().value_->type(RespType::Map);
         pending_value_stack_.front().is_attribute_ = true;
+        ++open_attribute_frames_;
         break;
       }
       default: {
@@ -1141,7 +1111,13 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
       ENVOY_LOG(trace, "parse slice: ValueComplete");
       ASSERT(!pending_value_stack_.empty());
       bool was_attribute = pending_value_stack_.front().is_attribute_;
-      if (!was_attribute) {
+      if (was_attribute) {
+        --open_attribute_frames_;
+      } else if (open_attribute_frames_ == 0) {
+        // Only a value completing OUTSIDE any attribute counts as progress for the
+        // consecutive-attribute guard. Children completing inside an attribute belong to a
+        // frame that is itself discarded; letting them reset the counter would neuter the cap
+        // for every non-empty attribute (``|1 <k> <v>`` repeated indefinitely).
         consecutive_attributes_ = 0;
       }
       pending_value_stack_.pop_front();

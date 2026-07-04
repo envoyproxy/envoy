@@ -33,11 +33,13 @@ constexpr absl::string_view kHelloFieldMode = "mode";
 constexpr absl::string_view kHelloFieldRole = "role";
 constexpr absl::string_view kHelloFieldModules = "modules";
 
-// The proxy advertises itself with these stable values. The Redis-compatible
-// version string is what clients gate feature detection on; the real Envoy
-// build version is available via /server_info.
+// The proxy advertises itself with these stable values. The Redis-compatible version string is
+// what clients gate feature detection on, and the proxy fronts backends whose versions it cannot
+// know — so advertise the floor implied by RESP3 support (introduced in 6.0.0), not a ceiling: a
+// higher number would entice clients to issue 7.x-only commands that a 6.x backend rejects at
+// runtime. The real Envoy build version is available via /server_info.
 constexpr absl::string_view kHelloServerName = "envoy-redis-proxy";
-constexpr absl::string_view kHelloRedisCompatVersion = "7.0.0";
+constexpr absl::string_view kHelloRedisCompatVersion = "6.0.0";
 // Per the RESP3 spec, ``HELLO mode`` must be one of ``standalone`` / ``sentinel`` / ``cluster``
 // (https://redis.io/docs/latest/develop/reference/protocol-spec/). Strict clients reject other
 // values. Envoy presents one logical Redis endpoint and hides Redis Cluster routing internally,
@@ -1091,6 +1093,19 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
     // treating custom commands to be simple commands for now
     addHandler(scope, stat_prefix, command, latency_in_micros, simple_command_handler_);
   }
+
+  {
+    // See hello_command_stats_ in the header: locally-answered HELLO keeps the per-command
+    // stats the old registration emitted.
+    const std::string command_stat_prefix = fmt::format("{}command.hello.", stat_prefix);
+    Stats::StatNameManagedStorage storage{command_stat_prefix + std::string("latency"),
+                                          scope.symbolTable()};
+    hello_command_stats_.emplace(CommandStats{
+        ALL_COMMAND_STATS(POOL_COUNTER_PREFIX(scope, command_stat_prefix))
+            scope.histogramFromStatName(storage.statName(),
+                                        latency_in_micros ? Stats::Histogram::Unit::Microseconds
+                                                          : Stats::Histogram::Unit::Milliseconds)});
+  }
 }
 
 // HELLO is handled BEFORE the connectionAllowed gate so that ``HELLO N AUTH <user> <pass>`` can
@@ -1119,6 +1134,7 @@ SplitRequestPtr InstanceImpl::handleHelloCommand(const Common::Redis::RespValue&
     const std::string& proto_arg = args[i].asString();
     int64_t proto_ver = 0;
     if (!absl::SimpleAtoi(proto_arg, &proto_ver) || proto_ver < 2 || proto_ver > 3) {
+      hello_command_stats_->error_.inc();
       callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().UnsupportedProtocol));
       return nullptr;
     }
@@ -1129,6 +1145,7 @@ SplitRequestPtr InstanceImpl::handleHelloCommand(const Common::Redis::RespValue&
 
   // Exact-match: explicit N from args[1], bare HELLO from currentDownstreamRespVersion().
   if (requested_version != required_version) {
+    hello_command_stats_->error_.inc();
     callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().UnsupportedProtocol));
     return nullptr;
   }
@@ -1145,11 +1162,13 @@ SplitRequestPtr InstanceImpl::handleHelloCommand(const Common::Redis::RespValue&
     const std::string opt = absl::AsciiStrToUpper(args[i].asString());
     if (opt == kHelloOptionAuth) {
       if (i + 2 >= args.size()) {
+        hello_command_stats_->error_.inc();
         callbacks.onResponse(Common::Redis::Utility::makeError(
             "ERR Syntax error: HELLO AUTH requires <username> <password>"));
         return nullptr;
       }
       if (has_auth_option) {
+        hello_command_stats_->error_.inc();
         callbacks.onResponse(Common::Redis::Utility::makeError(
             "ERR Syntax error: HELLO AUTH specified more than once"));
         return nullptr;
@@ -1160,11 +1179,13 @@ SplitRequestPtr InstanceImpl::handleHelloCommand(const Common::Redis::RespValue&
       i += 3;
     } else if (opt == kHelloOptionSetname) {
       if (i + 1 >= args.size()) {
+        hello_command_stats_->error_.inc();
         callbacks.onResponse(Common::Redis::Utility::makeError(
             "ERR Syntax error: HELLO SETNAME requires a <clientname>"));
         return nullptr;
       }
       if (seen_setname) {
+        hello_command_stats_->error_.inc();
         callbacks.onResponse(Common::Redis::Utility::makeError(
             "ERR Syntax error: HELLO SETNAME specified more than once"));
         return nullptr;
@@ -1178,6 +1199,7 @@ SplitRequestPtr InstanceImpl::handleHelloCommand(const Common::Redis::RespValue&
       // in their ``HELLO`` handshake do not error out.
       i += 2;
     } else {
+      hello_command_stats_->error_.inc();
       callbacks.onResponse(Common::Redis::Utility::makeError(
           fmt::format("ERR Syntax error: unknown HELLO option '{}'", args[i].asString())));
       return nullptr;
@@ -1191,10 +1213,13 @@ SplitRequestPtr InstanceImpl::handleHelloCommand(const Common::Redis::RespValue&
       // Fall through to HELLO reply emission below.
       break;
     case AuthAttempt::Denied:
+      hello_command_stats_->error_.inc();
       callbacks.onResponse(
           Common::Redis::Utility::makeError("WRONGPASS invalid username-password pair"));
       return nullptr;
     case AuthAttempt::ImplOwnsResponse:
+      // Outcome resolves inside the filter (deferred external auth or an already-emitted
+      // synchronous error); only ``total`` is counted for this path.
       // The implementation owns the response; the splitter emits nothing here and yields control.
       // Either external auth is in flight — the impl later emits the deferred HELLO reply (Map on
       // success, error on failure) plus the downstream RESP version flip, and ProxyFilter queues
@@ -1206,6 +1231,7 @@ SplitRequestPtr InstanceImpl::handleHelloCommand(const Common::Redis::RespValue&
   } else if (!callbacks.connectionAllowed()) {
     // Bare HELLO (no AUTH option) still requires prior authentication on
     // an auth-required listener.
+    hello_command_stats_->error_.inc();
     callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().AuthRequiredError));
     return nullptr;
   }
@@ -1215,6 +1241,7 @@ SplitRequestPtr InstanceImpl::handleHelloCommand(const Common::Redis::RespValue&
   if (explicit_version) {
     callbacks.setDownstreamRespVersion(requested_version);
   }
+  hello_command_stats_->success_.inc();
   callbacks.onResponse(buildHelloReply(requested_version));
   return nullptr;
 }
@@ -1266,7 +1293,9 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   // likewise refuses HELLO in a transaction, and answering it locally here would flip the
   // protocol mid-transaction and emit a reply EXEC never accounts for.
   if (command_name == Common::Redis::SupportedCommands::hello()) {
+    hello_command_stats_->total_.inc();
     if (callbacks.transaction().active_) {
+      hello_command_stats_->error_.inc();
       callbacks.onResponse(Common::Redis::Utility::makeError(
           fmt::format("'{}' command is not supported within transaction", command_name)));
       return nullptr;
@@ -1301,7 +1330,12 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   // transaction allowlist's error shape — an out-of-band +OK here would desynchronize EXEC's reply
   // count. (Real Redis queues CLIENT in a transaction; the proxy's transaction model only
   // forwards allowlisted data commands.)
-  if (command_name == Common::Redis::SupportedCommands::client()) {
+  if (command_name == Common::Redis::SupportedCommands::client() &&
+      custom_commands_.find(command_name) == custom_commands_.end()) {
+    // Deployments that predate local CLIENT handling may proxy CLIENT upstream via
+    // ``custom_commands``; that explicit operator opt-in wins over the local ``SETNAME`` /
+    // ``SETINFO``
+    // interception — the generic handler lookup below then routes it like any simple command.
     if (callbacks.transaction().active_) {
       callbacks.onResponse(Common::Redis::Utility::makeError(
           fmt::format("'{}' command is not supported within transaction", command_name)));

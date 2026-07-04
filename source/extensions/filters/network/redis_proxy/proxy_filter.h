@@ -155,7 +155,7 @@ private:
       return parent_.downstream_resp_version_;
     }
 
-    absl::optional<uint32_t> takePendingHelloAuthVersion() override {
+    std::optional<uint32_t> takePendingHelloAuthVersion() override {
       auto version = pending_hello_auth_version_;
       pending_hello_auth_version_.reset();
       return version;
@@ -174,7 +174,7 @@ private:
     // onAuthenticateExternal, ProxyFilter consults this to emit the deferred HELLO Map (and
     // flip the downstream RESP version) on success or an error reply on failure, instead of
     // the +OK that the AUTH-command path emits.
-    absl::optional<uint32_t> pending_hello_auth_version_;
+    std::optional<uint32_t> pending_hello_auth_version_;
   };
 
   void onQuit(PendingRequest& request);
@@ -182,6 +182,9 @@ private:
   void onAuth(PendingRequest& request, const std::string& username, const std::string& password);
   void onResponse(PendingRequest& request, Common::Redis::RespValuePtr&& value);
   bool checkPassword(const std::string& password);
+  // Shared local-credential policy for ``AUTH <user> <pass>`` and ``HELLO N AUTH <user> <pass>``
+  // (one copy so the two auth entry points cannot silently diverge).
+  bool checkCredentials(const std::string& username, const std::string& password);
   // Inline-auth path used by HELLO N AUTH ... handling. Local-credentials case returns
   // Allowed (flipping connection_allowed_) or Denied. External-auth case stashes
   // ``requested_version`` on ``request`` and kicks off ``authenticateExternal``, returning

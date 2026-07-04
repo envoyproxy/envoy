@@ -487,12 +487,11 @@ TEST_F(RedisEncoderDecoderImplTest, ToStringResp3Types) {
     v.asArray() = {k1, v1, k2, v2};
     EXPECT_EQ("{\"k1\": 1, \"k2\": 2}", v.toString());
   }
-  // Double — use an exact-representable value (0.5 = 2^-1) so fmt::format("{}", 0.5) is
-  // deterministically "0.5". Using 3.14 here would be fragile across fmt library versions.
+  // Double — the payload is stored as raw wire bytes (pass-through).
   {
     RespValue v;
     v.type(RespType::Double);
-    v.setDouble(0.5);
+    v.asString() = "0.5";
     EXPECT_EQ("0.5", v.toString());
   }
   // BigNumber
@@ -1112,7 +1111,6 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3Double) {
   ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Double, decoded_values_[0]->type());
   EXPECT_EQ("3.14", decoded_values_[0]->asString());
-  EXPECT_DOUBLE_EQ(3.14, decoded_values_[0]->asDouble());
 
   encoder_.setProtocolVersion(RespProtocolVersion::Resp3);
   Buffer::OwnedImpl out;
@@ -1163,7 +1161,6 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3DoubleNegative) {
   ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Double, decoded_values_[0]->type());
   EXPECT_EQ("-1.5", decoded_values_[0]->asString());
-  EXPECT_DOUBLE_EQ(-1.5, decoded_values_[0]->asDouble());
 }
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3DoubleInf) {
@@ -1171,7 +1168,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3DoubleInf) {
   decoder_.decode(buffer_);
   ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Double, decoded_values_[0]->type());
-  EXPECT_TRUE(std::isinf(decoded_values_[0]->asDouble()));
+  EXPECT_EQ("inf", decoded_values_[0]->asString());
 }
 
 // RESP3 BigNumber test
@@ -1335,7 +1332,7 @@ TEST_F(RedisRespValueTest, Resp3TypeCopyMove) {
   // Double
   RespValue double_val;
   double_val.type(RespType::Double);
-  double_val.setDouble(3.14);
+  double_val.asString() = "3.14";
   verifyMoves(double_val);
 
   // BigNumber
@@ -1395,11 +1392,11 @@ TEST_F(RedisRespValueTest, Resp3TypeEquality) {
 
   RespValue double1, double2;
   double1.type(RespType::Double);
-  double1.setDouble(3.14);
+  double1.asString() = "3.14";
   double2.type(RespType::Double);
-  double2.setDouble(2.71);
+  double2.asString() = "2.71";
   EXPECT_NE(double1, double2);
-  double2.setDouble(3.14);
+  double2.asString() = "3.14";
   EXPECT_EQ(double1, double2);
 
   // Byte-for-byte equality (stricter than IEEE): two payloads representing the same
@@ -1409,7 +1406,6 @@ TEST_F(RedisRespValueTest, Resp3TypeEquality) {
   d_short.asString() = "3.14";
   d_long.type(RespType::Double);
   d_long.asString() = "3.1400000000000001";
-  EXPECT_DOUBLE_EQ(d_short.asDouble(), d_long.asDouble());
   EXPECT_NE(d_short, d_long);
 
   // Cross-type inequality
@@ -1552,7 +1548,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3DoubleNaN) {
   decoder_.decode(buffer_);
   ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Double, decoded_values_[0]->type());
-  EXPECT_TRUE(std::isnan(decoded_values_[0]->asDouble()));
+  EXPECT_EQ("nan", decoded_values_[0]->asString());
 
   encoder_.setProtocolVersion(RespProtocolVersion::Resp3);
   Buffer::OwnedImpl out;
@@ -1565,8 +1561,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3DoubleNegativeInf) {
   decoder_.decode(buffer_);
   ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Double, decoded_values_[0]->type());
-  EXPECT_TRUE(std::isinf(decoded_values_[0]->asDouble()));
-  EXPECT_LT(decoded_values_[0]->asDouble(), 0);
+  EXPECT_EQ("-inf", decoded_values_[0]->asString());
 
   encoder_.setProtocolVersion(RespProtocolVersion::Resp3);
   Buffer::OwnedImpl out;
@@ -1814,47 +1809,43 @@ TEST_F(RespEncoderDownconversionTest, BooleanFalseAsInteger) {
   EXPECT_EQ(":0\r\n", out.toString());
 }
 
+// The Double payload is a raw pass-through of the decoded bytes; the RESP2 down-conversion wraps
+// exactly those bytes as a bulk string and RESP3 re-frames them under ``,``.
 TEST_F(RespEncoderDownconversionTest, DoubleAsBulkString) {
   RespValue v;
   v.type(RespType::Double);
-  v.setDouble(3.14);
-
-  // Pin the exact ``{:.17g}`` byte shape (17 sig digits, general format).
-  const std::string expected_digits = "3.1400000000000001";
+  v.asString() = "3.14";
 
   Buffer::OwnedImpl out;
   encodeResp2(v, out);
-  EXPECT_EQ("$" + std::to_string(expected_digits.size()) + "\r\n" + expected_digits + "\r\n",
-            out.toString());
+  EXPECT_EQ("$4\r\n3.14\r\n", out.toString());
 
   Buffer::OwnedImpl resp3_out;
   encoder_.setProtocolVersion(RespProtocolVersion::Resp3);
   encoder_.encode(v, resp3_out);
-  EXPECT_EQ("," + expected_digits + "\r\n", resp3_out.toString());
+  EXPECT_EQ(",3.14\r\n", resp3_out.toString());
 }
 
-// Small integer-valued doubles emit the bare integer form (no ".0" pad), coinciding with
-// Redis's ``d2string`` integer fast path. Larger / non-integer values may diverge.
+// Bare-integer Double payloads (the form Redis itself emits for integral values) survive both
+// frames without gaining a decimal point.
 TEST_F(RespEncoderDownconversionTest, DoubleIntegerValuedHasNoDecimal) {
   RespValue v;
   v.type(RespType::Double);
-  v.setDouble(1.0);
+  v.asString() = "1";
   Buffer::OwnedImpl out;
   encodeResp2(v, out);
-  // RESP2 form: bulk string carrying "1", not "1.0".
   EXPECT_EQ("$1\r\n1\r\n", out.toString());
 
   Buffer::OwnedImpl resp3_out;
   encoder_.setProtocolVersion(RespProtocolVersion::Resp3);
   encoder_.encode(v, resp3_out);
-  // RESP3 native form is ``,1\r\n`` — the bare digit form Redis itself emits.
   EXPECT_EQ(",1\r\n", resp3_out.toString());
 }
 
 TEST_F(RespEncoderDownconversionTest, DoubleInfAsBulkString) {
   RespValue v;
   v.type(RespType::Double);
-  v.setDouble(std::numeric_limits<double>::infinity());
+  v.asString() = "inf";
   Buffer::OwnedImpl out;
   encodeResp2(v, out);
   EXPECT_EQ("$3\r\ninf\r\n", out.toString());
@@ -1863,7 +1854,7 @@ TEST_F(RespEncoderDownconversionTest, DoubleInfAsBulkString) {
 TEST_F(RespEncoderDownconversionTest, DoubleNegInfAsBulkString) {
   RespValue v;
   v.type(RespType::Double);
-  v.setDouble(-std::numeric_limits<double>::infinity());
+  v.asString() = "-inf";
   Buffer::OwnedImpl out;
   encodeResp2(v, out);
   EXPECT_EQ("$4\r\n-inf\r\n", out.toString());
@@ -1872,7 +1863,7 @@ TEST_F(RespEncoderDownconversionTest, DoubleNegInfAsBulkString) {
 TEST_F(RespEncoderDownconversionTest, DoubleNanAsBulkString) {
   RespValue v;
   v.type(RespType::Double);
-  v.setDouble(std::nan(""));
+  v.asString() = "nan";
   Buffer::OwnedImpl out;
   encodeResp2(v, out);
   EXPECT_EQ("$3\r\nnan\r\n", out.toString());
@@ -2080,6 +2071,31 @@ TEST_F(RedisEncoderDecoderImplTest, AttributeFloodRejected) {
   buffer_.add(flood);
   EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
                             "too many consecutive RESP3 attributes");
+}
+
+// The flood guard must count NON-EMPTY attributes too: ``|1 <k> <v>`` repeated. A child value
+// completing inside an attribute frame must not reset consecutive_attributes_ — otherwise the
+// guard only ever catches the ``|0`` case. One past the cap trips it before the cumulative
+// element budget would.
+TEST_F(RedisEncoderDecoderImplTest, NonEmptyAttributeFloodRejected) {
+  std::string flood;
+  for (uint32_t i = 0; i < DecoderImpl::kMaxConsecutiveAttributes + 1; ++i) {
+    flood += "|1\r\n+k\r\n+v\r\n";
+  }
+  flood += "+OK\r\n";
+  buffer_.add(flood);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "too many consecutive RESP3 attributes");
+}
+
+// A non-empty attribute followed by its annotated value is accepted and the value is delivered:
+// the reset happens on the value OUTSIDE any attribute, so a normal ``|1 k v <value>`` decodes.
+TEST_F(RedisEncoderDecoderImplTest, NonEmptyAttributeThenValueAccepted) {
+  buffer_.add("|1\r\n+key\r\n+val\r\n+OK\r\n");
+  decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::SimpleString, decoded_values_[0]->type());
+  EXPECT_EQ("OK", decoded_values_[0]->asString());
 }
 
 TEST_F(RedisEncoderDecoderImplTest, MapCountOverflowRejected) {

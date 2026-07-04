@@ -151,7 +151,7 @@ public:
   }
   // The deferred HELLO-AUTH version is exercised through the real ProxyFilter::PendingRequest in
   // proxy_filter_test; no MockSplitCallbacks test drives it, so this stub simply reports "none".
-  absl::optional<uint32_t> takePendingHelloAuthVersion() override { return absl::nullopt; }
+  std::optional<uint32_t> takePendingHelloAuthVersion() override { return std::nullopt; }
 
   uint32_t downstream_resp_version_{2};
   // Defaults to RESP2 listener — matches the proto default. Tests covering the RESP3-listener

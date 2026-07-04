@@ -222,7 +222,7 @@ void ProxyFilter::onAuthenticateExternal(CommandSplitter::SplitCallbacks& reques
   // auth) distinguishes the AUTH-command path (emit +OK / error) from the HELLO N AUTH ...
   // path (emit HELLO Map / error). Consume it through the callback interface rather than
   // downcasting to PendingRequest.
-  const absl::optional<uint32_t> hello_auth_version = request.takePendingHelloAuthVersion();
+  const std::optional<uint32_t> hello_auth_version = request.takePendingHelloAuthVersion();
   const bool is_hello_auth = hello_auth_version.has_value();
 
   Common::Redis::RespValuePtr redis_response;
@@ -351,13 +351,7 @@ void ProxyFilter::onAuth(PendingRequest& request, const std::string& username,
   if (config_->downstream_auth_username_.empty() && config_->downstream_auth_passwords_.empty()) {
     response->type(Common::Redis::RespType::Error);
     response->asString() = "ERR Client sent AUTH, but no username-password pair is set";
-  } else if (config_->downstream_auth_username_.empty() && username == "default" &&
-             checkPassword(password)) {
-    // empty username and "default" are synonymous in Redis 6 ACLs
-    response->type(Common::Redis::RespType::SimpleString);
-    response->asString() = "OK";
-    connection_allowed_ = true;
-  } else if (username == config_->downstream_auth_username_ && checkPassword(password)) {
+  } else if (checkCredentials(username, password)) {
     response->type(Common::Redis::RespType::SimpleString);
     response->asString() = "OK";
     connection_allowed_ = true;
@@ -398,20 +392,20 @@ ProxyFilter::attemptDownstreamAuthInline(PendingRequest& request, const std::str
     request.onResponse(std::move(response));
     return AuthAttempt::ImplOwnsResponse;
   }
-  // Local credential check, mirroring the two onAuth overloads:
-  //   - Empty configured username + "default" supplied (Redis 6 ACL synonym).
-  //   - Configured username matches.
-  // When no username was configured but credentials were, only the password
-  // path applies; a username supplied alongside is rejected unless it is
-  // "default".
-  bool credentials_match = false;
+  // Same local-credential policy as the AUTH command paths (checkCredentials).
+  connection_allowed_ = checkCredentials(username, password);
+  return connection_allowed_ ? AuthAttempt::Allowed : AuthAttempt::Denied;
+}
+
+bool ProxyFilter::checkCredentials(const std::string& username, const std::string& password) {
+  // Single policy for both auth entry points (``AUTH`` and ``HELLO N AUTH``):
+  //   - no configured username: the default user may be named "default" (Redis 6 ACL synonym)
+  //     or left empty; only the password is checked.
+  //   - configured username: exact match.
   if (config_->downstream_auth_username_.empty()) {
-    credentials_match = (username.empty() || username == "default") && checkPassword(password);
-  } else {
-    credentials_match = (username == config_->downstream_auth_username_) && checkPassword(password);
+    return (username.empty() || username == "default") && checkPassword(password);
   }
-  connection_allowed_ = credentials_match;
-  return credentials_match ? AuthAttempt::Allowed : AuthAttempt::Denied;
+  return username == config_->downstream_auth_username_ && checkPassword(password);
 }
 
 bool ProxyFilter::checkPassword(const std::string& password) {

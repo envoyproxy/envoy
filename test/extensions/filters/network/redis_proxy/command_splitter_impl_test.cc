@@ -1461,6 +1461,63 @@ TEST_F(RedisSingleServerRequestTest, ClientSubcommandErrorSanitizesControlBytes)
   EXPECT_EQ(nullptr, handle_);
 }
 
+// HELLO is answered locally but must still emit the command.hello.* stats the old cluster-scope
+// registration produced, so dashboards keyed on them keep working. A successful bare HELLO
+// increments total + success.
+TEST_F(RedisSingleServerRequestTest, HelloEmitsCommandStatsOnSuccess) {
+  InSequence s;
+  callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp2;
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"hello", "2"});
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.success").value());
+  EXPECT_EQ(0UL, store_.counter("redis.foo.command.hello.error").value());
+}
+
+// A version-mismatch HELLO (``NOPROTO``) increments total + error, so handshake-error alerting
+// has a signal (``downstream_rq_noproto`` only counts pre-HELLO data commands, not HELLO itself).
+TEST_F(RedisSingleServerRequestTest, HelloVersionMismatchEmitsErrorStat) {
+  InSequence s;
+  callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp2;
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"hello", "3"}); // RESP2 listener, client asks for 3
+
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.total").value());
+  EXPECT_EQ(0UL, store_.counter("redis.foo.command.hello.success").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.error").value());
+}
+
+// A deployment that opts CLIENT into custom_commands keeps proxying it upstream: the local
+// ``SETNAME`` / ``SETINFO`` interception must not shadow that explicit configuration. With
+// ``client`` in
+// custom_commands, CLIENT routes through the generic simple-command handler (makeRequest on the
+// conn pool) rather than being answered locally.
+TEST_F(RedisSingleServerRequestTest, ClientInCustomCommandsProxiesUpstream) {
+  InSequence s;
+  InstanceImpl splitter = getSplitter({"client"});
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"client", "SETNAME", "my-app"});
+  // Simple-command routing hashes on the first key argument ("SETNAME"); the request is handed
+  // to the conn pool rather than answered locally with +OK.
+  EXPECT_CALL(*conn_pool_, makeRequest_("SETNAME", RespVariantEq(*request), _))
+      .WillOnce(Return(&pool_request_));
+  handle_ = splitter.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_NE(nullptr, handle_);
+
+  EXPECT_CALL(pool_request_, cancel());
+  handle_->cancel();
+}
+
 // Bare HELLO on a RESP2 auth-required listener still requires prior auth — the
 // HELLO + connectionAllowed reorder must NOT have removed the gate for
 // non-AUTH HELLO calls.

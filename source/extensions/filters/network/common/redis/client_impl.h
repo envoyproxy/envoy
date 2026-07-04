@@ -273,13 +273,32 @@ private:
   void replayHeldUserRequests();
   void failHeldUserRequests();
   void removeHeldUserRequest(HeldUserRequest* held);
-  // True while any request-related work is outstanding: either an upstream request is in
-  // flight (including init requests such as HELLO/AUTH/READONLY in pending_requests_) or
-  // user requests are queued during init (held_user_requests_). Drives whether the
-  // post-connect op timeout should be armed.
+  // True while any request-related work is outstanding: an upstream request is in flight
+  // (including init requests such as HELLO/AUTH/READONLY in pending_requests_), user requests
+  // are queued during init (held_user_requests_), or the AWS IAM token fetch is pending.
+  // The token wait is the one init stage with no wire request to track, and it must still be
+  // bounded by the connect/op timer — otherwise a hung credentials provider leaves a
+  // half-initialized connection in the pool with every timer disabled once its held requests
+  // are canceled. Drives whether the post-connect op timeout should be armed.
   bool hasOutstandingWork() const {
-    return !pending_requests_.empty() || !held_user_requests_.empty();
+    return init_state_ == InitState::WaitingForAwsToken || !pending_requests_.empty() ||
+           !held_user_requests_.empty();
   }
+  // RAII batching guard for multi-request init/replay sequences: suppresses makeRequestInternal's
+  // auto-flush for its scope and performs one explicit flush on destruction, so the batch hits
+  // the wire as a single write and the re-enable + flush invariant cannot be dropped by an
+  // early return or a future call site.
+  struct BatchFlushGuard {
+    explicit BatchFlushGuard(ClientImpl& parent) : parent_(parent) {
+      parent_.queue_enabled_ = true;
+    }
+    ~BatchFlushGuard() {
+      parent_.queue_enabled_ = false;
+      parent_.flushBufferAndResetTimer();
+    }
+    ClientImpl& parent_;
+  };
+
   void sendResp3InitCommands(const std::string& auth_username, const std::string& auth_password);
   void sendReadonlyInit();
   void onInitStepSuccess(InitState completed_step);
@@ -309,6 +328,11 @@ private:
   Stats::Scope& scope_;
   bool is_transaction_client_;
   bool queue_enabled_{false};
+  // True while onEvent drains a locally-initiated close (downstream teardown, pool drain).
+  // Hello3InitCallbacks::onFailure consults it so that a local close of a connection with a
+  // HELLO 3 still in flight does not count toward upstream_resp3_hello_failure — that counter
+  // is documented as a misconfigured-upstream signal and must not be polluted by client churn.
+  bool local_close_{false};
   std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
   std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
       aws_iam_authenticator_;

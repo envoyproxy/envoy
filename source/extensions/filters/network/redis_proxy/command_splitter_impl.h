@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -20,7 +21,6 @@
 #include "source/extensions/filters/network/redis_proxy/router.h"
 
 #include "absl/container/flat_hash_set.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -176,7 +176,7 @@ public:
   uint32_t currentDownstreamRespVersion() const override {
     return callbacks_.currentDownstreamRespVersion();
   }
-  absl::optional<uint32_t> takePendingHelloAuthVersion() override {
+  std::optional<uint32_t> takePendingHelloAuthVersion() override {
     return callbacks_.takePendingHelloAuthVersion();
   }
 
@@ -576,6 +576,11 @@ private:
   TimeSource& time_source_;
   Common::Redis::FaultManagerPtr fault_manager_;
   absl::flat_hash_set<std::string> custom_commands_;
+  // HELLO is answered locally (handleHelloCommand) and does not route through
+  // handler_lookup_table_, but the ``command.hello.*`` stats its old cluster-scope registration
+  // emitted must survive for operators alarming on them. Latency exists for schema parity and
+  // is not recorded — the local reply has no round trip to time.
+  std::optional<CommandStats> hello_command_stats_;
 };
 
 } // namespace CommandSplitter
