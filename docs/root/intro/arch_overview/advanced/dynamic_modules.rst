@@ -26,14 +26,17 @@ Currently, dynamic modules are supported at the following extension points:
 * As a :ref:`listener filter <envoy_v3_api_msg_extensions.filters.listener.dynamic_modules.v3.DynamicModuleListenerFilter>`.
 * As a :ref:`UDP listener filter <envoy_v3_api_msg_extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter>`.
 * As an :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.dynamic_modules.v3.DynamicModuleAccessLog>`.
+* As a :ref:`formatter <envoy_v3_api_msg_extensions.formatter.dynamic_modules.v3.DynamicModuleFormatter>`.
 * As a :ref:`network filter <envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter>`.
 * As an :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`.
 * As an :ref:`HTTP matching data input <envoy_v3_api_msg_extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput>`.
 * As an :ref:`input matcher <envoy_v3_api_msg_extensions.matching.input_matchers.dynamic_modules.v3.DynamicModuleMatcher>`.
 * As a :ref:`TLS certificate validator <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig>`.
+* As a :ref:`transport socket <envoy_v3_api_msg_extensions.transport_sockets.dynamic_modules.v3.DynamicModuleTransportSocket>`.
 * As a :ref:`load balancing policy <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`.
 * As an :ref:`upstream HTTP TCP bridge <envoy_v3_api_msg_extensions.upstreams.http.dynamic_modules.v3.Config>`.
 * As a :ref:`tracer <envoy_v3_api_msg_extensions.tracers.dynamic_modules.v3.DynamicModuleTracer>`.
+* As a :ref:`health checker <envoy_v3_api_msg_extensions.health_checkers.dynamic_modules.v3.DynamicModuleHealthCheck>`.
 
 There are a few design goals for the dynamic modules:
 
@@ -85,12 +88,39 @@ and returns a fail-closed default:
 * Network filter callbacks close the connection and return ``StopIteration``.
 * Listener filter callbacks close the socket and return ``StopIteration``.
 
-When ``CatchUnwind`` is applied to a filter, this prevents a single panicking module
-from aborting the entire Envoy process. The affected request or connection is
-terminated; other traffic is unaffected.
+The SDK always guards each callback at the FFI boundary so a panic can never unwind into
+Envoy and corrupt the process, regardless of whether ``CatchUnwind`` is used. The wrapper
+adds graceful filter-level teardown on top of that guard. The affected request or
+connection is terminated. Other traffic is unaffected.
 
 Getting started
 --------------------------
 
 We have a dedicated repository for the dynamic module examples to help you get started.
 The repository is available at `envoyproxy/dynamic-modules-examples <https://github.com/envoyproxy/dynamic-modules-examples>`_
+
+Statistics
+---------------------------
+
+All dynamic-module extension types emit the following statistics in the shared ``dynamic_modules.`` namespace.
+These stats track failures encountered while loading the extension's configuration. Each one is tagged with
+``config_name``, set to the configured name of the dynamic-module extension instance — for example the
+:ref:`filter_name
+<envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter.filter_name>`
+for the HTTP filter, ``transport_socket_name`` for the transport socket, ``lb_policy_name`` for the
+load-balancing policy, ``tracer_name`` for the tracer or ``cluster_name`` for the cluster
+(``default`` if the extension has no per-instance name, as for the UDP listener filter).
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  module_load_error, Counter, "Total dynamic modules that could not be loaded (missing or invalid module source, ``dlopen`` failure, by-name lookup miss, or a required ABI symbol could not be resolved)."
+  config_init_error, Counter, "Total configurations that failed to initialize after the module loaded successfully (the module rejected or failed to parse the supplied configuration)."
+  remote_fetch_error, Counter, "Total failures fetching or loading a remote module source, including rejected cache misses when ``nack_on_cache_miss`` is set. Only the HTTP filter supports remote module sources."
+  per_route_config_error, Counter, "Total per-route configurations that failed to load or initialize. Only emitted by the HTTP filter."
+
+In addition to the counters above, a module may define its own custom metrics. These are emitted
+under the configurable :ref:`metrics_namespace
+<envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.metrics_namespace>`
+(``dynamicmodulescustom`` by default), separately from the ``dynamic_modules.`` namespace above.

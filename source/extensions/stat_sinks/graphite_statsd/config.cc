@@ -29,7 +29,7 @@ GraphiteStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
     RETURN_IF_NOT_OK_REF(address_or_error.status());
     Network::Address::InstanceConstSharedPtr address = address_or_error.value();
     ENVOY_LOG(debug, "statsd UDP ip address: {}", address->asString());
-    absl::optional<uint64_t> max_bytes;
+    std::optional<uint64_t> max_bytes;
     if (statsd_sink.has_max_bytes_per_datagram()) {
       max_bytes = statsd_sink.max_bytes_per_datagram().value();
     }

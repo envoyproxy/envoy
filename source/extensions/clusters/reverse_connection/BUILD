@@ -15,6 +15,7 @@ envoy_cc_extension(
     visibility = ["//visibility:public"],
     deps = [
         "//envoy/upstream:cluster_factory_interface",
+        "//source/common/formatter:builtin_command_parser_factory_helper_lib",
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/network:address_lib",

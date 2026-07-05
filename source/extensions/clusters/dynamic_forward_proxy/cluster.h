@@ -2,6 +2,7 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 #include "envoy/http/conn_pool.h"
@@ -48,7 +49,7 @@ public:
                                              Upstream::LoadBalancerContext* context) const;
 
   // Extensions::Common::DynamicForwardProxy::DfpCluster
-  std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>
+  std::pair<bool, std::optional<envoy::config::cluster::v3::Cluster>>
   createSubClusterConfig(const std::string& cluster_name, const std::string& host,
                          const int port) override;
   bool touch(const std::string& cluster_name) override;
@@ -90,11 +91,14 @@ private:
 
   using HostInfoMap = absl::flat_hash_map<std::string, HostInfo>;
 
+  class DFPHostSelectionHandle;
+
   class LoadBalancer : public Upstream::LoadBalancer,
                        public Extensions::Common::DynamicForwardProxy::DfpLb,
                        public Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks {
   public:
-    LoadBalancer(const Cluster& cluster) : cluster_(cluster) {}
+    LoadBalancer(std::weak_ptr<const Cluster> cluster) : cluster_(cluster) {}
+    ~LoadBalancer() override;
 
     // DfpLb
     Upstream::HostConstSharedPtr findHostByName(const std::string& host) const override;
@@ -104,7 +108,7 @@ private:
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* context, const Upstream::Host& host,
                              std::vector<uint8_t>& hash_key) override;
     OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override;
@@ -137,8 +141,8 @@ private:
     };
 
     absl::flat_hash_map<LookupKey, std::vector<ConnectionInfo>, LookupKeyHash> connection_info_map_;
-
-    const Cluster& cluster_;
+    absl::flat_hash_set<DFPHostSelectionHandle*> pending_host_selection_handles_;
+    std::weak_ptr<const Cluster> cluster_;
   };
 
   // This acts as the bridge for asynchronous host lookup. If the host is not
@@ -150,19 +154,41 @@ private:
       : public Upstream::AsyncHostSelectionHandle,
         public Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks {
   public:
-    DFPHostSelectionHandle(Upstream::LoadBalancerContext* context, const Cluster& cluster,
-                           std::string hostname)
-        : context_(context), cluster_(cluster), hostname_(hostname) {};
+    DFPHostSelectionHandle(
+        Upstream::LoadBalancerContext* context, std::weak_ptr<const Cluster> cluster,
+        std::string hostname,
+        absl::flat_hash_set<DFPHostSelectionHandle*>& pending_host_selection_handles)
+        : context_(context), cluster_(cluster), hostname_(hostname),
+          pending_host_selection_handles_(pending_host_selection_handles) {}
+
+    // Ideally the cancel() will be called to cancel the async host selection before the handle is
+    // destructed. In case it is not, the destructor will also ensure the cancellation of the async
+    // host selection to avoid calling back into the load balancer after it is destructed.
+    ~DFPHostSelectionHandle() override { cancel(); }
 
     void cancel() override {
       // Cancels the DNS callback.
       handle_.reset();
+
+      if (pending_host_selection_handles_.has_value()) {
+        // Removes itself from the pending host selection handles so that the cluster will not
+        // attempt to call onLoadDnsCacheComplete after cancellation.
+        pending_host_selection_handles_->erase(this);
+        pending_host_selection_handles_.reset();
+      }
     }
 
     void
     onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& info) override {
-      Upstream::HostConstSharedPtr host = cluster_.findHostByName(hostname_);
+      Upstream::HostConstSharedPtr host;
+      if (auto cluster = cluster_.lock()) {
+        host = cluster->findHostByName(hostname_);
+      }
       std::string details = info->details();
+      if (pending_host_selection_handles_.has_value()) {
+        pending_host_selection_handles_->erase(this);
+        pending_host_selection_handles_.reset();
+      }
       context_->onAsyncHostSelection(std::move(host), std::move(details));
     }
 
@@ -172,30 +198,33 @@ private:
     void setAutoDec(Upstream::ResourceAutoIncDecPtr&& dec) { auto_dec_ = std::move(dec); }
 
   private:
+    friend class LoadBalancer;
+
     Upstream::LoadBalancerContext* context_;
     Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr handle_;
     Upstream::ResourceAutoIncDecPtr auto_dec_;
-    const Cluster& cluster_;
+    std::weak_ptr<const Cluster> cluster_;
     std::string hostname_;
+    OptRef<absl::flat_hash_set<DFPHostSelectionHandle*>> pending_host_selection_handles_;
   };
 
   class LoadBalancerFactory : public Upstream::LoadBalancerFactory {
   public:
-    LoadBalancerFactory(Cluster& cluster) : cluster_(cluster) {}
+    LoadBalancerFactory(std::weak_ptr<const Cluster> cluster) : cluster_(std::move(cluster)) {}
 
     // Upstream::LoadBalancerFactory
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
       return std::make_unique<LoadBalancer>(cluster_);
     }
-    bool recreateOnHostChange() const override { return false; }
+    bool recreateOnHostChangeDeprecated() const override { return false; }
 
   private:
-    Cluster& cluster_;
+    std::weak_ptr<const Cluster> cluster_;
   };
 
   class ThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {
   public:
-    ThreadAwareLoadBalancer(Cluster& cluster) : cluster_(cluster) {}
+    ThreadAwareLoadBalancer(std::weak_ptr<const Cluster> cluster) : cluster_(std::move(cluster)) {}
 
     // Upstream::ThreadAwareLoadBalancer
     Upstream::LoadBalancerFactorySharedPtr factory() override {
@@ -204,7 +233,7 @@ private:
     absl::Status initialize() override { return absl::OkStatus(); }
 
   private:
-    Cluster& cluster_;
+    std::weak_ptr<const Cluster> cluster_;
   };
 
   absl::Status
@@ -244,6 +273,10 @@ private:
   const std::chrono::milliseconds sub_cluster_ttl_;
   const envoy::config::cluster::v3::Cluster_LbPolicy sub_cluster_lb_policy_;
   const bool enable_sub_cluster_;
+
+  // Optional DNS configuration for dynamically created sub clusters. When set, sub clusters are
+  // created using the DnsCluster extension rather than the legacy STRICT_DNS discovery type.
+  const std::optional<envoy::extensions::clusters::dns::v3::DnsCluster> sub_cluster_dns_config_;
 
   friend class ClusterFactory;
   friend class ClusterTest;

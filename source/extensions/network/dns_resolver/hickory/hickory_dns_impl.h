@@ -57,7 +57,7 @@ using OnDnsResolverResetNetworkingType =
  */
 class HickoryDnsResolverConfig {
 public:
-  static std::shared_ptr<HickoryDnsResolverConfig>
+  static absl::StatusOr<std::shared_ptr<HickoryDnsResolverConfig>>
   create(const envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig&
              proto_config);
 
@@ -77,6 +77,16 @@ public:
 
 private:
   HickoryDnsResolverConfig() = default;
+
+  // Test-only entry point that allows the module name to be overridden so tests can exercise
+  // dynamic-module load, ABI symbol resolution, and Rust-side rejection failure paths that are
+  // unreachable through the public ``create()`` against the statically linked production module.
+  // Accessed via ``HickoryDnsResolverConfigTestPeer``.
+  friend class HickoryDnsResolverConfigTestPeer;
+  static absl::StatusOr<std::shared_ptr<HickoryDnsResolverConfig>> createForModule(
+      const envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig&
+          proto_config,
+      absl::string_view module_name);
 
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
 };
@@ -140,6 +150,9 @@ public:
 
 private:
   friend class HickoryPendingResolution;
+  // Test-only access to the private ``shutting_down_`` flag, used to verify the ABI callback's
+  // early-return fast path without racing against destructor teardown.
+  friend class HickoryDnsResolverTestPeer;
   friend void ::envoy_dynamic_module_callback_dns_resolve_complete(
       envoy_dynamic_module_type_dns_resolver_envoy_ptr, uint64_t,
       envoy_dynamic_module_type_dns_resolution_status, envoy_dynamic_module_type_module_buffer,

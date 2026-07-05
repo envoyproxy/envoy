@@ -134,6 +134,7 @@ envoy_cc_library(
     name = "proxy_filter_lib",
     srcs = ["proxy_filter.cc"],
     hdrs = ["proxy_filter.h"],
+    external_deps = ["ssl"],
     deps = [
         ":command_splitter_interface",
         ":external_auth_lib",

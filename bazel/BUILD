@@ -6,6 +6,7 @@ load("@envoy_toolshed//:macros.bzl", "json_data")
 load("@envoy_toolshed//:utils.bzl", "json_merge")
 load("@envoy_toolshed//dependency:macros.bzl", "updater")
 load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_java//toolchains:default_java_toolchain.bzl", "default_java_toolchain")
 load("@rules_shell//shell:sh_library.bzl", "sh_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load(":deprecated_features.bzl", "check_removed_fips_define")
@@ -14,6 +15,15 @@ load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+# TODO(jwendell): Remove after https://github.com/protocolbuffers/protobuf/issues/20760 is fixed.
+default_java_toolchain(
+    name = "envoy_java_toolchain",
+    java_runtime = "@rules_java//toolchains:remotejdk_25",
+    javabuilder_jvm_opts = ["--sun-misc-unsafe-memory-access=allow"],
+    source_version = "11",
+    target_version = "11",
+)
 
 exports_files([
     "gen_sh_test_runner.sh",
@@ -77,6 +87,14 @@ cc_library(
         "//bazel:linux": ["-static-libgcc"],
         "//conditions:default": [],
     }),
+)
+
+config_setting(
+    name = "sockmap_enabled",
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    define_values = {"sockmap": "enabled"},
 )
 
 config_setting(
@@ -305,6 +323,14 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "disable_http3_on_linux_x86_64",
+    match_all = [
+        ":disable_http3",
+        ":linux_x86_64",
+    ],
+)
+
+selects.config_setting_group(
     name = "disable_http3_on_not_x86_ppc",
     match_all = [
         ":disable_http3",
@@ -516,6 +542,11 @@ bool_flag(
     build_setting_default = False,
 )
 
+bool_flag(
+    name = "openssl",
+    build_setting_default = False,
+)
+
 config_setting(
     name = "fips_build",
     flag_values = {":fips": "True"},
@@ -538,7 +569,7 @@ config_setting(
 
 config_setting(
     name = "using_openssl",
-    flag_values = {":ssl": "//compat/openssl:ssl"},
+    flag_values = {":openssl": "True"},
 )
 
 # Convenience grouping for any FIPS SSL library

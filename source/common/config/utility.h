@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/api/api.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -26,7 +28,6 @@
 #include "source/common/version/api_version.h"
 #include "source/common/version/api_version_struct.h"
 
-#include "absl/types/optional.h"
 #include "udpa/type/v1/typed_struct.pb.h"
 #include "xds/type/v3/typed_struct.pb.h"
 
@@ -142,9 +143,9 @@ public:
    * Gets the gRPC control plane management server from the API config source. The result is either
    * a cluster name or a host name.
    * @param api_config_source the config source to validate.
-   * @return the gRPC control plane server, or absl::nullopt if it couldn't be extracted.
+   * @return the gRPC control plane server, or std::nullopt if it couldn't be extracted.
    */
-  static absl::optional<std::string>
+  static std::optional<std::string>
   getGrpcControlPlane(const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
@@ -251,13 +252,7 @@ public:
    */
   template <class Factory, class ProtoMessage>
   static Factory* getFactory(const ProtoMessage& message) {
-    Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
-    if (factory != nullptr ||
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_extension_lookup_by_name")) {
-      return factory;
-    }
-
-    return Utility::getFactoryByName<Factory>(message.name());
+    return Utility::getFactoryByType<Factory>(message.typed_config());
   }
 
   /**
@@ -270,18 +265,12 @@ public:
   template <class Factory, class ProtoMessage>
   static Factory* getAndCheckFactory(const ProtoMessage& message, bool is_optional) {
     Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_extension_lookup_by_name")) {
-      if (factory == nullptr && !is_optional) {
-        ExceptionUtil::throwEnvoyException(
-            fmt::format("Didn't find a registered implementation for '{}' with type URL: '{}'",
-                        message.name(), getFactoryType(message.typed_config())));
-      }
-      return factory;
-    } else if (factory != nullptr) {
-      return factory;
+    if (factory == nullptr && !is_optional) {
+      ExceptionUtil::throwEnvoyException(
+          fmt::format("Didn't find a registered implementation for '{}' with type URL: '{}'",
+                      message.name(), getFactoryType(message.typed_config())));
     }
-
-    return Utility::getAndCheckFactoryByName<Factory>(message.name(), is_optional);
+    return factory;
   }
 
   /**
@@ -489,13 +478,13 @@ public:
   prepareJitteredExponentialBackOffStrategy(
       const envoy::config::core::v3::ApiConfigSource& api_config_source,
       Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
-      absl::optional<const uint32_t> default_max_interval_ms) {
+      std::optional<const uint32_t> default_max_interval_ms) {
     auto& grpc_services = api_config_source.grpc_services();
     if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc()) {
       return prepareJitteredExponentialBackOffStrategy(
           grpc_services[0].envoy_grpc(), random, default_base_interval_ms, default_max_interval_ms);
     }
-    return buildJitteredExponentialBackOffStrategy(absl::nullopt, random, default_base_interval_ms,
+    return buildJitteredExponentialBackOffStrategy(std::nullopt, random, default_base_interval_ms,
                                                    default_max_interval_ms);
   }
 
@@ -511,16 +500,16 @@ public:
    */
   template <typename T>
   static absl::StatusOr<JitteredExponentialBackOffStrategyPtr>
-  prepareJitteredExponentialBackOffStrategy(
-      const T& config, Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
-      absl::optional<const uint32_t> default_max_interval_ms) {
+  prepareJitteredExponentialBackOffStrategy(const T& config, Random::RandomGenerator& random,
+                                            const uint32_t default_base_interval_ms,
+                                            std::optional<const uint32_t> default_max_interval_ms) {
     // If RetryPolicy containing backoff values is found in config
     if (config.has_retry_policy() && config.retry_policy().has_retry_back_off()) {
       return buildJitteredExponentialBackOffStrategy(config.retry_policy().retry_back_off(), random,
                                                      default_base_interval_ms,
                                                      default_max_interval_ms);
     }
-    return buildJitteredExponentialBackOffStrategy(absl::nullopt, random, default_base_interval_ms,
+    return buildJitteredExponentialBackOffStrategy(std::nullopt, random, default_base_interval_ms,
                                                    default_max_interval_ms);
   }
 
@@ -538,9 +527,9 @@ private:
    */
   static absl::StatusOr<JitteredExponentialBackOffStrategyPtr>
   buildJitteredExponentialBackOffStrategy(
-      absl::optional<const envoy::config::core::v3::BackoffStrategy> backoff,
+      std::optional<const envoy::config::core::v3::BackoffStrategy> backoff,
       Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
-      absl::optional<const uint32_t> default_max_interval_ms);
+      std::optional<const uint32_t> default_max_interval_ms);
 };
 } // namespace Config
 } // namespace Envoy

@@ -20,7 +20,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::InvokeWithoutArgs;
 using testing::Return;
 
 namespace Envoy {
@@ -39,8 +38,8 @@ public:
   }
 
   static void resetTrie(IpTaggingFilterConfig& filter_config) {
-    if (filter_config.trie_) {
-      filter_config.trie_.reset();
+    if (filter_config.static_ip_tags_) {
+      const_cast<LoadedIpTags*>(filter_config.static_ip_tags_.get())->trie.reset();
     }
   }
 };
@@ -262,7 +261,7 @@ public:
   }
 
   void initializeFilter(const std::string& yaml,
-                        absl::optional<std::string> expected_error = absl::nullopt) {
+                        std::optional<std::string> expected_error = std::nullopt) {
     envoy::extensions::filters::http::ip_tagging::v3::IPTagging config;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
     auto config_or =
@@ -474,7 +473,7 @@ TEST_F(IpTaggingFilterTest, ReusesIpTagsProviderInstanceForSameFilePath) {
   auto provider2 = IpTaggingFilterConfigPeer::ipTagsProvider(*config2);
   EXPECT_NE(nullptr, provider1);
   EXPECT_NE(nullptr, provider2);
-  EXPECT_EQ(provider1->ipTags(), provider2->ipTags());
+  EXPECT_EQ(provider1->loadedIpTags()->trie, provider2->loadedIpTags()->trie);
 }
 
 TEST_F(IpTaggingFilterTest, DifferentIpTagsProviderInstanceForDifferentFilePath) {
@@ -501,7 +500,7 @@ TEST_F(IpTaggingFilterTest, DifferentIpTagsProviderInstanceForDifferentFilePath)
   auto provider2 = IpTaggingFilterConfigPeer::ipTagsProvider(*config2);
   EXPECT_NE(nullptr, provider1);
   EXPECT_NE(nullptr, provider2);
-  EXPECT_NE(provider1->ipTags(), provider2->ipTags());
+  EXPECT_NE(provider1->loadedIpTags()->trie, provider2->loadedIpTags()->trie);
   ::testing::Mock::VerifyAndClearExpectations(&filter_callbacks_);
 }
 

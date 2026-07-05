@@ -3,6 +3,7 @@
 #include <array>
 #include <chrono>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -13,8 +14,6 @@
 #include "envoy/ssl/tls_certificate_config.h"
 
 #include "source/common/network/cidr_range.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -122,7 +121,7 @@ public:
   /**
    * @return the compiance policy for the TLS context.
    */
-  virtual absl::optional<
+  virtual std::optional<
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
   compliancePolicy() const PURE;
 };
@@ -157,12 +156,6 @@ public:
    * @return The maximum number of session keys to store.
    */
   virtual size_t maxSessionKeys() const PURE;
-
-  /**
-   * @return true if the enforcement that handshake will fail if the keyUsage extension is present
-   * and incompatible with the TLS usage is enabled.
-   */
-  virtual bool enforceRsaKeyUsage() const PURE;
 
   /**
    * @return an optional factory which can be used to create TLS context provider instances.
@@ -208,7 +201,7 @@ public:
    * @return timeout in seconds for the session.
    * Session timeout is used to specify lifetime hint of tls tickets.
    */
-  virtual absl::optional<std::chrono::seconds> sessionTimeout() const PURE;
+  virtual std::optional<std::chrono::seconds> sessionTimeout() const PURE;
 
   /**
    * @return True if stateless TLS session resumption is disabled, false otherwise.

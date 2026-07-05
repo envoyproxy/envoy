@@ -50,8 +50,22 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/stats:histogram_lib",
+        "//source/common/stats:symbol_table_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
+        "@libcircllhist",
+    ],
+)
+
+envoy_cc_test(
+    name = "timespan_impl_test",
+    srcs = ["timespan_impl_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/stats:timespan_lib",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -179,6 +193,7 @@ envoy_cc_test(
         "//test/common/memory:memory_test_utility_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:thread_factory_for_test_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/hash:hash_testing",
     ],
@@ -242,6 +257,7 @@ envoy_cc_benchmark_binary(
         "//source/common/stats:utility_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:thread_factory_for_test_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/strings",
         "@benchmark",

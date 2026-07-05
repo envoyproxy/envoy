@@ -11,7 +11,7 @@ constexpr absl::string_view kDefaultLocalAddressSelectorName =
 
 absl::Status
 validate(const std::vector<::Envoy::Upstream::UpstreamLocalAddress>& upstream_local_addresses,
-         absl::optional<std::string> cluster_name) {
+         std::optional<std::string> cluster_name) {
 
   if (upstream_local_addresses.empty()) {
     return absl::InvalidArgumentError(
@@ -63,7 +63,7 @@ std::string DefaultUpstreamLocalAddressSelectorFactory::name() const {
 absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr>
 DefaultUpstreamLocalAddressSelectorFactory::createLocalAddressSelector(
     std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
-    absl::optional<std::string> cluster_name) const {
+    std::optional<std::string> cluster_name) const {
   absl::Status status = validate(upstream_local_addresses, cluster_name);
   if (!status.ok()) {
     return status;

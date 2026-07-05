@@ -19,7 +19,6 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/resource_monitors/downstream_connections:downstream_connections_monitor",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/resource_monitors/downstream_connections/v3:pkg_cc_proto",
     ],
 )

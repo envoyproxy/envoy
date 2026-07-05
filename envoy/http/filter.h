@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/access_log/access_log.h"
@@ -22,8 +23,6 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/scope_tracked_object_stack.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -212,6 +211,16 @@ class UpstreamCallbacks {
 public:
   virtual ~UpstreamCallbacks() = default;
 
+  // Called when a host has been selected for the upstream connection but BEFORE the connection
+  // is initiated. This allows upstream HTTP filters to inspect the selected host and reject
+  // the connection if needed (e.g., blocking private IP addresses).
+  //
+  // To reject the connection, the filter should call sendLocalReply() which will abort the
+  // upstream connection attempt.
+  //
+  // @param host the selected upstream host.
+  virtual void onHostSelected(const Upstream::HostDescriptionConstSharedPtr& host) PURE;
+
   // Called when the upstream connection is established and
   // UpstreamStreamFilterCallbacks::upstream should be available.
   //
@@ -227,6 +236,11 @@ public:
 
   // Returns a handle to the upstream stream's stream info.
   virtual StreamInfo::StreamInfo& upstreamStreamInfo() PURE;
+
+  // Returns the WebTransport session of the *downstream* stream paired with this upstream request,
+  // if any. Used by the upstream WebTransport codec to obtain the downstream session so it can
+  // bridge the two. Defaults to an empty OptRef for non-WebTransport streams.
+  virtual OptRef<WebTransportSession> downstreamWebTransportSession() { return {}; }
 
   // Returns a handle to the generic upstream.
   virtual OptRef<Router::GenericUpstream> upstream() PURE;
@@ -304,7 +318,7 @@ public:
   virtual void
   requestRouteConfigUpdate(RouteCache& route_cache,
                            Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb,
-                           absl::optional<Router::ConfigConstSharedPtr> route_config,
+                           std::optional<Router::ConfigConstSharedPtr> route_config,
                            Event::Dispatcher& dispatcher, RequestHeaderMap& request_headers) PURE;
   virtual void
   requestVhdsUpdate(const std::string& host_header, Event::Dispatcher& thread_local_dispatcher,
@@ -345,7 +359,7 @@ public:
    * refreshCachedRoute. It is important to note that setRoute(nullptr) is different from a
    * clearRouteCache(), because clearRouteCache() wants route resolution to be attempted again.
    * clearRouteCache() achieves this by setting cached_route_ and cached_cluster_info_ to
-   * absl::optional ptrs instead of null ptrs.
+   * std::optional ptrs instead of null ptrs.
    */
   virtual void setRoute(Router::RouteConstSharedPtr route) PURE;
 
@@ -390,6 +404,14 @@ public:
    * method.
    */
   virtual void refreshRouteCluster() PURE;
+
+  /**
+   * Re-initialize the cached cluster info using the currently selected target cluster
+   * name from the matched route, without invoking cluster re-selection in specifiers.
+   * Useful to pull newly fetched cluster metadata (like from on-demand discovery) into
+   * the active stream.
+   */
+  virtual void recreateClusterInfo() PURE;
 
   /**
    * Schedules a request for a RouteConfiguration update from the management server.
@@ -510,7 +532,7 @@ public:
 
   /**
    * Return the HTTP/1 stream encoder options if applicable. If the stream is not HTTP/1 returns
-   * absl::nullopt.
+   * std::nullopt.
    */
   virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 
@@ -592,6 +614,17 @@ public:
  */
 class StreamDecoderFilterCallbacks : public virtual StreamFilterCallbacks {
 public:
+  /**
+   * @return the WebTransport session of the stream this decoder filter chain is bound to, if any.
+   *
+   * For the downstream HTTP connection manager this returns the downstream codec stream's
+   * WebTransport session. It lets the upstream WebTransport codec obtain the downstream session
+   * (via the router/upstream-callbacks chain) and bridge the two directly, without going through
+   * filter state. Filters/chains not carrying a WebTransport session inherit the default empty
+   * OptRef.
+   */
+  virtual OptRef<WebTransportSession> webTransportSession() { return {}; }
+
   /**
    * Continue iterating through the filter chain with buffered headers and body data. This routine
    * can only be called if the filter has previously returned StopIteration from decodeHeaders()
@@ -705,7 +738,7 @@ public:
    */
   virtual void sendLocalReply(Code response_code, absl::string_view body_text,
                               std::function<void(ResponseHeaderMap& headers)> modify_headers,
-                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
 
   /**
@@ -916,7 +949,7 @@ public:
     // The error code which (barring reset) will be sent to the client.
     Http::Code code_;
     // The gRPC status set in local reply.
-    absl::optional<Grpc::Status::GrpcStatus> grpc_status_;
+    std::optional<Grpc::Status::GrpcStatus> grpc_status_;
     // The details of why a local reply is being sent.
     absl::string_view details_;
     // True if a reset will occur rather than the local reply (some prior filter
@@ -1122,7 +1155,7 @@ public:
    */
   virtual void sendLocalReply(Code response_code, absl::string_view body_text,
                               std::function<void(ResponseHeaderMap& headers)> modify_headers,
-                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
   /**
    * Adds new metadata to be encoded.
@@ -1355,9 +1388,9 @@ public:
    * Check whether the filter chain is disabled for this stream.
    * @param name the name of the filter chain to check.
    *
-   * @return absl::optional<bool> whether the filter chain is disabled for this stream.
+   * @return std::optional<bool> whether the filter chain is disabled for this stream.
    */
-  virtual absl::optional<bool> filterDisabled(absl::string_view name) const PURE;
+  virtual std::optional<bool> filterDisabled(absl::string_view name) const PURE;
 
   /**
    * @return const StreamInfo::StreamInfo& the stream info for this stream.

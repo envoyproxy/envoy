@@ -117,6 +117,11 @@ TEST(StringUtil, strtoull) {
   EXPECT_EQ(nullptr, StringUtil::strtoull("18446744073709551616", out));
   EXPECT_NE(nullptr, StringUtil::strtoull("18446744073709551615", out));
   EXPECT_EQ(18446744073709551615U, out);
+
+  // Signed values are invalid for unsigned parsing.
+  EXPECT_EQ(nullptr, StringUtil::strtoull("-1", out));
+  EXPECT_EQ(nullptr, StringUtil::strtoull("+1", out));
+  EXPECT_EQ(nullptr, StringUtil::strtoull("\t-42", out));
 }
 
 TEST(StringUtil, atoull) {
@@ -133,6 +138,11 @@ TEST(StringUtil, atoull) {
 
   EXPECT_TRUE(StringUtil::atoull("00789", out));
   EXPECT_EQ(789U, out);
+
+  // Signed values are invalid for unsigned parsing.
+  EXPECT_FALSE(StringUtil::atoull("-1", out));
+  EXPECT_FALSE(StringUtil::atoull("+1", out));
+  EXPECT_FALSE(StringUtil::atoull("\r\n-9", out));
 
   // Verify subsequent call to atoull succeeds after the first one
   // failed due to errno ERANGE

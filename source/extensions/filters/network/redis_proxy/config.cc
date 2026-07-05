@@ -77,9 +77,9 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   for (auto& cluster : unique_clusters) {
 
     // Create the AWS IAM authenticator if required
-    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+    std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator;
-    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config;
+    std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config;
     auto cluster_optref = server_context.clusterManager().clusters().getCluster(cluster);
     if (cluster_optref.has_value()) {
       // Does our cluster have an AwsIam element available? If so, create a new authenticator for

@@ -292,7 +292,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     } else {
       state_ = State::Responded;
       callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimitServiceError);
-      callbacks_->sendLocalReply(config_->statusOnError(), response_body, nullptr, absl::nullopt,
+      callbacks_->sendLocalReply(config_->statusOnError(), response_body, nullptr, std::nullopt,
                                  RcDetails::get().RateLimitError);
     }
   } else if (!initiating_call_) {

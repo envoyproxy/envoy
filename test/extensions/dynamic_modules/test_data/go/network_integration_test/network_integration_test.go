@@ -63,7 +63,11 @@ type connectionStateConfigFactory struct {
 	shared.EmptyNetworkFilterConfigFactory
 }
 
-func (f *connectionStateConfigFactory) Create(shared.NetworkFilterConfigHandle, []byte) (shared.NetworkFilterFactory, error) {
+func (f *connectionStateConfigFactory) Create(handle shared.NetworkFilterConfigHandle, _ []byte) (shared.NetworkFilterFactory, error) {
+	// Emit a metric directly from the config context (no per-connection filter), exercising the
+	// config-scoped emission path. This would typically be done from a scheduled background task.
+	configTotal, _ := handle.DefineCounter("config_total")
+	handle.IncrementCounterValue(configTotal, 1)
 	return &connectionStateFactory{}, nil
 }
 

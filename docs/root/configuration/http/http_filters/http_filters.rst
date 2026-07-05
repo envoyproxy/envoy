@@ -13,6 +13,7 @@ HTTP filters
   api_key_auth_filter
   aws_request_signing_filter
   bandwidth_limit_filter
+  bandwidth_share_filter
   basic_auth_filter
   buffer_filter
   cache_filter
@@ -34,6 +35,7 @@ HTTP filters
   fault_filter
   file_server_filter
   file_system_buffer_filter
+  filter_chain_filter
   gcp_authn_filter
   geoip_filter
   golang_filter
@@ -73,5 +75,6 @@ HTTP filters
   tap_filter
   thrift_to_metadata_filter
   upstream_codec_filter
+  upstream_rbac_filter
   wasm_filter
   transform_filter

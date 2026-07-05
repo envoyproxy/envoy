@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <optional>
 #include <string>
 
 #include "envoy/admin/v3/server_info.pb.h"
@@ -10,7 +11,6 @@
 #include "envoy/network/address.h"
 #include "envoy/stats/tag.h"
 
-#include "absl/types/optional.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {

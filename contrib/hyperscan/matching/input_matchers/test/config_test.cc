@@ -18,7 +18,7 @@ protected:
     config.set_name("hyperscan");
     envoy::extensions::matching::input_matchers::hyperscan::v3alpha::Hyperscan hyperscan;
     TestUtility::loadFromYaml(yaml, hyperscan);
-    config.mutable_typed_config()->PackFrom(hyperscan);
+    std::ignore = config.mutable_typed_config()->PackFrom(hyperscan);
 
     Config factory;
     auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(

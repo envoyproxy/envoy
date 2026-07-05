@@ -11,6 +11,7 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -35,16 +36,16 @@ public:
 
     if (!gauge.has_value()) {
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError,
-                                         "Couldn't find stat", nullptr, absl::nullopt, "");
+                                         "Couldn't find stat", nullptr, std::nullopt, "");
       return Http::FilterHeadersStatus::StopIteration;
     }
     if (gauge->get().value() == 0) {
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError, "EDS not ready",
-                                         nullptr, absl::nullopt, "");
+                                         nullptr, std::nullopt, "");
       return Http::FilterHeadersStatus::StopIteration;
     }
-    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "EDS is ready", nullptr,
-                                       absl::nullopt, "");
+    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "EDS is ready", nullptr, std::nullopt,
+                                       "");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -53,9 +54,12 @@ private:
   Stats::StatNameManagedStorage stat_name_;
 };
 
-class EdsReadyFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class EdsReadyFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<
+                                 test::integration::filters::EdsReadyFilterConfig> {
 public:
-  EdsReadyFilterConfig() : EmptyHttpFilterConfig("eds-ready-filter") {}
+  EdsReadyFilterConfig()
+      : UniqueEmptyHttpFilterConfig<test::integration::filters::EdsReadyFilterConfig>(
+            "eds-ready-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&,

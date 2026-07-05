@@ -23,7 +23,7 @@ UpstreamHttp11ConnectSocketConfigFactory::createTransportSocketFactory(
       const envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport&>(
       message, context.messageValidationVisitor());
 
-  absl::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info;
+  std::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info;
   if (outer_config.has_default_proxy_address()) {
     auto address_or_error =
         Network::Address::resolveProtoAddress(outer_config.default_proxy_address());

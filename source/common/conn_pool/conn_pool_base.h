@@ -58,8 +58,8 @@ public:
     return std::min(remaining_streams_, concurrent_stream_limit_);
   }
 
-  // Returns the application protocol, or absl::nullopt for TCP.
-  virtual absl::optional<Http::Protocol> protocol() const PURE;
+  // Returns the application protocol, or std::nullopt for TCP.
+  virtual std::optional<Http::Protocol> protocol() const PURE;
 
   virtual int64_t currentUnusedCapacity() const {
     int64_t remaining_concurrent_streams =
