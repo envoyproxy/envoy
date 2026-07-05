@@ -10,33 +10,6 @@ namespace Quic {
 
 using ValidationResults = Envoy::Extensions::TransportSockets::Tls::ValidationResults;
 
-namespace {
-
-// Bridges the completion of an asynchronous Envoy cert validation to the QUICHE handshake.
-// Unlike the client-side counterpart in envoy_quic_proof_verifier.cc, no hostname matching is
-// performed: client certificates are not tied to a hostname.
-class ServerQuicValidateResultCallback : public Ssl::ValidateResultCallback {
-public:
-  ServerQuicValidateResultCallback(Event::Dispatcher& dispatcher,
-                                   std::unique_ptr<quic::ProofVerifierCallback>&& quic_callback)
-      : dispatcher_(dispatcher), quic_callback_(std::move(quic_callback)) {}
-
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
-
-  void onCertValidationResult(bool succeeded, Ssl::ClientValidationStatus /*detailed_status*/,
-                              const std::string& error_details, uint8_t /*tls_alert*/) override {
-    std::unique_ptr<quic::ProofVerifyDetails> details =
-        std::make_unique<CertVerifyResult>(succeeded);
-    quic_callback_->Run(succeeded, succeeded ? "" : error_details, &details);
-  }
-
-private:
-  Event::Dispatcher& dispatcher_;
-  std::unique_ptr<quic::ProofVerifierCallback> quic_callback_;
-};
-
-} // namespace
-
 EnvoyTlsServerHandshaker::EnvoyTlsServerHandshaker(
     quic::QuicSession* session, const quic::QuicCryptoServerConfig* crypto_config,
     Ssl::ServerContextSharedPtr pinned_ssl_ctx, bool disable_resumption,
@@ -49,6 +22,12 @@ EnvoyTlsServerHandshaker::EnvoyTlsServerHandshaker(
   // config_ may reflect an SDS update before ssl_ctx_ is swapped on the main thread.
   if (disable_resumption || !pinnedServerContext()->hasSessionTicketKeys()) {
     DisableResumption();
+  }
+}
+
+EnvoyTlsServerHandshaker::~EnvoyTlsServerHandshaker() {
+  if (pending_validation_callback_ != nullptr) {
+    pending_validation_callback_->cancel();
   }
 }
 
@@ -91,11 +70,15 @@ quic::QuicAsyncStatus EnvoyTlsServerHandshaker::VerifyCertChain(
   }
 
   auto envoy_callback =
-      std::make_unique<ServerQuicValidateResultCallback>(dispatcher_, std::move(callback));
+      std::make_unique<ServerQuicValidateResultCallback>(*this, dispatcher_, std::move(callback));
+  // Retain a non-owning pointer so a pending validation can be cancelled if this handshaker is
+  // destroyed first. The callback object is owned by the cert validator.
+  ServerQuicValidateResultCallback* envoy_callback_ptr = envoy_callback.get();
   ValidationResults result = pinnedServerContext()->customVerifyCertChainForQuic(
       *cert_chain, std::move(envoy_callback), /*is_server=*/true,
       /*transport_socket_options=*/nullptr, /*validation_context=*/{}, /*host_name=*/"");
   if (result.status == ValidationResults::ValidationStatus::Pending) {
+    pending_validation_callback_ = envoy_callback_ptr;
     return quic::QUIC_PENDING;
   }
   if (result.status == ValidationResults::ValidationStatus::Successful) {
@@ -121,6 +104,22 @@ void EnvoyTlsServerHandshaker::OnProofVerifyDetailsAvailable(
   const auto* result = dynamic_cast<const CertVerifyResult*>(&verify_details);
   if (result != nullptr && result->isValid() && envoy_connection_ != nullptr) {
     envoy_connection_->onCertValidated();
+  }
+}
+
+void EnvoyTlsServerHandshaker::onAsyncCertValidationDone(
+    bool succeeded, const std::string& error_details,
+    std::unique_ptr<quic::ProofVerifierCallback> quic_callback) {
+  pending_validation_callback_ = nullptr;
+  // QUICHE's proof verify completion (ProofVerifierCallbackImpl::Run) resumes the handshake with
+  // a plain AdvanceHandshake(), which asserts on the server side that a packet flusher is
+  // attached. Mirror quic::TlsServerHandshaker::AdvanceHandshakeFromCallback by attaching a
+  // flusher around the resumption and notifying the delegate afterwards.
+  quic::QuicConnection::ScopedPacketFlusher flusher(session()->connection());
+  std::unique_ptr<quic::ProofVerifyDetails> details = std::make_unique<CertVerifyResult>(succeeded);
+  quic_callback->Run(succeeded, error_details, &details);
+  if (!is_connection_closed()) {
+    handshaker_delegate()->OnHandshakeCallbackDone();
   }
 }
 

@@ -17,28 +17,28 @@ public:
   void setRequireClientCertificate(
       const std::string& trusted_ca = "test/config/integration/certs/cacert.pem",
       const std::string& custom_validator_yaml = "") {
-    config_helper_.addConfigModifier([trusted_ca, custom_validator_yaml](
-                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* transport_socket = bootstrap.mutable_static_resources()
-                                   ->mutable_listeners(0)
-                                   ->mutable_filter_chains(0)
-                                   ->mutable_transport_socket();
-      auto quic_transport_socket_config = MessageUtil::anyConvert<
-          envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport>(
-          *transport_socket->mutable_typed_config());
-      auto* tls_context = quic_transport_socket_config.mutable_downstream_tls_context();
-      tls_context->mutable_require_client_certificate()->set_value(true);
-      auto* validation_context =
-          tls_context->mutable_common_tls_context()->mutable_validation_context();
-      validation_context->mutable_trusted_ca()->set_filename(
-          TestEnvironment::runfilesPath(trusted_ca));
-      if (!custom_validator_yaml.empty()) {
-        TestUtility::loadFromYaml(custom_validator_yaml,
-                                  *validation_context->mutable_custom_validator_config());
-      }
-      std::ignore =
-          transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
-    });
+    config_helper_.addConfigModifier(
+        [trusted_ca, custom_validator_yaml](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* transport_socket = bootstrap.mutable_static_resources()
+                                       ->mutable_listeners(0)
+                                       ->mutable_filter_chains(0)
+                                       ->mutable_transport_socket();
+          auto quic_transport_socket_config = MessageUtil::anyConvert<
+              envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport>(
+              *transport_socket->mutable_typed_config());
+          auto* tls_context = quic_transport_socket_config.mutable_downstream_tls_context();
+          tls_context->mutable_require_client_certificate()->set_value(true);
+          auto* validation_context =
+              tls_context->mutable_common_tls_context()->mutable_validation_context();
+          validation_context->mutable_trusted_ca()->set_filename(
+              TestEnvironment::runfilesPath(trusted_ca));
+          if (!custom_validator_yaml.empty()) {
+            TestUtility::loadFromYaml(custom_validator_yaml,
+                                      *validation_context->mutable_custom_validator_config());
+          }
+          std::ignore =
+              transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+        });
   }
 
   void setForwardClientCertDetails() {
