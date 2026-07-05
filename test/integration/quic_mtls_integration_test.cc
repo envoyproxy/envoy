@@ -86,7 +86,11 @@ TEST_P(QuicMtlsIntegrationTest, NoClientCertHandshakeFailure) {
   initialize();
 
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
-  EXPECT_TRUE(codec_client_->disconnected());
+  // The client finishes its side of the handshake before the server rejects it, so wait for the
+  // server-initiated close.
+  if (!codec_client_->disconnected()) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  }
 }
 
 // A client certificate not signed by the listener's trusted CA fails the handshake.
@@ -96,7 +100,11 @@ TEST_P(QuicMtlsIntegrationTest, UntrustedClientCertHandshakeFailure) {
   initialize();
 
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
-  EXPECT_TRUE(codec_client_->disconnected());
+  // The client finishes its side of the handshake before the server rejects it, so wait for the
+  // server-initiated close.
+  if (!codec_client_->disconnected()) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  }
 }
 
 // Client certificate validation using an asynchronous cert validator completes the handshake.
