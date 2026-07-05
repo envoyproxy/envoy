@@ -9,6 +9,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -46,7 +47,7 @@ protected:
     setUpSdsConfig(secret_config, SECRET_NAME);
     auto* transport_socket = cds_cluster.mutable_transport_socket();
     transport_socket->set_name("envoy.transport_sockets.tls");
-    transport_socket->mutable_typed_config()->PackFrom(tls_context);
+    std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
     sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
         Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(), {cds_cluster}, {cds_cluster}, {},
         "55");
@@ -57,7 +58,7 @@ protected:
     discovery_response.set_version_info("1");
     discovery_response.set_type_url(
         Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>());
-    discovery_response.add_resources()->PackFrom(secret);
+    std::ignore = discovery_response.add_resources()->PackFrom(secret);
     xds_stream_->sendGrpcMessage(discovery_response);
   }
 
@@ -94,17 +95,17 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(SdsIntegrationTest, SdsForUpstreamCluster) {
   // Wait until the new cluster from CDS is added before sending the SDS response.
   sendCdsResponse();
-  ASSERT_TRUE(waitForCounterGe("cluster_manager.cluster_added", 1));
+  ASSERT_TRUE(waitForCounter("cluster_manager.cluster_added", Ge(1)));
 
   // Wait until the Envoy instance has obtained an updated secret from the SDS cluster. This
   // verifies that the SDS API is working from the Envoy client and allows us to know we can start
   // sending HTTP requests to the upstream cluster using the secret.
   sendSdsResponse(getClientSecret());
-  ASSERT_TRUE(waitForCounterGe(fmt::format("sds.{}.update_success", SECRET_NAME), 1));
+  ASSERT_TRUE(waitForCounter(fmt::format("sds.{}.update_success", SECRET_NAME), Ge(1)));
   ASSERT_TRUE(
-      waitForCounterGe(fmt::format("cluster.{}.client_ssl_socket_factory.ssl_context_update_by_sds",
-                                   XDS_CLUSTER_NAME),
-                       1));
+      waitForCounter(fmt::format("cluster.{}.client_ssl_socket_factory.ssl_context_update_by_sds",
+                                 XDS_CLUSTER_NAME),
+                     Ge(1)));
 }
 
 } // namespace

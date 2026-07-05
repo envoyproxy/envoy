@@ -120,7 +120,7 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
   CacheEntry& entry = cache_[secret_name];
   entry.cert_context_ = cert_context;
   size_t notify_count = 0;
-  for (auto fetch_handle : entry.callbacks_) {
+  for (const auto& fetch_handle : entry.callbacks_) {
     if (auto handle = fetch_handle.lock(); handle) {
       handle->notify(cert_context);
       notify_count++;
@@ -168,7 +168,7 @@ void SecretManager::doRemoveCertificateConfig(absl::string_view secret_name) {
     return;
   }
   size_t notify_count = 0;
-  for (auto fetch_handle : it->second.callbacks_) {
+  for (const auto& fetch_handle : it->second.callbacks_) {
     if (auto handle = fetch_handle.lock(); handle) {
       handle->notify(nullptr);
       notify_count++;
@@ -214,7 +214,7 @@ void SecretManager::setContext(absl::string_view secret_name, AsyncContextConstS
       [stats_scope = stats_scope_, stats = stats_] { stats->cert_updated_.inc(); });
 }
 
-absl::optional<AsyncContextConstSharedPtr>
+std::optional<AsyncContextConstSharedPtr>
 SecretManager::getContext(absl::string_view secret_name) const {
   OptRef<ThreadLocalCerts> current = cert_contexts_.get();
   if (current) {

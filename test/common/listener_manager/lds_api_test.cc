@@ -48,7 +48,7 @@ public:
     lds_callbacks_ = cluster_manager_.subscription_factory_.callbacks_;
   }
 
-  void expectAdd(const std::string& listener_name, absl::optional<std::string> version,
+  void expectAdd(const std::string& listener_name, std::optional<std::string> version,
                  bool updated) {
     if (!version) {
       EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true))

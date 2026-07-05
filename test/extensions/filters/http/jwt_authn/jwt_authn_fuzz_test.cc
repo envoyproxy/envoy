@@ -106,7 +106,6 @@ DEFINE_PROTO_FUZZER(const JwtAuthnFuzzInput& input) {
     if (!rules.name().empty() && !rules.requires_().empty()) {
       filter_callbacks.stream_info_.filter_state_->setData(
           rules.name(), std::make_unique<Router::StringAccessorImpl>(input.filter_state_selector()),
-          StreamInfo::FilterState::StateType::ReadOnly,
           StreamInfo::FilterState::LifeSpan::FilterChain);
     }
   }

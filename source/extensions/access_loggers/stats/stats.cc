@@ -7,6 +7,7 @@
 
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/stats/symbol_table.h"
+#include "source/extensions/access_loggers/stats/scope_provider_singleton.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -142,7 +143,7 @@ void GaugeKey::makeOwned() {
          "Both borrowed and owned tags are present in GaugeKey::makeOwned");
   if (borrowed_tags_.has_value() && !owned_tags_.has_value()) {
     owned_tags_ = borrowed_tags_.value().get();
-    borrowed_tags_ = absl::nullopt;
+    borrowed_tags_ = std::nullopt;
   }
 }
 
@@ -169,9 +170,15 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
                                Server::Configuration::GenericFactoryContext& context,
                                AccessLog::FilterPtr&& filter,
                                const std::vector<Formatter::CommandParserPtr>& commands)
-    : Common::ImplBase(std::move(filter)),
-      scope_(context.statsScope().createScope(config.stat_prefix(), true /* evictable */)),
-      stat_name_pool_(scope_->symbolTable()), histograms_([&]() {
+    : Common::ImplBase(std::move(filter)), scope_([&]() {
+        envoy::type::v3::Scope modified_config = config.stats_scope();
+        if (!config.stat_prefix().empty()) {
+          modified_config.set_prefix(config.stat_prefix());
+        }
+        return Stats::ScopeProviderSingleton::getScope(context, modified_config);
+      }()),
+
+      stat_name_pool_(context.statsScope().symbolTable()), histograms_([&]() {
         std::vector<Histogram> histograms;
         for (const auto& hist_cfg : config.histograms()) {
           histograms.emplace_back(NameAndTags(hist_cfg.stat(), stat_name_pool_, commands, context),
@@ -328,10 +335,9 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
 }
 
 namespace {
-absl::optional<uint64_t> getFormatValue(const Formatter::FormatterProvider& formatter,
-                                        const Formatter::Context& context,
-                                        const StreamInfo::StreamInfo& stream_info,
-                                        bool is_percent) {
+std::optional<uint64_t> getFormatValue(const Formatter::FormatterProvider& formatter,
+                                       const Formatter::Context& context,
+                                       const StreamInfo::StreamInfo& stream_info, bool is_percent) {
   Protobuf::Value computed_value = formatter.formatValue(context, stream_info);
   double value;
   if (computed_value.has_number_value()) {
@@ -341,13 +347,13 @@ absl::optional<uint64_t> getFormatValue(const Formatter::FormatterProvider& form
       ENVOY_LOG_PERIODIC_MISC(error, std::chrono::seconds(10),
                               "Stats access logger formatted a string that isn't a number: {}",
                               computed_value.string_value());
-      return absl::nullopt;
+      return std::nullopt;
     }
   } else {
     ENVOY_LOG_PERIODIC_MISC(error, std::chrono::seconds(10),
                             "Stats access logger computed non-number value: {}",
                             computed_value.DebugString());
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   if (is_percent) {
@@ -371,7 +377,7 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
       continue;
     }
 
-    absl::optional<uint64_t> computed_value_opt =
+    std::optional<uint64_t> computed_value_opt =
         getFormatValue(*histogram.value_formatter_, context, stream_info,
                        histogram.unit_ == Stats::Histogram::Unit::Percent);
     if (!computed_value_opt.has_value()) {
@@ -394,7 +400,7 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
 
     uint64_t value;
     if (counter.value_formatter_ != nullptr) {
-      absl::optional<uint64_t> computed_value_opt =
+      std::optional<uint64_t> computed_value_opt =
           getFormatValue(*counter.value_formatter_, context, stream_info, false);
       if (!computed_value_opt.has_value()) {
         continue;
@@ -429,7 +435,7 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
 
   uint64_t value;
   if (gauge.value_formatter_ != nullptr) {
-    absl::optional<uint64_t> computed_value_opt =
+    std::optional<uint64_t> computed_value_opt =
         getFormatValue(*gauge.value_formatter_, context, stream_info, false);
     if (!computed_value_opt.has_value()) {
       return;
@@ -455,9 +461,9 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
     if (!filter_state.hasData<AccessLogState>(AccessLogState::key())) {
       // TODO(TAOXUY): Create a new PR that adds test coverage around any corner cases of which
       // level should be used, and adds this comment or an updated version.
-      filter_state.setData(
-          AccessLogState::key(), std::make_shared<AccessLogState>(shared_from_this()),
-          StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Request);
+      filter_state.setData(AccessLogState::key(),
+                           std::make_shared<AccessLogState>(shared_from_this()),
+                           StreamInfo::FilterState::LifeSpan::Request);
     }
     auto* state = filter_state.getDataMutable<AccessLogState>(AccessLogState::key());
 

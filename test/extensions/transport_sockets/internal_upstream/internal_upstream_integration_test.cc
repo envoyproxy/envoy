@@ -8,6 +8,7 @@
 #include "source/extensions/transport_sockets/internal_upstream/config.h"
 
 #include "test/integration/http_integration.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
 
@@ -53,7 +54,7 @@ public:
       config.mutable_buffer_size_kb()->set_value(buffer_size_);
     }
     auto* bootstrap_extension = bootstrap.add_bootstrap_extensions();
-    bootstrap_extension->mutable_typed_config()->PackFrom(config);
+    std::ignore = bootstrap_extension->mutable_typed_config()->PackFrom(config);
     bootstrap_extension->set_name("envoy.bootstrap.internal_listener");
   }
   void initialize() override {
@@ -347,7 +348,8 @@ TEST_F(InternalUpstreamIntegrationTest, TcpProxyHalfCloseLeak) {
   // Verify that the connection does not leak by waiting for the active connection gauge to drop to
   // zero. If the server side of the internal connection fails to clean up the downstream connection
   // then this wait will time out because the connection is stuck in CloseAfterFlush indefinitely.
-  test_server_->waitForGaugeEq("listener.envoy_internal_internal_listener.downstream_cx_active", 0);
+  test_server_->waitForGauge("listener.envoy_internal_internal_listener.downstream_cx_active",
+                             testing::Eq(0));
 }
 
 } // namespace

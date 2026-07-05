@@ -17,7 +17,7 @@ namespace {
 using ::nlohmann::json;
 
 absl::StatusOr<json> getJsonValue(const json& data, absl::string_view path) {
-  std::vector<std::string> parts = absl::StrSplit(path, '.');
+  std::vector<absl::string_view> parts = absl::StrSplit(path, '.');
   json current = data;
   for (const auto& part : parts) {
     if (!current.contains(part)) {
@@ -97,11 +97,11 @@ void appendQueryParamsToBaseUrl(std::string& url, absl::Span<const QueryParam> q
 
 // Recursively removes a path from a JSON object.
 // Returns true if `data` becomes empty after removal, false otherwise.
-bool recursiveRemoveJsonPath(json& data, absl::Span<const std::string> parts) {
+bool recursiveRemoveJsonPath(json& data, absl::Span<const absl::string_view> parts) {
   if (parts.empty()) {
     return false;
   }
-  const std::string& key = parts[0];
+  absl::string_view key = parts[0];
   if (!data.is_object() || !data.contains(key)) {
     return false;
   }
@@ -120,7 +120,7 @@ void removeJsonPath(json& data, absl::string_view path) {
   if (path.empty()) {
     return;
   }
-  std::vector<std::string> parts = absl::StrSplit(path, '.');
+  std::vector<absl::string_view> parts = absl::StrSplit(path, '.');
   recursiveRemoveJsonPath(data, parts);
 }
 

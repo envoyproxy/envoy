@@ -59,6 +59,7 @@ public:
   }
   bool loggingDone() { return logging_done_; }
   uint64_t bytesOutstanding() { return bytes_outstanding_; }
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool notify_ack_listener_before_soon_to_be_destroyed() const {
     return notify_ack_listener_before_soon_to_be_destroyed_;
   }
@@ -66,7 +67,7 @@ public:
 private:
   uint64_t bytes_outstanding_ = 0;
   bool fin_sent_ = false;
-  AccessLog::InstanceSharedPtrVector access_log_handlers_{};
+  AccessLog::InstanceSharedPtrVector access_log_handlers_;
   Http::RequestHeaderMapConstSharedPtr request_header_map_;
   Http::ResponseHeaderMapConstSharedPtr response_header_map_;
   Http::ResponseTrailerMapConstSharedPtr response_trailer_map_;
@@ -76,7 +77,7 @@ private:
   bool logging_done_ = false;
   uint64_t retransmitted_packets_ = 0;
   uint64_t retransmitted_bytes_ = 0;
-  absl::optional<MonotonicTime> last_downstream_ack_timestamp_;
+  std::optional<MonotonicTime> last_downstream_ack_timestamp_;
 
   const bool notify_ack_listener_before_soon_to_be_destroyed_{
       GetQuicReloadableFlag(quic_notify_ack_listener_earlier) &&

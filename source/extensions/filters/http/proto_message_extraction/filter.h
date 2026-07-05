@@ -40,11 +40,10 @@ public:
 
 private:
   struct HandleDataStatus {
-    explicit HandleDataStatus(Envoy::Http::FilterDataStatus status)
-        : got_messages(false), filter_status(status) {}
+    explicit HandleDataStatus(Envoy::Http::FilterDataStatus status) : filter_status(status) {}
 
     // If true, the function has processed at least one message.
-    bool got_messages;
+    bool got_messages{false};
 
     // If "got_message" is false, return this filter_status.
     Envoy::Http::FilterDataStatus filter_status;

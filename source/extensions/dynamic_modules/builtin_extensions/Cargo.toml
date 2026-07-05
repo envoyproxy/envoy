@@ -9,7 +9,7 @@ repository = "https://github.com/envoyproxy/envoy"
 
 [dependencies]
 envoy-proxy-dynamic-modules-rust-sdk = { path = "../sdk/rust" }
-hickory-resolver = { version = "0.25", features = ["system-config", "tokio", "tls-ring", "https-ring", "dnssec-ring", "webpki-roots"] }
+hickory-resolver = { version = "0.26", features = ["system-config", "tokio", "tls-ring", "https-ring", "dnssec-ring", "webpki-roots"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 time = ">=0.3.47"

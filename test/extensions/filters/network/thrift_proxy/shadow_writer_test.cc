@@ -14,7 +14,6 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -79,7 +78,7 @@ public:
 
     auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                                 ProtocolType::Binary);
-    EXPECT_NE(absl::nullopt, router_handle);
+    EXPECT_NE(std::nullopt, router_handle);
     EXPECT_CALL(connection, write(_, false));
 
     auto& request_owner = router_handle->requestOwner();
@@ -295,7 +294,7 @@ TEST_F(ShadowWriterTest, SubmitClusterNotFound) {
   EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
-  EXPECT_EQ(absl::nullopt, router_handle);
+  EXPECT_EQ(std::nullopt, router_handle);
   EXPECT_EQ(1U, context_.scope().counterFromString("test.shadow_request_submit_failure").value());
 }
 
@@ -306,7 +305,7 @@ TEST_F(ShadowWriterTest, SubmitClusterInMaintenance) {
   EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(cluster.get()));
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
-  EXPECT_EQ(absl::nullopt, router_handle);
+  EXPECT_EQ(std::nullopt, router_handle);
   EXPECT_EQ(1U, context_.scope().counterFromString("test.shadow_request_submit_failure").value());
 }
 
@@ -317,10 +316,10 @@ TEST_F(ShadowWriterTest, SubmitNoHealthyUpstream) {
       std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
   EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(cluster.get()));
   EXPECT_CALL(*cluster->cluster_.info_, maintenanceMode()).WillOnce(Return(false));
-  EXPECT_CALL(*cluster, tcpConnPool(_, _)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(*cluster, tcpConnPool(_, _)).WillOnce(Return(std::nullopt));
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
-  EXPECT_EQ(absl::nullopt, router_handle);
+  EXPECT_EQ(std::nullopt, router_handle);
   EXPECT_EQ(1U, context_.scope().counterFromString("test.shadow_request_submit_failure").value());
 
   // We still count the request, even if it didn't go through.
@@ -341,7 +340,7 @@ TEST_F(ShadowWriterTest, SubmitConnectionNotReady) {
       }));
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
-  EXPECT_NE(absl::nullopt, router_handle);
+  EXPECT_NE(std::nullopt, router_handle);
   EXPECT_TRUE(router_handle->waitingForConnection());
 
   EXPECT_EQ(
@@ -374,7 +373,7 @@ TEST_F(ShadowWriterTest, ShadowRequestWriteBeforePoolReady) {
 
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
-  EXPECT_NE(absl::nullopt, router_handle);
+  EXPECT_NE(std::nullopt, router_handle);
 
   // Write before connection is ready.
   auto& request_owner = router_handle->requestOwner();
@@ -417,7 +416,7 @@ TEST_F(ShadowWriterTest, ShadowRequestPoolFailure) {
 
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
-  EXPECT_NE(absl::nullopt, router_handle);
+  EXPECT_NE(std::nullopt, router_handle);
   router_handle->requestOwner().messageEnd();
 }
 

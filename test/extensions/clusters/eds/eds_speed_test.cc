@@ -24,11 +24,9 @@
 #include "test/mocks/config/custom_config_validators.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/admin.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/server/options.h"
-#include "test/mocks/ssl/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -152,7 +150,7 @@ public:
     response->set_type_url(type_url_);
     response->set_version_info(fmt::format("version-{}", version_++));
     auto* resource = response->mutable_resources()->Add();
-    resource->PackFrom(cluster_load_assignment);
+    std::ignore = resource->PackFrom(cluster_load_assignment);
     state_.ResumeTiming();
     if (use_unified_mux_) {
       dynamic_cast<Config::XdsMux::GrpcMuxSotw&>(*grpc_mux_)

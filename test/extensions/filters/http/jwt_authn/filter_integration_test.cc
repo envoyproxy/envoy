@@ -7,7 +7,6 @@
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/integration/http_protocol_integration.h"
-#include "test/test_common/registry.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 using envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig;
@@ -39,7 +38,7 @@ std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jw
 
   HttpFilter filter;
   filter.set_name("envoy.filters.http.jwt_authn");
-  filter.mutable_typed_config()->PackFrom(proto_config);
+  std::ignore = filter.mutable_typed_config()->PackFrom(proto_config);
   return MessageUtil::getJsonStringFromMessageOrError(filter);
 }
 
@@ -58,7 +57,7 @@ std::string getAsyncFetchFilterConfig(const std::string& config_str, bool fast_l
 
   HttpFilter filter;
   filter.set_name("envoy.filters.http.jwt_authn");
-  filter.mutable_typed_config()->PackFrom(proto_config);
+  std::ignore = filter.mutable_typed_config()->PackFrom(proto_config);
   return MessageUtil::getJsonStringFromMessageOrError(filter);
 }
 
@@ -290,7 +289,6 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
       format_string:
         text_format_source:
           inline_string: "%REQ(jwt_selector)%"
-      read_only: true
 )");
   initialize();
 
@@ -667,7 +665,7 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodTokenAsyncFetchFast) {
   // the first request will trigger a second jwks fetch, this is not expected, test will fail.
   // To avoid such race condition, before making the first request, wait for the first
   // fetch stats to be updated.
-  test_server_->waitForCounterGe("http.config_test.jwt_authn.jwks_fetch_success", 1);
+  test_server_->waitForCounter("http.config_test.jwt_authn.jwks_fetch_success", testing::Ge(1));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -752,7 +750,7 @@ public:
           auto& per_route_any =
               (*virtual_host->mutable_routes(0)
                     ->mutable_typed_per_filter_config())["envoy.filters.http.jwt_authn"];
-          per_route_any.PackFrom(per_route);
+          std::ignore = per_route_any.PackFrom(per_route);
         });
 
     initialize();

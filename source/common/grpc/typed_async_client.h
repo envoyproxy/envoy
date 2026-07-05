@@ -77,7 +77,7 @@ public:
 
 private:
   void onSuccessRaw(Buffer::InstancePtr&& response, Tracing::Span& span) override {
-    auto message = ResponsePtr<Response>(dynamic_cast<Response*>(
+    auto message = ResponsePtr<Response>(Envoy::Protobuf::DynamicCastMessage<Response>(
         Internal::parseMessageUntyped(std::make_unique<Response>(), std::move(response))
             .release()));
     if (!message) {
@@ -98,7 +98,7 @@ public:
 
 private:
   bool onReceiveMessageRaw(Buffer::InstancePtr&& response) override {
-    auto message = ResponsePtr<Response>(dynamic_cast<Response*>(
+    auto message = ResponsePtr<Response>(Envoy::Protobuf::DynamicCastMessage<Response>(
         Internal::parseMessageUntyped(std::make_unique<Response>(), std::move(response))
             .release()));
     if (!message) {
@@ -139,7 +139,7 @@ public:
   void reset() { client_.reset(); }
 
 private:
-  RawAsyncClientSharedPtr client_{};
+  RawAsyncClientSharedPtr client_;
 };
 
 } // namespace Grpc

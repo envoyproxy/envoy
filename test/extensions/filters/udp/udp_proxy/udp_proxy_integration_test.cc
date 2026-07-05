@@ -14,6 +14,8 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -64,7 +66,7 @@ public:
       : BaseIntegrationTest(GetParam(), ConfigHelper::baseUdpListenerConfig()),
         registration_(factory_), session_filter_registration_(session_filter_factory_) {}
 
-  void setup(uint32_t upstream_count, absl::optional<uint64_t> max_rx_datagram_size = absl::nullopt,
+  void setup(uint32_t upstream_count, std::optional<uint64_t> max_rx_datagram_size = std::nullopt,
              const std::string& session_filters_config = "",
              const std::string& cluster = "cluster_0") {
     FakeUpstreamConfig::UdpConfig config;
@@ -219,7 +221,7 @@ typed_config:
 
   void setupMultiple() {
     FakeUpstreamConfig::UdpConfig config;
-    config.max_rx_datagram_size_ = absl::nullopt;
+    config.max_rx_datagram_size_ = std::nullopt;
     setUdpFakeUpstream(config);
 
     config_helper_.addListenerFilter(R"EOF(
@@ -266,21 +268,22 @@ typed_config:
     EXPECT_EQ(expected_response, response_datagram.buffer_->toString());
     EXPECT_EQ(listener_address.asString(), response_datagram.addresses_.peer_->asString());
 
-    test_server_->waitForCounterEq("udp.foo.downstream_sess_rx_bytes", request.size());
-    test_server_->waitForCounterEq("udp.foo.downstream_sess_rx_datagrams", 1);
-    test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_tx_bytes_total",
-                                   expected_request.size());
-    test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tx_datagrams", 1);
+    test_server_->waitForCounter("udp.foo.downstream_sess_rx_bytes", Eq(request.size()));
+    test_server_->waitForCounter("udp.foo.downstream_sess_rx_datagrams", Eq(1));
+    test_server_->waitForCounter("cluster.cluster_0.upstream_cx_tx_bytes_total",
+                                 Eq(expected_request.size()));
+    test_server_->waitForCounter("cluster.cluster_0.udp.sess_tx_datagrams", Eq(1));
 
-    test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_rx_bytes_total", response.size());
-    test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams", 1);
+    test_server_->waitForCounter("cluster.cluster_0.upstream_cx_rx_bytes_total",
+                                 Eq(response.size()));
+    test_server_->waitForCounter("cluster.cluster_0.udp.sess_rx_datagrams", Eq(1));
     // The stat is incremented after the send so there is a race condition and we must wait for
     // the counter to be incremented.
-    test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_bytes", expected_response.size());
-    test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_datagrams", 1);
+    test_server_->waitForCounter("udp.foo.downstream_sess_tx_bytes", Eq(expected_response.size()));
+    test_server_->waitForCounter("udp.foo.downstream_sess_tx_datagrams", Eq(1));
 
-    test_server_->waitForCounterEq("udp.foo.downstream_sess_total", 1);
-    test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+    test_server_->waitForCounter("udp.foo.downstream_sess_total", Eq(1));
+    test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(1));
   }
 
   UdpReverseFilterConfigFactory factory_;
@@ -309,7 +312,7 @@ TEST_P(UdpProxyIntegrationTest, NoReusePort) {
   // Do not wait for listeners to start as the listener will fail.
   defer_listener_finalization_ = true;
   setup(1);
-  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_rejected", Ge(1));
 }
 
 // Basic loopback test.
@@ -332,9 +335,9 @@ TEST_P(UdpProxyIntegrationTest, DownstreamDrop) {
       (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_RECEIVE) + 1024;
   client.write(std::string(large_datagram_size, 'a'), *listener_address);
   if (GetParam() == Network::Address::IpVersion::v4) {
-    test_server_->waitForCounterEq("listener.0.0.0.0_0.udp.downstream_rx_datagram_dropped", 1);
+    test_server_->waitForCounter("listener.0.0.0.0_0.udp.downstream_rx_datagram_dropped", Eq(1));
   } else {
-    test_server_->waitForCounterEq("listener.[__]_0.udp.downstream_rx_datagram_dropped", 1);
+    test_server_->waitForCounter("listener.[__]_0.udp.downstream_rx_datagram_dropped", Eq(1));
   }
 }
 
@@ -460,7 +463,7 @@ TEST_P(UdpProxyIntegrationTest, MultipleFilters) {
 }
 
 TEST_P(UdpProxyIntegrationTest, ReadSessionFilter) {
-  setup(1, absl::nullopt, getDrainerSessionFilterConfig({{"read", 3, 0}}));
+  setup(1, std::nullopt, getDrainerSessionFilterConfig({{"read", 3, 0}}));
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -468,7 +471,7 @@ TEST_P(UdpProxyIntegrationTest, ReadSessionFilter) {
 }
 
 TEST_P(UdpProxyIntegrationTest, TwoReadSessionFilters) {
-  setup(1, absl::nullopt, getDrainerSessionFilterConfig({{"read", 3, 0}, {"read", 1, 0}}));
+  setup(1, std::nullopt, getDrainerSessionFilterConfig({{"read", 3, 0}, {"read", 1, 0}}));
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -476,7 +479,7 @@ TEST_P(UdpProxyIntegrationTest, TwoReadSessionFilters) {
 }
 
 TEST_P(UdpProxyIntegrationTest, WriteSessionFilter) {
-  setup(1, absl::nullopt, getDrainerSessionFilterConfig({{"write", 0, 3}}));
+  setup(1, std::nullopt, getDrainerSessionFilterConfig({{"write", 0, 3}}));
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -484,7 +487,7 @@ TEST_P(UdpProxyIntegrationTest, WriteSessionFilter) {
 }
 
 TEST_P(UdpProxyIntegrationTest, TwoWriteSessionFilters) {
-  setup(1, absl::nullopt, getDrainerSessionFilterConfig({{"write", 0, 3}, {"write", 0, 1}}));
+  setup(1, std::nullopt, getDrainerSessionFilterConfig({{"write", 0, 3}, {"write", 0, 1}}));
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -492,7 +495,7 @@ TEST_P(UdpProxyIntegrationTest, TwoWriteSessionFilters) {
 }
 
 TEST_P(UdpProxyIntegrationTest, ReadAndWriteSessionFilters) {
-  setup(1, absl::nullopt, getDrainerSessionFilterConfig({{"read", 3, 0}, {"write", 0, 3}}));
+  setup(1, std::nullopt, getDrainerSessionFilterConfig({{"read", 3, 0}, {"write", 0, 3}}));
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -500,7 +503,7 @@ TEST_P(UdpProxyIntegrationTest, ReadAndWriteSessionFilters) {
 }
 
 TEST_P(UdpProxyIntegrationTest, TwoReadAndWriteSessionFilters) {
-  setup(1, absl::nullopt,
+  setup(1, std::nullopt,
         getDrainerSessionFilterConfig(
             {{"read", 3, 0}, {"write", 0, 3}, {"read", 1, 0}, {"write", 0, 1}}));
   const uint32_t port = lookupPort("listener_0");
@@ -510,7 +513,7 @@ TEST_P(UdpProxyIntegrationTest, TwoReadAndWriteSessionFilters) {
 }
 
 TEST_P(UdpProxyIntegrationTest, BidirectionalSessionFilter) {
-  setup(1, absl::nullopt, getDrainerSessionFilterConfig({{"read_write", 3, 3}}));
+  setup(1, std::nullopt, getDrainerSessionFilterConfig({{"read_write", 3, 3}}));
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -519,7 +522,7 @@ TEST_P(UdpProxyIntegrationTest, BidirectionalSessionFilter) {
 
 TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnNewSession) {
   // In both filters, the onNewSession() call will increase the amount of bytes to drain by 1.
-  setup(1, absl::nullopt,
+  setup(1, std::nullopt,
         getDrainerSessionFilterConfig(
             {{"read", 2, 0, true, false, true, false}, {"read", 0, 0, true, false, true, false}}));
 
@@ -549,7 +552,7 @@ TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnNewSession) {
 }
 
 TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnRead) {
-  setup(1, absl::nullopt,
+  setup(1, std::nullopt,
         getDrainerSessionFilterConfig({{"read", 0, 0, false, true, false, false}}));
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = *Network::Utility::resolveUrl(
@@ -578,7 +581,7 @@ TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnRead) {
 }
 
 TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnNewSessionButNotOnData) {
-  setup(1, absl::nullopt, getDrainerSessionFilterConfig({{"read", 0, 0, true}}));
+  setup(1, std::nullopt, getDrainerSessionFilterConfig({{"read", 0, 0, true}}));
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -588,7 +591,7 @@ TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnNewSessionButNotOnData) {
   client.write("hello1", *listener_address);
 
   // One datagram should be received, but none sent upstream because socket was not created.
-  test_server_->waitForCounterEq("udp.foo.downstream_sess_rx_datagrams", 1);
+  test_server_->waitForCounter("udp.foo.downstream_sess_rx_datagrams", Eq(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.udp.sess_tx_datagrams")->value());
 }
 
@@ -598,7 +601,7 @@ TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnNewSessionAndLaterContinu
   // The first filter will StopIteration in onNewSession(), so the count will increase by 1. Then,
   // onData will call to continueFilterChain(), so the next onNewSession() will also increase the
   // count by 1. We expect overall that 2 bytes will be drained.
-  setup(1, absl::nullopt,
+  setup(1, std::nullopt,
         getDrainerSessionFilterConfig(
             {{"read", 0, 0, true, false, true, false}, {"read", 0, 0, true, false, true, false}}));
 
@@ -628,7 +631,7 @@ TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnNewSessionAndLaterContinu
 }
 
 TEST_P(UdpProxyIntegrationTest, WriteSessionFilterStopOnWrite) {
-  setup(1, absl::nullopt,
+  setup(1, std::nullopt,
         getDrainerSessionFilterConfig({{"write", 0, 0, false, false, false, true}}));
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = *Network::Utility::resolveUrl(
@@ -657,7 +660,7 @@ TEST_P(UdpProxyIntegrationTest, WriteSessionFilterStopOnWrite) {
 }
 
 TEST_P(UdpProxyIntegrationTest, BufferingFilterBasicFlow) {
-  setup(1, absl::nullopt, getBufferSessionFilterConfig({{2, 2, true}}));
+  setup(1, std::nullopt, getBufferSessionFilterConfig({{2, 2, true}}));
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -667,7 +670,7 @@ TEST_P(UdpProxyIntegrationTest, BufferingFilterBasicFlow) {
   client.write("hello2", *listener_address);
 
   // Two downstream datagrams should be received, but none sent upstream due to filter buffering.
-  test_server_->waitForCounterEq("udp.foo.downstream_sess_rx_datagrams", 2);
+  test_server_->waitForCounter("udp.foo.downstream_sess_rx_datagrams", Eq(2));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.udp.sess_tx_datagrams")->value());
 
   // Third downstream datagram should flush the previously buffered datagrams, due to
@@ -682,13 +685,13 @@ TEST_P(UdpProxyIntegrationTest, BufferingFilterBasicFlow) {
   EXPECT_EQ("hello2", request_datagram.buffer_->toString());
   ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
   EXPECT_EQ("hello3", request_datagram.buffer_->toString());
-  test_server_->waitForCounterEq("udp.foo.downstream_sess_rx_datagrams", 3);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tx_datagrams", 3);
+  test_server_->waitForCounter("udp.foo.downstream_sess_rx_datagrams", Eq(3));
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tx_datagrams", Eq(3));
 
   // Two upstream datagrams should be received, but none sent downstream due to filter buffering.
   fake_upstreams_[0]->sendUdpDatagram("response1", request_datagram.addresses_.peer_);
   fake_upstreams_[0]->sendUdpDatagram("response2", request_datagram.addresses_.peer_);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams", 2);
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_rx_datagrams", Eq(2));
   EXPECT_EQ(0, test_server_->counter("udp.foo.downstream_sess_tx_datagrams")->value());
 
   // Third upstream datagram should flush the previously buffered datagrams, due to
@@ -702,12 +705,12 @@ TEST_P(UdpProxyIntegrationTest, BufferingFilterBasicFlow) {
   EXPECT_EQ("response2", response_datagram.buffer_->toString());
   client.recv(response_datagram);
   EXPECT_EQ("response3", response_datagram.buffer_->toString());
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams", 3);
-  test_server_->waitForCounterEq("udp.foo.downstream_sess_rx_datagrams", 3);
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_rx_datagrams", Eq(3));
+  test_server_->waitForCounter("udp.foo.downstream_sess_rx_datagrams", Eq(3));
 }
 
 TEST_P(UdpProxyIntegrationTest, TwoBufferingFilters) {
-  setup(1, absl::nullopt, getBufferSessionFilterConfig({{1, 1, false}, {1, 1, false}}));
+  setup(1, std::nullopt, getBufferSessionFilterConfig({{1, 1, false}, {1, 1, false}}));
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -718,7 +721,7 @@ TEST_P(UdpProxyIntegrationTest, TwoBufferingFilters) {
   client.write("hello2", *listener_address);
 
   // Two downstream datagrams should be received, but none sent upstream due to filter buffering.
-  test_server_->waitForCounterEq("udp.foo.downstream_sess_rx_datagrams", 2);
+  test_server_->waitForCounter("udp.foo.downstream_sess_rx_datagrams", Eq(2));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.udp.sess_tx_datagrams")->value());
 
   // 'hello1' will flush upstream, 'hello2' will proceed to second filter. 'hello3' will
@@ -729,8 +732,8 @@ TEST_P(UdpProxyIntegrationTest, TwoBufferingFilters) {
   Network::UdpRecvData request_datagram;
   ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
   EXPECT_EQ("hello1", request_datagram.buffer_->toString());
-  test_server_->waitForCounterEq("udp.foo.downstream_sess_rx_datagrams", 3);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tx_datagrams", 1);
+  test_server_->waitForCounter("udp.foo.downstream_sess_rx_datagrams", Eq(3));
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tx_datagrams", Eq(1));
 
   // 'hello2' will flush upstream, 'hello3' will proceed to second filter. 'hello4' will
   // buffer in the first filter.
@@ -739,15 +742,15 @@ TEST_P(UdpProxyIntegrationTest, TwoBufferingFilters) {
   // Wait for the upstream datagram.
   ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
   EXPECT_EQ("hello2", request_datagram.buffer_->toString());
-  test_server_->waitForCounterEq("udp.foo.downstream_sess_rx_datagrams", 4);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tx_datagrams", 2);
+  test_server_->waitForCounter("udp.foo.downstream_sess_rx_datagrams", Eq(4));
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tx_datagrams", Eq(2));
 
   // Testing the upstream to downstream direction.
   // Two upstream datagrams should be received, but none sent downstream due to filter buffering.
   fake_upstreams_[0]->sendUdpDatagram("response1", request_datagram.addresses_.peer_);
   // 'response1' will proceed to second filter. 'response2' will buffer in first filter.
   fake_upstreams_[0]->sendUdpDatagram("response2", request_datagram.addresses_.peer_);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams", 2);
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_rx_datagrams", Eq(2));
   EXPECT_EQ(0, test_server_->counter("udp.foo.downstream_sess_tx_datagrams")->value());
 
   // 'response1' will flush downstream, 'response2' will proceed to second filter. 'response3' will
@@ -758,16 +761,16 @@ TEST_P(UdpProxyIntegrationTest, TwoBufferingFilters) {
   Network::UdpRecvData response_datagram;
   client.recv(response_datagram);
   EXPECT_EQ("response1", response_datagram.buffer_->toString());
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams", 3);
-  test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_datagrams", 1);
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_rx_datagrams", Eq(3));
+  test_server_->waitForCounter("udp.foo.downstream_sess_tx_datagrams", Eq(1));
 
   // 'response2' will flush downstream, 'response3' will proceed to second filter. 'response4' will
   // buffer in the first filter.
   fake_upstreams_[0]->sendUdpDatagram("response4", request_datagram.addresses_.peer_);
   client.recv(response_datagram);
   EXPECT_EQ("response2", response_datagram.buffer_->toString());
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams", 4);
-  test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_datagrams", 2);
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_rx_datagrams", Eq(4));
+  test_server_->waitForCounter("udp.foo.downstream_sess_tx_datagrams", Eq(2));
 }
 
 // Per session cluster setter filter sets non-existent cluster.
@@ -780,7 +783,7 @@ TEST_P(UdpProxyIntegrationTest, PerSessionClusterSetterFilterNoClusterFound) {
       cluster: cluster_1
 )EOF";
 
-  setup(1, absl::nullopt, session_filters_config);
+  setup(1, std::nullopt, session_filters_config);
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -789,9 +792,9 @@ TEST_P(UdpProxyIntegrationTest, PerSessionClusterSetterFilterNoClusterFound) {
   client.write("hello", *listener_address);
 
   // cluster_1 does not exist, so the session will be closed.
-  test_server_->waitForCounterEq("udp.foo.downstream_sess_no_route", 1);
-  test_server_->waitForCounterEq("udp.foo.downstream_sess_total", 1);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForCounter("udp.foo.downstream_sess_no_route", Eq(1));
+  test_server_->waitForCounter("udp.foo.downstream_sess_total", Eq(1));
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 }
 
 // Basic loopback test with per session cluster setter filter.
@@ -804,7 +807,7 @@ TEST_P(UdpProxyIntegrationTest, PerSessionClusterSetterFilterBasicLoopback) {
       cluster: cluster_0
 )EOF";
 
-  setup(1, absl::nullopt, session_filters_config, "cluster_1");
+  setup(1, std::nullopt, session_filters_config, "cluster_1");
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));

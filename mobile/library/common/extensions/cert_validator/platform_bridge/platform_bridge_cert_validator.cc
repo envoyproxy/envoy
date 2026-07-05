@@ -68,13 +68,13 @@ ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
     stats_.fail_verify_error_.inc();
     ENVOY_LOG(debug, error);
     return {ValidationResults::ValidationStatus::Failed,
-            Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt, error};
+            Envoy::Ssl::ClientValidationStatus::NotValidated, std::nullopt, error};
   }
   if (callback == nullptr) {
     IS_ENVOY_BUG("No callback specified");
     const char* error = "verify cert chain failed: no callback specified.";
     return {ValidationResults::ValidationStatus::Failed,
-            Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt, error};
+            Envoy::Ssl::ClientValidationStatus::NotValidated, std::nullopt, error};
   }
 
   std::vector<std::string> certs;
@@ -109,6 +109,8 @@ ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
   ValidationJob job;
   job.result_callback_ = std::move(callback);
   Event::Dispatcher& dispatcher = job.result_callback_->dispatcher();
+  ASSERT(Thread::MainThread::isMainOrTestThread(),
+         "Certification validation must happen on the main thread.");
   Thread::Options thread_options;
   thread_options.priority_ = thread_priority_;
   job.validation_thread_ = thread_factory_->createThread(
@@ -119,13 +121,13 @@ ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
       thread_options, /* crash_on_failure=*/false);
   if (job.validation_thread_ == nullptr) {
     return {ValidationResults::ValidationStatus::Failed,
-            Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt,
+            Envoy::Ssl::ClientValidationStatus::NotValidated, std::nullopt,
             "Failed creating a thread for cert chain validation."};
   }
   Thread::ThreadId thread_id = job.validation_thread_->pthreadId();
   validation_jobs_[thread_id] = std::move(job);
   return {ValidationResults::ValidationStatus::Pending,
-          Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt, absl::nullopt};
+          Envoy::Ssl::ClientValidationStatus::NotValidated, std::nullopt, std::nullopt};
 }
 
 void PlatformBridgeCertValidator::verifyCertChainByPlatform(

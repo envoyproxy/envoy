@@ -10,6 +10,7 @@
 #include "test/config/utility.h"
 #include "test/integration/filters/add_header_filter.pb.h"
 #include "test/integration/filters/repick_cluster_filter.h"
+#include "test/integration/filters/test_filters.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
 
@@ -31,6 +32,8 @@ constexpr absl::string_view expected_types[] = {
 
 using HttpFilterProto =
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
+using testing::Eq;
+using testing::Ge;
 using testing::Not;
 
 class UpstreamHttpFilterIntegrationTestBase : public HttpIntegrationTest {
@@ -52,9 +55,9 @@ public:
               (*cluster->mutable_typed_extension_protocol_options())
                   ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
       *protocol_options.add_http_filters() = config;
-      (*cluster->mutable_typed_extension_protocol_options())
-          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-              .PackFrom(protocol_options);
+      std::ignore = (*cluster->mutable_typed_extension_protocol_options())
+                        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                            .PackFrom(protocol_options);
     });
   }
 
@@ -66,9 +69,9 @@ public:
           HttpFilterProto& router_filter = *hcm.mutable_http_filters()->rbegin();
           ASSERT_EQ(router_filter.name(), "envoy.filters.http.router");
           envoy::extensions::filters::http::router::v3::Router router;
-          router_filter.typed_config().UnpackTo(&router);
+          std::ignore = router_filter.typed_config().UnpackTo(&router);
           *router.add_upstream_http_filters() = config;
-          router_filter.mutable_typed_config()->PackFrom(router);
+          std::ignore = router_filter.mutable_typed_config()->PackFrom(router);
         });
   }
 
@@ -80,7 +83,7 @@ public:
     configuration.set_header_key(key);
     configuration.set_header_value(value);
     filter_config.set_disabled(disabled);
-    filter_config.mutable_typed_config()->PackFrom(configuration);
+    std::ignore = filter_config.mutable_typed_config()->PackFrom(configuration);
     return filter_config;
   }
 
@@ -88,7 +91,7 @@ public:
     HttpFilterProto filter_config;
     filter_config.set_name("envoy.filters.http.upstream_codec");
     auto configuration = envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec();
-    filter_config.mutable_typed_config()->PackFrom(configuration);
+    std::ignore = filter_config.mutable_typed_config()->PackFrom(configuration);
     return filter_config;
   }
 
@@ -137,6 +140,29 @@ public:
     EXPECT_TRUE(upstream_headers != nullptr);
     cleanupUpstreamAndDownstream();
     return upstream_headers;
+  }
+
+  void addStaticNoConfigFilter(const std::string& name) {
+    HttpFilterProto filter_config;
+    filter_config.set_name(name);
+    std::ignore = filter_config.mutable_typed_config()->PackFrom(Envoy::Protobuf::Struct());
+    if (useRouterFilters()) {
+      addStaticRouterFilter(filter_config);
+    } else {
+      addStaticClusterFilter(filter_config);
+    }
+  }
+
+  template <typename ProtoConfig>
+  void addStaticTypedConfigFilter(const std::string& name, const ProtoConfig& config) {
+    HttpFilterProto filter_config;
+    filter_config.set_name(name);
+    std::ignore = filter_config.mutable_typed_config()->PackFrom(config);
+    if (useRouterFilters()) {
+      addStaticRouterFilter(filter_config);
+    } else {
+      addStaticClusterFilter(filter_config);
+    }
   }
 
   bool use_router_filters_{false};
@@ -228,6 +254,74 @@ TEST_P(StaticRouterOrClusterFiltersIntegrationTest, TwoFilters) {
   expectHeaderKeyAndValue(headers, default_header_key_, "value1,value2");
 }
 
+// Verifies that an upstream filter calling sendLocalReply() from onHostSelected()
+// (before decodeHeaders) correctly returns an error to the client without
+// corrupting the connection state. Two requests on the same HTTP/2 connection
+// (header-only + POST with body) prove the state machine handles early abort cleanly.
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest, OnHostSelectedLocalReply) {
+  addStaticTypedConfigFilter("local-reply-during-host-selection",
+                             test::integration::filters::LocalReplyDuringHostSelectionConfig());
+  addCodecFilter();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Request 1: header-only GET — rejected during onHostSelected.
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  EXPECT_TRUE(response1->waitForEndStream());
+  EXPECT_TRUE(response1->complete());
+  EXPECT_EQ("403", response1->headers().getStatusValue());
+
+  // Request 2: POST with body — rejected during onHostSelected, body must be drained cleanly.
+  Http::TestRequestHeaderMapImpl post_headers{
+      {":method", "POST"}, {":path", "/"}, {":scheme", "https"}, {":authority", "host"}};
+  auto response2 = codec_client_->makeRequestWithBody(post_headers, "hello");
+  EXPECT_TRUE(response2->waitForEndStream());
+  EXPECT_TRUE(response2->complete());
+  EXPECT_EQ("403", response2->headers().getStatusValue());
+
+  // No upstream request was made — newStream() was never called.
+  auto upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
+  EXPECT_TRUE(upstream_headers == nullptr);
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Verify that a local reply sent from onHostSelected is not retried, even when the route has a
+// retry policy that would normally retry on 4xx responses.
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest, OnHostSelectedLocalReplyNoRetry) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* retry_policy = hcm.mutable_route_config()
+                                 ->mutable_virtual_hosts(0)
+                                 ->mutable_routes(0)
+                                 ->mutable_route()
+                                 ->mutable_retry_policy();
+        retry_policy->set_retry_on("4xx");
+        retry_policy->mutable_num_retries()->set_value(3);
+      });
+
+  addStaticTypedConfigFilter("local-reply-during-host-selection",
+                             test::integration::filters::LocalReplyDuringHostSelectionConfig());
+  addCodecFilter();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  EXPECT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+
+  // No upstream connection was ever initiated — newStream() was never called on any attempt.
+  auto upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
+  EXPECT_TRUE(upstream_headers == nullptr);
+
+  cleanupUpstreamAndDownstream();
+}
+
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, StaticRouterOrClusterFiltersIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()));
@@ -243,6 +337,8 @@ public:
     autonomous_upstream_ = false;
     config_helper_.prependFilter(R"EOF(
 name: encode-headers-return-stop-iteration-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.EncodeHeadersReturnStopIterationFilterConfig
 )EOF",
                                  false);
 
@@ -344,7 +440,7 @@ public:
       auto default_configuration = test::integration::filters::AddHeaderFilterConfig();
       default_configuration.set_header_key(default_header_key_);
       default_configuration.set_header_value(default_header_value_);
-      discovery->mutable_default_config()->PackFrom(default_configuration);
+      std::ignore = discovery->mutable_default_config()->PackFrom(default_configuration);
     }
 
     discovery->set_apply_default_config_without_warming(apply_without_warming);
@@ -380,9 +476,9 @@ public:
       auto* filter = protocol_options.add_http_filters();
       setDynamicFilterConfig(filter, name, apply_without_warming, set_default_config, rate_limit,
                              second_connection);
-      (*cluster->mutable_typed_extension_protocol_options())
-          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-              .PackFrom(protocol_options);
+      std::ignore = (*cluster->mutable_typed_extension_protocol_options())
+                        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                            .PackFrom(protocol_options);
     });
   }
 
@@ -396,11 +492,11 @@ public:
           HttpFilterProto& router_filter = *hcm.mutable_http_filters(0);
           ASSERT_EQ(router_filter.name(), "envoy.filters.http.router");
           envoy::extensions::filters::http::router::v3::Router router;
-          router_filter.typed_config().UnpackTo(&router);
+          std::ignore = router_filter.typed_config().UnpackTo(&router);
           auto* filter = router.add_upstream_http_filters();
           setDynamicFilterConfig(filter, name, apply_without_warming, set_default_config,
                                  rate_limit, second_connection);
-          router_filter.mutable_typed_config()->PackFrom(router);
+          std::ignore = router_filter.mutable_typed_config()->PackFrom(router);
         });
   }
 
@@ -464,7 +560,7 @@ public:
     });
 
     HttpIntegrationTest::initialize();
-    test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+    test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
     EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
     registerTestServerPorts({"http"});
   }
@@ -529,7 +625,7 @@ public:
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url(Config::TestTypeUrl::get().Listener);
-    response.add_resources()->PackFrom(listener_config_);
+    std::ignore = response.add_resources()->PackFrom(listener_config_);
     lds_stream_->sendGrpcMessage(response);
   }
 
@@ -541,11 +637,11 @@ public:
     auto configuration = test::integration::filters::AddHeaderFilterConfig();
     configuration.set_header_key(key);
     configuration.set_header_value(val);
-    typed_config.mutable_typed_config()->PackFrom(configuration);
+    std::ignore = typed_config.mutable_typed_config()->PackFrom(configuration);
 
     envoy::service::discovery::v3::Resource resource;
     resource.set_name(name);
-    resource.mutable_resource()->PackFrom(typed_config);
+    std::ignore = resource.mutable_resource()->PackFrom(typed_config);
     if (ttl) {
       resource.mutable_ttl()->set_seconds(1);
     }
@@ -553,7 +649,7 @@ public:
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
-    response.add_resources()->PackFrom(resource);
+    std::ignore = response.add_resources()->PackFrom(resource);
 
     if (!second_connection) {
       ecds_stream_->sendGrpcMessage(response);
@@ -626,15 +722,15 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, BasicSuccess) {
 
   // Send 1st config update.
   sendXdsResponse(filter_name_, "1", default_header_key_, "test-val1");
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(1));
   auto headers2 = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers2, "test-val1");
 
   // Send 2nd config update.
   sendXdsResponse(filter_name_, "1", default_header_key_, "test-val2");
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 2);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(2));
   auto headers3 = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers3, "test-val2");
 };
@@ -647,14 +743,14 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, BasicSuccessWithTtl) {
 
   // Send 1st config update.
   sendXdsResponse(filter_name_, "1", default_header_key_, "test-val1", true);
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(1));
   auto headers1 = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers1, "test-val1");
 
   // Wait for configuration expiry, the default configuration should be applied.
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 2);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(2));
   auto headers2 = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers2, default_header_value_);
 };
@@ -667,8 +763,8 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, BasicWithConfigFail) {
 
   // Send config update with invalid config (header value length has to >=2).
   sendXdsResponse(filter_name_, "1", default_header_key_, "x");
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_fail", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_fail", Eq(1));
   auto headers = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers, default_header_value_);
 };
@@ -681,8 +777,8 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, TwoSubscriptionsSameName) {
   initialize();
 
   sendXdsResponse(filter_name_, "1", default_header_key_, "test-val");
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(1));
   auto headers = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers, "test-val,test-val");
 }
@@ -701,10 +797,10 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, TwoSubscriptionsDifferentNa
   // Send 1st config update.
   sendXdsResponse("foo", "1", "header-key1", "test-val1");
   sendXdsResponse("bar", "1", "header-key2", "test-val1", false, true);
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter.foo.config_reload", 1);
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter.bar.config_reload", 1);
+  test_server_->waitForCounter("extension_config_discovery.upstream_http_filter.foo.config_reload",
+                               Eq(1));
+  test_server_->waitForCounter("extension_config_discovery.upstream_http_filter.bar.config_reload",
+                               Eq(1));
   auto headers2 = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers2, "header-key1", "test-val1");
   expectHeaderKeyAndValue(headers2, "header-key2", "test-val1");
@@ -712,10 +808,10 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, TwoSubscriptionsDifferentNa
   // Send 2nd config update.
   sendXdsResponse("foo", "2", "header-key1", "test-val2");
   sendXdsResponse("bar", "2", "header-key2", "test-val2", false, true);
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter.foo.config_reload", 2);
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter.bar.config_reload", 2);
+  test_server_->waitForCounter("extension_config_discovery.upstream_http_filter.foo.config_reload",
+                               Eq(2));
+  test_server_->waitForCounter("extension_config_discovery.upstream_http_filter.bar.config_reload",
+                               Eq(2));
   auto headers3 = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers3, "header-key1", "test-val2");
   expectHeaderKeyAndValue(headers3, "header-key2", "test-val2");
@@ -731,8 +827,8 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, TwoDynamicTwoStaticFilterMi
   initialize();
 
   sendXdsResponse(filter_name_, "1", default_header_key_, "xds-val");
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(1));
   auto headers = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers, default_header_key_, "xds-val,static-val1,xds-val");
   expectHeaderKeyAndValue(headers, "header2", "static-val2");
@@ -748,8 +844,8 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, DynamicStaticFilterMixedDif
   initialize();
 
   sendXdsResponse(filter_name_, "1", default_header_key_, "xds-val");
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(1));
   auto headers = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers, default_header_key_, "static-val1,xds-val,xds-val");
   expectHeaderKeyAndValue(headers, "header2", "static-val2");
@@ -775,8 +871,8 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, UpdateDuringConnection) {
 
   // Send config update.
   sendXdsResponse(filter_name_, "1", default_header_key_, "xds-val");
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(1));
 
   IntegrationStreamDecoderPtr response2 =
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -802,8 +898,8 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, BasicSuccessWithConfigDump)
 
   // Send 1st config update.
   sendXdsResponse(filter_name_, "1", default_header_key_, "xds-val");
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(1));
 
   // Verify ECDS config dump are working correctly.
   BufferingStreamDecoderPtr response;
@@ -824,13 +920,13 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, BasicSuccessWithConfigDump)
 
   // With /config_dump, the response has the format: EcdsConfigDump.
   envoy::admin::v3::EcdsConfigDump ecds_config_dump;
-  config_dump.configs(2).UnpackTo(&ecds_config_dump);
+  std::ignore = config_dump.configs(2).UnpackTo(&ecds_config_dump);
   EXPECT_EQ("1", ecds_config_dump.ecds_filters(0).version_info());
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("foo", filter_config.name());
   test::integration::filters::AddHeaderFilterConfig http_filter_config;
-  filter_config.typed_config().UnpackTo(&http_filter_config);
+  std::ignore = filter_config.typed_config().UnpackTo(&http_filter_config);
   EXPECT_EQ(default_header_key_, http_filter_config.header_key());
   EXPECT_EQ("xds-val", http_filter_config.header_value());
 }
@@ -878,8 +974,8 @@ TEST_P(DynamicRouterAndClusterFiltersIntegrationTest, DynamicRouterAndClusterSam
 
   // Send 1st config update.
   sendXdsResponse(filter_name_, "1", default_header_key_, "test-val1");
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(1));
   auto headers2 = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers2, "test-val1");
 };
@@ -900,10 +996,10 @@ TEST_P(DynamicRouterAndClusterFiltersIntegrationTest, DynamicRouterAndClusterDif
   // Send 1st config update.
   sendXdsResponse("foo", "1", default_header_key_, "value-from-cluster");
   sendXdsResponse("bar", "1", default_header_key_, "value-from-router", false, true);
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter.foo.config_reload", 1);
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter.bar.config_reload", 1);
+  test_server_->waitForCounter("extension_config_discovery.upstream_http_filter.foo.config_reload",
+                               Eq(1));
+  test_server_->waitForCounter("extension_config_discovery.upstream_http_filter.bar.config_reload",
+                               Eq(1));
   auto headers2 = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers2, "value-from-cluster");
 };

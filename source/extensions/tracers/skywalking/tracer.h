@@ -90,6 +90,9 @@ public:
   // trace. That make it is impossible to update the sampling decision. So, the useLocalDecision()
   // always return false now. This should be resolved in the future.
   bool useLocalDecision() const override { return false; }
+  // SkyWalking ships every finished span. setSampled(false) only sets a skip flag, it does
+  // not drop the span.
+  bool exportedSpan() const override { return true; }
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
   void setBaggage(absl::string_view, absl::string_view) override {}
   std::string getTraceId() const override { return tracing_context_->traceId(); }

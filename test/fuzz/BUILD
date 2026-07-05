@@ -11,6 +11,7 @@ load(
     "envoy_proto_library",
     "envoy_select_signal_trace",
 )
+load("//bazel:toolchains.bzl", "LLVM_MAJOR")
 
 licenses(["notice"])  # Apache 2
 
@@ -26,9 +27,9 @@ exports_files(["headers.dict"])
 
 cc_library(
     name = "fuzzed_data_provider",
-    hdrs = ["@llvm_toolchain_llvm//:lib/clang/18/include/fuzzer/FuzzedDataProvider.h"],
+    hdrs = ["@llvm_toolchain_llvm//:lib/clang/" + LLVM_MAJOR + "/include/fuzzer/FuzzedDataProvider.h"],
     include_prefix = "",
-    strip_include_prefix = "/lib/clang/18/include",
+    strip_include_prefix = "/lib/clang/" + LLVM_MAJOR + "/include",
     visibility = ["//visibility:public"],
 )
 
@@ -72,7 +73,6 @@ envoy_cc_test_library(
     deps = [
         ":common_proto_cc_proto",
         "//source/common/common:empty_string",
-        "//source/common/common:logger_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib_header",

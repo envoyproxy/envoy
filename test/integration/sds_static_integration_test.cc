@@ -16,7 +16,6 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
-#include "test/mocks/secret/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
@@ -50,7 +49,7 @@ public:
           "validation_context");
       common_tls_context->add_tls_certificate_sds_secret_configs()->set_name("server_cert");
       transport_socket->set_name("envoy.transport_sockets.tls");
-      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
 
       auto* secret = bootstrap.mutable_static_resources()->add_secrets();
       secret->set_name("validation_context");
@@ -118,7 +117,7 @@ public:
       auto* transport_socket =
           bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
       transport_socket->set_name("envoy.transport_sockets.tls");
-      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
 
       auto* secret = bootstrap.mutable_static_resources()->add_secrets();
       secret->set_name("client_cert");

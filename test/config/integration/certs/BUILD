@@ -8,6 +8,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+# Includes all generated certificates needed for integration tests.
 filegroup(
     name = "certs",
     srcs = glob([

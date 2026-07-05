@@ -19,7 +19,7 @@ class MockCallbacks : public Callbacks {
                Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(void, onPoolReady,
               (RequestEncoder & encoder, Upstream::HostDescriptionConstSharedPtr host,
-               StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol));
+               StreamInfo::StreamInfo& info, std::optional<Http::Protocol> protocol));
 };
 
 class MockInstance : public Instance {
@@ -39,21 +39,11 @@ public:
   MOCK_METHOD(bool, maybePreconnect, (float));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
   MOCK_METHOD(absl::string_view, protocolDescription, (), (const));
-  MOCK_METHOD(void, setLifetimeCallbacks,
-              (OptRef<ConnectionLifetimeCallbacks> callbacks, std::vector<uint8_t> hash_key));
+  MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, socketOptions, (), (override));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_;
   IdleCb idle_cb_;
-};
-
-class MockConnectionLifetimeCallbacks : public ConnectionLifetimeCallbacks {
-public:
-  MOCK_METHOD(void, onConnectionOpen,
-              (Instance & pool, std::vector<uint8_t>& hash_key,
-               const Network::Connection& connection));
-  MOCK_METHOD(void, onConnectionDraining,
-              (Instance & pool, std::vector<uint8_t>& hash_key,
-               const Network::Connection& connection));
+  Network::ConnectionSocket::OptionsSharedPtr socket_options_;
 };
 
 } // namespace ConnectionPool

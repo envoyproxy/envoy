@@ -11,6 +11,10 @@
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/quic/quic_network_connectivity_observer_impl.h"
+#include "source/common/quic/scone_state.h"
+#include "source/common/runtime/runtime_features.h"
+
+#include "quiche/quic/core/quic_bandwidth.h"
 
 namespace Envoy {
 namespace Quic {
@@ -116,6 +120,9 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   http_datagram_support_ = quic::HttpDatagramSupport::kRfc;
 #endif
+
+  streamInfo().filterState()->setData(SconeStateKey, std::make_shared<SconeState>(),
+                                      StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
@@ -125,6 +132,23 @@ EnvoyQuicClientSession::~EnvoyQuicClientSession() {
     registry_->unregisterObserver(*network_connectivity_observer_);
   }
 }
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+quic::WebTransportHttp3VersionSet
+EnvoyQuicClientSession::LocallySupportedWebTransportVersions() const {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_support_web_transport")) {
+    return {};
+  }
+  return quic::kDefaultSupportedWebTransportVersions;
+}
+void EnvoyQuicClientSession::registerStreamWaitingForSettings(quic::QuicStreamId stream_id) {
+  streams_waiting_for_settings_.insert(stream_id);
+}
+
+void EnvoyQuicClientSession::unregisterStreamWaitingForSettings(quic::QuicStreamId stream_id) {
+  streams_waiting_for_settings_.erase(stream_id);
+}
+#endif
 
 absl::string_view EnvoyQuicClientSession::requestedServerName() const { return server_id().host(); }
 
@@ -203,13 +227,6 @@ quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::QuicStr
   return nullptr;
 }
 
-quic::QuicSpdyStream*
-EnvoyQuicClientSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
-  // Envoy doesn't support server push.
-  IS_ENVOY_BUG("unexpectes server push call");
-  return nullptr;
-}
-
 bool EnvoyQuicClientSession::hasDataToWrite() { return HasDataToWrite(); }
 
 const quic::QuicConnection* EnvoyQuicClientSession::quicConnection() const {
@@ -241,6 +258,30 @@ void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
       dispatcher_.timeSource());
 
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
+}
+
+bool EnvoyQuicClientSession::OnSettingsFrame(const quic::SettingsFrame& frame) {
+  if (!quic::QuicSpdyClientSession::OnSettingsFrame(frame)) {
+    // The base implementation may close the connection on invalid settings.
+    return false;
+  }
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // The peer's SETTINGS (carrying WebTransport/HTTP Datagram negotiation) are now known. Write any
+  // WebTransport CONNECT requests whose encodeHeaders() was deferred because QUICHE only creates
+  // the upstream WebTransport session at header-write time and only if WebTransport is already
+  // negotiated. Move the set aside first so a flush that somehow re-registers (it should not, since
+  // settings_received() is now true) cannot mutate what we iterate.
+  absl::flat_hash_set<quic::QuicStreamId> waiting = std::move(streams_waiting_for_settings_);
+  streams_waiting_for_settings_.clear();
+  for (quic::QuicStreamId stream_id : waiting) {
+    // The stream may have been reset/closed while waiting; GetActiveStream() returns nullptr then,
+    // so a stale ID is harmless.
+    if (auto* stream = GetActiveStream(stream_id); stream != nullptr) {
+      static_cast<EnvoyQuicClientStream*>(stream)->flushPendingHeaders();
+    }
+  }
+#endif
+  return true;
 }
 
 std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::CreateQuicCryptoStream() {
@@ -350,6 +391,20 @@ void EnvoyQuicClientSession::StartDraining() {
   if (http_connection_callbacks_ != nullptr) {
     // HTTP/3 GOAWAY doesn't have an error code field.
     http_connection_callbacks_->onGoAway(Http::GoAwayErrorCode::NoError);
+  }
+}
+
+void EnvoyQuicClientSession::OnSconePacket(quic::QuicBandwidth bandwidth) {
+  auto* state = streamInfo().filterState()->getDataMutable<SconeState>(SconeStateKey);
+  if (state) {
+    state->scone_max_kbps = bandwidth.ToKBitsPerSecond();
+    auto now = dispatcher_.timeSource().systemTime();
+    state->timestamp_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+    ENVOY_CONN_LOG(debug, "SCONE update: {} kbps at {} ms", *this, bandwidth.ToKBitsPerSecond(),
+                   state->timestamp_ms.value());
+  } else {
+    IS_ENVOY_BUG("SconeState not found in FilterState");
   }
 }
 

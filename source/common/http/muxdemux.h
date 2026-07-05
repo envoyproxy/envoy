@@ -50,10 +50,11 @@ public:
 
   // Iterator over streams. Allows sending different headers, body or trailers to different streams.
   struct StreamIterator {
-    using difference_type = std::ptrdiff_t;
-    using element_type = AsyncClient::Stream*;
-    using pointer = element_type*;
-    using reference = element_type&;
+    // Standard iterator aliases intentionally use STL-prescribed snake_case names.
+    using difference_type = std::ptrdiff_t;    // NOLINT(readability-identifier-naming)
+    using element_type = AsyncClient::Stream*; // NOLINT(readability-identifier-naming)
+    using pointer = element_type*;             // NOLINT(readability-identifier-naming)
+    using reference = element_type&;           // NOLINT(readability-identifier-naming)
     explicit StreamIterator(std::vector<CallbacksFacade>::iterator it) : it(it) {}
     StreamIterator() = default;
 
@@ -112,7 +113,7 @@ public:
   struct Callbacks {
     std::string cluster_name;
     std::weak_ptr<AsyncClient::StreamCallbacks> callbacks;
-    absl::optional<AsyncClient::StreamOptions> options;
+    std::optional<AsyncClient::StreamOptions> options;
   };
 
   static std::shared_ptr<MuxDemux> create(Server::Configuration::FactoryContext& context) {

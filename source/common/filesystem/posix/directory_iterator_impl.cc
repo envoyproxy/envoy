@@ -17,7 +17,7 @@ DirectoryIteratorImpl::DirectoryIteratorImpl(const std::string& directory_path)
   if (status_.ok()) {
     nextEntry();
   } else {
-    entry_ = {"", FileType::Other, absl::nullopt};
+    entry_ = {"", FileType::Other, std::nullopt};
   }
 }
 
@@ -46,7 +46,7 @@ void DirectoryIteratorImpl::nextEntry() {
   dirent* entry = ::readdir(dir_);
 
   if (entry == nullptr) {
-    entry_ = {"", FileType::Other, absl::nullopt};
+    entry_ = {"", FileType::Other, std::nullopt};
     if (errno != 0) {
       status_ = absl::ErrnoToStatus(errno, fmt::format("unable to iterate directory {}: {}",
                                                        directory_path_, errorDetails(errno)));
@@ -75,18 +75,18 @@ absl::StatusOr<DirectoryEntry> DirectoryIteratorImpl::makeEntry(absl::string_vie
       // If we confirm this with an lstat, treat this file entity as
       // a regular file, which may be unlink()'ed.
       if (::lstat(full_path.c_str(), &stat_buf) == 0 && S_ISLNK(stat_buf.st_mode)) {
-        return DirectoryEntry{std::string{filename}, FileType::Regular, absl::nullopt};
+        return DirectoryEntry{std::string{filename}, FileType::Regular, std::nullopt};
       }
     }
     return absl::ErrnoToStatus(
         result.errno_, fmt::format("unable to stat file: '{}' ({})", full_path, result.errno_));
   } else if (S_ISDIR(stat_buf.st_mode)) {
-    return DirectoryEntry{std::string{filename}, FileType::Directory, absl::nullopt};
+    return DirectoryEntry{std::string{filename}, FileType::Directory, std::nullopt};
   } else if (S_ISREG(stat_buf.st_mode)) {
     return DirectoryEntry{std::string{filename}, FileType::Regular,
                           static_cast<uint64_t>(stat_buf.st_size)};
   } else {
-    return DirectoryEntry{std::string{filename}, FileType::Other, absl::nullopt};
+    return DirectoryEntry{std::string{filename}, FileType::Other, std::nullopt};
   }
 }
 

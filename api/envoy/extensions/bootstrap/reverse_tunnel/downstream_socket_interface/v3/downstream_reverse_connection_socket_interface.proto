@@ -2,9 +2,14 @@ syntax = "proto3";
 
 package envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3;
 
+import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
+
+import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3";
 option java_outer_classname = "DownstreamReverseConnectionSocketInterfaceProto";
@@ -18,6 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for the downstream reverse connection socket interface.
 // This interface initiates reverse connections to upstream Envoys and provides
 // them as socket connections for downstream requests.
+// [#next-free-field: 6]
 message DownstreamReverseConnectionSocketInterface {
   // HTTP handshake settings for initiator envoy initiated reverse tunnels.
   message HttpHandshakeConfig {
@@ -27,6 +33,18 @@ message DownstreamReverseConnectionSocketInterface {
 
     // Additional headers to include in the HTTP handshake request.
     repeated config.core.v3.HeaderValueOption additional_headers = 2;
+
+    // Perform the handshake as an HTTP/1.1 ``Upgrade`` exchange (``Upgrade: reverse-tunnel``,
+    // success on ``101``) so HTTP proxies can route the handshake and splice the tunnel
+    // afterward. The responder must set this flag to the same value.
+    // Defaults to ``false``.
+    bool use_http_upgrade = 3;
+
+    // Formatter extensions usable in ``additional_headers`` substitution. See the formatter
+    // extensions documentation for details. When set, ``additional_headers`` values are evaluated
+    // as substitution format strings; when empty, the values are sent literally.
+    // [#extension-category: envoy.formatter]
+    repeated config.core.v3.TypedExtensionConfig formatters = 4;
   }
 
   // Stat prefix to be used for downstream reverse connection socket interface stats.
@@ -40,4 +58,16 @@ message DownstreamReverseConnectionSocketInterface {
   // Optional HTTP handshake configuration. When unset, the initiator envoy uses the defaults
   // provided by ``HttpHandshakeConfig``.
   HttpHandshakeConfig http_handshake = 3;
+
+  // Access log configuration for reverse tunnel initiator lifecycle events.
+  // Logs are emitted on handshake success, handshake failure, and connection close.
+  // Reverse tunnel metadata (``node_id``, ``cluster_id``, ``tenant_id``, upstream cluster, etc.)
+  // is available via ``%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:*)%`` substitutions.
+  repeated config.accesslog.v3.AccessLog access_log = 4;
+
+  // Upper bound on the per-host reconnect backoff. The initiator retries a failed handshake on a
+  // deterministic exponential schedule (1s, 2s, 4s, ...) with small upward jitter; this value caps
+  // that schedule.
+  google.protobuf.Duration max_reconnect_backoff = 5
+      [(validate.rules).duration = {gte {seconds: 1}}];
 }

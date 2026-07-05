@@ -13,7 +13,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
@@ -34,12 +33,7 @@ parseHttpConnectionManagerFromYaml(const std::string& yaml) {
 
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
-  HttpConnectionManagerConfigTest() {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-    ON_CALL(context_, listenerInfo()).WillByDefault(testing::ReturnRef(listener_info_));
-  }
-  NiceMock<Network::MockListenerInfo> listener_info_;
+  HttpConnectionManagerConfigTest() {}
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Http::SlowDateProviderImpl date_provider_{
       context_.server_factory_context_.mainThreadDispatcher().timeSource()};
@@ -52,29 +46,34 @@ public:
   TestScopedRuntime scoped_runtime_;
   void createHttpConnectionManagerConfig(const std::string& yaml) {
     creation_status_ = absl::OkStatus();
-    HttpConnectionManagerConfig(parseHttpConnectionManagerFromYaml(yaml), context_, date_provider_,
-                                route_config_provider_manager_,
-                                &scoped_routes_config_provider_manager_, tracer_manager_,
-                                filter_config_provider_manager_, creation_status_);
+    [[maybe_unused]] HttpConnectionManagerConfig config(
+        parseHttpConnectionManagerFromYaml(yaml), context_, date_provider_,
+        route_config_provider_manager_, &scoped_routes_config_provider_manager_, tracer_manager_,
+        filter_config_provider_manager_, creation_status_);
     THROW_IF_NOT_OK(creation_status_);
   }
   absl::Status creation_status_{absl::OkStatus()};
 };
 
-class PassThroughFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<
-                                     test::http_connection_manager::FilterDependencyTestFilter> {
+template <typename Proto>
+class TemplatedPassThroughFilterFactory
+    : public Extensions::HttpFilters::Common::FactoryBase<Proto> {
 public:
-  PassThroughFilterFactory(std::string name) : FactoryBase(name) {}
+  TemplatedPassThroughFilterFactory(std::string name)
+      : Extensions::HttpFilters::Common::FactoryBase<Proto>(name) {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const test::http_connection_manager::FilterDependencyTestFilter&, const std::string&,
-      Server::Configuration::FactoryContext&) override {
+  Http::FilterFactoryCb
+  createFilterFactoryFromProtoTyped(const Proto&, const std::string&,
+                                    Server::Configuration::FactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(std::make_shared<Http::PassThroughDecoderFilter>());
     };
   }
 };
+
+using PassThroughFilterFactory =
+    TemplatedPassThroughFilterFactory<test::http_connection_manager::FilterDependencyTestFilter>;
 
 } // namespace HttpConnectionManager
 } // namespace NetworkFilters

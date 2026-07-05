@@ -30,7 +30,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/simulated_time_system.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -149,6 +149,30 @@ TEST_F(SslContextImplTest, TestCipherSuites) {
             "ciphers were rejected when tried individually: BOGUS1-SHA256, BOGUS2-SHA");
 }
 
+// Validates that multiple cipher-suites with the same contents are still equal
+// after dedup.
+TEST_F(SslContextImplTest, TestCipherSuitesDeduplication) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      cipher_suites: "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context1;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context1);
+  auto cfg1 = *ClientContextConfigImpl::create(tls_context1, factory_context_);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context2;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context2);
+  auto cfg2 = *ClientContextConfigImpl::create(tls_context2, factory_context_);
+
+  EXPECT_EQ(cfg1->cipherSuites(), "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256");
+  EXPECT_EQ(cfg2->cipherSuites(), "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256");
+
+  EXPECT_TRUE(manager_.createSslClientContext(*store_.rootScope(), *cfg1).ok());
+  EXPECT_TRUE(manager_.createSslClientContext(*store_.rootScope(), *cfg2).ok());
+}
+
 // Envoy's default cipher preference is server's.
 TEST_F(SslContextImplTest, TestServerCipherPreference) {
   const std::string yaml = R"EOF(
@@ -238,7 +262,7 @@ TEST_F(SslContextImplTest, TestExpiredCert) {
   Envoy::Ssl::ClientContextSharedPtr context(
       *manager_.createSslClientContext(*store_.rootScope(), *cfg));
   auto cleanup = cleanUpHelper(context);
-  EXPECT_EQ(absl::nullopt, context->daysUntilFirstCertExpires());
+  EXPECT_EQ(std::nullopt, context->daysUntilFirstCertExpires());
 }
 
 // Validate that when the context is updated, the daysUntilFirstCertExpires returns the current
@@ -259,7 +283,7 @@ TEST_F(SslContextImplTest, TestContextUpdate) {
   auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Envoy::Ssl::ClientContextSharedPtr context(
       *manager_.createSslClientContext(*store_.rootScope(), *cfg));
-  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), absl::nullopt);
+  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), std::nullopt);
 
   const std::string expiring_yaml = R"EOF(
   common_tls_context:
@@ -293,8 +317,8 @@ TEST_F(SslContextImplTest, TestContextUpdate) {
   manager_.removeContext(new_context);
   auto cleanup = cleanUpHelper(updated_context);
 
-  EXPECT_EQ(updated_context->daysUntilFirstCertExpires(), absl::nullopt);
-  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), absl::nullopt);
+  EXPECT_EQ(updated_context->daysUntilFirstCertExpires(), std::nullopt);
+  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), std::nullopt);
 }
 
 TEST_F(SslContextImplTest, TestGetCertInformation) {

@@ -15,6 +15,7 @@
 #include "contrib/postgres_inspector/filters/listener/test/postgres_test_utils.h"
 #include "gtest/gtest.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
@@ -72,7 +73,7 @@ typed_config:
       envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy pg_config;
       pg_config.set_stat_prefix("postgres_with_ssl");
       pg_config.set_terminate_ssl(false);
-      pg_filter->mutable_typed_config()->PackFrom(pg_config);
+      std::ignore = pg_filter->mutable_typed_config()->PackFrom(pg_config);
 
       // Add TCP proxy for routing to backend.
       auto* tcp_filter = pg_chain->add_filters();
@@ -80,7 +81,7 @@ typed_config:
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_config;
       tcp_config.set_stat_prefix("tcp_postgres");
       tcp_config.set_cluster("cluster_db1");
-      tcp_filter->mutable_typed_config()->PackFrom(tcp_config);
+      std::ignore = tcp_filter->mutable_typed_config()->PackFrom(tcp_config);
 
       // Default chain for non-PostgreSQL traffic.
       auto* default_chain = listener->add_filter_chains();
@@ -90,7 +91,7 @@ typed_config:
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy default_config;
       default_config.set_stat_prefix("tcp_default");
       default_config.set_cluster("cluster_db2");
-      default_filter->mutable_typed_config()->PackFrom(default_config);
+      std::ignore = default_filter->mutable_typed_config()->PackFrom(default_config);
     });
 
     setUpstreamCount(2);
@@ -172,11 +173,11 @@ TEST_P(PostgresInspectorWithProxyIntegrationTest, PostgresPre17DetectedAndRouted
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
 
   // Verify postgres_inspector detected the protocol.
-  test_server_->waitForCounterGe("postgres_inspector.postgres_found", 1);
-  test_server_->waitForCounterGe("postgres_inspector.ssl_requested", 1);
+  test_server_->waitForCounter("postgres_inspector.postgres_found", Ge(1));
+  test_server_->waitForCounter("postgres_inspector.ssl_requested", Ge(1));
 
   // Verify postgres_proxy is in the filter chain.
-  test_server_->waitForCounterGe("postgres.postgres_with_ssl.sessions", 1);
+  test_server_->waitForCounter("postgres.postgres_with_ssl.sessions", Ge(1));
 
   driver->close();
 }
@@ -192,11 +193,11 @@ TEST_P(PostgresInspectorWithProxyIntegrationTest, Postgres17DirectSSLDetectedAnd
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
 
   // Verify postgres_inspector detected the protocol.
-  test_server_->waitForCounterGe("postgres_inspector.postgres_found", 1);
-  test_server_->waitForCounterGe("postgres_inspector.ssl_requested", 1);
+  test_server_->waitForCounter("postgres_inspector.postgres_found", Ge(1));
+  test_server_->waitForCounter("postgres_inspector.ssl_requested", Ge(1));
 
   // Verify postgres_proxy is in the filter chain.
-  test_server_->waitForCounterGe("postgres.postgres_with_ssl.sessions", 1);
+  test_server_->waitForCounter("postgres.postgres_with_ssl.sessions", Ge(1));
 
   driver->close();
 }
@@ -212,8 +213,8 @@ TEST_P(PostgresInspectorWithProxyIntegrationTest, PlaintextPostgresDetectedAndRo
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
 
   // Verify postgres_inspector detected the protocol.
-  test_server_->waitForCounterGe("postgres_inspector.postgres_found", 1);
-  test_server_->waitForCounterGe("postgres_inspector.ssl_not_requested", 1);
+  test_server_->waitForCounter("postgres_inspector.postgres_found", Ge(1));
+  test_server_->waitForCounter("postgres_inspector.ssl_not_requested", Ge(1));
 
   driver->close();
 }
@@ -235,12 +236,12 @@ TEST_P(PostgresInspectorWithProxyIntegrationTest, MixedVersionConnectionsHandled
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream3));
 
   // Verify stats demonstrate detection of all three types.
-  test_server_->waitForCounterGe("postgres_inspector.postgres_found", 3);
-  test_server_->waitForCounterGe("postgres_inspector.ssl_requested", 2);
-  test_server_->waitForCounterGe("postgres_inspector.ssl_not_requested", 1);
+  test_server_->waitForCounter("postgres_inspector.postgres_found", Ge(3));
+  test_server_->waitForCounter("postgres_inspector.ssl_requested", Ge(2));
+  test_server_->waitForCounter("postgres_inspector.ssl_not_requested", Ge(1));
 
   // Verify postgres_proxy handled at least the SSL sessions.
-  test_server_->waitForCounterGe("postgres.postgres_with_ssl.sessions", 2);
+  test_server_->waitForCounter("postgres.postgres_with_ssl.sessions", Ge(2));
 
   driver1->close();
   driver2->close();

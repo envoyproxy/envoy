@@ -21,9 +21,9 @@ ClusterFactory::createClusterWithConfig(
     Upstream::ClusterFactoryContext& context) {
   absl::Status creation_status = absl::OkStatus();
   envoy::config::cluster::v3::Cluster cluster_with_metadata = cluster;
-  (*cluster_with_metadata.mutable_metadata()
-        ->mutable_typed_filter_metadata())["envoy.clusters.mcp_multicluster"]
-      .PackFrom(proto_config);
+  std::ignore = (*cluster_with_metadata.mutable_metadata()
+                      ->mutable_typed_filter_metadata())["envoy.clusters.mcp_multicluster"]
+                    .PackFrom(proto_config);
   envoy::extensions::clusters::composite::v3::ClusterConfig composite_cluster_config;
 
   for (const auto& server : proto_config.servers()) {

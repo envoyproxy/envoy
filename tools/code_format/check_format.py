@@ -688,12 +688,22 @@ class FormatChecker:
             report_error("Don't use std::get_if; use absl::get_if instead")
         if self.token_in_line("std::holds_alternative", line):
             report_error("Don't use std::holds_alternative; use absl::holds_alternative instead")
-        if self.token_in_line("std::make_optional", line):
-            report_error("Don't use std::make_optional; use absl::make_optional instead")
         if self.token_in_line("std::monostate", line):
             report_error("Don't use std::monostate; use absl::monostate instead")
-        if self.token_in_line("std::optional", line):
-            report_error("Don't use std::optional; use absl::optional instead")
+        absl_optional = "absl::" + "optional"
+        absl_nullopt = "absl::" + "nullopt"
+        absl_make_optional = "absl::" + "make_optional"
+        absl_optional_header = "absl/types/" + "optional.h"
+        if self.token_in_line(absl_optional, line):
+            report_error(f"Don't use {absl_optional} (deprecated); use std::optional instead")
+        if self.token_in_line(absl_nullopt, line):
+            report_error(f"Don't use {absl_nullopt} (deprecated); use std::nullopt instead")
+        if self.token_in_line(absl_make_optional, line):
+            report_error(
+                f"Don't use {absl_make_optional} (deprecated); use std::make_optional instead")
+        if absl_optional_header in line:
+            report_error(
+                f"Don't include {absl_optional_header} (deprecated); use <optional> instead")
         if not self.allow_listed_for_std_string_view(
                 file_path) and not "NOLINT(std::string_view)" in line:
             if self.token_in_line("std::string_view", line) or self.token_in_line("toStdStringView",
@@ -1050,7 +1060,6 @@ class FormatChecker:
         self.config.buildifier_path
         self.config.buildozer_path
         self.check_visibility()
-        self.run_rustfmt()
         # We first run formatting on non-BUILD files, since the BUILD file format
         # requires analysis of srcs/hdrs in the BUILD file, and we don't want these
         # to be rewritten by other multiprocessing pooled processes.
@@ -1093,28 +1102,6 @@ class FormatChecker:
         except subprocess.CalledProcessError as e:
             if (e.returncode != 0 and e.returncode != 1):
                 self.error_messages.append("Failed to check visibility with command %s" % command)
-
-    def run_rustfmt(self):
-        # Run bazel
-        command = "bazel run @rules_rust//:rustfmt"
-        try:
-            subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
-        except subprocess.CalledProcessError as e:
-            self.error_messages.append(
-                f"ERROR: something went wrong while executing: {e.cmd}\n{e.output.decode()}")
-            return
-        if self.args.operation_type == "check":
-            try:
-                diff = subprocess.check_output(
-                    "git diff --name-only -- '*.rs'", shell=True,
-                    stderr=subprocess.STDOUT).strip().decode()
-                if diff:
-                    self.error_messages.append(
-                        f"ERROR: rustfmt diff detected. Please run 'bazel run @rules_rust//:rustfmt':\n{diff}"
-                    )
-            except subprocess.CalledProcessError as e:
-                self.error_messages.append(
-                    f"ERROR: git diff failed: {e.output.decode()}")
 
     def included_for_memcpy(self, file_path):
         return file_path in self.config.paths["memcpy"]["include"]

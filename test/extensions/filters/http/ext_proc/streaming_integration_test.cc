@@ -86,7 +86,7 @@ protected:
       // Merge the filter.
       envoy::config::listener::v3::Filter ext_proc_filter;
       ext_proc_filter.set_name("envoy.filters.http.ext_proc");
-      ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
+      std::ignore = ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
     });
 
@@ -98,7 +98,7 @@ protected:
   }
 
   Http::RequestEncoder&
-  sendClientRequestHeaders(absl::optional<std::function<void(Http::HeaderMap&)>> cb) {
+  sendClientRequestHeaders(std::optional<std::function<void(Http::HeaderMap&)>> cb) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestRequestHeaderMapImpl headers{{":method", "POST"}};
@@ -121,7 +121,7 @@ protected:
   // "num_chunks" of "chunk_size" bytes each. Return a copy of the complete
   // body that may be used for comparison later.
   Buffer::OwnedImpl sendPostRequest(uint32_t num_chunks, uint32_t chunk_size,
-                                    absl::optional<std::function<void(Http::HeaderMap&)>> cb) {
+                                    std::optional<std::function<void(Http::HeaderMap&)>> cb) {
     auto& encoder = sendClientRequestHeaders(cb);
     Buffer::OwnedImpl post_body;
     for (uint32_t i = 0; i < num_chunks && codec_client_->streamOpen(); i++) {
@@ -138,7 +138,7 @@ protected:
   }
 
   TestProcessor test_processor_;
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_;
   IntegrationStreamDecoderPtr client_response_;
   std::atomic<uint64_t> processor_request_hash_;
   std::atomic<uint64_t> processor_response_hash_;

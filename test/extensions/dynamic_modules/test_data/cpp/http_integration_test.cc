@@ -1085,6 +1085,13 @@ public:
     assertEq((uint32_t)res.second, (uint32_t)MetricsResult::Success, "h2");
     ids.epVals = res.first;
 
+    // Emit a metric directly from the config context (no per-stream filter), exercising the
+    // config-scoped emission path. This would typically be done from a scheduled background task.
+    auto config_total = handle.defineCounter("config_total");
+    assertEq((uint32_t)config_total.second, (uint32_t)MetricsResult::Success, "c3");
+    assertEq((uint32_t)handle.incrementCounterValue(config_total.first, 1),
+             (uint32_t)MetricsResult::Success, "c3i");
+
     return std::make_unique<StatsCallbacksFilterFactory>(ids);
   }
 };
@@ -1195,6 +1202,85 @@ public:
 };
 
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(StreamingTerminalConfigFactory, "streaming_terminal_filter");
+
+// -----------------------------------------------------------------------------
+// BufferLimit
+// -----------------------------------------------------------------------------
+
+class BufferLimitFilter : public HttpFilter, public DownstreamWatermarkCallbacks {
+public:
+  explicit BufferLimitFilter(HttpFilterHandle& handle) : handle_(handle) {
+    handle_.setDownstreamWatermarkCallbacks(*this);
+  }
+
+  HeadersStatus onRequestHeaders(HeaderMap& headers, bool end_stream) override {
+    initial_buffer_limit_ = handle_.getBufferLimit();
+    constexpr uint64_t desired_limit = 65536;
+    if (initial_buffer_limit_ < desired_limit) {
+      handle_.setBufferLimit(desired_limit);
+    }
+    return HeadersStatus::Continue;
+  }
+
+  HeadersStatus onResponseHeaders(HeaderMap& headers, bool end_stream) override {
+    headers.set("x-initial-buffer-limit", std::to_string(initial_buffer_limit_));
+    headers.set("x-current-buffer-limit", std::to_string(handle_.getBufferLimit()));
+    headers.set("x-above-watermark-count", std::to_string(above_w_));
+    headers.set("x-below-watermark-count", std::to_string(below_w_));
+    return HeadersStatus::Continue;
+  }
+
+  void onAboveWriteBufferHighWatermark() override { above_w_++; }
+
+  void onBelowWriteBufferLowWatermark() override { below_w_++; }
+
+  BodyStatus onRequestBody(BodyBuffer& body, bool end_stream) override {
+    return BodyStatus::Continue;
+  }
+
+  TrailersStatus onRequestTrailers(HeaderMap& trailers) override {
+    return TrailersStatus::Continue;
+  }
+
+  BodyStatus onResponseBody(BodyBuffer& body, bool end_stream) override {
+    return BodyStatus::Continue;
+  }
+
+  TrailersStatus onResponseTrailers(HeaderMap& trailers) override {
+    return TrailersStatus::Continue;
+  }
+
+  void onStreamComplete() override {}
+
+  void onDestroy() override { handle_.clearDownstreamWatermarkCallbacks(); }
+
+private:
+  HttpFilterHandle& handle_;
+  uint64_t initial_buffer_limit_{0};
+  int above_w_{0};
+  int below_w_{0};
+};
+
+class BufferLimitFilterFactory : public HttpFilterFactory {
+public:
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    return std::make_unique<BufferLimitFilter>(handle);
+  }
+};
+
+class BufferLimitConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
+                                            std::string_view config_view) override {
+    return std::make_unique<BufferLimitFilterFactory>();
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(BufferLimitConfigFactory, "buffer_limit_filter");
+
+// -----------------------------------------------------------------------------
+// SdkSurfaceSmoke
+// -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
 // HttpStreamBasic

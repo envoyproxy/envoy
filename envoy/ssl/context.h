@@ -1,13 +1,12 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/admin/v3/certs.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -25,7 +24,7 @@ public:
    * @return the number of days in this context until the next certificate will expire, the value is
    * set when not expired.
    */
-  virtual absl::optional<uint32_t> daysUntilFirstCertExpires() const PURE;
+  virtual std::optional<uint32_t> daysUntilFirstCertExpires() const PURE;
 
   /**
    * @return certificate details conforming to proto admin.v2alpha.certs.
@@ -39,9 +38,9 @@ public:
 
   /**
    * @return the number of seconds in this context until the next OCSP response will
-   * expire, or `absl::nullopt` if no OCSP responses exist.
+   * expire, or `std::nullopt` if no OCSP responses exist.
    */
-  virtual absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const PURE;
+  virtual std::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const PURE;
 };
 using ContextSharedPtr = std::shared_ptr<Context>;
 

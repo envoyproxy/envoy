@@ -4,6 +4,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
+#include "source/common/http/matching/data_impl.h"
+#include "source/common/matcher/matcher.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/composite/action.h"
 #include "source/extensions/filters/http/composite/config.h"
@@ -13,7 +15,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 
@@ -129,7 +131,7 @@ TEST_F(FilterTest, StreamEncoderFilterDelegation) {
 
   EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
   ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+                             "actionName", std::nullopt, context_.runtime_loader_);
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -159,7 +161,7 @@ TEST_F(FilterTest, StreamDecoderFilterDelegation) {
 
   EXPECT_CALL(*stream_filter, setDecoderFilterCallbacks(_));
   ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+                             "actionName", std::nullopt, context_.runtime_loader_);
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -190,7 +192,7 @@ TEST_F(FilterTest, StreamFilterDelegation) {
   EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
   ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+                             "actionName", std::nullopt, context_.runtime_loader_);
   filter_.onMatchCallback(action);
 
   expectFilterStateInfo(filter_state);
@@ -218,7 +220,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamFilters) {
   };
 
   ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+                             "actionName", std::nullopt, context_.runtime_loader_);
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -244,7 +246,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamDecoderFilters) {
   };
 
   ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+                             "actionName", std::nullopt, context_.runtime_loader_);
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -270,7 +272,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamEncoderFilters) {
   };
 
   ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+                             "actionName", std::nullopt, context_.runtime_loader_);
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -300,7 +302,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
   };
 
   ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+                             "actionName", std::nullopt, context_.runtime_loader_);
   EXPECT_CALL(*encode_filter, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
@@ -339,8 +341,8 @@ TEST(ConfigTest, TestDynamicConfigInDownstream) {
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = true,
       .stat_prefix_ = "test",
-      .factory_context_ = absl::nullopt,
-      .upstream_factory_context_ = absl::nullopt,
+      .factory_context_ = std::nullopt,
+      .upstream_factory_context_ = std::nullopt,
       .server_factory_context_ = server_factory_context,
   };
   ExecuteFilterActionFactory factory;
@@ -368,9 +370,9 @@ TEST(ConfigTest, TestDynamicConfigInUpstream) {
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = false,
       .stat_prefix_ = "test",
-      .factory_context_ = absl::nullopt,
+      .factory_context_ = std::nullopt,
       .upstream_factory_context_ = upstream_factory_context,
-      .server_factory_context_ = absl::nullopt,
+      .server_factory_context_ = std::nullopt,
   };
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
@@ -396,8 +398,8 @@ TEST(ConfigTest, CreateFilterFromServerContextDual) {
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = true,
       .stat_prefix_ = "test",
-      .factory_context_ = absl::nullopt,
-      .upstream_factory_context_ = absl::nullopt,
+      .factory_context_ = std::nullopt,
+      .upstream_factory_context_ = std::nullopt,
       .server_factory_context_ = server_factory_context,
   };
   ExecuteFilterActionFactory factory;
@@ -424,8 +426,8 @@ TEST(ConfigTest, DualFilterNoUpstreamFactoryContext) {
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = false,
       .stat_prefix_ = "test",
-      .factory_context_ = absl::nullopt,
-      .upstream_factory_context_ = absl::nullopt,
+      .factory_context_ = std::nullopt,
+      .upstream_factory_context_ = std::nullopt,
       .server_factory_context_ = server_factory_context,
   };
   ExecuteFilterActionFactory factory;
@@ -450,9 +452,9 @@ TEST(ConfigTest, DownstreamFilterNoFactoryContext) {
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = true,
       .stat_prefix_ = "test",
-      .factory_context_ = absl::nullopt,
-      .upstream_factory_context_ = absl::nullopt,
-      .server_factory_context_ = absl::nullopt,
+      .factory_context_ = std::nullopt,
+      .upstream_factory_context_ = std::nullopt,
+      .server_factory_context_ = std::nullopt,
   };
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
@@ -478,8 +480,8 @@ TEST(ConfigTest, TestDownstreamFilterNoOverridingServerContext) {
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = true,
       .stat_prefix_ = "test",
-      .factory_context_ = absl::nullopt,
-      .upstream_factory_context_ = absl::nullopt,
+      .factory_context_ = std::nullopt,
+      .upstream_factory_context_ = std::nullopt,
       .server_factory_context_ = server_factory_context,
   };
   ExecuteFilterActionFactory factory;
@@ -508,8 +510,8 @@ TEST(ConfigTest, TestSamplePercentNotSpecifiedl) {
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = true,
       .stat_prefix_ = "test",
-      .factory_context_ = absl::nullopt,
-      .upstream_factory_context_ = absl::nullopt,
+      .factory_context_ = std::nullopt,
+      .upstream_factory_context_ = std::nullopt,
       .server_factory_context_ = server_factory_context,
   };
   ExecuteFilterActionFactory factory;
@@ -543,8 +545,8 @@ TEST(ConfigTest, TestSamplePercentInPlaceFeatureEnabled) {
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = true,
       .stat_prefix_ = "test",
-      .factory_context_ = absl::nullopt,
-      .upstream_factory_context_ = absl::nullopt,
+      .factory_context_ = std::nullopt,
+      .upstream_factory_context_ = std::nullopt,
       .server_factory_context_ = server_factory_context,
   };
   ExecuteFilterActionFactory factory;
@@ -582,8 +584,8 @@ TEST(ConfigTest, TestSamplePercentInPlaceFeatureNotEnabled) {
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = true,
       .stat_prefix_ = "test",
-      .factory_context_ = absl::nullopt,
-      .upstream_factory_context_ = absl::nullopt,
+      .factory_context_ = std::nullopt,
+      .upstream_factory_context_ = std::nullopt,
       .server_factory_context_ = server_factory_context,
   };
   ExecuteFilterActionFactory factory;
@@ -670,7 +672,6 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingAction) {
 
   filter_state->setData(MatchedActionsFilterStateKey,
                         std::make_shared<MatchedActionInfo>("rootFilterName", "oldActionName"),
-                        StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
 
   Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
@@ -679,7 +680,7 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingAction) {
 
   EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
   ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+                             "actionName", std::nullopt, context_.runtime_loader_);
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -701,7 +702,6 @@ TEST_F(FilterTest, MatchingActionShouldNotCollitionWithOtherRootFilter) {
 
   filter_state->setData(MatchedActionsFilterStateKey,
                         std::make_shared<MatchedActionInfo>("otherRootFilterName", "anyActionName"),
-                        StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
 
   Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
@@ -710,7 +710,7 @@ TEST_F(FilterTest, MatchingActionShouldNotCollitionWithOtherRootFilter) {
 
   EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
   ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+                             "actionName", std::nullopt, context_.runtime_loader_);
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -747,7 +747,7 @@ TEST_F(UpstreamFilterTest, StreamEncoderFilterDelegationUpstream) {
 
   EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
   ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+                             "actionName", std::nullopt, context_.runtime_loader_);
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -787,7 +787,7 @@ TEST_F(FilterTest, FilterChainDecodeInOrder) {
   EXPECT_CALL(*filter2, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
 
-  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", std::nullopt,
                              context_.runtime_loader_);
   filter_.onMatchCallback(action);
 
@@ -832,7 +832,7 @@ TEST_F(FilterTest, FilterChainEncodeInReverseOrder) {
   EXPECT_CALL(*filter2, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
 
-  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", std::nullopt,
                              context_.runtime_loader_);
   filter_.onMatchCallback(action);
 
@@ -873,7 +873,7 @@ TEST_F(FilterTest, FilterChainStopsIterationOnDecode) {
   EXPECT_CALL(*filter2, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
 
-  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", std::nullopt,
                              context_.runtime_loader_);
   filter_.onMatchCallback(action);
 
@@ -911,7 +911,7 @@ TEST_F(FilterTest, FilterChainWithMixedFilterTypes) {
   EXPECT_CALL(*encoder_filter, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
 
-  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", std::nullopt,
                              context_.runtime_loader_);
   filter_.onMatchCallback(action);
 
@@ -945,7 +945,7 @@ TEST_F(FilterTest, EmptyFilterChainSucceeds) {
   // Empty filter chain should not call success counter since no filters were injected.
   EXPECT_CALL(success_counter_, inc()).Times(0);
 
-  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", std::nullopt,
                              context_.runtime_loader_);
   filter_.onMatchCallback(action);
 
@@ -984,7 +984,7 @@ TEST_F(FilterTest, FilterChainWithThreeFilters) {
   EXPECT_CALL(*filter3, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
 
-  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", std::nullopt,
                              context_.runtime_loader_);
   filter_.onMatchCallback(action);
 
@@ -1062,7 +1062,7 @@ TEST(FilterChainActionTest, IsFilterChainReturnsTrue) {
   });
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", std::nullopt,
                              context.runtime_loader_);
 
   EXPECT_TRUE(action.isFilterChain());
@@ -1075,7 +1075,7 @@ TEST(FilterChainActionTest, IsFilterChainReturnsFalse) {
 
   ExecuteFilterAction action(
       [cb = std::move(callback)]() mutable -> OptRef<Http::FilterFactoryCb> { return cb; },
-      "single_filter", absl::nullopt, context.runtime_loader_);
+      "single_filter", std::nullopt, context.runtime_loader_);
 
   EXPECT_FALSE(action.isFilterChain());
 }
@@ -1103,7 +1103,7 @@ TEST_F(FilterTest, FilterChainComprehensiveDecodeEncodeCoverage) {
   EXPECT_CALL(*filter2, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
 
-  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", std::nullopt,
                              context_.runtime_loader_);
   filter_.onMatchCallback(action);
 
@@ -1247,7 +1247,7 @@ TEST_F(FilterTest, FilterChainStopsIterationOnDecodeTrailers) {
   EXPECT_CALL(*filter2, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
 
-  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", std::nullopt,
                              context_.runtime_loader_);
   filter_.onMatchCallback(action);
 
@@ -1287,7 +1287,7 @@ TEST_F(FilterTest, FilterChainStopsIterationOnDecodeMetadata) {
   EXPECT_CALL(*filter2, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
 
-  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", std::nullopt,
                              context_.runtime_loader_);
   filter_.onMatchCallback(action);
 
@@ -1328,7 +1328,7 @@ TEST_F(FilterTest, FilterChainStopsIterationOnDecodeData) {
   EXPECT_CALL(*filter2, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
 
-  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", std::nullopt,
                              context_.runtime_loader_);
   filter_.onMatchCallback(action);
 
@@ -1369,7 +1369,7 @@ TEST_F(FilterTest, FilterChainStopsIterationOnEncode1xxHeaders) {
   EXPECT_CALL(*filter2, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
 
-  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", std::nullopt,
                              context_.runtime_loader_);
   filter_.onMatchCallback(action);
 
@@ -1410,7 +1410,7 @@ TEST_F(FilterTest, FilterChainStopsIterationOnEncodeData) {
   EXPECT_CALL(*filter2, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
 
-  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", std::nullopt,
                              context_.runtime_loader_);
   filter_.onMatchCallback(action);
 
@@ -1452,7 +1452,7 @@ TEST_F(FilterTest, FilterChainStopsIterationOnEncodeTrailers) {
   EXPECT_CALL(*filter2, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
 
-  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", std::nullopt,
                              context_.runtime_loader_);
   filter_.onMatchCallback(action);
 
@@ -1493,7 +1493,7 @@ TEST_F(FilterTest, FilterChainStopsIterationOnEncodeMetadata) {
   EXPECT_CALL(*filter2, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
 
-  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", std::nullopt,
                              context_.runtime_loader_);
   filter_.onMatchCallback(action);
 
@@ -1528,7 +1528,7 @@ TEST(ConfigTest, TestEmptyFilterChainThrowsException) {
       .is_downstream_ = true,
       .stat_prefix_ = "test",
       .factory_context_ = factory_context,
-      .upstream_factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = std::nullopt,
       .server_factory_context_ = server_factory_context,
   };
   ExecuteFilterActionFactory factory;
@@ -1556,7 +1556,7 @@ TEST(ConfigTest, TestUpstreamFilterChainConfiguration) {
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = false,
       .stat_prefix_ = "test",
-      .factory_context_ = absl::nullopt,
+      .factory_context_ = std::nullopt,
       .upstream_factory_context_ = upstream_factory_context,
       .server_factory_context_ = server_factory_context,
   };
@@ -1586,8 +1586,8 @@ TEST(ConfigTest, TestUpstreamFilterChainNoUpstreamFactoryContext) {
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = false,
       .stat_prefix_ = "test",
-      .factory_context_ = absl::nullopt,
-      .upstream_factory_context_ = absl::nullopt,
+      .factory_context_ = std::nullopt,
+      .upstream_factory_context_ = std::nullopt,
       .server_factory_context_ = server_factory_context,
   };
   ExecuteFilterActionFactory factory;
@@ -1612,7 +1612,7 @@ TEST(ConfigTest, TestFilterChainNameCreatesLookupAction) {
       .is_downstream_ = true,
       .stat_prefix_ = "test",
       .factory_context_ = factory_context,
-      .upstream_factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = std::nullopt,
       .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
   auto action =
@@ -1644,7 +1644,7 @@ TEST(ConfigTest, TestFilterChainNameWithSamplePercent) {
       .is_downstream_ = true,
       .stat_prefix_ = "test",
       .factory_context_ = factory_context,
-      .upstream_factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = std::nullopt,
       .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
   auto action =
@@ -1683,7 +1683,7 @@ TEST_F(FilterTest, FilterChainWithMultipleFilters) {
   EXPECT_CALL(*filter2, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
 
-  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", std::nullopt,
                              context_.runtime_loader_);
   filter_.onMatchCallback(action);
 
@@ -1743,7 +1743,7 @@ TEST(ConfigTest, CompileNamedFilterChainsFailsOnFactoryError) {
   auto* typed = chain.add_typed_config();
   typed->set_name("envoy.filters.http.test.fail_factory");
   Protobuf::Struct struct_config;
-  typed->mutable_typed_config()->PackFrom(struct_config);
+  std::ignore = typed->mutable_typed_config()->PackFrom(struct_config);
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   CompositeFilterFactory factory;
@@ -1779,6 +1779,13 @@ TEST(FilterCallbacksWrapperTest, SingleModeRejectsMultipleFiltersAndExposesDispa
   EXPECT_EQ(&dispatcher, &wrapper.dispatcher());
   EXPECT_TRUE(wrapper.filter_to_inject_.has_value());
   EXPECT_EQ(1, wrapper.errors_.size());
+
+  // No-op methods for code coverage.
+  wrapper.filterConfigName();
+  wrapper.setFilterConfigName("");
+  wrapper.route();
+  wrapper.filterDisabled("");
+  wrapper.requestHeaders();
 }
 
 TEST(FilterCallbacksWrapperTest, ChainModeAcceptsMultipleFilters) {
@@ -1819,7 +1826,7 @@ TEST_F(FilterTest, NamedFilterChainLookupWithSamplingSkipped) {
   }};
 
   // Create filter with named chains.
-  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, named_chains);
+  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, nullptr, named_chains);
   filter_with_chains.setDecoderFilterCallbacks(decoder_callbacks_);
   filter_with_chains.setEncoderFilterCallbacks(encoder_callbacks_);
 
@@ -1863,7 +1870,7 @@ TEST_F(FilterTest, NamedFilterChainLookupNoNamedChainsConfigured) {
   EXPECT_CALL(success_counter_, inc()).Times(0);
   EXPECT_CALL(error_counter_, inc()).Times(0);
 
-  ExecuteFilterAction action("non-existent-chain", absl::nullopt, context_.runtime_loader_);
+  ExecuteFilterAction action("non-existent-chain", std::nullopt, context_.runtime_loader_);
   EXPECT_LOG_CONTAINS("debug",
                       "filter_chain_name 'non-existent-chain' specified but no named filter chains",
                       filter_without_chains.onMatchCallback(action));
@@ -1889,7 +1896,7 @@ TEST_F(FilterTest, NamedFilterChainLookupChainNotFound) {
     cb.addStreamFilter(std::make_shared<Http::MockStreamFilter>());
   }};
 
-  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, named_chains);
+  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, nullptr, named_chains);
   filter_with_chains.setDecoderFilterCallbacks(decoder_callbacks_);
   filter_with_chains.setEncoderFilterCallbacks(encoder_callbacks_);
 
@@ -1897,7 +1904,7 @@ TEST_F(FilterTest, NamedFilterChainLookupChainNotFound) {
   EXPECT_CALL(success_counter_, inc()).Times(0);
   EXPECT_CALL(error_counter_, inc()).Times(0);
 
-  ExecuteFilterAction action("missing-chain", absl::nullopt, context_.runtime_loader_);
+  ExecuteFilterAction action("missing-chain", std::nullopt, context_.runtime_loader_);
   EXPECT_LOG_CONTAINS("debug", "filter_chain_name 'missing-chain' not found in named filter chains",
                       filter_with_chains.onMatchCallback(action));
 
@@ -1925,7 +1932,7 @@ TEST_F(FilterTest, NamedFilterChainLookupSuccess) {
       [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamFilter(filter1); },
       [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamFilter(filter2); }};
 
-  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, named_chains);
+  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, nullptr, named_chains);
   filter_with_chains.setDecoderFilterCallbacks(decoder_callbacks_);
   filter_with_chains.setEncoderFilterCallbacks(encoder_callbacks_);
 
@@ -1935,7 +1942,7 @@ TEST_F(FilterTest, NamedFilterChainLookupSuccess) {
   EXPECT_CALL(*filter2, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
 
-  ExecuteFilterAction action("my-chain", absl::nullopt, context_.runtime_loader_);
+  ExecuteFilterAction action("my-chain", std::nullopt, context_.runtime_loader_);
   filter_with_chains.onMatchCallback(action);
 
   // Verify filter state is updated with the chain name.
@@ -1972,7 +1979,7 @@ TEST(ExecuteFilterActionTest, CreateFiltersReturnsEarlyForNamedFilterChainLookup
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   // Create a named filter chain lookup action.
-  ExecuteFilterAction action("my-chain", absl::nullopt, context.runtime_loader_);
+  ExecuteFilterAction action("my-chain", std::nullopt, context.runtime_loader_);
 
   EXPECT_TRUE(action.isNamedFilterChainLookup());
   EXPECT_FALSE(action.isFilterChain());
@@ -2006,7 +2013,7 @@ TEST_F(FilterTest, NamedFilterChainLookupWithAccessLoggers) {
       },
   };
 
-  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, named_chains);
+  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, nullptr, named_chains);
   filter_with_chains.setDecoderFilterCallbacks(decoder_callbacks_);
   filter_with_chains.setEncoderFilterCallbacks(encoder_callbacks_);
 
@@ -2014,7 +2021,7 @@ TEST_F(FilterTest, NamedFilterChainLookupWithAccessLoggers) {
   EXPECT_CALL(*filter1, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
 
-  ExecuteFilterAction action("chain-with-logger", absl::nullopt, context_.runtime_loader_);
+  ExecuteFilterAction action("chain-with-logger", std::nullopt, context_.runtime_loader_);
   filter_with_chains.onMatchCallback(action);
 
   // Verify access loggers are called.
@@ -2023,6 +2030,161 @@ TEST_F(FilterTest, NamedFilterChainLookupWithAccessLoggers) {
 
   EXPECT_CALL(*filter1, onDestroy());
   filter_with_chains.onDestroy();
+}
+
+// Helper to build a simple AnyMatcher that always resolves to the given action.
+static Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>
+makeAlwaysMatchTree(Matcher::ActionConstSharedPtr action) {
+  Matcher::OnMatch<Envoy::Http::HttpMatchingData> on_match{action, nullptr, false};
+  return std::make_shared<Matcher::AnyMatcher<Envoy::Http::HttpMatchingData>>(on_match);
+}
+
+// Helper to build an AnyMatcher with no on_no_match, i.e. never matches.
+static Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> makeNeverMatchTree() {
+  return std::make_shared<Matcher::AnyMatcher<Envoy::Http::HttpMatchingData>>(std::nullopt);
+}
+
+// Test that onMatchCallback logs an error and is a no-op when an inline match_tree is provided.
+// The inline tree is evaluated in decodeHeaders instead.
+TEST_F(FilterTest, OnMatchCallbackIgnoredWhenInlineMatchTreeIsSet) {
+  auto stream_filter = std::make_shared<Http::MockStreamFilter>();
+  Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamFilter(stream_filter);
+  };
+  auto action = std::make_shared<ExecuteFilterAction>(
+      [&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; }, "actionName",
+      std::nullopt, context_.runtime_loader_);
+
+  // Create a filter with a never-match inline tree; we only want to test onMatchCallback.
+  Filter filter_with_tree(stats_, decoder_callbacks_.dispatcher(), false, makeNeverMatchTree());
+  filter_with_tree.setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_with_tree.setEncoderFilterCallbacks(encoder_callbacks_);
+
+  // onMatchCallback should log an error and skip the action when match_tree_ is set.
+  EXPECT_CALL(success_counter_, inc()).Times(0);
+  EXPECT_LOG_CONTAINS("error",
+                      "Inline match tree is provided and the onMatchCallback should never be "
+                      "called from the ExtensionWithMatcher",
+                      filter_with_tree.onMatchCallback(*action));
+
+  filter_with_tree.onDestroy();
+}
+
+// Test that decodeHeaders executes the match tree action when the tree produces a match.
+TEST_F(FilterTest, DecodeHeadersExecutesInlineMatchTreeAction) {
+  auto stream_filter = std::make_shared<Http::MockStreamFilter>();
+  StreamInfo::FilterStateSharedPtr filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(testing::Return("rootFilterName"));
+  ON_CALL(decoder_callbacks_.stream_info_, filterState())
+      .WillByDefault(testing::ReturnRef(filter_state));
+
+  Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamFilter(stream_filter);
+  };
+  auto action = std::make_shared<ExecuteFilterAction>(
+      [&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; }, "actionName",
+      std::nullopt, context_.runtime_loader_);
+
+  Filter filter_with_tree(stats_, decoder_callbacks_.dispatcher(), false,
+                          makeAlwaysMatchTree(action));
+  filter_with_tree.setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_with_tree.setEncoderFilterCallbacks(encoder_callbacks_);
+
+  // The match tree always matches, so the filter should be delegated.
+  EXPECT_CALL(*stream_filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(success_counter_, inc());
+  EXPECT_CALL(*stream_filter, decodeHeaders(_, false))
+      .WillOnce(testing::Return(Http::FilterHeadersStatus::Continue));
+
+  auto status = filter_with_tree.decodeHeaders(default_request_headers_, false);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, status);
+
+  EXPECT_CALL(*stream_filter, onDestroy());
+  filter_with_tree.onDestroy();
+}
+
+// Test that decodeHeaders is a no-op (continues) when the match tree produces no match.
+TEST_F(FilterTest, DecodeHeadersNoActionWhenMatchTreeDoesNotMatch) {
+  Filter filter_with_tree(stats_, decoder_callbacks_.dispatcher(), false, makeNeverMatchTree());
+  filter_with_tree.setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_with_tree.setEncoderFilterCallbacks(encoder_callbacks_);
+
+  EXPECT_CALL(success_counter_, inc()).Times(0);
+  auto status = filter_with_tree.decodeHeaders(default_request_headers_, false);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, status);
+
+  filter_with_tree.onDestroy();
+}
+
+// Test that decodeHeaders picks up the per-route match tree and overrides the filter-level one.
+TEST_F(FilterTest, DecodeHeadersUsesPerRouteMatchTree) {
+  auto stream_filter = std::make_shared<Http::MockStreamFilter>();
+  StreamInfo::FilterStateSharedPtr filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(testing::Return("rootFilterName"));
+  ON_CALL(decoder_callbacks_.stream_info_, filterState())
+      .WillByDefault(testing::ReturnRef(filter_state));
+
+  Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamFilter(stream_filter);
+  };
+  auto action = std::make_shared<ExecuteFilterAction>(
+      [&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; }, "actionName",
+      std::nullopt, context_.runtime_loader_);
+
+  // The filter-level match tree never matches.
+  Filter filter_with_tree(stats_, decoder_callbacks_.dispatcher(), false, makeNeverMatchTree());
+  filter_with_tree.setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_with_tree.setEncoderFilterCallbacks(encoder_callbacks_);
+
+  // Set up per-route config that always matches.
+  auto per_route_match_tree = makeAlwaysMatchTree(action);
+  auto per_route_config = std::make_shared<CompositePerRouteConfig>(per_route_match_tree);
+
+  ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+      .WillByDefault(testing::Return(per_route_config.get()));
+
+  // The per-route match tree always matches, so the filter should be delegated.
+  EXPECT_CALL(*stream_filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(success_counter_, inc());
+  EXPECT_CALL(*stream_filter, decodeHeaders(_, false))
+      .WillOnce(testing::Return(Http::FilterHeadersStatus::Continue));
+
+  auto status = filter_with_tree.decodeHeaders(default_request_headers_, false);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, status);
+
+  EXPECT_CALL(*stream_filter, onDestroy());
+  filter_with_tree.onDestroy();
+}
+
+// Test handleAction with an unsupported action type URL logs an error and does nothing.
+TEST_F(FilterTest, HandleActionWithUnsupportedActionTypeLogsError) {
+  // Create a custom action with a different type URL.
+  class WrongTypeAction : public Matcher::ActionBase<
+                              envoy::extensions::filters::http::composite::v3::CompositePerRoute> {
+  };
+
+  auto wrong_action = std::make_shared<WrongTypeAction>();
+  Filter filter_with_tree(stats_, decoder_callbacks_.dispatcher(), false,
+                          makeAlwaysMatchTree(wrong_action));
+  filter_with_tree.setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_with_tree.setEncoderFilterCallbacks(encoder_callbacks_);
+
+  EXPECT_CALL(success_counter_, inc()).Times(0);
+  EXPECT_LOG_CONTAINS("error", "Received unsupported action type",
+                      filter_with_tree.decodeHeaders(default_request_headers_, false));
+
+  filter_with_tree.onDestroy();
+}
+
+// Test CompositePerRouteConfig stores and returns the match tree.
+TEST(CompositePerRouteConfigTest, StoresAndReturnsMatchTree) {
+  auto match_tree = makeNeverMatchTree();
+  CompositePerRouteConfig config(match_tree);
+  EXPECT_EQ(match_tree, config.matchTree());
 }
 
 } // namespace

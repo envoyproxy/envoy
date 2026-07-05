@@ -44,8 +44,8 @@
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/registry.h"
 
 #include "absl/time/time.h"
 #include "base_integration_test.h"
@@ -54,6 +54,7 @@
 namespace Envoy {
 namespace {
 
+using testing::Eq;
 using testing::HasSubstr;
 
 envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::CodecType
@@ -265,8 +266,8 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeHttpConnection(uint32_t port)
 
 IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
     Network::ClientConnectionPtr&& conn,
-    absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
-    absl::optional<envoy::config::core::v3::HttpProtocolOptions> common_http_options,
+    std::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+    std::optional<envoy::config::core::v3::HttpProtocolOptions> common_http_options,
     bool wait_till_connected) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   cluster->max_response_headers_count_ = 200;
@@ -316,7 +317,7 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
 
 IntegrationCodecClientPtr
 HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
-  auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  auto codec = makeRawHttpConnection(std::move(conn), std::nullopt);
   EXPECT_TRUE(codec->connected()) << codec->connection()->transportFailureReason();
   return codec;
 }
@@ -342,9 +343,6 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
   // lookupPort calls.
   config_helper_.renameListener("http");
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
-  // Allow extension lookup by name in the integration tests.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.no_extension_lookup_by_name",
-                                    "false");
 
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -479,7 +477,7 @@ HttpIntegrationTest::Result HttpIntegrationTest::sendRequestAndWaitForResponse(
   } else {
     response = codec_client_->makeHeaderOnlyRequest(request_headers);
   }
-  absl::optional<uint64_t> index = waitForNextUpstreamRequest(upstream_indices, timeout);
+  std::optional<uint64_t> index = waitForNextUpstreamRequest(upstream_indices, timeout);
   // Send response headers, and end_stream if there is no response body.
   upstream_request_->encodeHeaders(response_headers, response_body_size == 0);
   // Send any response data, with end_stream true.
@@ -523,7 +521,7 @@ void HttpIntegrationTest::sendRequestAndVerifyResponse(
     const Http::TestRequestHeaderMapImpl& request_headers, const int request_size,
     const Http::TestResponseHeaderMapImpl& response_headers, const int response_size,
     const int backend_idx,
-    absl::optional<const Http::TestResponseHeaderMapImpl> expected_response_headers) {
+    std::optional<const Http::TestResponseHeaderMapImpl> expected_response_headers) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
                                                 response_size, backend_idx);
@@ -555,7 +553,7 @@ void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoderPtr response,
   EXPECT_EQ(response->body(), expected_body);
 }
 
-absl::optional<uint64_t> HttpIntegrationTest::waitForNextUpstreamConnection(
+std::optional<uint64_t> HttpIntegrationTest::waitForNextUpstreamConnection(
     const std::vector<uint64_t>& upstream_indices,
     std::chrono::milliseconds connection_wait_timeout,
     FakeHttpConnectionPtr& fake_upstream_connection) {
@@ -579,10 +577,10 @@ absl::optional<uint64_t> HttpIntegrationTest::waitForNextUpstreamConnection(
   return {};
 }
 
-absl::optional<uint64_t>
+std::optional<uint64_t>
 HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& upstream_indices,
                                                 std::chrono::milliseconds connection_wait_timeout) {
-  absl::optional<uint64_t> upstream_with_request;
+  std::optional<uint64_t> upstream_with_request;
   // If there is no upstream connection, wait for it to be established.
   if (!fake_upstream_connection_) {
     upstream_with_request = waitForNextUpstreamConnection(upstream_indices, connection_wait_timeout,
@@ -787,15 +785,15 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
   checkSimpleRequestSuccess(0, 0, response.get());
 
-  test_server_->waitForCounterEq("vhost.integration.vcluster.test_vcluster.upstream_rq_total", 1);
-  test_server_->waitForCounterEq("vhost.integration.vcluster.other.upstream_rq_total", 0);
+  test_server_->waitForCounter("vhost.integration.vcluster.test_vcluster.upstream_rq_total", Eq(1));
+  test_server_->waitForCounter("vhost.integration.vcluster.other.upstream_rq_total", Eq(0));
 
   auto response2 =
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
   checkSimpleRequestSuccess(0, 0, response2.get());
 
-  test_server_->waitForCounterEq("vhost.integration.vcluster.test_vcluster.upstream_rq_total", 1);
-  test_server_->waitForCounterEq("vhost.integration.vcluster.other.upstream_rq_total", 1);
+  test_server_->waitForCounter("vhost.integration.vcluster.test_vcluster.upstream_rq_total", Eq(1));
+  test_server_->waitForCounter("vhost.integration.vcluster.other.upstream_rq_total", Eq(1));
 }
 
 // Make sure route level stats are generated correctly.
@@ -820,8 +818,8 @@ void HttpIntegrationTest::testRouteStats() {
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
   checkSimpleRequestSuccess(0, 0, response.get());
 
-  test_server_->waitForCounterEq("vhost.integration.route.test_route.upstream_rq_total", 1);
-  test_server_->waitForCounterEq("vhost.integration.route.test_route.upstream_rq_completed", 1);
+  test_server_->waitForCounter("vhost.integration.route.test_route.upstream_rq_total", Eq(1));
+  test_server_->waitForCounter("vhost.integration.route.test_route.upstream_rq_completed", Eq(1));
 }
 
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
@@ -1250,7 +1248,11 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
                                                absl::string_view initial_code) {
   if (with_encoder_filter) {
     // Add a filter to make sure 100s play well with them.
-    config_helper_.prependFilter("name: passthrough-filter");
+    config_helper_.prependFilter(R"EOF(
+      name: passthrough-filter
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.PassthroughFilterConfig
+    )EOF");
   }
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1317,11 +1319,19 @@ void HttpIntegrationTest::testTwoRequests(bool network_backup) {
   // created while the socket appears to be in the high watermark state, and regression tests that
   // flow control will be corrected as the socket "becomes unblocked"
   if (network_backup) {
-    config_helper_.prependFilter(
-        fmt::format(R"EOF(
-  name: pause-filter{}
-  )EOF",
-                    downstreamProtocol() == Http::CodecType::HTTP3 ? "-for-quic" : ""));
+    if (downstreamProtocol() == Http::CodecType::HTTP3) {
+      config_helper_.prependFilter(R"EOF(
+        name: pause-filter-for-quic
+        typed_config:
+          "@type": type.googleapis.com/test.integration.filters.PauseFilterForQuicConfig
+      )EOF");
+    } else {
+      config_helper_.prependFilter(R"EOF(
+        name: pause-filter
+        typed_config:
+          "@type": type.googleapis.com/test.integration.filters.PauseFilterConfig
+      )EOF");
+    }
   }
   initialize();
 
@@ -1496,7 +1506,7 @@ void HttpIntegrationTest::testLargeResponseHeaders(uint32_t size, uint32_t count
   }
 
   initialize();
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt,
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt,
                                         client_protocol_options);
   reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
       ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(big_headers));
@@ -1719,7 +1729,7 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecType admin_request_type) {
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
 
   // Validate that the listeners have been stopped.
-  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+  test_server_->waitForCounter("listener_manager.listener_stopped", Eq(1));
 
   // Validate that port is closed and can be bound by other sockets.
   // This does not work for HTTP/3 because the port is not closed until the listener is completely
@@ -1731,9 +1741,11 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecType admin_request_type) {
 
 void HttpIntegrationTest::simultaneousRequest(uint32_t request1_bytes, uint32_t request2_bytes,
                                               uint32_t response1_bytes, uint32_t response2_bytes) {
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   FakeStreamPtr upstream_request1;
   FakeStreamPtr upstream_request2;

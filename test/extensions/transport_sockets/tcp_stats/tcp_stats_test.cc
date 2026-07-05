@@ -12,6 +12,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -74,12 +75,12 @@ public:
     return opt_ref.value().get().value();
   }
 
-  absl::optional<uint64_t> histogramValue(absl::string_view name) {
+  std::optional<uint64_t> histogramValue(absl::string_view name) {
     std::vector<uint64_t> values = store_.histogramValues(absl::StrCat("tcp_stats.", name), true);
     ASSERT(values.size() <= 1,
            absl::StrCat(name, " didn't have <=1 value, instead had ", values.size()));
     if (values.empty()) {
-      return absl::nullopt;
+      return std::nullopt;
     } else {
       return values[0];
     }
@@ -106,7 +107,7 @@ TEST_F(TcpStatsTest, Periodic) {
   EXPECT_EQ(42, gaugeValue("cx_tx_unsent_bytes"));
 
   EXPECT_CALL(*timer_, disableTimer());
-  tcp_stats_socket_->closeSocket(Network::ConnectionEvent::RemoteClose);
+  tcp_stats_socket_->closeSocket(Network::ConnectionEvent::RemoteClose, false);
 }
 
 // Validate that stats are updated when the connection is closed. Gauges should be set to zero,
@@ -117,8 +118,8 @@ TEST_F(TcpStatsTest, CloseSocket) {
   tcp_info_.tcpi_segs_out = 42;
   tcp_info_.tcpi_notsent_bytes = 1;
   tcp_info_.tcpi_unacked = 2;
-  EXPECT_CALL(*inner_socket_, closeSocket(Network::ConnectionEvent::RemoteClose));
-  tcp_stats_socket_->closeSocket(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*inner_socket_, closeSocket(Network::ConnectionEvent::RemoteClose, false));
+  tcp_stats_socket_->closeSocket(Network::ConnectionEvent::RemoteClose, false);
   EXPECT_EQ(42, counterValue("cx_tx_segments"));
   EXPECT_EQ(0, gaugeValue("cx_tx_unsent_bytes"));
   EXPECT_EQ(0, gaugeValue("cx_tx_unacked_segments"));
@@ -187,7 +188,7 @@ TEST_F(TcpStatsTest, Values) {
   EXPECT_EQ(9U, histogramValue("cx_rtt_variance_us"));
   // No more packets were transmitted (numerator and denominator deltas are zero), so no value
   // should be emitted.
-  EXPECT_EQ(absl::nullopt, histogramValue("cx_tx_percent_retransmitted_segments"));
+  EXPECT_EQ(std::nullopt, histogramValue("cx_tx_percent_retransmitted_segments"));
 
   // Set stats on 2nd socket. Values should be combined.
   tcp_info_.tcpi_total_retrans = 1;
@@ -294,12 +295,13 @@ TEST(TcpStatsTest, ConfigErrorOnUnsupportedPlatform) {
   envoy::extensions::transport_sockets::tcp_stats::v3::Config proto_config;
   proto_config.mutable_transport_socket()->set_name("envoy.transport_sockets.raw_buffer");
   envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
-  proto_config.mutable_transport_socket()->mutable_typed_config()->PackFrom(raw_buffer);
+  std::ignore =
+      proto_config.mutable_transport_socket()->mutable_typed_config()->PackFrom(raw_buffer);
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
 
   envoy::config::core::v3::TransportSocket transport_socket_config;
   transport_socket_config.set_name("envoy.transport_sockets.tcp_stats");
-  transport_socket_config.mutable_typed_config()->PackFrom(proto_config);
+  std::ignore = transport_socket_config.mutable_typed_config()->PackFrom(proto_config);
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket_config);
   EXPECT_THROW_WITH_MESSAGE(

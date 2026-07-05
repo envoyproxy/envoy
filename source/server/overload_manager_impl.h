@@ -134,7 +134,7 @@ public:
   Symbol get(absl::string_view name);
 
   // Returns the symbol for the name if there is one, otherwise nullopt.
-  absl::optional<Symbol> lookup(absl::string_view string) const;
+  std::optional<Symbol> lookup(absl::string_view string) const;
 
   // Translates a symbol back into a name.
   const absl::string_view name(Symbol symbol) const;
@@ -157,7 +157,7 @@ public:
          ThreadLocal::SlotAllocator& slot_allocator,
          const envoy::config::overload::v3::OverloadManager& config,
          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-         const Server::Options& options);
+         const Server::Options& options, Runtime::Loader& runtime);
 
   // Server::OverloadManager
   void start() override;
@@ -167,7 +167,7 @@ public:
   LoadShedPoint* getLoadShedPoint(absl::string_view point_name) override;
   Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override;
   void stop() override;
-  absl::optional<envoy::config::overload::v3::ShrinkHeapConfig>
+  std::optional<envoy::config::overload::v3::ShrinkHeapConfig>
   getShrinkHeapConfig() const override {
     return shrink_heap_config_;
   }
@@ -177,7 +177,8 @@ protected:
                       ThreadLocal::SlotAllocator& slot_allocator,
                       const envoy::config::overload::v3::OverloadManager& config,
                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                      const Server::Options& options, absl::Status& creation_status);
+                      const Server::Options& options, Runtime::Loader& runtime,
+                      absl::Status& creation_status);
 
   // Factory for timer managers. This allows test-only subclasses to inject a mock implementation.
   virtual Event::ScaledRangeTimerManagerPtr createScaledRangeTimerManager(
@@ -258,7 +259,7 @@ private:
                               absl::Hash<NamedOverloadActionSymbolTable::Symbol>>;
   ActionToCallbackMap action_to_callbacks_;
 
-  absl::optional<envoy::config::overload::v3::ShrinkHeapConfig> shrink_heap_config_;
+  std::optional<envoy::config::overload::v3::ShrinkHeapConfig> shrink_heap_config_;
 };
 
 } // namespace Server

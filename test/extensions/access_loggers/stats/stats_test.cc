@@ -1,20 +1,24 @@
 #include "envoy/stats/sink.h"
+#include "envoy/type/v3/scope.pb.h"
 
-#include "source/common/stats/allocator.h"
+#include "source/common/config/decoded_resource_impl.h"
+#include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/thread_local_store.h"
+#include "source/extensions/access_loggers/stats/config.h"
 #include "source/extensions/access_loggers/stats/stats.h"
 
 #include "test/common/memory/memory_test_utility.h"
-#include "test/mocks/event/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/config/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/hash/hash_testing.h"
+#include "absl/status/statusor.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -27,21 +31,21 @@ class MockScopeWithGauge : public Stats::MockScope {
 public:
   using Stats::MockScope::MockScope;
 
-  MOCK_METHOD(Stats::Gauge&, gaugeFromStatNameWithTags,
-              (const Stats::StatName& name, Stats::StatNameTagVectorOptConstRef tags,
-               Stats::Gauge::ImportMode import_mode),
+  MOCK_METHOD(Stats::Gauge&, gaugeFromTaggedName,
+              (Stats::StatName name, std::optional<Stats::StatNameTagSpan> name_tags,
+               Stats::StatName tagged_name, Stats::Gauge::ImportMode import_mode),
               (override));
-  MOCK_METHOD(Stats::Histogram&, histogramFromStatNameWithTags,
-              (const Stats::StatName& name, Stats::StatNameTagVectorOptConstRef tags,
-               Stats::Histogram::Unit unit),
+  MOCK_METHOD(Stats::Histogram&, histogramFromTaggedName,
+              (Stats::StatName name, std::optional<Stats::StatNameTagSpan> name_tags,
+               Stats::StatName tagged_name, Stats::Histogram::Unit unit),
               (override));
 };
 
 // MockGaugeWithTags is introduced to support iterateTagStatNames which is used in
-// AccessLogState destructor to reconstruct the gauge with tags.
+// AccessLogState destructor to reconstruct the gauge with name_tags.
 //
 // It uses StatNameDynamicStorage to own the storage for tag names and values.
-// This is necessary because the tags passed to gaugeFromStatNameWithTags during
+// This is necessary because the name_tags passed to gaugeFromTaggedName during
 // logging are often backed by temporary storage (stack-allocated in emitLogConst)
 // which is destroyed after the log call returns. By making a copy into
 // tags_storage_, we ensure that iterateTagStatNames returns valid StatNames even
@@ -52,8 +56,9 @@ public:
 
   void iterateTagStatNames(const TagStatNameIterFn& fn) const override {
     for (const auto& tag : tags_storage_) {
-      if (!fn(tag.first->statName(), tag.second->statName()))
+      if (!fn(tag.first->statName(), tag.second->statName())) {
         return;
+      }
     }
   }
 
@@ -75,9 +80,12 @@ public:
 
 class StatsAccessLoggerTest : public testing::Test {
 public:
+  void TearDown() override { logger_.reset(); }
+
   void initialize(std::string config_yaml = {}) {
     const std::string default_config_yaml = R"EOF(
-      stat_prefix: test_stat_prefix
+      stats_scope:
+        prefix: test_stat_prefix
       counters:
         - stat:
             name: counter
@@ -116,29 +124,44 @@ public:
     ON_CALL(store_, gauge(_, _)).WillByDefault(testing::ReturnRef(*gauge_));
 
     ON_CALL(context_, statsScope()).WillByDefault(testing::ReturnRef(store_.mockScope()));
+    ON_CALL(context_, scope()).WillByDefault(testing::ReturnRef(store_.mockScope()));
+    ON_CALL(context_.server_context_, serverScope())
+        .WillByDefault(testing::ReturnRef(store_.mockScope()));
+    ON_CALL(context_, serverScope()).WillByDefault(testing::ReturnRef(store_.mockScope()));
+
     EXPECT_CALL(store_.mockScope(), createScope_(_))
-        .WillOnce(Invoke([this](const std::string& name) {
-          scope_name_storage_ =
+        .WillRepeatedly(Invoke([this](const std::string& name) {
+          auto scope_name_storage =
               std::make_unique<Stats::StatNameDynamicStorage>(name, context_.store_.symbolTable());
           auto scope = std::make_shared<NiceMock<MockScopeWithGauge>>(
-              scope_name_storage_->statName(), store_);
-          ON_CALL(*scope, gaugeFromStatNameWithTags(_, _, _))
-              .WillByDefault(Invoke(
-                  [scope_ptr = scope.get()](const Stats::StatName& name,
-                                            Stats::StatNameTagVectorOptConstRef tags,
-                                            Stats::Gauge::ImportMode import_mode) -> Stats::Gauge& {
-                    return scope_ptr->Stats::MockScope::gaugeFromStatNameWithTags(name, tags,
-                                                                                  import_mode);
-                  }));
-          ON_CALL(*scope, histogramFromStatNameWithTags(_, _, _))
-              .WillByDefault(Invoke([scope_ptr = scope.get()](
-                                        const Stats::StatName& name,
-                                        Stats::StatNameTagVectorOptConstRef tags,
-                                        Stats::Histogram::Unit unit) -> Stats::Histogram& {
-                return scope_ptr->Stats::MockScope::histogramFromStatNameWithTags(name, tags, unit);
+              scope_name_storage->statName(), store_);
+          ON_CALL(*scope, gaugeFromTaggedName(_, _, _, _))
+              .WillByDefault(Invoke([this](Stats::StatName name,
+                                           std::optional<Stats::StatNameTagSpan>, Stats::StatName,
+                                           Stats::Gauge::ImportMode import_mode) -> Stats::Gauge& {
+                return this->store_.gauge(this->context_.store_.symbolTable().toString(name),
+                                          import_mode);
               }));
+          ON_CALL(*scope, counterFromTaggedName(_, _, _))
+              .WillByDefault(
+                  Invoke([this](Stats::StatName name, std::optional<Stats::StatNameTagSpan>,
+                                Stats::StatName) -> Stats::Counter& {
+                    return this->store_.counter(this->context_.store_.symbolTable().toString(name));
+                  }));
+
+          ON_CALL(*scope, histogramFromTaggedName(_, _, _, _))
+              .WillByDefault(Invoke(
+                  [scope_ptr = scope.get()](Stats::StatName name,
+                                            std::optional<Stats::StatNameTagSpan> name_tags,
+                                            Stats::StatName tagged_name,
+                                            Stats::Histogram::Unit unit) -> Stats::Histogram& {
+                    return scope_ptr->Stats::MockScope::histogramFromTaggedName(name, name_tags,
+                                                                                tagged_name, unit);
+                  }));
+
           scope_ = scope;
-          return scope_;
+          name_storages_.push_back(std::move(scope_name_storage));
+          return scope;
         }));
 
     logger_ = std::make_shared<StatsAccessLog>(config, context_, std::move(filter_),
@@ -148,6 +171,7 @@ public:
   AccessLog::FilterPtr filter_;
   NiceMock<Stats::MockStore> store_;
   NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
+  std::vector<std::unique_ptr<Stats::StatNameDynamicStorage>> name_storages_;
   std::shared_ptr<Stats::MockScope> scope_;
   std::unique_ptr<Stats::StatNameDynamicStorage> scope_name_storage_;
   std::shared_ptr<StatsAccessLog> logger_;
@@ -159,7 +183,8 @@ public:
 
 TEST_F(StatsAccessLoggerTest, IncorrectValueFormatter) {
   const std::string cfg = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -171,9 +196,30 @@ TEST_F(StatsAccessLoggerTest, IncorrectValueFormatter) {
       "Stats logger `value_format` string must contain exactly one substitution");
 }
 
+TEST(StatsAccessLogConfigTest, ValidationFailBothEmpty) {
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  envoy::extensions::access_loggers::stats::v3::Config config;
+  EXPECT_THROW_WITH_MESSAGE(
+      AccessLogFactory().createAccessLogInstance(config, nullptr, context), EnvoyException,
+      "Either 'stat_prefix' or 'stats_scope' must be configured, but not both.");
+}
+
+TEST(StatsAccessLogConfigTest, DEPRECATED_FEATURE_TEST(ValidationFailBothSet)) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.features.enable_all_deprecated_features", "true"}});
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  envoy::extensions::access_loggers::stats::v3::Config config;
+  config.set_stat_prefix("prefix");
+  config.mutable_stats_scope()->set_sharing_name("scope1");
+  EXPECT_THROW_WITH_MESSAGE(
+      AccessLogFactory().createAccessLogInstance(config, nullptr, context), EnvoyException,
+      "Either 'stat_prefix' or 'stats_scope' must be configured, but not both.");
+}
+
 TEST_F(StatsAccessLoggerTest, HistogramUnits) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     histograms:
       - stat:
           name: Unspecified
@@ -208,7 +254,8 @@ TEST_F(StatsAccessLoggerTest, HistogramUnits) {
 
 TEST_F(StatsAccessLoggerTest, HistogramUnitsInvalid) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     histograms:
       - stat:
           name: histogram
@@ -225,7 +272,8 @@ TEST_F(StatsAccessLoggerTest, HistogramUnitsInvalid) {
 
 TEST_F(StatsAccessLoggerTest, CounterBothFormatAndFixed) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -240,7 +288,8 @@ TEST_F(StatsAccessLoggerTest, CounterBothFormatAndFixed) {
 
 TEST_F(StatsAccessLoggerTest, CounterNoValueConfig) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -254,7 +303,8 @@ TEST_F(StatsAccessLoggerTest, CounterNoValueConfig) {
 // Format string resolved to empty optional (no value available).
 TEST_F(StatsAccessLoggerTest, NoValueFormatted) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -263,7 +313,7 @@ TEST_F(StatsAccessLoggerTest, NoValueFormatted) {
 
   initialize(yaml);
 
-  absl::optional<std::string> nullopt{absl::nullopt};
+  std::optional<std::string> nullopt{std::nullopt};
   EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(nullopt));
   EXPECT_CALL(store_, counter(_)).Times(0);
   EXPECT_LOG_CONTAINS("error", "Stats access logger computed non-number value: ", {
@@ -274,7 +324,8 @@ TEST_F(StatsAccessLoggerTest, NoValueFormatted) {
 // Format string resolved to a non-number string.
 TEST_F(StatsAccessLoggerTest, NonNumberValueFormatted) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     histograms:
       - stat:
           name: counter
@@ -283,7 +334,7 @@ TEST_F(StatsAccessLoggerTest, NonNumberValueFormatted) {
 
   initialize(yaml);
 
-  absl::optional<std::string> not_a_number{"hello"};
+  std::optional<std::string> not_a_number{"hello"};
   EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(not_a_number));
   EXPECT_CALL(store_, counter(_)).Times(0);
   EXPECT_LOG_CONTAINS("error", "Stats access logger formatted a string that isn't a number: hello",
@@ -293,7 +344,8 @@ TEST_F(StatsAccessLoggerTest, NonNumberValueFormatted) {
 // Format string resolved to a number string.
 TEST_F(StatsAccessLoggerTest, NumberStringValueFormatted) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -302,7 +354,7 @@ TEST_F(StatsAccessLoggerTest, NumberStringValueFormatted) {
 
   initialize(yaml);
 
-  absl::optional<std::string> a_number{"42"};
+  std::optional<std::string> a_number{"42"};
   EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(a_number));
   EXPECT_CALL(store_, counter(_));
   EXPECT_CALL(store_.counter_, add(42));
@@ -311,7 +363,8 @@ TEST_F(StatsAccessLoggerTest, NumberStringValueFormatted) {
 
 TEST_F(StatsAccessLoggerTest, CounterValueFixed) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -320,7 +373,7 @@ TEST_F(StatsAccessLoggerTest, CounterValueFixed) {
 
   initialize(yaml);
 
-  absl::optional<std::string> a_number{"42"};
+  std::optional<std::string> a_number{"42"};
   EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(a_number));
   EXPECT_CALL(store_, counter(_));
   EXPECT_CALL(store_.counter_, add(42));
@@ -330,7 +383,8 @@ TEST_F(StatsAccessLoggerTest, CounterValueFixed) {
 // Histogram values are in the range 0-1.0, so ensure that fractional values work.
 TEST_F(StatsAccessLoggerTest, HistogramPercent) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     histograms:
       - stat:
           name: histogram
@@ -340,7 +394,7 @@ TEST_F(StatsAccessLoggerTest, HistogramPercent) {
 
   initialize(yaml);
 
-  absl::optional<std::string> a_number{"0.1"};
+  std::optional<std::string> a_number{"0.1"};
   EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(a_number));
   EXPECT_CALL(store_, histogram(_, Stats::Histogram::Unit::Percent))
       .WillOnce(
@@ -361,7 +415,8 @@ TEST_F(StatsAccessLoggerTest, HistogramPercent) {
 // Test that a tag formatter that doesn't have a value becomes an empty string.
 TEST_F(StatsAccessLoggerTest, EmptyTagFormatter) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -373,26 +428,28 @@ TEST_F(StatsAccessLoggerTest, EmptyTagFormatter) {
 
   initialize(yaml);
 
-  absl::optional<std::string> nullopt{absl::nullopt};
+  std::optional<std::string> nullopt{std::nullopt};
   EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(nullopt));
   EXPECT_CALL(stream_info_, responseCode())
-      .WillRepeatedly(testing::Return(absl::optional<uint32_t>{200}));
-  EXPECT_CALL(*scope_, counterFromStatNameWithTags(_, _))
-      .WillOnce(
-          testing::Invoke([this](const Stats::StatName& name,
-                                 Stats::StatNameTagVectorOptConstRef tags) -> Stats::Counter& {
-            EXPECT_EQ("counter", scope_->symbolTable().toString(name));
-            EXPECT_EQ(1, tags->get().size());
-            EXPECT_EQ(":200", scope_->symbolTable().toString(tags->get().front().second));
+      .WillRepeatedly(testing::Return(std::optional<uint32_t>{200}));
+  EXPECT_CALL(*scope_, counterFromTaggedName(_, _, _))
+      .WillOnce(testing::Invoke([this](Stats::StatName name,
+                                       std::optional<Stats::StatNameTagSpan> name_tags,
+                                       Stats::StatName) -> Stats::Counter& {
+        EXPECT_EQ("counter", scope_->symbolTable().toString(name));
+        EXPECT_EQ(1, name_tags->size());
+        EXPECT_EQ(":200", scope_->symbolTable().toString(name_tags->front().second));
 
-            return scope_->counterFromStatNameWithTags_(name, tags);
-          }));
+        return store_.counter_;
+      }));
+  EXPECT_CALL(store_.counter_, add(1));
   logger_->log(formatter_context_, stream_info_);
 }
 
 TEST_F(StatsAccessLoggerTest, GaugeNonNumberValueFormatted) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -405,7 +462,7 @@ TEST_F(StatsAccessLoggerTest, GaugeNonNumberValueFormatted) {
 
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
 
-  absl::optional<std::string> not_a_number{"hello"};
+  std::optional<std::string> not_a_number{"hello"};
   EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(not_a_number));
   EXPECT_CALL(store_, gauge(_, _)).Times(0);
   // Note: Logging is verified in NonNumberValueFormatted. We skip verification here due to shared
@@ -416,7 +473,8 @@ TEST_F(StatsAccessLoggerTest, GaugeNonNumberValueFormatted) {
 // Format string resolved to a number string.
 TEST_F(StatsAccessLoggerTest, GaugeNumberValueFormatted) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -437,7 +495,8 @@ TEST_F(StatsAccessLoggerTest, GaugeNumberValueFormatted) {
 
 TEST_F(StatsAccessLoggerTest, GaugeValueFixed) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -455,7 +514,7 @@ TEST_F(StatsAccessLoggerTest, GaugeValueFixed) {
 
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
 
-  absl::optional<std::string> a_number{"42"};
+  std::optional<std::string> a_number{"42"};
   EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(a_number));
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::NeverImport));
   EXPECT_CALL(*gauge_, set(42));
@@ -464,7 +523,8 @@ TEST_F(StatsAccessLoggerTest, GaugeValueFixed) {
 
 TEST_F(StatsAccessLoggerTest, GaugeOperationTypeSet) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -476,7 +536,7 @@ TEST_F(StatsAccessLoggerTest, GaugeOperationTypeSet) {
 
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
 
-  absl::optional<std::string> a_number{"42"};
+  std::optional<std::string> a_number{"42"};
   EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(a_number));
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::NeverImport));
   EXPECT_CALL(*gauge_, set(42));
@@ -485,7 +545,8 @@ TEST_F(StatsAccessLoggerTest, GaugeOperationTypeSet) {
 
 TEST_F(StatsAccessLoggerTest, GaugeBothFormatAndFixed) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -502,7 +563,8 @@ TEST_F(StatsAccessLoggerTest, GaugeBothFormatAndFixed) {
 
 TEST_F(StatsAccessLoggerTest, GaugeNoValueConfig) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -515,7 +577,8 @@ TEST_F(StatsAccessLoggerTest, GaugeNoValueConfig) {
 
 TEST_F(StatsAccessLoggerTest, GaugeBothSetAndAddSubtract) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -533,7 +596,8 @@ TEST_F(StatsAccessLoggerTest, GaugeBothSetAndAddSubtract) {
 
 TEST_F(StatsAccessLoggerTest, GaugeMultipleAdd) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -548,7 +612,8 @@ TEST_F(StatsAccessLoggerTest, GaugeMultipleAdd) {
 
 TEST_F(StatsAccessLoggerTest, GaugeNeitherSetNorAddSubtract) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -560,7 +625,8 @@ TEST_F(StatsAccessLoggerTest, GaugeNeitherSetNorAddSubtract) {
 
 TEST_F(StatsAccessLoggerTest, GaugeAddSubtractBehavior) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -597,7 +663,8 @@ TEST_F(StatsAccessLoggerTest, GaugeAddSubtractBehavior) {
 
 TEST_F(StatsAccessLoggerTest, GaugeAddZeroValue) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -627,7 +694,8 @@ TEST_F(StatsAccessLoggerTest, GaugeAddZeroValue) {
 
 TEST_F(StatsAccessLoggerTest, GaugeSubtractBeforeAdd) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -655,7 +723,8 @@ TEST_F(StatsAccessLoggerTest, GaugeSubtractBeforeAdd) {
 
 TEST_F(StatsAccessLoggerTest, GaugeMultipleSubAfterAdd) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -693,7 +762,8 @@ TEST_F(StatsAccessLoggerTest, GaugeMultipleSubAfterAdd) {
 
 TEST_F(StatsAccessLoggerTest, PairedSubtractIgnoresConfiguredValue) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -719,7 +789,8 @@ TEST_F(StatsAccessLoggerTest, PairedSubtractIgnoresConfiguredValue) {
 
 TEST_F(StatsAccessLoggerTest, DestructionSubtractsRemainingValue) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -751,7 +822,8 @@ TEST_F(StatsAccessLoggerTest, DestructionSubtractsRemainingValue) {
 
 TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorSubtractsFromSavedGauge) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -777,32 +849,33 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorSubtractsFromSavedGauge) {
 
   NiceMock<StreamInfo::MockStreamInfo> local_stream_info;
   EXPECT_CALL(local_stream_info, responseCode())
-      .WillRepeatedly(testing::Return(absl::optional<uint32_t>{200}));
+      .WillRepeatedly(testing::Return(std::optional<uint32_t>{200}));
 
   // Initial lookup and add
-  EXPECT_CALL(*mock_scope, gaugeFromStatNameWithTags(_, _, Stats::Gauge::ImportMode::Accumulate))
-      .WillRepeatedly(
-          Invoke([&](const Stats::StatName& name, Stats::StatNameTagVectorOptConstRef tags,
-                     Stats::Gauge::ImportMode) -> Stats::Gauge& {
-            saved_name = name;
-            if (tags) {
-              for (const auto& tag : tags->get()) {
-                saved_tags_strs.emplace_back(store_.symbolTable().toString(tag.first),
-                                             store_.symbolTable().toString(tag.second));
-              }
-              EXPECT_FALSE(saved_tags_strs.empty());
-              auto* gauge_with_tags = dynamic_cast<MockGaugeWithTags*>(gauge_);
-              EXPECT_TRUE(gauge_with_tags != nullptr);
-              gauge_with_tags->setTags(tags->get(), store_.symbolTable());
-            }
-            return *gauge_;
-          }));
+  EXPECT_CALL(*mock_scope, gaugeFromTaggedName(_, _, _, Stats::Gauge::ImportMode::Accumulate))
+      .WillRepeatedly(Invoke([&](Stats::StatName name,
+                                 std::optional<Stats::StatNameTagSpan> name_tags, Stats::StatName,
+                                 Stats::Gauge::ImportMode) -> Stats::Gauge& {
+        saved_name = name;
+        if (name_tags.has_value() && !name_tags->empty()) {
+          for (const auto& tag : *name_tags) {
+            saved_tags_strs.emplace_back(store_.symbolTable().toString(tag.first),
+                                         store_.symbolTable().toString(tag.second));
+          }
+          EXPECT_FALSE(saved_tags_strs.empty());
+          auto* gauge_with_tags = dynamic_cast<MockGaugeWithTags*>(gauge_);
+          EXPECT_TRUE(gauge_with_tags != nullptr);
+          gauge_with_tags->setTags(Stats::StatNameTagVector(name_tags->begin(), name_tags->end()),
+                                   store_.symbolTable());
+        }
+        return *gauge_;
+      }));
 
   EXPECT_CALL(*gauge_, add(10));
   logger_->log(formatter_context_, local_stream_info);
 
   // The destructor of AccessLogState should call sub(10, _) directly on the saved gauge
-  // This will trigger a second lookup using gaugeFromString (tags == absl::nullopt).
+  // This will trigger a second lookup using gaugeFromString (tags == std::nullopt).
   EXPECT_CALL(*gauge_, sub(10));
 
   // local_stream_info goes out of scope here, triggering AccessLogState destructor.
@@ -810,7 +883,8 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorSubtractsFromSavedGauge) {
 
 TEST_F(StatsAccessLoggerTest, SameGaugeAddSubtractDefinedTwice) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -851,7 +925,8 @@ TEST_F(StatsAccessLoggerTest, SameGaugeAddSubtractDefinedTwice) {
 
 TEST_F(StatsAccessLoggerTest, GaugeNotSet) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -863,9 +938,34 @@ TEST_F(StatsAccessLoggerTest, GaugeNotSet) {
                             "Stats logger gauge set operation must have a valid log type.");
 }
 
+TEST_F(StatsAccessLoggerTest, StatsScope) {
+  const std::string yaml = R"EOF(
+    stats_scope:
+      max_counters: 10
+    counters:
+      - stat:
+          name: counter
+        value_fixed: 1
+)EOF";
+
+  initialize(yaml);
+
+  Formatter::Context formatter_context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  // The newly created scope for "test_scope" is stored at the end of `name_storages_` but
+  // since `scope_` only stores the last created scope for non-"scope_discovery", it should
+  // be exactly `scope_` here.
+  EXPECT_CALL(*scope_, counterFromTaggedName(_, _, _))
+      .WillOnce(testing::ReturnRef(store_.counter_));
+  EXPECT_CALL(store_.counter_, add(1));
+  logger_->log(formatter_context, stream_info);
+}
+
 TEST_F(StatsAccessLoggerTest, DropStatAction) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -896,7 +996,8 @@ TEST_F(StatsAccessLoggerTest, DropStatAction) {
   logger_->log(formatter_context_, stream_info_);
 
   const std::string yaml2 = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -929,7 +1030,8 @@ TEST_F(StatsAccessLoggerTest, DropStatAction) {
 
 TEST_F(StatsAccessLoggerTest, DropStatActionOnHistogram) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     histograms:
       - stat:
           name: histogram
@@ -961,7 +1063,8 @@ TEST_F(StatsAccessLoggerTest, DropStatActionOnHistogram) {
   logger_->log(formatter_context_, stream_info_);
 
   const std::string yaml2 = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     histograms:
       - stat:
           name: histogram
@@ -997,7 +1100,8 @@ TEST_F(StatsAccessLoggerTest, DropStatActionOnHistogram) {
 
 TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTag) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -1025,22 +1129,23 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTag) {
   initialize(yaml);
 
   // Case 1: Filter matches (tag foo=bar), so update tag action is executed.
-  EXPECT_CALL(*scope_, counterFromStatNameWithTags(_, _))
-      .WillOnce(
-          testing::Invoke([this](const Stats::StatName& name,
-                                 Stats::StatNameTagVectorOptConstRef tags) -> Stats::Counter& {
-            EXPECT_EQ("counter", scope_->symbolTable().toString(name));
-            EXPECT_EQ(1, tags->get().size());
-            EXPECT_EQ("foo", scope_->symbolTable().toString(tags->get()[0].first));
-            EXPECT_EQ("baz", scope_->symbolTable().toString(tags->get()[0].second));
-            return scope_->counterFromStatNameWithTags_(name, tags);
-          }));
+  EXPECT_CALL(*scope_, counterFromTaggedName(_, _, _))
+      .WillOnce(testing::Invoke([this](Stats::StatName name,
+                                       std::optional<Stats::StatNameTagSpan> name_tags,
+                                       Stats::StatName tagged_name) -> Stats::Counter& {
+        EXPECT_EQ("counter", scope_->symbolTable().toString(name));
+        EXPECT_EQ(1, name_tags->size());
+        EXPECT_EQ("foo", scope_->symbolTable().toString((*name_tags)[0].first));
+        EXPECT_EQ("baz", scope_->symbolTable().toString((*name_tags)[0].second));
+        return scope_->counterFromTaggedName_(name, name_tags, tagged_name);
+      }));
   logger_->log(formatter_context_, stream_info_);
 }
 
 TEST_F(StatsAccessLoggerTest, StatTagFilterDropTag) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -1067,20 +1172,21 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterDropTag) {
   initialize(yaml);
 
   // Case 1: Filter matches (tag foo=bar), so drop tag action is executed.
-  EXPECT_CALL(*scope_, counterFromStatNameWithTags(_, _))
-      .WillOnce(
-          testing::Invoke([this](const Stats::StatName& name,
-                                 Stats::StatNameTagVectorOptConstRef tags) -> Stats::Counter& {
-            EXPECT_EQ("counter", scope_->symbolTable().toString(name));
-            EXPECT_EQ(0, tags->get().size());
-            return scope_->counterFromStatNameWithTags_(name, tags);
-          }));
+  EXPECT_CALL(*scope_, counterFromTaggedName(_, _, _))
+      .WillOnce(testing::Invoke([this](Stats::StatName name,
+                                       std::optional<Stats::StatNameTagSpan> name_tags,
+                                       Stats::StatName tagged_name) -> Stats::Counter& {
+        EXPECT_EQ("counter", scope_->symbolTable().toString(name));
+        EXPECT_EQ(0, name_tags->size());
+        return scope_->counterFromTaggedName_(name, name_tags, tagged_name);
+      }));
   logger_->log(formatter_context_, stream_info_);
 }
 
 TEST_F(StatsAccessLoggerTest, DropStatActionOnGauge) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -1114,7 +1220,8 @@ TEST_F(StatsAccessLoggerTest, DropStatActionOnGauge) {
   logger_->log(formatter_context_, stream_info_);
 
   const std::string yaml2 = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -1150,7 +1257,8 @@ TEST_F(StatsAccessLoggerTest, DropStatActionOnGauge) {
 
 TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTagOnGauge) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -1184,13 +1292,13 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTagOnGauge) {
   ASSERT_TRUE(mock_scope != nullptr);
 
   // Case 1: Filter matches (tag foo=bar), so update tag action is executed.
-  EXPECT_CALL(*mock_scope, gaugeFromStatNameWithTags(_, _, _))
-      .WillOnce(Invoke([&](const Stats::StatName& name, Stats::StatNameTagVectorOptConstRef tags,
-                           Stats::Gauge::ImportMode) -> Stats::Gauge& {
+  EXPECT_CALL(*mock_scope, gaugeFromTaggedName(_, _, _, _))
+      .WillOnce(Invoke([&](Stats::StatName name, std::optional<Stats::StatNameTagSpan> name_tags,
+                           Stats::StatName, Stats::Gauge::ImportMode) -> Stats::Gauge& {
         EXPECT_EQ("gauge", scope_->symbolTable().toString(name));
-        EXPECT_EQ(1, tags->get().size());
-        EXPECT_EQ("foo", scope_->symbolTable().toString(tags->get()[0].first));
-        EXPECT_EQ("baz", scope_->symbolTable().toString(tags->get()[0].second));
+        EXPECT_EQ(1, name_tags->size());
+        EXPECT_EQ("foo", scope_->symbolTable().toString((*name_tags)[0].first));
+        EXPECT_EQ("baz", scope_->symbolTable().toString((*name_tags)[0].second));
         return *gauge_;
       }));
   logger_->log(formatter_context_, stream_info_);
@@ -1198,7 +1306,8 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTagOnGauge) {
 
 TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTagOnHistogram) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     histograms:
       - stat:
           name: histogram
@@ -1230,16 +1339,17 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTagOnHistogram) {
   ASSERT_TRUE(mock_scope != nullptr);
 
   // Case 1: Filter matches (tag foo=bar), so update tag action is executed.
-  EXPECT_CALL(*mock_scope, histogramFromStatNameWithTags(_, _, _))
-      .WillOnce(Invoke([&](const Stats::StatName& name, Stats::StatNameTagVectorOptConstRef tags,
-                           Stats::Histogram::Unit) -> Stats::Histogram& {
-        EXPECT_EQ("histogram", scope_->symbolTable().toString(name));
-        EXPECT_EQ(1, tags->get().size());
-        EXPECT_EQ("foo", scope_->symbolTable().toString(tags->get()[0].first));
-        EXPECT_EQ("baz", scope_->symbolTable().toString(tags->get()[0].second));
-        return store_.mockScope().histogramFromStatNameWithTags(name, tags,
-                                                                Stats::Histogram::Unit::Bytes);
-      }));
+  EXPECT_CALL(*mock_scope, histogramFromTaggedName(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Stats::StatName name, std::optional<Stats::StatNameTagSpan> name_tags,
+                     Stats::StatName tagged_name, Stats::Histogram::Unit) -> Stats::Histogram& {
+            EXPECT_EQ("histogram", scope_->symbolTable().toString(name));
+            EXPECT_EQ(1, name_tags->size());
+            EXPECT_EQ("foo", scope_->symbolTable().toString((*name_tags)[0].first));
+            EXPECT_EQ("baz", scope_->symbolTable().toString((*name_tags)[0].second));
+            return store_.mockScope().histogramFromTaggedName(name, name_tags, tagged_name,
+                                                              Stats::Histogram::Unit::Bytes);
+          }));
   logger_->log(formatter_context_, stream_info_);
 }
 
@@ -1252,9 +1362,9 @@ TEST(GaugeKeyTest, EqualityAndHashing) {
   Stats::StatName name1 = pool.add("name1");
   Stats::StatName name2 = pool.add("name2");
 
-  GaugeKey key1(name1, absl::nullopt);
-  GaugeKey key2(name1, absl::nullopt);
-  GaugeKey key3(name2, absl::nullopt);
+  GaugeKey key1(name1, std::nullopt);
+  GaugeKey key2(name1, std::nullopt);
+  GaugeKey key3(name2, std::nullopt);
 
   // Basic equality
   EXPECT_EQ(key1, key2);
@@ -1306,8 +1416,8 @@ TEST(GaugeKeyTest, VerifyAbslHashCorrectness) {
   Stats::StatNameTagVector tags1 = {{tag_n1, tag_v1}};
   Stats::StatNameTagVector tags2 = {{tag_n1, tag_v2}};
 
-  GaugeKey key_empty1(name1, absl::nullopt);
-  GaugeKey key_empty2(name2, absl::nullopt);
+  GaugeKey key_empty1(name1, std::nullopt);
+  GaugeKey key_empty2(name2, std::nullopt);
 
   GaugeKey key_borrowed(name1, std::cref(tags1));
   GaugeKey key_owned(name1, std::cref(tags1));
@@ -1338,7 +1448,7 @@ TEST(GaugeKeyTest, ExactMemoryFootprint) {
   // 1. Check memory usage of empty GaugeKey (no heap should be used by GaugeKey itself).
   {
     Memory::TestUtil::MemoryTest memory_test;
-    GaugeKey key(name, absl::nullopt);
+    GaugeKey key(name, std::nullopt);
     // GaugeKey on stack, no heap should be allocated.
     EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
   }

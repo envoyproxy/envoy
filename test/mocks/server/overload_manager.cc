@@ -2,8 +2,6 @@
 
 #include <string>
 
-#include "test/mocks/event/mocks.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

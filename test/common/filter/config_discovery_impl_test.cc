@@ -15,10 +15,8 @@
 
 #include "test/integration/filters/add_body_filter.pb.h"
 #include "test/mocks/init/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
@@ -219,7 +217,7 @@ public:
     config_source.set_apply_default_config_without_warming(!warm);
     if (default_configuration || !warm) {
       Protobuf::StringValue default_config;
-      config_source.mutable_default_config()->PackFrom(default_config);
+      std::ignore = config_source.mutable_default_config()->PackFrom(default_config);
     }
 
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
@@ -247,7 +245,7 @@ public:
     envoy::config::core::v3::TypedExtensionConfig extension_config;
     extension_config.set_name(name);
     extension_config.mutable_typed_config()->set_type_url("type.googleapis.com/" + getTypeUrl());
-    response.add_resources()->PackFrom(extension_config);
+    std::ignore = response.add_resources()->PackFrom(extension_config);
     return response;
   }
 
@@ -260,7 +258,7 @@ public:
     EXPECT_CALL(init_watcher_, ready());
     ASSERT_TRUE(
         callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()).ok());
-    EXPECT_NE(absl::nullopt, provider_->config());
+    EXPECT_NE(std::nullopt, provider_->config());
     EXPECT_EQ(1UL, store_.counter(getConfigReloadCounter()).value());
     EXPECT_EQ(0UL, store_.counter(getConfigFailCounter()).value());
 
@@ -454,7 +452,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
   TypeParam config_discovery_test;
   config_discovery_test.setup();
   EXPECT_EQ("foo", config_discovery_test.provider_->name());
-  EXPECT_EQ(absl::nullopt, config_discovery_test.provider_->config());
+  EXPECT_EQ(std::nullopt, config_discovery_test.provider_->config());
 
   // Initial request.
   {
@@ -469,7 +467,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
     ASSERT_TRUE(config_discovery_test.callbacks_
                     ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
                     .ok());
-    EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
+    EXPECT_NE(std::nullopt, config_discovery_test.provider_->config());
     EXPECT_EQ(1UL,
               config_discovery_test.store_.counter(config_discovery_test.getConfigReloadCounter())
                   .value());
@@ -520,7 +518,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TooManyResources) {
   extension_config.set_name("foo");
   extension_config.mutable_typed_config()->set_type_url("type.googleapis.com/" +
                                                         config_discovery_test.getTypeUrl());
-  response.add_resources()->PackFrom(extension_config);
+  std::ignore = response.add_resources()->PackFrom(extension_config);
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
   EXPECT_CALL(config_discovery_test.init_watcher_, ready());
@@ -558,7 +556,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, IncrementalWithOutDefault) {
   config_discovery_test.setup();
   config_discovery_test.incrementalTest();
   // Verify the provider config is empty.
-  EXPECT_EQ(absl::nullopt, config_discovery_test.provider_->config());
+  EXPECT_EQ(std::nullopt, config_discovery_test.provider_->config());
 }
 
 // With default config.
@@ -569,7 +567,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, IncrementalWithDefault) {
   config_discovery_test.setup(true, true);
   config_discovery_test.incrementalTest();
   // Verify the provider config is not empty since the default config is there.
-  EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
+  EXPECT_NE(std::nullopt, config_discovery_test.provider_->config());
 }
 
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, ApplyWithoutWarming) {
@@ -577,7 +575,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, ApplyWithoutWarming) {
   TypeParam config_discovery_test;
   config_discovery_test.setup(false);
   EXPECT_EQ("foo", config_discovery_test.provider_->name());
-  EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
+  EXPECT_NE(std::nullopt, config_discovery_test.provider_->config());
   EXPECT_EQ(
       0UL,
       config_discovery_test.store_.counter(config_discovery_test.getConfigReloadCounter()).value());
@@ -592,7 +590,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProviders) {
   config_discovery_test.setup();
   const auto provider2 = config_discovery_test.createProvider("foo", true, false);
   EXPECT_EQ("foo", provider2->name());
-  EXPECT_EQ(absl::nullopt, provider2->config());
+  EXPECT_EQ(std::nullopt, provider2->config());
   const auto response = config_discovery_test.createResponse("1", "foo");
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
@@ -600,8 +598,8 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProviders) {
   ASSERT_TRUE(config_discovery_test.callbacks_
                   ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
                   .ok());
-  EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
-  EXPECT_NE(absl::nullopt, provider2->config());
+  EXPECT_NE(std::nullopt, config_discovery_test.provider_->config());
+  EXPECT_NE(std::nullopt, provider2->config());
   EXPECT_EQ(
       1UL,
       config_discovery_test.store_.counter(config_discovery_test.getConfigReloadCounter()).value());
@@ -618,10 +616,10 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProvidersInvalid) {
   add_body_filter_config.set_body_size(10);
   envoy::config::core::v3::TypedExtensionConfig extension_config;
   extension_config.set_name("foo");
-  extension_config.mutable_typed_config()->PackFrom(add_body_filter_config);
+  std::ignore = extension_config.mutable_typed_config()->PackFrom(add_body_filter_config);
   envoy::service::discovery::v3::DiscoveryResponse response;
   response.set_version_info("1");
-  response.add_resources()->PackFrom(extension_config);
+  std::ignore = response.add_resources()->PackFrom(extension_config);
 
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);

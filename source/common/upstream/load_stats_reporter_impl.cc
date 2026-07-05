@@ -12,6 +12,7 @@ namespace Upstream {
 namespace {
 
 envoy::service::load_stats::v3::LoadStatsRequest
+// NOLINTNEXTLINE(readability-identifier-naming)
 MakeRequestTemplate(const LocalInfo::LocalInfo& local_info) {
   envoy::service::load_stats::v3::LoadStatsRequest request;
   request.mutable_node()->MergeFrom(local_info.node());
@@ -107,7 +108,7 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
         uint64_t rq_error = 0;
         uint64_t rq_active = 0;
         uint64_t rq_issued = 0;
-        LoadMetricStats::StatMap load_metrics;
+        LoadMetricStats::StatMap aggregated_host_custom_metrics;
 
         envoy::config::endpoint::v3::UpstreamLocalityStats locality_stats;
         locality_stats.mutable_locality()->MergeFrom(hosts[0]->locality());
@@ -123,6 +124,15 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
           // skip it.
           bool endpoint_has_updates =
               (host_rq_success + host_rq_error + host_rq_active + host_rq_issued) != 0;
+
+          std::unique_ptr<LoadMetricStats::StatMap> host_custom_metrics;
+          if (Runtime::runtimeFeatureEnabled(
+                  "envoy.reloadable_features.report_load_for_non_zero_stats")) {
+            host_custom_metrics = host->loadMetricStats().latch();
+            if (host_custom_metrics != nullptr) {
+              endpoint_has_updates = true;
+            }
+          }
 
           if (endpoint_has_updates) {
             rq_success += host_rq_success;
@@ -142,15 +152,18 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
               upstream_endpoint_stats->set_total_issued_requests(host_rq_issued);
             }
 
-            const std::unique_ptr<LoadMetricStats::StatMap> latched_stats =
-                host->loadMetricStats().latch();
-            if (latched_stats != nullptr) {
-              for (const auto& metric : *latched_stats) {
+            // TODO(fcfort): Remove this latch() call when cleaning up
+            // `report_load_for_non_zero_stats`.
+            if (host_custom_metrics == nullptr) {
+              host_custom_metrics = host->loadMetricStats().latch();
+            }
+            if (host_custom_metrics != nullptr) {
+              for (const auto& metric : *host_custom_metrics) {
                 const auto& metric_name = metric.first;
                 const auto& metric_value = metric.second;
 
                 // Add the metric to the load metrics map.
-                LoadMetricStats::Stat& stat = load_metrics[metric_name];
+                LoadMetricStats::Stat& stat = aggregated_host_custom_metrics[metric_name];
                 stat.num_requests_with_metric += metric_value.num_requests_with_metric;
                 stat.total_metric_value += metric_value.total_metric_value;
 
@@ -168,14 +181,28 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
           }
         }
 
+        // Upstream locality stats
+
         bool should_send_locality_stats = rq_issued != 0;
-        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features."
-                                           "report_load_when_rq_active_is_non_zero")) {
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.report_load_for_non_zero_stats")) {
+          bool has_host_custom_metrics = false;
+          for (const auto& metric : aggregated_host_custom_metrics) {
+            if (metric.second.num_requests_with_metric != 0 ||
+                metric.second.total_metric_value != 0) {
+              has_host_custom_metrics = true;
+              break;
+            }
+          }
+          should_send_locality_stats = rq_success != 0 || rq_error != 0 || rq_active != 0 ||
+                                       rq_issued != 0 || has_host_custom_metrics;
+        } else if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features."
+                                                  "report_load_when_rq_active_is_non_zero")) {
           // If rq_active is non-zero, we should send the locality stats even if
           // rq_issued is zero (no new requests have been issued in this poll
           // window). This is needed to report long-lived connections/requests (e.g., when
           // web-sockets are used).
-          should_send_locality_stats = should_send_locality_stats || (rq_active != 0);
+          should_send_locality_stats = (rq_issued != 0) || (rq_active != 0);
         }
 
         if (should_send_locality_stats) {
@@ -183,7 +210,7 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
           locality_stats.set_total_error_requests(rq_error);
           locality_stats.set_total_requests_in_progress(rq_active);
           locality_stats.set_total_issued_requests(rq_issued);
-          for (const auto& metric : load_metrics) {
+          for (const auto& metric : aggregated_host_custom_metrics) {
             auto* load_metric_stats = locality_stats.add_load_metric_stats();
             load_metric_stats->set_metric_name(metric.first);
             load_metric_stats->set_num_requests_finished_with_metric(

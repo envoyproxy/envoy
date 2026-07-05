@@ -53,7 +53,7 @@ public:
   LegacyDnsClusterFactory(const std::string& name, bool set_all_addresses_in_single_endpoint)
       : ClusterFactoryImplBase(name),
         set_all_addresses_in_single_endpoint_(set_all_addresses_in_single_endpoint) {}
-  virtual absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
+  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override {
     absl::StatusOr<Network::DnsResolverSharedPtr> dns_resolver_or_error =
@@ -157,6 +157,8 @@ DnsClusterImpl::DnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
       local_info_(context.serverFactoryContext().localInfo()), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(dns_cluster, dns_refresh_rate, 5000))),
+      dns_min_refresh_rate_ms_(std::chrono::milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(dns_cluster, dns_min_refresh_rate, 0))),
       dns_jitter_ms_(PROTOBUF_GET_MS_OR_DEFAULT(dns_cluster, dns_jitter, 0)),
       respect_dns_ttl_(dns_cluster.respect_dns_ttl()),
       dns_lookup_family_(
@@ -244,7 +246,7 @@ void DnsClusterImpl::updateAllHosts(const HostVector& hosts_added, const HostVec
   // TODO(dio): Add assertion in here.
   priority_state_manager.updateClusterPrioritySet(
       current_priority, std::move(priority_state_manager.priorityState()[current_priority].first),
-      hosts_added, hosts_removed, absl::nullopt, weighted_priority_health_,
+      hosts_added, hosts_removed, std::nullopt, weighted_priority_health_,
       overprovisioning_factor_);
 }
 
@@ -422,7 +424,8 @@ void DnsClusterImpl::ResolveTarget::startResolve() {
 
           if (!response.empty() && parent_.respect_dns_ttl_ &&
               new_hosts.ttl_refresh_rate != std::chrono::seconds(0)) {
-            final_refresh_rate = new_hosts.ttl_refresh_rate;
+            final_refresh_rate = std::max(std::chrono::milliseconds(new_hosts.ttl_refresh_rate),
+                                          parent_.dns_min_refresh_rate_ms_);
             ASSERT(new_hosts.ttl_refresh_rate != std::chrono::seconds::max() &&
                    final_refresh_rate.count() > 0);
           }

@@ -137,6 +137,12 @@ TEST_F(LocalRateLimiterImplTest, TooFastFillRate) {
       EnvoyException, "local rate limit token bucket fill timer must be >= 50ms");
 }
 
+// Verify that max_tokens=0 skips the 50ms fill interval validation since fill is irrelevant.
+TEST_F(LocalRateLimiterImplTest, ZeroMaxTokensSkipsFillIntervalCheck) {
+  VERBOSE_EXPECT_NO_THROW(
+      LocalRateLimiterImpl(std::chrono::milliseconds(10), 0, 1, dispatcher_, descriptors_));
+}
+
 class LocalRateLimiterDescriptorImplTest : public LocalRateLimiterImplTest {
 public:
   void initializeWithAtomicTokenBucketDescriptor(const std::chrono::milliseconds fill_interval,
@@ -323,6 +329,51 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitSmallFillInterval)
   EXPECT_THROW_WITH_MESSAGE(
       LocalRateLimiterImpl(std::chrono::milliseconds(59000), 2, 1, dispatcher_, descriptors_),
       EnvoyException, "local rate limit descriptor token bucket fill timer must be >= 50ms");
+}
+
+// Verify that max_tokens=0 always rejects for both default and per-descriptor token buckets.
+TEST_F(LocalRateLimiterDescriptorImplTest, AlwaysRejectWithZeroMaxTokens) {
+  // Default bucket: max_tokens=0 always rejects regardless of time advancing.
+  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 0, 1);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  // Per-descriptor bucket: max_tokens=0 always rejects regardless of time advancing.
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 0, 1, "0.1s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 1, 1);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+}
+
+// Verify that a descriptor with max_tokens=0 skips the 50ms fill interval validation.
+TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorZeroMaxTokensSkipsFillIntervalCheck) {
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 0, 1, "0.010s"),
+                            *descriptors_.Add());
+  VERBOSE_EXPECT_NO_THROW(
+      LocalRateLimiterImpl(std::chrono::milliseconds(50), 1, 1, dispatcher_, descriptors_));
+}
+
+// Verify that a dynamic (wildcard) descriptor with max_tokens=0 always rejects.
+TEST_F(LocalRateLimiterDescriptorImplTest, DynamicDescriptorAlwaysRejectWithZeroMaxTokens) {
+  TestUtility::loadFromYaml(fmt::format(wildcard_descriptor_config_yaml, 0, 1, "0.1s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 1, 1);
+
+  std::vector<RateLimit::Descriptor> descriptors{{{{"user", "A"}}}};
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors).allowed);
+
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors).allowed);
+
+  // A different wildcard value also always rejects.
+  std::vector<RateLimit::Descriptor> descriptors2{{{{"user", "B"}}}};
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors2).allowed);
 }
 
 TEST_F(LocalRateLimiterDescriptorImplTest, DuplicateDescriptor) {

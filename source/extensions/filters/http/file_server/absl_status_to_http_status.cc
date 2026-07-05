@@ -10,6 +10,7 @@ Http::Code abslStatusToHttpStatus(absl::StatusCode code) {
   case absl::StatusCode::kOk:
     return Http::Code::OK;
   case absl::StatusCode::kCancelled:
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
     return static_cast<Http::Code>(499);
   case absl::StatusCode::kUnknown:
     return Http::Code::InternalServerError;

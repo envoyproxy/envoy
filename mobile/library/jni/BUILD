@@ -77,7 +77,7 @@ envoy_cc_library(
         ":android_network_utility_lib",
         ":jni_init_lib",
         ":jni_utility_lib",
-        "//library/cc:engine_builder_lib",
+        "//library/cc:mobile_engine_builder_lib",
         "//library/common:internal_engine_lib",
         "//library/common/api:c_types",
         "//library/common/bridge:utility_lib",

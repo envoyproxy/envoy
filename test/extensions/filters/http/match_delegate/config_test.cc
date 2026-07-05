@@ -367,7 +367,7 @@ template <class InputType, class ActionType>
 Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>
 createMatchingTree(const std::string& name, const std::string& value) {
   auto tree = *Matcher::ExactMapMatcher<Envoy::Http::HttpMatchingData>::create(
-      std::make_unique<InputType>(name), absl::nullopt);
+      std::make_unique<InputType>(name), std::nullopt);
 
   tree->addChild(value, Matcher::OnMatch<Envoy::Http::HttpMatchingData>{
                             std::make_shared<ActionType>(), nullptr, false});
@@ -378,7 +378,7 @@ createMatchingTree(const std::string& name, const std::string& value) {
 Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> createRequestAndResponseMatchingTree() {
   auto tree = *Matcher::ExactMapMatcher<Envoy::Http::HttpMatchingData>::create(
       std::make_unique<Envoy::Http::Matching::HttpResponseHeadersDataInput>("match-header"),
-      absl::nullopt);
+      std::nullopt);
 
   tree->addChild(
       "match",
@@ -613,6 +613,8 @@ TEST(DelegatingFilterTest, MatchTreeSkipActionRequestAndResponseHeaders) {
         Buffer::OwnedImpl empty_buffer;
         filter->decoder_callbacks_->encodeData(empty_buffer, false);
 
+        filter->decoder_callbacks_->encodeMetadata(std::make_unique<Envoy::Http::MetadataMap>());
+
         Envoy::Http::ResponseTrailerMapPtr trailers{
             new Envoy::Http::TestResponseTrailerMapImpl{{"test", "test"}}};
         filter->decoder_callbacks_->encodeTrailers(std::move(trailers));
@@ -629,6 +631,12 @@ TEST(DelegatingFilterTest, MatchTreeSkipActionRequestAndResponseHeaders) {
       .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) {
         EXPECT_CALL(*filter, encodeData(_, _)).Times(0);
         delegating_filter->encodeData(data, end_stream);
+      }));
+  EXPECT_CALL(decoder_callbacks, encodeMetadata_(_))
+      .WillOnce(Invoke([&](Envoy::Http::MetadataMapPtr metadata) {
+        // All the following encoding callbacks will be skipped.
+        EXPECT_CALL(*filter, encodeMetadata(_)).Times(0);
+        delegating_filter->encodeMetadata(*metadata);
       }));
   EXPECT_CALL(decoder_callbacks, encodeTrailers_(_))
       .WillOnce(Invoke([&](Envoy::Http::ResponseTrailerMap& trailers) {
@@ -747,6 +755,8 @@ TEST(DelegatingFilterTest, MatchTreeFilterActionEncodingTrailers) {
         Buffer::OwnedImpl empty_buffer;
         filter->decoder_callbacks_->encodeData(empty_buffer, false);
 
+        filter->decoder_callbacks_->encodeMetadata(std::make_unique<Envoy::Http::MetadataMap>());
+
         Envoy::Http::ResponseTrailerMapPtr trailers{
             new Envoy::Http::TestResponseTrailerMapImpl{{"match-trailer", "match"}}};
         filter->decoder_callbacks_->encodeTrailers(std::move(trailers));
@@ -762,6 +772,12 @@ TEST(DelegatingFilterTest, MatchTreeFilterActionEncodingTrailers) {
       .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) {
         EXPECT_CALL(*filter, encodeData(_, _));
         delegating_filter->encodeData(data, end_stream);
+      }));
+  EXPECT_CALL(decoder_callbacks, encodeMetadata_(_))
+      .WillOnce(Invoke([&](Envoy::Http::MetadataMapPtr metadata) {
+        // All the following encoding callbacks will be skipped.
+        EXPECT_CALL(*filter, encodeMetadata(_));
+        delegating_filter->encodeMetadata(*metadata);
       }));
   EXPECT_CALL(decoder_callbacks, encodeTrailers_(_))
       .WillOnce(Invoke([&](Envoy::Http::ResponseTrailerMap& trailers) {

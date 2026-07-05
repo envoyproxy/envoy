@@ -2,6 +2,7 @@
 
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <type_traits>
 #include <utility>
 
@@ -16,8 +17,8 @@
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
-#include "absl/types/optional.h"
 #include "quiche/quic/core/quic_config.h"
 #include "quiche/quic/core/quic_error_codes.h"
 #include "quiche/quic/core/quic_stream.h"
@@ -39,7 +40,7 @@ private:
 
   const ScopeTrackedObject* object_;
   Event::ScopeTracker& tracker_;
-  absl::optional<ScopeTrackerScopeState> state_;
+  std::optional<ScopeTrackerScopeState> state_;
 };
 } // namespace
 
@@ -82,6 +83,21 @@ EnvoyQuicServerSession::~EnvoyQuicServerSession() {
   QuicFilterManagerConnectionImpl::network_connection_ = nullptr;
 }
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+quic::WebTransportHttp3VersionSet
+EnvoyQuicServerSession::LocallySupportedWebTransportVersions() const {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_support_web_transport")) {
+    return {};
+  }
+  if (!http3_options_.has_value() || !http3_options_->allow_extended_connect()) {
+    // WebTransport requires extended CONNECT, so only advertise it when extended CONNECT is
+    // enabled.
+    return {};
+  }
+  return quic::kDefaultSupportedWebTransportVersions;
+}
+#endif
+
 absl::string_view EnvoyQuicServerSession::requestedServerName() const {
   return {GetCryptoStream()->crypto_negotiated_params().sni};
 }
@@ -114,14 +130,19 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
   if (aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();
   }
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // On a WebTransport-capable session an incoming bidirectional stream may turn out to be a
+  // WebTransport data stream (first frame WEBTRANSPORT_STREAM) rather than an HTTP request. Defer
+  // setting up the request decoder until real request headers arrive
+  // (EnvoyQuicServerStream::OnInitialHeadersComplete); data streams never reach there and so never
+  // become HCM streams, which would otherwise dangle during connection teardown. Non-WebTransport
+  // sessions keep the original eager behavior.
+  if (SupportsWebTransport()) {
+    return stream;
+  }
+#endif
   setUpRequestDecoder(*stream);
   return stream;
-}
-
-quic::QuicSpdyStream*
-EnvoyQuicServerSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
-  IS_ENVOY_BUG("Unexpected disallowed server push call");
-  return nullptr;
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingBidirectionalStream() {
@@ -243,6 +264,11 @@ quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() const {
                                         position_->filter_chain_.transportSocketFactory())
                                         .earlyDataEnabled()
                                   : true;
+  config.disable_ticket_support = position_.has_value()
+                                      ? !dynamic_cast<const QuicServerTransportSocketFactory&>(
+                                             position_->filter_chain_.transportSocketFactory())
+                                             .resumptionEnabled()
+                                      : false;
   return config;
 }
 
@@ -318,6 +344,7 @@ void EnvoyQuicServerSession::OnStreamClosed(quic::QuicStreamId id) {
   }
 }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void EnvoyQuicServerSession::TerminateIdleSession() {
   ENVOY_BUG(!on_connection_closed_called_,
             "TerminateIdleSession called after session on close called.");
@@ -325,8 +352,10 @@ void EnvoyQuicServerSession::TerminateIdleSession() {
                                 quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
 }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void EnvoyQuicServerSession::OnLastActiveStreamClosed() { MaybeAddSessionToIdleList(); }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void EnvoyQuicServerSession::MaybeAddSessionToIdleList() {
   if (session_idle_list_ == nullptr || is_in_idle_list_) {
     return;
@@ -335,6 +364,7 @@ void EnvoyQuicServerSession::MaybeAddSessionToIdleList() {
   session_idle_list_->AddSession(*this);
 }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void EnvoyQuicServerSession::MaybeRemoveSessionFromIdleList() {
   if (session_idle_list_ == nullptr || !is_in_idle_list_) {
     return;

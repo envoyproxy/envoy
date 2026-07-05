@@ -36,7 +36,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/udp/udp_proxy/session_filters/http_capsule:config",
         "//source/extensions/filters/udp/udp_proxy/session_filters/http_capsule:http_capsule_filter_lib",
         "//test/integration:integration_lib",
-        "//test/test_common:registry_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )

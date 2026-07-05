@@ -16,7 +16,7 @@ HostConstSharedPtr RandomLoadBalancer::chooseHostOnce(LoadBalancerContext* conte
 
 HostConstSharedPtr RandomLoadBalancer::peekOrChoose(LoadBalancerContext* context, bool peek) {
   uint64_t random_hash = random(peek);
-  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random_hash);
+  const std::optional<HostsSource> hosts_source = hostSourceToUse(context, random_hash);
   if (!hosts_source) {
     return nullptr;
   }

@@ -26,7 +26,6 @@
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -88,7 +87,7 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadataObservabilityMode) {
   initializeConfig(config_option);
   HttpIntegrationTest::initialize();
 
-  auto response = sendDownstreamRequest(absl::nullopt);
+  auto response = sendDownstreamRequest(std::nullopt);
 
   testSendDyanmicMetadata();
 
@@ -106,7 +105,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithHeader) {
   initializeConfig();
   HttpIntegrationTest::initialize();
 
-  auto response = sendDownstreamRequest(absl::nullopt);
+  auto response = sendDownstreamRequest(std::nullopt);
   Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
                                                           {":method", "GET"},
                                                           {"host", "host"},
@@ -162,7 +161,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithBody) {
   initializeConfig();
   HttpIntegrationTest::initialize();
   const std::string original_body_str = "Hello";
-  auto response = sendDownstreamRequestWithBody(original_body_str, absl::nullopt);
+  auto response = sendDownstreamRequestWithBody(original_body_str, std::nullopt);
 
   processRequestBodyMessage(*grpc_upstreams_[0], true,
                             [&original_body_str](const HttpBody& body, BodyResponse& body_resp) {
@@ -207,7 +206,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithWrongBodyMode) {
   initializeConfig();
   HttpIntegrationTest::initialize();
   const std::string original_body_str = "Hello";
-  auto response = sendDownstreamRequestWithBody(original_body_str, absl::nullopt);
+  auto response = sendDownstreamRequestWithBody(original_body_str, std::nullopt);
 
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
@@ -223,7 +222,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithTrailer) {
   proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
   initializeConfig();
   HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
+  auto response = sendDownstreamRequest(std::nullopt);
 
   handleUpstreamRequestWithTrailer();
 
@@ -262,9 +261,9 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
   const std::string body_str = "Hello";
   auto response = sendDownstreamRequestWithBodyAndTrailer(body_str);
 
-  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
-  processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
-  processRequestTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
+  processRequestBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
+  processRequestTrailersMessage(*grpc_upstreams_[0], false, std::nullopt);
 
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
@@ -283,13 +282,13 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullResponse) {
 
   initializeConfig();
   HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
+  auto response = sendDownstreamRequest(std::nullopt);
 
   handleUpstreamRequestWithTrailer();
 
-  processResponseHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
-  processResponseBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
-  processResponseTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processResponseHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
+  processResponseBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
+  processResponseTrailersMessage(*grpc_upstreams_[0], false, std::nullopt);
 
   verifyDownstreamResponse(*response, 200);
 
@@ -343,9 +342,9 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithLogging) {
   auto response = sendDownstreamRequest(
       [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
 
-  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
   handleUpstreamRequest();
-  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, std::nullopt);
   verifyDownstreamResponse(*response, 200);
 }
 
@@ -389,18 +388,18 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityMode) {
     if (old_protocol_options.http_filters().empty()) {
       auto* http_filter = old_protocol_options.add_http_filters();
       http_filter->set_name("envoy.filters.http.upstream_codec");
-      http_filter->mutable_typed_config()->PackFrom(
+      std::ignore = http_filter->mutable_typed_config()->PackFrom(
           envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
     }
     auto* ext_proc_filter = old_protocol_options.add_http_filters();
     ext_proc_filter->set_name("envoy.filters.http.ext_proc");
-    ext_proc_filter->mutable_typed_config()->PackFrom(proto_config_);
+    std::ignore = ext_proc_filter->mutable_typed_config()->PackFrom(proto_config_);
     for (int i = old_protocol_options.http_filters_size() - 1; i > 0; --i) {
       old_protocol_options.mutable_http_filters()->SwapElements(i, i - 1);
     }
-    (*cluster->mutable_typed_extension_protocol_options())
-        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-            .PackFrom(old_protocol_options);
+    std::ignore = (*cluster->mutable_typed_extension_protocol_options())
+                      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                          .PackFrom(old_protocol_options);
   });
   HttpIntegrationTest::initialize();
 
@@ -462,18 +461,18 @@ TEST_P(ExtProcIntegrationTest, DISABLED_GetAndSetHeadersUpstreamObservabilityMod
     if (old_protocol_options.http_filters().empty()) {
       auto* http_filter = old_protocol_options.add_http_filters();
       http_filter->set_name("envoy.filters.http.upstream_codec");
-      http_filter->mutable_typed_config()->PackFrom(
+      std::ignore = http_filter->mutable_typed_config()->PackFrom(
           envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
     }
     auto* ext_proc_filter = old_protocol_options.add_http_filters();
     ext_proc_filter->set_name("envoy.filters.http.ext_proc");
-    ext_proc_filter->mutable_typed_config()->PackFrom(proto_config_);
+    std::ignore = ext_proc_filter->mutable_typed_config()->PackFrom(proto_config_);
     for (int i = old_protocol_options.http_filters_size() - 1; i > 0; --i) {
       old_protocol_options.mutable_http_filters()->SwapElements(i, i - 1);
     }
-    (*cluster->mutable_typed_extension_protocol_options())
-        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-            .PackFrom(old_protocol_options);
+    std::ignore = (*cluster->mutable_typed_extension_protocol_options())
+                      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                          .PackFrom(old_protocol_options);
   });
   HttpIntegrationTest::initialize();
 
@@ -521,7 +520,7 @@ TEST_P(ExtProcIntegrationTest, InvalidServerOnResponseInObservabilityMode) {
   initializeConfig(config_option);
   HttpIntegrationTest::initialize();
 
-  auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
+  auto response = sendDownstreamRequestWithBody("Replace this!", std::nullopt);
   handleUpstreamRequest();
   EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_,
                                                          std::chrono::milliseconds(25000)));

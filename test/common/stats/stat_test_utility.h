@@ -2,7 +2,6 @@
 
 #include "envoy/stats/store.h"
 
-#include "source/common/common/logger.h"
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/common/memory/memory_test_utility.h"
@@ -139,18 +138,18 @@ public:
   Counter& counterFromString(const std::string& name) override;
   Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override;
   Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override;
-  Counter& counterFromStatNameWithTags(const StatName& stat_name,
-                                       StatNameTagVectorOptConstRef tags) override;
-  Gauge& gaugeFromStatNameWithTags(const StatName& stat_name, StatNameTagVectorOptConstRef tags,
-                                   Gauge::ImportMode import_mode) override;
-  Histogram& histogramFromStatNameWithTags(const StatName& stat_name,
-                                           StatNameTagVectorOptConstRef tags,
-                                           Histogram::Unit unit) override;
+  Counter& counterFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                                 StatName tagged_name) override;
+  Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                             StatName tagged_name, Gauge::ImportMode import_mode) override;
+  Histogram& histogramFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                                     StatName tagged_name, Histogram::Unit unit) override;
   TestStore& store() override { return store_; }
   const TestStore& constStore() const override { return store_; }
 
 private:
-  std::string statNameWithTags(const StatName& stat_name, StatNameTagVectorOptConstRef tags);
+  std::string statNameWithTags(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                               StatName tagged_name);
   static std::string addDot(const std::string& prefix) {
     if (prefix.empty() || prefix[prefix.size() - 1] == '.') {
       return prefix;
@@ -158,8 +157,8 @@ private:
     return prefix + ".";
   }
 
-  void verifyConsistency(StatName ref_stat_name, StatName stat_name,
-                         StatNameTagVectorOptConstRef tags);
+  void verifyConsistency(StatName ref_stat_name, StatName base_name,
+                         std::optional<StatNameTagSpan> name_tags, StatName tagged_name);
 
   TestStore& store_;
   const std::string prefix_str_;

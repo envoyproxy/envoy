@@ -22,6 +22,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -66,7 +67,7 @@ public:
 
       envoy::config::listener::v3::Filter ratelimit_filter;
       ratelimit_filter.set_name("envoy.filters.http.ratelimit");
-      ratelimit_filter.mutable_typed_config()->PackFrom(proto_config_);
+      std::ignore = ratelimit_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ratelimit_filter));
     });
     config_helper_.addConfigModifier(
@@ -363,8 +364,8 @@ TEST_P(RatelimitIntegrationTest, Timeout) {
   waitForRatelimitRequest();
   switch (clientType()) {
   case Grpc::ClientType::EnvoyGrpc:
-    test_server_->waitForCounterGe("cluster.ratelimit_cluster.upstream_rq_timeout", 1);
-    test_server_->waitForCounterGe("cluster.ratelimit_cluster.upstream_rq_504", 1);
+    test_server_->waitForCounter("cluster.ratelimit_cluster.upstream_rq_timeout", Ge(1));
+    test_server_->waitForCounter("cluster.ratelimit_cluster.upstream_rq_504", Ge(1));
     EXPECT_EQ(1, test_server_->counter("cluster.ratelimit_cluster.upstream_rq_timeout")->value());
     EXPECT_EQ(1, test_server_->counter("cluster.ratelimit_cluster.upstream_rq_504")->value());
     break;

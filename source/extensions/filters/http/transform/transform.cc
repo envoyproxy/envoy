@@ -21,17 +21,17 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Transform {
 
-absl::optional<std::string> BodyFormatterProvider::format(const Formatter::Context& context,
-                                                          const StreamInfo::StreamInfo&) const {
+std::optional<std::string> BodyFormatterProvider::format(const Formatter::Context& context,
+                                                         const StreamInfo::StreamInfo&) const {
   const auto extension = context.typedExtension<BodyContextExtension>();
   if (!extension.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const auto& body = request_body_ ? extension->request_body : extension->response_body;
   const auto& value = Config::Metadata::structValue(body, path_);
   if (value.kind_case() == Protobuf::Value::kNullValue ||
       value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   if (value.kind_case() == Protobuf::Value::kStringValue) {
     return value.string_value();
@@ -58,8 +58,9 @@ class BodyFormatterCommandParser : public Formatter::CommandParser {
 public:
   BodyFormatterCommandParser() = default;
 
-  Formatter::FormatterProviderPtr parse(absl::string_view command, absl::string_view command_arg,
-                                        absl::optional<size_t>) const override {
+  absl::StatusOr<Formatter::FormatterProviderPtr> parse(absl::string_view command,
+                                                        absl::string_view command_arg,
+                                                        std::optional<size_t>) const override {
 
     if (command == "REQUEST_BODY") {
       return std::make_unique<BodyFormatterProvider>(command_arg, true);
@@ -101,7 +102,7 @@ Transformation::Transformation(const ProtoTransformation& config,
     }
   }
 
-  if (config.headers_mutations().size() > 0) {
+  if (!config.headers_mutations().empty()) {
     auto mutations_or =
         Http::HeaderMutations::create(config.headers_mutations(), context, bodyCommandParsers());
     SET_AND_RETURN_IF_NOT_OK(mutations_or.status(), creation_status);

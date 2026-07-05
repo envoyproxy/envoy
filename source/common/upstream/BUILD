@@ -37,7 +37,7 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/config:subscription_base_interface",
+        "//source/common/config:resource_type_helper_lib",
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -56,7 +56,7 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/config:subscription_base_interface",
+        "//source/common/config:resource_type_helper_lib",
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -315,6 +315,8 @@ envoy_cc_library(
     hdrs = ["prod_cluster_info_factory.h"],
     deps = [
         ":upstream_includes",
+        "//source/common/init:manager_lib",
+        "//source/common/init:watcher_lib",
     ],
 )
 
@@ -467,6 +469,7 @@ envoy_cc_library(
         ":upstream_factory_context_lib",
         "//envoy/event:timer_interface",
         "//envoy/filter:config_provider_manager_interface",
+        "//envoy/http:client_codec_factory_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:dns_interface",
         "//envoy/runtime:runtime_interface",
@@ -592,7 +595,6 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/upstream:upstream_interface",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -611,7 +613,6 @@ envoy_cc_library(
         "//envoy/registry",
         "//envoy/upstream:upstream_interface",
         "//source/common/network:resolver_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/upstream/local_address_selector/v3:pkg_cc_proto",
     ],
     # Ensure this factory in the source is always linked in.

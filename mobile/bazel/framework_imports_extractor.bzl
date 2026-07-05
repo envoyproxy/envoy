@@ -53,6 +53,5 @@ framework_imports_extractor = rule(
         platform_type = attr.string(default = "ios"),
         minimum_os_version = attr.string(default = MINIMUM_IOS_VERSION),
     ),
-    # fragments = ["apple"],
     implementation = _framework_imports_extractor,
 )

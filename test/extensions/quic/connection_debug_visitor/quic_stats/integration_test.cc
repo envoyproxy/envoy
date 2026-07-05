@@ -3,6 +3,7 @@
 
 #include "test/integration/http_integration.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace Extensions {
 namespace Quic {
@@ -21,7 +22,7 @@ public:
                                           ->mutable_connection_debug_visitor_config();
 
           envoy::extensions::quic::connection_debug_visitor::quic_stats::v3::Config config;
-          debug_visitor_config->mutable_typed_config()->PackFrom(config);
+          std::ignore = debug_visitor_config->mutable_typed_config()->PackFrom(config);
           debug_visitor_config->set_name("envoy.quic.connection_debug_visitor.quic_stats");
 
           listener->set_stat_prefix("test");
@@ -50,7 +51,7 @@ TEST_P(QuicStatsIntegrationTest, Basic) {
   // before validating values and ranges. Gauges/counters and histograms go through slightly
   // different paths, so check each to avoid test flakes.
   test_server_->waitUntilHistogramHasSamples("listener.test.quic_stats.cx_rtt_us");
-  test_server_->waitForCounterGe("listener.test.quic_stats.cx_tx_packets_total", 1);
+  test_server_->waitForCounter("listener.test.quic_stats.cx_tx_packets_total", Ge(1));
 
   auto validateCounterRange = [this](const std::string& name, uint64_t lower, uint64_t upper) {
     auto counter = test_server_->counter(absl::StrCat("listener.test.quic_stats.", name));
@@ -114,13 +115,13 @@ TEST_P(QuicStatsIntegrationTest, CertChainTooLong) {
     cert->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/long_serverkey.pem"));
 
-    ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+    std::ignore = ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
   });
 
   testRouterHeaderOnlyRequestAndResponse();
   codec_client_->goAway();
   codec_client_->close(Network::ConnectionCloseType::FlushWrite);
-  test_server_->waitForCounterGe("listener.test.quic_stats.cx_tx_packets_total", 1);
+  test_server_->waitForCounter("listener.test.quic_stats.cx_tx_packets_total", Ge(1));
 
   EXPECT_GE(test_server_->counter("listener.test.quic_stats.cx_tx_amplification_throttling_total")
                 ->value(),

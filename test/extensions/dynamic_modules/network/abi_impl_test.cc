@@ -1,3 +1,4 @@
+#include <thread>
 #include <vector>
 
 #include "envoy/registry/registry.h"
@@ -94,6 +95,8 @@ public:
         cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
+    // Re-open stat creation so tests can call `define_*` from the test thread.
+    filter_config_->stat_creation_frozen_ = false;
 
     filter_ = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
 
@@ -1126,6 +1129,85 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetAndGetDynamicMetadataString
   EXPECT_EQ(value, std::string(result.ptr, result.length));
 }
 
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetDynamicMetadataMergesInPlace) {
+  const std::string ns = "test.ns";
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(connection_.stream_info_, dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+
+  // Sequential single sets accumulate under one namespace rather than replacing it.
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"k1", 2}, {"v1", 2});
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"k2", 2}, 7.0);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"k1", 2}, &result));
+  EXPECT_EQ("v1", std::string(result.ptr, result.length));
+  double number = 0.0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"k2", 2}, &number));
+  EXPECT_DOUBLE_EQ(7.0, number);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetDynamicMetadataStringBatch) {
+  const std::string ns = "test.ns";
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(connection_.stream_info_, dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+
+  envoy_dynamic_module_type_envoy_buffer result;
+
+  // An empty batch is a no-op and must not create the namespace.
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, nullptr, 0);
+  EXPECT_TRUE(metadata.filter_metadata().empty());
+
+  // A batch creates the namespace once and sets every entry.
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> entries = {
+      {"k1", 2, "v1", 2},
+      {"k2", 2, "v2", 2},
+  };
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, entries.data(), entries.size());
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"k1", 2}, &result));
+  EXPECT_EQ("v1", std::string(result.ptr, result.length));
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"k2", 2}, &result));
+  EXPECT_EQ("v2", std::string(result.ptr, result.length));
+
+  // A later batch overwrites an existing key and merges new keys while leaving untouched keys
+  // intact, proving the in place merge does not drop existing fields.
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> merge = {
+      {"k1", 2, "new", 3},
+      {"k3", 2, "v3", 2},
+  };
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, merge.data(), merge.size());
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"k1", 2}, &result));
+  EXPECT_EQ("new", std::string(result.ptr, result.length));
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"k2", 2}, &result));
+  EXPECT_EQ("v2", std::string(result.ptr, result.length));
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"k3", 2}, &result));
+  EXPECT_EQ("v3", std::string(result.ptr, result.length));
+
+  // Within a single batch, a later entry with a duplicate key wins.
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> dup = {
+      {"dup", 3, "first", 5},
+      {"dup", 3, "last", 4},
+  };
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, dup.data(), dup.size());
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()}, {"dup", 3}, &result));
+  EXPECT_EQ("last", std::string(result.ptr, result.length));
+}
+
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetAndGetDynamicMetadataNumber) {
   const std::string ns = "test.ns";
   const std::string key = "number.key";
@@ -1596,6 +1678,8 @@ public:
         cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
+    // Re-open stat creation so tests can call `define_*` from the test thread.
+    filter_config_->stat_creation_frozen_ = false;
 
     filter_ = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
 
@@ -2254,10 +2338,6 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, StartUpstreamSecureTransportNu
 // =============================================================================
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterSchedulerNewDelete) {
-  // Set up the dispatcher for the filter via connection.
-  NiceMock<Event::MockDispatcher> worker_dispatcher;
-  EXPECT_CALL(connection_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
-
   auto scheduler = envoy_dynamic_module_callback_network_filter_scheduler_new(filterPtr());
   EXPECT_NE(nullptr, scheduler);
 
@@ -2265,19 +2345,15 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterSchedulerNewDelet
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterSchedulerCommit) {
-  // Set up the dispatcher for the filter via connection.
-  NiceMock<Event::MockDispatcher> worker_dispatcher;
-  EXPECT_CALL(connection_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
-
   auto scheduler = envoy_dynamic_module_callback_network_filter_scheduler_new(filterPtr());
   EXPECT_NE(nullptr, scheduler);
 
-  // Expect the callback to be posted.
-  EXPECT_CALL(worker_dispatcher, post(_));
+  // The dispatcher cached during `initializeReadFilterCallbacks` (in SetUp) is
+  // `worker_thread_dispatcher_`.
+  EXPECT_CALL(worker_thread_dispatcher_, post(_));
 
   envoy_dynamic_module_callback_network_filter_scheduler_commit(scheduler, 12345);
 
-  // Clean up.
   envoy_dynamic_module_callback_network_filter_scheduler_delete(scheduler);
 }
 
@@ -2304,16 +2380,12 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterConfigSchedulerCo
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterSchedulerCommitInvokesOnScheduled) {
-  // Set up the dispatcher for the filter via connection.
-  NiceMock<Event::MockDispatcher> worker_dispatcher;
-  EXPECT_CALL(connection_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
-
   auto scheduler = envoy_dynamic_module_callback_network_filter_scheduler_new(filterPtr());
   EXPECT_NE(nullptr, scheduler);
 
   // Capture the posted callback and invoke it to verify onScheduled is called.
   Event::PostCb captured_cb;
-  EXPECT_CALL(worker_dispatcher, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
   }));
 
@@ -2324,7 +2396,6 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterSchedulerCommitIn
   // Since the no_op module's on_scheduled is a no-op, we just verify it doesn't crash.
   captured_cb();
 
-  // Clean up.
   envoy_dynamic_module_callback_network_filter_scheduler_delete(scheduler);
 }
 
@@ -2354,16 +2425,12 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
        NetworkFilterSchedulerCommitAfterFilterDestroyedDoesNotCrash) {
-  // Set up the dispatcher for the filter via connection.
-  NiceMock<Event::MockDispatcher> worker_dispatcher;
-  EXPECT_CALL(connection_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
-
   auto scheduler = envoy_dynamic_module_callback_network_filter_scheduler_new(filterPtr());
   EXPECT_NE(nullptr, scheduler);
 
   // Capture the posted callback.
   Event::PostCb captured_cb;
-  EXPECT_CALL(worker_dispatcher, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
   }));
 
@@ -2375,7 +2442,45 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
   // The callback should not crash even though the filter is destroyed.
   captured_cb();
 
-  // Clean up.
+  envoy_dynamic_module_callback_network_filter_scheduler_delete(scheduler);
+}
+
+// Verifies `commit()` from a foreign thread before destroy posts via the cached dispatcher.
+// Run under `--config=tsan` to confirm no data race on `read_callbacks_`.
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
+       NetworkFilterSchedulerCommitFromForeignThreadBeforeDestroyPosts) {
+  auto* scheduler = envoy_dynamic_module_callback_network_filter_scheduler_new(filterPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  Event::PostCb captured_cb;
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  }));
+
+  std::thread foreign(
+      [&]() { envoy_dynamic_module_callback_network_filter_scheduler_commit(scheduler, 42); });
+  foreign.join();
+
+  ASSERT_TRUE(captured_cb);
+  captured_cb();
+
+  envoy_dynamic_module_callback_network_filter_scheduler_delete(scheduler);
+}
+
+// Verifies `commit()` from a foreign thread after the filter is destroyed is a safe no-op.
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
+       NetworkFilterSchedulerCommitFromForeignThreadAfterDestroyIsNoOp) {
+  auto* scheduler = envoy_dynamic_module_callback_network_filter_scheduler_new(filterPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  filter_.reset();
+
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).Times(0);
+
+  std::thread foreign(
+      [&]() { envoy_dynamic_module_callback_network_filter_scheduler_commit(scheduler, 999); });
+  foreign.join();
+
   envoy_dynamic_module_callback_network_filter_scheduler_delete(scheduler);
 }
 
@@ -2502,6 +2607,89 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, AboveHighWatermark) {
 
   EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_above_high_watermark(filterPtr()));
   EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_above_high_watermark(filterPtr()));
+}
+
+// Verifies the factory auto-freezes stat creation so `define_*` returns `Frozen` after init.
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, MetricsFrozenAfterInit) {
+  filter_config_->stat_creation_frozen_ = true;
+  envoy_dynamic_module_type_module_buffer name = {const_cast<char*>("frozen_counter"), 14};
+  size_t out_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_network_filter_config_define_counter(
+                static_cast<void*>(filter_config_.get()), name, &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_network_filter_config_define_gauge(
+                static_cast<void*>(filter_config_.get()), name, &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_network_filter_config_define_histogram(
+                static_cast<void*>(filter_config_.get()), name, &out_id));
+}
+
+// Verifies metrics can be operated from the filter config context (outside the connection
+// lifecycle), mirroring the per-filter operate callbacks.
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ConfigStatsOperate) {
+  void* config = static_cast<void*>(filter_config_.get());
+
+  size_t counter_id = 0;
+  envoy_dynamic_module_type_module_buffer counter_name = {const_cast<char*>("cfg_counter"), 11};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_network_filter_config_define_counter(config, counter_name,
+                                                                               &counter_id));
+  size_t gauge_id = 0;
+  envoy_dynamic_module_type_module_buffer gauge_name = {const_cast<char*>("cfg_gauge"), 9};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_network_filter_config_define_gauge(config, gauge_name,
+                                                                             &gauge_id));
+  size_t histogram_id = 0;
+  envoy_dynamic_module_type_module_buffer histogram_name = {const_cast<char*>("cfg_histogram"), 13};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_network_filter_config_define_histogram(
+                config, histogram_name, &histogram_id));
+
+  // Operate the metrics from the config context.
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_network_filter_config_increment_counter(config, counter_id, 7));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_network_filter_config_increment_gauge(config, gauge_id, 10));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_network_filter_config_decrement_gauge(config, gauge_id, 3));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_network_filter_config_record_histogram_value(
+                config, histogram_id, 42));
+
+  EXPECT_EQ(7, stats_.counterFromString("dynamicmodulescustom.cfg_counter").value());
+  EXPECT_EQ(
+      7,
+      stats_.gaugeFromString("dynamicmodulescustom.cfg_gauge", Stats::Gauge::ImportMode::Accumulate)
+          .value());
+
+  // set_gauge overrides the value.
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_network_filter_config_set_gauge(config, gauge_id, 100));
+  EXPECT_EQ(
+      100,
+      stats_.gaugeFromString("dynamicmodulescustom.cfg_gauge", Stats::Gauge::ImportMode::Accumulate)
+          .value());
+
+  // Invalid ids return MetricNotFound.
+  const size_t invalid_id = 9999;
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_network_filter_config_increment_counter(config, invalid_id, 1));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_network_filter_config_increment_gauge(config, invalid_id, 1));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_network_filter_config_decrement_gauge(config, invalid_id, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_network_filter_config_set_gauge(config, invalid_id, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_network_filter_config_record_histogram_value(
+                config, invalid_id, 1));
 }
 
 } // namespace NetworkFilters

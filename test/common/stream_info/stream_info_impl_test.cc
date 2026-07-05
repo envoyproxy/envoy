@@ -17,6 +17,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -31,7 +32,7 @@ REGISTER_CUSTOM_RESPONSE_FLAG(CF, CustomFlag);
 REGISTER_CUSTOM_RESPONSE_FLAG(CF2, CustomFlag2);
 
 std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
-                                       absl::optional<std::chrono::nanoseconds> timing) {
+                                       std::optional<std::chrono::nanoseconds> timing) {
   EXPECT_TRUE(timing);
   EXPECT_LE(last, timing.value());
   return timing.value();
@@ -42,11 +43,13 @@ protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
     ASSERT_TRUE(
         // with --config=docker-msan
-        sizeof(stream_info) == 720 ||
+        sizeof(stream_info) == 752 ||
         // with --config=docker-clang
-        sizeof(stream_info) == 744 ||
+        sizeof(stream_info) == 776 ||
         // with --config=docker-clang-libc++
-        sizeof(stream_info) == 696)
+        sizeof(stream_info) == 728 ||
+        // with protobuf v35
+        sizeof(stream_info) == 736 || sizeof(stream_info) == 760)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -120,6 +123,33 @@ TEST_F(StreamInfoImplTest, TimingTest) {
   EXPECT_FALSE(info.requestComplete());
   info.onRequestComplete();
   dur = checkDuration(dur, info.requestComplete());
+}
+
+// downstreamConnectionBegin is empty until set.
+TEST(DownstreamTimingTest, ConnectionBeginSet) {
+  DownstreamTiming timing;
+  EXPECT_FALSE(timing.downstreamConnectionBegin().has_value());
+
+  const MonotonicTime begin(std::chrono::milliseconds(5));
+  timing.setDownstreamConnectionBegin(begin);
+  ASSERT_TRUE(timing.downstreamConnectionBegin().has_value());
+  EXPECT_EQ(begin, timing.downstreamConnectionBegin().value());
+}
+
+// onDownstreamConnectionEnd records only the first close so the duration is not inflated.
+TEST(DownstreamTimingTest, ConnectionEndRecordsFirstClose) {
+  Event::SimulatedTimeSystem time_system;
+  DownstreamTiming timing;
+  EXPECT_FALSE(timing.downstreamConnectionEnd().has_value());
+
+  timing.onDownstreamConnectionEnd(time_system);
+  ASSERT_TRUE(timing.downstreamConnectionEnd().has_value());
+  const MonotonicTime first_close = timing.downstreamConnectionEnd().value();
+
+  // A later close event does not overwrite the recorded connection end time.
+  time_system.advanceTimeWait(std::chrono::milliseconds(5));
+  timing.onDownstreamConnectionEnd(time_system);
+  EXPECT_EQ(first_close, timing.downstreamConnectionEnd().value());
 }
 
 TEST_F(StreamInfoImplTest, BytesTest) {
@@ -342,7 +372,6 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     EXPECT_EQ(route.get(), stream_info.route().ptr());
 
     stream_info.filterState()->setData("test", std::make_unique<TestIntAccessor>(1),
-                                       FilterState::StateType::ReadOnly,
                                        FilterState::LifeSpan::FilterChain);
     EXPECT_EQ(1, stream_info.filterState()->getDataReadOnly<TestIntAccessor>("test")->access());
 
@@ -385,7 +414,7 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
 TEST_F(StreamInfoImplTest, CodecStreamId) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
                              FilterState::LifeSpan::FilterChain);
-  EXPECT_EQ(absl::nullopt, stream_info.codecStreamId());
+  EXPECT_EQ(std::nullopt, stream_info.codecStreamId());
   stream_info.setCodecStreamId(12345);
   EXPECT_EQ(12345, stream_info.codecStreamId());
 }
@@ -433,7 +462,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   s1.addPacketsRetransmitted(1);
 
   // setFrom
-  s1.setVirtualClusterName(absl::optional<std::string>("bar"));
+  s1.setVirtualClusterName(std::optional<std::string>("bar"));
   s1.setResponseCode(200);
   s1.setResponseCodeDetails("OK");
   s1.setConnectionTerminationDetails("baz");
@@ -445,7 +474,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   s1.route_ = std::make_shared<NiceMock<Router::MockRoute>>();
   s1.setDynamicMetadata("com.test", MessageUtil::keyValueStruct("test_key", "test_value"));
   s1.filterState()->setData("test", std::make_unique<TestIntAccessor>(1),
-                            FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
+                            FilterState::LifeSpan::FilterChain);
   Http::TestRequestHeaderMapImpl headers1;
   s1.setRequestHeaders(headers1);
   Upstream::ClusterInfoConstSharedPtr cluster_info(new NiceMock<Upstream::MockClusterInfo>());

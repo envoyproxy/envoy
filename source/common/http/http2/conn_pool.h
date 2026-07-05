@@ -22,7 +22,7 @@ public:
   // configuration and cached SETTINGS.
   static uint32_t calculateInitialStreamsLimit(
       Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache,
-      absl::optional<HttpServerPropertiesCache::Origin>& origin,
+      std::optional<HttpServerPropertiesCache::Origin>& origin,
       Upstream::HostDescriptionConstSharedPtr host);
 
   ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
@@ -36,7 +36,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state,
                  Server::OverloadManager& overload_manager,
-                 absl::optional<HttpServerPropertiesCache::Origin> origin = absl::nullopt,
+                 std::optional<HttpServerPropertiesCache::Origin> origin = std::nullopt,
                  Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache = nullptr);
 
 } // namespace Http2

@@ -14,6 +14,7 @@
 #include "contrib/postgres_inspector/filters/listener/test/postgres_test_utils.h"
 #include "gtest/gtest.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
@@ -65,7 +66,7 @@ typed_config:
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy pg_config;
       pg_config.set_stat_prefix("tcp_postgres");
       pg_config.set_cluster("cluster_postgres");
-      pg_filter->mutable_typed_config()->PackFrom(pg_config);
+      std::ignore = pg_filter->mutable_typed_config()->PackFrom(pg_config);
 
       // Default filter chain for non-PostgreSQL traffic.
       auto* default_chain = listener->add_filter_chains();
@@ -75,7 +76,7 @@ typed_config:
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy default_config;
       default_config.set_stat_prefix("tcp_default");
       default_config.set_cluster("cluster_default");
-      default_filter->mutable_typed_config()->PackFrom(default_config);
+      std::ignore = default_filter->mutable_typed_config()->PackFrom(default_config);
     });
 
     setUpstreamCount(2);
@@ -169,8 +170,8 @@ TEST_P(PostgresInspectorIntegrationTest, DetectsPostgresPre17SSLRequest) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
 
   // Verify postgres_inspector detected the protocol.
-  test_server_->waitForCounterGe("postgres_inspector.postgres_found", 1);
-  test_server_->waitForCounterGe("postgres_inspector.ssl_requested", 1);
+  test_server_->waitForCounter("postgres_inspector.postgres_found", Ge(1));
+  test_server_->waitForCounter("postgres_inspector.ssl_requested", Ge(1));
 
   driver->close();
 }
@@ -186,8 +187,8 @@ TEST_P(PostgresInspectorIntegrationTest, DetectsPostgres17DirectSSL) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
 
   // Verify postgres_inspector detected the protocol.
-  test_server_->waitForCounterGe("postgres_inspector.postgres_found", 1);
-  test_server_->waitForCounterGe("postgres_inspector.ssl_requested", 1);
+  test_server_->waitForCounter("postgres_inspector.postgres_found", Ge(1));
+  test_server_->waitForCounter("postgres_inspector.ssl_requested", Ge(1));
 
   driver->close();
 }
@@ -203,8 +204,8 @@ TEST_P(PostgresInspectorIntegrationTest, DetectsPlaintextPostgresStartup) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
 
   // Verify postgres_inspector detected the protocol.
-  test_server_->waitForCounterGe("postgres_inspector.postgres_found", 1);
-  test_server_->waitForCounterGe("postgres_inspector.ssl_not_requested", 1);
+  test_server_->waitForCounter("postgres_inspector.postgres_found", Ge(1));
+  test_server_->waitForCounter("postgres_inspector.ssl_not_requested", Ge(1));
 
   driver->close();
 }
@@ -220,7 +221,7 @@ TEST_P(PostgresInspectorIntegrationTest, DoesNotDetectNonPostgres) {
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(upstream));
 
   // Verify postgres_inspector did NOT detect PostgreSQL.
-  test_server_->waitForCounterGe("postgres_inspector.postgres_not_found", 1);
+  test_server_->waitForCounter("postgres_inspector.postgres_not_found", Ge(1));
 
   driver->close();
 }
@@ -251,10 +252,10 @@ TEST_P(PostgresInspectorIntegrationTest, MultipleMixedConnectionsDetectedCorrect
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream4));
 
   // Verify stats.
-  test_server_->waitForCounterGe("postgres_inspector.postgres_found", 3);
-  test_server_->waitForCounterGe("postgres_inspector.postgres_not_found", 1);
-  test_server_->waitForCounterGe("postgres_inspector.ssl_requested", 2);
-  test_server_->waitForCounterGe("postgres_inspector.ssl_not_requested", 1);
+  test_server_->waitForCounter("postgres_inspector.postgres_found", Ge(3));
+  test_server_->waitForCounter("postgres_inspector.postgres_not_found", Ge(1));
+  test_server_->waitForCounter("postgres_inspector.ssl_requested", Ge(2));
+  test_server_->waitForCounter("postgres_inspector.ssl_not_requested", Ge(1));
 
   driver1->close();
   driver2->close();

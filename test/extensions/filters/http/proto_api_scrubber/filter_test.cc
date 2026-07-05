@@ -17,9 +17,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/tracing/mocks.h"
 #include "test/proto/apikeys.pb.h"
 #include "test/proto/bookstore.pb.h"
 #include "test/test_common/environment.h"
@@ -205,7 +203,7 @@ protected:
 
   void setupFilterConfig(absl::string_view config_pb,
                          const char* descriptor_path = kApiKeysDescriptorRelativePath) {
-    Protobuf::TextFormat::ParseFromString(config_pb, &proto_config_);
+    std::ignore = Protobuf::TextFormat::ParseFromString(config_pb, &proto_config_);
     if (!proto_config_.has_descriptor_set()) {
       *proto_config_.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
           api_->fileSystem()
@@ -421,7 +419,7 @@ protected:
       }
     )pb") {
     apikeys::CreateApiKeyRequest request;
-    Envoy::Protobuf::TextFormat::ParseFromString(pb, &request);
+    std::ignore = Envoy::Protobuf::TextFormat::ParseFromString(pb, &request);
     return request;
   }
 
@@ -434,7 +432,7 @@ protected:
       kms_key: "projects/my-project/locations/my-location"
     )pb") {
     apikeys::ApiKey response;
-    Envoy::Protobuf::TextFormat::ParseFromString(pb, &response);
+    std::ignore = Envoy::Protobuf::TextFormat::ParseFromString(pb, &response);
     return response;
   }
 
@@ -444,7 +442,7 @@ protected:
     sensitive_msg.set_secret(std::string(sensitive_secret));
     sensitive_msg.set_public_field("public_data");
 
-    request.mutable_any_field()->PackFrom(sensitive_msg);
+    std::ignore = request.mutable_any_field()->PackFrom(sensitive_msg);
     return request;
   }
 
@@ -1094,7 +1092,7 @@ TEST_F(ProtoApiScrubberScrubbingTest, ScrubRequestAnyField) {
 
   // Pre-check
   SensitiveMessage inner_message;
-  request.any_field().UnpackTo(&inner_message);
+  std::ignore = request.any_field().UnpackTo(&inner_message);
   EXPECT_EQ(inner_message.secret(), secret_value);
 
   // Run filter
@@ -1110,7 +1108,7 @@ TEST_F(ProtoApiScrubberScrubbingTest, ScrubRequestAnyField) {
   EXPECT_TRUE(scrubbed_request.ParseFromString(frames[0].data_->toString()));
 
   SensitiveMessage scrubbed_inner;
-  scrubbed_request.any_field().UnpackTo(&scrubbed_inner);
+  std::ignore = scrubbed_request.any_field().UnpackTo(&scrubbed_inner);
 
   EXPECT_EQ(scrubbed_inner.secret(), "");                  // Field should be cleared
   EXPECT_EQ(scrubbed_inner.public_field(), "public_data"); // Other field preserved

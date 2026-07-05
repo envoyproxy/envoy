@@ -32,6 +32,14 @@ McpJsonRestBridgeFilterConfigFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+McpJsonRestBridgeFilterConfigFactory::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
+        proto_config,
+    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<McpJsonRestBridgePerRouteConfig>(proto_config);
+}
+
 /**
  * Static registration for the MCP JSON REST bridge filter. @see RegisterFactory.
  */

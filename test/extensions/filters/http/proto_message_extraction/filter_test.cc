@@ -180,7 +180,7 @@ apikeys::CreateApiKeyRequest makeCreateApiKeyRequest(absl::string_view pb = R"pb
       }
     )pb") {
   apikeys::CreateApiKeyRequest request;
-  Envoy::Protobuf::TextFormat::ParseFromString(pb, &request);
+  std::ignore = Envoy::Protobuf::TextFormat::ParseFromString(pb, &request);
   return request;
 }
 
@@ -195,7 +195,7 @@ apikeys::ApiKey makeCreateApiKeyResponse(absl::string_view pb = R"pb(
   expire_time { seconds: 1715842560 nanos: 0 }
 )pb") {
   apikeys::ApiKey response;
-  Envoy::Protobuf::TextFormat::ParseFromString(pb, &response);
+  std::ignore = Envoy::Protobuf::TextFormat::ParseFromString(pb, &response);
   return response;
 }
 
@@ -1081,6 +1081,86 @@ TEST_F(FilterTestExtractOk, ExtractCardinalityRepeatedComplexField) {
                           key: "numResponseItems"
                           value {
                             string_value: "2"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          )pb");
+      });
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
+}
+
+TEST_F(FilterTestExtractOk, ExtractRepeatedStringField) {
+  setUp(R"pb(
+    mode: FIRST_AND_LAST
+    extraction_by_method: {
+      key: "apikeys.ApiKeys.CreateApiKey"
+      value: {
+        response_extraction_by_field: { key: "repeated_string_field" value: EXTRACT }
+      }
+    })pb");
+
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  Envoy::Http::TestResponseHeaderMapImpl resp_headers = TestResponseHeaderMapImpl{
+      {":status", "200"},
+      {"grpc-status", "1"},
+      {"content-type", "application/grpc"},
+  };
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter_->encodeHeaders(resp_headers, false));
+
+  apikeys::ApiKey response = makeCreateApiKeyResponse(R"pb(
+    repeated_string_field: "one"
+    repeated_string_field: "two"
+    repeated_string_field: "three"
+  )pb");
+  Envoy::Buffer::InstancePtr response_data = Envoy::Grpc::Common::serializeToGrpcFrame(response);
+
+  EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
+        EXPECT_EQ(ns, kFilterName);
+        checkProtoStruct(new_dynamic_metadata, R"pb(
+            fields {
+              key: "responses"
+              value {
+                struct_value {
+                  fields {
+                    key: "first"
+                    value {
+                      struct_value {
+                        fields {
+                          key: "@type"
+                          value {
+                            string_value: "type.googleapis.com/apikeys.ApiKey"
+                          }
+                        }
+                        fields {
+                          key: "repeatedStringField"
+                          value {
+                            list_value {
+                              values {
+                                string_value: "one"
+                              }
+                              values {
+                                string_value: "two"
+                              }
+                              values {
+                                string_value: "three"
+                              }
+                            }
                           }
                         }
                       }

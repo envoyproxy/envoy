@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.pb.h"
@@ -9,8 +10,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/grpc/status.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,8 +24,8 @@ public:
       : upstream_content_type_(std::move(upstream_content_type)),
         withhold_grpc_frames_(withhold_grpc_frames),
         response_size_header_(!response_size_header.empty()
-                                  ? absl::make_optional(Http::LowerCaseString(response_size_header))
-                                  : absl::nullopt) {}
+                                  ? std::make_optional(Http::LowerCaseString(response_size_header))
+                                  : std::nullopt) {}
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
@@ -44,7 +43,7 @@ private:
 
   const std::string upstream_content_type_;
   const bool withhold_grpc_frames_;
-  const absl::optional<Http::LowerCaseString> response_size_header_;
+  const std::optional<Http::LowerCaseString> response_size_header_;
 
   bool enabled_{};
   bool prefix_stripped_{};
@@ -57,11 +56,11 @@ private:
   // The actual size of the response returned by the upstream so far.
   uint32_t upstream_response_bytes_{};
 
-  std::string content_type_{};
+  std::string content_type_;
   Grpc::Status::GrpcStatus grpc_status_{};
   // Normally we'd use the encoding buffer, but since we need to mutate the
   // buffer we instead maintain our own.
-  Buffer::OwnedImpl buffer_{};
+  Buffer::OwnedImpl buffer_;
 };
 
 using FilterPtr = std::unique_ptr<Filter>;

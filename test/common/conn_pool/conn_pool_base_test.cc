@@ -33,7 +33,7 @@ public:
   uint64_t id() const override { return 1; }
   bool closingWithIncompleteStream() const override { return false; }
   uint32_t numActiveStreams() const override { return active_streams_; }
-  absl::optional<Http::Protocol> protocol() const override { return absl::nullopt; }
+  std::optional<Http::Protocol> protocol() const override { return std::nullopt; }
   void onEvent(Network::ConnectionEvent event) override {
     parent_.onConnectionEvent(*this, "", event);
   }
@@ -68,7 +68,7 @@ public:
   bool supportsEarlyData() const override { return supports_early_data_; }
   uint32_t active_streams_{};
 
-  absl::optional<uint64_t> capacity_override_;
+  std::optional<uint64_t> capacity_override_;
 
 private:
   bool supports_early_data_;
@@ -95,6 +95,7 @@ public:
               (const Upstream::HostDescriptionConstSharedPtr& n, absl::string_view,
                ConnectionPool::PoolFailureReason, AttachContext&));
   MOCK_METHOD(void, onPoolReady, (ActiveClient&, AttachContext&));
+  void setSkipPendingOverflowForTest(bool value) { skip_pending_overflow_on_active_rq_ = value; }
 };
 
 class ConnPoolImplBaseTest : public testing::Test {
@@ -235,7 +236,7 @@ public:
   Event::DispatcherPtr dispatcher_;
   NiceMock<Server::MockOverloadManager> overload_manager_;
   uint32_t max_connection_duration_ = 5000;
-  absl::optional<std::chrono::milliseconds> max_connection_duration_opt_{max_connection_duration_};
+  std::optional<std::chrono::milliseconds> max_connection_duration_opt_{max_connection_duration_};
   uint32_t stream_limit_ = 100;
   uint32_t concurrent_streams_ = 1;
   Upstream::ClusterConnectivityState state_;
@@ -363,7 +364,7 @@ TEST_F(ConnPoolImplBaseTest, ExplicitPreconnectNotHealthy) {
 TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationTimerNull) {
   // Force a null max connection duration optional.
   // newActiveClientAndStream() will expect the connection duration timer to remain null.
-  max_connection_duration_opt_ = absl::nullopt;
+  max_connection_duration_opt_ = std::nullopt;
   newActiveClientAndStream();
   closeStreamAndDrainClient();
 }
@@ -688,6 +689,49 @@ TEST_F(ConnPoolImplDispatcherBaseTest, PoolDrainsWithEarlyDataStreams) {
 
   // Clean up.
   closeStream();
+}
+
+// Test that when max_active_requests circuit breaker fires in attachStreamToClient(),
+// upstream_rq_active_overflow is incremented and upstream_rq_pending_overflow is not
+// (runtime flag enabled by default).
+TEST_F(ConnPoolImplDispatcherBaseTest, MaxActiveRequestsOverflow) {
+  // Allow 2 concurrent streams per connection so the client stays Ready after the first stream,
+  // and cap active requests at 1 so the second newStreamImpl() overflows the circuit breaker.
+  concurrent_streams_ = 2;
+  cluster_->resetResourceManager(1024, 1024, 1, 1, 1);
+
+  // Attach first stream — rq counter reaches its limit (1/1); client stays Ready.
+  newActiveClientAndStream(ActiveClient::State::Ready);
+
+  // Second stream: finds the Ready client, attachStreamToClient() overflows.
+  EXPECT_CALL(pool_, onPoolFailure(_, _, ConnectionPool::PoolFailureReason::Overflow, _));
+  pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_active_overflow_.value());
+  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_rq_pending_overflow_.value());
+
+  closeStreamAndDrainClient();
+}
+
+// Test legacy behavior: when the runtime flag is disabled, both upstream_rq_active_overflow
+// and upstream_rq_pending_overflow are incremented for the max_active_requests path.
+TEST_F(ConnPoolImplDispatcherBaseTest, MaxActiveRequestsOverflowLegacy) {
+  // Simulate the legacy behavior where skip_pending_overflow_count_on_active_rq is false.
+  // We set the cached flag directly since the pool is constructed before the test body runs.
+  pool_.setSkipPendingOverflowForTest(false);
+
+  concurrent_streams_ = 2;
+  cluster_->resetResourceManager(1024, 1024, 1, 1, 1);
+
+  newActiveClientAndStream(ActiveClient::State::Ready);
+
+  EXPECT_CALL(pool_, onPoolFailure(_, _, ConnectionPool::PoolFailureReason::Overflow, _));
+  pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_active_overflow_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_pending_overflow_.value());
+
+  closeStreamAndDrainClient();
 }
 
 } // namespace ConnectionPool

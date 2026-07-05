@@ -5,7 +5,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/formatter/substitution_formatter_base.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/http/header_evaluator.h"
 #include "envoy/http/header_map.h"
 
@@ -70,6 +70,15 @@ public:
    */
   static absl::StatusOr<HeaderParserPtr>
   configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add);
+
+  /*
+   * @param headers_to_add defines the headers to add during calls to evaluateHeaders.
+   * @param command_parsers custom formatter command parsers (e.g. for %SECRET()% substitution).
+   * @return HeaderParserPtr a configured HeaderParserPtr.
+   */
+  static absl::StatusOr<HeaderParserPtr>
+  configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add,
+            const Formatter::CommandParserPtrVector& command_parsers);
 
   /*
    * @param headers_to_add defines headers to add during calls to evaluateHeaders.

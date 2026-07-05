@@ -26,21 +26,22 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
                        Config::XdsManager& xds_manager, Upstream::ClusterManager& cm,
                        Init::Manager& init_manager, Stats::Scope& scope, ListenerManager& lm,
                        ProtobufMessage::ValidationVisitor& validation_visitor)
-    : Envoy::Config::SubscriptionBase<envoy::config::listener::v3::Listener>(validation_visitor,
-                                                                             "name"),
-      listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")),
-      xds_manager_(xds_manager), init_target_("LDS", [this]() { subscription_->start({}); }) {
-  const auto resource_name = getResourceName();
+    : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")),
+      resource_type_helper_(validation_visitor, "name"), xds_manager_(xds_manager),
+      init_target_("LDS", [this]() { subscription_->start({}); }) {
+  const auto resource_name = resource_type_helper_.getResourceName();
   if (lds_resources_locator == nullptr) {
-    subscription_ = THROW_OR_RETURN_VALUE(cm.subscriptionFactory().subscriptionFromConfigSource(
-                                              lds_config, Grpc::Common::typeUrl(resource_name),
-                                              *scope_, *this, resource_decoder_, {}),
-                                          Config::SubscriptionPtr);
+    subscription_ =
+        THROW_OR_RETURN_VALUE(cm.subscriptionFactory().subscriptionFromConfigSource(
+                                  lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this,
+                                  resource_type_helper_.resourceDecoder(), {}),
+                              Config::SubscriptionPtr);
   } else {
-    subscription_ = THROW_OR_RETURN_VALUE(
-        cm.subscriptionFactory().collectionSubscriptionFromUrl(
-            *lds_resources_locator, lds_config, resource_name, *scope_, *this, resource_decoder_),
-        Config::SubscriptionPtr);
+    subscription_ =
+        THROW_OR_RETURN_VALUE(cm.subscriptionFactory().collectionSubscriptionFromUrl(
+                                  *lds_resources_locator, lds_config, resource_name, *scope_, *this,
+                                  resource_type_helper_.resourceDecoder()),
+                              Config::SubscriptionPtr);
   }
   init_manager.add(init_target_);
 }
@@ -81,14 +82,16 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
       auto& state = failure_state.back();
       state.set_details(error_message);
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
-      state.mutable_failed_configuration()->PackFrom(resource.get().resource());
+      std::ignore = state.mutable_failed_configuration()->PackFrom(resource.get().resource());
 #endif
       absl::StrAppend(&message, listener_name, ": ", error_message, "\n");
+      ENVOY_LOG(warn, "lds: listener '{}' config rejected: {}", listener_name, error_message);
     };
 
     TRY_ASSERT_MAIN_THREAD {
       const envoy::config::listener::v3::Listener& listener =
-          dynamic_cast<const envoy::config::listener::v3::Listener&>(resource.get().resource());
+          Envoy::Protobuf::DynamicCastMessage<envoy::config::listener::v3::Listener>(
+              resource.get().resource());
       listener_name = listener.name();
       if (!listener_names.insert(listener.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully

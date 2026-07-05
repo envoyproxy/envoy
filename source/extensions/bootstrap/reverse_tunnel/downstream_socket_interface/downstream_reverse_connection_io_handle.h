@@ -43,16 +43,29 @@ public:
   void onPingMessage() override;
 
   /**
-   * Tell this IO handle to ignore close() and shutdown() calls.
-   * This is called by the HTTP filter during socket hand-off to prevent
-   * the handed-off socket from being affected by connection cleanup.
-   */
-  void ignoreCloseAndShutdown() { ignore_close_and_shutdown_ = true; }
-
-  /**
    * Get the owned socket for read-only access.
    */
   const Network::ConnectionSocket& getSocket() const { return *owned_socket_; }
+
+  /**
+   * Key the parent IOHandle uses to track this tunnel (the local address of the outbound TCP
+   * socket at handoff time). The drain-aware HCM passes this back to parent() when the tunnel
+   * begins draining so the parent can drop it from tracking and dial a replacement.
+   */
+  const std::string& connectionKey() const { return connection_key_; }
+
+  /**
+   * Parent ReverseConnectionIOHandle that owns this tunnel, or nullptr if the parent has already
+   * been torn down (it clears this back-pointer via detachParent() on teardown). Always re-check
+   * for nullptr at the point of use rather than caching the result.
+   */
+  ReverseConnectionIOHandle* parent() const { return parent_; }
+
+  /**
+   * Called by the parent ReverseConnectionIOHandle when it is destroyed, so a surviving tunnel's
+   * parent() returns nullptr instead of a dangling pointer.
+   */
+  void detachParent() { parent_ = nullptr; }
 
 private:
   // The socket that this IOHandle owns and manages lifetime for.
@@ -61,8 +74,6 @@ private:
   ReverseConnectionIOHandle* parent_;
   // Connection key for tracking this specific connection.
   std::string connection_key_;
-  // Flag to ignore close and shutdown calls during socket hand-off.
-  bool ignore_close_and_shutdown_{false};
 };
 
 } // namespace ReverseConnection

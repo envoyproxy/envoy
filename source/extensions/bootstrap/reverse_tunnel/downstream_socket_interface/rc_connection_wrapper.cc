@@ -1,5 +1,8 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.h"
 
+#include <algorithm>
+#include <optional>
+
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 
@@ -9,9 +12,12 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_socket_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
+
+#include "absl/strings/numbers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -135,15 +141,31 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
       {{Http::Headers::get().Method, Http::Headers::get().MethodValues.Get},
        {Http::Headers::get().Path, parent_.requestPath()},
        {Http::Headers::get().Host, host_value}});
+  if (parent_.useHttpUpgrade()) {
+    // Negotiate the handshake as an HTTP/1.1 Upgrade so HCM `upgrade_configs` can splice
+    // the connection raw after `101 Switching Protocols`. Both ends must agree.
+    headers->setReferenceKey(Http::Headers::get().Connection,
+                             Http::Headers::get().ConnectionValues.Upgrade);
+    headers->setReferenceKey(Http::Headers::get().Upgrade,
+                             ::Envoy::Extensions::Bootstrap::ReverseConnection::
+                                 ReverseConnectionUtility::REVERSE_TUNNEL_UPGRADE_PROTOCOL);
+  }
   headers->addCopy(node_hdr, std::string(node_id));
   headers->addCopy(cluster_hdr, std::string(cluster_id));
   headers->addCopy(tenant_hdr, std::string(tenant_id));
   headers->addCopy(upstream_cluster_hdr, cluster_name_);
+
+  const Http::LowerCaseString& initiation_time_hdr =
+      ::Envoy::Extensions::Bootstrap::ReverseConnection::reverseTunnelInitiationTimeHeader();
+  auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    connection_->dispatcher().timeSource().systemTime().time_since_epoch())
+                    .count();
+  headers->addCopy(initiation_time_hdr, absl::StrCat(now_ms));
+
   using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
-  for (const auto& h : parent_.additionalHeaders()) {
-    const Http::LowerCaseString key(h.header().key());
-    const auto& value = h.header().value();
-    switch (h.append_action()) {
+  const auto apply_header = [&headers](const Http::LowerCaseString& key, absl::string_view value,
+                                       HeaderValueOption::HeaderAppendAction action) {
+    switch (action) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
       headers->addCopy(key, value);
@@ -162,6 +184,18 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
       headers->setCopy(key, value);
       break;
     }
+  };
+
+  if (const auto& handshake_headers = parent_.handshakeHeaders(); handshake_headers != nullptr) {
+    StreamInfo::StreamInfoImpl stream_info(connection_->dispatcher().timeSource(), nullptr,
+                                           StreamInfo::FilterState::LifeSpan::Connection);
+    for (const auto& hdr : *handshake_headers) {
+      apply_header(hdr.key, hdr.value_formatter->format({}, stream_info), hdr.append_action);
+    }
+  } else {
+    for (const auto& h : parent_.additionalHeaders()) {
+      apply_header(Http::LowerCaseString(h.header().key()), h.header().value(), h.append_action());
+    }
   }
   headers->setContentLength(0);
 
@@ -178,13 +212,45 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
 
 void RCConnectionWrapper::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool) {
   const uint64_t status = Http::Utility::getResponseStatus(*headers);
-  if (status == 200) {
-    ENVOY_LOG(debug, "Received HTTP 200 OK response");
+  const uint64_t expected = parent_.useHttpUpgrade() ? 101 : 200;
+  if (status == expected) {
+    ENVOY_LOG(debug, "Received HTTP {} response", status);
     onHandshakeSuccess();
-  } else {
-    ENVOY_LOG(error, "Received non-200 HTTP response: {}", status);
-    onHandshakeFailure(HandshakeFailureReason::httpStatusError(absl::StrCat(status)));
+    return;
   }
+  ENVOY_LOG(error, "Received unexpected HTTP response: {} (expected {})", status, expected);
+  // A 429 may carry a Retry-After cool-off hint; forward it so the parent can honor it as the
+  // per-host backoff before the next attempt.
+  std::optional<std::chrono::milliseconds> retry_after;
+  if (status == 429) {
+    retry_after = parseRetryAfter(*headers);
+  }
+  onHandshakeFailure(HandshakeFailureReason::httpStatusError(absl::StrCat(status)), retry_after);
+}
+
+std::optional<std::chrono::milliseconds>
+RCConnectionWrapper::parseRetryAfter(const Http::ResponseHeaderMap& headers) {
+  // ``Retry-After`` is not a registered inline header, so look it up by name. The key is a
+  // function-local static to avoid reconstructing the LowerCaseString on every handshake response.
+  static const Http::LowerCaseString retry_after_header{"retry-after"};
+  const auto result = headers.get(retry_after_header);
+  if (result.empty()) {
+    return std::nullopt;
+  }
+  const absl::string_view value = result[0]->value().getStringView();
+  // RFC 7231 allows delta-seconds or an HTTP-date. Rate limiters emit delta-seconds; honor that
+  // form and ignore the date form (the caller falls back to its computed backoff). A zero (or
+  // unparseable) value is treated as absent so it cannot short-circuit the backoff.
+  uint64_t seconds = 0;
+  if (!absl::SimpleAtoi(value, &seconds) || seconds == 0) {
+    return std::nullopt;
+  }
+  // Clamp purely to avoid overflow when widening seconds to milliseconds; this is NOT the backoff
+  // policy cap. The effective ceiling (the configured ``max_reconnect_backoff``) is applied by the
+  // caller in trackConnectionFailure(), so this bound is intentionally far above any sane value.
+  constexpr uint64_t kMaxRetryAfterSeconds = 3600; // 1 hour.
+  seconds = std::min(seconds, kMaxRetryAfterSeconds);
+  return std::chrono::seconds(static_cast<int64_t>(seconds));
 }
 
 void RCConnectionWrapper::dispatchHttp1(Buffer::Instance& buffer) {
@@ -213,7 +279,8 @@ void RCConnectionWrapper::onHandshakeSuccess() {
   parent_.onConnectionDone(message, this, false);
 }
 
-void RCConnectionWrapper::onHandshakeFailure(const HandshakeFailureReason& reason) {
+void RCConnectionWrapper::onHandshakeFailure(const HandshakeFailureReason& reason,
+                                             std::optional<std::chrono::milliseconds> retry_after) {
   const std::string error_message = reason.getDetailedName();
   const std::string stats_failure_reason = reason.getNameForStats();
 
@@ -225,7 +292,7 @@ void RCConnectionWrapper::onHandshakeFailure(const HandshakeFailureReason& reaso
     extension->incrementHandshakeStats(cluster_name_, false, stats_failure_reason);
   }
 
-  parent_.onConnectionDone(error_message, this, false);
+  parent_.onConnectionDone(error_message, this, false, retry_after);
 }
 
 void RCConnectionWrapper::shutdown() {
@@ -246,24 +313,7 @@ void RCConnectionWrapper::shutdown() {
   ENVOY_LOG(debug, "RCConnectionWrapper: Shutting down connection ID: {}, state: {}", connection_id,
             static_cast<int>(state));
 
-  // Remove connection callbacks first to prevent recursive calls during shutdown.
-  if (state != Network::Connection::State::Closed) {
-    connection_->removeConnectionCallbacks(*this);
-    ENVOY_LOG(debug, "Connection callbacks removed");
-  }
-
-  // Close the connection if it's still open.
-  state = connection_->state();
-  if (state == Network::Connection::State::Open) {
-    ENVOY_LOG(debug, "Closing open connection gracefully");
-    connection_->close(Network::ConnectionCloseType::FlushWrite);
-  } else if (state == Network::Connection::State::Closing) {
-    ENVOY_LOG(debug, "Connection already closing");
-  } else {
-    ENVOY_LOG(debug, "Connection already closed");
-  }
-
-  // Clear the connection pointer after shutdown.
+  connection_->removeConnectionCallbacks(*this);
   connection_.reset();
   ENVOY_LOG(debug, "RCConnectionWrapper: Connection cleared after shutdown");
   ENVOY_LOG(debug, "RCConnectionWrapper: Shutdown completed");

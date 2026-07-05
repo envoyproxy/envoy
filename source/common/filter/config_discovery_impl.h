@@ -15,7 +15,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/config/subscription_base.h"
+#include "source/common/config/resource_type_helper.h"
 #include "source/common/config/utility.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
@@ -117,7 +117,7 @@ public:
   }
 
   absl::Status onConfigRemoved(Config::ConfigAppliedCb applied_on_all_threads) override {
-    absl::optional<FactoryCb> cb;
+    std::optional<FactoryCb> cb;
     if (default_configuration_) {
       auto cb_or_error = instantiateFilterFactory(*default_configuration_);
       RETURN_IF_NOT_OK_REF(cb_or_error.status());
@@ -145,7 +145,7 @@ private:
   virtual absl::StatusOr<FactoryCb>
   instantiateFilterFactory(const Protobuf::Message& message) const PURE;
 
-  void update(absl::optional<FactoryCb> config, Config::ConfigAppliedCb applied_on_all_threads) {
+  void update(std::optional<FactoryCb> config, Config::ConfigAppliedCb applied_on_all_threads) {
     // This call must not capture 'this' as it is invoked on all workers asynchronously.
     main_config_->tls_->runOnAllThreads(
         [config](OptRef<ThreadLocalConfig> tls) { tls->config_ = config; },
@@ -161,8 +161,8 @@ private:
   }
 
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalConfig() : config_{absl::nullopt} {}
-    absl::optional<FactoryCb> config_{};
+    ThreadLocalConfig() : config_{std::nullopt} {}
+    std::optional<FactoryCb> config_{};
   };
 
   // Currently applied configuration to ensure that the main thread deletes the last reference to
@@ -173,7 +173,7 @@ private:
         : tls_(std::make_unique<ThreadLocal::TypedSlot<ThreadLocalConfig>>(tls)) {
       tls_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalConfig>(); });
     }
-    absl::optional<FactoryCb> current_config_{absl::nullopt};
+    std::optional<FactoryCb> current_config_{std::nullopt};
     ThreadLocal::TypedSlotPtr<ThreadLocalConfig> tls_;
   };
   const std::string stat_prefix_;
@@ -418,10 +418,9 @@ struct ExtensionConfigDiscoveryStats {
  * Subscriptions are shared between the filter config providers. The filter config providers are
  * notified when a new config is accepted.
  */
-class FilterConfigSubscription
-    : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>,
-      Logger::Loggable<Logger::Id::filter>,
-      public std::enable_shared_from_this<FilterConfigSubscription> {
+class FilterConfigSubscription : public Config::SubscriptionCallbacks,
+                                 Logger::Loggable<Logger::Id::filter>,
+                                 public std::enable_shared_from_this<FilterConfigSubscription> {
 public:
   static absl::StatusOr<std::unique_ptr<FilterConfigSubscription>>
   create(const envoy::config::core::v3::ConfigSource& config_source,
@@ -483,6 +482,9 @@ private:
   Server::Configuration::ServerFactoryContext& factory_context_;
 
   Init::SharedTargetImpl init_target_;
+  const Config::ResourceTypeHelper<envoy::config::core::v3::TypedExtensionConfig>
+      resource_type_helper_;
+
   bool started_{false};
 
   Stats::ScopeSharedPtr scope_;

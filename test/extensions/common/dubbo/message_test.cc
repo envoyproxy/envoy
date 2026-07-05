@@ -403,7 +403,7 @@ TEST(RpcRequestTest, InitializeWithDecodedValuesTest) {
 TEST(RpcResponseTest, SimpleSetAndGetTest) {
   RpcResponse response;
 
-  EXPECT_EQ(absl::nullopt, response.responseType());
+  EXPECT_EQ(std::nullopt, response.responseType());
 
   // Set the response type and validate we can get it.
   response.setResponseType(RpcResponseType::ResponseNullValueWithAttachments);

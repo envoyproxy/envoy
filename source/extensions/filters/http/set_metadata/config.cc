@@ -38,6 +38,13 @@ Http::FilterFactoryCb SetMetadataConfig::createFilterFactoryFromProtoWithServerC
   };
 }
 
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+SetMetadataConfig::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config,
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<Config>(proto_config, context.scope(), "");
+}
+
 REGISTER_FACTORY(SetMetadataConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace SetMetadataFilter
