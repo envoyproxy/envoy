@@ -33,6 +33,27 @@ message RedisProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
 
+  // RESP protocol version supported on this listener.
+  enum ProtocolVersion {
+    // Default. The listener speaks RESP2 on both downstream connections and
+    // every routed upstream conn pool: no ``HELLO 3`` is sent upstream and a
+    // downstream ``HELLO 3`` is rejected with ``-NOPROTO``. (RESP3-aware
+    // handling such as the local ``HELLO`` reply, ``CLIENT SETINFO`` /
+    // ``SETNAME`` acceptance, and the RESP3 decoder is always present; this
+    // value only controls the negotiated wire version.)
+    RESP2 = 0;
+
+    // The listener speaks RESP3 on both downstream connections and every
+    // routed upstream conn pool. Upstream conn pools negotiate ``HELLO 3``
+    // (combined with ``AUTH`` when credentials or AWS IAM authentication are
+    // configured) on each new connection; ``upstream_resp3_hello_failure``
+    // tracks negotiation failures. Downstream clients must perform an
+    // explicit ``HELLO 3`` handshake before any data command — bare ``HELLO``
+    // on a fresh connection or any non-HELLO/AUTH/QUIT command before
+    // ``HELLO 3`` is rejected with ``-NOPROTO``.
+    RESP3 = 1;
+  }
+
   // Redis connection pool settings.
   // [#next-free-field: 11]
   message ConnPoolSettings {
@@ -389,27 +410,6 @@ message RedisProxy {
   //   The is to support redis's feature wherein new commands can be added using redis' modules api:
   //   https://redis.io/docs/latest/develop/reference/modules/
   repeated string custom_commands = 11;
-
-  // RESP protocol version supported on this listener.
-  enum ProtocolVersion {
-    // Default. The listener speaks RESP2 on both downstream connections and
-    // every routed upstream conn pool: no ``HELLO 3`` is sent upstream and a
-    // downstream ``HELLO 3`` is rejected with ``-NOPROTO``. (RESP3-aware
-    // handling such as the local ``HELLO`` reply, ``CLIENT SETINFO`` /
-    // ``SETNAME`` acceptance, and the RESP3 decoder is always present; this
-    // value only controls the negotiated wire version.)
-    RESP2 = 0;
-
-    // The listener speaks RESP3 on both downstream connections and every
-    // routed upstream conn pool. Upstream conn pools negotiate ``HELLO 3``
-    // (combined with ``AUTH`` when credentials or AWS IAM authentication are
-    // configured) on each new connection; ``upstream_resp3_hello_failure``
-    // tracks negotiation failures. Downstream clients must perform an
-    // explicit ``HELLO 3`` handshake before any data command — bare ``HELLO``
-    // on a fresh connection or any non-HELLO/AUTH/QUIT command before
-    // ``HELLO 3`` is rejected with ``-NOPROTO``.
-    RESP3 = 1;
-  }
 
   // RESP protocol version enforced for both downstream connections and every
   // routed upstream conn pool for this listener. Mismatched negotiation is

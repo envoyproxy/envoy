@@ -109,8 +109,12 @@ const std::string CONFIG_RESP3_LISTENER = CONFIG + R"EOF(
 )EOF";
 
 // RESP3 listener with a downstream password configured, for HELLO 3 AUTH inline-auth coverage.
+// Uses the non-deprecated repeated ``downstream_auth_passwords`` so the config loads under the
+// compile_time_options build (``deprecated_features=disabled`` makes the singular
+// ``downstream_auth_password`` a fatal config rejection).
 const std::string CONFIG_RESP3_LISTENER_WITH_AUTH = CONFIG_RESP3_LISTENER + R"EOF(
-          downstream_auth_password: { inline_string: somepassword }
+          downstream_auth_passwords:
+          - inline_string: somepassword
 )EOF";
 
 // RESP3 listener with a non-Primary read policy: every routed upstream must negotiate HELLO 3,
