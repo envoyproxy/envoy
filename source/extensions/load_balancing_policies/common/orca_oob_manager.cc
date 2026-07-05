@@ -13,6 +13,7 @@
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/upstream/host_utility.h"
 
 #include "xds/service/orca/v3/orca.pb.h"
 
@@ -387,12 +388,13 @@ void OrcaOobManager::OobSession::onReport(const xds::data::orca::v3::OrcaLoadRep
   // stream). No recipient, or any recipient rejecting, counts as a report error.
   bool had_recipient = false;
   bool apply_failed = false;
-  Upstream::forEachOrcaLoadReportRecipient(*host_, [&](Upstream::HostLbPolicyData& data) {
-    had_recipient = true;
-    if (!data.onOrcaLoadReport(report, {}).ok()) {
-      apply_failed = true;
-    }
-  });
+  Upstream::HostUtility::forEachOrcaLoadReportRecipient(
+      *host_, [&](Upstream::HostLbPolicyData& data) {
+        had_recipient = true;
+        if (!data.onOrcaLoadReport(report, std::nullopt).ok()) {
+          apply_failed = true;
+        }
+      });
   if (!had_recipient || apply_failed) {
     parent_.oob_stats_.report_errors_.inc();
   }

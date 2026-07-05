@@ -43,7 +43,8 @@ using ::testing::Return;
 // HostLbPolicyData (not just OrcaHostLbPolicyData) via the standard onOrcaLoadReport entry point.
 class RecordingLbPolicyData : public Upstream::HostLbPolicyData {
 public:
-  explicit RecordingLbPolicyData(absl::Status status = absl::OkStatus()) : status_(status) {}
+  explicit RecordingLbPolicyData(absl::Status status = absl::OkStatus())
+      : status_(std::move(status)) {}
   bool receivesOrcaLoadReport() const override { return true; }
   absl::Status onOrcaLoadReport(const Upstream::OrcaLoadReport& report,
                                 OptRef<const StreamInfo::StreamInfo>) override {

@@ -38,6 +38,7 @@
 #include "source/common/router/retry_state_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
+#include "source/common/upstream/host_utility.h"
 
 #include "absl/container/inlined_vector.h"
 
@@ -2565,7 +2566,7 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
 
   // Inline capacity of 2 covers the typical case of 1-2 LB policies per host.
   absl::InlinedVector<Upstream::HostLbPolicyData*, 2> orca_recipients;
-  Upstream::forEachOrcaLoadReportRecipient(
+  Upstream::HostUtility::forEachOrcaLoadReportRecipient(
       *upstream_host, [&](Upstream::HostLbPolicyData& data) { orca_recipients.push_back(&data); });
 
   if (!cluster_->lrsReportMetricNames().has_value() && orca_recipients.empty()) {
