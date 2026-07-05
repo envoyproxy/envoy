@@ -13,12 +13,9 @@ EnvoyQuicCryptoServerStreamFactoryImpl::createEnvoyQuicCryptoServerStream(
     quic::QuicCompressedCertsCache* compressed_certs_cache, quic::QuicSession* session,
     quic::QuicCryptoServerStreamBase::Helper* helper,
     OptRef<const Network::DownstreamTransportSocketFactory> transport_socket_factory,
-    // Though this extension doesn't use the dispatcher parameter, it might be used by
-    // downstreams. Do not remove it.
-    Envoy::Event::Dispatcher& /*dispatcher*/) {
+    Envoy::Event::Dispatcher& dispatcher) {
 
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_session_ticket_support") ||
-      !transport_socket_factory.has_value()) {
+  if (!transport_socket_factory.has_value()) {
     return quic::CreateCryptoServerStream(crypto_config, compressed_certs_cache, session, helper);
   }
 
@@ -26,12 +23,22 @@ EnvoyQuicCryptoServerStreamFactoryImpl::createEnvoyQuicCryptoServerStream(
   // ssl_ctx_ is set in the constructor and swapped (never nulled) on SDS updates.
   auto& factory = static_cast<const QuicServerTransportSocketFactory&>(*transport_socket_factory);
 
+  const bool ticket_support =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_session_ticket_support");
+  if (!ticket_support && !factory.requireClientCertificate()) {
+    return quic::CreateCryptoServerStream(crypto_config, compressed_certs_cache, session, helper);
+  }
+
+  // The Envoy handshaker is needed for session ticket handling and/or client certificate
+  // validation. If it is used only because client certificates are required while the session
+  // ticket runtime flag is off, disable resumption: the ticket key callback was not installed on
+  // the SSL context in that case.
   auto ticket_config = factory.getSessionTicketConfig();
-  bool disable_resumption = ticket_config.disable_stateless_resumption || !ticket_config.has_keys ||
-                            ticket_config.handles_session_resumption;
+  bool disable_resumption = !ticket_support || ticket_config.disable_stateless_resumption ||
+                            !ticket_config.has_keys || ticket_config.handles_session_resumption;
 
   return std::make_unique<EnvoyTlsServerHandshaker>(session, crypto_config, factory.sslCtx(),
-                                                    disable_resumption);
+                                                    disable_resumption, dispatcher);
 }
 
 REGISTER_FACTORY(EnvoyQuicCryptoServerStreamFactoryImpl,

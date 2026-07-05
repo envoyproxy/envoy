@@ -167,7 +167,7 @@ enable_early_data:
       "QUIC early data is enabled but resumption is disabled. Early data requires resumption.");
 }
 
-TEST_F(QuicServerTransportSocketFactoryConfigTest, ClientAuthUnsupported) {
+TEST_F(QuicServerTransportSocketFactoryConfigTest, ClientCertificateAuthenticationAccepted) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
 downstream_tls_context:
   require_client_certificate: true
@@ -181,8 +181,32 @@ downstream_tls_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
 )EOF");
-  EXPECT_THROW_WITH_MESSAGE(verifyQuicServerTransportSocketFactory(yaml, true), EnvoyException,
-                            "TLS Client Authentication is not supported over QUIC");
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  Network::DownstreamTransportSocketFactoryPtr transport_socket_factory = THROW_OR_RETURN_VALUE(
+      config_factory_.createTransportSocketFactory(proto_config, context_, {}),
+      Network::DownstreamTransportSocketFactoryPtr);
+  EXPECT_TRUE(static_cast<QuicServerTransportSocketFactory&>(*transport_socket_factory)
+                  .requireClientCertificate());
+}
+
+TEST_F(QuicServerTransportSocketFactoryConfigTest, ClientCertificateNotRequiredByDefault) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+)EOF");
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  Network::DownstreamTransportSocketFactoryPtr transport_socket_factory = THROW_OR_RETURN_VALUE(
+      config_factory_.createTransportSocketFactory(proto_config, context_, {}),
+      Network::DownstreamTransportSocketFactoryPtr);
+  EXPECT_FALSE(static_cast<QuicServerTransportSocketFactory&>(*transport_socket_factory)
+                   .requireClientCertificate());
 }
 
 // QuicServerTransportSocketFactory implements DownstreamTransportSocketFactory

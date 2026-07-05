@@ -150,6 +150,14 @@ public:
   std::optional<uint64_t> congestionWindowInBytes() const override;
   const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
 
+  // Marks the peer certificate of this connection as validated. Called by the crypto stream
+  // when certificate validation succeeds.
+  void onCertValidated() {
+    if (quic_ssl_info_ != nullptr) {
+      quic_ssl_info_->onCertValidated();
+    }
+  }
+
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;
 

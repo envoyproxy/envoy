@@ -2833,6 +2833,27 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "quic_mtls_integration_test",
+    size = "large",
+    srcs = select({
+        "//bazel:disable_http3": [],
+        "//bazel:disable_admin_functionality": [],
+        "//conditions:default": ["quic_mtls_integration_test.cc"],
+    }),
+    data = ["//test/config/integration/certs"],
+    rbe_pool = "4core",
+    tags = [
+        "cpu:3",
+        "fails_on_clang_cl",
+        "fails_on_windows",
+    ],
+    deps = envoy_select_enable_http3([
+        ":quic_http_integration_test_lib",
+        "//test/common/tls/cert_validator:timed_cert_validator",
+    ]),
+)
+
+envoy_cc_test(
     name = "web_transport_integration_test",
     size = "large",
     srcs = select({
