@@ -140,6 +140,11 @@ individual filter instance/script can be tracked by providing a per-filter
   errors, Counter, Total script execution errors.
   executions, Counter, Total number of times ``envoy_on_request`` and ``envoy_on_response`` was executed.
 
+In addition, a single process-wide ``lua.lua_vm_count`` gauge (not affected by ``stat_prefix``) tracks
+the total number of active Lua VMs across every filter-config-level and route-level Lua script
+configured in the process. Each configured script accounts for ``concurrency + 1`` VMs (one per
+worker thread, plus the main thread).
+
 Script examples
 ---------------
 
@@ -1369,7 +1374,7 @@ Sets a filter state object by name using a registered :ref:`object factory <well
 * ``factoryKey`` is a string that specifies the registered ``ObjectFactory`` name used to create the object. See :ref:`well-known filter state objects <well_known_filter_state>` for the list of available factory keys.
 * ``payload`` is a string passed to the factory's ``createFromBytes`` method.
 
-The object is stored as read-only with filter chain lifespan and no upstream sharing.
+The object is stored with filter chain lifespan and no upstream sharing.
 
 Raises a Lua error if the factory key is not registered or if the factory fails to create an object from the given payload.
 

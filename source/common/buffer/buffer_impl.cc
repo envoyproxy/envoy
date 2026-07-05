@@ -204,7 +204,7 @@ void OwnedImpl::drainImpl(uint64_t size) {
   }
 }
 
-RawSliceVector OwnedImpl::getRawSlices(absl::optional<uint64_t> max_slices) const {
+RawSliceVector OwnedImpl::getRawSlices(std::optional<uint64_t> max_slices) const {
   uint64_t max_out = slices_.size();
   if (max_slices.has_value()) {
     max_out = std::min(max_out, max_slices.value());
@@ -590,7 +590,7 @@ bool OwnedImpl::startsWith(absl::string_view data) const {
     return false;
   }
 
-  if (data.length() == 0) {
+  if (data.empty()) {
     return true;
   }
 

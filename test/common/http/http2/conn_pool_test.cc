@@ -11,7 +11,6 @@
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/http/conn_pool.h"
 #include "test/mocks/http/http_server_properties_cache.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -53,10 +52,10 @@ public:
             std::move(host), std::move(priority), dispatcher, options, transport_socket_options,
             random_generator, state,
             [](HttpConnPoolImplBase* pool) {
-              return std::make_unique<ActiveClient>(*pool, absl::nullopt);
+              return std::make_unique<ActiveClient>(*pool, std::nullopt);
             },
             [](Upstream::Host::CreateConnectionData&, HttpConnPoolImplBase*) { return nullptr; },
-            std::vector<Protocol>{Protocol::Http2}, overload_manager, absl::nullopt, nullptr) {}
+            std::vector<Protocol>{Protocol::Http2}, overload_manager, std::nullopt, nullptr) {}
 
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override {
     // We expect to own the connection, but already have it, so just release it to prevent it from
@@ -122,8 +121,7 @@ public:
     }
   }
 
-  void expectConnectionSetupForClient(int num_clients,
-                                      absl::optional<uint32_t> buffer_limits = {}) {
+  void expectConnectionSetupForClient(int num_clients, std::optional<uint32_t> buffer_limits = {}) {
     // Set the createClientConnection mocks. The createCodecClient_ invoke
     // below takes care of making sure connection_index_ is updated.
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
@@ -160,13 +158,13 @@ public:
 
   // Creates a new test client, expecting a new connection to be created and associated
   // with the new client.
-  void expectClientCreate(absl::optional<uint32_t> buffer_limits = {}) {
+  void expectClientCreate(std::optional<uint32_t> buffer_limits = {}) {
     createTestClients(1);
     expectConnectionSetupForClient(1, buffer_limits);
   }
   void expectClientsCreate(int num_clients) {
     createTestClients(num_clients);
-    expectConnectionSetupForClient(num_clients, absl::nullopt);
+    expectConnectionSetupForClient(num_clients, std::nullopt);
   }
 
   // Connects a pending connection for client with the given index.
@@ -1095,6 +1093,30 @@ TEST_F(Http2ConnPoolImplTest, RemoteReset) {
   EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_cx_active_.value());
 }
 
+TEST_F(Http2ConnPoolImplTest, RemoteResetNoError) {
+  InSequence s;
+
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, false));
+  EXPECT_TRUE(
+      r1.callbacks_.outer_encoder_
+          ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, false)
+          .ok());
+  r1.inner_encoder_.stream_.resetStream(Http::StreamResetReason::RemoteResetNoError);
+
+  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*this, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
+  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_rq_rx_reset_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_rx_reset_no_error_.value());
+  EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_open_.value());
+  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_cx_active_.value());
+}
+
 TEST_F(Http2ConnPoolImplTest, DrainDisconnectWithActiveRequest) {
   InSequence s;
   cluster_->max_requests_per_connection_ = 1;
@@ -1951,7 +1973,7 @@ protected:
   }
 
   TestScopedRuntime scoped_runtime_;
-  absl::optional<HttpServerPropertiesCache::Origin> origin_{{"https", "hostname.com", 443}};
+  std::optional<HttpServerPropertiesCache::Origin> origin_{{"https", "hostname.com", 443}};
   std::shared_ptr<Upstream::MockHost> mock_host_{std::make_shared<NiceMock<Upstream::MockHost>>()};
   std::shared_ptr<MockHttpServerPropertiesCache> cache_{
       std::make_shared<NiceMock<MockHttpServerPropertiesCache>>()};
@@ -2088,181 +2110,43 @@ TEST_F(Http2ConnPoolImplTest, RequestTrackingConnectionFailureNoMetric) {
   EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
 }
 
-// Normal pool lifecycle works without any lifetime callbacks set.
-TEST_F(Http2ConnPoolImplTest, ConnectionLifecycleNoopsWithoutCallbacks) {
+/**
+ * Verify that if a request is synchronously reset during onPoolReady(),
+ * it does not trigger recursive reentrant crashes in ConnPoolImplBase in the H2 pool.
+ */
+TEST_F(Http2ConnPoolImplTest, ReentrancySynchronousResetInPoolReady) {
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.conn_pool_fix_reentrancy", "true"}});
+
   InSequence s;
 
+  // 1. Create a client and a pending request.
   expectClientCreate();
-  ActiveTestRequest r1(*this, 0, false);
-  expectClientConnect(0, r1);
-  completeRequestCloseUpstream(0, r1);
-}
+  ActiveTestRequest r(*this, 0, false);
 
-// Connected event fires onConnectionOpen with correct pool, hash_key, and connection args.
-TEST_F(Http2ConnPoolImplTest, ConnectedEventFiresOpenCallbackWithCorrectArgs) {
-  InSequence s;
+  // 2. Expect the H2 client connection to be created, and expect onPoolReady.
+  // We override the onPoolReady callback to synchronously reset the stream!
+  EXPECT_CALL(*test_clients_[0].codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&r.inner_decoder_), ReturnRef(r.inner_encoder_)));
 
-  ConnectionPool::MockConnectionLifetimeCallbacks lifetime_callbacks;
-  std::vector<uint8_t> hash_key = {1, 2, 3};
-  pool_->setLifetimeCallbacks(
-      makeOptRef<ConnectionPool::ConnectionLifetimeCallbacks>(lifetime_callbacks), hash_key);
+  bool already_called = false;
+  EXPECT_CALL(r.callbacks_.pool_ready_, ready()).WillRepeatedly(Invoke([&]() {
+    if (already_called) {
+      ADD_FAILURE() << "Recursive onPoolReady call detected! Core pool reentrant bug is active!";
+      return;
+    }
+    already_called = true;
+    ASSERT_NE(r.callbacks_.outer_encoder_, nullptr);
+    r.callbacks_.outer_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+  }));
 
-  expectClientCreate();
-  ActiveTestRequest r1(*this, 0, false);
+  // 3. Connect the client. This will trigger onPoolReady -> resetStream -> onStreamClosed ->
+  // onUpstreamReady recursively.
+  expectClientConnect(0);
 
-  EXPECT_CALL(lifetime_callbacks,
-              onConnectionOpen(testing::Ref(*pool_), testing::ContainerEq(hash_key),
-                               testing::Ref(*test_clients_[0].connection_)));
-  expectClientConnect(0, r1);
-
-  completeRequest(r1);
-
-  EXPECT_CALL(lifetime_callbacks,
-              onConnectionDraining(testing::Ref(*pool_), testing::ContainerEq(hash_key),
-                                   testing::Ref(*test_clients_[0].connection_)));
-  EXPECT_CALL(*this, onClientDestroy());
-  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
-  dispatcher_.clearDeferredDeleteList();
-}
-
-// RemoteClose fires onConnectionDraining with correct args.
-TEST_F(Http2ConnPoolImplTest, RemoteCloseFiresDrainingCallbackWithCorrectArgs) {
-  InSequence s;
-
-  ConnectionPool::MockConnectionLifetimeCallbacks lifetime_callbacks;
-  std::vector<uint8_t> hash_key = {4, 5, 6};
-  pool_->setLifetimeCallbacks(
-      makeOptRef<ConnectionPool::ConnectionLifetimeCallbacks>(lifetime_callbacks), hash_key);
-
-  expectClientCreate();
-  ActiveTestRequest r1(*this, 0, false);
-
-  EXPECT_CALL(lifetime_callbacks, onConnectionOpen(_, _, _));
-  expectClientConnect(0, r1);
-
-  completeRequest(r1);
-
-  EXPECT_CALL(lifetime_callbacks,
-              onConnectionDraining(testing::Ref(*pool_), testing::ContainerEq(hash_key),
-                                   testing::Ref(*test_clients_[0].connection_)));
-  EXPECT_CALL(*this, onClientDestroy());
-  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
-  dispatcher_.clearDeferredDeleteList();
-}
-
-// LocalClose fires onConnectionDraining with correct args.
-TEST_F(Http2ConnPoolImplTest, LocalCloseFiresDrainingCallbackWithCorrectArgs) {
-  InSequence s;
-
-  ConnectionPool::MockConnectionLifetimeCallbacks lifetime_callbacks;
-  std::vector<uint8_t> hash_key = {4, 5, 6};
-  pool_->setLifetimeCallbacks(
-      makeOptRef<ConnectionPool::ConnectionLifetimeCallbacks>(lifetime_callbacks), hash_key);
-
-  expectClientCreate();
-  ActiveTestRequest r1(*this, 0, false);
-
-  EXPECT_CALL(lifetime_callbacks, onConnectionOpen(_, _, _));
-  expectClientConnect(0, r1);
-
-  completeRequest(r1);
-
-  EXPECT_CALL(lifetime_callbacks,
-              onConnectionDraining(testing::Ref(*pool_), testing::ContainerEq(hash_key),
-                                   testing::Ref(*test_clients_[0].connection_)));
-  EXPECT_CALL(*this, onClientDestroy());
-  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::LocalClose);
-  dispatcher_.clearDeferredDeleteList();
-}
-
-// GOAWAY with an active stream fires onConnectionDraining once from the GOAWAY handler
-// and again when the connection closes after the stream completes.
-TEST_F(Http2ConnPoolImplTest, GoAwayWithActiveStreamFiresDrainingCallback) {
-  InSequence s;
-
-  ConnectionPool::MockConnectionLifetimeCallbacks lifetime_callbacks;
-  std::vector<uint8_t> hash_key = {7, 8, 9};
-  pool_->setLifetimeCallbacks(
-      makeOptRef<ConnectionPool::ConnectionLifetimeCallbacks>(lifetime_callbacks), hash_key);
-
-  expectClientCreate();
-  ActiveTestRequest r1(*this, 0, false);
-
-  EXPECT_CALL(lifetime_callbacks, onConnectionOpen(_, _, _));
-  expectClientConnect(0, r1);
-
-  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
-  EXPECT_TRUE(
-      r1.callbacks_.outer_encoder_
-          ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
-          .ok());
-
-  // GOAWAY with active request fires draining from the goaway handler.
-  EXPECT_CALL(lifetime_callbacks,
-              onConnectionDraining(testing::Ref(*pool_), testing::ContainerEq(hash_key),
-                                   testing::Ref(*test_clients_[0].connection_)));
-  test_clients_[0].codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
-
-  // Completing the request triggers close on the draining connection, firing draining again.
-  EXPECT_CALL(lifetime_callbacks, onConnectionDraining(_, _, _));
-  EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
-  EXPECT_CALL(*this, onClientDestroy());
-  r1.inner_decoder_->decodeHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
-  dispatcher_.clearDeferredDeleteList();
-}
-
-// GOAWAY on an idle connection closes immediately; draining fires from the close event only.
-TEST_F(Http2ConnPoolImplTest, GoAwayIdleConnectionFiresDrainingDuetoClose) {
-  InSequence s;
-
-  ConnectionPool::MockConnectionLifetimeCallbacks lifetime_callbacks;
-  std::vector<uint8_t> hash_key = {10, 11, 12};
-  pool_->setLifetimeCallbacks(
-      makeOptRef<ConnectionPool::ConnectionLifetimeCallbacks>(lifetime_callbacks), hash_key);
-
-  expectClientCreate();
-  ActiveTestRequest r1(*this, 0, false);
-
-  EXPECT_CALL(lifetime_callbacks, onConnectionOpen(_, _, _));
-  expectClientConnect(0, r1);
-
-  completeRequest(r1);
-
-  EXPECT_CALL(lifetime_callbacks,
-              onConnectionDraining(testing::Ref(*pool_), testing::ContainerEq(hash_key),
-                                   testing::Ref(*test_clients_[0].connection_)));
-  EXPECT_CALL(*this, onClientDestroy());
-  test_clients_[0].codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
-  dispatcher_.clearDeferredDeleteList();
-}
-
-// Calling setLifetimeCallbacks a second time replaces the first; only the latest fires.
-TEST_F(Http2ConnPoolImplTest, SetLifetimeCallbacksReplacesExisting) {
-  InSequence s;
-
-  ConnectionPool::MockConnectionLifetimeCallbacks first_callbacks;
-  ConnectionPool::MockConnectionLifetimeCallbacks second_callbacks;
-  std::vector<uint8_t> hash_key = {1};
-
-  pool_->setLifetimeCallbacks(
-      makeOptRef<ConnectionPool::ConnectionLifetimeCallbacks>(first_callbacks), hash_key);
-  pool_->setLifetimeCallbacks(
-      makeOptRef<ConnectionPool::ConnectionLifetimeCallbacks>(second_callbacks), hash_key);
-
-  expectClientCreate();
-  ActiveTestRequest r1(*this, 0, false);
-
-  EXPECT_CALL(first_callbacks, onConnectionOpen(_, _, _)).Times(0);
-  EXPECT_CALL(second_callbacks,
-              onConnectionOpen(testing::Ref(*pool_), testing::ContainerEq(hash_key), _));
-  expectClientConnect(0, r1);
-
-  completeRequest(r1);
-
-  EXPECT_CALL(first_callbacks, onConnectionDraining(_, _, _)).Times(0);
-  EXPECT_CALL(second_callbacks,
-              onConnectionDraining(testing::Ref(*pool_), testing::ContainerEq(hash_key), _));
+  // 4. Verify that the connection is successfully closed.
   EXPECT_CALL(*this, onClientDestroy());
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();

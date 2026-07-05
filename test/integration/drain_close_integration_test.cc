@@ -5,6 +5,7 @@ namespace Envoy {
 namespace {
 
 using DrainCloseIntegrationTest = HttpProtocolIntegrationTest;
+using testing::Eq;
 
 TEST_P(DrainCloseIntegrationTest, DrainCloseGradual) {
   autonomous_upstream_ = true;
@@ -115,7 +116,7 @@ TEST_P(DrainCloseIntegrationTest, AdminGracefulDrain) {
   }
 
   // New connections can still be made.
-  auto second_codec_client_ = makeRawHttpConnection(makeClientConnection(http_port), absl::nullopt);
+  auto second_codec_client_ = makeRawHttpConnection(makeClientConnection(http_port), std::nullopt);
   EXPECT_TRUE(second_codec_client_->connected());
 
   // Invoke /drain_listeners and shut down listeners.
@@ -124,7 +125,7 @@ TEST_P(DrainCloseIntegrationTest, AdminGracefulDrain) {
       lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
   EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
 
-  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+  test_server_->waitForCounter("listener_manager.listener_stopped", Eq(1));
   ASSERT_TRUE(waitForPortAvailable(http_port));
 }
 
@@ -163,7 +164,7 @@ TEST_P(DrainCloseIntegrationTest, RepeatedAdminGracefulDrain) {
       lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
   EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
 
-  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+  test_server_->waitForCounter("listener_manager.listener_stopped", Eq(1));
   ASSERT_TRUE(waitForPortAvailable(http_port));
 }
 
@@ -208,7 +209,7 @@ TEST_P(DrainCloseIntegrationTest, AdminGracefulDrainSkipExit) {
   }
 
   // New connections can still be made.
-  auto second_codec_client_ = makeRawHttpConnection(makeClientConnection(http_port), absl::nullopt);
+  auto second_codec_client_ = makeRawHttpConnection(makeClientConnection(http_port), std::nullopt);
   EXPECT_TRUE(second_codec_client_->connected());
 
   // Invoke /drain_listeners and shut down listeners.
@@ -217,7 +218,7 @@ TEST_P(DrainCloseIntegrationTest, AdminGracefulDrainSkipExit) {
       lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
   EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
 
-  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+  test_server_->waitForCounter("listener_manager.listener_stopped", Eq(1));
   ASSERT_TRUE(waitForPortAvailable(http_port));
 }
 

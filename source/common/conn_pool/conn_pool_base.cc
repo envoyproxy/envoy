@@ -404,9 +404,15 @@ void ConnPoolImplBase::onUpstreamReady() {
     ActiveClientPtr& client = ready_clients_.front();
     ENVOY_CONN_LOG(debug, "attaching to next stream", *client);
     // Pending streams are pushed onto the front, so pull from the back.
-    attachStreamToClient(*client, pending_streams_.back()->context());
-    cluster_connectivity_state_.decrPendingStreams(1);
-    pending_streams_.pop_back();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_fix_reentrancy")) {
+      PendingStreamPtr pending_stream = pending_streams_.back()->removeFromList(pending_streams_);
+      cluster_connectivity_state_.decrPendingStreams(1);
+      attachStreamToClient(*client, pending_stream->context());
+    } else {
+      attachStreamToClient(*client, pending_streams_.back()->context());
+      cluster_connectivity_state_.decrPendingStreams(1);
+      pending_streams_.pop_back();
+    }
   }
   if (!pending_streams_.empty()) {
     tryCreateNewConnections();
@@ -662,7 +668,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     }
 
     // Now that the active client is ready, set up a timer for max connection duration.
-    const absl::optional<std::chrono::milliseconds> max_connection_duration =
+    const std::optional<std::chrono::milliseconds> max_connection_duration =
         client.parent_.host()->cluster().maxConnectionDuration();
     if (max_connection_duration.has_value()) {
       client.connection_duration_timer_ = client.parent_.dispatcher().createTimer(
@@ -701,11 +707,13 @@ PendingStream::PendingStream(ConnPoolImplBase& parent, bool can_send_early_data)
   Upstream::ClusterTrafficStats& traffic_stats = *parent_.host()->cluster().trafficStats();
   traffic_stats.upstream_rq_pending_total_.inc();
   traffic_stats.upstream_rq_pending_active_.inc();
+  parent_.host()->stats().rq_pending_active_.inc();
   parent_.host()->cluster().resourceManager(parent_.priority()).pendingRequests().inc();
 }
 
 PendingStream::~PendingStream() {
   parent_.host()->cluster().trafficStats()->upstream_rq_pending_active_.dec();
+  parent_.host()->stats().rq_pending_active_.dec();
   parent_.host()->cluster().resourceManager(parent_.priority()).pendingRequests().dec();
 }
 
@@ -822,9 +830,15 @@ void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
 
     if (stream.can_send_early_data_) {
       ENVOY_CONN_LOG(debug, "creating stream for early data.", client);
-      attachStreamToClient(client, stream.context());
-      cluster_connectivity_state_.decrPendingStreams(1);
-      stream.removeFromList(pending_streams_);
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_fix_reentrancy")) {
+        PendingStreamPtr pending_stream = stream.removeFromList(pending_streams_);
+        cluster_connectivity_state_.decrPendingStreams(1);
+        attachStreamToClient(client, pending_stream->context());
+      } else {
+        attachStreamToClient(client, stream.context());
+        cluster_connectivity_state_.decrPendingStreams(1);
+        stream.removeFromList(pending_streams_);
+      }
     }
     if (stop_iteration) {
       return;

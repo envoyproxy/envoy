@@ -32,7 +32,7 @@ public:
     auto& secret_cfg = (*generic_secret_cfg.mutable_secret_configs())["api-token"];
     secret_cfg.set_name("api-token");
     secret_cfg.mutable_sds_config()->mutable_path_config_source()->set_path(sds_yaml_path_);
-    formatter_ext.mutable_typed_config()->PackFrom(generic_secret_cfg);
+    std::ignore = formatter_ext.mutable_typed_config()->PackFrom(generic_secret_cfg);
 
     useAccessLog("%SECRET(api-token)%", {formatter_ext});
     HttpIntegrationTest::initialize();
@@ -85,7 +85,7 @@ TEST_P(GenericSecretRotationIntegrationTest, SecretRotationReflectedInAccessLog)
 
   // Rotate the secret and wait for the SDS update to propagate.
   rotateSecret("rotated-token");
-  test_server_->waitForCounterGe("sds.api-token.update_success", 2);
+  test_server_->waitForCounter("sds.api-token.update_success", testing::Ge(2));
 
   // Trigger a second access log entry; the flush will use the rotated secret value.
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -119,7 +119,7 @@ public:
     formatter_ext.set_name("envoy.formatter.generic_secret");
     envoy::extensions::formatter::generic_secret::v3::GenericSecret generic_secret_cfg;
     (*generic_secret_cfg.mutable_secret_configs())["api-token"].set_name("static-token");
-    formatter_ext.mutable_typed_config()->PackFrom(generic_secret_cfg);
+    std::ignore = formatter_ext.mutable_typed_config()->PackFrom(generic_secret_cfg);
 
     useAccessLog("%SECRET(api-token)%", {formatter_ext});
     HttpIntegrationTest::initialize();
@@ -168,7 +168,7 @@ public:
     formatter_ext.set_name("envoy.formatter.generic_secret");
     envoy::extensions::formatter::generic_secret::v3::GenericSecret generic_secret_cfg;
     (*generic_secret_cfg.mutable_secret_configs())["known-token"].set_name("known-token");
-    formatter_ext.mutable_typed_config()->PackFrom(generic_secret_cfg);
+    std::ignore = formatter_ext.mutable_typed_config()->PackFrom(generic_secret_cfg);
 
     useAccessLog("%SECRET(unknown-token)%", {formatter_ext});
     HttpIntegrationTest::initialize();

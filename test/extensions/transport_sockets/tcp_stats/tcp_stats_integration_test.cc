@@ -5,6 +5,7 @@
 
 #include "test/integration/integration.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -21,20 +22,20 @@ public:
       envoy::config::core::v3::TransportSocket inner_socket;
       inner_socket.set_name("envoy.transport_sockets.raw_buffer");
       envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
-      inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
+      std::ignore = inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
       envoy::extensions::transport_sockets::tcp_stats::v3::Config proto_config;
       proto_config.mutable_transport_socket()->MergeFrom(inner_socket);
 
       auto* cluster_transport_socket =
           bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
       cluster_transport_socket->set_name("envoy.transport_sockets.tcp_stats");
-      cluster_transport_socket->mutable_typed_config()->PackFrom(proto_config);
+      std::ignore = cluster_transport_socket->mutable_typed_config()->PackFrom(proto_config);
 
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
       auto* listener_transport_socket =
           listener->mutable_filter_chains(0)->mutable_transport_socket();
       listener_transport_socket->set_name("envoy.transport_sockets.tcp_stats");
-      listener_transport_socket->mutable_typed_config()->PackFrom(proto_config);
+      std::ignore = listener_transport_socket->mutable_typed_config()->PackFrom(proto_config);
 
       listener->set_stat_prefix("test");
     });
@@ -78,9 +79,9 @@ TEST_P(TcpStatsSocketIntegrationTest, Basic) {
   // before validating values and ranges. Gauges/counters and histograms go through slightly
   // different paths, so check each to avoid test flakes.
   test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.tcp_stats.cx_rtt_us");
-  test_server_->waitForCounterGe("cluster.cluster_0.tcp_stats.cx_tx_segments", 1);
+  test_server_->waitForCounter("cluster.cluster_0.tcp_stats.cx_tx_segments", Ge(1));
   test_server_->waitUntilHistogramHasSamples("listener.test.tcp_stats.cx_rtt_us");
-  test_server_->waitForCounterGe("listener.test.tcp_stats.cx_tx_segments", 1);
+  test_server_->waitForCounter("listener.test.tcp_stats.cx_tx_segments", Ge(1));
 
   auto validateCounterRange = [this](const std::string& name, uint64_t lower, uint64_t upper) {
     auto counter = test_server_->counter(absl::StrCat("cluster.cluster_0.tcp_stats.", name));

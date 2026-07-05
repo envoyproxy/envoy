@@ -84,7 +84,6 @@ envoy_cc_library(
     hdrs = envoy_select_enable_http3(["scone_state.h"]),
     deps = envoy_select_enable_http3([
         "@abseil-cpp//absl/strings:string_view",
-        "@abseil-cpp//absl/types:optional",
         "//envoy/stream_info:filter_state_interface",
     ]),
 )
@@ -123,6 +122,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "envoy_tls_server_handshaker",
+    srcs = envoy_select_enable_http3(["envoy_tls_server_handshaker.cc"]),
+    hdrs = envoy_select_enable_http3(["envoy_tls_server_handshaker.h"]),
+    external_deps = ["ssl"],
+    deps = envoy_select_enable_http3([
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
+        "//source/common/tls:server_context_lib",
+        "@quiche//:quic_server_session_lib",
+    ]),
+)
+
+envoy_cc_library(
     name = "envoy_quic_proof_source_lib",
     srcs = envoy_select_enable_http3(["envoy_quic_proof_source.cc"]),
     hdrs = envoy_select_enable_http3(["envoy_quic_proof_source.h"]),
@@ -130,6 +142,7 @@ envoy_cc_library(
     deps = envoy_select_enable_http3([
         ":envoy_quic_proof_source_base_lib",
         ":envoy_quic_utils_lib",
+        ":envoy_tls_server_handshaker",
         ":quic_io_handle_wrapper_lib",
         ":quic_transport_socket_factory_lib",
         "//envoy/ssl:tls_certificate_config_interface",
@@ -300,9 +313,9 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:session_idle_list_lib",
         "@quiche//:quic_server_http_spdy_session_lib",
-        "@abseil-cpp//absl/types:optional",
     ]) + envoy_select_enable_http_datagrams([
         ":http_datagram_handler",
     ]),
@@ -343,6 +356,7 @@ envoy_cc_library(
         "@quiche//:quic_core_error_codes_lib",
     ]) + envoy_select_enable_http_datagrams([
         ":http_datagram_handler",
+        ":web_transport_session_bridge_lib",
     ]),
 )
 
@@ -740,5 +754,18 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "@quiche//:quic_core_http_spdy_session_lib",
         "@quiche//:quic_core_types_lib",
+    ]),
+)
+
+envoy_cc_library(
+    name = "web_transport_session_bridge_lib",
+    srcs = envoy_select_enable_http3(["web_transport_session_bridge.cc"]),
+    hdrs = envoy_select_enable_http3(["web_transport_session_bridge.h"]),
+    deps = envoy_select_enable_http3([
+        "//envoy/http:codec_interface",
+        "//source/common/common:logger_lib",
+        "@quiche//:quiche_common_buffer_allocator_lib",
+        "@quiche//:quiche_common_capsule_lib",
+        "@quiche//:quiche_web_transport_web_transport_lib",
     ]),
 )

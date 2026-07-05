@@ -8,7 +8,6 @@
 
 #include "test/extensions/filters/http/cache/http_cache_implementation_test_common.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -40,7 +39,7 @@ TEST(Registration, GetFactory) {
   ASSERT_NE(factory, nullptr);
   envoy::extensions::filters::http::cache::v3::CacheConfig config;
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  config.mutable_typed_config()->PackFrom(*factory->createEmptyConfigProto());
+  std::ignore = config.mutable_typed_config()->PackFrom(*factory->createEmptyConfigProto());
   EXPECT_EQ(factory->getCache(config, factory_context)->cacheInfo().name_,
             "envoy.extensions.http.cache.simple");
 }

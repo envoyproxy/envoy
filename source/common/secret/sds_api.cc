@@ -21,21 +21,21 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
                ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
                std::function<void()> destructor_cb, Event::Dispatcher& dispatcher, Api::Api& api,
                bool warm)
-    : Envoy::Config::SubscriptionBase<envoy::extensions::transport_sockets::tls::v3::Secret>(
-          validation_visitor, "name"),
-      init_target_(fmt::format("SdsApi {}", sds_config_name), [this, warm] { initialize(warm); }),
+    : init_target_(fmt::format("SdsApi {}", sds_config_name), [this, warm] { initialize(warm); }),
       dispatcher_(dispatcher), api_(api),
       scope_(stats.createScope(absl::StrCat("sds.", sds_config_name, "."))),
-      sds_api_stats_(generateStats(*scope_)), sds_config_(std::move(sds_config)),
-      sds_config_name_(sds_config_name), clean_up_(std::move(destructor_cb)),
-      subscription_factory_(subscription_factory), time_source_(time_source),
+      sds_api_stats_(generateStats(*scope_)), resource_type_helper_(validation_visitor, "name"),
+      sds_config_(std::move(sds_config)), sds_config_name_(sds_config_name),
+      clean_up_(std::move(destructor_cb)), subscription_factory_(subscription_factory),
+      time_source_(time_source),
       secret_data_{sds_config_name_, "uninitialized", time_source_.systemTime()} {
-  const auto resource_name = getResourceName();
+  const auto resource_name = resource_type_helper_.getResourceName();
   // This has to happen here (rather than in initialize()) as it can throw exceptions.
-  subscription_ = THROW_OR_RETURN_VALUE(
-      subscription_factory_.subscriptionFromConfigSource(
-          sds_config_, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {}),
-      Config::SubscriptionPtr);
+  subscription_ =
+      THROW_OR_RETURN_VALUE(subscription_factory_.subscriptionFromConfigSource(
+                                sds_config_, Grpc::Common::typeUrl(resource_name), *scope_, *this,
+                                resource_type_helper_.resourceDecoder(), {}),
+                            Config::SubscriptionPtr);
 }
 
 void SdsApi::resolveDataSource(const FileContentMap& files,
@@ -92,12 +92,15 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
   if (!status.ok()) {
     return status;
   }
-  const auto& secret = dynamic_cast<const envoy::extensions::transport_sockets::tls::v3::Secret&>(
-      resources[0].get().resource());
+  const auto& secret =
+      Envoy::Protobuf::DynamicCastMessage<envoy::extensions::transport_sockets::tls::v3::Secret>(
+          resources[0].get().resource());
 
   if (secret.name() != sds_config_name_) {
-    return absl::InvalidArgumentError(
-        fmt::format("Unexpected SDS secret (expecting {}): {}", sds_config_name_, secret.name()));
+    const auto msg =
+        fmt::format("Unexpected SDS secret (expecting {}): {}", sds_config_name_, secret.name());
+    ENVOY_LOG_MISC(warn, "sds: secret '{}' config rejected: {}", sds_config_name_, msg);
+    return absl::InvalidArgumentError(msg);
   }
 
   const uint64_t new_hash = MessageUtil::hash(secret);
@@ -182,8 +185,10 @@ void SdsApi::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reaso
 absl::Status SdsApi::validateUpdateSize(uint32_t added_resources_num,
                                         uint32_t removed_resources_num) const {
   if (added_resources_num == 0 && removed_resources_num == 0) {
-    return absl::InvalidArgumentError(
-        fmt::format("Missing SDS resources for {} in onConfigUpdate()", sds_config_name_));
+    const auto msg =
+        fmt::format("Missing SDS resources for {} in onConfigUpdate()", sds_config_name_);
+    ENVOY_LOG_MISC(warn, "sds: secret '{}' config rejected: {}", sds_config_name_, msg);
+    return absl::InvalidArgumentError(msg);
   }
 
   // This conditional technically allows a response with added=1 removed=1
@@ -191,10 +196,11 @@ absl::Status SdsApi::validateUpdateSize(uint32_t added_resources_num,
   // It is, however, preferred to ignore these nonsensical responses rather
   // than NACK them, so it is allowed here.
   if (added_resources_num > 1 || removed_resources_num > 1) {
-    return absl::InvalidArgumentError(
-        fmt::format("Unexpected SDS secrets length for {}, number of added resources "
-                    "{}, number of removed resources {}. Expected sum is 1",
-                    sds_config_name_, added_resources_num, removed_resources_num));
+    const auto msg = fmt::format("Unexpected SDS secrets length for {}, number of added resources "
+                                 "{}, number of removed resources {}. Expected sum is 1",
+                                 sds_config_name_, added_resources_num, removed_resources_num);
+    ENVOY_LOG_MISC(warn, "sds: secret '{}' config rejected: {}", sds_config_name_, msg);
+    return absl::InvalidArgumentError(msg);
   }
   return absl::OkStatus();
 }

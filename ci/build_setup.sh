@@ -82,6 +82,9 @@ case $CI_TARGET in
     external)
         ENVOY_OUTPUT_BASE_DIR="${ENVOY_OUTPUT_BASE_DIR:-external}"
         ;;
+    refresh_compdb|pre_refresh_compdb)
+        ENVOY_OUTPUT_BASE_DIR="${ENVOY_OUTPUT_BASE_DIR:-base-envoy-compdb}"
+        ;;
     *)
         ENVOY_OUTPUT_BASE_DIR="${ENVOY_OUTPUT_BASE_DIR:-base}"
         ;;
@@ -111,7 +114,7 @@ BAZEL_BUILD_OPTIONS=(
   "${BAZEL_OPTIONS[@]}"
   "${BAZEL_GLOBAL_OPTIONS[@]}"
   "--verbose_failures"
-  "--experimental_generate_json_trace_profile"
+  "--generate_json_trace_profile"
   "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
   "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 

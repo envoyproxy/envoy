@@ -66,8 +66,9 @@ AccessLog::InstanceSharedPtr FluentdAccessLogFactory::createAccessLogInstance(
                             std::vector<Formatter::CommandParserPtr>);
 
   Formatter::FormatterPtr json_formatter =
-      Formatter::SubstitutionFormatStringUtils::createJsonFormatter(proto_config.record(), false,
-                                                                    commands);
+      THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::createJsonFormatter(
+                                proto_config.record(), false, commands),
+                            Formatter::FormatterPtr);
   FluentdFormatterPtr fluentd_formatter =
       std::make_unique<FluentdFormatterImpl>(std::move(json_formatter));
 

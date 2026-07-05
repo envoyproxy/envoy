@@ -18,10 +18,8 @@
 #endif
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/init/mocks.h"
-#include "test/mocks/server/instance.h"
-#include "test/mocks/thread_local/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -66,7 +64,7 @@ vhds:
       auto* resource = to_ret.Add();
       resource->set_name(vhost.name());
       resource->set_version("1");
-      resource->mutable_resource()->PackFrom(vhost);
+      std::ignore = resource->mutable_resource()->PackFrom(vhost);
     }
 
     return to_ret;

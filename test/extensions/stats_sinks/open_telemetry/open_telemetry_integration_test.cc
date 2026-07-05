@@ -17,6 +17,8 @@
 #include "opentelemetry/proto/resource/v1/resource.pb.h"
 
 using testing::AssertionResult;
+using testing::Eq;
+using testing::Ge;
 
 namespace Envoy {
 namespace {
@@ -88,7 +90,7 @@ public:
       envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
       driver_.configureExporter(sink_config, fake_upstreams_.back()->localAddress());
       sink_config.set_prefix(stat_prefix_);
-      metrics_sink->mutable_typed_config()->PackFrom(sink_config);
+      std::ignore = metrics_sink->mutable_typed_config()->PackFrom(sink_config);
 
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(500));
@@ -228,9 +230,9 @@ private:
             // GoogleGrpc uses its own stream tracking; EnvoyGrpc uses Envoy's cluster stats.
             [client_type](IntegrationTestServer& server) {
               if (client_type == Grpc::ClientType::GoogleGrpc) {
-                server.waitForCounterGe("grpc.otlp_collector.streams_closed_0", 1);
+                server.waitForCounter("grpc.otlp_collector.streams_closed_0", Ge(1));
               } else {
-                server.waitForGaugeEq("cluster.otlp_collector.upstream_rq_active", 0);
+                server.waitForGauge("cluster.otlp_collector.upstream_rq_active", Eq(0));
               }
             }};
   }
@@ -259,7 +261,7 @@ private:
             },
             // HTTP uses standard cluster request tracking.
             [](IntegrationTestServer& server) {
-              server.waitForGaugeEq("cluster.otlp_collector.upstream_rq_active", 0);
+              server.waitForGauge("cluster.otlp_collector.upstream_rq_active", Eq(0));
             }};
   }
 
@@ -331,7 +333,7 @@ public:
                      fake_upstreams_.back()->localAddress());
 
       // Add custom conversion rules.
-      Protobuf::TextFormat::ParseFromString(
+      std::ignore = Protobuf::TextFormat::ParseFromString(
           R"pb(matcher_list {
                      matchers {
                        predicate {
@@ -420,7 +422,7 @@ public:
                    })pb",
           sink_config.mutable_custom_metric_conversions());
 
-      metrics_sink->mutable_typed_config()->PackFrom(sink_config);
+      std::ignore = metrics_sink->mutable_typed_config()->PackFrom(sink_config);
 
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(500));
@@ -527,7 +529,7 @@ public:
       header->mutable_header()->set_key("x-custom-formatter");
       header->mutable_header()->set_value("%HOSTNAME%");
 
-      sink->mutable_typed_config()->PackFrom(config);
+      std::ignore = sink->mutable_typed_config()->PackFrom(config);
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(100));
     });

@@ -15,7 +15,6 @@
 
 #include "test/common/quic/test_utils.h"
 #include "test/mocks/api/mocks.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/network/mocks.h"
@@ -253,6 +252,18 @@ INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionTests, EnvoyQuicClientSessionTest
                                           testing::Bool()));
 
 TEST_P(EnvoyQuicClientSessionTest, ShutdownNoOp) { http_connection_->shutdownNotice(); }
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+// WebTransport is opt-in: the client advertises no WebTransport versions (and so will not negotiate
+// WebTransport) unless envoy.reloadable_features.quic_support_web_transport is enabled.
+TEST_P(EnvoyQuicClientSessionTest, WebTransportNegotiationGatedByRuntimeFlag) {
+  EXPECT_FALSE(envoy_quic_session_->WillNegotiateWebTransport());
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_support_web_transport", "true"}});
+  EXPECT_TRUE(envoy_quic_session_->WillNegotiateWebTransport());
+}
+#endif
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionTest, EnvoyQuicClientSessionTest,
                          testing::Combine(testing::ValuesIn(quic::CurrentSupportedHttp3Versions()),
@@ -589,7 +600,7 @@ TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
 
 TEST_P(EnvoyQuicClientSessionTest, EcnReportingIsEnabled) {
   const Network::ConnectionSocketPtr& socket = quic_connection_->connectionSocket();
-  absl::optional<Network::Address::IpVersion> version = socket->ipVersion();
+  std::optional<Network::Address::IpVersion> version = socket->ipVersion();
   EXPECT_TRUE(version.has_value());
   int optval;
   socklen_t optlen = sizeof(optval);
@@ -604,7 +615,7 @@ TEST_P(EnvoyQuicClientSessionTest, EcnReportingIsEnabled) {
 }
 
 TEST_P(EnvoyQuicClientSessionTest, EcnReporting) {
-  absl::optional<Network::Address::IpVersion> version = peer_socket_->ipVersion();
+  std::optional<Network::Address::IpVersion> version = peer_socket_->ipVersion();
   EXPECT_TRUE(version.has_value());
   // Make the peer socket send ECN marks
   Api::SysCallIntResult rv;

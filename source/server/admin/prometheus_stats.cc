@@ -20,6 +20,9 @@ namespace Server {
 
 namespace {
 
+constexpr absl::string_view kCounter = "counter";
+constexpr absl::string_view kGauge = "gauge";
+
 const Regex::CompiledGoogleReMatcher& promRegex() {
   CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcherNoSafetyChecks, "[^a-zA-Z0-9_]");
 }
@@ -32,6 +35,15 @@ std::string sanitizeName(const absl::string_view name) {
   // prometheus. Refer to https://prometheus.io/docs/concepts/data_model/.
   // The initial [a-zA-Z_] constraint is always satisfied by the namespace prefix.
   return promRegex().replaceAll(name, "_");
+}
+
+// same logic as above, but does it in place (no allocations)
+void sanitizeNameInPlace(std::string& name) {
+  for (char& c : name) {
+    if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_')) {
+      c = '_';
+    }
+  }
 }
 
 /**
@@ -76,9 +88,9 @@ public:
   }
 
   void generateOutput(Buffer::Instance& output,
-                      const std::vector<const Stats::PrimitiveCounterSnapshot*>& counters,
+                      std::vector<Stats::PrimitiveCounterSnapshot*>&& counters,
                       const std::string& prefixed_tag_extracted_name) const override {
-    generateNumericOutput(output, counters, prefixed_tag_extracted_name);
+    generateNumericOutput(output, std::move(counters), prefixed_tag_extracted_name);
   }
 
   void generateOutput(Buffer::Instance& output, const std::vector<const Stats::Gauge*>& gauges,
@@ -87,9 +99,9 @@ public:
   }
 
   void generateOutput(Buffer::Instance& output,
-                      const std::vector<const Stats::PrimitiveGaugeSnapshot*>& gauges,
+                      std::vector<Stats::PrimitiveGaugeSnapshot*>&& gauges,
                       const std::string& prefixed_tag_extracted_name) const override {
-    generateNumericOutput(output, gauges, prefixed_tag_extracted_name);
+    generateNumericOutput(output, std::move(gauges), prefixed_tag_extracted_name);
   }
 
   void generateOutput(Buffer::Instance& output,
@@ -124,7 +136,7 @@ public:
     for (const auto* text_readout : text_readouts) {
       auto tags = text_readout->tags();
       tags.push_back(Stats::Tag{"text_value", text_readout->value()});
-      const std::string formattedTags = PrometheusStatsFormatter::formattedTags(tags);
+      const std::string formattedTags = PrometheusStatsFormatter::formattedTags(std::move(tags));
       output.add(fmt::format("{0}{{{1}}} 0\n", prefixed_tag_extracted_name, formattedTags));
     }
   }
@@ -139,12 +151,10 @@ private:
   void generateNumericOutput(Buffer::Instance& output, const std::vector<const StatType*>& metrics,
                              const std::string& prefixed_tag_extracted_name) const {
     absl::string_view type;
-    if constexpr (std::is_same_v<Stats::Counter, StatType> ||
-                  std::is_same_v<Stats::PrimitiveCounterSnapshot, StatType>) {
-      type = "counter";
-    } else if constexpr (std::is_same_v<Stats::Gauge, StatType> ||
-                         std::is_same_v<Stats::PrimitiveGaugeSnapshot, StatType>) {
-      type = "gauge";
+    if constexpr (std::is_same_v<Stats::Counter, StatType>) {
+      type = kCounter;
+    } else if constexpr (std::is_same_v<Stats::Gauge, StatType>) {
+      type = kGauge;
     } else {
       static_assert(false, "Unexpected StatsType");
     }
@@ -152,6 +162,27 @@ private:
     generateTypeOutput(output, type, prefixed_tag_extracted_name);
     for (const auto* metric : metrics) {
       const std::string formatted_tags = PrometheusStatsFormatter::formattedTags(metric->tags());
+      output.add(fmt::format("{0}{{{1}}} {2}\n", prefixed_tag_extracted_name, formatted_tags,
+                             metric->value()));
+    }
+  }
+
+  template <class StatType>
+  void generateNumericOutput(Buffer::Instance& output, std::vector<StatType*>&& metrics,
+                             const std::string& prefixed_tag_extracted_name) const {
+    absl::string_view type;
+    if constexpr (std::is_same_v<Stats::PrimitiveCounterSnapshot, StatType>) {
+      type = kCounter;
+    } else if constexpr (std::is_same_v<Stats::PrimitiveGaugeSnapshot, StatType>) {
+      type = kGauge;
+    } else {
+      static_assert(false, "Unexpected StatsType");
+    }
+
+    generateTypeOutput(output, type, prefixed_tag_extracted_name);
+    for (auto* metric : metrics) {
+      const std::string formatted_tags =
+          PrometheusStatsFormatter::formattedTags(metric->getAndClearTags());
       output.add(fmt::format("{0}{{{1}}} {2}\n", prefixed_tag_extracted_name, formatted_tags,
                              metric->value()));
     }
@@ -168,8 +199,11 @@ private:
     generateTypeOutput(output, "histogram", prefixed_tag_extracted_name);
 
     for (const auto* histogram : histograms) {
-      const std::string tags = PrometheusStatsFormatter::formattedTags(histogram->tags());
-      const std::string hist_tags = histogram->tags().empty() ? EMPTY_STRING : (tags + ",");
+      auto histogram_tags = histogram->tags();
+      const bool empty_tags = histogram_tags.empty();
+
+      const std::string tags = PrometheusStatsFormatter::formattedTags(std::move(histogram_tags));
+      const std::string hist_tags = empty_tags ? EMPTY_STRING : (tags + ",");
 
       const Stats::HistogramStatistics& stats = histogram->cumulativeStatistics();
       Stats::ConstSupportedBuckets& supported_buckets = stats.supportedBuckets();
@@ -231,7 +265,7 @@ class ProtobufFormat : public PrometheusStatsFormatter::OutputFormat {
 public:
   static constexpr uint32_t kDefaultMaxNativeHistogramBuckets = 20;
 
-  ProtobufFormat(absl::optional<uint32_t> native_histogram_max_buckets)
+  ProtobufFormat(std::optional<uint32_t> native_histogram_max_buckets)
       : native_histogram_max_buckets_(
             native_histogram_max_buckets.value_or(kDefaultMaxNativeHistogramBuckets)) {}
 
@@ -243,9 +277,9 @@ public:
 
   // Return the prometheus output for a group of PrimitiveCounters.
   void generateOutput(Buffer::Instance& output,
-                      const std::vector<const Stats::PrimitiveCounterSnapshot*>& counters,
+                      std::vector<Stats::PrimitiveCounterSnapshot*>&& counters,
                       const std::string& prefixed_tag_extracted_name) const override {
-    generateNumericOutput(output, counters, prefixed_tag_extracted_name,
+    generateNumericOutput(output, std::move(counters), prefixed_tag_extracted_name,
                           io::prometheus::client::MetricType::COUNTER);
   }
 
@@ -286,9 +320,9 @@ public:
 
   // Return the prometheus output for a group of PrimitiveGauges.
   void generateOutput(Buffer::Instance& output,
-                      const std::vector<const Stats::PrimitiveGaugeSnapshot*>& gauges,
+                      std::vector<Stats::PrimitiveGaugeSnapshot*>&& gauges,
                       const std::string& prefixed_tag_extracted_name) const override {
-    generateNumericOutput(output, gauges, prefixed_tag_extracted_name,
+    generateNumericOutput(output, std::move(gauges), prefixed_tag_extracted_name,
                           io::prometheus::client::MetricType::GAUGE);
   }
 
@@ -319,11 +353,12 @@ public:
 private:
   // Helper method to add labels to a metric from tags.
   void addLabelsToMetric(io::prometheus::client::Metric* metric,
-                         const std::vector<Stats::Tag>& tags) const {
+                         std::vector<Stats::Tag>&& tags) const {
     metric->mutable_label()->Reserve(tags.size());
-    for (const auto& tag : tags) {
+    for (auto& tag : tags) {
       auto* label = metric->add_label();
-      label->set_name(sanitizeName(tag.name_));
+      sanitizeNameInPlace(tag.name_);
+      label->set_name(std::move(tag.name_));
       label->set_value(sanitizeValue(tag.value_));
     }
   }
@@ -350,6 +385,38 @@ private:
       } else {
         auto* gauge = prom_metric->mutable_gauge();
         gauge->set_value(metric->value());
+      }
+    }
+
+    writeDelimitedMessage(metric_family, output);
+  }
+
+  template <class StatType>
+  void generateNumericOutput(Buffer::Instance& output, std::vector<StatType*>&& metrics,
+                             const std::string& prefixed_tag_extracted_name,
+                             io::prometheus::client::MetricType type) const {
+    ASSERT(!metrics.empty());
+
+    io::prometheus::client::MetricFamily metric_family;
+    metric_family.set_name(prefixed_tag_extracted_name);
+    metric_family.set_type(type);
+    metric_family.mutable_metric()->Reserve(metrics.size());
+
+    for (auto* metric : metrics) {
+      auto* prom_metric = metric_family.add_metric();
+
+      uint64_t value = metric->value();
+      auto tags = metric->getAndClearTags();
+
+      addLabelsToMetric(prom_metric, std::move(tags));
+
+      // Set value based on type
+      if (type == io::prometheus::client::MetricType::COUNTER) {
+        auto* counter = prom_metric->mutable_counter();
+        counter->set_value(value);
+      } else {
+        auto* gauge = prom_metric->mutable_gauge();
+        gauge->set_value(value);
       }
     }
 
@@ -557,7 +624,7 @@ private:
     constexpr int8_t kSchemaDefault = 4;
 
     for (int8_t schema = kSchemaDefault; schema >= kSchemaMin; --schema) {
-      absl::optional<std::set<int32_t>> indices = nativeHistogramBucketIndicesFromHistogramBuckets(
+      std::optional<std::set<int32_t>> indices = nativeHistogramBucketIndicesFromHistogramBuckets(
           detailed_buckets, schema, zero_threshold, max_buckets);
       // If it doesn't have a value, that means it exceeded `max_buckets`.
       if (indices.has_value()) {
@@ -574,9 +641,9 @@ private:
   // cover any part of the range of any of the buckets.
   //
   // If max_buckets is provided and the limit would be exceeded, returns nullopt.
-  static absl::optional<std::set<int32_t>> nativeHistogramBucketIndicesFromHistogramBuckets(
+  static std::optional<std::set<int32_t>> nativeHistogramBucketIndicesFromHistogramBuckets(
       const std::vector<Stats::ParentHistogram::Bucket>& buckets, int8_t schema,
-      double zero_threshold, absl::optional<uint32_t> max_buckets = absl::nullopt) {
+      double zero_threshold, std::optional<uint32_t> max_buckets = std::nullopt) {
     std::set<int32_t> indices;
 
     const double log_base = std::log(std::pow(2.0, std::pow(2.0, static_cast<double>(-schema))));
@@ -605,7 +672,7 @@ private:
 
         // Early termination if we've exceeded the limit
         if (max_buckets.has_value() && indices.size() > *max_buckets) {
-          return absl::nullopt;
+          return std::nullopt;
         }
       }
     }
@@ -623,7 +690,7 @@ private:
 
     uint8_t* const end_of_varint =
         Protobuf::io::CodedOutputStream::WriteVarint64ToArray(length, reservation_start);
-    message.SerializeWithCachedSizesToArray(end_of_varint);
+    std::ignore = message.SerializeWithCachedSizesToArray(end_of_varint);
 
     ASSERT(end_of_varint >= reservation_start);
     const size_t varint_size = end_of_varint - reservation_start;
@@ -681,10 +748,9 @@ uint64_t outputStatType(Buffer::Instance& response, const StatsParams& params,
   // comparison.
   const Stats::SymbolTable& global_symbol_table = metrics.front()->constSymbolTable();
 
-  // Sorted collection of metrics sorted by their tagExtractedName, to satisfy the requirements
-  // of the exposition format.
-  std::map<Stats::StatName, StatTypeUnsortedCollection, Stats::StatNameLessThan> groups(
-      global_symbol_table);
+  // Collection of metrics by their tagExtractedName.
+  // Sorting will be done on the names separately.
+  absl::flat_hash_map<Stats::StatName, StatTypeUnsortedCollection> groups;
 
   for (const auto& metric : metrics) {
     ASSERT(&global_symbol_table == &metric->constSymbolTable());
@@ -694,10 +760,19 @@ uint64_t outputStatType(Buffer::Instance& response, const StatsParams& params,
     groups[metric->tagExtractedStatName()].push_back(metric.get());
   }
 
+  std::vector<Stats::StatName> sorted_stat_names;
+  sorted_stat_names.reserve(groups.size());
+  for (const auto& [group, _] : groups) {
+    sorted_stat_names.push_back(group);
+  }
+  Stats::StatNameLessThan comp(global_symbol_table);
+  std::sort(sorted_stat_names.begin(), sorted_stat_names.end(), comp);
+
   auto result = groups.size();
-  for (auto& group : groups) {
-    const absl::optional<std::string> prefixed_tag_extracted_name =
-        PrometheusStatsFormatter::metricName(global_symbol_table.toString(group.first),
+  for (auto& group_name : sorted_stat_names) {
+    auto& group = groups[group_name];
+    const std::optional<std::string> prefixed_tag_extracted_name =
+        PrometheusStatsFormatter::metricName(global_symbol_table.toString(group_name),
                                              custom_namespaces);
     if (!prefixed_tag_extracted_name.has_value()) {
       --result;
@@ -707,17 +782,16 @@ uint64_t outputStatType(Buffer::Instance& response, const StatsParams& params,
     // Sort before producing the final output to satisfy the "preferred" ordering from the
     // prometheus spec: metrics will be sorted by their tags' textual representation, which will
     // be consistent across calls.
-    std::sort(group.second.begin(), group.second.end(), MetricLessThan());
+    std::sort(group.begin(), group.end(), MetricLessThan());
 
-    output_format.generateOutput(response, group.second, prefixed_tag_extracted_name.value());
+    output_format.generateOutput(response, group, prefixed_tag_extracted_name.value());
   }
   return result;
 }
 
 template <class StatType, class OutputFormat>
 uint64_t outputPrimitiveStatType(Buffer::Instance& response, const StatsParams& params,
-                                 const std::vector<StatType>& metrics,
-                                 const OutputFormat& output_format,
+                                 std::vector<StatType>&& metrics, const OutputFormat& output_format,
                                  const Stats::CustomStatNamespaces& custom_namespaces) {
 
   /*
@@ -735,28 +809,36 @@ uint64_t outputPrimitiveStatType(Buffer::Instance& response, const StatsParams& 
   // be sorted before producing the final output to satisfy the "preferred" ordering from the
   // prometheus spec: metrics will be sorted by their tags' textual representation, which will be
   // consistent across calls.
-  using StatTypeUnsortedCollection = std::vector<const StatType*>;
+  using StatTypeUnsortedCollection = std::vector<StatType*>;
 
   // Return early to avoid crashing when getting the symbol table from the first metric.
   if (metrics.empty()) {
     return 0;
   }
 
-  // Sorted collection of metrics sorted by their tagExtractedName, to satisfy the requirements
-  // of the exposition format.
-  std::map<std::string, StatTypeUnsortedCollection> groups;
+  // Collection of metrics sorted by their tagExtractedName.
+  // We satisfy the requirements of the exposition format by iterating over the sorted keys.
+  absl::flat_hash_map<std::string, StatTypeUnsortedCollection> groups;
 
-  for (const auto& metric : metrics) {
+  for (auto& metric : metrics) {
     if (!params.shouldShowMetric(metric)) {
       continue;
     }
     groups[metric.tagExtractedName()].push_back(&metric);
   }
 
+  std::vector<std::string> sorted_group_names;
+  sorted_group_names.reserve(groups.size());
+  for (const auto& [group, _] : groups) {
+    sorted_group_names.push_back(group);
+  }
+  std::sort(sorted_group_names.begin(), sorted_group_names.end());
+
   auto result = groups.size();
-  for (auto& group : groups) {
-    const absl::optional<std::string> prefixed_tag_extracted_name =
-        PrometheusStatsFormatter::metricName(group.first, custom_namespaces);
+  for (auto& group_name : sorted_group_names) {
+    auto& group = groups[group_name];
+    const std::optional<std::string> prefixed_tag_extracted_name =
+        PrometheusStatsFormatter::metricName(std::move(group_name), custom_namespaces);
     if (!prefixed_tag_extracted_name.has_value()) {
       --result;
       continue;
@@ -765,9 +847,9 @@ uint64_t outputPrimitiveStatType(Buffer::Instance& response, const StatsParams& 
     // Sort before producing the final output to satisfy the "preferred" ordering from the
     // prometheus spec: metrics will be sorted by their tags' textual representation, which will
     // be consistent across calls.
-    std::sort(group.second.begin(), group.second.end(), PrimitiveMetricSnapshotLessThan());
+    std::sort(group.begin(), group.end(), PrimitiveMetricSnapshotLessThan());
 
-    output_format.generateOutput(response, group.second, prefixed_tag_extracted_name.value());
+    output_format.generateOutput(response, std::move(group), prefixed_tag_extracted_name.value());
   }
   return result;
 }
@@ -819,11 +901,12 @@ bool useProtobufFormat(const StatsParams& params, const Http::RequestHeaderMap& 
 
 } // namespace
 
-std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag>& tags) {
+std::string PrometheusStatsFormatter::formattedTags(std::vector<Stats::Tag>&& tags) {
   std::vector<std::string> buf;
   buf.reserve(tags.size());
-  for (const Stats::Tag& tag : tags) {
-    buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), sanitizeValue(tag.value_)));
+  for (Stats::Tag& tag : tags) {
+    sanitizeNameInPlace(tag.name_);
+    buf.push_back(fmt::format("{}=\"{}\"", tag.name_, sanitizeValue(tag.value_)));
   }
   return absl::StrJoin(buf, ",");
 }
@@ -853,10 +936,10 @@ absl::Status PrometheusStatsFormatter::validateParams(const StatsParams& params,
   return result;
 }
 
-absl::optional<std::string>
-PrometheusStatsFormatter::metricName(const std::string& extracted_name,
+std::optional<std::string>
+PrometheusStatsFormatter::metricName(std::string&& extracted_name,
                                      const Stats::CustomStatNamespaces& custom_namespaces) {
-  const absl::optional<absl::string_view> custom_namespace_stripped =
+  const std::optional<absl::string_view> custom_namespace_stripped =
       custom_namespaces.stripRegisteredPrefix(extracted_name);
   if (custom_namespace_stripped.has_value()) {
     // This case the name has a custom namespace, and it is a custom metric.
@@ -868,7 +951,7 @@ PrometheusStatsFormatter::metricName(const std::string& extracted_name,
     // thanks to sanitizeName above, so the only thing we have to do is check
     // if it does not start with digits.
     if (sanitized_name.empty() || absl::ascii_isdigit(sanitized_name.front())) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     return sanitized_name;
   }
@@ -876,7 +959,8 @@ PrometheusStatsFormatter::metricName(const std::string& extracted_name,
   // If it does not have a custom namespace, add namespacing prefix to avoid conflicts, as per best
   // practice: https://prometheus.io/docs/practices/naming/#metric-names Also, naming conventions on
   // https://prometheus.io/docs/concepts/data_model/
-  return absl::StrCat("envoy_", sanitizeName(extracted_name));
+  sanitizeNameInPlace(extracted_name);
+  return absl::StrCat("envoy_", extracted_name);
 }
 
 uint64_t PrometheusStatsFormatter::generateWithOutputFormat(
@@ -938,10 +1022,10 @@ uint64_t PrometheusStatsFormatter::generateWithOutputFormat(
       },
       [&](Stats::PrimitiveGaugeSnapshot&& metric) { host_gauges.emplace_back(std::move(metric)); });
 
-  metric_name_count +=
-      outputPrimitiveStatType(response, params, host_counters, output_format, custom_namespaces);
-  metric_name_count +=
-      outputPrimitiveStatType(response, params, host_gauges, output_format, custom_namespaces);
+  metric_name_count += outputPrimitiveStatType(response, params, std::move(host_counters),
+                                               output_format, custom_namespaces);
+  metric_name_count += outputPrimitiveStatType(response, params, std::move(host_gauges),
+                                               output_format, custom_namespaces);
 
   return metric_name_count;
 }

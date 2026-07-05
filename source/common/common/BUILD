@@ -48,6 +48,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "cpu_affinity_lib",
+    srcs = ["cpu_affinity.cc"],
+    hdrs = ["cpu_affinity.h"],
+    deps = [
+        "//source/common/api:os_sys_calls_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "debug_recursion_checker_lib",
     hdrs = ["debug_recursion_checker.h"],
     deps = [":assert_lib"],
@@ -225,6 +234,11 @@ envoy_cc_library(
         ":macros",
         ":non_copyable",
         "//source/common/protobuf",
+        # Depend on the header-only interface, not the implementation lib, so that every commit to
+        # main does not invalidate the build cache of minimal_logger_lib (and everything that
+        # transitively depends on it). The implementation is linked by the final binary via
+        # version_linkstamp (production) / test_version_linkstamp (tests).
+        "//source/common/version:version_string_interface_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/synchronization",
     ] + select({
@@ -331,7 +345,6 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http:path_utility_lib",
         "//source/common/protobuf",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
@@ -345,6 +358,7 @@ envoy_cc_library(
         "//envoy/common:exception_lib",
         "//envoy/common:matchers_interface",
         "//envoy/common:pure_lib",
+        "//source/common/matcher:address_matcher_lib",
         "//source/common/network:cidr_range_lib",
         "@abseil-cpp//absl/status:statusor",
     ],

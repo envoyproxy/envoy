@@ -10,11 +10,10 @@
 #include "source/extensions/clusters/eds/leds.h"
 
 #include "test/common/stats/stat_test_utility.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/admin.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"
@@ -60,7 +59,7 @@ public:
       auto* resource = to_ret.Add();
       resource->set_name(resource_name);
       resource->set_version("1");
-      resource->mutable_resource()->PackFrom(lb_endpoint);
+      std::ignore = resource->mutable_resource()->PackFrom(lb_endpoint);
     }
 
     return to_ret;

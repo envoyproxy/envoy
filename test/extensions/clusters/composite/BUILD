@@ -23,7 +23,6 @@ envoy_extension_cc_test(
         "//test/mocks/http:conn_pool_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:connection_mocks",
-        "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:admin_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/ssl:ssl_mocks",

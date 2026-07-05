@@ -7,7 +7,6 @@
 #include "source/extensions/filters/http/cache_v2/cache_headers_utils.h"
 #include "source/extensions/filters/http/cache_v2/http_cache.h"
 
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -61,12 +60,12 @@ protected:
 
   virtual CacheReaderPtr
   insert(Key key, const Http::TestResponseHeaderMapImpl& headers, const absl::string_view body,
-         const absl::optional<Http::TestResponseTrailerMapImpl> trailers = absl::nullopt);
+         const std::optional<Http::TestResponseTrailerMapImpl> trailers = std::nullopt);
 
   CacheReaderPtr
   insert(absl::string_view request_path, const Http::TestResponseHeaderMapImpl& headers,
          const absl::string_view body,
-         const absl::optional<Http::TestResponseTrailerMapImpl> trailers = absl::nullopt);
+         const std::optional<Http::TestResponseTrailerMapImpl> trailers = std::nullopt);
 
   std::pair<std::string, EndStream> getBody(CacheReader& reader, uint64_t start, uint64_t end);
 

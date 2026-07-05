@@ -26,6 +26,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
+#include "absl/functional/any_invocable.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -57,10 +58,12 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   // necessary right now.
   timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(10));
   ON_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
-      .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
-                               std::function<void()> above_overflow) -> Buffer::Instance* {
-        return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
-      }));
+      .WillByDefault(
+          Invoke([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                    absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+            return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                               std::move(above_overflow));
+          }));
   ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
   ON_CALL(factory_context_, statsScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
   ON_CALL(factory_context_.server_context_, sslContextManager())
@@ -210,7 +213,7 @@ std::string BaseIntegrationTest::finalizeConfigWithPorts(ConfigHelper& config_he
     lds.set_version_info("0");
     for (auto& listener : config_helper.bootstrap().static_resources().listeners()) {
       Protobuf::Any* resource = lds.add_resources();
-      resource->PackFrom(listener);
+      std::ignore = resource->PackFrom(listener);
     }
 #ifdef ENVOY_ENABLE_YAML
     TestEnvironment::writeStringToFileForTest(
@@ -300,7 +303,7 @@ void BaseIntegrationTest::setUpstreamProtocol(Http::CodecType protocol) {
   }
 }
 
-absl::optional<uint64_t> BaseIntegrationTest::waitForNextRawUpstreamConnection(
+std::optional<uint64_t> BaseIntegrationTest::waitForNextRawUpstreamConnection(
     const std::vector<uint64_t>& upstream_indices, FakeRawConnectionPtr& fake_upstream_connection,
     std::chrono::milliseconds connection_wait_timeout) {
   AssertionResult result = AssertionFailure();
@@ -424,7 +427,8 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 std::string getListenerDetails(Envoy::Server::Instance& server) {
   const auto& cbs_maps = server.admin()->getConfigTracker().getCallbacksMap();
   ProtobufTypes::MessagePtr details = cbs_maps.at("listeners")(Matchers::UniversalStringMatcher());
-  auto listener_info = dynamic_cast<envoy::admin::v3::ListenersConfigDump&>(*details);
+  auto listener_info =
+      Envoy::Protobuf::DynamicCastMessage<envoy::admin::v3::ListenersConfigDump>(*details);
 #ifdef ENVOY_ENABLE_YAML
   return MessageUtil::getYamlStringFromMessage(listener_info.dynamic_listeners(0).error_state());
 #else
@@ -524,7 +528,7 @@ void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
 std::vector<std::string>
 BaseIntegrationTest::waitForAccessLogEntries(const std::string& filename,
                                              Network::ClientConnection* client_connection,
-                                             absl::optional<uint32_t> min_entries) {
+                                             std::optional<uint32_t> min_entries) {
   // Wait a max of 1s for logs to flush to disk.
   std::string contents;
   std::vector<std::string> entries;

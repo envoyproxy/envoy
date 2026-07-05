@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/common/optref.h"
@@ -16,7 +17,6 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/functional/overload.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "absl/types/variant.h"
 #include "xds/type/matcher/v3/matcher.pb.h"
 
@@ -83,6 +83,7 @@ enum class MatchResult {
 };
 
 // Prints a human-readable string representing the MatchResult.
+// NOLINTNEXTLINE(readability-identifier-naming)
 inline static std::string MatchResultToString(MatchResult match_result) {
   switch (match_result) {
   case MatchResult::Matched:
@@ -142,12 +143,12 @@ public:
   virtual ~OnMatchFactory() = default;
 
   // Instantiates a nested matcher sub-tree or an action.
-  // Returns absl::nullopt if neither sub-tree or action is specified.
-  virtual absl::optional<OnMatchFactoryCb<DataType>>
+  // Returns std::nullopt if neither sub-tree or action is specified.
+  virtual std::optional<OnMatchFactoryCb<DataType>>
   createOnMatch(const xds::type::matcher::v3::Matcher::OnMatch&) PURE;
   // Instantiates a nested matcher sub-tree or an action.
-  // Returns absl::nullopt if neither sub-tree or action is specified.
-  virtual absl::optional<OnMatchFactoryCb<DataType>>
+  // Returns std::nullopt if neither sub-tree or action is specified.
+  virtual std::optional<OnMatchFactoryCb<DataType>>
   createOnMatch(const envoy::config::common::matcher::v3::Matcher::OnMatch&) PURE;
 };
 
@@ -216,7 +217,7 @@ protected:
   // Internally handle recursion & keep_matching logic in matcher implementations.
   // This should be called against initial matching & on-no-match results.
   static inline ActionMatchResult
-  handleRecursionAndSkips(const absl::optional<OnMatch<DataType>>& on_match, const DataType& data,
+  handleRecursionAndSkips(const std::optional<OnMatch<DataType>>& on_match, const DataType& data,
                           SkippedMatchCb skipped_match_cb) {
     if (!on_match.has_value()) {
       return ActionMatchResult::noMatch();
@@ -313,14 +314,12 @@ public:
   /**
    * @return the default "string" data or nil. Life time must be bound by "this".
    */
-  absl::optional<absl::string_view> stringData() const {
+  std::optional<absl::string_view> stringData() const {
     return absl::visit(
         absl::Overload{
-            [](const std::string& arg) { return absl::make_optional<absl::string_view>(arg); },
-            [](const absl::string_view& arg) {
-              return absl::make_optional<absl::string_view>(arg);
-            },
-            [](const auto&) { return absl::optional<absl::string_view>(); }},
+            [](const std::string& arg) { return std::make_optional<absl::string_view>(arg); },
+            [](const absl::string_view& arg) { return std::make_optional<absl::string_view>(arg); },
+            [](const auto&) { return std::optional<absl::string_view>(); }},
         data_);
   }
 
@@ -337,8 +336,9 @@ public:
   }
 
   static DataInputGetResult
+  // NOLINTNEXTLINE(readability-identifier-naming)
   NoData(DataAvailability data_availability = DataAvailability::AllDataAvailable) {
-    return DataInputGetResult(absl::monostate(), data_availability);
+    return {absl::monostate(), data_availability};
   }
 
   /**
@@ -346,21 +346,24 @@ public:
    *duration of matching. Use CreateString when a string must be constructed.
    **/
   static DataInputGetResult
+  // NOLINTNEXTLINE(readability-identifier-naming)
   CreateStringView(absl::string_view data,
                    DataAvailability data_availability = DataAvailability::AllDataAvailable) {
-    return DataInputGetResult(data, data_availability);
+    return {data, data_availability};
   }
 
   static DataInputGetResult
+  // NOLINTNEXTLINE(readability-identifier-naming)
   CreateString(std::string&& data,
                DataAvailability data_availability = DataAvailability::AllDataAvailable) {
-    return DataInputGetResult(std::move(data), data_availability);
+    return {std::move(data), data_availability};
   }
 
   static DataInputGetResult
+  // NOLINTNEXTLINE(readability-identifier-naming)
   CreateCustom(std::shared_ptr<CustomMatchData>&& data,
                DataAvailability data_availability = DataAvailability::AllDataAvailable) {
-    return DataInputGetResult(std::move(data), data_availability);
+    return {std::move(data), data_availability};
   }
 
 private:
@@ -484,7 +487,7 @@ public:
   createCustomMatcherFactoryCb(const Protobuf::Message& config,
                                Server::Configuration::ServerFactoryContext& factory_context,
                                DataInputFactoryCb<DataType> data_input,
-                               absl::optional<OnMatchFactoryCb<DataType>> on_no_match,
+                               std::optional<OnMatchFactoryCb<DataType>> on_no_match,
                                OnMatchFactory<DataType>& on_match_factory) PURE;
   std::string category() const override {
     // Static assert to guide implementors to understand what is required.

@@ -55,10 +55,10 @@ class FaultAbortConfig {
 public:
   FaultAbortConfig(const envoy::extensions::filters::http::fault::v3::FaultAbort& abort_config);
 
-  absl::optional<Http::Code> httpStatusCode(const Http::RequestHeaderMap* request_headers) const {
+  std::optional<Http::Code> httpStatusCode(const Http::RequestHeaderMap* request_headers) const {
     return provider_->httpStatusCode(request_headers);
   }
-  absl::optional<Grpc::Status::GrpcStatus>
+  std::optional<Grpc::Status::GrpcStatus>
   grpcStatusCode(const Http::RequestHeaderMap* request_headers) const {
     return provider_->grpcStatusCode(request_headers);
   }
@@ -76,12 +76,12 @@ private:
 
     // Return the HTTP status code to use. Optionally passed HTTP headers that may contain the
     // HTTP status code depending on the provider implementation.
-    virtual absl::optional<Http::Code>
+    virtual std::optional<Http::Code>
     httpStatusCode(const Http::RequestHeaderMap* request_headers) const PURE;
 
     // Return the gRPC status code to use. Optionally passed an HTTP header that may contain the
     // gRPC status code depending on the provider implementation.
-    virtual absl::optional<Grpc::Status::GrpcStatus>
+    virtual std::optional<Grpc::Status::GrpcStatus>
     grpcStatusCode(const Http::RequestHeaderMap* request_headers) const PURE;
 
     // Return what percentage of requests abort faults should be applied to. Optionally passed
@@ -93,17 +93,17 @@ private:
   // Abort provider that uses a fixed abort status code.
   class FixedAbortProvider : public AbortProvider {
   public:
-    FixedAbortProvider(absl::optional<Http::Code> http_status_code,
-                       absl::optional<Grpc::Status::GrpcStatus> grpc_status_code,
+    FixedAbortProvider(std::optional<Http::Code> http_status_code,
+                       std::optional<Grpc::Status::GrpcStatus> grpc_status_code,
                        const envoy::type::v3::FractionalPercent& percentage)
         : http_status_code_(http_status_code), grpc_status_code_(grpc_status_code),
           percentage_(percentage) {}
 
-    absl::optional<Http::Code> httpStatusCode(const Http::RequestHeaderMap*) const override {
+    std::optional<Http::Code> httpStatusCode(const Http::RequestHeaderMap*) const override {
       return http_status_code_;
     }
 
-    absl::optional<Grpc::Status::GrpcStatus>
+    std::optional<Grpc::Status::GrpcStatus>
     grpcStatusCode(const Http::RequestHeaderMap*) const override {
       return grpc_status_code_;
     }
@@ -113,8 +113,8 @@ private:
     }
 
   private:
-    const absl::optional<Http::Code> http_status_code_;
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status_code_;
+    const std::optional<Http::Code> http_status_code_;
+    const std::optional<Grpc::Status::GrpcStatus> grpc_status_code_;
     const envoy::type::v3::FractionalPercent percentage_;
   };
 
@@ -124,10 +124,10 @@ private:
     HeaderAbortProvider(const envoy::type::v3::FractionalPercent& percentage)
         : header_percentage_provider_(HeaderNames::get().AbortRequestPercentage, percentage) {}
 
-    absl::optional<Http::Code>
+    std::optional<Http::Code>
     httpStatusCode(const Http::RequestHeaderMap* request_headers) const override;
 
-    absl::optional<Grpc::Status::GrpcStatus>
+    std::optional<Grpc::Status::GrpcStatus>
     grpcStatusCode(const Http::RequestHeaderMap* request_headers) const override;
 
     envoy::type::v3::FractionalPercent
@@ -153,7 +153,7 @@ class FaultDelayConfig {
 public:
   FaultDelayConfig(const envoy::extensions::filters::common::fault::v3::FaultDelay& delay_config);
 
-  absl::optional<std::chrono::milliseconds>
+  std::optional<std::chrono::milliseconds>
   duration(const Http::RequestHeaderMap* request_headers) const {
     return provider_->duration(request_headers);
   }
@@ -171,7 +171,7 @@ private:
 
     // Return the duration to use. Optionally passed HTTP headers that may contain the delay
     // depending on the provider implementation.
-    virtual absl::optional<std::chrono::milliseconds>
+    virtual std::optional<std::chrono::milliseconds>
     duration(const Http::RequestHeaderMap* request_headers) const PURE;
     // Return what percentage of requests request faults should be applied to. Optionally passed
     // HTTP headers that may contain the percentage depending on the provider implementation.
@@ -187,7 +187,7 @@ private:
         : delay_(delay), percentage_(percentage) {}
 
     // DelayProvider
-    absl::optional<std::chrono::milliseconds>
+    std::optional<std::chrono::milliseconds>
     duration(const Http::RequestHeaderMap*) const override {
       return delay_;
     }
@@ -208,7 +208,7 @@ private:
         : header_percentage_provider_(HeaderNames::get().DelayRequestPercentage, percentage) {}
 
     // DelayProvider
-    absl::optional<std::chrono::milliseconds>
+    std::optional<std::chrono::milliseconds>
     duration(const Http::RequestHeaderMap* request_headers) const override;
 
     envoy::type::v3::FractionalPercent
@@ -236,7 +236,7 @@ public:
   FaultRateLimitConfig(
       const envoy::extensions::filters::common::fault::v3::FaultRateLimit& rate_limit_config);
 
-  absl::optional<uint64_t> rateKbps(const Http::RequestHeaderMap* request_headers) const {
+  std::optional<uint64_t> rateKbps(const Http::RequestHeaderMap* request_headers) const {
     return provider_->rateKbps(request_headers);
   }
 
@@ -253,7 +253,7 @@ private:
 
     // Return the rate limit to use in KiB/s. Optionally passed HTTP headers that may contain the
     // rate limit depending on the provider implementation.
-    virtual absl::optional<uint64_t>
+    virtual std::optional<uint64_t>
     rateKbps(const Http::RequestHeaderMap* request_headers) const PURE;
     // Return what percentage of requests response rate limit faults should be applied to.
     // Optionally passed HTTP headers that may contain the percentage depending on the provider
@@ -268,7 +268,7 @@ private:
     FixedRateLimitProvider(uint64_t fixed_rate_kbps,
                            const envoy::type::v3::FractionalPercent& percentage)
         : fixed_rate_kbps_(fixed_rate_kbps), percentage_(percentage) {}
-    absl::optional<uint64_t> rateKbps(const Http::RequestHeaderMap*) const override {
+    std::optional<uint64_t> rateKbps(const Http::RequestHeaderMap*) const override {
       return fixed_rate_kbps_;
     }
 
@@ -288,7 +288,7 @@ private:
         : header_percentage_provider_(HeaderNames::get().ThroughputResponsePercentage, percentage) {
     }
     // RateLimitProvider
-    absl::optional<uint64_t> rateKbps(const Http::RequestHeaderMap* request_headers) const override;
+    std::optional<uint64_t> rateKbps(const Http::RequestHeaderMap* request_headers) const override;
     envoy::type::v3::FractionalPercent
     percentage(const Http::RequestHeaderMap* request_headers) const override {
       return header_percentage_provider_.percentage(request_headers);

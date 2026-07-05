@@ -1,5 +1,7 @@
 #include "source/common/formatter/substitution_formatter.h"
 
+#include "source/common/formatter/builtin_command_parser_factory_helper.h"
+
 namespace Envoy {
 namespace Formatter {
 
@@ -304,7 +306,7 @@ SubstitutionFormatParser::parse(absl::string_view format,
     const size_t sub_format_size = sub_format.size();
 
     absl::string_view command, command_arg;
-    absl::optional<size_t> max_len;
+    std::optional<size_t> max_len;
 
     if (!re2::RE2::Consume(&sub_format, commandWithArgsRegex(), &command, &command_arg, &max_len)) {
       return absl::InvalidArgumentError(fmt::format(
@@ -316,7 +318,10 @@ SubstitutionFormatParser::parse(absl::string_view format,
     // First try the command parsers provided by the user. This allows the user to override
     // built-in command parsers.
     for (const auto& cmd : command_parsers) {
-      auto formatter = cmd->parse(command, command_arg, max_len);
+      absl::StatusOr<FormatterProviderPtr> formatter_result =
+          cmd->parse(command, command_arg, max_len);
+      RETURN_IF_ERROR(formatter_result.status());
+      FormatterProviderPtr formatter = std::move(formatter_result).value();
       if (formatter) {
         formatters.push_back(std::move(formatter));
         added = true;
@@ -327,7 +332,10 @@ SubstitutionFormatParser::parse(absl::string_view format,
     // Next, try the built-in command parsers.
     if (!added) {
       for (const auto& cmd : BuiltInCommandParserFactoryHelper::commandParsers()) {
-        auto formatter = cmd->parse(command, command_arg, max_len);
+        absl::StatusOr<FormatterProviderPtr> formatter_result =
+            cmd->parse(command, command_arg, max_len);
+        RETURN_IF_ERROR(formatter_result.status());
+        FormatterProviderPtr formatter = std::move(formatter_result).value();
         if (formatter) {
           formatters.push_back(std::move(formatter));
           added = true;
@@ -369,7 +377,7 @@ std::string FormatterImpl::format(const Context& context,
   log_line.reserve(256);
 
   for (const auto& provider : providers_) {
-    const absl::optional<std::string> bit = provider->format(context, stream_info);
+    const std::optional<std::string> bit = provider->format(context, stream_info);
     // Add the formatted value if there is one. Otherwise add a default value
     // of "-" if omit_empty_values_ is not set.
     if (bit.has_value()) {
@@ -387,7 +395,7 @@ void stringValueToLogLine(const JsonFormatterImpl::Formatters& formatters, const
                           std::string& sanitize, bool omit_empty_values) {
   log_line.push_back('"'); // Start the JSON string.
   for (const JsonFormatterImpl::Formatter& formatter : formatters) {
-    const absl::optional<std::string> value = formatter->format(context, info);
+    const std::optional<std::string> value = formatter->format(context, info);
     if (!value.has_value()) {
       // Add the empty value. This needn't be sanitized.
       log_line.append(omit_empty_values ? EMPTY_STRING : DefaultUnspecifiedValueStringView);

@@ -16,12 +16,12 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
-#include "test/mocks/grpc/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -71,8 +71,6 @@ class SdsApiTest : public testing::Test, public SdsApiTestBase {};
 // Validate that SdsApi object is created and initialized successfully.
 TEST_F(SdsApiTest, BasicTest) {
   ::testing::InSequence s;
-  const envoy::service::secret::v3::SdsDummy dummy;
-
   envoy::config::core::v3::ConfigSource config_source;
   setupMocks();
   TlsCertificateSdsApi sds_api(
@@ -85,8 +83,6 @@ TEST_F(SdsApiTest, BasicTest) {
 // Validate that target initializes when no warming is requested.
 TEST_F(SdsApiTest, BasicNoWarmTest) {
   ::testing::InSequence s;
-  const envoy::service::secret::v3::SdsDummy dummy;
-
   envoy::config::core::v3::ConfigSource config_source;
   setupMocks();
   TlsCertificateSdsApi sds_api(
@@ -100,8 +96,6 @@ TEST_F(SdsApiTest, BasicNoWarmTest) {
 // Validate that start() initializes the target.
 TEST_F(SdsApiTest, BasicManualStart) {
   ::testing::InSequence s;
-  const envoy::service::secret::v3::SdsDummy dummy;
-
   envoy::config::core::v3::ConfigSource config_source;
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,

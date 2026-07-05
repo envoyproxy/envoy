@@ -55,7 +55,7 @@ void TcpStatsSocket::onConnected() {
   transport_socket_->onConnected();
 }
 
-void TcpStatsSocket::closeSocket(Network::ConnectionEvent event) {
+void TcpStatsSocket::closeSocket(Network::ConnectionEvent event, bool abort_reset) {
   // Record final values.
   recordStats();
 
@@ -71,10 +71,10 @@ void TcpStatsSocket::closeSocket(Network::ConnectionEvent event) {
     timer_->disableTimer();
   }
 
-  transport_socket_->closeSocket(event);
+  transport_socket_->closeSocket(event, abort_reset);
 }
 
-absl::optional<struct tcp_info> TcpStatsSocket::querySocketInfo() {
+std::optional<struct tcp_info> TcpStatsSocket::querySocketInfo() {
   struct tcp_info info;
   memset(&info, 0, sizeof(info));
   socklen_t optlen = sizeof(info);
@@ -82,14 +82,14 @@ absl::optional<struct tcp_info> TcpStatsSocket::querySocketInfo() {
   if (result.return_value_ != 0) {
     ENVOY_LOG(debug, "Failed getsockopt(IPPROTO_TCP, TCP_INFO): rc {} errno {} optlen {}",
               result.return_value_, result.errno_, optlen);
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return info;
   }
 }
 
 void TcpStatsSocket::recordStats() {
-  absl::optional<struct tcp_info> tcp_info = querySocketInfo();
+  std::optional<struct tcp_info> tcp_info = querySocketInfo();
   if (!tcp_info.has_value()) {
     return;
   }

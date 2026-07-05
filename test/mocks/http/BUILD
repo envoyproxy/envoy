@@ -28,6 +28,16 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
+    name = "webtransport_mocks",
+    srcs = ["webtransport.cc"],
+    hdrs = ["webtransport.h"],
+    deps = [
+        "//envoy/http:codec_interface",
+        "@quiche//:quiche_web_transport_web_transport_lib",
+    ],
+)
+
+envoy_cc_mock(
     name = "conn_pool_mocks",
     srcs = ["conn_pool.cc"],
     hdrs = ["conn_pool.h"],

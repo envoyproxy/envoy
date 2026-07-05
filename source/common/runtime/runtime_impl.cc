@@ -45,7 +45,21 @@ void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
   stats.deprecated_feature_seen_since_process_start_.inc();
 }
 
-void refreshReloadableFlags(const Snapshot::EntryMap& flag_map) {
+void refreshReloadableFlags(const Snapshot::EntryMap& flag_map,
+                            absl::node_hash_map<std::string, bool>& runtime_feature_defaults) {
+  for (const auto& it : flag_map) {
+    if (it.second.bool_value_.has_value() && isRuntimeFeature(it.first)) {
+      runtime_feature_defaults.try_emplace(it.first, Runtime::runtimeFeatureEnabled(it.first));
+    }
+  }
+
+  for (const auto& it : runtime_feature_defaults) {
+    const auto flag = flag_map.find(it.first);
+    if (flag == flag_map.end() || !flag->second.bool_value_.has_value()) {
+      maybeSetRuntimeGuard(it.first, it.second);
+    }
+  }
+
   for (const auto& it : flag_map) {
     if (it.second.bool_value_.has_value() && isRuntimeFeature(it.first)) {
       maybeSetRuntimeGuard(it.first, it.second.bool_value_.value());
@@ -136,7 +150,7 @@ Snapshot::ConstStringOptRef SnapshotImpl::get(absl::string_view key) const {
   ASSERT(!isRuntimeFeature(key)); // Make sure runtime guarding is only used for getBoolean
   auto entry = key.empty() ? values_.end() : values_.find(key);
   if (entry == values_.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return entry->second.raw_string_value_;
   }
@@ -542,6 +556,8 @@ absl::Status LoaderImpl::initialize(Upstream::ClusterManager& cm) {
   return absl::OkStatus();
 }
 
+absl::Status LoaderImpl::onWorkerThreadsRegistered() { return loadNewSnapshot(); }
+
 void LoaderImpl::startRtdsSubscriptions(ReadyCallback on_done) {
   on_rtds_initialized_ = on_done;
   init_manager_.initialize(init_watcher_);
@@ -555,17 +571,16 @@ void LoaderImpl::onRtdsReady() {
 RtdsSubscription::RtdsSubscription(
     LoaderImpl& parent, const envoy::config::bootstrap::v3::RuntimeLayer::RtdsLayer& rtds_layer,
     Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>(validation_visitor,
-                                                                            "name"),
-      parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
+    : parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
       stats_scope_(store_.createScope("runtime")), resource_name_(rtds_layer.name()),
-      init_target_("RTDS " + resource_name_, [this]() { start(); }) {}
+      init_target_("RTDS " + resource_name_, [this]() { start(); }),
+      resource_type_helper_(validation_visitor, "name") {}
 
 absl::Status RtdsSubscription::createSubscription() {
-  const auto resource_name = getResourceName();
+  const auto resource_name = resource_type_helper_.getResourceName();
   auto subscription_or_error = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
-      config_source_, Grpc::Common::typeUrl(resource_name), *stats_scope_, *this, resource_decoder_,
-      {});
+      config_source_, Grpc::Common::typeUrl(resource_name), *stats_scope_, *this,
+      resource_type_helper_.resourceDecoder(), {});
   RETURN_IF_NOT_OK(subscription_or_error.status());
   subscription_ = std::move(*subscription_or_error);
   return absl::OkStatus();
@@ -578,8 +593,8 @@ RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& 
   if (!valid.ok()) {
     return valid;
   }
-  const auto& runtime =
-      dynamic_cast<const envoy::service::runtime::v3::Runtime&>(resources[0].get().resource());
+  const auto& runtime = Envoy::Protobuf::DynamicCastMessage<envoy::service::runtime::v3::Runtime>(
+      resources[0].get().resource());
   if (runtime.name() != resource_name_) {
     return absl::InvalidArgumentError(
         fmt::format("Unexpected RTDS runtime (expecting {}): {}", resource_name_, runtime.name()));
@@ -653,7 +668,7 @@ absl::Status LoaderImpl::loadNewSnapshot() {
     return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(ptr);
   });
 
-  refreshReloadableFlags(ptr->values());
+  refreshReloadableFlags(ptr->values(), runtime_feature_defaults_);
 
   {
     absl::MutexLock lock(snapshot_mutex_);

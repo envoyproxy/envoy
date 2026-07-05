@@ -15,8 +15,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CacheV2 {
 
-using CancelWrapper::cancelWrapped;
-
 class UpstreamRequestWithCacheabilityReset : public HttpSource {
 public:
   UpstreamRequestWithCacheabilityReset(
@@ -88,7 +86,7 @@ static Http::ResponseHeaderMapPtr notSatisfiableHeaders() {
 }
 
 void ActiveLookupContext::getHeaders(GetHeadersCallback&& cb) {
-  absl::optional<std::vector<RawByteRange>> ranges = lookup().parseRange();
+  std::optional<std::vector<RawByteRange>> ranges = lookup().parseRange();
   if (ranges) {
     // If it's a range request, inject the appropriate modified content-range and
     // content-length headers into the response once we have the response headers.
@@ -248,7 +246,7 @@ void CacheSession::sendLookupResponsesAndMaybeValidationRequest(CacheEntryStatus
   lookup_subscribers_.erase(it, lookup_subscribers_.end());
   if (!lookup_subscribers_.empty()) {
     // At least one subscriber required validation.
-    return performValidation();
+    performValidation();
   }
 }
 
@@ -586,7 +584,8 @@ void CacheSession::getLookupResult(ActiveLookupRequestPtr lookup, ActiveLookupRe
       } else {
         sub.context_->lookup().stats().incCacheSessionsSubscribers();
         lookup_subscribers_.push_back(std::move(sub));
-        return performValidation();
+        performValidation();
+        return;
       }
     }
     auto result = std::make_unique<ActiveLookupResult>();
@@ -771,7 +770,6 @@ void CacheSession::onUncacheable(Http::ResponseHeaderMapPtr headers, EndStream e
     cache_sessions->stats().subCacheSessionsSubscribers(lookup_subscribers_.size());
   }
   lookup_subscribers_.clear();
-  return;
 }
 
 void CacheSession::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, EndStream end_stream,

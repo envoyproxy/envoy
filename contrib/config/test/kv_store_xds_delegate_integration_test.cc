@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/key_value_store.h"
@@ -17,6 +19,8 @@
 #include "contrib/config/test/invalid_proto_kv_store_config.pb.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -93,7 +97,7 @@ public:
           tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
       setUpSdsConfig(secret_config, CLIENT_CERT_NAME);
       transport_socket->set_name("envoy.transport_sockets.tls");
-      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
     });
 
     // Add static runtime values.
@@ -339,9 +343,11 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   initialize();
 
   // Wait until the discovery responses have been processed.
-  test_server_->waitForCounterGe(
-      "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
-  test_server_->waitForCounterGe("runtime.load_success", 2);
+  test_server_->waitForCounter(
+      "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", Ge(1));
+  // Initial snapshot load, post-listener-manager TLS refresh (onWorkerThreadsRegistered), and
+  // first RTDS response each increment runtime.load_success; wait until all have completed.
+  test_server_->waitForCounter("runtime.load_success", Ge(3));
 
   // Verify that the xDS resources are used by Envoy.
   checkSecretExists(std::string(CLIENT_CERT_NAME), /*version_info=*/"1");
@@ -360,9 +366,11 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
     layer:
       baz: saz
   )EOF");
+  const uint32_t runtime_loads_before_rtds_v2 =
+      test_server_->counter("runtime.load_success")->value();
   sendSotwDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TestTypeUrl::get().Runtime, {rtds_resource}, "2", rtds_stream_.get());
-  test_server_->waitForCounterGe("runtime.load_success", 3);
+  test_server_->waitForCounter("runtime.load_success", Ge(runtime_loads_before_rtds_v2 + 1));
 
   EXPECT_EQ("whatevs", getRuntimeKey("foo"));
   EXPECT_EQ("yar", getRuntimeKey("bar"));
@@ -372,10 +380,10 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   shutdownAndRestartTestServer();
 
   // Wait until SDS and RTDS have been loaded from the KV store and updated the Envoy instance.
-  test_server_->waitForCounterGe(
-      "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
-  // Two runtime loads are expected, one for the admin layer and one for the RTDS layer.
-  test_server_->waitForCounterGe("runtime.load_success", 2);
+  test_server_->waitForCounter(
+      "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", Ge(1));
+  // Expect initial snapshot load, post-listener-manager TLS refresh, and RTDS restored from KV.
+  test_server_->waitForCounter("runtime.load_success", Ge(3));
 
   // Verify that the latest resource values in the KV store are used by Envoy.
   EXPECT_EQ(2, test_server_->counter("xds.kv_store.load_success")->value());
@@ -398,10 +406,12 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
             foo: zoo
             baz: jazz
   )EOF");
+  const uint32_t runtime_loads_before_rtds_v3 =
+      test_server_->counter("runtime.load_success")->value();
   sendSotwDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TestTypeUrl::get().Runtime, {rtds_resource_v2}, /*version=*/"3", rtds_stream_.get());
 
-  test_server_->waitForCounterGe("runtime.load_success", 3);
+  test_server_->waitForCounter("runtime.load_success", Ge(runtime_loads_before_rtds_v3 + 1));
 
   // Verify that the values from the xDS response are used instead of from the persisted xDS once
   // connectivity is re-established.
@@ -412,10 +422,10 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
 // A KeyValueStore implementation that returns an invalid proto field value for a Cluster resource.
 class InvalidProtoKeyValueStore : public KeyValueStore {
 public:
-  absl::optional<absl::string_view> get(absl::string_view) override { return absl::nullopt; }
+  std::optional<absl::string_view> get(absl::string_view) override { return std::nullopt; }
   void remove(absl::string_view) override {}
   void addOrUpdate(absl::string_view, absl::string_view,
-                   absl::optional<std::chrono::seconds>) override {}
+                   std::optional<std::chrono::seconds>) override {}
   void flush() override {}
 
   // We only have a cds_config making wildcard requests, so we only need to implement the iterate
@@ -445,10 +455,10 @@ public:
     envoy::service::discovery::v3::Resource r;
     r.set_name(cluster_name);
     r.set_version("1");
-    r.mutable_resource()->PackFrom(cluster_resource);
+    std::ignore = r.mutable_resource()->PackFrom(cluster_resource);
 
     std::string value;
-    r.SerializeToString(&value);
+    std::ignore = r.SerializeToString(&value);
 
     cb(key, value);
   }
@@ -538,7 +548,7 @@ TEST_P(InvalidProtoKeyValueStoreXdsDelegateIntegrationTest, InvalidProto) {
   initialize();
 
   // Make sure that the proto parsing of a serialized resource with an invalid enum value fails.
-  test_server_->waitForCounterEq("xds.kv_store.xds_load_failed", 1);
+  test_server_->waitForCounter("xds.kv_store.xds_load_failed", Eq(1));
 }
 
 } // namespace

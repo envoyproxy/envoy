@@ -86,7 +86,7 @@ public:
     EXPECT_CALL(cert_validation_ctx_config_, autoSniSanMatch()).WillRepeatedly(Return(false));
     auto context_or_error = Extensions::TransportSockets::Tls::ClientContextImpl::create(
         *store_.rootScope(), client_context_config_, factory_context_);
-    THROW_IF_NOT_OK(context_or_error.status());
+    THROW_IF_NOT_OK_REF(context_or_error.status());
     verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(*context_or_error));
   }
 
@@ -102,8 +102,8 @@ protected:
   const std::string cert_chain_{quic::test::kTestCertificateChainPem};
   std::string root_ca_cert_;
   const std::string leaf_cert_;
-  absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_{
-      absl::nullopt};
+  std::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_{
+      std::nullopt};
   NiceMock<Stats::MockStore> store_;
   Server::Configuration::MockServerFactoryContext factory_context_;
   NiceMock<Ssl::MockClientContextConfig> client_context_config_;
@@ -201,12 +201,11 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidLeafCert) {
   const std::string ocsp_response;
   const std::string cert_sct;
   std::string error_details;
-  const std::vector<std::string> certs{"invalid leaf cert"};
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyCertChain("www.google.com", 54321, certs, ocsp_response, cert_sct,
-                                       &verify_context_, &error_details, &verify_details, nullptr,
-                                       nullptr));
+            verifier_->VerifyCertChain("www.google.com", 54321, {"invalid leaf cert"},
+                                       ocsp_response, cert_sct, &verify_context_, &error_details,
+                                       &verify_details, nullptr, nullptr));
   EXPECT_EQ("d2i_X509: fail to parse DER", error_details);
 }
 
@@ -301,12 +300,13 @@ VdGXMAjeXhnOnPvmDi5hUz/uvI+Pg6cNmUoCRwSCnK/DazhA
 -----END CERTIFICATE-----)"};
   std::stringstream pem_stream(certs);
   std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
+  std::vector<absl::string_view> chain_view(chain.begin(), chain.end());
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(chain[0]);
   ASSERT(cert_view);
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyCertChain("www.google.com", 54321, chain, ocsp_response, cert_sct,
+            verifier_->VerifyCertChain("www.google.com", 54321, chain_view, ocsp_response, cert_sct,
                                        &verify_context_, &error_details, &verify_details, nullptr,
                                        nullptr));
   EXPECT_EQ("Invalid leaf cert, only P-256 ECDSA certificates are supported", error_details);
@@ -374,10 +374,11 @@ ZCFbredVxDBZuoVsfrKPSQa407Jj1Q==
   std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(chain[0]);
+  std::vector<absl::string_view> chain_view(chain.begin(), chain.end());
   ASSERT(cert_view);
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyCertChain("lyft.com", 54321, chain, ocsp_response, cert_sct,
+            verifier_->VerifyCertChain("lyft.com", 54321, chain_view, ocsp_response, cert_sct,
                                        &verify_context_, &error_details, &verify_details, nullptr,
                                        nullptr));
   EXPECT_EQ("verify cert failed: X509_verify_cert: certificate verification error at depth 0: "
@@ -438,8 +439,9 @@ wYsML58R3P8=
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   std::stringstream pem_stream(cert_v1);
   std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
+  std::vector<absl::string_view> chain_view(chain.begin(), chain.end());
   EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyCertChain("localhost", 54321, chain, ocsp_response, cert_sct,
+            verifier_->VerifyCertChain("localhost", 54321, chain_view, ocsp_response, cert_sct,
                                        &verify_context_, &error_details, &verify_details, nullptr,
                                        nullptr))
       << error_details;

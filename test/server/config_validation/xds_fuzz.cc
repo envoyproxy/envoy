@@ -8,6 +8,7 @@
 
 #include "source/common/common/matchers.h"
 
+using testing::Eq;
 namespace Envoy {
 
 // Helper functions to build API responses.
@@ -263,7 +264,7 @@ void XdsFuzzTest::replay() {
       addListener(listener_name, route_name);
       if (!sent_listener) {
         addRoute(route_name);
-        test_server_->waitForCounterEq("listener_manager.listener_create_success", 1, timeout_);
+        test_server_->waitForCounter("listener_manager.listener_create_success", Eq(1), timeout_);
       }
       sent_listener = true;
       break;
@@ -290,20 +291,20 @@ void XdsFuzzTest::replay() {
     }
     if (sent_listener) {
       // Wait for all of the updates to take effect.
-      test_server_->waitForGaugeEq("listener_manager.total_listeners_warming",
-                                   verifier_.numWarming(), timeout_);
-      test_server_->waitForGaugeEq("listener_manager.total_listeners_active", verifier_.numActive(),
+      test_server_->waitForGauge("listener_manager.total_listeners_warming",
+                                 Eq(verifier_.numWarming()), timeout_);
+      test_server_->waitForGauge("listener_manager.total_listeners_active",
+                                 Eq(verifier_.numActive()), timeout_);
+      test_server_->waitForGauge("listener_manager.total_listeners_draining",
+                                 Eq(verifier_.numDraining()), timeout_);
+      test_server_->waitForCounter("listener_manager.listener_modified",
+                                   Eq(verifier_.numModified()), timeout_);
+      test_server_->waitForCounter("listener_manager.listener_added", Eq(verifier_.numAdded()),
                                    timeout_);
-      test_server_->waitForGaugeEq("listener_manager.total_listeners_draining",
-                                   verifier_.numDraining(), timeout_);
-      test_server_->waitForCounterEq("listener_manager.listener_modified", verifier_.numModified(),
-                                     timeout_);
-      test_server_->waitForCounterEq("listener_manager.listener_added", verifier_.numAdded(),
-                                     timeout_);
-      test_server_->waitForCounterEq("listener_manager.listener_removed", verifier_.numRemoved(),
-                                     timeout_);
-      test_server_->waitForCounterEq("listener_manager.lds.update_success", lds_update_success_,
-                                     timeout_);
+      test_server_->waitForCounter("listener_manager.listener_removed", Eq(verifier_.numRemoved()),
+                                   timeout_);
+      test_server_->waitForCounter("listener_manager.lds.update_success", Eq(lds_update_success_),
+                                   timeout_);
     }
     logState();
   }
@@ -387,7 +388,7 @@ void XdsFuzzTest::verifyState() {
 envoy::admin::v3::ListenersConfigDump XdsFuzzTest::getListenersConfigDump() {
   auto message_ptr = test_server_->server().admin()->getConfigTracker().getCallbacksMap().at(
       "listeners")(Matchers::UniversalStringMatcher());
-  return dynamic_cast<const envoy::admin::v3::ListenersConfigDump&>(*message_ptr);
+  return Envoy::Protobuf::DynamicCastMessage<envoy::admin::v3::ListenersConfigDump>(*message_ptr);
 }
 
 std::vector<envoy::config::route::v3::RouteConfiguration> XdsFuzzTest::getRoutesConfigDump() {
@@ -399,14 +400,14 @@ std::vector<envoy::config::route::v3::RouteConfiguration> XdsFuzzTest::getRoutes
   }
 
   auto message_ptr = map.at("routes")(Matchers::UniversalStringMatcher());
-  auto dump = dynamic_cast<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
+  auto dump = Envoy::Protobuf::DynamicCastMessage<envoy::admin::v3::RoutesConfigDump>(*message_ptr);
 
   // Since the route config dump gives the RouteConfigurations as an Any, go through and cast them
   // back to RouteConfigurations.
   std::vector<envoy::config::route::v3::RouteConfiguration> dump_routes;
   for (const auto& route : dump.dynamic_route_configs()) {
     envoy::config::route::v3::RouteConfiguration dyn_route;
-    route.route_config().UnpackTo(&dyn_route);
+    std::ignore = route.route_config().UnpackTo(&dyn_route);
     dump_routes.push_back(dyn_route);
   }
   return dump_routes;

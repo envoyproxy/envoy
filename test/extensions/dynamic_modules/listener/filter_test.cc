@@ -51,6 +51,8 @@ public:
         cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
+    // Re-open stat creation so tests can call `define_*` from the test thread.
+    filter_config_->stat_creation_frozen_ = false;
 
     ON_CALL(callbacks_, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher));
   }
@@ -398,6 +400,31 @@ TEST_F(DynamicModuleListenerFilterTest, MetricsInvalidId) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
             envoy_dynamic_module_callback_listener_filter_record_histogram_value(
                 static_cast<void*>(filter.get()), 999, 1));
+}
+
+// The listener manager owns filters as a unique_ptr, so the adapter holds the filter in a
+// shared_ptr and forwards every ListenerFilter method to it. Shared ownership is what lets the
+// async callout and scheduler paths call shared_from_this. The integration test is the guard for
+// the production factory wiring.
+TEST_F(DynamicModuleListenerFilterTest, AdapterForwardsAndOwnsFilter) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  std::weak_ptr<DynamicModuleListenerFilter> weak = filter;
+  auto adapter = std::make_unique<SharedListenerFilterAdapter>(filter);
+
+  EXPECT_EQ(Network::FilterStatus::Continue, adapter->onAccept(callbacks_));
+  EXPECT_EQ(&callbacks_, filter->callbacks());
+
+  Buffer::OwnedImpl buffer("test data");
+  TestListenerFilterBuffer test_buffer(buffer);
+  EXPECT_EQ(Network::FilterStatus::Continue, adapter->onData(test_buffer));
+  EXPECT_EQ(filter->maxReadBytes(), adapter->maxReadBytes());
+  adapter->onClose();
+
+  // The adapter holds the only remaining strong reference and releases it on destruction.
+  filter.reset();
+  EXPECT_FALSE(weak.expired());
+  adapter.reset();
+  EXPECT_TRUE(weak.expired());
 }
 
 } // namespace ListenerFilters

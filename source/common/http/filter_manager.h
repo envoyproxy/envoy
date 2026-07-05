@@ -44,19 +44,23 @@ constexpr absl::string_view LocalReplyFilterStateKey =
     "envoy.filters.network.http_connection_manager.local_reply_owner";
 class LocalReplyOwnerObject : public StreamInfo::FilterState::Object {
 public:
-  LocalReplyOwnerObject(const std::string& filter_config_name)
+  // The filter_config_name is expected to outlive the LocalReplyOwnerObject, as it typically
+  // comes from the filter configuration.
+  LocalReplyOwnerObject(absl::string_view filter_config_name)
       : filter_config_name_(filter_config_name) {}
 
   ProtobufTypes::MessagePtr serializeAsProto() const override {
     auto message = std::make_unique<Protobuf::StringValue>();
-    message->set_value(filter_config_name_);
+    message->set_value(std::string(filter_config_name_));
     return message;
   }
 
-  absl::optional<std::string> serializeAsString() const override { return filter_config_name_; }
+  std::optional<std::string> serializeAsString() const override {
+    return std::string(filter_config_name_);
+  }
 
 private:
-  const std::string filter_config_name_;
+  const absl::string_view filter_config_name_;
 };
 
 // TODO(wbpcode): Rather than allocating every filter with an unique pointer, we could
@@ -201,7 +205,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
 
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
-                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details);
 
   // A vector to save metadata when the current filter's [de|en]codeMetadata() can not be called,
@@ -270,6 +274,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void handleMetadataAfterHeadersCallback() override;
 
   // Http::StreamDecoderFilterCallbacks
+  OptRef<WebTransportSession> webTransportSession() override;
   void addDecodedData(Buffer::Instance& data, bool streaming) override;
   void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
   RequestTrailerMap& addDecodedTrailers() override;
@@ -281,7 +286,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
-                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
   void encode1xxHeaders(ResponseHeaderMapPtr&& headers) override;
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
@@ -370,7 +375,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   void modifyEncodingBuffer(std::function<void(Buffer::Instance&)> callback) override;
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
-                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
 
   void responseDataTooLarge();
@@ -387,6 +392,13 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
 class FilterManagerCallbacks {
 public:
   virtual ~FilterManagerCallbacks() = default;
+
+  /**
+   * @return the WebTransport session of the codec stream this filter manager is bound to, if any.
+   * The downstream HTTP connection manager returns the downstream codec stream's session; the
+   * default empty OptRef applies elsewhere.
+   */
+  virtual OptRef<WebTransportSession> webTransportSession() { return {}; }
 
   /**
    * Called when the provided headers have been encoded by all the filters in the chain.
@@ -643,10 +655,10 @@ public:
   const std::vector<std::string>& requestedApplicationProtocols() const override {
     return StreamInfoImpl::downstreamAddressProvider().requestedApplicationProtocols();
   }
-  absl::optional<uint64_t> connectionID() const override {
+  std::optional<uint64_t> connectionID() const override {
     return StreamInfoImpl::downstreamAddressProvider().connectionID();
   }
-  absl::optional<absl::string_view> interfaceName() const override {
+  std::optional<absl::string_view> interfaceName() const override {
     return StreamInfoImpl::downstreamAddressProvider().interfaceName();
   }
   Ssl::ConnectionInfoConstSharedPtr sslConnection() const override {
@@ -667,7 +679,7 @@ public:
   absl::string_view ja4Hash() const override {
     return StreamInfoImpl::downstreamAddressProvider().ja4Hash();
   }
-  const absl::optional<std::chrono::milliseconds>& roundTripTime() const override {
+  const std::optional<std::chrono::milliseconds>& roundTripTime() const override {
     return StreamInfoImpl::downstreamAddressProvider().roundTripTime();
   }
   OptRef<const Network::FilterChainInfo> filterChainInfo() const override {
@@ -698,6 +710,12 @@ public:
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
     ASSERT(state_.filter_call_state_ == 0);
+  }
+
+  // Returns the WebTransport session of the codec stream this filter manager is bound to, if any.
+  // Delegates to the FilterManagerCallbacks (e.g. the HTTP connection manager's ActiveStream).
+  OptRef<WebTransportSession> webTransportSession() {
+    return filter_manager_callbacks_.webTransportSession();
   }
 
   // ScopeTrackedObject
@@ -793,7 +811,7 @@ public:
 
   virtual void sendLocalReply(Code code, absl::string_view body,
                               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
 
   void resetStream(StreamResetReason reason, absl::string_view transport_failure_reason);
@@ -1027,8 +1045,8 @@ private:
 
     OptRef<const Router::Route> route() const override { return route_; }
 
-    absl::optional<bool> filterDisabled(absl::string_view config_name) const override {
-      return route_ ? route_->filterDisabled(config_name) : absl::nullopt;
+    std::optional<bool> filterDisabled(absl::string_view config_name) const override {
+      return route_ ? route_->filterDisabled(config_name) : std::nullopt;
     }
 
     const StreamInfo::StreamInfo& streamInfo() const override { return manager_.streamInfo(); }
@@ -1233,7 +1251,7 @@ public:
 
   void sendLocalReply(Code code, absl::string_view body,
                       const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
 
   /**
@@ -1265,7 +1283,7 @@ private:
   void sendLocalReplyViaFilterChain(
       bool is_grpc_request, Code code, absl::string_view body,
       const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
-      const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
+      const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
 
   /**
    * Prepares a local reply that will be sent along the encoder filters in
@@ -1274,7 +1292,7 @@ private:
   void prepareLocalReplyViaFilterChain(
       bool is_grpc_request, Code code, absl::string_view body,
       const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
-      const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
+      const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
 
   /**
    * Executes a prepared local reply along the encoder filters.
@@ -1288,7 +1306,7 @@ private:
   void sendDirectLocalReply(Code code, absl::string_view body,
                             const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                             bool is_head_request,
-                            const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
+                            const std::optional<Grpc::Status::GrpcStatus> grpc_status);
 
 private:
   OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;

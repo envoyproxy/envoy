@@ -174,9 +174,9 @@ void UpstreamRequestImpl::sendHeaders(Http::RequestHeaderMapPtr request_headers)
   // would have bypassed cache lookup and insertion, so this class wouldn't
   // be instantiated. So end_stream will always be true.
   stream_->sendHeaders(*request_headers_, /*end_stream=*/true);
-  absl::optional<absl::string_view> range_header = RangeUtils::getRangeHeader(*request_headers_);
+  std::optional<absl::string_view> range_header = RangeUtils::getRangeHeader(*request_headers_);
   if (range_header) {
-    absl::optional<std::vector<RawByteRange>> ranges =
+    std::optional<std::vector<RawByteRange>> ranges =
         RangeUtils::parseRangeHeader(range_header.value(), 1);
     if (ranges) {
       stream_pos_ = ranges.value().front().firstBytePos();
@@ -184,15 +184,15 @@ void UpstreamRequestImpl::sendHeaders(Http::RequestHeaderMapPtr request_headers)
   }
 }
 
-template <class... Ts> struct overloaded : Ts... {
+template <class... Ts> struct Overloaded : Ts... {
   using Ts::operator()...;
 };
-template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+template <class... Ts> Overloaded(Ts...) -> Overloaded<Ts...>;
 
 void UpstreamRequestImpl::onReset() {
   ASSERT(dispatcher_.isThreadSafe());
   stream_ = nullptr;
-  absl::visit(overloaded{
+  absl::visit(Overloaded{
                   [](absl::monostate&&) {},
                   [](GetHeadersCallback&& cb) { cb(nullptr, EndStream::Reset); },
                   [](GetBodyCallback&& cb) { cb(nullptr, EndStream::Reset); },

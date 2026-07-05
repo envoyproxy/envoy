@@ -6,7 +6,6 @@
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
@@ -219,16 +218,15 @@ filter_state_rules:
 
   // Wrong selector
   StreamInfo::FilterStateImpl filter_state2(StreamInfo::FilterState::LifeSpan::FilterChain);
-  filter_state2.setData(
-      "jwt_selector", std::make_unique<Router::StringAccessorImpl>("wrong_selector"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state2.setData("jwt_selector",
+                        std::make_unique<Router::StringAccessorImpl>("wrong_selector"),
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filter_conf->findVerifier(Http::TestRequestHeaderMapImpl(), filter_state2) ==
               nullptr);
 
   // correct selector
   StreamInfo::FilterStateImpl filter_state3(StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state3.setData("jwt_selector", std::make_unique<Router::StringAccessorImpl>("selector1"),
-                        StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filter_conf->findVerifier(Http::TestRequestHeaderMapImpl(), filter_state3) !=
               nullptr);
@@ -236,7 +234,6 @@ filter_state_rules:
   // correct selector
   StreamInfo::FilterStateImpl filter_state4(StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state4.setData("jwt_selector", std::make_unique<Router::StringAccessorImpl>("selector2"),
-                        StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filter_conf->findVerifier(Http::TestRequestHeaderMapImpl(), filter_state4) !=
               nullptr);
@@ -377,6 +374,59 @@ providers:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THAT_THROWS_MESSAGE(FilterConfigImpl(proto_config, "", context), EnvoyException,
                              HasSubstr("Duration out-of-range"));
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksWithRetryPolicy) {
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    remote_jwks:
+      http_uri:
+        uri: http://www.valid.com/resource
+        cluster: pubkey_cluster
+        timeout: 1s
+      retry_policy:
+        retry_back_off:
+          base_interval: 1s
+          max_interval: 10s
+        num_retries: 5
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
+  auto* jwks_data = filter_conf->getJwksCache().findByIssuer("issuer1");
+  EXPECT_NE(nullptr, jwks_data);
+  EXPECT_NE(nullptr, jwks_data->retryPolicy());
+  EXPECT_EQ(5, jwks_data->retryPolicy()->numRetries());
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksWithInvalidRetryPolicy) {
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    remote_jwks:
+      http_uri:
+        uri: http://www.valid.com/resource
+        cluster: pubkey_cluster
+        timeout: 1s
+      retry_policy:
+        retry_back_off:
+          base_interval: 10s
+          max_interval: 1s
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THAT_THROWS_MESSAGE(
+      FilterConfigImpl(proto_config, "", context), EnvoyException,
+      HasSubstr("max_interval must be greater than or equal to the base_interval"));
 }
 
 } // namespace

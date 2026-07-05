@@ -30,7 +30,7 @@ public:
    * version of the histogram).
    * @return An optional override for the number of bins.
    */
-  virtual absl::optional<uint32_t> bins(absl::string_view stat_name) const PURE;
+  virtual std::optional<uint32_t> bins(absl::string_view stat_name) const PURE;
 };
 
 using HistogramSettingsConstPtr = std::unique_ptr<const HistogramSettings>;

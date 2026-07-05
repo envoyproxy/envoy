@@ -5,6 +5,7 @@
 #include "source/common/router/context_impl.h"
 #include "source/common/tls/context_manager_impl.h"
 
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/drain_manager.h"
 #include "test/mocks/server/instance.h"
@@ -29,6 +30,12 @@ public:
 
   // Server::Configuration::FactoryContext
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
+  MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
+  MOCK_METHOD(bool, isQuic, (), (const));
+  MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
+  MOCK_METHOD(Stats::Scope&, prefixedScope, ());
+
+  // Server::Configuration::ListenerFactoryContext
   MOCK_METHOD(Stats::Scope&, listenerScope, ());
   MOCK_METHOD(const Network::ListenerInfo&, listenerInfo, (), (const));
 
@@ -39,6 +46,7 @@ public:
   Stats::IsolatedStoreImpl listener_store_;
   Stats::Scope& listener_scope_{*listener_store_.rootScope()};
   testing::NiceMock<MockDrainManager> drain_manager_;
+  testing::NiceMock<Network::MockListenerInfo> listener_info_;
 };
 
 class MockUpstreamFactoryContext : public UpstreamFactoryContext {

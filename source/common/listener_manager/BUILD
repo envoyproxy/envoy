@@ -30,6 +30,7 @@ envoy_cc_library(
         "//envoy/config:typed_metadata_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:listener_interface",
+        "//envoy/network:udp_packet_writer_factory_factory_interface",
         "//envoy/server:api_listener_interface",
         "//envoy/server:filter_config_interface",
         "//envoy/server:listener_manager_interface",
@@ -38,7 +39,9 @@ envoy_cc_library(
         "//source/common/access_log:access_log_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:basic_resource_lib",
+        "//source/common/common:cpu_affinity_lib",
         "//source/common/common:empty_string",
+        "//source/common/common:thread_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/init:manager_lib",
@@ -62,7 +65,9 @@ envoy_cc_library(
         "//source/server:factory_context_lib",
         "//source/server:listener_manager_factory_lib",
         "//source/server:transport_socket_config_lib",
+        "@abseil-cpp//absl/types:span",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
@@ -114,7 +119,10 @@ envoy_cc_library(
         "//source/server:configuration_lib",
         "//source/server:factory_context_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-    ],
+        "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
+    ] + envoy_select_enable_http3([
+        "//source/common/quic:quic_server_transport_socket_factory_lib",
+    ]),
 )
 
 envoy_cc_library(
@@ -137,7 +145,7 @@ envoy_cc_library(
         "//envoy/server:listener_manager_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/config:api_version_lib",
-        "//source/common/config:subscription_base_interface",
+        "//source/common/config:resource_type_helper_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:common_lib",
         "//source/common/init:target_lib",

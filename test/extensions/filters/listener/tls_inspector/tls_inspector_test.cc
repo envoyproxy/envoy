@@ -9,7 +9,6 @@
 #include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "absl/strings/str_format.h"
@@ -42,8 +41,8 @@ public:
       : cfg_(std::make_shared<Config>(
             *store_.rootScope(),
             envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector())),
-        io_handle_(Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false,
-                                                                            absl::nullopt, {})) {}
+        io_handle_(Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, std::nullopt,
+                                                                            {})) {}
 
   void init() {
     filter_ = std::make_unique<Filter>(cfg_);

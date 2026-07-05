@@ -10,12 +10,14 @@ fn main() {
   // will try to use the system clang from PATH. So, this doesn't affect the local builds.
   // In any case, clang must be found to build the bindings.
 
-  println!("cargo:rerun-if-changed=../../abi/abi.h");
+  let abi_header = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("abi/abi.h");
+
+  println!("cargo:rerun-if-changed={}", abi_header.display());
 
   let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
   let bindings = bindgen::Builder::default()
-    .header("../../abi/abi.h")
+    .header(abi_header.to_str().unwrap())
     .clang_arg("-v")
     .default_enum_style(bindgen::EnumVariation::Rust {
       non_exhaustive: false,

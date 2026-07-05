@@ -234,7 +234,6 @@ envoy_cc_library(
         "//source/common/runtime:runtime_features_lib",
         "//source/common/singleton:const_singleton",
         "//source/common/version:api_version_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -245,8 +244,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "subscription_base_interface",
-    hdrs = ["subscription_base.h"],
+    name = "resource_type_helper_lib",
+    hdrs = ["resource_type_helper.h"],
     deps = [
         ":opaque_resource_decoder_lib",
         ":resource_name_lib",

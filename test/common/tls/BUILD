@@ -64,7 +64,6 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
-        "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
@@ -126,7 +125,6 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
-        "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
@@ -169,7 +167,7 @@ envoy_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:environment_lib",
-        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
@@ -204,6 +202,7 @@ envoy_cc_test(
         "//source/common/tls:utility_lib",
         "//test/common/tls/test_data:cert_infos",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
 )
@@ -268,7 +267,6 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
-        "//test/mocks/stats:stats_mocks",
     ],
 )
 
@@ -290,7 +288,6 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
-        "//test/mocks/stats:stats_mocks",
         "//test/test_common:registry_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
@@ -312,6 +309,25 @@ envoy_cc_test(
         "//source/common/tls:cert_compression_lib",
         "//test/test_common:logging_lib",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "cert_compression_benchmark",
+    srcs = ["cert_compression_benchmark.cc"],
+    external_deps = ["ssl"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
+        "//source/common/tls:cert_compression_lib",
+        "@abseil-cpp//absl/strings:string_view",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "cert_compression_benchmark_test",
+    benchmark_binary = "cert_compression_benchmark",
 )
 
 envoy_cc_benchmark_binary(

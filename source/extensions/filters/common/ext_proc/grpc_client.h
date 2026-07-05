@@ -16,7 +16,7 @@ namespace ExternalProcessing {
  */
 template <typename ResponseType> class ProcessorCallbacks : public RequestCallbacks<ResponseType> {
 public:
-  virtual ~ProcessorCallbacks() = default;
+  ~ProcessorCallbacks() override = default;
   virtual void onReceiveMessage(std::unique_ptr<ResponseType>&& response) PURE;
   virtual void onGrpcError(Grpc::Status::GrpcStatus error, const std::string& message) PURE;
   virtual void onGrpcClose() PURE;
@@ -48,7 +48,7 @@ using ProcessorStreamPtr = std::unique_ptr<ProcessorStream<RequestType, Response
 template <typename RequestType, typename ResponseType>
 class ProcessorClient : public ClientBase<RequestType, ResponseType> {
 public:
-  virtual ~ProcessorClient() = default;
+  ~ProcessorClient() override = default;
   virtual ProcessorStreamPtr<RequestType, ResponseType>
   start(ProcessorCallbacks<ResponseType>& callbacks,
         const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,

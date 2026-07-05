@@ -8,7 +8,7 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/engine.h"
-#include "library/cc/engine_builder.h"
+#include "test/cc/engine_builder_test_shim.h"
 #include "library/cc/stream.h"
 #include "library/cc/stream_client.h"
 #include "library/cc/stream_prototype.h"
@@ -23,7 +23,7 @@ envoy_status_t fetchUrls(const std::vector<std::string> urls,
                          std::vector<Http::Protocol>* used_protocols) {
   absl::Notification engine_running;
   Platform::EngineBuilder engine_builder;
-  engine_builder.setLogLevel(Envoy::Logger::Logger::trace)
+  engine_builder.setLogLevel(Envoy::Logger::Logger::info)
       .enableLogger(false)
       .addRuntimeGuard("dns_cache_set_ip_version_to_remove", true)
       .addRuntimeGuard("quic_no_tcp_delay", true)

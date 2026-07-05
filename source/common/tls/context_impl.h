@@ -53,7 +53,7 @@ struct TlsContext {
   // for "not an ECDSA context".
   CurveNID ec_group_curve_name_ = EC_CURVE_INVALID_NID;
   bool is_must_staple_{};
-  Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_{};
+  Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_;
 
 #ifdef ENVOY_ENABLE_QUIC
   quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> quic_cert_;
@@ -102,10 +102,10 @@ public:
 
   static int sslSocketIndex();
   // Ssl::Context
-  absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
+  std::optional<uint32_t> daysUntilFirstCertExpires() const override;
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
   std::vector<Envoy::Ssl::CertificateDetailsPtr> getCertChainInformation() const override;
-  absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override;
+  std::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override;
 
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 

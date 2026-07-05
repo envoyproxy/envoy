@@ -21,6 +21,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/test_time_system.h"
 
+#include "absl/functional/any_invocable.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -43,16 +44,19 @@ IntegrationTcpClient::IntegrationTcpClient(
       callbacks_(new ConnectionCallbacks(*this)) {
   EXPECT_CALL(factory, createBuffer_(_, _, _))
       .Times(AtLeast(1))
-      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                           std::function<void()> above_overflow) -> Buffer::Instance* {
-        client_write_buffer_ =
-            new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
-        return client_write_buffer_;
-      }))
-      .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
-                                std::function<void()> above_overflow) -> Buffer::Instance* {
-        return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
-      }));
+      .WillOnce(
+          Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                     absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+            client_write_buffer_ = new NiceMock<MockWatermarkBuffer>(
+                std::move(below_low), std::move(above_high), std::move(above_overflow));
+            return client_write_buffer_;
+          }))
+      .WillRepeatedly(
+          Invoke([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                    absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+            return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                               std::move(above_overflow));
+          }));
 
   connection_ = dispatcher.createClientConnection(
       *Network::Utility::resolveUrl(fmt::format(

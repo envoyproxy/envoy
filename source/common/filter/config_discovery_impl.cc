@@ -80,20 +80,21 @@ FilterConfigSubscription::FilterConfigSubscription(
     Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
     FilterConfigProviderManagerImplBase& filter_config_provider_manager,
     const std::string& subscription_id, absl::Status& creation_status)
-    : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>(
-          factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
-      filter_config_name_(filter_config_name),
+    : filter_config_name_(filter_config_name),
       last_(std::make_shared<ConfigVersion>("", factory_context.timeSource().systemTime())),
       factory_context_(factory_context),
       init_target_(fmt::format("FilterConfigSubscription init {}", filter_config_name_),
                    [this]() { start(); }),
+      resource_type_helper_(factory_context.messageValidationContext().dynamicValidationVisitor(),
+                            "name"),
       scope_(factory_context.scope().createScope(stat_prefix)),
       stats_({ALL_EXTENSION_CONFIG_DISCOVERY_STATS(POOL_COUNTER(*scope_))}),
       filter_config_provider_manager_(filter_config_provider_manager),
       subscription_id_(subscription_id) {
-  const auto resource_name = getResourceName();
+  const auto resource_name = resource_type_helper_.getResourceName();
   auto subscription_or_error = cluster_manager.subscriptionFactory().subscriptionFromConfigSource(
-      config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
+      config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this,
+      resource_type_helper_.resourceDecoder(), {});
   SET_AND_RETURN_IF_NOT_OK(subscription_or_error.status(), creation_status);
   subscription_ = std::move(*subscription_or_error);
 }
@@ -114,8 +115,9 @@ FilterConfigSubscription::onConfigUpdate(const std::vector<Config::DecodedResour
     return absl::InvalidArgumentError(fmt::format(
         "Unexpected number of resources in ExtensionConfigDS response: {}", resources.size()));
   }
-  const auto& filter_config = dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(
-      resources[0].get().resource());
+  const auto& filter_config =
+      Envoy::Protobuf::DynamicCastMessage<envoy::config::core::v3::TypedExtensionConfig>(
+          resources[0].get().resource());
   if (filter_config.name() != filter_config_name_) {
     return absl::InvalidArgumentError(fmt::format(
         "Unexpected resource name in ExtensionConfigDS response: {}", filter_config.name()));
@@ -302,7 +304,7 @@ ProtobufTypes::MessagePtr FilterConfigProviderManagerImplBase::dumpEcdsFilterCon
     filter_config.set_name(ecds_filter->name());
     MessageUtil::packFrom(*filter_config.mutable_typed_config(), *ecds_filter->lastConfig());
     auto& filter_config_dump = *config_dump->mutable_ecds_filters()->Add();
-    filter_config_dump.mutable_ecds_filter()->PackFrom(filter_config);
+    std::ignore = filter_config_dump.mutable_ecds_filter()->PackFrom(filter_config);
     filter_config_dump.set_version_info(ecds_filter->lastVersionInfo());
     TimestampUtil::systemClockToTimestamp(ecds_filter->lastUpdated(),
                                           *(filter_config_dump.mutable_last_updated()));

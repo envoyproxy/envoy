@@ -75,6 +75,11 @@ bool headersWithinLimits(const Http::HeaderMap& headers) {
          headers.byteSize() <= headers.maxHeadersKb() * 1024;
 }
 
+Http::Code zeroHttpCode() {
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
+  return static_cast<Http::Code>(0);
+}
+
 } // namespace
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
@@ -98,30 +103,30 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       validate_mutations_(config.validate_mutations()), scope_(scope),
       decoder_header_mutation_checker_(
           config.has_decoder_header_mutation_rules()
-              ? absl::optional<Filters::Common::MutationRules::Checker>(
+              ? std::optional<Filters::Common::MutationRules::Checker>(
                     Filters::Common::MutationRules::Checker(config.decoder_header_mutation_rules(),
                                                             factory_context.regexEngine()))
-              : absl::nullopt),
+              : std::nullopt),
       enable_dynamic_metadata_ingestion_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enable_dynamic_metadata_ingestion, true)),
       runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
-      filter_metadata_(config.has_filter_metadata() ? absl::optional(config.filter_metadata())
-                                                    : absl::nullopt),
+      filter_metadata_(config.has_filter_metadata() ? std::optional(config.filter_metadata())
+                                                    : std::nullopt),
       emit_filter_state_stats_(config.emit_filter_state_stats()),
       enforce_response_header_limits_(config.enforce_response_header_limits()),
       filter_enabled_(config.has_filter_enabled()
-                          ? absl::optional<Runtime::FractionalPercent>(
+                          ? std::optional<Runtime::FractionalPercent>(
                                 Runtime::FractionalPercent(config.filter_enabled(), runtime_))
-                          : absl::nullopt),
+                          : std::nullopt),
       filter_enabled_metadata_(
           config.has_filter_enabled_metadata()
-              ? absl::optional<Matchers::MetadataMatcher>(
+              ? std::optional<Matchers::MetadataMatcher>(
                     Matchers::MetadataMatcher(config.filter_enabled_metadata(), factory_context))
-              : absl::nullopt),
+              : std::nullopt),
       deny_at_disable_(config.has_deny_at_disable()
-                           ? absl::optional<Runtime::FeatureFlag>(
+                           ? std::optional<Runtime::FeatureFlag>(
                                  Runtime::FeatureFlag(config.deny_at_disable(), runtime_))
-                           : absl::nullopt),
+                           : std::nullopt),
       pool_(scope_.symbolTable()),
       metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
                                    config.metadata_context_namespaces().end()),
@@ -199,9 +204,9 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       // specific configuration. If the more specific configuration has no override, leave both
       // unset so that the main filter configuration is used.
       grpc_service_(more_specific.grpc_service_.has_value() ? more_specific.grpc_service_
-                                                            : absl::nullopt),
+                                                            : std::nullopt),
       http_service_(more_specific.http_service_.has_value() ? more_specific.http_service_
-                                                            : absl::nullopt) {
+                                                            : std::nullopt) {
   // Merge context extensions from more specific configuration, overriding less specific ones.
   for (const auto& extension : more_specific.context_extensions_) {
     context_extensions_[extension.first] = extension.second;
@@ -221,10 +226,10 @@ Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grp
   // A timeout of 0 means infinite (no timeout). Convert to nullopt in that case.
   const uint32_t timeout_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(grpc_service, timeout, kDefaultPerRouteTimeoutMs);
-  const absl::optional<std::chrono::milliseconds> timeout =
+  const std::optional<std::chrono::milliseconds> timeout =
       timeout_ms == 0
-          ? absl::nullopt
-          : absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(timeout_ms));
+          ? std::nullopt
+          : std::optional<std::chrono::milliseconds>(std::chrono::milliseconds(timeout_ms));
 
   // We can skip transport version check for per-route gRPC service here.
   // The transport version is already validated at the main configuration level.
@@ -287,7 +292,6 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     if (!filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
       filter_state->setData(decoder_callbacks_->filterConfigName(),
                             std::make_shared<ExtAuthzLoggingInfo>(config_->filterMetadata()),
-                            Envoy::StreamInfo::FilterState::StateType::Mutable,
                             Envoy::StreamInfo::FilterState::LifeSpan::Request);
 
       // This may return nullptr (if there's a value at this name whose type doesn't match or isn't
@@ -304,7 +308,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     }
   }
 
-  absl::optional<FilterConfigPerRoute> maybe_merged_per_route_config;
+  std::optional<FilterConfigPerRoute> maybe_merged_per_route_config;
   for (const FilterConfigPerRoute& cfg :
        Http::Utility::getAllPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_)) {
     if (maybe_merged_per_route_config.has_value()) {
@@ -321,6 +325,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   }
 
   // Check if we need to use a per-route service override (gRPC or HTTP).
+  Filters::Common::ExtAuthz::Client* client_to_use = client_.get();
   if (maybe_merged_per_route_config) {
     if (maybe_merged_per_route_config->grpcService().has_value()) {
       const auto& grpc_service = maybe_merged_per_route_config->grpcService().value();
@@ -328,9 +333,9 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
                        *decoder_callbacks_);
 
       // Create a new gRPC client for this route.
-      auto per_route_client = createPerRouteGrpcClient(grpc_service);
-      if (per_route_client != nullptr) {
-        client_ = std::move(per_route_client);
+      per_route_client_ = createPerRouteGrpcClient(grpc_service);
+      if (per_route_client_ != nullptr) {
+        client_to_use = per_route_client_.get();
         ENVOY_STREAM_LOG(debug, "ext_authz filter: successfully created per-route gRPC client.",
                          *decoder_callbacks_);
       } else {
@@ -345,9 +350,9 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
                        *decoder_callbacks_);
 
       // Create a new HTTP client for this route.
-      auto per_route_client = createPerRouteHttpClient(http_service);
-      if (per_route_client != nullptr) {
-        client_ = std::move(per_route_client);
+      per_route_client_ = createPerRouteHttpClient(http_service);
+      if (per_route_client_ != nullptr) {
+        client_to_use = per_route_client_.get();
         ENVOY_STREAM_LOG(debug, "ext_authz filter: successfully created per-route HTTP client.",
                          *decoder_callbacks_);
       } else {
@@ -391,9 +396,10 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   filter_return_ = FilterReturn::StopDecoding; // Don't let the filter chain continue as we are
                                                // going to invoke check call.
   cluster_ = decoder_callbacks_->clusterInfoSharedPtr();
+  active_client_ = client_to_use;
   initiating_call_ = true;
-  client_->check(*this, check_request_, decoder_callbacks_->activeSpan(),
-                 decoder_callbacks_->streamInfo());
+  client_to_use->check(*this, check_request_, decoder_callbacks_->activeSpan(),
+                       decoder_callbacks_->streamInfo());
   initiating_call_ = false;
 }
 
@@ -427,7 +433,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
       decoder_callbacks_->sendLocalReply(
-          config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
+          config_->statusOnError(), EMPTY_STRING, nullptr, std::nullopt,
           Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -590,7 +596,7 @@ void Filter::updateEffect(const Effect effect) {
   logging_info_->setReqProcessingEffect(effect);
 }
 
-void Filter::updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& grpc_status) {
+void Filter::updateLoggingInfo(const std::optional<Grpc::Status::GrpcStatus>& grpc_status) {
   if (!config_->emitFilterStateStats()) {
     return;
   }
@@ -609,7 +615,8 @@ void Filter::updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& g
         decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value()));
   }
 
-  auto const* stream_info = client_->streamInfo();
+  // Use the client that actually served this check request for stream info.
+  auto const* stream_info = active_client_ ? active_client_->streamInfo() : client_->streamInfo();
   if (stream_info == nullptr) {
     return;
   }
@@ -634,7 +641,10 @@ void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callb
 void Filter::onDestroy() {
   if (state_ == State::Calling) {
     state_ = State::Complete;
-    client_->cancel();
+    if (active_client_ != nullptr) {
+      active_client_->cancel();
+      active_client_ = nullptr;
+    }
   }
 }
 
@@ -655,6 +665,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   Stats::StatName empty_stat_name;
 
   updateLoggingInfo(response->grpc_status);
+  active_client_ = nullptr;
 
   if (response->saw_invalid_append_actions) {
     if (config_->validateMutations()) {
@@ -922,7 +933,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                              response->response_headers_to_overwrite_if_exists.end()};
     }
 
-    absl::optional<Http::Utility::QueryParamsMulti> modified_query_parameters;
+    std::optional<Http::Utility::QueryParamsMulti> modified_query_parameters;
     if (!response->query_parameters_to_set.empty()) {
       modified_query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(
           request_headers_->Path()->value().getStringView());
@@ -1064,7 +1075,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
             response_headers.addCopy(Http::LowerCaseString(key), value);
           }
         },
-        absl::nullopt, Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied);
+        std::nullopt, Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied);
     break;
   }
 
@@ -1111,7 +1122,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     } else {
       // Use custom status code from error_response if provided, otherwise use status_on_error.
       // Status code 0 means not set.
-      const Http::Code status_code = response->status_code != static_cast<Http::Code>(0)
+      const Http::Code status_code = response->status_code != zeroHttpCode()
                                          ? response->status_code
                                          : config_->statusOnError();
       ENVOY_STREAM_LOG(
@@ -1127,7 +1138,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
            this](Http::HeaderMap& response_headers) -> void {
             addErrorResponseHeaders(response_headers, headers_to_set, headers_to_append);
           },
-          absl::nullopt, Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
+          std::nullopt, Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
     }
     break;
   }
@@ -1144,7 +1155,7 @@ void Filter::responseHeaderLimitsReached() {
   encoder_callbacks_->streamInfo().setResponseFlag(
       StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
   encoder_callbacks_->sendLocalReply(
-      status, EMPTY_STRING, nullptr, absl::nullopt,
+      status, EMPTY_STRING, nullptr, std::nullopt,
       Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzInvalid);
 }
 
@@ -1159,7 +1170,7 @@ void Filter::rejectResponse() {
   decoder_callbacks_->streamInfo().setResponseFlag(
       StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
   decoder_callbacks_->sendLocalReply(
-      status, EMPTY_STRING, nullptr, absl::nullopt,
+      status, EMPTY_STRING, nullptr, std::nullopt,
       Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzInvalid);
 }
 
@@ -1222,7 +1233,7 @@ bool Filter::validateAndClearInvalidErrorResponseAttributes(
       response->headers_to_set.clear();
       response->headers_to_append.clear();
       response->body.clear();
-      response->status_code = static_cast<Http::Code>(0); // Clear custom status.
+      response->status_code = zeroHttpCode(); // Clear custom status.
       return false;
     }
   }
@@ -1241,7 +1252,7 @@ bool Filter::validateAndClearInvalidErrorResponseAttributes(
       response->headers_to_set.clear();
       response->headers_to_append.clear();
       response->body.clear();
-      response->status_code = static_cast<Http::Code>(0); // Clear custom status.
+      response->status_code = zeroHttpCode(); // Clear custom status.
       return false;
     }
   }
@@ -1291,7 +1302,7 @@ void Filter::addErrorResponseHeaders(
 
 void ShadowDecisionObject::populateProto(ShadowDecisionProto& msg) const {
   msg.set_check_result(check_result_);
-  if (status_code_ != static_cast<Http::Code>(0)) {
+  if (status_code_ != zeroHttpCode()) {
     msg.set_status_code(static_cast<uint32_t>(status_code_));
   }
   for (const auto& [key, value] : response_headers_) {
@@ -1307,7 +1318,7 @@ ProtobufTypes::MessagePtr ShadowDecisionObject::serializeAsProto() const {
   return msg;
 }
 
-absl::optional<std::string> ShadowDecisionObject::serializeAsString() const {
+std::optional<std::string> ShadowDecisionObject::serializeAsString() const {
   ShadowDecisionProto msg;
   populateProto(msg);
   return MessageUtil::getJsonStringFromMessageOrError(msg);
@@ -1318,7 +1329,7 @@ void Filter::setShadowFilterState(Filters::Common::ExtAuthz::Response& response)
   using ShadowDecisionProto = envoy::extensions::filters::http::ext_authz::v3::ShadowDecision;
 
   ShadowDecisionProto::CheckResult check_result = ShadowDecisionProto::UNSPECIFIED;
-  Http::Code status_code = static_cast<Http::Code>(0);
+  Http::Code status_code{};
   Filters::Common::ExtAuthz::UnsafeHeaderVector response_headers;
 
   switch (response.status) {
@@ -1334,13 +1345,13 @@ void Filter::setShadowFilterState(Filters::Common::ExtAuthz::Response& response)
     break;
   case CheckStatus::Error:
     check_result = ShadowDecisionProto::ERROR;
-    status_code = response.status_code != static_cast<Http::Code>(0) ? response.status_code
-                                                                     : config_->statusOnError();
+    status_code =
+        response.status_code != zeroHttpCode() ? response.status_code : config_->statusOnError();
     stats_.shadow_error_.inc();
     break;
-  default:
-    IS_ENVOY_BUG("unexpected CheckStatus value in shadow mode");
-    return;
+  default:                                                       // LCOV_EXCL_LINE
+    IS_ENVOY_BUG("unexpected CheckStatus value in shadow mode"); // LCOV_EXCL_LINE
+    return;                                                      // LCOV_EXCL_LINE
   }
 
   auto object = std::make_shared<ShadowDecisionObject>(check_result, status_code,
@@ -1350,7 +1361,7 @@ void Filter::setShadowFilterState(Filters::Common::ExtAuthz::Response& response)
   // already uses the filter's configured name as its FilterState key (with a different lifespan).
   decoder_callbacks_->streamInfo().filterState()->setData(
       absl::StrCat(decoder_callbacks_->filterConfigName(), ".shadow"), std::move(object),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+      StreamInfo::FilterState::LifeSpan::FilterChain);
 }
 
 } // namespace ExtAuthz

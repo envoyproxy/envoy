@@ -79,7 +79,7 @@ public:
   // Set to default so that the default client connection factory is used to initiate connections
   // to. the address.
   absl::string_view addressType() const override { return "default"; }
-  absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+  std::optional<std::string> networkNamespace() const override { return std::nullopt; }
   Network::Address::InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override {
     return nullptr;
   }
@@ -160,11 +160,11 @@ public:
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                              const Upstream::Host& /*host*/,
                              std::vector<uint8_t>& /*hash_key*/) override {
-      return absl::nullopt;
+      return std::nullopt;
     }
 
     // Lifetime tracking not implemented.
@@ -183,6 +183,7 @@ private:
     // Upstream::LoadBalancerFactory.
     Upstream::LoadBalancerPtr create() { return std::make_unique<LoadBalancer>(cluster_); }
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
+    bool recreateOnHostChangeDeprecated() const override { return false; }
 
     const std::shared_ptr<RevConCluster> cluster_;
   };
@@ -203,7 +204,10 @@ private:
   void cleanup();
 
   // Checks if a host exists for a given host identifier and if not creates and caches it.
-  Upstream::HostSelectionResponse checkAndCreateHost(absl::string_view host_id);
+  Upstream::HostSelectionResponse checkAndCreateHost(absl::string_view host_id,
+                                                     Upstream::HostSharedPtr& created_host);
+
+  void addHostToHostSet(Upstream::HostSharedPtr host);
 
   // Get the upstream socket manager from the thread-local registry.
   BootstrapReverseConnection::UpstreamSocketManager* getUpstreamSocketManager() const;

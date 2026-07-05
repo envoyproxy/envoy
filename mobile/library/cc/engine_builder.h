@@ -12,108 +12,16 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/types/optional.h"
+#include <optional>
 #include "library/cc/engine.h"
 #include "library/cc/key_value_store.h"
 #include "library/cc/string_accessor.h"
 #include "library/common/engine_types.h"
 
+#include "library/cc/engine_builder_types.h"
+
 namespace Envoy {
 namespace Platform {
-
-// Represents the locality information in the Bootstrap's node, as defined in:
-// https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#envoy-v3-api-msg-config-core-v3-locality
-struct NodeLocality {
-  std::string region;
-  std::string zone;
-  std::string sub_zone;
-};
-
-#ifdef ENVOY_MOBILE_XDS
-constexpr int DefaultXdsTimeout = 5;
-
-// Forward declaration so it can be referenced by XdsBuilder.
-class EngineBuilder;
-
-// A class for building the xDS configuration for the Envoy Mobile engine.
-// xDS is a protocol for dynamic configuration of Envoy instances, more information can be found in:
-// https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol.
-//
-// This class is typically used as input to the EngineBuilder's setXds() method.
-class XdsBuilder final {
-public:
-  // `xds_server_address`: the host name or IP address of the xDS management server. The xDS server
-  //                       must support the ADS protocol
-  //                       (https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/operations/dynamic_configuration#aggregated-xds-ads).
-  // `xds_server_port`: the port on which the xDS management server listens for ADS discovery
-  //                    requests.
-  XdsBuilder(std::string xds_server_address, const uint32_t xds_server_port);
-
-  // Adds a header to the initial HTTP metadata headers sent on the gRPC stream.
-  //
-  // A common use for the initial metadata headers is for authentication to the xDS management
-  // server.
-  //
-  // For example, if using API keys to authenticate to Traffic Director on GCP (see
-  // https://cloud.google.com/docs/authentication/api-keys for details), invoke:
-  //   builder.addInitialStreamHeader("x-goog-api-key", api_key_token)
-  //          .addInitialStreamHeader("X-Android-Package", app_package_name)
-  //          .addInitialStreamHeader("X-Android-Cert", sha1_key_fingerprint);
-  XdsBuilder& addInitialStreamHeader(std::string header, std::string value);
-
-  // Sets the PEM-encoded server root certificates used to negotiate the TLS handshake for the gRPC
-  // connection. If no root certs are specified, the operating system defaults are used.
-  XdsBuilder& setSslRootCerts(std::string root_certs);
-
-  // Adds Runtime Discovery Service (RTDS) to the Runtime layers of the Bootstrap configuration,
-  // to retrieve dynamic runtime configuration via the xDS management server.
-  //
-  // `resource_name`: The runtime config resource to subscribe to.
-  // `timeout_in_seconds`: <optional> specifies the `initial_fetch_timeout` field on the
-  //    api.v3.core.ConfigSource. Unlike the ConfigSource default of 15s, we set a default fetch
-  //    timeout value of 5s, to prevent mobile app initialization from stalling. The default
-  //    parameter value may change through the course of experimentation and no assumptions should
-  //    be made of its exact value.
-  XdsBuilder& addRuntimeDiscoveryService(std::string resource_name,
-                                         int timeout_in_seconds = DefaultXdsTimeout);
-
-  // Adds the Cluster Discovery Service (CDS) configuration for retrieving dynamic cluster resources
-  // via the xDS management server.
-  //
-  // `cds_resources_locator`: <optional> the xdstp:// URI for subscribing to the cluster resources.
-  //    If not using xdstp, then `cds_resources_locator` should be set to the empty string.
-  // `timeout_in_seconds`: <optional> specifies the `initial_fetch_timeout` field on the
-  //    api.v3.core.ConfigSource. Unlike the ConfigSource default of 15s, we set a default fetch
-  //    timeout value of 5s, to prevent mobile app initialization from stalling. The default
-  //    parameter value may change through the course of experimentation and no assumptions should
-  //    be made of its exact value.
-  XdsBuilder& addClusterDiscoveryService(std::string cds_resources_locator = "",
-                                         int timeout_in_seconds = DefaultXdsTimeout);
-
-protected:
-  // Sets the xDS configuration specified on this XdsBuilder instance on the Bootstrap proto
-  // provided as an input parameter.
-  //
-  // This method takes in a modifiable Bootstrap proto pointer because returning a new Bootstrap
-  // proto would rely on proto's MergeFrom behavior, which can lead to unexpected results in the
-  // Bootstrap config.
-  void build(envoy::config::bootstrap::v3::Bootstrap& bootstrap) const;
-
-private:
-  // Required so that EngineBuilder can call the XdsBuilder's protected build() method.
-  friend class EngineBuilder;
-
-  std::string xds_server_address_;
-  uint32_t xds_server_port_;
-  std::vector<envoy::config::core::v3::HeaderValue> xds_initial_grpc_metadata_;
-  std::string ssl_root_certs_;
-  std::string rtds_resource_name_;
-  int rtds_timeout_in_seconds_ = DefaultXdsTimeout;
-  bool enable_cds_ = false;
-  std::string cds_resources_locator_;
-  int cds_timeout_in_seconds_ = DefaultXdsTimeout;
-};
-#endif // ENVOY_MOBILE_XDS
 
 // The C++ Engine builder creates a structured bootstrap proto and modifies it through parameters
 // set through the EngineBuilder API calls to produce the Bootstrap config that the Engine is
@@ -153,10 +61,16 @@ public:
   EngineBuilder& setDeviceOs(std::string app_id);
   EngineBuilder& setStreamIdleTimeoutSeconds(int stream_idle_timeout_seconds);
   EngineBuilder& setPerTryIdleTimeoutSeconds(int per_try_idle_timeout_seconds);
+  EngineBuilder& setRequestTimeoutMilliseconds(int request_timeout_ms);
   EngineBuilder& enableGzipDecompression(bool gzip_decompression_on);
   EngineBuilder& enableBrotliDecompression(bool brotli_decompression_on);
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
   EngineBuilder& enableHttp3(bool http3_on);
+  // If true, all HTTP requests are handled on a dedicated worker thread instead of on the Envoy
+  // main thread which also handles all xDS requests.
+  // Note: Engine in worker thread model doesn't support platform certificate validation and system
+  // proxy settings. And these settings will be ignored if worker thread model is enabled.
+  EngineBuilder& enableWorkerThread(bool use_worker_thread);
   EngineBuilder& enableEarlyData(bool early_data_on);
   EngineBuilder& enableScone(bool enable);
   EngineBuilder& addQuicConnectionOption(std::string option);
@@ -298,7 +212,7 @@ private:
   int dns_query_timeout_seconds_ = 120;
   bool disable_dns_refresh_on_failure_{false};
   bool disable_dns_refresh_on_network_change_{false};
-  absl::optional<uint32_t> dns_num_retries_ = 3;
+  std::optional<uint32_t> dns_num_retries_ = 3;
   uint32_t getaddrinfo_num_threads_ = 1;
   int h2_connection_keepalive_idle_interval_milliseconds_ = 100000000;
   int h2_connection_keepalive_timeout_seconds_ = 15;
@@ -307,14 +221,15 @@ private:
   std::string device_os_ = "unspecified";
   int stream_idle_timeout_seconds_ = 15;
   int per_try_idle_timeout_seconds_ = 15;
+  int request_timeout_ms_ = 0;
   bool gzip_decompression_filter_ = true;
   bool brotli_decompression_filter_ = false;
   bool socket_tagging_filter_ = false;
   bool platform_certificates_validation_on_ = false;
   bool dns_cache_on_ = false;
   int dns_cache_save_interval_seconds_ = 1;
-  absl::optional<int> network_thread_priority_ = absl::nullopt;
-  absl::optional<size_t> high_watermark_ = absl::nullopt;
+  std::optional<int> network_thread_priority_ = std::nullopt;
+  std::optional<size_t> high_watermark_ = std::nullopt;
 
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 
@@ -343,7 +258,7 @@ private:
 
   std::vector<NativeFilterConfig> native_filter_chain_;
   std::vector<std::pair<std::string /* host */, uint32_t /* port */>> dns_preresolve_hostnames_;
-  absl::optional<envoy::config::core::v3::TypedExtensionConfig> dns_resolver_config_;
+  std::optional<envoy::config::core::v3::TypedExtensionConfig> dns_resolver_config_;
   std::vector<envoy::config::core::v3::SocketOption> socket_options_;
 
   std::vector<std::pair<std::string, bool>> runtime_guards_;
@@ -374,12 +289,14 @@ private:
   int max_time_on_non_default_network_seconds_ = 0;
 
   std::string node_id_;
-  absl::optional<NodeLocality> node_locality_ = absl::nullopt;
-  absl::optional<Protobuf::Struct> node_metadata_ = absl::nullopt;
+  std::optional<NodeLocality> node_locality_ = std::nullopt;
+  std::optional<Protobuf::Struct> node_metadata_ = std::nullopt;
   bool enable_stats_collection_ = true;
-  bool enable_network_change_monitor_ = false;
+  bool use_worker_thread_{false};
+  bool enable_network_change_monitor_{false};
+
 #ifdef ENVOY_MOBILE_XDS
-  absl::optional<XdsBuilder> xds_builder_ = absl::nullopt;
+  std::optional<XdsBuilder> xds_builder_ = std::nullopt;
 #endif // ENVOY_MOBILE_XDS
 };
 

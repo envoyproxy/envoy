@@ -71,7 +71,7 @@ template <class T> static void addGrpcResponseTags(Span& span, const T& headers)
   addTagIfNotNull(span, Tracing::Tags::get().GrpcMessage, headers.GrpcMessage());
   // Set error tag when Grpc status code represents an upstream error. See
   // https://github.com/envoyproxy/envoy/issues/18877.
-  absl::optional<Grpc::Status::GrpcStatus> grpc_status_code = Grpc::Common::getGrpcStatus(headers);
+  std::optional<Grpc::Status::GrpcStatus> grpc_status_code = Grpc::Common::getGrpcStatus(headers);
   if (grpc_status_code.has_value()) {
     const auto& status = grpc_status_code.value();
     if (status != Grpc::Status::WellKnownGrpcStatus::InvalidCode) {
@@ -151,6 +151,12 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
                                                const Http::ResponseTrailerMap* response_trailers,
                                                const StreamInfo::StreamInfo& stream_info,
                                                const Config& tracing_config) {
+  // Early exit if tags are not needed
+  if (!span.exportedSpan()) {
+    span.finishSpan();
+    return;
+  }
+
   // Pre response data.
   if (request_headers) {
     if (request_headers->RequestId()) {

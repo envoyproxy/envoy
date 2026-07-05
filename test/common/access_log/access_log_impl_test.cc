@@ -17,8 +17,6 @@
 #include "test/common/stream_info/test_util.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
-#include "test/mocks/event/mocks.h"
-#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
@@ -1732,7 +1730,8 @@ public:
     auto factory_config = Config::Utility::translateToFactoryConfig(
         config, context.messageValidationVisitor(), *this);
 
-    Protobuf::Struct struct_config = *dynamic_cast<const Protobuf::Struct*>(factory_config.get());
+    Protobuf::Struct struct_config =
+        *Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(factory_config.get());
     return std::make_unique<SampleExtensionFilter>(
         static_cast<uint32_t>(struct_config.fields().at("rate").number_value()));
   }

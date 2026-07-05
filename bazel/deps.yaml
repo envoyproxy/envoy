@@ -65,7 +65,7 @@ openssl:
   project_name: "OpenSSL"
   project_desc: "TLS/SSL and crypto library"
   project_url: "https://github.com/openssl/openssl"
-  release_date: "2026-04-07"
+  release_date: "2026-06-09"
   use_category:
   - controlplane
   - dataplane_core
@@ -128,6 +128,30 @@ liburing:
   - dataplane_core
   - controlplane
 
+elfutils:
+  project_name: "elfutils"
+  project_desc: "Utilities and libraries for handling ELF files, providing libelf for libbpf"
+  project_url: "https://sourceware.org/elfutils"
+  release_date: "2026-04-15"
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.extensions.network.socket_interface.sockmap
+  license: "LGPL-3.0-or-later OR GPL-2.0-or-later"
+  license_url: "https://sourceware.org/git/?p=elfutils.git;a=blob_plain;f=COPYING-LGPLV3;hb=elfutils-{version}"
+
+libbpf:
+  project_name: "libbpf"
+  project_desc: "Library for loading eBPF programs and reading their data structures"
+  project_url: "https://github.com/libbpf/libbpf"
+  release_date: "2026-03-16"
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.extensions.network.socket_interface.sockmap
+  license: "LGPL-2.1-only OR BSD-2-Clause"
+  license_url: "https://github.com/libbpf/libbpf/blob/v{version}/LICENSE"
+
 buildtools:
   project_name: "Bazel build tools"
   project_desc: "Developer tools for working with Google's bazel buildtool."
@@ -163,7 +187,7 @@ dd_trace_cpp:
   project_name: "Datadog C++ Tracing Library"
   project_desc: "Datadog distributed tracing for C++"
   project_url: "https://github.com/DataDog/dd-trace-cpp"
-  release_date: "2025-10-14"
+  release_date: "2026-05-06"
   use_category:
   - observability_ext
   extensions:
@@ -245,6 +269,7 @@ flatbuffers:
   - envoy.filters.http.ext_proc
   - envoy.filters.http.rate_limit_quota
   - envoy.filters.http.rbac
+  - envoy.filters.http.upstream_rbac
   - envoy.filters.http.wasm
   - envoy.filters.network.rbac
   - envoy.filters.network.wasm
@@ -296,7 +321,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-04-20"
+  release_date: "2026-06-29"
   use_category:
   - controlplane
   - dataplane_core
@@ -318,7 +343,7 @@ com_github_grpc_grpc:
   project_name: "gRPC"
   project_desc: "gRPC C core library"
   project_url: "https://grpc.io"
-  release_date: "2025-10-20"
+  release_date: "2026-06-08"
   use_category:
   - dataplane_core
   - controlplane
@@ -557,6 +582,16 @@ wasmtime:
   license: "Apache-2.0"
   license_url: "https://github.com/bytecodealliance/wasmtime/blob/v{version}/LICENSE"
 
+wuffs:
+  project_name: "Wuffs"
+  project_desc: "Memory-safe, high-performance JSON (and other format) parser written in a memory-safe subset of C"
+  project_url: "https://github.com/google/wuffs-mirror-release-c"
+  release_date: "2024-09-14"
+  use_category:
+  - dataplane_ext
+  license: "Apache-2.0"
+  license_url: "https://github.com/google/wuffs-mirror-release-c/blob/v{version}/LICENSE"
+
 abseil_cpp:
   project_name: "Abseil"
   project_desc: "Open source collection of C++ libraries drawn from the most fundamental pieces of Google’s internal codebase"
@@ -583,6 +618,7 @@ cel_cpp:
   - envoy.filters.http.ext_proc
   - envoy.filters.http.rate_limit_quota
   - envoy.filters.http.rbac
+  - envoy.filters.http.upstream_rbac
   - envoy.filters.http.wasm
   - envoy.filters.network.rbac
   - envoy.filters.network.wasm
@@ -611,6 +647,7 @@ cel_spec:
   - envoy.filters.http.ext_proc
   - envoy.filters.http.rate_limit_quota
   - envoy.filters.http.rbac
+  - envoy.filters.http.upstream_rbac
   - envoy.filters.http.wasm
   - envoy.filters.network.rbac
   - envoy.filters.network.wasm
@@ -639,7 +676,7 @@ com_google_protobuf:
   project_name: "Protocol Buffers"
   project_desc: "Language-neutral, platform-neutral extensible mechanism for serializing structured data"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-06-11"
   use_category:
   - dataplane_core
   - controlplane
@@ -650,6 +687,7 @@ com_google_protobuf:
   - com_google_protobuf_protoc_osx_aarch_64
   - com_google_protobuf_protoc_osx_x86_64
   - com_google_protobuf_protoc_win64
+  - zlib
   cpe: "cpe:2.3:a:google:protobuf:*"
   license: "Protocol Buffers"
   license_url: "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE"
@@ -658,7 +696,7 @@ com_google_protobuf_protoc_linux_aarch_64:
   project_name: "Protocol Buffers (protoc) linux_aarch_64"
   project_desc: "Protoc compiler for protobuf (linux_aarch_64)"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-06-11"
   use_category:
   - build
 
@@ -666,7 +704,7 @@ com_google_protobuf_protoc_linux_ppcle_64:
   project_name: "Protocol Buffers (protoc) linux_ppcle_64"
   project_desc: "Protoc compiler for protobuf (linux_ppcle_64)"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-06-11"
   use_category:
   - build
 
@@ -674,7 +712,7 @@ com_google_protobuf_protoc_linux_x86_64:
   project_name: "Protocol Buffers (protoc) linux_x86_64"
   project_desc: "Protoc compiler for protobuf (linux_x86_64)"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-06-11"
   use_category:
   - build
 
@@ -682,7 +720,7 @@ com_google_protobuf_protoc_osx_aarch_64:
   project_name: "Protocol Buffers (protoc) osx_aarch_64"
   project_desc: "Protoc compiler for protobuf (osx_aarch_64)"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-06-11"
   use_category:
   - build
 
@@ -690,7 +728,7 @@ com_google_protobuf_protoc_osx_x86_64:
   project_name: "Protocol Buffers (protoc) osx_x86_64"
   project_desc: "Protoc compiler for protobuf (osx_x86_64)"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-06-11"
   use_category:
   - build
 
@@ -698,7 +736,7 @@ com_google_protobuf_protoc_win64:
   project_name: "Protocol Buffers (protoc) win64"
   project_desc: "Protoc compiler for protobuf (win64)"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-06-11"
   use_category:
   - build
 
@@ -799,7 +837,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-04-20"
+  release_date: "2026-06-10"
   use_category:
   - build
   - controlplane
@@ -854,7 +892,7 @@ fips_go_linux_amd64:
   project_name: "Go (Linux amd64)"
   project_desc: "Go programming language (Linux amd64)"
   project_url: "https://golang.org/"
-  release_date: "2025-06-05"
+  release_date: "2025-05-07"
   use_category:
   - build
   - dataplane_core
@@ -867,7 +905,7 @@ fips_go_linux_arm64:
   project_name: "Go (Linux arm64)"
   project_desc: "Go programming language (Linux arm64)"
   project_url: "https://golang.org/"
-  release_date: "2025-06-05"
+  release_date: "2025-05-07"
   use_category:
   - build
   - dataplane_core
@@ -906,7 +944,7 @@ fips_go_ppc64le:
   project_name: "Go (Linux ppc64le)"
   project_desc: "Go programming language (Linux ppc64le)"
   project_url: "https://golang.org/"
-  release_date: "2026-04-07"
+  release_date: "2025-05-07"
   use_category:
   - build
   - dataplane_core
@@ -1080,7 +1118,7 @@ kafka_source:
   project_name: "Kafka (source)"
   project_desc: "Open-source distributed event streaming platform"
   project_url: "https://kafka.apache.org"
-  release_date: "2025-05-12"
+  release_date: "2026-02-07"
   use_category:
   - dataplane_ext
   extensions:
@@ -1195,7 +1233,7 @@ proxy_wasm_cpp_host:
   project_name: "WebAssembly for Proxies (C++ host implementation)"
   project_desc: "WebAssembly for Proxies (C++ host implementation)"
   project_url: "https://github.com/proxy-wasm/proxy-wasm-cpp-host"
-  release_date: "2026-01-15"
+  release_date: "2026-06-22"
   use_category:
   - dataplane_ext
   extensions:
@@ -1281,9 +1319,15 @@ rules_java:
   project_name: "Java rules for Bazel"
   project_desc: "Bazel rules for the Java language"
   project_url: "https://github.com/bazelbuild/rules_java/"
-  release_date: "2025-03-25"
+  release_date: "2026-02-24"
   use_category:
   - build
+  - dataplane_core
+  - dataplane_ext
+  - observability_ext
+  - controlplane
+  - api
+  - other
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/rules_java/blob/{version}/LICENSE"
 
@@ -1365,6 +1409,12 @@ rules_shell:
   release_date: "2026-03-23"
   use_category:
   - build
+  - dataplane_core
+  - dataplane_ext
+  - observability_ext
+  - controlplane
+  - api
+  - other
   license: "Apache-2.0"
   license_url: "https://github.com/protocolbuffers/rules_shell/blob/{version}/LICENSE"
 
@@ -1397,7 +1447,7 @@ thrift:
   project_name: "Apache Thrift"
   project_desc: "Apache Thrift Python library"
   project_url: "https://thrift.apache.org/"
-  release_date: "2025-05-23"
+  release_date: "2026-04-27"
   use_category:
   - test_only
   cpe: "cpe:2.3:a:apache:thrift:*"

@@ -1,17 +1,19 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 
+#include "source/common/common/logger.h"
 #include "source/server/admin/handler_ctx.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {

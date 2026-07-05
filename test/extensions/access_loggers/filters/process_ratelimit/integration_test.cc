@@ -8,7 +8,6 @@
 #include "test/integration/ads_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -148,7 +147,7 @@ public:
     EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                         {"route_config_0"}, {}, {}));
 
-    test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+    test_server_->waitForCounter("listener_manager.listener_create_success", testing::Ge(1));
 
     // Make a request to verify listener_0 is working.
     makeSingleRequest();
@@ -188,10 +187,11 @@ typed_config:
   envoy::config::listener::v3::Listener listener_1 = buildListener("listener_1", "route_config_0");
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       hcm_config;
-  listener_1.filter_chains(0).filters(0).typed_config().UnpackTo(&hcm_config);
+  std::ignore = listener_1.filter_chains(0).filters(0).typed_config().UnpackTo(&hcm_config);
   *hcm_config.add_access_log() = parseAccessLogFromV3Yaml(access_log_yaml);
-  listener_1.mutable_filter_chains(0)->mutable_filters(0)->mutable_typed_config()->PackFrom(
-      hcm_config);
+  std::ignore =
+      listener_1.mutable_filter_chains(0)->mutable_filters(0)->mutable_typed_config()->PackFrom(
+          hcm_config);
 
   // Update listeners: remove listener_0 and add listener_1.
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(

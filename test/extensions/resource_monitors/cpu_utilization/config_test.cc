@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "envoy/extensions/resource_monitors/cpu_utilization/v3/cpu_utilization.pb.h"
 #include "envoy/registry/registry.h"
 
@@ -7,9 +9,9 @@
 #include "source/server/resource_monitor_config_impl.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/options.h"
 
-#include "absl/types/optional.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -35,8 +37,8 @@ public:
   double pressure() const { return pressure_.value_or(0.0); }
 
 private:
-  absl::optional<double> pressure_;
-  absl::optional<EnvoyException> error_;
+  std::optional<double> pressure_;
+  std::optional<EnvoyException> error_;
   bool has_success_ = false;
   bool has_error_ = false;
 };
@@ -53,8 +55,9 @@ TEST(CpuUtilizationMonitorFactoryTest, CreateMonitorDefault) {
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
   auto monitor = factory->createResourceMonitor(config, context);
   EXPECT_NE(monitor, nullptr);
 }
@@ -74,8 +77,9 @@ TEST(CpuUtilizationMonitorFactoryTest, CreateContainerCPUMonitor) {
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
 
 #if defined(__linux__)
   // Skip the check if the system running the test does not support cgroup.
@@ -105,8 +109,9 @@ TEST(CpuUtilizationMonitorFactoryTest, HostMonitorFunctional) {
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
   auto monitor = factory->createResourceMonitor(config, context);
   ASSERT_NE(monitor, nullptr);
 
@@ -130,8 +135,9 @@ TEST(CpuUtilizationMonitorFactoryTest, ContainerMonitorFunctional) {
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
 
   // Skip the check if the system running the test does not support cgroup.
   TRY_ASSERT_MAIN_THREAD {

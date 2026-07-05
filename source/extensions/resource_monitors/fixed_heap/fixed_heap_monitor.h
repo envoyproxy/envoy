@@ -3,6 +3,10 @@
 #include "envoy/extensions/resource_monitors/fixed_heap/v3/fixed_heap.pb.h"
 #include "envoy/server/resource_monitor.h"
 
+#include "source/common/runtime/runtime_protos.h"
+
+#include "absl/types/variant.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
@@ -27,18 +31,18 @@ public:
 };
 
 /**
- * Heap memory monitor with a statically configured maximum.
+ * Heap memory monitor with a statically configured or runtime-derived maximum.
  */
 class FixedHeapMonitor : public Server::ResourceMonitor {
 public:
   FixedHeapMonitor(
-      const envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig& config,
+      absl::variant<uint64_t, Runtime::UInt64> max_heap_source,
       std::unique_ptr<MemoryStatsReader> stats = std::make_unique<MemoryStatsReader>());
 
   void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override;
 
 private:
-  const uint64_t max_heap_;
+  const absl::variant<uint64_t, Runtime::UInt64> max_heap_source_;
   std::unique_ptr<MemoryStatsReader> stats_;
 };
 

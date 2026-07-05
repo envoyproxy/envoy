@@ -71,7 +71,7 @@ private:
 class TestSerializedStringFilterState : public StreamInfo::FilterState::Object {
 public:
   TestSerializedStringFilterState(std::string str) : raw_string_(str) {}
-  absl::optional<std::string> serializeAsString() const override {
+  std::optional<std::string> serializeAsString() const override {
     return raw_string_ + " By PLAIN";
   }
   ProtobufTypes::MessagePtr serializeAsProto() const override {
@@ -140,7 +140,7 @@ TEST(SubstitutionFormatterTest, UnsupportedArrayValueTypeThrows) {
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterPlainStringTest) {
   StreamInfo::MockStreamInfo stream_info;
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
   OpenTelemetryFormatMap expected = {{"plain_string", "plain_string_value"}};
@@ -161,7 +161,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterPlainStringTest) {
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterTypesTest) {
   StreamInfo::MockStreamInfo stream_info;
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
   KeyValueList key_mapping;
@@ -222,7 +222,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterTypesTest) {
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterNestedObjectsTest) {
   StreamInfo::MockStreamInfo stream_info;
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
   KeyValueList key_mapping;
@@ -429,7 +429,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterNestedObjectsTest) {
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterSingleOperatorTest) {
   StreamInfo::MockStreamInfo stream_info;
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
   OpenTelemetryFormatMap expected = {{"protocol", "HTTP/1.1"}};
@@ -450,7 +450,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterSingleOperatorTest) {
 TEST(SubstitutionFormatterTest, EmptyOpenTelemetryFormatterTest) {
   StreamInfo::MockStreamInfo stream_info;
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
   OpenTelemetryFormatMap expected = {{"protocol", ""}};
@@ -497,7 +497,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterNonExistentHeaderTest) {
                             key_mapping);
   OpenTelemetryFormatter formatter(key_mapping, {});
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
   verifyOpenTelemetryOutput(formatter.format({&request_header, &response_header}, stream_info),
@@ -536,7 +536,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterAlternateHeaderTest) {
                             key_mapping);
   OpenTelemetryFormatter formatter(key_mapping, {});
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
   verifyOpenTelemetryOutput(formatter.format({&request_header, &response_header}, stream_info),
@@ -653,11 +653,9 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataNoClusterIn
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateTest) {
   StreamInfo::MockStreamInfo stream_info;
   stream_info.filter_state_->setData("test_key",
-                                     std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
+                                     std::make_unique<Router::StringAccessorImpl>("test_value"));
   stream_info.filter_state_->setData("test_obj",
-                                     std::make_unique<TestSerializedStructFilterState>(),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
+                                     std::make_unique<TestSerializedStructFilterState>());
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
   OpenTelemetryFormatMap expected = {{"test_key", "\"test_value\""},
@@ -686,10 +684,8 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateTest) {
   const StreamInfo::FilterStateSharedPtr upstream_filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request);
   upstream_filter_state->setData("test_key",
-                                 std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                 StreamInfo::FilterState::StateType::ReadOnly);
-  upstream_filter_state->setData("test_obj", std::make_unique<TestSerializedStructFilterState>(),
-                                 StreamInfo::FilterState::StateType::ReadOnly);
+                                 std::make_unique<Router::StringAccessorImpl>("test_value"));
+  upstream_filter_state->setData("test_obj", std::make_unique<TestSerializedStructFilterState>());
 
   EXPECT_CALL(stream_info, upstreamInfo()).Times(testing::AtLeast(1));
   // Get pointer to MockUpstreamInfo.
@@ -724,8 +720,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateTest) {
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateSpeciferTest) {
   StreamInfo::MockStreamInfo stream_info;
   stream_info.filter_state_->setData(
-      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"));
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
   OpenTelemetryFormatMap expected = {
@@ -759,8 +754,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateSpecife
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request));
 
   stream_info.upstream_info_->upstreamFilterState()->setData(
-      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"));
 
   EXPECT_CALL(Const(stream_info), upstreamInfo()).Times(testing::AtLeast(1));
 
@@ -790,8 +784,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateErrorSpeciferTe
   StreamInfo::MockStreamInfo stream_info;
   std::string body;
   stream_info.filter_state_->setData(
-      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"));
 
   // 'ABCDE' is error specifier.
   KeyValueList key_mapping;
@@ -821,8 +814,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateErrorSp
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request));
 
   stream_info.upstream_info_->upstreamFilterState()->setData(
-      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"));
 
   // 'ABCDE' is error specifier.
   KeyValueList key_mapping;
@@ -898,7 +890,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterMultiTokenTest) {
                               key_mapping);
     OpenTelemetryFormatter formatter(key_mapping, {});
 
-    absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+    std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
     verifyOpenTelemetryOutput(formatter.format({&request_header, &response_header}, stream_info),
