@@ -259,6 +259,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_ssl_connection_info_lib",
+    srcs = envoy_select_enable_http3(["quic_ssl_connection_info.cc"]),
     hdrs = envoy_select_enable_http3(["quic_ssl_connection_info.h"]),
     external_deps = ["ssl"],
     deps = envoy_select_enable_http3([

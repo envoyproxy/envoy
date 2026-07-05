@@ -39,8 +39,7 @@ std::string certToPem(X509& cert) {
 
 // Iterate the peer certificate chain, converting each certificate to PEM and calling the provided
 // callback. Does nothing if the chain is not available.
-void forEachPeerCertPem(SSL* ssl, std::function<void(const std::string&)> cb) {
-  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
+void forEachPeerCertPem(STACK_OF(X509)* cert_chain, std::function<void(const std::string&)> cb) {
   if (cert_chain == nullptr) {
     return;
   }
@@ -49,6 +48,14 @@ void forEachPeerCertPem(SSL* ssl, std::function<void(const std::string&)> cb) {
   }
 }
 } // namespace
+
+bssl::UniquePtr<X509> ConnectionInfoImplBase::peerCertificate() const {
+  return bssl::UniquePtr<X509>(SSL_get_peer_certificate(ssl()));
+}
+
+STACK_OF(X509)* ConnectionInfoImplBase::peerCertificateChain() const {
+  return SSL_get_peer_full_cert_chain(ssl());
+}
 
 template <typename ValueType>
 const ValueType&
@@ -140,8 +147,8 @@ absl::Span<const std::string> ConnectionInfoImplBase::othernameSansLocalCertific
 
 const std::string& ConnectionInfoImplBase::sha256PeerCertificateDigest() const {
   return getCachedValueOrCreate<std::string>(
-      CachedValueTag::Sha256PeerCertificateDigest, [](SSL* ssl) {
-        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+      CachedValueTag::Sha256PeerCertificateDigest, [this](SSL*) {
+        bssl::UniquePtr<X509> cert = peerCertificate();
         if (!cert) {
           return std::string{};
         }
@@ -151,8 +158,8 @@ const std::string& ConnectionInfoImplBase::sha256PeerCertificateDigest() const {
 
 absl::Span<const std::string> ConnectionInfoImplBase::sha256PeerCertificateChainDigests() const {
   return getCachedValueOrCreate<std::vector<std::string>>(
-      CachedValueTag::Sha256PeerCertificateChainDigests, [](SSL* ssl) {
-        STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
+      CachedValueTag::Sha256PeerCertificateChainDigests, [this](SSL*) {
+        STACK_OF(X509)* cert_chain = peerCertificateChain();
         if (cert_chain == nullptr) {
           return std::vector<std::string>{};
         }
@@ -164,20 +171,20 @@ absl::Span<const std::string> ConnectionInfoImplBase::sha256PeerCertificateChain
 }
 
 const std::string& ConnectionInfoImplBase::sha1PeerCertificateDigest() const {
-  return getCachedValueOrCreate<std::string>(
-      CachedValueTag::Sha1PeerCertificateDigest, [](SSL* ssl) {
-        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
-        if (!cert) {
-          return std::string{};
-        }
-        return Utility::getSha1DigestFromCertificate(*cert);
-      });
+  return getCachedValueOrCreate<std::string>(CachedValueTag::Sha1PeerCertificateDigest,
+                                             [this](SSL*) {
+                                               bssl::UniquePtr<X509> cert = peerCertificate();
+                                               if (!cert) {
+                                                 return std::string{};
+                                               }
+                                               return Utility::getSha1DigestFromCertificate(*cert);
+                                             });
 }
 
 absl::Span<const std::string> ConnectionInfoImplBase::sha1PeerCertificateChainDigests() const {
   return getCachedValueOrCreate<std::vector<std::string>>(
-      CachedValueTag::Sha1PeerCertificateChainDigests, [](SSL* ssl) {
-        STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
+      CachedValueTag::Sha1PeerCertificateChainDigests, [this](SSL*) {
+        STACK_OF(X509)* cert_chain = peerCertificateChain();
         if (cert_chain == nullptr) {
           return std::vector<std::string>{};
         }
@@ -190,8 +197,8 @@ absl::Span<const std::string> ConnectionInfoImplBase::sha1PeerCertificateChainDi
 
 const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificate() const {
   return getCachedValueOrCreate<std::string>(
-      CachedValueTag::UrlEncodedPemEncodedPeerCertificate, [](SSL* ssl) {
-        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+      CachedValueTag::UrlEncodedPemEncodedPeerCertificate, [this](SSL*) {
+        bssl::UniquePtr<X509> cert = peerCertificate();
         if (!cert) {
           return std::string{};
         }
@@ -200,21 +207,21 @@ const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificate()
 }
 
 const std::string& ConnectionInfoImplBase::pemEncodedPeerCertificate() const {
-  return getCachedValueOrCreate<std::string>(
-      CachedValueTag::PemEncodedPeerCertificate, [](SSL* ssl) {
-        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
-        if (!cert) {
-          return std::string{};
-        }
-        return certToPem(*cert);
-      });
+  return getCachedValueOrCreate<std::string>(CachedValueTag::PemEncodedPeerCertificate,
+                                             [this](SSL*) {
+                                               bssl::UniquePtr<X509> cert = peerCertificate();
+                                               if (!cert) {
+                                                 return std::string{};
+                                               }
+                                               return certToPem(*cert);
+                                             });
 }
 
 const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificateChain() const {
   return getCachedValueOrCreate<std::string>(
-      CachedValueTag::UrlEncodedPemEncodedPeerCertificateChain, [](SSL* ssl) {
+      CachedValueTag::UrlEncodedPemEncodedPeerCertificateChain, [this](SSL*) {
         std::string result;
-        forEachPeerCertPem(ssl, [&result](const std::string& pem) {
+        forEachPeerCertPem(peerCertificateChain(), [&result](const std::string& pem) {
           absl::StrAppend(&result, Envoy::Http::Utility::PercentEncoding::urlEncode(pem));
         });
         return result;
@@ -223,9 +230,10 @@ const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificateCh
 
 absl::Span<const std::string> ConnectionInfoImplBase::pemEncodedPeerCertificateChain() const {
   return getCachedValueOrCreate<std::vector<std::string>>(
-      CachedValueTag::PemEncodedPeerCertificateChain, [](SSL* ssl) {
+      CachedValueTag::PemEncodedPeerCertificateChain, [this](SSL*) {
         std::vector<std::string> result;
-        forEachPeerCertPem(ssl, [&result](const std::string& pem) { result.emplace_back(pem); });
+        forEachPeerCertPem(peerCertificateChain(),
+                           [&result](const std::string& pem) { result.emplace_back(pem); });
         return result;
       });
 }
@@ -234,8 +242,8 @@ bool ConnectionInfoImplBase::peerCertificateSanMatches(const Ssl::SanMatcher& ma
   const bssl::UniquePtr<GENERAL_NAMES>& sans =
       getCachedValueOrCreate<bssl::UniquePtr<GENERAL_NAMES>>(
           CachedValueTag::PeerCertificateSanMatches,
-          [](SSL* ssl) -> bssl::UniquePtr<GENERAL_NAMES> {
-            bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+          [this](SSL*) -> bssl::UniquePtr<GENERAL_NAMES> {
+            bssl::UniquePtr<X509> cert = peerCertificate();
             if (!cert) {
               return nullptr;
             }
@@ -256,8 +264,8 @@ bool ConnectionInfoImplBase::peerCertificateSanMatches(const Ssl::SanMatcher& ma
 
 absl::Span<const std::string> ConnectionInfoImplBase::uriSanPeerCertificate() const {
   return getCachedValueOrCreate<std::vector<std::string>>(
-      CachedValueTag::UriSanPeerCertificate, [](SSL* ssl) {
-        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+      CachedValueTag::UriSanPeerCertificate, [this](SSL*) {
+        bssl::UniquePtr<X509> cert = peerCertificate();
         if (!cert) {
           return std::vector<std::string>{};
         }
@@ -267,8 +275,8 @@ absl::Span<const std::string> ConnectionInfoImplBase::uriSanPeerCertificate() co
 
 absl::Span<const std::string> ConnectionInfoImplBase::dnsSansPeerCertificate() const {
   return getCachedValueOrCreate<std::vector<std::string>>(
-      CachedValueTag::DnsSansPeerCertificate, [](SSL* ssl) {
-        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+      CachedValueTag::DnsSansPeerCertificate, [this](SSL*) {
+        bssl::UniquePtr<X509> cert = peerCertificate();
         if (!cert) {
           return std::vector<std::string>{};
         }
@@ -278,8 +286,8 @@ absl::Span<const std::string> ConnectionInfoImplBase::dnsSansPeerCertificate() c
 
 absl::Span<const std::string> ConnectionInfoImplBase::ipSansPeerCertificate() const {
   return getCachedValueOrCreate<std::vector<std::string>>(
-      CachedValueTag::IpSansPeerCertificate, [](SSL* ssl) {
-        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+      CachedValueTag::IpSansPeerCertificate, [this](SSL*) {
+        bssl::UniquePtr<X509> cert = peerCertificate();
         if (!cert) {
           return std::vector<std::string>{};
         }
@@ -289,8 +297,8 @@ absl::Span<const std::string> ConnectionInfoImplBase::ipSansPeerCertificate() co
 
 absl::Span<const std::string> ConnectionInfoImplBase::emailSansPeerCertificate() const {
   return getCachedValueOrCreate<std::vector<std::string>>(
-      CachedValueTag::EmailSansPeerCertificate, [](SSL* ssl) {
-        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+      CachedValueTag::EmailSansPeerCertificate, [this](SSL*) {
+        bssl::UniquePtr<X509> cert = peerCertificate();
         if (!cert) {
           return std::vector<std::string>{};
         }
@@ -300,8 +308,8 @@ absl::Span<const std::string> ConnectionInfoImplBase::emailSansPeerCertificate()
 
 absl::Span<const std::string> ConnectionInfoImplBase::othernameSansPeerCertificate() const {
   return getCachedValueOrCreate<std::vector<std::string>>(
-      CachedValueTag::OthernameSansPeerCertificate, [](SSL* ssl) {
-        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+      CachedValueTag::OthernameSansPeerCertificate, [this](SSL*) {
+        bssl::UniquePtr<X509> cert = peerCertificate();
         if (!cert) {
           return std::vector<std::string>{};
         }
@@ -311,8 +319,8 @@ absl::Span<const std::string> ConnectionInfoImplBase::othernameSansPeerCertifica
 
 absl::Span<const std::string> ConnectionInfoImplBase::oidsPeerCertificate() const {
   return getCachedValueOrCreate<std::vector<std::string>>(
-      CachedValueTag::OidsPeerCertificate, [](SSL* ssl) {
-        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+      CachedValueTag::OidsPeerCertificate, [this](SSL*) {
+        bssl::UniquePtr<X509> cert = peerCertificate();
         if (!cert) {
           return std::vector<std::string>{};
         }
@@ -392,8 +400,8 @@ const std::string& ConnectionInfoImplBase::sni() const {
 
 const std::string& ConnectionInfoImplBase::serialNumberPeerCertificate() const {
   return getCachedValueOrCreate<std::string>(
-      CachedValueTag::SerialNumberPeerCertificate, [](SSL* ssl) {
-        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+      CachedValueTag::SerialNumberPeerCertificate, [this](SSL*) {
+        bssl::UniquePtr<X509> cert = peerCertificate();
         if (!cert) {
           return std::string{};
         }
@@ -403,8 +411,8 @@ const std::string& ConnectionInfoImplBase::serialNumberPeerCertificate() const {
 
 absl::Span<const std::string> ConnectionInfoImplBase::serialNumbersPeerCertificates() const {
   return getCachedValueOrCreate<std::vector<std::string>>(
-      CachedValueTag::SerialNumbersPeerCertificates, [](SSL* ssl) {
-        STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
+      CachedValueTag::SerialNumbersPeerCertificates, [this](SSL*) {
+        STACK_OF(X509)* cert_chain = peerCertificateChain();
         if (cert_chain == nullptr) {
           return std::vector<std::string>{};
         }
@@ -416,8 +424,8 @@ absl::Span<const std::string> ConnectionInfoImplBase::serialNumbersPeerCertifica
 }
 
 const std::string& ConnectionInfoImplBase::issuerPeerCertificate() const {
-  return getCachedValueOrCreate<std::string>(CachedValueTag::IssuerPeerCertificate, [](SSL* ssl) {
-    bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+  return getCachedValueOrCreate<std::string>(CachedValueTag::IssuerPeerCertificate, [this](SSL*) {
+    bssl::UniquePtr<X509> cert = peerCertificate();
     if (!cert) {
       return std::string{};
     }
@@ -448,8 +456,8 @@ const std::string& ConnectionInfoImplBase::serialNumberPeerCertificateIssuer() c
 }
 
 const std::string& ConnectionInfoImplBase::subjectPeerCertificate() const {
-  return getCachedValueOrCreate<std::string>(CachedValueTag::SubjectPeerCertificate, [](SSL* ssl) {
-    bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+  return getCachedValueOrCreate<std::string>(CachedValueTag::SubjectPeerCertificate, [this](SSL*) {
+    bssl::UniquePtr<X509> cert = peerCertificate();
     if (!cert) {
       return std::string{};
     }
@@ -459,8 +467,8 @@ const std::string& ConnectionInfoImplBase::subjectPeerCertificate() const {
 
 Ssl::ParsedX509NameOptConstRef ConnectionInfoImplBase::parsedSubjectPeerCertificate() const {
   const auto& parsedName = getCachedValueOrCreate<Ssl::ParsedX509NamePtr>(
-      CachedValueTag::ParsedSubjectPeerCertificate, [](SSL* ssl) {
-        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+      CachedValueTag::ParsedSubjectPeerCertificate, [this](SSL*) {
+        bssl::UniquePtr<X509> cert = peerCertificate();
         if (!cert) {
           return Ssl::ParsedX509NamePtr();
         }
@@ -484,7 +492,7 @@ const std::string& ConnectionInfoImplBase::subjectLocalCertificate() const {
 }
 
 std::optional<SystemTime> ConnectionInfoImplBase::validFromPeerCertificate() const {
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
+  bssl::UniquePtr<X509> cert = peerCertificate();
   if (!cert) {
     return std::nullopt;
   }
@@ -492,7 +500,7 @@ std::optional<SystemTime> ConnectionInfoImplBase::validFromPeerCertificate() con
 }
 
 std::optional<SystemTime> ConnectionInfoImplBase::expirationPeerCertificate() const {
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
+  bssl::UniquePtr<X509> cert = peerCertificate();
   if (!cert) {
     return std::nullopt;
   }

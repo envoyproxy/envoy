@@ -23,40 +23,36 @@ public:
     return session_.GetCryptoStream()->GetSsl();
   }
 
-  // Extensions::TransportSockets::Tls::ConnectionInfoImplBase
-  // TODO(#23809) populate those field once we support mutual TLS.
-  bool peerCertificatePresented() const override { return false; }
-  const std::string& sha256PeerCertificateDigest() const override { return EMPTY_STRING; }
-  const std::string& sha1PeerCertificateDigest() const override { return EMPTY_STRING; }
-  absl::Span<const std::string> uriSanPeerCertificate() const override { return {}; }
-  const std::string& serialNumberPeerCertificate() const override { return EMPTY_STRING; }
-  const std::string& issuerPeerCertificate() const override { return EMPTY_STRING; }
-  const std::string& sha256PeerCertificateIssuerDigest() const override { return EMPTY_STRING; }
-  const std::string& serialNumberPeerCertificateIssuer() const override { return EMPTY_STRING; }
-  const std::string& subjectPeerCertificate() const override { return EMPTY_STRING; }
-  Ssl::ParsedX509NameOptConstRef parsedSubjectPeerCertificate() const override {
-    return std::nullopt;
-  }
-  const std::string& urlEncodedPemEncodedPeerCertificate() const override { return EMPTY_STRING; }
-  const std::string& pemEncodedPeerCertificate() const override { return EMPTY_STRING; }
-  const std::string& urlEncodedPemEncodedPeerCertificateChain() const override {
-    return EMPTY_STRING;
-  }
-  absl::Span<const std::string> pemEncodedPeerCertificateChain() const override { return {}; }
-  absl::Span<const std::string> dnsSansPeerCertificate() const override { return {}; }
-  std::optional<SystemTime> validFromPeerCertificate() const override { return std::nullopt; }
-  std::optional<SystemTime> expirationPeerCertificate() const override { return std::nullopt; }
-  // QUIC SSL object doesn't cache local certs after the handshake.
+  X509* validatedPeerIssuer() const override;
+
+  // QUIC SSL object doesn't cache local certs after the handshake, and the X509-based local
+  // certificate getters are not usable on its CRYPTO_BUFFER-based SSL object.
   // TODO(danzh) cache these fields during cert chain retrieval.
   const std::string& subjectLocalCertificate() const override { return EMPTY_STRING; }
   absl::Span<const std::string> uriSanLocalCertificate() const override { return {}; }
   absl::Span<const std::string> dnsSansLocalCertificate() const override { return {}; }
+  absl::Span<const std::string> ipSansLocalCertificate() const override { return {}; }
+  absl::Span<const std::string> emailSansLocalCertificate() const override { return {}; }
+  absl::Span<const std::string> othernameSansLocalCertificate() const override { return {}; }
+  absl::Span<const std::string> oidsLocalCertificate() const override { return {}; }
 
   void onCertValidated() { cert_validated_ = true; };
+
+protected:
+  // Extensions::TransportSockets::Tls::ConnectionInfoImplBase
+  // QUIC's SSL object uses the CRYPTO_BUFFER-based method, so the default X509-based peer
+  // certificate getters are not usable on it. Convert the CRYPTO_BUFFER peer chain to X509 once
+  // and serve the base class accessors from the converted chain.
+  bssl::UniquePtr<X509> peerCertificate() const override;
+  STACK_OF(X509)* peerCertificateChain() const override;
 
 private:
   quic::QuicSession& session_;
   bool cert_validated_{false};
+  // The peer certificate chain converted from the CRYPTO_BUFFER-based SSL object, lazily created
+  // and cached. Null if conversion hasn't happened, was queried before the handshake delivered
+  // the peer chain, or failed.
+  mutable bssl::UniquePtr<STACK_OF(X509)> peer_cert_chain_;
 };
 
 } // namespace Quic
