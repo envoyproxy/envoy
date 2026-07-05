@@ -2,6 +2,7 @@
 
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/stats/prefix_utility.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -13,8 +14,8 @@ namespace A2a {
 
 namespace {
 A2aFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-  const std::string final_prefix = absl::StrCat(prefix, "a2a.");
-  return A2aFilterStats{A2A_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  Stats::TaggedStatName stat_prefix = Stats::mergeStatPrefix(scope.symbolTable(), prefix, "a2a.");
+  return A2aFilterStats{A2A_FILTER_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
 }
 } // namespace
 

@@ -24,40 +24,46 @@ DecompressorFilterConfig::DecompressorFilterConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
     Compression::Decompressor::DecompressorFactoryPtr decompressor_factory)
-    : stats_prefix_(fmt::format("{}decompressor.{}.{}", stats_prefix,
-                                proto_config.decompressor_library().name(),
-                                decompressor_factory->statsPrefix())),
+    : filter_stats_prefix_(fmt::format("decompressor.{}.{}",
+                                       proto_config.decompressor_library().name(),
+                                       decompressor_factory->statsPrefix())),
       trailers_prefix_(fmt::format("{}-decompressor-{}",
                                    ThreadSafeSingleton<Http::PrefixValue>::get().prefix(),
                                    proto_config.decompressor_library().name())),
-      decompressor_stats_prefix_(stats_prefix_ + "decompressor_library"),
+      decompressor_stats_prefix_(
+          fmt::format("{}{}decompressor_library", stats_prefix, filter_stats_prefix_)),
       decompressor_factory_(std::move(decompressor_factory)),
-      request_direction_config_(proto_config.request_direction_config(), stats_prefix_, scope,
-                                runtime),
-      response_direction_config_(proto_config.response_direction_config(), stats_prefix_, scope,
-                                 runtime) {}
+      request_direction_config_(proto_config.request_direction_config(), stats_prefix,
+                                filter_stats_prefix_, scope, runtime),
+      response_direction_config_(proto_config.response_direction_config(), stats_prefix,
+                                 filter_stats_prefix_, scope, runtime) {}
 
 DecompressorFilterConfig::DirectionConfig::DirectionConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor::CommonDirectionConfig&
         proto_config,
-    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
-    : stats_(generateStats(stats_prefix, scope)),
+    const std::string& parent_stats_prefix, const std::string& filter_stats_prefix,
+    Stats::Scope& scope, Runtime::Loader& runtime)
+    : stats_(generateStats(parent_stats_prefix, filter_stats_prefix, scope)),
       decompression_enabled_(proto_config.enabled(), runtime),
       ignore_no_transform_header_(proto_config.ignore_no_transform_header()) {}
 
 DecompressorFilterConfig::RequestDirectionConfig::RequestDirectionConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor::RequestDirectionConfig&
         proto_config,
-    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
-    : DirectionConfig(proto_config.common_config(), stats_prefix + "request.", scope, runtime),
+    const std::string& parent_stats_prefix, const std::string& filter_stats_prefix,
+    Stats::Scope& scope, Runtime::Loader& runtime)
+    : DirectionConfig(proto_config.common_config(), parent_stats_prefix,
+                      filter_stats_prefix + "request.", scope, runtime),
       advertise_accept_encoding_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, advertise_accept_encoding, true)) {}
 
 DecompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor::ResponseDirectionConfig&
         proto_config,
-    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
-    : DirectionConfig(proto_config.common_config(), stats_prefix + "response.", scope, runtime) {}
+    const std::string& parent_stats_prefix, const std::string& filter_stats_prefix,
+    Stats::Scope& scope, Runtime::Loader& runtime)
+    : DirectionConfig(proto_config.common_config(), parent_stats_prefix,
+                      filter_stats_prefix + "response.", scope, runtime) {}
 
 DecompressorFilter::DecompressorFilter(DecompressorFilterConfigSharedPtr config)
     : config_(std::move(config)), request_byte_tracker_(config_->trailersCompressedBytesString(),

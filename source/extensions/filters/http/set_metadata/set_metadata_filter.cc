@@ -5,6 +5,7 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/stats/prefix_utility.h"
 
 #include "absl/strings/str_format.h"
 
@@ -87,8 +88,9 @@ Config::Config(const envoy::extensions::filters::http::set_metadata::v3::Config&
 }
 
 FilterStats Config::generateStats(const std::string& prefix, Stats::Scope& scope) {
-  std::string final_prefix = prefix + "set_metadata.";
-  return {ALL_SET_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  Stats::TaggedStatName stat_prefix =
+      Stats::mergeStatPrefix(scope.symbolTable(), prefix, "set_metadata.");
+  return {ALL_SET_METADATA_FILTER_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
 }
 
 SetMetadataFilter::SetMetadataFilter(const ConfigSharedPtr config) : config_(config) {}

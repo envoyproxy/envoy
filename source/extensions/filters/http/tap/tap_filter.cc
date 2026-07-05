@@ -2,6 +2,8 @@
 
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 
+#include "source/common/stats/prefix_utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -9,7 +11,7 @@ namespace TapFilter {
 
 FilterConfigImpl::FilterConfigImpl(
     const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
-    const std::string& stats_prefix, Common::Tap::TapConfigFactoryPtr&& config_factory,
+    const std::string& stats_prefix, Extensions::Common::Tap::TapConfigFactoryPtr&& config_factory,
     Stats::Scope& scope, OptRef<Server::Admin> admin, Singleton::Manager& singleton_manager,
     ThreadLocal::SlotAllocator& tls, Event::Dispatcher& main_thread_dispatcher)
     : ExtensionConfigBase(proto_config.common_config(), std::move(config_factory), admin,
@@ -23,8 +25,8 @@ HttpTapConfigSharedPtr FilterConfigImpl::currentConfig() {
 FilterStats Filter::generateStats(const std::string& prefix, Stats::Scope& scope) {
   // TODO(mattklein123): Consider whether we want to additionally namespace the stats on the
   // filter's configured opaque ID.
-  std::string final_prefix = prefix + "tap.";
-  return {ALL_TAP_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  Stats::TaggedStatName stat_prefix = Stats::mergeStatPrefix(scope.symbolTable(), prefix, "tap.");
+  return {ALL_TAP_FILTER_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {

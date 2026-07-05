@@ -49,7 +49,7 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Respons
         Http::CustomHeaders::get().AccessControlAllowPrviateNetwork);
 
 CorsFilterConfig::CorsFilterConfig(const std::string& stats_prefix, Stats::Scope& scope)
-    : stats_(generateStats(stats_prefix + "cors.", scope)) {}
+    : stats_(generateStats(stats_prefix, scope)) {}
 
 CorsFilter::CorsFilter(CorsFilterConfigSharedPtr config) : config_(std::move(config)) {}
 

@@ -5,6 +5,7 @@
 #include "source/common/common/hex.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/stats/prefix_utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,8 +28,9 @@ const std::string& FilterConfigImpl::hostRewrite() const { return host_rewrite_;
 bool FilterConfigImpl::useUnsignedPayload() const { return use_unsigned_payload_; }
 
 FilterStats Filter::generateStats(const std::string& prefix, Stats::Scope& scope) {
-  const std::string final_prefix = prefix + "aws_request_signing.";
-  return {ALL_AWS_REQUEST_SIGNING_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  Stats::TaggedStatName stat_prefix =
+      Stats::mergeStatPrefix(scope.symbolTable(), prefix, "aws_request_signing.");
+  return {ALL_AWS_REQUEST_SIGNING_FILTER_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {

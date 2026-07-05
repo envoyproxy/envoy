@@ -21,6 +21,7 @@
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/lc_trie.h"
 #include "source/common/stats/symbol_table.h"
+#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -61,7 +62,7 @@ private:
   // them goes away (relevant for providers shared across listeners).
   Stats::ScopeSharedPtr scope_;
   Stats::StatNameSetPtr stat_name_set_;
-  const Stats::StatName stats_prefix_;
+  const Stats::TaggedStatName stats_prefix_;
   const Stats::StatName unknown_tag_;
   const Stats::StatName total_;
   const Stats::StatName no_hit_;

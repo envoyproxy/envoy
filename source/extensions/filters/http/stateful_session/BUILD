@@ -20,6 +20,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:prefix_utility_lib",
         "//source/common/upstream:load_balancer_context_base_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:pass_through_filter_lib",

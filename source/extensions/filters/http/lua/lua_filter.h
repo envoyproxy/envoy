@@ -8,6 +8,7 @@
 #include "source/common/crypto/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/common/lua/wrappers.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/lua/wrappers.h"
@@ -478,8 +479,14 @@ public:
 private:
   LuaFilterStats generateStats(const std::string& prefix, const std::string& filter_stats_prefix,
                                Stats::Scope& scope) {
-    const std::string final_prefix = absl::StrCat(prefix, "lua.", filter_stats_prefix);
-    return {ALL_LUA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+    // No lua tag exists in well_known_names.cc, so filter_stats_prefix stays an untagged literal;
+    // only the parent "http.<hcm>." prefix is tagged (by the helper).
+    Stats::TaggedStatName stat_prefix =
+        filter_stats_prefix.empty()
+            ? Stats::mergeStatPrefix(scope.symbolTable(), prefix, "lua.")
+            : Stats::mergeStatPrefix(scope.symbolTable(), prefix,
+                                     absl::StrCat("lua.", filter_stats_prefix, "."));
+    return {ALL_LUA_FILTER_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
   }
 
   const bool clear_route_cache_{};

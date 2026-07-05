@@ -6,6 +6,7 @@
 #include "source/common/config/datasource.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
+#include "source/common/stats/prefix_utility.h"
 
 #include "absl/strings/str_join.h"
 
@@ -16,7 +17,7 @@ namespace IpTagging {
 
 IpTagsStats::IpTagsStats(const std::string& stat_prefix, Stats::ScopeSharedPtr scope)
     : scope_(std::move(scope)), stat_name_set_(scope_->symbolTable().makeSet("IpTagging")),
-      stats_prefix_(stat_name_set_->add(stat_prefix + "ip_tagging")),
+      stats_prefix_(Stats::mergeStatPrefix(scope_->symbolTable(), stat_prefix, "ip_tagging.")),
       unknown_tag_(stat_name_set_->add("unknown_tag.hit")), total_(stat_name_set_->add("total")),
       no_hit_(stat_name_set_->add("no_hit")),
       reload_success_(stat_name_set_->add("reload_success")) {}
@@ -26,8 +27,9 @@ void IpTagsStats::incHit(absl::string_view tag) {
 }
 
 void IpTagsStats::incCounter(Stats::StatName name) {
-  Stats::SymbolTable::StoragePtr storage = scope_->symbolTable().join({stats_prefix_, name});
-  scope_->counterFromStatName(Stats::StatName(storage.get())).inc();
+  Stats::Utility::counterFromTaggedPrefix(*scope_, stats_prefix_.baseName(),
+                                          stats_prefix_.nameTags(), stats_prefix_.name(), name)
+      .inc();
 }
 
 absl::StatusOr<LcTrieSharedPtr> IpTagsStats::parseIpTagsAsProto(

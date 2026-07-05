@@ -13,6 +13,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/stats/prefix_utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -39,8 +40,9 @@ struct HealthCheckFilterStats {
   ALL_HEALTH_CHECK_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 
   static HealthCheckFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    const std::string final_prefix = absl::StrCat(prefix, "health_check.");
-    return {ALL_HEALTH_CHECK_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+    Stats::TaggedStatName stat_prefix =
+        Stats::mergeStatPrefix(scope.symbolTable(), prefix, "health_check.");
+    return {ALL_HEALTH_CHECK_FILTER_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
   }
 };
 

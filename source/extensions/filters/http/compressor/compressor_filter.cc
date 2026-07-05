@@ -91,21 +91,21 @@ void compressAndUpdateStats(const Compression::Compressor::CompressorPtr& compre
 CompressorFilterConfig::DirectionConfig::DirectionConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor::CommonDirectionConfig&
         proto_config,
-    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
+    const std::string& parent_stats_prefix, const std::string& filter_stats_prefix,
+    Stats::Scope& scope, Runtime::Loader& runtime)
     : compression_enabled_(proto_config.enabled(), runtime),
       min_content_length_{contentLengthUint(proto_config.min_content_length().value())},
       content_type_values_(contentTypeSet(proto_config.content_type())),
-      stats_{generateStats(stats_prefix, scope)} {}
+      stats_{generateStats(parent_stats_prefix, filter_stats_prefix, scope)} {}
 
 CompressorFilterConfig::CompressorFilterConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
     Compression::Compressor::CompressorFactoryPtr compressor_factory)
-    : common_stats_prefix_(fmt::format("{}compressor.{}.{}", stats_prefix,
-                                       proto_config.compressor_library().name(),
+    : filter_stats_prefix_(fmt::format("compressor.{}.{}", proto_config.compressor_library().name(),
                                        compressor_factory->statsPrefix())),
-      request_direction_config_(proto_config, common_stats_prefix_, scope, runtime),
-      response_direction_config_(proto_config, common_stats_prefix_, scope, runtime),
+      request_direction_config_(proto_config, stats_prefix, filter_stats_prefix_, scope, runtime),
+      response_direction_config_(proto_config, stats_prefix, filter_stats_prefix_, scope, runtime),
       content_encoding_(compressor_factory->contentEncoding()),
       compressor_factory_(std::move(compressor_factory)),
       choose_first_(proto_config.choose_first()) {}
@@ -124,9 +124,10 @@ uint32_t CompressorFilterConfig::DirectionConfig::contentLengthUint(Protobuf::ui
 
 CompressorFilterConfig::RequestDirectionConfig::RequestDirectionConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
-    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
-    : DirectionConfig(proto_config.request_direction_config().common_config(),
-                      stats_prefix + "request.", scope, runtime),
+    const std::string& parent_stats_prefix, const std::string& filter_stats_prefix,
+    Stats::Scope& scope, Runtime::Loader& runtime)
+    : DirectionConfig(proto_config.request_direction_config().common_config(), parent_stats_prefix,
+                      filter_stats_prefix + "request.", scope, runtime),
       is_set_{proto_config.has_request_direction_config()} {}
 
 absl::flat_hash_set<uint32_t>
@@ -136,10 +137,12 @@ uncompressibleResponseCodesSet(const Protobuf::RepeatedField<uint32_t>& codes) {
 
 CompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
-    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
-    : DirectionConfig(commonConfig(proto_config),
-                      proto_config.has_response_direction_config() ? stats_prefix + "response."
-                                                                   : stats_prefix,
+    const std::string& parent_stats_prefix, const std::string& filter_stats_prefix,
+    Stats::Scope& scope, Runtime::Loader& runtime)
+    : DirectionConfig(commonConfig(proto_config), parent_stats_prefix,
+                      proto_config.has_response_direction_config()
+                          ? filter_stats_prefix + "response."
+                          : filter_stats_prefix,
                       scope, runtime),
       disable_on_etag_header_(
           proto_config.has_response_direction_config()
@@ -153,7 +156,7 @@ CompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
       status_header_enabled_(proto_config.response_direction_config().status_header_enabled()),
       uncompressible_response_codes_(uncompressibleResponseCodesSet(
           proto_config.response_direction_config().uncompressible_response_codes())),
-      response_stats_{generateResponseStats(stats_prefix, scope)} {}
+      response_stats_{generateResponseStats(parent_stats_prefix, filter_stats_prefix, scope)} {}
 
 const envoy::extensions::filters::http::compressor::v3::Compressor::CommonDirectionConfig
 CompressorFilterConfig::ResponseDirectionConfig::commonConfig(

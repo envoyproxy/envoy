@@ -5,6 +5,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "absl/container/inlined_vector.h"
@@ -38,7 +39,9 @@ public:
 
 private:
   static CorsStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    return CorsStats{ALL_CORS_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+    Stats::TaggedStatName stat_prefix =
+        Stats::mergeStatPrefix(scope.symbolTable(), prefix, "cors.");
+    return CorsStats{ALL_CORS_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
   }
 
   CorsStats stats_;

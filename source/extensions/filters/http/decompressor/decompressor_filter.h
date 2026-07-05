@@ -9,6 +9,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/runtime/runtime_protos.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
@@ -41,7 +42,8 @@ public:
   public:
     DirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor::
                         CommonDirectionConfig& proto_config,
-                    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
+                    const std::string& parent_stats_prefix, const std::string& filter_stats_prefix,
+                    Stats::Scope& scope, Runtime::Loader& runtime);
 
     virtual ~DirectionConfig() = default;
 
@@ -51,8 +53,14 @@ public:
     bool ignoreNoTransformHeader() const { return ignore_no_transform_header_; }
 
   private:
-    static DecompressorStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-      return DecompressorStats{ALL_DECOMPRESSOR_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+    static DecompressorStats generateStats(const std::string& parent_stats_prefix,
+                                           const std::string& filter_stats_prefix,
+                                           Stats::Scope& scope) {
+      // The parent "http.<hcm>."/"cluster.<name>." prefix is tagged; the filter's own
+      // "decompressor.<lib>.<algo>.<direction>" segments are untagged literals.
+      Stats::TaggedStatName stat_prefix =
+          Stats::mergeStatPrefix(scope.symbolTable(), parent_stats_prefix, filter_stats_prefix);
+      return DecompressorStats{ALL_DECOMPRESSOR_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
     }
 
     const DecompressorStats stats_;
@@ -64,7 +72,8 @@ public:
   public:
     RequestDirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor::
                                RequestDirectionConfig& proto_config,
-                           const std::string& stats_prefix, Stats::Scope& scope,
+                           const std::string& parent_stats_prefix,
+                           const std::string& filter_stats_prefix, Stats::Scope& scope,
                            Runtime::Loader& runtime);
 
     // DirectionConfig
@@ -82,7 +91,8 @@ public:
   public:
     ResponseDirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor::
                                 ResponseDirectionConfig& proto_config,
-                            const std::string& stats_prefix, Stats::Scope& scope,
+                            const std::string& parent_stats_prefix,
+                            const std::string& filter_stats_prefix, Stats::Scope& scope,
                             Runtime::Loader& runtime);
 
     // DirectionConfig
@@ -112,7 +122,9 @@ public:
   }
 
 private:
-  const std::string stats_prefix_;
+  // The filter's own stat-prefix segments ("decompressor.<lib>.<algo>"), tag-free; the parent
+  // "http.<hcm>."/"cluster.<name>." prefix is kept separate and tagged by mergeStatPrefix.
+  const std::string filter_stats_prefix_;
   const std::string trailers_prefix_;
   const std::string decompressor_stats_prefix_;
   const Compression::Decompressor::DecompressorFactoryPtr decompressor_factory_;

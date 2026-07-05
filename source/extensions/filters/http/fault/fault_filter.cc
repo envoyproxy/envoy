@@ -20,6 +20,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/common/stats/utility.h"
 
 namespace Envoy {
@@ -402,9 +403,9 @@ Http::FilterTrailersStatus FaultFilter::decodeTrailers(Http::RequestTrailerMap&)
 }
 
 FaultFilterStats FaultFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
-  const std::string final_prefix = prefix + "fault.";
-  return {ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                                 POOL_GAUGE_PREFIX(scope, final_prefix))};
+  Stats::TaggedStatName stat_prefix = Stats::mergeStatPrefix(scope.symbolTable(), prefix, "fault.");
+  return {ALL_FAULT_FILTER_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix),
+                                 POOL_GAUGE_TAGGED(scope, stat_prefix))};
 }
 
 bool FaultFilter::tryIncActiveFaults() {

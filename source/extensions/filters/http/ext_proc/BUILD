@@ -36,6 +36,7 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
+        "//source/common/stats:prefix_utility_lib",
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
         "//source/extensions/filters/common/processing_effect:processing_effect_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",

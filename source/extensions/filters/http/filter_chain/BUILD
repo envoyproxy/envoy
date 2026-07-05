@@ -22,6 +22,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http:filter_chain_helper_lib",
         "//source/common/http:utility_lib",
+        "//source/common/stats:prefix_utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/filter_chain/v3:pkg_cc_proto",
     ],

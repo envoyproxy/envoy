@@ -5,6 +5,7 @@
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.validate.h"
 
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/gcp_authn/crypto_utils.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_client.h"
@@ -73,7 +74,11 @@ private:
   std::optional<std::string> getClientCertFingerprint(Upstream::ThreadLocalCluster* cluster);
 
   GcpAuthnFilterStats generateStats(const std::string& stats_prefix, Stats::Scope& scope) {
-    return {ALL_GCP_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, stats_prefix))};
+    // gcp_authn passes the parent "http.<hcm>." prefix straight through (its stat names carry no
+    // filter segment), so only the parent tag is extracted.
+    Stats::TaggedStatName stat_prefix =
+        Stats::mergeStatPrefix(scope.symbolTable(), stats_prefix, "");
+    return {ALL_GCP_AUTHN_FILTER_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
   }
 
   FilterConfigSharedPtr filter_config_;

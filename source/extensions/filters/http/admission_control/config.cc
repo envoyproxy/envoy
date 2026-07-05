@@ -42,8 +42,6 @@ absl::StatusOr<Http::FilterFactoryCb> AdmissionControlFilterFactory::createFilte
     return absl::InvalidArgumentError("Success rate threshold cannot be less than 1.0%.");
   }
 
-  const std::string prefix = stats_prefix + "admission_control.";
-
   // Create the thread-local controller.
   auto tls = ThreadLocal::TypedSlot<ThreadLocalControllerImpl>::makeUnique(context.threadLocal());
   auto sampling_window = std::chrono::seconds(
@@ -71,8 +69,9 @@ absl::StatusOr<Http::FilterFactoryCb> AdmissionControlFilterFactory::createFilte
                                                      context.api().randomGenerator(), scope,
                                                      std::move(tls), std::move(response_evaluator));
 
-  return [filter_config, prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<AdmissionControlFilter>(filter_config, prefix));
+  return [filter_config, stats_prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(
+        std::make_shared<AdmissionControlFilter>(filter_config, stats_prefix));
   };
 }
 

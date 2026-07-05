@@ -12,6 +12,7 @@
 #include "source/common/common/cleanup.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/http/adaptive_concurrency/controller/controller.h"
 
 #include "absl/synchronization/mutex.h"
@@ -54,11 +55,12 @@ GradientControllerConfig::GradientControllerConfig(
 }
 GradientController::GradientController(GradientControllerConfig config,
                                        Event::Dispatcher& dispatcher, Runtime::Loader&,
-                                       const std::string& stats_prefix, Stats::Scope& scope,
+                                       const std::string& parent_stats_prefix,
+                                       const std::string& filter_stats_prefix, Stats::Scope& scope,
                                        Random::RandomGenerator& random, TimeSource& time_source)
     : config_(std::move(config)), dispatcher_(dispatcher), scope_(scope),
-      stats_(generateStats(scope_, stats_prefix)), random_(random), time_source_(time_source),
-      deferred_limit_value_(0), num_rq_outstanding_(0),
+      stats_(generateStats(scope_, parent_stats_prefix, filter_stats_prefix)), random_(random),
+      time_source_(time_source), deferred_limit_value_(0), num_rq_outstanding_(0),
       concurrency_limit_(config_.minConcurrency()),
       latency_sample_hist_(hist_fast_alloc(), hist_free) {
   min_rtt_calc_timer_ = dispatcher_.createTimer([this]() -> void { enterMinRTTSamplingWindow(); });
@@ -92,9 +94,14 @@ GradientController::GradientController(GradientControllerConfig config,
 }
 
 GradientControllerStats GradientController::generateStats(Stats::Scope& scope,
-                                                          const std::string& stats_prefix) {
-  return {ALL_GRADIENT_CONTROLLER_STATS(POOL_COUNTER_PREFIX(scope, stats_prefix),
-                                        POOL_GAUGE_PREFIX(scope, stats_prefix))};
+                                                          const std::string& parent_stats_prefix,
+                                                          const std::string& filter_stats_prefix) {
+  // The parent "http.<hcm>." prefix is tagged; the filter's own
+  // "adaptive_concurrency.gradient_controller." segments are untagged literals.
+  Stats::TaggedStatName stat_prefix =
+      Stats::mergeStatPrefix(scope.symbolTable(), parent_stats_prefix, filter_stats_prefix);
+  return {ALL_GRADIENT_CONTROLLER_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix),
+                                        POOL_GAUGE_TAGGED(scope, stat_prefix))};
 }
 
 void GradientController::enterMinRTTSamplingWindow() {

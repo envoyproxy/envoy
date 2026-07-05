@@ -5,6 +5,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/stats/prefix_utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -26,9 +28,12 @@ struct GrpcJsonTranscoderFilterStats {
 
   static GrpcJsonTranscoderFilterStats generateStats(const std::string& prefix,
                                                      Stats::Scope& scope) {
+    // The filter's stats sit directly under the "http.<hcm>." parent prefix (no filter-name
+    // segment), so the whole prefix is the parent and the filter's own prefix is empty.
+    Stats::TaggedStatName stat_prefix = Stats::mergeStatPrefix(scope.symbolTable(), prefix, "");
     return GrpcJsonTranscoderFilterStats{ALL_GRPC_JSON_TRANSCODER_FILTER_STATS(
-        POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix),
-        POOL_HISTOGRAM_PREFIX(scope, prefix))};
+        POOL_COUNTER_TAGGED(scope, stat_prefix), POOL_GAUGE_TAGGED(scope, stat_prefix),
+        POOL_HISTOGRAM_TAGGED(scope, stat_prefix))};
   }
 };
 

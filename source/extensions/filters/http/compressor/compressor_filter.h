@@ -10,6 +10,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_protos.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
@@ -68,7 +69,8 @@ public:
     DirectionConfig(
         const envoy::extensions::filters::http::compressor::v3::Compressor::CommonDirectionConfig&
             proto_config,
-        const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
+        const std::string& parent_stats_prefix, const std::string& filter_stats_prefix,
+        Stats::Scope& scope, Runtime::Loader& runtime);
 
     virtual ~DirectionConfig() = default;
 
@@ -84,8 +86,14 @@ public:
     const Runtime::FeatureFlag compression_enabled_;
 
   private:
-    static CompressorStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-      return CompressorStats{COMMON_COMPRESSOR_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+    static CompressorStats generateStats(const std::string& parent_stats_prefix,
+                                         const std::string& filter_stats_prefix,
+                                         Stats::Scope& scope) {
+      // The parent "http.<hcm>."/"cluster.<name>." prefix is tagged; the filter's own
+      // "compressor.<lib>.<algo>[.request|.response]" segments are untagged literals.
+      Stats::TaggedStatName stat_prefix =
+          Stats::mergeStatPrefix(scope.symbolTable(), parent_stats_prefix, filter_stats_prefix);
+      return CompressorStats{COMMON_COMPRESSOR_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
     }
 
     static uint32_t contentLengthUint(Protobuf::uint32 length);
@@ -102,7 +110,8 @@ public:
   public:
     RequestDirectionConfig(
         const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
-        const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
+        const std::string& parent_stats_prefix, const std::string& filter_stats_prefix,
+        Stats::Scope& scope, Runtime::Loader& runtime);
 
     bool compressionEnabled() const override { return is_set_ && compression_enabled_.enabled(); }
 
@@ -114,7 +123,8 @@ public:
   public:
     ResponseDirectionConfig(
         const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
-        const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
+        const std::string& parent_stats_prefix, const std::string& filter_stats_prefix,
+        Stats::Scope& scope, Runtime::Loader& runtime);
 
     bool compressionEnabled() const override { return compression_enabled_.enabled(); }
     const ResponseCompressorStats& responseStats() const { return response_stats_; }
@@ -126,9 +136,13 @@ public:
     bool isResponseCodeCompressible(uint32_t response_code) const;
 
   private:
-    static ResponseCompressorStats generateResponseStats(const std::string& prefix,
+    static ResponseCompressorStats generateResponseStats(const std::string& parent_stats_prefix,
+                                                         const std::string& filter_stats_prefix,
                                                          Stats::Scope& scope) {
-      return ResponseCompressorStats{RESPONSE_COMPRESSOR_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+      Stats::TaggedStatName stat_prefix =
+          Stats::mergeStatPrefix(scope.symbolTable(), parent_stats_prefix, filter_stats_prefix);
+      return ResponseCompressorStats{
+          RESPONSE_COMPRESSOR_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
     }
 
     // TODO(rojkov): delete this translation function once the deprecated fields
@@ -161,7 +175,9 @@ public:
   }
 
 private:
-  const std::string common_stats_prefix_;
+  // The filter's own stat-prefix segments ("compressor.<lib>.<algo>"), tag-free; the parent
+  // "http.<hcm>."/"cluster.<name>." prefix is kept separate and tagged by mergeStatPrefix.
+  const std::string filter_stats_prefix_;
   const RequestDirectionConfig request_direction_config_;
   const ResponseDirectionConfig response_direction_config_;
 

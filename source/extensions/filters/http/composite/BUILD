@@ -51,6 +51,7 @@ envoy_cc_extension(
     deps = [
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
+        "//source/common/stats:prefix_utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/composite:filter_lib",
         "@envoy_api//envoy/extensions/filters/http/composite/v3:pkg_cc_proto",

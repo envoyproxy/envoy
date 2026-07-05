@@ -41,7 +41,7 @@ FilterConfig::FilterConfig(UserMap&& users, const std::string& forward_username_
     : users_(std::move(users)), forward_username_header_(forward_username_header),
       authentication_header_(Http::LowerCaseString(authentication_header)),
       allow_missing_(allow_missing), emit_dynamic_metadata_(emit_dynamic_metadata),
-      stats_(generateStats(stats_prefix + "basic_auth.", scope)) {}
+      stats_(generateStats(stats_prefix, scope)) {}
 
 BasicAuthFilter::BasicAuthFilter(FilterConfigConstSharedPtr config) : config_(std::move(config)) {}
 

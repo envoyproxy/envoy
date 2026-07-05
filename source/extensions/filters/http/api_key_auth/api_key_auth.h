@@ -5,6 +5,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -219,7 +220,9 @@ public:
 
 private:
   static ApiKeyAuthStats generateStats(Stats::Scope& scope, const std::string& prefix) {
-    return ApiKeyAuthStats{ALL_API_KEY_AUTH_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+    Stats::TaggedStatName stat_prefix =
+        Stats::mergeStatPrefix(scope.symbolTable(), prefix, "api_key_auth.");
+    return ApiKeyAuthStats{ALL_API_KEY_AUTH_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
   }
 
   const ApiKeyAuthConfig default_config_;

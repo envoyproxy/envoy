@@ -20,6 +20,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/common/tracing/tracing_validation.h"
 #include "source/extensions/filters/common/mcp/constants.h"
 #include "source/extensions/filters/common/mcp/filter_state.h"
@@ -42,8 +43,8 @@ const Http::LowerCaseString kMcpSessionId{
     std::string(Filters::Common::Mcp::McpConstants::MCP_SESSION_ID_HEADER)};
 
 McpFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-  const std::string final_prefix = absl::StrCat(prefix, "mcp.");
-  return McpFilterStats{MCP_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  Stats::TaggedStatName stat_prefix = Stats::mergeStatPrefix(scope.symbolTable(), prefix, "mcp.");
+  return McpFilterStats{MCP_FILTER_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
 }
 
 const Http::LowerCaseString& traceparentHeader() {

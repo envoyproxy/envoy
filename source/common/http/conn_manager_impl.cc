@@ -35,6 +35,7 @@
 #include "source/common/common/perf_tracing.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/exception.h"
@@ -49,10 +50,10 @@
 #include "source/common/network/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/stream_info/utility.h"
 
-#include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
@@ -99,20 +100,25 @@ upstreamOperationNameFormatter(const Http::TracingConnectionManagerConfig& hcm_c
 
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
                                                             Stats::Scope& scope) {
+  Stats::TaggedStatName stat_prefix = Stats::mergeStatPrefix(scope.symbolTable(), prefix, "");
   return ConnectionManagerStats(
-      {ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix),
-                               POOL_HISTOGRAM_PREFIX(scope, prefix))},
+      {ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix),
+                               POOL_GAUGE_TAGGED(scope, stat_prefix),
+                               POOL_HISTOGRAM_TAGGED(scope, stat_prefix))},
       prefix, scope);
 }
 
 ConnectionManagerTracingStats ConnectionManagerImpl::generateTracingStats(const std::string& prefix,
                                                                           Stats::Scope& scope) {
-  return {CONN_MAN_TRACING_STATS(POOL_COUNTER_PREFIX(scope, prefix + "tracing."))};
+  Stats::TaggedStatName stat_prefix =
+      Stats::mergeStatPrefix(scope.symbolTable(), prefix, "tracing.");
+  return {CONN_MAN_TRACING_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
 }
 
 ConnectionManagerListenerStats
 ConnectionManagerImpl::generateListenerStats(const std::string& prefix, Stats::Scope& scope) {
-  return {CONN_MAN_LISTENER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+  Stats::TaggedStatName stat_prefix = Stats::mergeStatPrefix(scope.symbolTable(), prefix, "");
+  return {CONN_MAN_LISTENER_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
 }
 
 ConnectionManagerImpl::ConnectionManagerImpl(

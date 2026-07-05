@@ -7,6 +7,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/http/jwt_authn/matcher.h"
 #include "source/extensions/filters/http/jwt_authn/stats.h"
 #include "source/extensions/filters/http/jwt_authn/verifier.h"
@@ -118,8 +119,14 @@ public:
 private:
   JwtAuthnFilterStats generateStats(const std::string& prefix,
                                     const std::string& filter_stats_prefix, Stats::Scope& scope) {
-    const std::string final_prefix = absl::StrCat(prefix, "jwt_authn.", filter_stats_prefix);
-    return {ALL_JWT_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+    // No jwt_authn tag exists in well_known_names.cc, so filter_stats_prefix stays an untagged
+    // literal; only the parent "http.<hcm>." prefix is tagged (by the helper).
+    Stats::TaggedStatName stat_prefix =
+        filter_stats_prefix.empty()
+            ? Stats::mergeStatPrefix(scope.symbolTable(), prefix, "jwt_authn.")
+            : Stats::mergeStatPrefix(scope.symbolTable(), prefix,
+                                     absl::StrCat("jwt_authn.", filter_stats_prefix, "."));
+    return {ALL_JWT_AUTHN_FILTER_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
   }
 
   struct MatcherVerifierPair {
