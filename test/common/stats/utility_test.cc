@@ -257,6 +257,20 @@ TEST_P(StatsUtilityTest, TaggedStatNamesNoTags) {
   const StatName prefix = pool_.add("prefix");
   Counter& c = Utility::counterFromTaggedPrefix(*scope, prefix, {}, prefix, "requests");
   EXPECT_EQ("scope.prefix.requests", c.name());
+
+  Counter& c2 = Utility::counterFromTaggedPrefix(*scope, prefix, {}, StatName(), "requests");
+  EXPECT_EQ("scope.prefix.requests", c2.name());
+
+  Gauge& g = Utility::gaugeFromTaggedPrefix(*scope, prefix, {}, StatName(), "gauge",
+                                            Gauge::ImportMode::NeverImport);
+  EXPECT_EQ("scope.prefix.gauge", g.name());
+
+  Histogram& h = Utility::histogramFromTaggedPrefix(*scope, prefix, {}, StatName(), "histogram",
+                                                    Histogram::Unit::Milliseconds);
+  EXPECT_EQ("scope.prefix.histogram", h.name());
+
+  TextReadout& t = Utility::textReadoutFromTaggedPrefix(*scope, prefix, {}, StatName(), "text");
+  EXPECT_EQ("scope.prefix.text", t.name());
 }
 
 // Exercises TaggedStatName directly: it pre-encodes the base name, tagged name, and tags
@@ -266,7 +280,7 @@ TEST_P(StatsUtilityTest, TaggedStatNameAccessors) {
   TaggedStatName tagged(*symbol_table_, "base.name", tag_views, "base.valA.name");
   EXPECT_EQ("base.name", symbol_table_->toString(tagged.baseName()));
   EXPECT_EQ("base.valA.name", symbol_table_->toString(tagged.name()));
-  const StatNameTagSpan name_tags = tagged.nameTags();
+  const StatNameTagSpan name_tags = tagged.tags();
   ASSERT_EQ(2, name_tags.size());
   EXPECT_EQ("tagA", symbol_table_->toString(name_tags[0].first));
   EXPECT_EQ("valA", symbol_table_->toString(name_tags[0].second));
@@ -277,7 +291,13 @@ TEST_P(StatsUtilityTest, TaggedStatNameAccessors) {
   TaggedStatName empty(*symbol_table_, "base", {}, "base");
   EXPECT_EQ("base", symbol_table_->toString(empty.baseName()));
   EXPECT_EQ("base", symbol_table_->toString(empty.name()));
-  EXPECT_TRUE(empty.nameTags().empty());
+  EXPECT_TRUE(empty.tags().empty());
+
+  // Empty tags with an empty tagged name: the name falls back to the base name.
+  TaggedStatName fallback(*symbol_table_, "base", {}, "");
+  EXPECT_EQ("base", symbol_table_->toString(fallback.baseName()));
+  EXPECT_EQ("base", symbol_table_->toString(fallback.name()));
+  EXPECT_TRUE(fallback.tags().empty());
 }
 
 TEST_P(StatsUtilityTest, Gauges) {

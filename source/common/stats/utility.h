@@ -73,24 +73,25 @@ public:
    * @param symbol_table The symbol table used to encode the names and tags.
    * @param base_name The tag-extracted name, which is used to create the tag-extracted stat
    * name.
-   * @param name_tags The tags associated with the tagged name.
-   * @param name The tagged name, which is used to create the tagged stat name.
+   * @param tags The tags associated with the tagged name.
+   * @param name The tagged name, which is used to create the tagged stat name. If tags is empty,
+   * this is ignored and base_name is used for both forms.
    *
    * Note: the names and tags are copied into a private pool, so the caller does not need to
    * maintain their lifetime after this constructor returns.
    */
-  TaggedStatName(SymbolTable& symbol_table, absl::string_view base_name,
-                 TagStringViewSpan name_tags, absl::string_view name);
+  TaggedStatName(SymbolTable& symbol_table, absl::string_view base_name, TagStringViewSpan tags,
+                 absl::string_view name);
 
   StatName name() const { return name_; }
   StatName baseName() const { return base_name_; }
-  StatNameTagSpan nameTags() const { return name_tags_; }
+  StatNameTagSpan tags() const { return tags_; }
 
 private:
   StatNamePool tag_pool_;
   StatName name_;
   StatName base_name_;
-  StatNameTagVec name_tags_;
+  StatNameTagVec tags_;
 };
 
 /**
@@ -285,7 +286,8 @@ TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
  * @param scope The scope in which to create the stat (the scope's own prefix/tags still apply).
  * @param base_prefix Pre-encoded prefix with tag values removed (the tag-extracted name).
  * @param prefix_tags Pre-encoded tags to attach to the stat.
- * @param prefix Pre-encoded prefix with tag values interleaved (the flat name).
+ * @param prefix Pre-encoded prefix with tag values interleaved (the flat name). If prefix_tags is
+ * empty, this is ignored and base_prefix is used for both forms.
  * @param name The stat's leaf name.
  */
 Counter& counterFromTaggedPrefix(Scope& scope, StatName base_prefix, StatNameTagSpan prefix_tags,

@@ -119,16 +119,16 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
 // Convenience wrappers taking a Stats::TaggedStatName (see utility.h), which pre-encodes the
 // tag-extracted prefix, the flat prefix and the tags.
 #define POOL_COUNTER_TAGGED(POOL, TAGGED_NAME)                                                     \
-  POOL_COUNTER_TAGGED_PREFIX(POOL, (TAGGED_NAME).baseName(), (TAGGED_NAME).nameTags(),             \
+  POOL_COUNTER_TAGGED_PREFIX(POOL, (TAGGED_NAME).baseName(), (TAGGED_NAME).tags(),                 \
                              (TAGGED_NAME).name())
 #define POOL_GAUGE_TAGGED(POOL, TAGGED_NAME)                                                       \
-  POOL_GAUGE_TAGGED_PREFIX(POOL, (TAGGED_NAME).baseName(), (TAGGED_NAME).nameTags(),               \
+  POOL_GAUGE_TAGGED_PREFIX(POOL, (TAGGED_NAME).baseName(), (TAGGED_NAME).tags(),                   \
                            (TAGGED_NAME).name())
 #define POOL_HISTOGRAM_TAGGED(POOL, TAGGED_NAME)                                                   \
-  POOL_HISTOGRAM_TAGGED_PREFIX(POOL, (TAGGED_NAME).baseName(), (TAGGED_NAME).nameTags(),           \
+  POOL_HISTOGRAM_TAGGED_PREFIX(POOL, (TAGGED_NAME).baseName(), (TAGGED_NAME).tags(),               \
                                (TAGGED_NAME).name())
 #define POOL_TEXT_READOUT_TAGGED(POOL, TAGGED_NAME)                                                \
-  POOL_TEXT_READOUT_TAGGED_PREFIX(POOL, (TAGGED_NAME).baseName(), (TAGGED_NAME).nameTags(),        \
+  POOL_TEXT_READOUT_TAGGED_PREFIX(POOL, (TAGGED_NAME).baseName(), (TAGGED_NAME).tags(),            \
                                   (TAGGED_NAME).name())
 
 #define NULL_STAT_DECL_(X) std::string(#X)),

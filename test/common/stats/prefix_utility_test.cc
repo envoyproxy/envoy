@@ -22,7 +22,7 @@ protected:
 
   // The flat name the tagged prefix produces for a "name" leaf (must match legacyName()).
   std::string taggedName(const TaggedStatName& p) {
-    return Utility::counterFromTaggedPrefix(scope_, p.baseName(), p.nameTags(), p.name(), "name")
+    return Utility::counterFromTaggedPrefix(scope_, p.baseName(), p.tags(), p.name(), "name")
         .name();
   }
 
@@ -31,7 +31,7 @@ protected:
 
   std::vector<std::pair<std::string, std::string>> tags(const TaggedStatName& p) {
     std::vector<std::pair<std::string, std::string>> out;
-    for (const StatNameTag& t : p.nameTags()) {
+    for (const StatNameTag& t : p.tags()) {
       out.emplace_back(symbol_table_.toString(t.first), symbol_table_.toString(t.second));
     }
     return out;
