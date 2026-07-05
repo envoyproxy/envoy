@@ -89,8 +89,10 @@ private:
   std::string effectiveSni(const Network::TransportSocketOptionsConstSharedPtr& options,
                            Upstream::HostDescriptionConstSharedPtr host) const;
   void setSessionForSni(SSL* ssl, absl::string_view sni);
+  void setSessionFromContextCache(SSL* ssl);
   void touchSessionBucket(absl::flat_hash_map<std::string, SniSessionBucket>::iterator it)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(session_keys_mu_);
+  bool scopeUpstreamTlsSessionCacheBySni() const;
 
   const std::string server_name_indication_;
   const bool auto_host_sni_;
@@ -98,6 +100,7 @@ private:
 
   const size_t max_session_keys_;
   absl::Mutex session_keys_mu_;
+  std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ ABSL_GUARDED_BY(session_keys_mu_);
   std::list<std::string> session_sni_lru_ ABSL_GUARDED_BY(session_keys_mu_);
   absl::flat_hash_map<std::string, SniSessionBucket>
       session_keys_by_sni_ ABSL_GUARDED_BY(session_keys_mu_);

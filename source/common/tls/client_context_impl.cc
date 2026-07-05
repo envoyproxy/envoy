@@ -181,7 +181,11 @@ ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& o
   }
 
   if (max_session_keys_ > 0) {
-    setSessionForSni(ssl_con.get(), server_name_indication);
+    if (scopeUpstreamTlsSessionCacheBySni()) {
+      setSessionForSni(ssl_con.get(), server_name_indication);
+    } else {
+      setSessionFromContextCache(ssl_con.get());
+    }
   }
 
   return ssl_con;
@@ -256,12 +260,38 @@ void ClientContextImpl::setSessionForSni(SSL* ssl, absl::string_view sni) {
   }
 }
 
+void ClientContextImpl::setSessionFromContextCache(SSL* ssl) {
+  absl::WriterMutexLock lock(session_keys_mu_);
+  if (session_keys_.empty()) {
+    return;
+  }
+
+  // Runtime-guarded rollback path for the previous context-wide cache
+  // behavior. This deliberately ignores SNI and should only be used while the
+  // reloadable feature remains available.
+  SSL_SESSION* session = session_keys_.front().get();
+  SSL_set_session(ssl, session);
+
+  if (SSL_SESSION_should_be_single_use(session)) {
+    session_keys_.pop_front();
+  }
+}
+
 int ClientContextImpl::newSessionKey(SSL* ssl, SSL_SESSION* session) {
   // BoringSSL transfers ownership of |session| to Envoy when this callback
   // returns 1. If Envoy cannot cache it, free it here and still report success.
   if (max_session_keys_ == 0) {
     SSL_SESSION_free(session);
     return 1;
+  }
+
+  if (!scopeUpstreamTlsSessionCacheBySni()) {
+    absl::WriterMutexLock lock(session_keys_mu_);
+    while (session_keys_.size() >= max_session_keys_) {
+      session_keys_.pop_back();
+    }
+    session_keys_.push_front(bssl::UniquePtr<SSL_SESSION>(session));
+    return 1; // Tell BoringSSL that we took ownership of the session.
   }
 
   const auto* effective_sni =
@@ -301,6 +331,11 @@ int ClientContextImpl::newSessionKey(SSL* ssl, SSL_SESSION* session) {
   }
 
   return 1; // Tell BoringSSL that we took ownership of the session.
+}
+
+bool ClientContextImpl::scopeUpstreamTlsSessionCacheBySni() const {
+  return Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.scope_upstream_tls_session_cache_by_sni");
 }
 
 // This callback should return 1 on success, 0 on internal error, and negative number
