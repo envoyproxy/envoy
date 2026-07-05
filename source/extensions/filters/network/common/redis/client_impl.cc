@@ -401,6 +401,15 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
 
   if (config_->enableCommandStats()) {
     bool success = !canceled && !value->isError();
+    // The HELLO 3 init request has a stricter success contract than "non-error reply": a
+    // non-Map or proto!=3 reply fails the negotiation (Hello3InitCallbacks::onResponse below
+    // tears the connection down and increments upstream_resp3_hello_failure). Apply the same
+    // predicate here so ``upstream_commands.hello.*`` and the negotiation counter never
+    // disagree about the same reply. Other init commands (READONLY, IAM AUTH) only ever
+    // answer +OK or an error, so the generic predicate is already exact for them.
+    if (success && &request.callbacks_ == &hello_init_callbacks_) {
+      success = isHello3SuccessResponse(*value);
+    }
     redis_command_stats_->updateStats(scope_, request.command_, success);
     request.command_request_timer_->complete();
   }

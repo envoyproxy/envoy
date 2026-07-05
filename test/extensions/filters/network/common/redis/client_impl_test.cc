@@ -1682,6 +1682,61 @@ TEST_F(RedisClientImplTest, Resp3HelloPlainOkSimpleStringIsTreatedAsFailure) {
   EXPECT_EQ(1UL, hello3_failure_counter_->value());
 }
 
+// Wrong-shape reply with command stats enabled: ``upstream_commands.hello.*`` must agree with
+// the negotiation outcome. Before onRespValue applied isHello3SuccessResponse to the HELLO init
+// request, a non-error wrong-shape reply recorded hello.success while
+// upstream_resp3_hello_failure counted the same reply as a negotiation failure — two operator
+// signals disagreeing about one event.
+TEST_F(RedisClientImplTest, Resp3HelloWrongShapeRecordsCommandFailureNotSuccess) {
+  InSequence s;
+  enableResp3();
+  setup(std::make_shared<ConfigEnableCommandStats>());
+
+  EXPECT_CALL(*encoder_, encode(Eq(makeBareHello3Request()), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->initialize("", "");
+
+  onConnected();
+
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, _));
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  respondWith(makeHelloMapReply(2));
+
+  EXPECT_EQ(1UL, hello3_failure_counter_->value());
+  EXPECT_EQ(1UL, stats_.counter("upstream_commands.hello.total").value());
+  EXPECT_EQ(0UL, stats_.counter("upstream_commands.hello.success").value());
+  EXPECT_EQ(1UL, stats_.counter("upstream_commands.hello.failure").value());
+}
+
+// Success-path companion pin: a genuine Map+proto=3 reply still records hello.success — the
+// stricter predicate only reclassifies wrong-shape replies, never genuine negotiations.
+TEST_F(RedisClientImplTest, Resp3HelloSuccessRecordsCommandSuccessStat) {
+  InSequence s;
+  enableResp3();
+  setup(std::make_shared<ConfigEnableCommandStats>());
+
+  EXPECT_CALL(*encoder_, encode(Eq(makeBareHello3Request()), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->initialize("", "");
+  onConnected();
+
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+  respondWith(makeHelloMapReply(3));
+  EXPECT_EQ(0UL, hello3_failure_counter_->value());
+  EXPECT_EQ(1UL, stats_.counter("upstream_commands.hello.total").value());
+  EXPECT_EQ(1UL, stats_.counter("upstream_commands.hello.success").value());
+  EXPECT_EQ(0UL, stats_.counter("upstream_commands.hello.failure").value());
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
 // HELLO answered with a RESP2-framed Array (even one that carries proto → 3): the server did
 // not actually switch protocols — a real RESP3 switch always frames the HELLO reply as a Map —
 // so isHello3SuccessResponse rejects it and the handshake fails.
