@@ -6,12 +6,69 @@
 
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/context_config_impl.h"
 
 #include "quiche/quic/core/crypto/quic_client_session_cache.h"
 
 namespace Envoy {
 namespace Quic {
+
+namespace {
+
+// Installs the configured client certificate chain and private key on the QUICHE client SSL
+// context so that upstream QUIC connections present a certificate when the peer requests one.
+// QUICHE's SSL context uses the CRYPTO_BUFFER-based method, so the chain is installed via
+// SSL_CTX_set_chain_and_key rather than the X509-based APIs.
+absl::Status configureQuicClientCertChain(SSL_CTX* quic_ssl_ctx,
+                                          const Ssl::TlsContext& tls_context) {
+  if (tls_context.cert_chain_ == nullptr) {
+    // No client certificate configured.
+    return absl::OkStatus();
+  }
+  EVP_PKEY* private_key = SSL_CTX_get0_privatekey(tls_context.ssl_ctx_.get());
+  if (private_key == nullptr) {
+    // The private key is not directly accessible when a private key provider is configured.
+    return absl::UnimplementedError(
+        "client certificates with a private key provider are not supported on QUIC");
+  }
+
+  std::vector<bssl::UniquePtr<CRYPTO_BUFFER>> chain;
+  auto append_cert = [&chain](X509* cert) {
+    uint8_t* der = nullptr;
+    const int len = i2d_X509(cert, &der);
+    if (len <= 0) {
+      return false;
+    }
+    bssl::UniquePtr<uint8_t> free_der(der);
+    chain.emplace_back(CRYPTO_BUFFER_new(der, len, nullptr));
+    return chain.back() != nullptr;
+  };
+  if (!append_cert(tls_context.cert_chain_.get())) {
+    return absl::InvalidArgumentError("failed to convert client certificate for QUIC");
+  }
+  STACK_OF(X509)* intermediates = nullptr;
+  SSL_CTX_get0_chain_certs(tls_context.ssl_ctx_.get(), &intermediates);
+  for (size_t i = 0; intermediates != nullptr && i < sk_X509_num(intermediates); i++) {
+    if (!append_cert(sk_X509_value(intermediates, i))) {
+      return absl::InvalidArgumentError("failed to convert client certificate chain for QUIC");
+    }
+  }
+
+  std::vector<CRYPTO_BUFFER*> raw_chain;
+  raw_chain.reserve(chain.size());
+  for (const auto& cert : chain) {
+    raw_chain.push_back(cert.get());
+  }
+  if (SSL_CTX_set_chain_and_key(quic_ssl_ctx, raw_chain.data(), raw_chain.size(), private_key,
+                                nullptr) != 1) {
+    return absl::InvalidArgumentError("failed to install client certificate chain for QUIC");
+  }
+  return absl::OkStatus();
+}
+
+} // namespace
 
 absl::StatusOr<std::unique_ptr<QuicClientTransportSocketFactory>>
 QuicClientTransportSocketFactory::create(
@@ -92,6 +149,24 @@ std::shared_ptr<quic::QuicCryptoClientConfig> QuicClientTransportSocketFactory::
         std::make_unique<quic::QuicClientSessionCache>());
 
     registerCertCompression(tls_config.crypto_config_->ssl_ctx());
+
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.quic_upstream_client_certificates")) {
+      // The cert selector is rejected at config load time for QUIC, so a production context is
+      // always a plain ClientContextImpl with at most one TLS certificate. The downcast can only
+      // fail for mock contexts in tests.
+      auto* client_context_impl =
+          dynamic_cast<Extensions::TransportSockets::Tls::ClientContextImpl*>(
+              tls_config.client_context_.get());
+      if (client_context_impl != nullptr && !client_context_impl->getTlsContexts().empty()) {
+        absl::Status status = configureQuicClientCertChain(
+            tls_config.crypto_config_->ssl_ctx(), client_context_impl->getTlsContexts()[0]);
+        if (!status.ok()) {
+          ENVOY_LOG(warn, "Not sending client certificates on QUIC connections: {}",
+                    status.message());
+        }
+      }
+    }
   }
   // Return the latest crypto config.
   return tls_config.crypto_config_;

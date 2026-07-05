@@ -412,10 +412,13 @@ envoy_cc_test(
         "//source/common/quic:quic_server_transport_socket_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/tls:context_config_lib",
+        "//source/common/tls:context_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@quiche//:quic_test_tools_test_certificates_lib",
     ]),
 )
 
