@@ -51,6 +51,26 @@ public:
           hcm.mutable_set_current_client_cert_details()->mutable_subject()->set_value(true);
         });
   }
+
+  // Sends a request over the current connection, asserting the client identity is forwarded
+  // upstream via XFCC (which is only populated if the server has the peer certificate) and, when
+  // expected, that the request was delivered as 0-RTT early data.
+  void sendRequestExpectingClientCert(bool expect_early_data) {
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    waitForNextUpstreamRequest();
+    const auto xfcc_header =
+        upstream_request_->headers().get(Http::LowerCaseString("x-forwarded-client-cert"));
+    ASSERT_FALSE(xfcc_header.empty());
+    EXPECT_THAT(std::string(xfcc_header[0]->value().getStringView()),
+                testing::HasSubstr("Subject="));
+    if (expect_early_data) {
+      EXPECT_THAT(upstream_request_->headers(),
+                  ContainsHeader(Http::Headers::get().EarlyData, "1"));
+    }
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicMtlsIntegrationTest,
@@ -65,18 +85,7 @@ TEST_P(QuicMtlsIntegrationTest, MutualTlsHandshakeSuccess) {
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest();
-  const auto xfcc_header =
-      upstream_request_->headers().get(Http::LowerCaseString("x-forwarded-client-cert"));
-  ASSERT_FALSE(xfcc_header.empty());
-  // The client certificate hash and subject are extracted from the presented certificate.
-  EXPECT_THAT(std::string(xfcc_header[0]->value().getStringView()),
-              testing::AllOf(testing::HasSubstr("Hash="), testing::HasSubstr("Subject=")));
-
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("200", response->headers().getStatusValue());
+  sendRequestExpectingClientCert(/*expect_early_data=*/false);
 }
 
 // Without a client certificate the handshake fails when the listener requires one.
@@ -141,6 +150,38 @@ TEST_P(QuicMtlsIntegrationTest, NoClientCertRequiredByDefault) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// With client certificates required, QUIC does not resume sessions: every connection performs a
+// full handshake and re-validates the client certificate. BoringSSL does not resume a session
+// that carries a client credential unless the server's client-certificate retention configuration
+// matches, which it does not for QUIC, so resumption is effectively disabled on mTLS filter
+// chains. This is stricter than TCP TLS (which resumes and carries the identity over), and means
+// there is no window where a client identity is attached to a resumed or 0-RTT connection without
+// a fresh certificate validation.
+TEST_P(QuicMtlsIntegrationTest, MutualTlsDoesNotResume) {
+  // All connections share the same PersistentQuicInfoImpl, so a resumable session would be reused.
+  concurrency_ = 1;
+  setRequireClientCertificate();
+  setForwardClientCertDetails();
+  configureTlsOptions(/*early_data_enabled=*/true, /*resumption_enabled=*/true);
+  initialize();
+
+  // Full handshake on the first connection, with extra round-trips so any session ticket would be
+  // received and cached before the connection closes.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  sendRequestExpectingClientCert(/*expect_early_data=*/false);
+  sendRequestExpectingClientCert(/*expect_early_data=*/false);
+  codec_client_->close();
+
+  // The second connection does another full handshake (no resumption, no 0-RTT) and the client
+  // certificate is validated again.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto* quic_session = static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  EXPECT_FALSE(quic_session->IsResumption());
+  EXPECT_FALSE(quic_session->EarlyDataAccepted());
+  sendRequestExpectingClientCert(/*expect_early_data=*/false);
+  codec_client_->close();
 }
 
 } // namespace
