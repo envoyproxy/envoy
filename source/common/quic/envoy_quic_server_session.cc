@@ -259,16 +259,21 @@ void EnvoyQuicServerSession::storeConnectionMapPosition(FilterChainToConnectionM
 
 quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() const {
   quic::QuicSSLConfig config = quic::QuicServerSessionBase::GetSSLConfig();
-  config.early_data_enabled = position_.has_value()
-                                  ? dynamic_cast<const QuicServerTransportSocketFactory&>(
-                                        position_->filter_chain_.transportSocketFactory())
-                                        .earlyDataEnabled()
-                                  : true;
-  config.disable_ticket_support = position_.has_value()
-                                      ? !dynamic_cast<const QuicServerTransportSocketFactory&>(
-                                             position_->filter_chain_.transportSocketFactory())
-                                             .resumptionEnabled()
-                                      : false;
+  const QuicServerTransportSocketFactory* transport_socket_factory =
+      position_.has_value() ? dynamic_cast<const QuicServerTransportSocketFactory*>(
+                                  &position_->filter_chain_.transportSocketFactory())
+                            : nullptr;
+  if (transport_socket_factory == nullptr) {
+    config.early_data_enabled = true;
+    return config;
+  }
+  config.early_data_enabled = transport_socket_factory->earlyDataEnabled();
+  config.disable_ticket_support = !transport_socket_factory->resumptionEnabled();
+  // Client certificates are validated in EnvoyTlsServerHandshaker::VerifyCertChain against the
+  // filter chain's validation context.
+  config.client_cert_mode = transport_socket_factory->requireClientCertificate()
+                                ? quic::ClientCertMode::kRequire
+                                : quic::ClientCertMode::kNone;
   return config;
 }
 

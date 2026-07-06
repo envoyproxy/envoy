@@ -96,6 +96,21 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "quic_ssl_connection_info_test",
+    srcs = envoy_select_enable_http3(["quic_ssl_connection_info_test.cc"]),
+    data = ["//test/common/tls/test_data:certs"],
+    rbe_pool = "6gig",
+    deps = envoy_select_enable_http3([
+        "//source/common/quic:quic_ssl_connection_info_lib",
+        "//test/common/tls:ssl_test_utils",
+        "//test/common/tls/test_data:cert_infos",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+        "@quiche//:quic_test_tools_test_utils_lib",
+    ]),
+)
+
+envoy_cc_test(
     name = "quic_stat_names_test",
     srcs = envoy_select_enable_http3(["quic_stat_names_test.cc"]),
     rbe_pool = "6gig",
@@ -397,10 +412,13 @@ envoy_cc_test(
         "//source/common/quic:quic_server_transport_socket_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/tls:context_config_lib",
+        "//source/common/tls:context_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@quiche//:quic_test_tools_test_certificates_lib",
     ]),
 )
 

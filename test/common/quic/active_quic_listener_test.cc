@@ -233,6 +233,10 @@ protected:
         .Times(connection_count);
 
     testing::Sequence seq;
+    // The transport socket factory is queried before the network filter chain is created (for
+    // the client certificate fail-closed check) and after, so it must not be sequenced.
+    EXPECT_CALL(*filter_chain_, transportSocketFactory())
+        .WillRepeatedly(ReturnRef(*transport_socket_factory_));
     for (int i = 0; i < connection_count; ++i) {
       auto read_filter = std::make_shared<Network::MockReadFilter>();
       Filter::NetworkFilterFactoriesList factories;
@@ -254,9 +258,6 @@ protected:
       EXPECT_CALL(*filter_chain_, networkFilterFactories())
           .InSequence(seq)
           .WillOnce(ReturnRef(filter_factories_.back()));
-      EXPECT_CALL(*filter_chain_, transportSocketFactory())
-          .InSequence(seq)
-          .WillRepeatedly(ReturnRef(*transport_socket_factory_));
     }
   }
 
