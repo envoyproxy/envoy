@@ -368,19 +368,23 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
   if (end_stream) {
     // Backend returned a headers-only response (e.g., 204 No Content). Synthesize a JSON-RPC
     // response body so MCP clients don't hang waiting for a body that will never arrive.
-    const bool is_error =
-        getResponseCode(response_headers) >= static_cast<int>(Http::Code::BadRequest);
+    const int response_code = getResponseCode(response_headers);
+    const bool is_error = response_code >= static_cast<int>(Http::Code::BadRequest);
     std::string synthetic;
     if (mcp_operation_ == McpOperation::ToolsCall) {
       synthetic = translateJsonRestResponseToJsonRpc("", *session_id_, is_error).dump();
-    } else {
-      // ToolsList: headers-only means no tools list is available; return a server error.
+    } else if (mcp_operation_ == McpOperation::ToolsList) {
+      // headers-only means no tools list is available; return a server error.
       json ret = {
           {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
           {McpConstants::ID_FIELD, *session_id_},
           {McpConstants::ERROR_FIELD, generateErrorJsonResponse(-32000, "Server error")},
       };
       synthetic = ret.dump();
+    }
+    // HTTP/2 disallows a body on 204/304. Promote to 200 so the synthesized body can be delivered.
+    if (response_code == static_cast<int>(Http::Code::NoContent) || response_code == 304) {
+      response_headers.setStatus(static_cast<uint64_t>(Http::Code::OK));
     }
     response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
     response_headers.setContentLength(synthetic.size());
