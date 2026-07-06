@@ -205,7 +205,7 @@ public:
     context_.thread_local_.setDispatcher(dispatcher_.get());
   }
 
-  void initialize(absl::optional<Bootstrap::GrpcAsyncClientManagerConfig> config = absl::nullopt) {
+  void initialize(std::optional<Bootstrap::GrpcAsyncClientManagerConfig> config = std::nullopt) {
     ON_CALL(context_, clusterManager()).WillByDefault(testing::ReturnRef(cm_));
     ON_CALL(context_, mainThreadDispatcher()).WillByDefault(testing::ReturnRef(*dispatcher_));
     ON_CALL(context_, timeSource()).WillByDefault(testing::ReturnRef(time_system_));
@@ -353,7 +353,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcInvalid) {
   initialize();
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
-  EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Invoke([](const std::string&) {
+  EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Invoke([](absl::string_view) {
     return absl::InvalidArgumentError("failure");
   }));
   EXPECT_EQ(

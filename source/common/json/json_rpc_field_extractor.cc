@@ -459,7 +459,7 @@ void JsonRpcFieldExtractor::validateRequiredFields() {
 }
 
 void JsonRpcFieldExtractor::checkValidJsonRpc(absl::string_view name,
-                                              absl::optional<absl::string_view> value) {
+                                              std::optional<absl::string_view> value) {
   if (depth_ == 1) {
     if (name == jsonRpcField()) {
       if (value.has_value() && value.value() == jsonRpcVersion()) {

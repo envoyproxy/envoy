@@ -297,7 +297,7 @@ public:
     auto* resource = ret.add_resources();
     resource->set_name("my_route/vhost_1");
     resource->set_version("4");
-    resource->mutable_resource()->PackFrom(
+    std::ignore = resource->mutable_resource()->PackFrom(
         TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
             virtualHostYaml("my_route/vhost_1", "vhost_1, vhost.first")));
     resource->add_aliases("my_route/vhost.first");
@@ -313,20 +313,11 @@ public:
 // VHDS Integration tests are similar to other xDS-dynamic config tests, but
 // also validate a dynamic-route config update (RDS) and a static-route config
 // settings.
-// TODO(adisuissa): enable the 'RouteConfigType::Static' testing option once its
-// support is added.
-/*
 #define VHDS_INTEGRATION_PARAMS                                                                    \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::Values(Grpc::ClientType::EnvoyGrpc),                                   \
                    testing::Values(Grpc::LegacyOrUnified::Legacy, Grpc::LegacyOrUnified::Unified), \
                    testing::Values(RouteConfigType::Rds, RouteConfigType::Static))
-*/
-#define VHDS_INTEGRATION_PARAMS                                                                    \
-  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
-                   testing::Values(Grpc::ClientType::EnvoyGrpc),                                   \
-                   testing::Values(Grpc::LegacyOrUnified::Legacy, Grpc::LegacyOrUnified::Unified), \
-                   testing::Values(RouteConfigType::Rds))
 
 inline std::string
 vhdsTestParamsToString(const testing::TestParamInfo<VhdsIntegrationTestParam>& info) {

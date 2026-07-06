@@ -8,6 +8,7 @@
 #include "source/common/common/byte_order.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/hex.h"
+#include "source/common/common/safe_memcpy.h"
 #include "source/common/common/utility.h"
 
 namespace Envoy {
@@ -133,9 +134,9 @@ void BufferHelper::writeCString(Buffer::Instance& data, const std::string& value
 }
 
 void BufferHelper::writeDouble(Buffer::Instance& data, double value) {
-  // We need to hack converting a double into little endian.
-  int64_t* to_write = reinterpret_cast<int64_t*>(&value);
-  writeInt64(data, *to_write);
+  int64_t to_write;
+  safeMemcpy(&to_write, &value);
+  writeInt64(data, to_write);
 }
 
 void BufferHelper::writeInt32(Buffer::Instance& data, int32_t value) {

@@ -37,7 +37,7 @@ class ThreadLocalHistogramImpl : public HistogramImplHelper {
 public:
   ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit, StatName tag_extracted_name,
                            StatNameTagSpan stat_name_tags, SymbolTable& symbol_table,
-                           absl::optional<uint32_t> bins);
+                           std::optional<uint32_t> bins);
   ~ThreadLocalHistogramImpl() override;
 
   void merge(histogram_t* target);
@@ -87,7 +87,7 @@ class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
   ParentHistogramImpl(StatName name, Histogram::Unit unit, ThreadLocalStoreImpl& parent,
                       StatName tag_extracted_name, StatNameTagSpan stat_name_tags,
-                      ConstSupportedBuckets& supported_buckets, absl::optional<uint32_t> bins,
+                      ConstSupportedBuckets& supported_buckets, std::optional<uint32_t> bins,
                       uint64_t id);
   ~ParentHistogramImpl() override;
 
@@ -133,7 +133,7 @@ public:
   // Indicates that the ThreadLocalStore is shutting down, so no need to clear its histogram_set_.
   void setShuttingDown(bool shutting_down) { shutting_down_ = shutting_down; }
   bool shuttingDown() const { return shutting_down_; }
-  absl::optional<uint32_t> bins() const { return bins_; }
+  std::optional<uint32_t> bins() const { return bins_; }
 
 private:
   bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
@@ -141,7 +141,7 @@ private:
   detailedlBucketsHelper(const histogram_t& histogram) const;
 
   const Histogram::Unit unit_;
-  const absl::optional<uint32_t> bins_;
+  const std::optional<uint32_t> bins_;
   ThreadLocalStoreImpl& thread_local_store_;
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;
@@ -167,7 +167,7 @@ public:
   static const char IterateScopeSync[];
   static const char MainDispatcherCleanupSync[];
 
-  ThreadLocalStoreImpl(Allocator& alloc);
+  ThreadLocalStoreImpl(Allocator& alloc, bool use_tag_scope = false);
   ~ThreadLocalStoreImpl() override;
   // Stats::Store
   NullCounterImpl& nullCounter() override { return null_counter_; }
@@ -300,21 +300,26 @@ private:
     }
 
     // Stats::Scope
-    Counter& counterFromStatNameWithTags(const StatName& name,
-                                         StatNameTagVectorOptConstRef tags) override;
-    Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                     Gauge::ImportMode import_mode) override;
-    Histogram& histogramFromStatNameWithTags(const StatName& name,
-                                             StatNameTagVectorOptConstRef tags,
-                                             Histogram::Unit unit) override;
-    TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                                 StatNameTagVectorOptConstRef tags) override;
-    ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
-                               const ScopeStatsLimitSettings& limits = {},
-                               StatsMatcherSharedPtr matcher = nullptr) override;
-    ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
-                                     const ScopeStatsLimitSettings& limits = {},
-                                     StatsMatcherSharedPtr matcher = nullptr) override;
+    // The legacy scope ignores name_tags/tagged_name: it joins parent's prefix + base_name as
+    // before.
+    Counter& counterFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                                   StatName tagged_name) override;
+    Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                               StatName tagged_name, Gauge::ImportMode import_mode) override;
+    Histogram& histogramFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                                       StatName tagged_name, Histogram::Unit unit) override;
+    TextReadout& textReadoutFromTaggedName(StatName base_name,
+                                           std::optional<StatNameTagSpan> name_tags,
+                                           StatName tagged_name) override;
+    ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name,
+                                             TagStringViewSpan name_tags,
+                                             absl::string_view tagged_name, bool evictable,
+                                             const ScopeStatsLimitSettings& limits,
+                                             StatsMatcherSharedPtr matcher) override;
+    ScopeSharedPtr scopeFromTaggedName(StatName base_name, StatNameTagSpan name_tags,
+                                       StatName tagged_name, bool evictable,
+                                       const ScopeStatsLimitSettings& limits,
+                                       StatsMatcherSharedPtr matcher) override;
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
@@ -416,7 +421,7 @@ private:
      */
     template <class StatType>
     StatType& safeMakeStat(StatName full_stat_name, StatName name_no_tags,
-                           absl::optional<StatNameTagSpan> stat_name_tags,
+                           std::optional<StatNameTagSpan> stat_name_tags,
                            StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
                            StatsMatcher::FastResult fast_reject_result,
                            StatNameStorageSet& central_rejected_stats,
@@ -424,7 +429,7 @@ private:
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
 
     template <class StatType>
-    using StatTypeOptConstRef = absl::optional<std::reference_wrapper<const StatType>>;
+    using StatTypeOptConstRef = std::optional<std::reference_wrapper<const StatType>>;
 
     /**
      * Looks up an existing stat, populating the local cache if necessary. Does
@@ -441,7 +446,7 @@ private:
                      StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const {
       auto iter = central_cache_map.find(name);
       if (iter == central_cache_map.end()) {
-        return absl::nullopt;
+        return std::nullopt;
       }
 
       return std::cref(*iter->second);
@@ -490,10 +495,50 @@ private:
     const ScopeStatsLimitSettings limits_;
     StatsMatcherSharedPtr scope_matcher_;
 
-  private:
+  protected:
     StatNameStorage prefix_;
     mutable CentralCacheEntrySharedPtr central_cache_ ABSL_GUARDED_BY(parent_.lock_);
     std::function<void()> cleanup_callback_;
+  };
+
+  // Tag-aware scope for the thread-local store. It tracks a tag-extracted prefix separately from
+  // the prefix (the base ScopeImpl's prefix_, which may carry interspersed tag values) and a set
+  // of scope-level prefix tags propagated onto every stat it creates. The tag-aware Scope APIs are
+  // implemented here; see TagStatNameJoiner.
+  class TagScopeImpl : public ScopeImpl {
+  public:
+    // `name` is the scope's tag-extracted prefix; `tagged_name` is its flat prefix with tag
+    // values interleaved (stored in the base ScopeImpl's prefix_).
+    TagScopeImpl(std::unique_ptr<StatNamePool> pool, StatName name, StatNameTagSpan name_tags,
+                 StatName tagged_name, ThreadLocalStoreImpl& store, bool evictable,
+                 const ScopeStatsLimitSettings& limits = {},
+                 StatsMatcherSharedPtr matcher = nullptr);
+
+    ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name,
+                                             TagStringViewSpan name_tags,
+                                             absl::string_view tagged_name, bool evictable,
+                                             const ScopeStatsLimitSettings& limits,
+                                             StatsMatcherSharedPtr matcher) override;
+    ScopeSharedPtr scopeFromTaggedName(StatName base_name, StatNameTagSpan name_tags,
+                                       StatName tagged_name, bool evictable,
+                                       const ScopeStatsLimitSettings& limits,
+                                       StatsMatcherSharedPtr matcher) override;
+    Counter& counterFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                                   StatName tagged_name) override;
+    Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                               StatName tagged_name, Gauge::ImportMode import_mode) override;
+    Histogram& histogramFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                                       StatName tagged_name, Histogram::Unit unit) override;
+    TextReadout& textReadoutFromTaggedName(StatName base_name,
+                                           std::optional<StatNameTagSpan> name_tags,
+                                           StatName tagged_name) override;
+
+  private:
+    std::unique_ptr<StatNamePool> pool_;
+    // The scope's tag-extracted prefix. Paired with the base ScopeImpl's prefix_
+    // (which holds the tagged/flat prefix) and prefix_tags_.
+    StatName tag_extracted_prefix_;
+    StatNameTagVec prefix_tags_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
@@ -601,6 +646,8 @@ private:
   uint64_t next_histogram_id_ ABSL_GUARDED_BY(hist_mutex_) = 0;
 
   StatNameSetPtr well_known_tags_;
+  // When true, the default scope is a TagScopeImpl, enabling the tag-aware Scope APIs.
+  const bool use_tag_scope_ = false;
 
   mutable Thread::MutexBasicLockable hist_mutex_;
   StatSet<ParentHistogramImpl> histogram_set_ ABSL_GUARDED_BY(hist_mutex_);

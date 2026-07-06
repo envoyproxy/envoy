@@ -39,8 +39,8 @@ The :ref:`MCP filter <config_http_filters_mcp>` emits the following dynamic meta
   :header: Name, Type, Description
   :widths: 1, 1, 4
 
-  method, string, "The JSON-RPC method name (e.g., ``initialize``, ``tools/list``, ``tools/call``)."
-  id, number, "The JSON-RPC request ID."
+  method, string, "The JSON-RPC method name (e.g., ``initialize``, ``tools/list``, ``tools/call``). For JSON-RPC responses (containing ``result`` or ``error``), this is set to ``__jsonrpc_response``."
+  id, number/string, "The JSON-RPC request ID. Numeric for standard requests; string for server response routing (e.g., ``time__42``)."
   params, struct, "The params object from the JSON-RPC request containing method-specific parameters."
 
 This metadata is consumed internally by the :ref:`MCP router filter <config_http_filters_mcp_router>` for

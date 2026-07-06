@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
@@ -44,6 +46,30 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_test(
+    name = "balsa_parser_test",
+    srcs = ["balsa_parser_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/http/http1:balsa_parser_lib",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "balsa_parser_benchmark",
+    srcs = ["balsa_parser_benchmark_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/http/http1:balsa_parser_lib",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "balsa_parser_benchmark_test",
+    benchmark_binary = "balsa_parser_benchmark",
 )
 
 envoy_cc_test(

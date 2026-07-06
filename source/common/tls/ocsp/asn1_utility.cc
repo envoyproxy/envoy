@@ -27,14 +27,14 @@ absl::string_view Asn1Utility::cbsToString(CBS& cbs) {
   return {str_head, CBS_len(&cbs)};
 }
 
-absl::StatusOr<absl::optional<CBS>> Asn1Utility::getOptional(CBS& cbs, unsigned tag) {
+absl::StatusOr<std::optional<CBS>> Asn1Utility::getOptional(CBS& cbs, unsigned tag) {
   int is_present;
   CBS data;
   if (!CBS_get_optional_asn1(&cbs, &data, &is_present, tag)) {
     return absl::InvalidArgumentError("Failed to parse ASN.1 element tag");
   }
 
-  return is_present ? absl::optional<CBS>(data) : absl::nullopt;
+  return is_present ? std::optional<CBS>(data) : std::nullopt;
 }
 
 absl::StatusOr<std::string> Asn1Utility::parseOid(CBS& cbs) {

@@ -1,10 +1,9 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "source/common/http/header_map_impl.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,7 +29,7 @@ public:
 
 private:
   bool is_oneway_{false};
-  absl::optional<std::string> topic_name_;
+  std::optional<std::string> topic_name_;
 
   Http::HeaderMapPtr headers_{Http::RequestHeaderMapImpl::create()};
 };

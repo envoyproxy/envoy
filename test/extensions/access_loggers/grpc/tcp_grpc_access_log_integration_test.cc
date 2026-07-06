@@ -82,7 +82,7 @@ public:
       common_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
       setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                      fake_upstreams_.back()->localAddress());
-      access_log->mutable_typed_config()->PackFrom(access_log_config);
+      std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
     });
     BaseIntegrationTest::initialize();
   }
@@ -102,7 +102,7 @@ public:
           listener->mutable_filter_chains(0)->mutable_filters(0)->mutable_typed_config();
 
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy_config;
-      tcp_proxy->UnpackTo(&tcp_proxy_config);
+      std::ignore = tcp_proxy->UnpackTo(&tcp_proxy_config);
 
       auto* access_log = tcp_proxy_config.add_access_log();
       access_log->set_name("grpc_accesslog");
@@ -112,18 +112,18 @@ public:
       common_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
       setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                      fake_upstreams_.back()->localAddress());
-      access_log->mutable_typed_config()->PackFrom(access_log_config);
+      std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
 
       tcp_proxy_config.mutable_access_log_options()
           ->mutable_access_log_flush_interval()
           ->set_seconds(1); // 1s
 
-      tcp_proxy->PackFrom(tcp_proxy_config);
+      std::ignore = tcp_proxy->PackFrom(tcp_proxy_config);
     });
     BaseIntegrationTest::initialize();
   }
 
-  void setupTlsInspectorFilter(absl::optional<ConfigHelper::ServerSslOptions> server_ssl_options,
+  void setupTlsInspectorFilter(std::optional<ConfigHelper::ServerSslOptions> server_ssl_options,
                                bool enable_ja3_fingerprinting = false) {
     std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter(enable_ja3_fingerprinting);
     config_helper_.addListenerFilter(tls_inspector_config);
@@ -135,7 +135,7 @@ public:
       auto* filter = filter_chain->mutable_filters(0);
       envoy::extensions::filters::network::echo::v3::Echo echo;
       filter->set_name("envoy.filters.network.echo");
-      filter->mutable_typed_config()->PackFrom(echo);
+      std::ignore = filter->mutable_typed_config()->PackFrom(echo);
     });
     if (server_ssl_options.has_value()) {
       config_helper_.addSslConfig(server_ssl_options.value());
@@ -574,6 +574,10 @@ tcp_logs:
 TEST_P(TcpGrpcAccessLogIntegrationTest, SslTerminatedWithJA3) {
   setupTlsInspectorFilter(/*ssl_terminate=*/true,
                           /*enable_`ja3`_fingerprinting=*/true);
+  // The fingerprint includes the certificate compression extension, which is opt-in, so enable
+  // the runtime guard explicitly to keep the client hello deterministic.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
   initialize();
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setSni("sni");
@@ -640,6 +644,10 @@ tcp_logs:
 TEST_P(TcpGrpcAccessLogIntegrationTest, SslNotTerminated) {
   setupTlsInspectorFilter(/*ssl_terminate=*/false,
                           /*enable_`ja3`_fingerprinting=*/false);
+  // The forwarded client hello byte count includes the certificate compression extension, which
+  // is opt-in, so enable the runtime guard explicitly to keep the client hello deterministic.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
   initialize();
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setSni("sni");
@@ -692,6 +700,10 @@ tcp_logs:
 TEST_P(TcpGrpcAccessLogIntegrationTest, SslNotTerminatedWithJA3) {
   setupTlsInspectorFilter(/*ssl_terminate=*/false,
                           /*enable_`ja3`_fingerprinting=*/true);
+  // The fingerprint and forwarded byte count include the certificate compression extension, which
+  // is opt-in, so enable the runtime guard explicitly to keep the client hello deterministic.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
   initialize();
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setSni("sni");
@@ -747,6 +759,10 @@ tcp_logs:
 TEST_P(TcpGrpcAccessLogIntegrationTest, SslNotTerminatedWithJA3NoSNI) {
   setupTlsInspectorFilter(/*ssl_terminate=*/false,
                           /*enable_`ja3`_fingerprinting=*/true);
+  // The fingerprint and forwarded byte count include the certificate compression extension, which
+  // is opt-in, so enable the runtime guard explicitly to keep the client hello deterministic.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
   initialize();
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});

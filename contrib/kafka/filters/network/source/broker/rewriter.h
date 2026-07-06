@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
@@ -69,7 +70,7 @@ private:
   // Pointer-to-member used to handle varying field names across the structs.
   template <typename T> void maybeUpdateHostAndPort(T& arg, const int32_t T::*node_id_field) const {
     const int32_t node_id = arg.*node_id_field;
-    const absl::optional<HostAndPort> hostAndPort = config_->findBrokerAddressOverride(node_id);
+    const std::optional<HostAndPort> hostAndPort = config_->findBrokerAddressOverride(node_id);
     if (hostAndPort) {
       ENVOY_LOG(trace, "Changing broker [{}] from {}:{} to {}:{}", node_id, arg.host_, arg.port_,
                 hostAndPort->first, hostAndPort->second);

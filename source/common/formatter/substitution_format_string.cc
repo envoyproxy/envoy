@@ -1,5 +1,7 @@
 #include "source/common/formatter/substitution_format_string.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Formatter {
 
@@ -51,7 +53,7 @@ absl::StatusOr<FormatterPtr> SubstitutionFormatStringUtils::fromProtoConfig(
   return nullptr;
 }
 
-FormatterPtr
+absl::StatusOr<FormatterPtr>
 SubstitutionFormatStringUtils::createJsonFormatter(const Protobuf::Struct& struct_format,
                                                    bool omit_empty_values,
                                                    const std::vector<CommandParserPtr>& commands) {

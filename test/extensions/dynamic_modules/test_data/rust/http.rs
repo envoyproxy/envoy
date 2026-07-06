@@ -243,6 +243,14 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
       std::str::from_utf8(downstream_addr.unwrap().as_slice()).unwrap(),
       "1.1.1.1:1234"
     );
+    let sni = envoy_filter.get_attribute_string(
+      abi::envoy_dynamic_module_type_attribute_id::ConnectionRequestedServerName,
+    );
+    assert!(sni.is_some());
+    assert_eq!(
+      std::str::from_utf8(sni.unwrap().as_slice()).unwrap(),
+      "example.com"
+    );
     let worker_index = envoy_filter.get_worker_index();
     assert_eq!(worker_index, 0);
 
@@ -624,6 +632,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SpanCallbacksFilter {
       span.set_operation("operation");
       span.log("event");
       span.set_sampled(true);
+      span.disable_local_decision();
       let _ = span.get_baggage("key");
       span.set_baggage("key", "value");
       let _ = span.get_trace_id();
@@ -711,6 +720,16 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
       "key",
     );
     assert!(ns_req_header.is_none());
+
+    // Set multiple string entries in one namespace via the batch setter, plus an empty batch.
+    // The resulting metadata is read back and asserted end-to-end by the C++ integration test in
+    // filter_test.cc.
+    envoy_filter
+      .set_dynamic_metadata_string_batch("ns_req_header_batch", &[("k1", "v1"), ("k2", "v2")]);
+    envoy_filter.set_dynamic_metadata_string_batch("ns_req_header_batch_empty", &[]);
+
+    // Set a non-UTF-8 byte value, asserted end-to-end by the C++ integration test in filter_test.cc.
+    envoy_filter.set_dynamic_metadata_bytes("ns_req_header_bytes", "key", &[0xff, 0x00, 0xfe]);
 
     // Try getting metadata from rotuer cluster and host.
     let metadata = envoy_filter.get_metadata_string(

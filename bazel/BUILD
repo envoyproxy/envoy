@@ -90,6 +90,14 @@ cc_library(
 )
 
 config_setting(
+    name = "sockmap_enabled",
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    define_values = {"sockmap": "enabled"},
+)
+
+config_setting(
     name = "windows_opt_build",
     values = {
         "cpu": "x64_windows",

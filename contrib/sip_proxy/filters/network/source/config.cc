@@ -94,7 +94,7 @@ ConfigImpl::ConfigImpl(
     envoy::extensions::filters::network::sip_proxy::v3alpha::SipFilter router;
     envoy::extensions::filters::network::sip_proxy::router::v3alpha::Router default_router;
     router.set_name(SipFilters::SipFilterNames::get().ROUTER);
-    router.mutable_typed_config()->PackFrom(default_router);
+    std::ignore = router.mutable_typed_config()->PackFrom(default_router);
     processFilter(router);
   } else {
     for (const auto& filter : config.sip_filters()) {

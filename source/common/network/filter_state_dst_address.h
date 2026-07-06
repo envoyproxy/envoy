@@ -15,15 +15,15 @@ public:
   AddressObject(Network::Address::InstanceConstSharedPtr address)
       : Address::InstanceAccessor(address) {}
   Network::Address::InstanceConstSharedPtr address() const { return getAddress(); }
-  absl::optional<std::string> serializeAsString() const override {
-    return getAddress() ? absl::make_optional(getAddress()->asString()) : absl::nullopt;
+  std::optional<std::string> serializeAsString() const override {
+    return getAddress() ? std::make_optional(getAddress()->asString()) : std::nullopt;
   }
   bool hasFieldSupport() const override { return true; }
   FieldType getField(absl::string_view field_name) const override;
 
   // Implements hashing interface because the value is applied once per upstream connection.
   // Multiple streams sharing the upstream connection must have the same address object.
-  absl::optional<uint64_t> hash() const override;
+  std::optional<uint64_t> hash() const override;
 };
 
 /**

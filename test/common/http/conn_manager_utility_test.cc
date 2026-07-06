@@ -79,8 +79,8 @@ public:
 
   MOCK_METHOD(void, set, (Http::RequestHeaderMap&, bool, bool));
   MOCK_METHOD(void, setInResponse, (Http::ResponseHeaderMap&, const Http::RequestHeaderMap&));
-  MOCK_METHOD(absl::optional<absl::string_view>, get, (const Http::RequestHeaderMap&), (const));
-  MOCK_METHOD(absl::optional<uint64_t>, getInteger, (const Http::RequestHeaderMap&), (const));
+  MOCK_METHOD(std::optional<absl::string_view>, get, (const Http::RequestHeaderMap&), (const));
+  MOCK_METHOD(std::optional<uint64_t>, getInteger, (const Http::RequestHeaderMap&), (const));
   MOCK_METHOD(Tracing::Reason, getTraceReason, (const Http::RequestHeaderMap&));
   MOCK_METHOD(void, setTraceReason, (Http::RequestHeaderMap&, Tracing::Reason));
   MOCK_METHOD(bool, useRequestIdForTraceSampling, (), (const));
@@ -157,7 +157,7 @@ public:
     std::string downstream_address_;
     bool internal_;
     Tracing::Reason trace_reason_;
-    absl::optional<OriginalIPRejectRequestOptions> reject_request_{absl::nullopt};
+    std::optional<OriginalIPRejectRequestOptions> reject_request_{std::nullopt};
   };
 
   // This is a convenience method used to call mutateRequestHeaders(). It is done in this
@@ -184,7 +184,7 @@ public:
   NiceMock<MockConnectionManagerConfig> config_;
   NiceMock<Router::MockConfig> route_config_;
   NiceMock<Router::MockRoute> route_;
-  absl::optional<std::string> user_agent_;
+  std::optional<std::string> user_agent_;
   NiceMock<Runtime::MockLoader> runtime_;
   Http::TracingConnectionManagerConfig tracing_config_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -3032,7 +3032,7 @@ TEST_F(ConnectionManagerUtilityTest, OriginalIPDetectionExtension) {
     TestRequestHeaderMapImpl headers{{header_name, "2.1.3.4"}};
     auto ret = callMutateRequestHeaders(headers, Protocol::Http11);
     EXPECT_EQ(ret.downstream_address_, "2.1.3.4:0");
-    EXPECT_EQ(ret.reject_request_, absl::nullopt);
+    EXPECT_EQ(ret.reject_request_, std::nullopt);
   }
 
   // Header missing -- fallbacks to default behavior.
@@ -3040,7 +3040,7 @@ TEST_F(ConnectionManagerUtilityTest, OriginalIPDetectionExtension) {
     TestRequestHeaderMapImpl headers;
     auto ret = callMutateRequestHeaders(headers, Protocol::Http11);
     EXPECT_EQ(ret.downstream_address_, "10.0.0.3:50000");
-    EXPECT_EQ(ret.reject_request_, absl::nullopt);
+    EXPECT_EQ(ret.reject_request_, std::nullopt);
   }
 }
 

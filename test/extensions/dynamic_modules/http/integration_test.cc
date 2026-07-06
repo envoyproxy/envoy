@@ -74,7 +74,7 @@ filter_config:
                                ->Mutable(0)
                                ->mutable_typed_per_filter_config();
 
-            (*config)["envoy.extensions.filters.http.dynamic_modules"].PackFrom(
+            std::ignore = (*config)["envoy.extensions.filters.http.dynamic_modules"].PackFrom(
                 per_route_config_proto);
           });
     }
@@ -425,6 +425,26 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestHeaders) {
       response->headers().get(Http::LowerCaseString("some_header"))[0]->value().getStringView());
 }
 
+// A live, non-serializable object stored in filter state at Request lifespan is carried across
+// recreate_stream: the rebuilt filter recovers the same object and echoes its value.
+TEST_P(DynamicModulesIntegrationTest, FilterStateObjectSurvivesRecreateStream) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the filter_state_object_recreate filter is only in the rust test module";
+  }
+  initializeFilter("filter_state_object_recreate");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("0xabcd", response->headers()
+                          .get(Http::LowerCaseString("x-live-object-value"))[0]
+                          ->value()
+                          .getStringView());
+}
+
 TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestBody) {
   initializeFilter("send_response", "on_request_body");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -462,6 +482,57 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnResponseHeaders) {
   EXPECT_EQ(
       "some_value",
       response->headers().get(Http::LowerCaseString("some_header"))[0]->value().getStringView());
+}
+
+// Regression test for the streaming-response re-entry fix. The filter produces its response with
+// send_response_headers and stamps a marker from on_response_headers. Before the fix the streaming
+// response re-entered that hook and leaked the marker onto the module's own response. Rust-only
+// because the streaming_response_reentry filter lives in the rust test module.
+TEST_P(DynamicModulesIntegrationTest, StreamingResponseDoesNotReenterEncodeHooks) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the streaming_response_reentry filter is only in the rust test module";
+  }
+  initializeFilter("streaming_response_reentry");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, true);
+  auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_FALSE(response->headers().get(Http::LowerCaseString("x-produced")).empty());
+  // The module's response hook must not run for the response it produced.
+  EXPECT_TRUE(response->headers().get(Http::LowerCaseString("x-reentered")).empty());
+}
+
+// Regression test for CatchUnwind re-entry. The filter is wrapped in the SDK's CatchUnwind panic
+// guard and completes its response with end-of-stream from on_scheduled. Completing with eos drives
+// FilterManager::onStreamComplete inline, synchronously re-entering the same wrapped filter's
+// on_stream_complete while the on_scheduled catch frame is still on the stack. on_stream_complete
+// bumps a counter; before the fix the re-entrant call is misread as a poisoned filter and skipped,
+// so the counter never moves. Rust-only because the reentrant_stream_complete filter lives in the
+// rust test module.
+TEST_P(DynamicModulesIntegrationTest, ReentrantStreamCompleteRunsUnderCatchUnwind) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the reentrant_stream_complete filter is only in the rust test module";
+  }
+  initializeFilter("reentrant_stream_complete");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, true);
+  auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("yes",
+            response->headers().get(Http::LowerCaseString("x-done"))[0]->value().getStringView());
+
+  // on_stream_complete must run even though the response was completed (eos) from on_scheduled,
+  // which re-enters the CatchUnwind-wrapped filter synchronously.
+  test_server_->waitForCounter("dynamicmodulescustom.reentrant_stream_complete_total",
+                               testing::Eq(1));
 }
 
 TEST_P(DynamicModulesIntegrationTest, HttpCalloutsNonExistentCluster) {
@@ -511,6 +582,48 @@ TEST_P(DynamicModulesIntegrationTest, Scheduler) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
+// Regression test for the shared continue-flag wedge. The upstream replies complete at headers
+// while the client is still uploading. The module holds the response at on_response_headers, a
+// request body chunk continues the decode direction, and the held response is then resumed via
+// continue_encoding. With a single shared continue flag the decode-side continue suppressed the
+// resume and the response never reached the client.
+TEST_P(DynamicModulesIntegrationTest, EarlyResponseDuringUpload) {
+  if (GetParam() != "rust") {
+    GTEST_SKIP() << "Early response during upload test only runs for Rust";
+  }
+  // The upstream half-closes its response while the request keeps uploading, so the router must
+  // keep decoding request data instead of resetting the stream.
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
+  initializeFilter("early_response_during_upload");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  auto& request_encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // The request is still open, so wait for the upstream stream without requiring its end of stream.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  // Reply complete at headers, for example an early 403, while the client is still uploading.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "403"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  // Wait until the module has held the response at on_response_headers before uploading more, so
+  // the request body continue is interleaved after the encode direction is paused.
+  test_server_->waitForCounter("dynamicmodulescustom.response_pause_total", testing::Ge(1));
+
+  // The request body continues the decode direction, then on_scheduled resumes the held response.
+  codec_client_->sendData(request_encoder, "upload", true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("403", response->headers().Status()->value().getStringView());
+}
+
 TEST_P(DynamicModulesIntegrationTest, FakeExternalCache) {
   initializeFilter("fake_external_cache");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -553,6 +666,10 @@ TEST_P(DynamicModulesIntegrationTest, FakeExternalCache) {
 TEST_P(DynamicModulesIntegrationTest, StatsCallbacks) {
   initializeFilter("stats_callbacks", "header_to_count,header_to_set");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // All modules emit a counter directly from the config context (no per-stream filter),
+  // exercising config-scoped metric emission.
+  test_server_->waitForCounter("dynamicmodulescustom.config_total", testing::Ge(1));
 
   // End-to-end request
   {

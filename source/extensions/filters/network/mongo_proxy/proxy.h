@@ -178,7 +178,7 @@ private:
   void doDecode(Buffer::Instance& buffer);
   void logMessage(Message& message, bool full);
   void onDrainClose();
-  absl::optional<std::chrono::milliseconds> delayDuration();
+  std::optional<std::chrono::milliseconds> delayDuration();
   void delayInjectionTimerCallback();
   void tryInjectDelay();
 

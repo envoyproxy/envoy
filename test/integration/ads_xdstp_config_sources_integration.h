@@ -227,7 +227,7 @@ public:
 
   // An optional setting to overwrite the (old) ADS config type. By default it
   // is not set, and the integration test param value will be used.
-  absl::optional<envoy::config::core::v3::ApiConfigSource_ApiType> ads_config_type_override_;
+  std::optional<envoy::config::core::v3::ApiConfigSource_ApiType> ads_config_type_override_;
 };
 
 } // namespace Envoy

@@ -147,7 +147,7 @@ public:
 private:
   const KeySources key_sources_;
   Credentials credentials_;
-  absl::optional<Forwarding> forwarding_;
+  std::optional<Forwarding> forwarding_;
 };
 
 class RouteConfig : public Router::RouteSpecificFilterConfig {

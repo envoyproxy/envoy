@@ -62,7 +62,7 @@ TEST_F(CELSamplerTest, TestWithInvalidParentContext) {
   EXPECT_STREQ(sampler_->getDescription().c_str(), "CELSampler");
 
   auto sampling_result =
-      sampler_->shouldSample(stream_info_, absl::nullopt, "operation_name", "12345",
+      sampler_->shouldSample(stream_info_, std::nullopt, "operation_name", "12345",
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   EXPECT_EQ(sampling_result.attributes, nullptr);

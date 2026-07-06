@@ -131,7 +131,7 @@ public:
    * has a valid prometheus namespace, the trimmed name is returned.
    * Otherwise, return nullopt.
    */
-  static absl::optional<std::string>
+  static std::optional<std::string>
   metricName(std::string&& extracted_name,
              const Stats::CustomStatNamespaces& custom_namespace_factory);
 };

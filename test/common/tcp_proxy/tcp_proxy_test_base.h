@@ -113,7 +113,7 @@ public:
     file_access_log.set_path("unused");
     file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         access_log_format);
-    access_log->mutable_typed_config()->PackFrom(file_access_log);
+    std::ignore = access_log->mutable_typed_config()->PackFrom(file_access_log);
     return config;
   }
 
@@ -153,9 +153,9 @@ public:
                       upstream_hosts_.at(conn_index));
   }
 
-  void raiseEventUpstreamConnectFailed(
-      uint32_t conn_index, ConnectionPool::PoolFailureReason reason,
-      absl::optional<absl::string_view> failure_message = absl::nullopt) {
+  void
+  raiseEventUpstreamConnectFailed(uint32_t conn_index, ConnectionPool::PoolFailureReason reason,
+                                  std::optional<absl::string_view> failure_message = std::nullopt) {
     conn_pool_callbacks_.at(conn_index)
         ->onPoolFailure(reason, failure_message ? *failure_message : "",
                         upstream_hosts_.at(conn_index));
