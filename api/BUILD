@@ -441,6 +441,7 @@ proto_library(
         "//envoy/extensions/upstreams/http/dynamic_modules/v3:pkg",
         "//envoy/extensions/upstreams/http/generic/v3:pkg",
         "//envoy/extensions/upstreams/http/http/v3:pkg",
+        "//envoy/extensions/upstreams/http/reverse_tunnel/v3:pkg",
         "//envoy/extensions/upstreams/http/tcp/v3:pkg",
         "//envoy/extensions/upstreams/http/udp/v3:pkg",
         "//envoy/extensions/upstreams/http/v3:pkg",
