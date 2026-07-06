@@ -78,6 +78,7 @@ public:
                                     const std::string& stats_prefix,
                                     Server::Configuration::FactoryContext& context) PURE;
 
+  [[deprecated("Use createHttpFilterFactoryFromProto instead")]]
   Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContext(
       const Protobuf::Message& proto_config, const std::string& stats_prefix,
       Server::Configuration::ServerFactoryContext& server_context) override {
@@ -104,6 +105,7 @@ public:
     return createFilterFactoryFromProtoWithServerContextTyped(proto_config, stats_prefix, context);
   }
 
+  [[deprecated("Use createHttpFilterFactoryFromProtoTyped instead")]]
   virtual Envoy::Http::FilterFactoryCb
   createFilterFactoryFromProtoWithServerContextTyped(const ConfigProto&, const std::string&,
                                                      Server::Configuration::ServerFactoryContext&) {
@@ -199,6 +201,7 @@ public:
 
   // This method is for dual filter to create filter from server context when it is configured
   // in downstream. It won't be called if a dual filter is in upstream.
+  [[deprecated("Use createHttpFilterFactoryFromProto instead")]]
   Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContext(
       const Protobuf::Message& proto_config, const std::string& stats_prefix,
       Server::Configuration::ServerFactoryContext& server_context) override {
@@ -226,6 +229,7 @@ public:
   }
 
 private:
+  [[deprecated("Use createHttpFilterFactoryFromProtoTyped instead")]]
   virtual Envoy::Http::FilterFactoryCb
   createFilterFactoryFromProtoWithServerContextTyped(const ConfigProto&, const std::string&,
                                                      Server::Configuration::ServerFactoryContext&) {

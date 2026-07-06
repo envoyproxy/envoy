@@ -358,6 +358,7 @@ public:
    * @param context supplies the filter's ServerFactoryContext.
    * @return Http::FilterFactoryCb the factory creation function.
    */
+  [[deprecated("Use createHttpFilterFactoryFromProto instead")]]
   virtual Http::FilterFactoryCb
   createFilterFactoryFromProtoWithServerContext(const Protobuf::Message&, const std::string&,
                                                 Server::Configuration::ServerFactoryContext&) {
