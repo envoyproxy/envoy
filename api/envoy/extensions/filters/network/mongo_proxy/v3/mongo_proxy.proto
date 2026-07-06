@@ -49,6 +49,6 @@ message MongoProxy {
   // queries, and metrics for those are emitted under a dedicated "query" namespace.
   repeated string commands = 5;
 
-  // The maximum depth of a BSON document that Envoy will parse. Defaults to 128.
-  google.protobuf.UInt32Value max_bson_depth = 6;
+  // The maximum depth of a BSON document that Envoy will parse. Defaults to 100.
+  google.protobuf.UInt32Value max_bson_depth = 6 [(validate.rules).uint32 = {gt: 0}];
 }
