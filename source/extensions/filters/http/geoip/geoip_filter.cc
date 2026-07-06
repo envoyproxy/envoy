@@ -29,8 +29,8 @@ GeoipFilterConfig::GeoipFilterConfig(
 }
 
 void GeoipFilterConfig::incCounter(Stats::StatName name) {
-  Stats::Utility::counterFromTaggedPrefix(scope_, stats_prefix_.baseName(),
-                                          stats_prefix_.nameTags(), stats_prefix_.name(), name)
+  Stats::Utility::counterFromTaggedPrefix(scope_, stats_prefix_.baseName(), stats_prefix_.tags(),
+                                          stats_prefix_.name(), name)
       .inc();
 }
 

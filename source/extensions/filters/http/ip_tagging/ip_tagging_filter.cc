@@ -27,8 +27,8 @@ void IpTagsStats::incHit(absl::string_view tag) {
 }
 
 void IpTagsStats::incCounter(Stats::StatName name) {
-  Stats::Utility::counterFromTaggedPrefix(*scope_, stats_prefix_.baseName(),
-                                          stats_prefix_.nameTags(), stats_prefix_.name(), name)
+  Stats::Utility::counterFromTaggedPrefix(*scope_, stats_prefix_.baseName(), stats_prefix_.tags(),
+                                          stats_prefix_.name(), name)
       .inc();
 }
 
