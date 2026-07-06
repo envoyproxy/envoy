@@ -37,19 +37,47 @@ BacktraceAction::BacktraceAction(
   }
 
   for (int i = 0; i < MaxSlots; ++i) {
-    timers_[i] = context.dispatcher_.createTimer([this, i]() {
-      auto& slot = signal_slots_[i];
-      if (slot.ready.load(std::memory_order_acquire)) {
-        ENVOY_LOG_MISC(critical, "Backtrace Action: backtrace for thread {}:",
-                       slot.tid.load(std::memory_order_relaxed));
-        BackwardsTrace tracer(slot.trace.frames, slot.trace.depth);
-        tracer.logTrace();
-        stats_.backtraces_logged_.inc();
-      } else {
-        stats_.backtraces_failed_.inc();
-      }
-      slot.tid.store(0, std::memory_order_release);
-    });
+    timers_[i] = context.dispatcher_.createTimer([this, i]() { onSlotTimer(i); });
+  }
+}
+
+void BacktraceAction::onSlotTimer(int slot_index) {
+  auto& slot = signal_slots_[slot_index];
+  switch (slot.state.load(std::memory_order_acquire)) {
+  case SlotState::Ready: {
+    // The handler finished writing the backtrace and it's safe to read.
+    // Log it and free the slot for future use.
+    ENVOY_LOG_MISC(critical, "Backtrace Action: backtrace for thread {}:",
+                   slot.tid.load(std::memory_order_relaxed));
+    BackwardsTrace tracer(slot.trace.frames, slot.trace.depth);
+    tracer.logTrace();
+    stats_.backtraces_logged_.inc();
+    slot.state.store(SlotState::Free, std::memory_order_release);
+    break;
+  }
+  case SlotState::Signaled: {
+    // The target thread never entered the signal handler. Assume that the
+    // thread is unable to process the signal and attempt to free the slot.
+    SlotState expected = SlotState::Signaled;
+    if (slot.state.compare_exchange_strong(expected, SlotState::Free, std::memory_order_acq_rel,
+                                           std::memory_order_relaxed)) {
+      stats_.backtraces_failed_.inc();
+      break;
+    }
+    // The target thread's signal handler just started writing the backtrace.
+    // Fall through and wait for it to finish.
+    FALLTHRU;
+  }
+  case SlotState::Writing:
+    // The handler is writing the backtrace into this slot at this moment.
+    // Re-arm the timer to let it finish.
+    timers_[slot_index]->enableTimer(std::chrono::milliseconds(100));
+    break;
+  case SlotState::Claimed:
+  case SlotState::Free:
+    // Nothing to do: Free means the slot was already released, and Claimed
+    // cannot be observed here (the timer is only armed after Signaled).
+    break;
   }
 }
 
@@ -66,21 +94,31 @@ void BacktraceAction::onNonFatalSignal(int /*sig*/, siginfo_t* info, void* conte
   if (info == nullptr || info->si_pid != getpid()) {
     return;
   }
-  // Async-signal-safe: reads a thread-local cached on each watched thread when
-  // it registered with the watchdog (see worker_impl.cc / server.cc), so this
-  // is just a TLS load by the time we reach the signal handler.
+
+  // Claim the slot identified by the TID of this thread.
+  // The backtrace may be dropped here if the timer already freed the slot.
   const int64_t mytid = Thread::getCurrentThreadId();
   for (auto& slot : signal_slots_) {
-    if (slot.tid.load(std::memory_order_acquire) == mytid) {
-      auto& t = slot.trace;
-      if (context != nullptr) {
-        t.depth = absl::GetStackTraceWithContext(t.frames, MaxStackDepth, 1, context, nullptr);
-      } else {
-        t.depth = absl::GetStackTrace(t.frames, MaxStackDepth, 1);
-      }
-      slot.ready.store(true, std::memory_order_release);
-      return;
+    if (slot.state.load(std::memory_order_acquire) != SlotState::Signaled ||
+        slot.tid.load(std::memory_order_relaxed) != mytid) {
+      continue;
     }
+    // Take ownership of the slot's backtrace buffer for the duration of the
+    // write. If the CAS fails, the timer freed the slot; nothing to do.
+    SlotState expected = SlotState::Signaled;
+    if (!slot.state.compare_exchange_strong(expected, SlotState::Writing, std::memory_order_acq_rel,
+                                            std::memory_order_relaxed)) {
+      continue;
+    }
+    auto& t = slot.trace;
+    if (context != nullptr) {
+      t.depth = absl::GetStackTraceWithContext(t.frames, MaxStackDepth, 1, context, nullptr);
+    } else {
+      t.depth = absl::GetStackTrace(t.frames, MaxStackDepth, 1);
+    }
+    // Publish the completed backtrace to the timer.
+    slot.state.store(SlotState::Ready, std::memory_order_release);
+    return;
   }
 }
 
@@ -98,6 +136,7 @@ void BacktraceAction::run(
   }
 
   for (const auto& [tid, ltt] : thread_last_checkin_pairs) {
+    // Skip any threads that are still cooling off.
     if (auto it = tid_to_last_backtrace_.find(tid); it != tid_to_last_backtrace_.end()) {
       if (std::chrono::duration_cast<std::chrono::milliseconds>(now - it->second) <
           cooldown_duration_) {
@@ -105,36 +144,26 @@ void BacktraceAction::run(
       }
     }
 
+    // Claim a free slot and signal the target thread to collect a backtrace.
     const int64_t raw_tid = tid.getId();
-
-    // Skip if already in-flight for this TID.
-    bool pending = false;
-    for (const auto& slot : signal_slots_) {
-      if (slot.tid.load(std::memory_order_acquire) == raw_tid) {
-        pending = true;
-        break;
-      }
-    }
-    if (pending) {
-      continue;
-    }
-
-    // Claim a free slot.
     for (int i = 0; i < MaxSlots; ++i) {
-      int64_t expected = 0;
-      if (signal_slots_[i].tid.compare_exchange_strong(expected, raw_tid, std::memory_order_release,
-                                                       std::memory_order_relaxed)) {
-        signal_slots_[i].ready.store(false, std::memory_order_relaxed);
-        if (!Thread::signalThread(tid, SIGUSR2)) {
-          ENVOY_LOG_MISC(warn, "Backtrace Action: failed to signal thread {}.", raw_tid);
-          signal_slots_[i].tid.store(0, std::memory_order_relaxed);
-          stats_.backtraces_failed_.inc();
-          break;
-        }
-        timers_[i]->enableTimer(std::chrono::milliseconds(100));
-        tid_to_last_backtrace_[tid] = now;
+      auto& slot = signal_slots_[i];
+      SlotState expected = SlotState::Free;
+      if (!slot.state.compare_exchange_strong(
+              expected, SlotState::Claimed, std::memory_order_acq_rel, std::memory_order_relaxed)) {
+        continue;
+      }
+      slot.tid.store(raw_tid, std::memory_order_relaxed);
+      slot.state.store(SlotState::Signaled, std::memory_order_release);
+      if (!Thread::signalThread(tid, SIGUSR2)) {
+        ENVOY_LOG_MISC(warn, "Backtrace Action: failed to signal thread {}.", raw_tid);
+        slot.state.store(SlotState::Free, std::memory_order_release);
+        stats_.backtraces_failed_.inc();
         break;
       }
+      timers_[i]->enableTimer(std::chrono::milliseconds(100));
+      tid_to_last_backtrace_[tid] = now;
+      break;
     }
   }
 }

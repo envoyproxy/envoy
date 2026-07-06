@@ -4,6 +4,7 @@
 #include <atomic>
 #include <chrono>
 #include <csignal>
+#include <cstdint>
 
 #include "envoy/event/timer.h"
 #include "envoy/extensions/watchdog/backtrace_action/v3/backtrace_action.pb.h"
@@ -47,6 +48,8 @@ public:
            MonotonicTime now) override;
 
 private:
+  friend class BacktraceActionPeer;
+
   static constexpr int MaxSlots = 16;
   static constexpr int MaxStackDepth = 64;
 
@@ -55,14 +58,31 @@ private:
     int depth{0};
   };
 
+  // Lifecycle of a SignalSlot.
+  //   Free -> Claimed: run() claimed the slot and is publishing the target tid.
+  //   Claimed -> Signaled: run() published the tid and signaled the target thread.
+  //   Signaled -> Writing: a signaled thread's handler claimed the slot to write.
+  //   Writing -> Ready: signal handler finished writing the trace.
+  //   Signaled -> Free: timer released a slot whose signal handler never started.
+  //   Ready -> Free: timer logged the trace and released the slot.
+  enum class SlotState : uint8_t {
+    Free,     // Available to be claimed.
+    Claimed,  // Reserved by run(), which is still writing the target tid.
+    Signaled, // Signal sent but signal handler has not started writing the trace yet.
+    Writing,  // Signal handler is currently writing the trace.
+    Ready,    // Signal handler has fully written and safe for the timer to read.
+  };
+
   struct SignalSlot {
-    std::atomic<int64_t> tid{0}; // 0 means the slot is free.
-    std::atomic<bool> ready{false};
+    std::atomic<int64_t> tid{0};
+    std::atomic<SlotState> state{SlotState::Free};
     RawTrace trace{};
   };
 
   // Called in signal handler context; must be async-signal-safe.
   static void onNonFatalSignal(int sig, siginfo_t* info, void* context);
+
+  void onSlotTimer(int slot_index);
 
   static BacktraceActionStats generateStats(Stats::Scope& scope);
 

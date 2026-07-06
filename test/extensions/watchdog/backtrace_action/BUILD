@@ -25,6 +25,7 @@ envoy_extension_cc_test(
         "//source/extensions/watchdog/backtrace_action:config",
         "//source/server:backtrace_lib",
         "//test/common/stats:stat_test_utility_lib",
+        "//test/mocks/event:event_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/synchronization",
