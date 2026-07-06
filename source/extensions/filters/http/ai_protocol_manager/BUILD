@@ -14,9 +14,9 @@ envoy_cc_library(
     srcs = ["filter_chain_bridge.cc"],
     hdrs = ["filter_chain_bridge.h"],
     deps = [
+        "//envoy/external_buffer:filter_chain_bridge_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
-        "//source/common/external_buffer:buffer_manager_lib",
     ],
 )
 
@@ -26,9 +26,9 @@ envoy_cc_library(
     hdrs = ["filter.h"],
     deps = [
         ":filter_chain_bridge_lib",
+        "//envoy/external_buffer:external_buffer_interface",
         "//source/common/common:logger_lib",
         "//source/common/external_buffer:buffer_manager_lib",
-        "//source/common/external_buffer:external_buffer_interface",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )

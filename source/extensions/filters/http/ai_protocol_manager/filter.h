@@ -1,8 +1,9 @@
 #pragma once
 
+#include "envoy/external_buffer/external_buffer.h"
+
 #include "source/common/common/logger.h"
 #include "source/common/external_buffer/buffer_manager.h"
-#include "source/common/external_buffer/external_buffer.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {

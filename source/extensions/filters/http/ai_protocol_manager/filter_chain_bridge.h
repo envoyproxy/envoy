@@ -1,8 +1,7 @@
 #pragma once
 
+#include "envoy/external_buffer/filter_chain_bridge.h"
 #include "envoy/http/filter.h"
-
-#include "source/common/external_buffer/buffer_manager.h"
 
 namespace Envoy {
 namespace Extensions {

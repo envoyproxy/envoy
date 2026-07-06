@@ -2,8 +2,9 @@
 
 #include <memory>
 
+#include "envoy/external_buffer/external_buffer.h"
+
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/external_buffer/external_buffer.h"
 
 namespace Envoy {
 namespace ExternalBuffer {
