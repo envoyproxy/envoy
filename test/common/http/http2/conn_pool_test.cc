@@ -838,11 +838,10 @@ TEST_F(Http2ConnPoolImplTest, PendingStreamsFailure) {
   ActiveTestRequest r2(*this, 0, false);
   ActiveTestRequest r3(*this, 0, false);
 
-  // The connection now becomes ready. This should cause all the queued requests to be sent.
-  // Note that these occur in reverse order due to the order we purge pending requests in.
-  expectStreamReset(r3);
+  // The connection fails, causing all queued requests to be failed in FIFO order.
+  expectStreamReset(r1);
   expectStreamReset(r2);
-  expectClientReset(0, r1, false);
+  expectClientReset(0, r3, false);
 
   expectClientCreate();
   // Since we have no active connection, subsequence requests will queue until
@@ -870,11 +869,10 @@ TEST_F(Http2ConnPoolImplTest, LocalFailure) {
   ActiveTestRequest r2(*this, 0, false);
   ActiveTestRequest r3(*this, 0, false);
 
-  // The connection now becomes ready. This should cause all the queued requests to be sent.
-  // Note that these occur in reverse order due to the order we purge pending requests in.
-  expectStreamReset(r3);
+  // The connection fails, causing all queued requests to be failed in FIFO order.
+  expectStreamReset(r1);
   expectStreamReset(r2);
-  expectClientReset(0, r1, true);
+  expectClientReset(0, r3, true);
 
   EXPECT_CALL(*this, onClientDestroy());
 }

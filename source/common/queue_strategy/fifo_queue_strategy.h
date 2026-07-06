@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <type_traits>
 #include <utility>
 
 #include "source/common/queue_strategy/queue_strategy_base.h"
@@ -19,17 +18,11 @@ public:
   ~FifoQueue() override = default;
 
   ConnectionPool::Cancellable* add(ItemPtrType&& item) override {
-    static_assert(std::is_base_of<ConnectionPool::Cancellable, ItemType>::value,
-                  "Queue item type must inherit from ConnectionPool::Cancellable");
     LinkedList::moveIntoListBack(std::move(item), this->items_);
     return this->items_.back().get();
   }
 
-  ItemPtrType remove(ItemType& item) override {
-    static_assert(std::is_base_of<LinkedObject<ItemType>, ItemType>::value,
-                  "Queue item type must inherit from LinkedObject");
-    return item.removeFromList(this->items_);
-  }
+  ItemPtrType remove(ItemType& item) override { return item.removeFromList(this->items_); }
 
   const ItemPtrType& next() const override { return this->items_.front(); }
 

@@ -2,6 +2,8 @@
 
 #include <list>
 #include <memory>
+#include <type_traits>
+#include <utility>
 
 #include "envoy/common/conn_pool.h"
 #include "envoy/config/typed_config.h"
@@ -19,6 +21,11 @@ namespace QueueStrategy {
 // Base class that handles queuing for objects.
 template <class ItemType> class QueueBase {
 
+  static_assert(std::is_base_of<ConnectionPool::Cancellable, ItemType>::value,
+                "Queue item type must inherit from ConnectionPool::Cancellable");
+  static_assert(std::is_base_of<LinkedObject<ItemType>, ItemType>::value,
+                "Queue item type must inherit from LinkedObject");
+
   using ItemPtrType = std::unique_ptr<ItemType>;
   using ListType = std::list<ItemPtrType>;
 
@@ -34,17 +41,7 @@ public:
 
   virtual ItemPtrType remove(ItemType& item) PURE;
 
-  // Move constructor.
-  QueueBase(QueueBase<ItemType>&& other) noexcept : items_(std::move(other.items_)) {}
-
-  QueueBase<ItemType>& operator=(QueueBase<ItemType>&& other) noexcept {
-    if (this != &other) {
-      items_ = std::move(other.items_);
-    }
-    return *this;
-  }
-
-  operator std::list<ItemPtrType>&&() { return std::move(items_); }
+  ListType takeItems() { return std::move(items_); }
 
   virtual const ItemPtrType& next() const PURE;
   virtual bool isOverloaded() const PURE;
@@ -92,10 +89,19 @@ public:
   virtual Iterator end() PURE;
 
 protected:
+  QueueBase(QueueBase<ItemType>&& other) noexcept : items_(std::move(other.items_)) {}
+
+  QueueBase<ItemType>& operator=(QueueBase<ItemType>&& other) noexcept {
+    if (this != &other) {
+      items_ = std::move(other.items_);
+    }
+    return *this;
+  }
+
   std::list<ItemPtrType> items_;
 };
 
-template <class ItemType> using QueueStrategySharedPtr = std::shared_ptr<QueueBase<ItemType>>;
+template <class ItemType> using QueueStrategyUniquePtr = std::unique_ptr<QueueBase<ItemType>>;
 
 /**
  * Implemented by each queue strategy and registered via Registry::registerFactory() or the
@@ -112,7 +118,7 @@ public:
    * @param context supplies the context for queue strategy.
    * @return FilterFactoryCb the factory creation function.
    */
-  virtual absl::StatusOr<QueueStrategySharedPtr<ItemType>>
+  virtual absl::StatusOr<QueueStrategyUniquePtr<ItemType>>
   createQueueStrategy(const Protobuf::Message& config, const std::string& stat_prefix,
                       ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 

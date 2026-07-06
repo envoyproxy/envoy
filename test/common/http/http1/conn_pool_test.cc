@@ -362,13 +362,14 @@ TEST_F(Http1ConnPoolImplTest, VerifyCancelInCallback) {
   // In this scenario, all connections must succeed, so when
   // one fails, the others are canceled.
   // Note: We rely on the fact that the implementation cancels the second request first,
-  // to simplify the test.
+  // when the first request fails.
   ConnPoolCallbacks callbacks1;
-  EXPECT_CALL(callbacks1.pool_failure_, ready()).Times(0);
-  ConnPoolCallbacks callbacks2;
-  EXPECT_CALL(callbacks2.pool_failure_, ready()).WillOnce(Invoke([&]() -> void {
-    handle1->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
+  Http::ConnectionPool::Cancellable* handle2{};
+  EXPECT_CALL(callbacks1.pool_failure_, ready()).WillOnce(Invoke([&]() -> void {
+    handle2->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   }));
+  ConnPoolCallbacks callbacks2;
+  EXPECT_CALL(callbacks2.pool_failure_, ready()).Times(0);
 
   NiceMock<MockResponseDecoder> outer_decoder;
   // Create the first client.
@@ -377,8 +378,7 @@ TEST_F(Http1ConnPoolImplTest, VerifyCancelInCallback) {
   ASSERT_NE(nullptr, handle1);
 
   // Create the second client.
-  Http::ConnectionPool::Cancellable* handle2 =
-      conn_pool_->newStream(outer_decoder, callbacks2, {false, true});
+  handle2 = conn_pool_->newStream(outer_decoder, callbacks2, {false, true});
   ASSERT_NE(nullptr, handle2);
 
   // Simulate connection failure.

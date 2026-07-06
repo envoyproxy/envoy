@@ -20,7 +20,7 @@ namespace Envoy {
 namespace ConnectionPool {
 
 using PendingStreamQueuePtr =
-    Envoy::Extensions::QueueStrategy::QueueStrategySharedPtr<PendingStream>;
+    Envoy::Extensions::QueueStrategy::QueueStrategyUniquePtr<PendingStream>;
 
 class ConnPoolImplBase;
 

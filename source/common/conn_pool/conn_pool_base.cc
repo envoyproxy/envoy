@@ -26,7 +26,7 @@ int64_t currentUnusedCapacity(const std::list<ActiveClientPtr>& connecting_clien
 PendingStreamQueuePtr createPendingStreamQueue(
     const OptRef<const envoy::config::core::v3::TypedExtensionConfig> queue_strategy_config) {
   if (!queue_strategy_config.has_value()) {
-    return std::make_shared<Extensions::QueueStrategy::FifoQueue<PendingStream>>();
+    return std::make_unique<Extensions::QueueStrategy::FifoQueue<PendingStream>>();
   }
 
   using PendingStreamQueueFactory = Extensions::QueueStrategy::QueueStrategyFactory<PendingStream>;
@@ -93,6 +93,7 @@ ConnPoolImplBase::ConnPoolImplBase(
 }
 
 ConnPoolImplBase::~ConnPoolImplBase() {
+  clearQueueOverloadedGauge();
   ENVOY_BUG(isIdleImpl(), dumpState());
   ENVOY_BUG(connecting_stream_capacity_ == 0, dumpState());
   ENVOY_BUG(connecting_and_connected_stream_capacity_ == 0, dumpState());
@@ -760,7 +761,7 @@ void ConnPoolImplBase::purgePendingStreams(
   //       if retry logic submits a new stream to the pool, we don't fail it inline.
   cluster_connectivity_state_.decrPendingStreams(pending_streams_->size());
   clearQueueOverloadedGauge();
-  pending_streams_to_purge_ = std::move(*pending_streams_);
+  pending_streams_to_purge_ = pending_streams_->takeItems();
   pending_streams_ = createPendingStreamQueue(host_->cluster().queueStrategyConfig());
   while (!pending_streams_to_purge_.empty()) {
     PendingStreamPtr stream =

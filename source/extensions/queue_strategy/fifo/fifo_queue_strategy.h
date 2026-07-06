@@ -20,7 +20,7 @@ public:
   }
 
   // QueueStrategyFactory
-  absl::StatusOr<QueueStrategySharedPtr<ItemType>>
+  absl::StatusOr<QueueStrategyUniquePtr<ItemType>>
   createQueueStrategy(const Protobuf::Message& config, const std::string& stat_prefix,
                       ProtobufMessage::ValidationVisitor& validation_visitor) override {
     return createQueueStrategyTyped(
@@ -34,10 +34,10 @@ public:
 
 private:
   // QueueStrategyFactory
-  absl::StatusOr<QueueStrategySharedPtr<ItemType>> createQueueStrategyTyped(
+  absl::StatusOr<QueueStrategyUniquePtr<ItemType>> createQueueStrategyTyped(
       const envoy::extensions::queue_strategy::fifo::v3::FifoQueueStrategyConfig&,
       const std::string&) {
-    return std::make_shared<FifoQueue<ItemType>>();
+    return std::make_unique<FifoQueue<ItemType>>();
   }
 };
 

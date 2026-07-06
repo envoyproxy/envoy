@@ -119,10 +119,10 @@ public:
     return std::make_unique<envoy::extensions::queue_strategy::fifo::v3::FifoQueueStrategyConfig>();
   }
 
-  absl::StatusOr<Extensions::QueueStrategy::QueueStrategySharedPtr<PendingStream>>
+  absl::StatusOr<Extensions::QueueStrategy::QueueStrategyUniquePtr<PendingStream>>
   createQueueStrategy(const Protobuf::Message&, const std::string&,
                       ProtobufMessage::ValidationVisitor&) override {
-    return std::make_shared<TestPendingStreamQueue>();
+    return std::make_unique<TestPendingStreamQueue>();
   }
 
   std::string name() const override { return "envoy.queue_strategy.fifo"; }
