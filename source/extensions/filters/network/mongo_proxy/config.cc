@@ -44,7 +44,7 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
   auto stats = std::make_shared<MongoStats>(context.scope(), stat_prefix, commands);
   const bool emit_dynamic_metadata = proto_config.emit_dynamic_metadata();
   const uint32_t max_bson_depth =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_bson_depth, 128);
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_bson_depth, 100);
 
   return [stat_prefix, &context, access_log, fault_config, emit_dynamic_metadata, stats,
           max_bson_depth](Network::FilterManager& filter_manager) -> void {
