@@ -151,22 +151,27 @@ public:
 // Delegation helper for RefcountPtr. This can be instantiated in a class, but
 // explicit delegation will be needed for each of the three methods.
 struct RefcountHelper {
-  // Implements the RefcountInterface API.
-  void incRefCount() {
-    // Note: The ++ref_count_ here and --ref_count_ below have implicit memory
-    // orderings of sequentially consistent. Relaxed on addition and
-    // acquire/release on subtraction is the typical use for reference
-    // counting. On x86, the difference in instruction count is minimal, but the
-    // savings are greater on other platforms.
-    //
-    // https://www.boost.org/doc/libs/1_69_0/doc/html/atomic/usage_examples.html#boost_atomic.usage_examples.example_reference_counters
-    ++ref_count_;
-  }
+  // Implements the RefcountInterface API, using the memory orderings from the
+  // canonical reference-counting example:
+  // https://www.boost.org/doc/libs/1_69_0/doc/html/atomic/usage_examples.html#boost_atomic.usage_examples.example_reference_counters
+  //
+  // Incrementing needs atomicity but no ordering: no action is taken based on
+  // the result, and a new reference can only be created by a thread that
+  // already holds a valid one. Decrementing must ensure that all of this
+  // thread's accesses to the object happen-before the object's destruction,
+  // so each decrement releases, and the final decrement (the one that takes
+  // the count to zero and triggers destruction) also acquires. We use an
+  // acq_rel read-modify-write rather than the fence-based formulation from
+  // the Boost example because TSAN models RMW orderings precisely, while
+  // standalone fences are not as well supported. On x86 the difference from
+  // the previous sequentially-consistent operations is minimal, but the
+  // savings are real on weakly-ordered platforms such as ARM.
+  void incRefCount() { ref_count_.fetch_add(1, std::memory_order_relaxed); }
   bool decRefCount() {
     ASSERT(ref_count_ >= 1);
-    return --ref_count_ == 0;
+    return ref_count_.fetch_sub(1, std::memory_order_acq_rel) == 1;
   }
-  uint32_t use_count() const { return ref_count_; }
+  uint32_t use_count() const { return ref_count_.load(std::memory_order_relaxed); }
 
   std::atomic<uint32_t> ref_count_{0};
 };

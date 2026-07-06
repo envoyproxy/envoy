@@ -178,7 +178,10 @@ envoy_cc_test(
     name = "refcount_ptr_test",
     srcs = ["refcount_ptr_test.cc"],
     rbe_pool = "6gig",
-    deps = ["//envoy/stats:refcount_ptr_interface"],
+    deps = [
+        "//envoy/stats:refcount_ptr_interface",
+        "//test/test_common:thread_factory_for_test_lib",
+    ],
 )
 
 envoy_cc_test(

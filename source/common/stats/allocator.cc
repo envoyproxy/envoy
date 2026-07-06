@@ -90,19 +90,41 @@ public:
   bool hidden() const override { return flags_ & Metric::Flags::Hidden; }
 
   // RefcountInterface
-  void incRefCount() override { ++ref_count_; }
+  void incRefCount() override { ref_count_.fetch_add(1, std::memory_order_relaxed); }
   bool decRefCount() override {
-    // We must, unfortunately, hold the allocator's lock when decrementing the
-    // refcount. Otherwise another thread may simultaneously try to allocate the
-    // same name'd stat after we decrement it, and we'll wind up with a
-    // dtor/update race. To avoid this we must hold the lock until the stat is
-    // removed from the map.
+    // Fast path: when this is not the last reference, drop it without taking
+    // the allocator's lock. The CAS loop only ever moves the count from
+    // observed values >= 2 to values >= 1, so it can never reach zero here;
+    // release ordering makes this thread's accesses to the stat visible to
+    // whichever thread ends up destroying it. Avoiding the lock matters for
+    // performance: flushing metrics to sinks briefly references every stat
+    // (see MetricSnapshotImpl), so with large stat counts a lock per release
+    // makes the ref-count a main-thread bottleneck during flushes (see
+    // #43836).
+    uint32_t count = ref_count_.load(std::memory_order_relaxed);
+    ASSERT(count >= 1);
+    while (count > 1) {
+      if (ref_count_.compare_exchange_weak(count, count - 1, std::memory_order_release,
+                                           std::memory_order_relaxed)) {
+        return false;
+      }
+    }
+
+    // Slow path: we observed ourselves holding the last reference, so we must
+    // hold the allocator's lock for the final decrement. Otherwise another
+    // thread may simultaneously try to allocate the same name'd stat after we
+    // decrement it, and we'll wind up with a dtor/update race. To avoid this
+    // we must hold the lock until the stat is removed from the map.
     //
-    // It might be worth thinking about a race-free way to decrement ref-counts
-    // without a lock, for the case where ref_count > 2, and we don't need to
-    // destruct anything. But it seems preferable at to be conservative here,
-    // as stats will only go out of scope when a scope is destructed (during
-    // xDS) or during admin stats operations.
+    // The observation above is only a hint: the count can rise again before
+    // we take the lock, if another thread re-shares this stat from the
+    // allocator's map (which requires the lock), in which case the decrement
+    // below does not hit zero and nothing is destroyed. It cannot fall below
+    // one, because our own reference is still counted. The transition to zero
+    // therefore always happens with the lock held, atomically with removal
+    // from the map. The sequentially-consistent decrement below also acquires
+    // the release sequence of all fast-path decrements, so every thread's
+    // accesses to the stat happen-before its destruction.
     Thread::LockGuard lock(alloc_.mutex_);
     ASSERT(ref_count_ >= 1);
     if (--ref_count_ == 0) {
@@ -112,7 +134,7 @@ public:
     }
     return false;
   }
-  uint32_t use_count() const override { return ref_count_; }
+  uint32_t use_count() const override { return ref_count_.load(std::memory_order_relaxed); }
 
   /**
    * We must atomically remove the counter/gauges from the allocator's sets when
@@ -130,9 +152,10 @@ protected:
   // but these are always in transition to ref-count 2 or higher, and thus
   // cannot race with a decrement to zero.
   //
-  // However, we must hold alloc_.mutex_ when decrementing ref_count_ so that
-  // when it hits zero we can atomically remove it from alloc_.counters_ or
-  // alloc_.gauges_. We leave it atomic to avoid taking the lock on increment.
+  // Non-final decrements also avoid the lock, using a CAS loop that can never
+  // reach zero. However, we must hold alloc_.mutex_ for a decrement that may
+  // hit zero, so that we can atomically remove the stat from alloc_.counters_
+  // or alloc_.gauges_; see decRefCount().
   std::atomic<uint32_t> ref_count_{0};
 
   std::atomic<uint16_t> flags_{0};
