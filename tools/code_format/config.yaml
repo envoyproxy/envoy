@@ -91,6 +91,7 @@ paths:
     # valid situation identified so far is template functions used for config
     # processing.
     - envoy/common/exception.h
+    - source/common/access_log/access_log_impl.cc
     - source/common/filter/config_discovery_impl.h
     - source/common/config/utility.h
     - source/common/matcher/matcher.h

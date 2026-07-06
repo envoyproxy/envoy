@@ -57,7 +57,11 @@ public:
                       std::optional<size_t> max_length = std::nullopt) {
     DefaultBuiltInStreamInfoCommandParserFactory factory;
     auto parser = factory.createCommandParser();
-    formatter_ = parser->parse(command, sub_command, max_length).value();
+    auto formatter_or = parser->parse(command, sub_command, max_length);
+    if (!formatter_or.ok()) {
+      throwEnvoyExceptionOrPanic(std::string(formatter_or.status().message()));
+    }
+    formatter_ = std::move(formatter_or).value();
     if (formatter_ == nullptr) {
       throwEnvoyExceptionOrPanic(fmt::format("Not supported command in StreamInfo: {}", command));
     }

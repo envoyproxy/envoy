@@ -104,7 +104,7 @@ cluster by invoking ``refreshRouteCluster()`` if the cluster specifier of route 
 the :ref:`matcher based cluster specifier <config_http_cluster_specifier_matcher>` support the
 ``refreshRouteCluster()`` callback.
 
-This callabck will not update the cached route but only refresh the target cluster name. This is
+This callback will not update the cached route but only refresh the target cluster name. This is
 suggested to replace ``clearRouteCache()`` if you only want to determine the target cluster based on
 the latest request attributes that have been updated by the filters and do not want to configure
 multiple similar routes at the route table.

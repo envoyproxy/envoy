@@ -439,6 +439,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/transport_sockets/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/upstreams/http/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/tracers/dynamic_modules @agrawroh @mathetake @wbpcode
+/*/extensions/health_checkers/dynamic_modules @basundhara-c @agrawroh @mathetake @wbpcode
 # Linux network namespace override
 /*/extensions/local_address_selectors/filter_state_override @tonya11en @kyessenov
 
