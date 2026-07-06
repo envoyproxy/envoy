@@ -225,9 +225,9 @@ message ProcessingRequest {
   // Flow control updates for ``FULL_DUPLEX_STREAMED`` and ``GRPC`` body
   // send modes.
   //
-  // This message may be included in a response message that also
+  // This message may be included in a request message that also
   // populates one of the fields in the ``request`` oneof above, or it
-  // may be sent in a response message that does not set the
+  // may be sent in a request message that does not set the
   // ``request`` oneof.
   //
   // In ``FULL_DUPLEX_STREAMED`` body send mode, for backward
