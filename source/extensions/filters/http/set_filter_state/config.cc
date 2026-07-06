@@ -60,13 +60,13 @@ SetFilterStateConfig::createRouteSpecificFilterConfigTyped(
       generic_context, proto_config.clear_route_cache());
 }
 
-Http::FilterFactoryCb SetFilterStateConfig::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb> SetFilterStateConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::set_filter_state::v3::Config& proto_config,
     const std::string&, Server::Configuration::ServerFactoryContext& context) {
 
   // TODO(wbpcode): these is a potential bug of message validation. The validation visitor
   // of server context should not be used here directly. But this is bug of
-  // 'createFilterFactoryFromProtoWithServerContext' and will be fixed in the future.
+  // 'createHttpFilterFactoryFromProto' and will be fixed in the future.
   Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
 
   const auto filter_config = std::make_shared<Filters::Common::SetFilterState::Config>(

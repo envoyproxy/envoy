@@ -105,7 +105,7 @@ TEST(HttpExtProcConfigTest, CorrectGrpcServiceConfigServerContext) {
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor());
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -132,7 +132,7 @@ TEST(HttpExtProcConfigTest, CorrectHttpServiceConfigServerContext) {
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor()).Times(testing::AtLeast(1));
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -332,7 +332,7 @@ TEST(HttpExtProcConfigTest, InvalidServiceConfigServerContext) {
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context),
+      factory.createHttpFilterFactoryFromProto(*proto_config, "stats", context).value(),
       EnvoyException, "One and only one of grpc_service or http_service must be configured");
 }
 
@@ -402,7 +402,7 @@ TEST(HttpExtProcConfigTest, UpstreamConfig) {
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor());
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

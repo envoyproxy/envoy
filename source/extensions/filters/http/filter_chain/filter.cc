@@ -33,11 +33,12 @@ FilterFactoriesVector createFilterFactoriesFromConfig(
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         filter_config, context.messageValidationVisitor(), factory);
     auto callback_or_error =
-        factory.createFilterFactoryFromProtoWithServerContext(*message, stats_prefix, context);
+        factory.createHttpFilterFactoryFromProto(*message, stats_prefix, context);
+    THROW_IF_NOT_OK_REF(callback_or_error.status());
 
     auto filter_config_provider =
         Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(context)
-            ->createStaticFilterConfigProvider(callback_or_error, filter_config.name());
+            ->createStaticFilterConfigProvider(callback_or_error.value(), filter_config.name());
     filter_factories.push_back({std::move(filter_config_provider)});
   }
   return filter_factories;
