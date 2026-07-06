@@ -159,7 +159,7 @@ void ProxyFilterConfig::ThreadLocalClusterInfo::onClusterAddOrUpdate(
   }
 }
 
-void ProxyFilterConfig::ThreadLocalClusterInfo::onClusterRemoval(const std::string&) {
+void ProxyFilterConfig::ThreadLocalClusterInfo::onClusterRemoval(absl::string_view) {
   // do nothing, should have no pending clusters.
 }
 

@@ -31,6 +31,7 @@ envoy_cc_library(
         ":scope_interface",
         ":stats_interface",
         ":stats_matcher_interface",
+        ":tag_producer_interface",
         "//envoy/common:optref_lib",
         "//envoy/common:pure_lib",
         "//envoy/event:dispatcher_interface",
@@ -42,8 +43,8 @@ envoy_cc_library(
     name = "scope_interface",
     hdrs = ["scope.h"],
     deps = [
+        ":histogram_interface",
         ":refcount_ptr_interface",
-        ":stats_interface",
         ":stats_matcher_interface",
         ":tag_interface",
         "//envoy/common:pure_lib",
@@ -59,20 +60,48 @@ envoy_cc_library(
     ],
 )
 
-# TODO(jmarantz): atomize the build rules to match the include files.
+envoy_cc_library(
+    name = "histogram_interface",
+    hdrs = ["histogram.h"],
+    deps = [
+        ":refcount_ptr_interface",
+        ":stats_interface",
+        "//envoy/common:pure_lib",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
+    name = "tag_extractor_interface",
+    hdrs = ["tag_extractor.h"],
+    deps = [
+        ":tag_interface",
+        "//envoy/common:interval_set_interface",
+        "//envoy/common:pure_lib",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
+    name = "tag_producer_interface",
+    hdrs = ["tag_producer.h"],
+    deps = [
+        ":tag_interface",
+        "//envoy/common:pure_lib",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
 envoy_cc_library(
     name = "stats_interface",
     hdrs = [
-        "histogram.h",
         "stats.h",
-        "tag_extractor.h",
-        "tag_producer.h",
     ],
     deps = [
         ":refcount_ptr_interface",
         ":tag_interface",
-        "//envoy/common:interval_set_interface",
-        "@abseil-cpp//absl/container:inlined_vector",
+        "//envoy/common:pure_lib",
+        "@abseil-cpp//absl/strings",
     ],
 )
 

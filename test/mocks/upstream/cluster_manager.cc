@@ -69,14 +69,14 @@ void MockClusterManager::initializeClusters(const std::vector<std::string>& acti
         }
       }));
   ON_CALL(*this, getActiveCluster(_))
-      .WillByDefault(Invoke([this](const std::string& cluster_name) -> OptRef<const Cluster> {
+      .WillByDefault(Invoke([this](absl::string_view cluster_name) -> OptRef<const Cluster> {
         if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
           return *it->second;
         }
         return std::nullopt;
       }));
   ON_CALL(*this, getActiveOrWarmingCluster(_))
-      .WillByDefault(Invoke([this](const std::string& cluster_name) -> OptRef<const Cluster> {
+      .WillByDefault(Invoke([this](absl::string_view cluster_name) -> OptRef<const Cluster> {
         if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
           return *it->second;
         }
@@ -86,7 +86,7 @@ void MockClusterManager::initializeClusters(const std::vector<std::string>& acti
         return std::nullopt;
       }));
   ON_CALL(*this, hasCluster(_))
-      .WillByDefault(Invoke([this](const std::string& cluster_name) -> bool {
+      .WillByDefault(Invoke([this](absl::string_view cluster_name) -> bool {
         return active_clusters_.find(cluster_name) != active_clusters_.end() ||
                warming_clusters_.find(cluster_name) != warming_clusters_.end();
       }));

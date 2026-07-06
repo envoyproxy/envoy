@@ -1180,6 +1180,13 @@ envoy.health_checkers.tcp:
   status: stable
   type_urls:
   - envoy.config.core.v3.HealthCheck.TcpHealthCheck
+envoy.health_checkers.dynamic_modules:
+  categories:
+  - envoy.health_checkers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.health_checkers.dynamic_modules.v3.DynamicModuleHealthCheck
 envoy.health_checkers.redis:
   categories:
   - envoy.health_checkers
