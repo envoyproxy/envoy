@@ -149,8 +149,6 @@ public:
     return context.session_keys_.empty() ? nullptr : context.session_keys_.front().get();
   }
 
-  static SSL_SESSION* currentSession(SSL* ssl) { return SSL_get_session(ssl); }
-
   static size_t maxSniSessionCacheEntries() { return ClientContextImpl::MaxSniSessionCacheEntries; }
 };
 
@@ -5821,13 +5819,6 @@ max_session_keys: 2
   ASSERT_NE(nullptr, cached_session);
   EXPECT_EQ(1, ClientContextImplPeer::cachedContextSessionCount(context.clientContext()));
   EXPECT_TRUE(ClientContextImplPeer::cachedSniNames(context.clientContext()).empty());
-
-  // With the rollback flag disabled, the next connection receives the most
-  // recent context-wide session even though it uses a different SNI.
-  auto ssl_b_or_error = context.clientContext().newSsl(sni_b_options, nullptr);
-  ASSERT_TRUE(ssl_b_or_error.ok()) << ssl_b_or_error.status();
-  auto ssl_b = std::move(ssl_b_or_error.value());
-  EXPECT_EQ(cached_session, ClientContextImplPeer::currentSession(ssl_b.get()));
 }
 
 TEST_P(SslSocketTest, ClientSessionCacheKeepsConfiguredSessionCountPerSni) {
@@ -6028,9 +6019,12 @@ TEST_P(SslSocketTest, ClientSessionResumptionDefault) {
 )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
+  sni: session.example.com
   common_tls_context:
 )EOF";
 
+  // The SNI-scoped client cache intentionally does not store sessions when no
+  // effective SNI is available, so enabled-resumption tests use an explicit SNI.
   testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, true, version_);
 }
 
@@ -6071,6 +6065,7 @@ TEST_P(SslSocketTest, ClientSessionResumptionEnabledTls12) {
 )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
+  sni: session.example.com
   common_tls_context:
     tls_params:
       tls_minimum_protocol_version: TLSv1_0
@@ -6121,6 +6116,7 @@ TEST_P(SslSocketTest, ClientSessionResumptionEnabledTls13) {
 )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
+  sni: session.example.com
   common_tls_context:
     tls_params:
       tls_minimum_protocol_version: TLSv1_3
