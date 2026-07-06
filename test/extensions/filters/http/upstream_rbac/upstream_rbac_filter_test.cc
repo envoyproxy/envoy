@@ -292,6 +292,32 @@ TEST_F(UpstreamRbacFilterTest, OnUpstreamConnectionEstablishedIsNoOp) {
   filter_->onUpstreamConnectionEstablished();
 }
 
+// When the filter is used as a router upstream filter, stats_prefix carries the parent namespace
+// (e.g. "http.ingress."). RBAC counters must land under that prefix: "http.ingress.rbac.*".
+TEST_F(UpstreamRbacFilterTest, RouterContextStatPrefixScopesStats) {
+  auto config = std::make_shared<RBACFilter::RoleBasedAccessControlFilterConfig>(
+      envoy::extensions::filters::http::rbac::v3::RBAC{}, "http.ingress.",
+      *stats_store_.rootScope(), context_, ProtobufMessage::getStrictValidationVisitor());
+
+  EXPECT_TRUE(stats_store_.findCounterByString("http.ingress.rbac.allowed").has_value());
+  EXPECT_TRUE(stats_store_.findCounterByString("http.ingress.rbac.denied").has_value());
+}
+
+// When used as a cluster upstream filter, the scope already carries the "cluster.<name>." prefix
+// so stats_prefix is empty. RBAC counters must appear as "cluster.cluster_0.rbac.*" and must NOT
+// be double-prefixed as "cluster.cluster_0.cluster.cluster_0.rbac.*".
+TEST_F(UpstreamRbacFilterTest, ClusterContextEmptyPrefixNoDoublePrefix) {
+  auto cluster_scope = stats_store_.rootScope()->createScope("cluster.cluster_0");
+  auto config = std::make_shared<RBACFilter::RoleBasedAccessControlFilterConfig>(
+      envoy::extensions::filters::http::rbac::v3::RBAC{}, "", *cluster_scope, context_,
+      ProtobufMessage::getStrictValidationVisitor());
+
+  EXPECT_TRUE(stats_store_.findCounterByString("cluster.cluster_0.rbac.allowed").has_value());
+  EXPECT_FALSE(stats_store_
+                   .findCounterByString("cluster.cluster_0.cluster.cluster_0.rbac.allowed")
+                   .has_value());
+}
+
 } // namespace
 } // namespace UpstreamRBACFilter
 } // namespace HttpFilters

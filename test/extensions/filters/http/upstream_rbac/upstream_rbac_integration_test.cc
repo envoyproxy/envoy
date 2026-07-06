@@ -113,5 +113,27 @@ TEST_P(UpstreamRbacIntegrationTest, AllowsNonMatchingUpstreamIp) {
   cleanupUpstreamAndDownstream();
 }
 
+// Stats emitted by the upstream RBAC filter in a cluster context must be scoped under
+// "cluster.<name>.rbac.*". They must NOT appear under "cluster.<name>.cluster.<name>.rbac.*"
+// (which would indicate that the stats_prefix string is being applied on top of a scope that
+// already carries the cluster prefix).
+TEST_P(UpstreamRbacIntegrationTest, ClusterContextStatsNotDoublePrefixed) {
+  addUpstreamRbacFilter(loopbackCidr(), loopbackPrefixLen());
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+
+  // The denied counter must exist under the cluster prefix exactly once.
+  EXPECT_NE(nullptr, test_server_->counter("cluster.cluster_0.rbac.denied"));
+  // It must not be double-prefixed.
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.cluster.cluster_0.rbac.denied"));
+
+  cleanupUpstreamAndDownstream();
+}
+
 } // namespace
 } // namespace Envoy
