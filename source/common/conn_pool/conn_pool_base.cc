@@ -295,13 +295,14 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
   // increase when a MAX_STREAMS frame is received.
   if (trackStreamCapacity()) {
     // If the effective client capacity was limited by concurrency, increase connected capacity.
+    const uint32_t concurrent_stream_limit = client.concurrentStreamLimit();
     bool limited_by_concurrency =
-        client.remaining_streams_ > client.concurrent_stream_limit_ - client.numActiveStreams() - 1;
+        client.remaining_streams_ > concurrent_stream_limit - client.numActiveStreams() - 1;
     // The capacity calculated by concurrency could be negative if a SETTINGS frame lowered the
     // number of allowed streams. In this case, connecting_and_connected_stream_capacity_ can be
-    // negative, and effective client capacity was still limited by concurrency. Compare
-    // client.concurrent_stream_limit_ and client.numActiveStreams() directly to avoid overflow.
-    bool negative_capacity = client.concurrent_stream_limit_ < client.numActiveStreams() + 1;
+    // negative, and effective client capacity was still limited by concurrency. Compare the
+    // current concurrent stream limit and client.numActiveStreams() directly to avoid overflow.
+    bool negative_capacity = concurrent_stream_limit < client.numActiveStreams() + 1;
     if (negative_capacity || limited_by_concurrency) {
       incrConnectingAndConnectedStreamCapacity(1, client);
     }

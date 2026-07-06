@@ -52,10 +52,10 @@ void HttpConnPoolImplMixed::onConnected(Envoy::ConnectionPool::ActiveClient& cli
   }
 
   uint32_t old_effective_limit = client.effectiveConcurrentStreamLimit();
-  if (protocol_ == Http::Protocol::Http11 && client.concurrent_stream_limit_ != 1) {
+  if (protocol_ == Http::Protocol::Http11 && client.concurrentStreamLimit() != 1) {
     // The estimates were all based on assuming HTTP/2 would be negotiated. Adjust down.
-    uint32_t delta = client.concurrent_stream_limit_ - 1;
-    client.concurrent_stream_limit_ = 1;
+    uint32_t delta = client.concurrentStreamLimit() - 1;
+    client.setConcurrentStreamLimit(1);
     decrConnectingAndConnectedStreamCapacity(delta, client);
     if (http_server_properties_cache_ && origin_.has_value()) {
       http_server_properties_cache_->setConcurrentStreams(origin_.value(), 1);

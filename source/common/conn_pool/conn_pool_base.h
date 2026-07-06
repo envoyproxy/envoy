@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "envoy/common/conn_pool.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
@@ -55,7 +57,7 @@ public:
   // Returns the concurrent stream limit, accounting for if the total stream limit
   // is less than the concurrent stream limit.
   virtual uint32_t effectiveConcurrentStreamLimit() const {
-    return std::min(remaining_streams_, concurrent_stream_limit_);
+    return std::min(remaining_streams_, concurrentStreamLimit());
   }
 
   // Returns the application protocol, or std::nullopt for TCP.
@@ -63,7 +65,7 @@ public:
 
   virtual int64_t currentUnusedCapacity() const {
     int64_t remaining_concurrent_streams =
-        static_cast<int64_t>(concurrent_stream_limit_) - numActiveStreams();
+        static_cast<int64_t>(concurrentStreamLimit()) - numActiveStreams();
 
     return std::min<int64_t>(remaining_streams_, remaining_concurrent_streams);
   }
@@ -123,6 +125,14 @@ public:
     return state_ != State::Connecting;
   }
 
+  uint32_t concurrentStreamLimit() const {
+    return concurrent_stream_limit_.load(std::memory_order_relaxed);
+  }
+
+  void setConcurrentStreamLimit(uint32_t concurrent_stream_limit) {
+    concurrent_stream_limit_.store(concurrent_stream_limit, std::memory_order_relaxed);
+  }
+
   ConnPoolImplBase& parent_;
   // The count of remaining streams allowed for this connection.
   // This will start out as the total number of streams per connection if capped
@@ -137,7 +147,7 @@ public:
   // The max concurrent stream for this connection, it's initialized by `configured_stream_limit_`
   // and can be adjusted by SETTINGS frame, but the max value of it can't exceed
   // `configured_stream_limit_`.
-  uint32_t concurrent_stream_limit_;
+  std::atomic<uint32_t> concurrent_stream_limit_;
   Upstream::HostDescriptionConstSharedPtr real_host_description_;
   Stats::TimespanPtr conn_connect_ms_;
   Stats::TimespanPtr conn_length_;

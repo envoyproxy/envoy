@@ -136,8 +136,8 @@ void MultiplexedActiveClientBase::onSettings(ReceivedSettings& settings) {
       parent().cache()->setConcurrentStreams(*parent().origin(),
                                              settings.maxConcurrentStreams().value());
     }
-    concurrent_stream_limit_ =
-        std::min(settings.maxConcurrentStreams().value(), configured_stream_limit_);
+    setConcurrentStreamLimit(
+        std::min(settings.maxConcurrentStreams().value(), configured_stream_limit_));
 
     int64_t delta = old_unused_capacity - currentUnusedCapacity();
     if (state() == ActiveClient::State::Ready && currentUnusedCapacity() <= 0) {
