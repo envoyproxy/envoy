@@ -33,7 +33,7 @@ class HeaderValueSelector {
 public:
   explicit HeaderValueSelector(Http::LowerCaseString header, bool remove)
       : header_(std::move(header)), remove_(std::move(remove)) {}
-  absl::optional<std::string> extract(Http::HeaderMap& map) const;
+  std::optional<std::string> extract(Http::HeaderMap& map) const;
   std::string toString() const { return fmt::format("header '{}'", header_.get()); }
 
 private:
@@ -45,12 +45,12 @@ class Rule {
 public:
   Rule(const ProtoRule& rule, Regex::Engine& regex_engine);
   const ProtoRule& rule() const { return rule_; }
-  const absl::optional<Matcher::RegexReplace>& regexReplace() const { return regex_replace_; }
+  const std::optional<Matcher::RegexReplace>& regexReplace() const { return regex_replace_; }
   std::shared_ptr<const HeaderValueSelector> selector_;
 
 private:
   const ProtoRule rule_;
-  absl::optional<Matcher::RegexReplace> regex_replace_;
+  std::optional<Matcher::RegexReplace> regex_replace_;
 };
 
 using HeaderToMetadataRules = std::vector<Rule>;

@@ -85,8 +85,8 @@ ClientPtr ClientImpl::create(
     DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
     const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
     bool is_transaction_client, const std::string& auth_username,
-    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
-    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+    std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+    std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator) {
 
   auto client = std::make_unique<ClientImpl>(
@@ -130,8 +130,8 @@ ClientImpl::ClientImpl(
     DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
     const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
     bool is_transaction_client,
-    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
-    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+    std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+    std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
@@ -397,8 +397,8 @@ ClientPtr ClientFactoryImpl::create(
     Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, const ConfigSharedPtr& config,
     const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
     const std::string& auth_username, const std::string& auth_password, bool is_transaction_client,
-    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
-    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+    std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+    std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator) {
 
   ClientPtr client =

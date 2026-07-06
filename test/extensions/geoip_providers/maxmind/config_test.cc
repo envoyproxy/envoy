@@ -27,43 +27,43 @@ using MaxmindProviderConfig = envoy::extensions::geoip_providers::maxmind::v3::M
 
 class GeoipProviderPeer {
 public:
-  static const absl::optional<std::string>& cityDbPath(const GeoipProvider& provider) {
+  static const std::optional<std::string>& cityDbPath(const GeoipProvider& provider) {
     return provider.config_->cityDbPath();
   }
-  static const absl::optional<std::string>& ispDbPath(const GeoipProvider& provider) {
+  static const std::optional<std::string>& ispDbPath(const GeoipProvider& provider) {
     return provider.config_->ispDbPath();
   }
-  static const absl::optional<std::string>& anonDbPath(const GeoipProvider& provider) {
+  static const std::optional<std::string>& anonDbPath(const GeoipProvider& provider) {
     return provider.config_->anonDbPath();
   }
-  static const absl::optional<std::string>& countryDbPath(const GeoipProvider& provider) {
+  static const std::optional<std::string>& countryDbPath(const GeoipProvider& provider) {
     return provider.config_->countryDbPath();
   }
-  static const absl::optional<std::string>& countryHeader(const GeoipProvider& provider) {
+  static const std::optional<std::string>& countryHeader(const GeoipProvider& provider) {
     return provider.config_->countryHeader();
   }
-  static const absl::optional<std::string>& cityHeader(const GeoipProvider& provider) {
+  static const std::optional<std::string>& cityHeader(const GeoipProvider& provider) {
     return provider.config_->cityHeader();
   }
-  static const absl::optional<std::string>& regionHeader(const GeoipProvider& provider) {
+  static const std::optional<std::string>& regionHeader(const GeoipProvider& provider) {
     return provider.config_->regionHeader();
   }
-  static const absl::optional<std::string>& asnHeader(const GeoipProvider& provider) {
+  static const std::optional<std::string>& asnHeader(const GeoipProvider& provider) {
     return provider.config_->asnHeader();
   }
-  static const absl::optional<std::string>& anonVpnHeader(const GeoipProvider& provider) {
+  static const std::optional<std::string>& anonVpnHeader(const GeoipProvider& provider) {
     return provider.config_->anonVpnHeader();
   }
-  static const absl::optional<std::string>& anonTorHeader(const GeoipProvider& provider) {
+  static const std::optional<std::string>& anonTorHeader(const GeoipProvider& provider) {
     return provider.config_->anonTorHeader();
   }
-  static const absl::optional<std::string>& anonProxyHeader(const GeoipProvider& provider) {
+  static const std::optional<std::string>& anonProxyHeader(const GeoipProvider& provider) {
     return provider.config_->anonProxyHeader();
   }
-  static const absl::optional<std::string>& anonHostingHeader(const GeoipProvider& provider) {
+  static const std::optional<std::string>& anonHostingHeader(const GeoipProvider& provider) {
     return provider.config_->anonHostingHeader();
   }
-  static const absl::optional<std::string>& ispHeader(const GeoipProvider& provider) {
+  static const std::optional<std::string>& ispHeader(const GeoipProvider& provider) {
     return provider.config_->ispHeader();
   }
   static bool isCityDbPathSet(const GeoipProvider& provider) {

@@ -10,7 +10,7 @@ namespace GcpAuthn {
 
 namespace {
 uint64_t generateCacheKey(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-                          const absl::optional<std::string>& fingerprint) {
+                          const std::optional<std::string>& fingerprint) {
   uint64_t key = MessageUtil::hash(audience);
   if (fingerprint.has_value()) {
     key = HashUtil::xxHash64(fingerprint.value(), key);
@@ -19,9 +19,9 @@ uint64_t generateCacheKey(const envoy::extensions::filters::http::gcp_authn::v3:
 }
 } // namespace
 
-absl::optional<std::string>
+std::optional<std::string>
 TokenCacheImpl::lookUp(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-                       const absl::optional<std::string>& fingerprint) {
+                       const std::optional<std::string>& fingerprint) {
   uint64_t key = generateCacheKey(audience, fingerprint);
   typename LRUCache::ScopedLookup lookup(&lru_cache_, key);
   if (lookup.found()) {
@@ -30,7 +30,7 @@ TokenCacheImpl::lookUp(const envoy::extensions::filters::http::gcp_authn::v3::Au
     // fingerprint.
     if (found_token->fingerprint != fingerprint ||
         !Protobuf::util::MessageDifferencer::Equals(found_token->audience, audience)) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     // Verify the validness of the token by checking its expiration time field.
     if (found_token->expires_at > 0 &&
@@ -38,13 +38,13 @@ TokenCacheImpl::lookUp(const envoy::extensions::filters::http::gcp_authn::v3::Au
             found_token->expires_at) {
       // Remove the expired entry.
       lru_cache_.remove(key);
-      return absl::nullopt;
+      return std::nullopt;
     }
     // Return the valid token string.
     return found_token->token;
   }
   // Return empty/nullopt if no entry is found or it was expired.
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 void TokenCacheImpl::insert(std::unique_ptr<GcpToken> token) {

@@ -1,12 +1,12 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "source/common/common/assert.h"
 #include "source/extensions/common/dubbo/message.h"
 
-#include "absl/types/optional.h"
 #include "hessian2/object.hpp"
 
 namespace Envoy {
@@ -46,7 +46,7 @@ public:
 
 private:
   MessageType message_type_{MessageType::Request};
-  absl::optional<ResponseStatus> response_status_;
+  std::optional<ResponseStatus> response_status_;
 
   int64_t request_id_{};
   size_t body_size_{};

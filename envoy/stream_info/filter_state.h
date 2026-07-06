@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "envoy/common/pure.h"
@@ -11,7 +12,6 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace StreamInfo {
@@ -97,11 +97,11 @@ public:
     virtual ProtobufTypes::MessagePtr serializeAsProto() const { return nullptr; }
 
     /**
-     * @return absl::optional<std::string> a optional string to the serialization of the filter
+     * @return std::optional<std::string> a optional string to the serialization of the filter
      * state. No value if the filter state cannot be serialized or serialization is not supported.
      * This method can be used to get an unstructured serialization result.
      */
-    virtual absl::optional<std::string> serializeAsString() const { return absl::nullopt; }
+    virtual std::optional<std::string> serializeAsString() const { return std::nullopt; }
 
     /**
      * @return bool true if the object supports field access. False if the object does not support

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <ctime>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/common/exception.h"
@@ -16,7 +17,6 @@
 #include "envoy/thread/thread.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {
@@ -96,7 +96,7 @@ public:
    * to start up in the new process.
    * @return response if the parent is alive.
    */
-  virtual absl::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() PURE;
+  virtual std::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() PURE;
 
   /**
    * Tell our parent process to gracefully terminate itself.

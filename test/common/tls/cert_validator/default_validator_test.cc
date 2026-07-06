@@ -706,12 +706,13 @@ public:
   MOCK_METHOD(envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
                   TrustChainVerification,
               trustChainVerification, (), (const override));
-  MOCK_METHOD(const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&,
+  MOCK_METHOD(const std::optional<envoy::config::core::v3::TypedExtensionConfig>&,
               customValidatorConfig, (), (const override));
   MOCK_METHOD(Api::Api&, api, (), (const override));
   bool onlyVerifyLeafCertificateCrl() const override { return false; }
-  absl::optional<uint32_t> maxVerifyDepth() const override { return absl::nullopt; }
+  std::optional<uint32_t> maxVerifyDepth() const override { return std::nullopt; }
   bool autoSniSanMatch() const override { return false; }
+  bool suppressClientCaList() const override { return false; }
 
 private:
   std::string s_;
@@ -780,21 +781,22 @@ public:
     return envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
         ACCEPT_UNTRUSTED;
   }
-  const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
+  const std::optional<envoy::config::core::v3::TypedExtensionConfig>&
   customValidatorConfig() const override {
     return custom_config_;
   }
   Api::Api& api() const override { return *api_; }
   bool onlyVerifyLeafCertificateCrl() const override { return false; }
-  absl::optional<uint32_t> maxVerifyDepth() const override { return absl::nullopt; }
+  std::optional<uint32_t> maxVerifyDepth() const override { return std::nullopt; }
   bool autoSniSanMatch() const override { return false; }
+  bool suppressClientCaList() const override { return false; }
 
 private:
   std::string ca_name_;
   std::string empty_;
   std::vector<std::string> empty_strs_;
   std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> empty_matchers_;
-  absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_config_;
+  std::optional<envoy::config::core::v3::TypedExtensionConfig> custom_config_;
   Api::ApiPtr api_ = Api::createApiForTest();
 };
 
@@ -889,6 +891,132 @@ TEST(DefaultCertValidatorTest, TestEmptyCertChainErrorDetails) {
   EXPECT_EQ(ValidationResults::ValidationStatus::Failed, results.status);
   EXPECT_TRUE(results.error_details.has_value());
   EXPECT_EQ(results.error_details.value(), "verify cert failed: empty cert chain");
+}
+
+namespace {
+
+TestCertificateValidationContextConfigPtr makeSuppressConfig(const std::string& ca_cert,
+                                                             bool suppress) {
+  envoy::config::core::v3::TypedExtensionConfig typed_conf;
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers{};
+  return std::make_unique<TestCertificateValidationContextConfig>(
+      typed_conf, /*allow_expired_certificate=*/false, san_matchers, ca_cert,
+      /*verify_depth=*/std::nullopt, suppress);
+}
+
+// Runs updateDigestForSessionId against the validator and returns the resulting
+// digest bytes. Lets tests compare digests produced under different configs.
+std::vector<uint8_t> computeSessionIdDigest(DefaultCertValidator& validator) {
+  bssl::ScopedEVP_MD_CTX md;
+  int rc = EVP_DigestInit_ex(md.get(), EVP_sha256(), nullptr);
+  RELEASE_ASSERT(rc == 1, "EVP_DigestInit_ex failed");
+  uint8_t scratch[EVP_MAX_MD_SIZE];
+  validator.updateDigestForSessionId(md, scratch, SHA256_DIGEST_LENGTH);
+  std::vector<uint8_t> out(EVP_MAX_MD_SIZE);
+  unsigned out_len = 0;
+  rc = EVP_DigestFinal_ex(md.get(), out.data(), &out_len);
+  RELEASE_ASSERT(rc == 1, "EVP_DigestFinal_ex failed");
+  out.resize(out_len);
+  return out;
+}
+
+} // namespace
+
+// Test that when suppress_client_ca_list is enabled, SSL_CTX_get_client_CA_list returns NULL
+TEST(DefaultCertValidatorTest, SuppressClientCaListEnabled) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  auto config = makeSuppressConfig(ca_cert, true);
+  auto validator = std::make_unique<DefaultCertValidator>(config.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  ASSERT_TRUE(validator->addClientValidationContext(ssl_ctx.get(), true).ok());
+
+  // When suppressed, the validator must not populate the CA list. Depending on the
+  // BoringSSL version, SSL_CTX_new may leave the list as nullptr or as an empty stack;
+  // both outcomes satisfy the guarantee that no CA names will be advertised.
+  STACK_OF(X509_NAME)* ca_list = SSL_CTX_get_client_CA_list(ssl_ctx.get());
+  if (ca_list != nullptr) {
+    EXPECT_EQ(sk_X509_NAME_num(ca_list), 0);
+  }
+}
+
+// Test that when suppress_client_ca_list is disabled (default), CA list is set correctly
+TEST(DefaultCertValidatorTest, SuppressClientCaListDisabled) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  auto config = makeSuppressConfig(ca_cert, false);
+  auto validator = std::make_unique<DefaultCertValidator>(config.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  ASSERT_TRUE(validator->addClientValidationContext(ssl_ctx.get(), true).ok());
+
+  STACK_OF(X509_NAME)* ca_list = SSL_CTX_get_client_CA_list(ssl_ctx.get());
+  ASSERT_NE(ca_list, nullptr);
+  EXPECT_GT(sk_X509_NAME_num(ca_list), 0);
+}
+
+// Test that addClientValidationContext returns an error when the CA cert PEM is malformed
+// (valid PEM header but corrupt base64 content).
+TEST(DefaultCertValidatorTest, AddClientValidationContextWithMalformedCaCert) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  // Valid PEM envelope but garbage base64 inside — triggers a decode error
+  // that is NOT PEM_R_NO_START_LINE, hitting the else-branch error return.
+  std::string ca_cert = "-----BEGIN CERTIFICATE-----\n"
+                        "not valid base64 content!!!\n"
+                        "-----END CERTIFICATE-----\n";
+
+  auto config = makeSuppressConfig(ca_cert, false);
+  auto validator = std::make_unique<DefaultCertValidator>(config.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  EXPECT_FALSE(validator->addClientValidationContext(ssl_ctx.get(), true).ok());
+}
+
+// Test that session ID hash differs when suppress_client_ca_list differs.
+// This prevents session resumption across contexts with different security settings.
+TEST(DefaultCertValidatorTest, SuppressClientCaListSessionIdDiffers) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  auto config_suppressed = makeSuppressConfig(ca_cert, true);
+  auto config_not_suppressed = makeSuppressConfig(ca_cert, false);
+
+  DefaultCertValidator validator_suppressed(config_suppressed.get(), stats, context);
+  DefaultCertValidator validator_not_suppressed(config_not_suppressed.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx_suppressed(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL_CTX> ssl_ctx_not_suppressed(SSL_CTX_new(TLS_method()));
+  std::vector<SSL_CTX*> ctxs1 = {ssl_ctx_suppressed.get()};
+  std::vector<SSL_CTX*> ctxs2 = {ssl_ctx_not_suppressed.get()};
+  ASSERT_TRUE(validator_suppressed.initializeSslContexts(ctxs1, true, *store.rootScope()).ok());
+  ASSERT_TRUE(validator_not_suppressed.initializeSslContexts(ctxs2, true, *store.rootScope()).ok());
+
+  auto digest_suppressed = computeSessionIdDigest(validator_suppressed);
+  auto digest_not_suppressed = computeSessionIdDigest(validator_not_suppressed);
+
+  EXPECT_NE(digest_suppressed, digest_not_suppressed)
+      << "Session ID digests must differ when suppress_client_ca_list differs";
 }
 
 } // namespace Tls

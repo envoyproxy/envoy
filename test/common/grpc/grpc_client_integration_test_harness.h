@@ -134,7 +134,7 @@ public:
   // Expects grpc stream receives the provided Server initial metadata, if encoded_metadata is
   // provided, expects the onReceiveInitialMetadata is called with the encoded metadata.
   void expectInitialMetadata(const TestMetadata& metadata,
-                             absl::optional<TestMetadata> encoded_metadata = std::nullopt) {
+                             std::optional<TestMetadata> encoded_metadata = std::nullopt) {
     EXPECT_CALL(*this, onReceiveInitialMetadata_(_))
         .WillOnce(Invoke([this, metadata,
                           encoded_metadata](const Http::HeaderMap& received_headers) {
@@ -161,7 +161,7 @@ public:
 
   void
   sendServerInitialMetadata(const TestMetadata& metadata,
-                            absl::optional<const TestMetadata> transcoded_metadata = std::nullopt) {
+                            std::optional<const TestMetadata> transcoded_metadata = std::nullopt) {
     Http::HeaderMapPtr reply_headers{new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
     for (auto& value : metadata) {
       reply_headers->addReference(value.first, value.second);
@@ -218,7 +218,7 @@ public:
 
   void sendServerTrailers(Status::GrpcStatus grpc_status, const std::string& grpc_message,
                           const TestMetadata& metadata, bool trailers_only = false,
-                          absl::optional<const TestMetadata> transcoded_metadata = std::nullopt) {
+                          std::optional<const TestMetadata> transcoded_metadata = std::nullopt) {
     Http::TestResponseTrailerMapImpl reply_trailers{
         {"grpc-status", std::to_string(enumToInt(grpc_status))}};
     if (!grpc_message.empty()) {
@@ -531,7 +531,7 @@ public:
   }
 
   HelloworldStreamPtr createStream(const TestMetadata& initial_metadata,
-                                   absl::optional<TestMetadata> encoded_metadata = absl::nullopt) {
+                                   std::optional<TestMetadata> encoded_metadata = std::nullopt) {
     auto stream = std::make_unique<HelloworldStream>(dispatcher_helper_);
     EXPECT_CALL(*stream, onCreateInitialMetadata(_))
         .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {

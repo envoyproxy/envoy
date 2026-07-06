@@ -66,7 +66,7 @@ DecodeHeadersBehaviorPtr createDecodeHeadersBehavior(
     // odcds_config->resources_locator must be empty.
     if (!odcds_config->has_source() && odcds_config->resources_locator().empty()) {
       odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::XdstpOdCdsApiImpl::create,
-                                                        odcds_config->source(), absl::nullopt,
+                                                        odcds_config->source(), std::nullopt,
                                                         validation_visitor),
                                     Upstream::OdCdsApiHandlePtr);
     }
@@ -83,14 +83,14 @@ DecodeHeadersBehaviorPtr createDecodeHeadersBehavior(
         if (odcds_config->source().config_source_specifier_case() ==
             envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds) {
           odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::XdstpOdCdsApiImpl::create,
-                                                            odcds_config->source(), absl::nullopt,
+                                                            odcds_config->source(), std::nullopt,
                                                             validation_visitor),
                                         Upstream::OdCdsApiHandlePtr);
         }
       }
       if (odcds == nullptr) {
         odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create,
-                                                          odcds_config->source(), absl::nullopt,
+                                                          odcds_config->source(), std::nullopt,
                                                           validation_visitor),
                                       Upstream::OdCdsApiHandlePtr);
       }
@@ -114,7 +114,7 @@ template <typename ProtoConfig>
 OptRef<const envoy::extensions::filters::http::on_demand::v3::OnDemandCds>
 getOdCdsConfig(const ProtoConfig& proto_config) {
   if (!proto_config.has_odcds()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return proto_config.odcds();
 }
@@ -275,6 +275,9 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
     // Whether or not the cluster exists, we continue decoding. Filters further down the
     // chain may want to weigh in on cluster selection, so we don't send a local reply
     // here.
+    if (cluster_status == Upstream::ClusterDiscoveryStatus::Available) {
+      callbacks_->downstreamCallbacks()->recreateClusterInfo();
+    }
     callbacks_->continueDecoding();
     return;
   }
@@ -298,6 +301,9 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
 
   // Cluster still does not exist or we did not recreate the stream. Either way,
   // continue with the filter chain.
+  if (cluster_status == Upstream::ClusterDiscoveryStatus::Available) {
+    callbacks_->downstreamCallbacks()->recreateClusterInfo();
+  }
   callbacks_->continueDecoding();
 }
 

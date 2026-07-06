@@ -425,6 +425,26 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestHeaders) {
       response->headers().get(Http::LowerCaseString("some_header"))[0]->value().getStringView());
 }
 
+// A live, non-serializable object stored in filter state at Request lifespan is carried across
+// recreate_stream: the rebuilt filter recovers the same object and echoes its value.
+TEST_P(DynamicModulesIntegrationTest, FilterStateObjectSurvivesRecreateStream) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the filter_state_object_recreate filter is only in the rust test module";
+  }
+  initializeFilter("filter_state_object_recreate");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("0xabcd", response->headers()
+                          .get(Http::LowerCaseString("x-live-object-value"))[0]
+                          ->value()
+                          .getStringView());
+}
+
 TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestBody) {
   initializeFilter("send_response", "on_request_body");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));

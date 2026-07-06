@@ -2257,9 +2257,9 @@ public:
 
   Http::TestRequestHeaderMapImpl
   expectedHeaders(bool is_ssl = false, bool use_post = false,
-                  absl::optional<std::string> opt_authority = absl::nullopt,
-                  absl::optional<std::string> opt_path = absl::nullopt,
-                  absl::optional<HeaderToAdd> header_to_add = absl::nullopt) {
+                  std::optional<std::string> opt_authority = std::nullopt,
+                  std::optional<std::string> opt_path = std::nullopt,
+                  std::optional<HeaderToAdd> header_to_add = std::nullopt) {
     // In case connect-udp is used, Envoy expect the H2 headers to be normalized with H1,
     // so expect that the request headers here match H1 headers, even though
     // eventually H2 headers will be sent. When the headers are normalized to H1, the method
@@ -2305,8 +2305,8 @@ public:
     EXPECT_CALL(request_encoder_.stream_, removeCallbacks(_));
   }
 
-  void filterStateOverride(absl::optional<uint32_t> proxy_port = absl::nullopt,
-                           absl::optional<uint32_t> target_port = absl::nullopt) {
+  void filterStateOverride(std::optional<uint32_t> proxy_port = std::nullopt,
+                           std::optional<uint32_t> target_port = std::nullopt) {
     if (proxy_port) {
       stream_info_.filterState()->setData(
           "udp.connect.proxy_port",
@@ -2320,7 +2320,7 @@ public:
     }
   }
 
-  void setup(absl::optional<HeaderToAdd> header_to_add = absl::nullopt) {
+  void setup(std::optional<HeaderToAdd> header_to_add = std::nullopt) {
     Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> headers_to_add;
     if (header_to_add) {
       envoy::config::core::v3::HeaderValueOption* header = headers_to_add.Add();
@@ -2499,7 +2499,7 @@ TEST_F(HttpUpstreamImplTest, DecodeTrailersAfterSuccessHeaders) {
 
 TEST_F(HttpUpstreamImplTest, EncodeHeaders) {
   HeaderToAdd header{"test_key", "test_val"};
-  absl::optional<uint32_t> port;
+  std::optional<uint32_t> port;
   bool is_ssl = false;
 
   setup(header);
@@ -2518,7 +2518,7 @@ TEST_F(HttpUpstreamImplTest, EncodeHeaders) {
 
 TEST_F(HttpUpstreamImplTest, EncodeHeadersWithPost) {
   std::string post_path = "/post/path";
-  absl::optional<uint32_t> port = 100;
+  std::optional<uint32_t> port = 100;
   bool is_ssl = true;
 
   setup();
@@ -2530,7 +2530,7 @@ TEST_F(HttpUpstreamImplTest, EncodeHeadersWithPost) {
 
   auto expected_headers =
       expectedHeaders(is_ssl, /*use_post=*/true, /*opt_authority=*/"proxy.host:100",
-                      /*opt_path=*/post_path, /*header_to_add=*/absl::nullopt);
+                      /*opt_path=*/post_path, /*header_to_add=*/std::nullopt);
 
   setAndExpectRequestEncoder(expected_headers, is_ssl);
 }
@@ -2604,7 +2604,7 @@ TEST_F(TunnelingConnectionPoolImplTest, ValidPool) {
 }
 
 TEST_F(TunnelingConnectionPoolImplTest, InvalidPool) {
-  EXPECT_CALL(cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(std::nullopt));
   setup();
   EXPECT_FALSE(pool_->valid());
 }
@@ -2637,7 +2637,7 @@ TEST_F(TunnelingConnectionPoolImplTest, PoolReady) {
   std::string upstream_host_name = "upstream_host_test";
   EXPECT_CALL(*upstream_host_, hostname()).WillOnce(ReturnRef(upstream_host_name));
   EXPECT_CALL(stream_callbacks_, resetIdleTimer());
-  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
+  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, std::nullopt);
   EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHost()->hostname(), upstream_host_name);
   ASSERT_EQ(stream_info_.upstreamInfo()->upstreamHostsAttempted().size(), 1);
   EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHostsAttempted()[0], upstream_host_);
@@ -2646,7 +2646,7 @@ TEST_F(TunnelingConnectionPoolImplTest, PoolReady) {
 TEST_F(TunnelingConnectionPoolImplTest, OnStreamFailure) {
   setup();
   createNewStream();
-  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
+  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, std::nullopt);
 
   EXPECT_CALL(stream_callbacks_,
               onStreamFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "", _));
@@ -2657,7 +2657,7 @@ TEST_F(TunnelingConnectionPoolImplTest, OnStreamFailure) {
 TEST_F(TunnelingConnectionPoolImplTest, OnStreamSuccess) {
   setup();
   createNewStream();
-  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
+  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, std::nullopt);
 
   EXPECT_CALL(stream_callbacks_, onStreamReady(_, _, _, _, _));
   pool_->onStreamSuccess(request_encoder_);
@@ -2668,7 +2668,7 @@ TEST_F(TunnelingConnectionPoolImplTest, OnDownstreamEvent) {
   createNewStream();
 
   EXPECT_CALL(request_encoder_.stream_, addCallbacks(_));
-  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
+  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, std::nullopt);
 
   EXPECT_CALL(request_encoder_.stream_, removeCallbacks(_));
   EXPECT_CALL(request_encoder_.stream_, resetStream(Http::StreamResetReason::LocalReset));
@@ -2682,7 +2682,7 @@ TEST_F(TunnelingConnectionPoolImplTest, FactoryTest) {
   auto valid_pool = factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_);
   EXPECT_FALSE(valid_pool == nullptr);
 
-  EXPECT_CALL(cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(std::nullopt));
   auto invalid_pool =
       factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_);
   EXPECT_TRUE(invalid_pool == nullptr);

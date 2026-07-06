@@ -64,8 +64,8 @@ public:
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, absl::nullopt,
-        absl::nullopt);
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
+        std::nullopt);
   }
 
   void setupWithAuth() {
@@ -101,8 +101,8 @@ public:
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, absl::nullopt,
-        absl::nullopt);
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
+        std::nullopt);
   }
 
   void setupAlwaysLogHealthCheckFailures() {
@@ -126,8 +126,8 @@ public:
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, absl::nullopt,
-        absl::nullopt);
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
+        std::nullopt);
   }
 
   void setupExistsHealthcheck() {
@@ -151,8 +151,8 @@ public:
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, absl::nullopt,
-        absl::nullopt);
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
+        std::nullopt);
   }
 
   void setupExistsHealthcheckWithAuth() {
@@ -189,8 +189,8 @@ public:
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, absl::nullopt,
-        absl::nullopt);
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
+        std::nullopt);
   }
 
   void setupDontReuseConnection() {
@@ -214,8 +214,8 @@ public:
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, absl::nullopt,
-        absl::nullopt);
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
+        std::nullopt);
   }
 
   Extensions::NetworkFilters::Common::Redis::Client::ClientPtr
@@ -223,8 +223,8 @@ public:
          const Extensions::NetworkFilters::Common::Redis::Client::ConfigSharedPtr&,
          const Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&,
          Stats::Scope&, const std::string& username, const std::string& password, bool,
-         absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>,
-         absl::optional<
+         std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>,
+         std::optional<
              NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>)
       override {
     EXPECT_EQ(auth_username_, username);
@@ -783,7 +783,7 @@ TEST(RedisHealthCheckerIamAuthTest, CheckTokenIsRetrieved) {
   auto mock_authenticator =
       std::make_shared<NetworkFilters::Common::Redis::AwsIamAuthenticator::MockAwsIamAuthenticator>(
           std::move(signer));
-  absl::optional<NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+  std::optional<NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
       authenticator = mock_authenticator;
 
   EXPECT_CALL(*mock_authenticator, getAuthToken("testusername", _)).WillOnce(Return("auth_token"));

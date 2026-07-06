@@ -23,7 +23,7 @@ Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
-Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb> FaultFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
   FaultFilterConfigSharedPtr filter_config(std::make_shared<FaultFilterConfig>(

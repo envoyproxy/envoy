@@ -146,8 +146,8 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
   };
 }
 
-Envoy::Http::FilterFactoryCb
-DynamicModuleConfigFactory::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Envoy::Http::FilterFactoryCb>
+DynamicModuleConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const FilterConfig& proto_config, const std::string& stat_prefix,
     Server::Configuration::ServerFactoryContext& context) {
   auto cb_or_error = createFilterFactory(proto_config, stat_prefix, context, context.scope());

@@ -21,8 +21,8 @@ Http::FilterFactoryCb StatefulSessionFactoryConfig::createFilterFactoryFromProto
   };
 }
 
-Http::FilterFactoryCb
-StatefulSessionFactoryConfig::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+StatefulSessionFactoryConfig::createHttpFilterFactoryFromProtoTyped(
     const ProtoConfig& proto_config, const std::string& stats_prefix,
     Server::Configuration::ServerFactoryContext& context) {
   Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());

@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -27,7 +28,6 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -102,11 +102,11 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
     : traffic_mode_(proto_config.traffic_mode()),
       clear_route_cache_(proto_config.clear_route_cache()),
       propagate_trace_context_(proto_config.has_propagate_trace_context()
-                                   ? absl::make_optional(proto_config.propagate_trace_context())
-                                   : absl::nullopt),
+                                   ? std::make_optional(proto_config.propagate_trace_context())
+                                   : std::nullopt),
       propagate_baggage_(proto_config.has_propagate_baggage()
-                             ? absl::make_optional(proto_config.propagate_baggage())
-                             : absl::nullopt),
+                             ? std::make_optional(proto_config.propagate_baggage())
+                             : std::nullopt),
       max_request_body_size_(proto_config.has_max_request_body_size()
                                  ? proto_config.max_request_body_size().value()
                                  : 8192), // Default: 8KB

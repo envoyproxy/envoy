@@ -1756,6 +1756,29 @@ TEST_P(TcpProxySslIntegrationTest, SslConnectionDataEarlyReadNotCached) {
             "fingerprint=c07e14fc43b9c7b3d92f1004f91d3a9e071d9c93a58afc76b4c14303ae3a0f34");
 }
 
+// Test that Envoy does not crash when a downstream TLS connection is rejected
+// due to upstream circuit breaker max_connections overflow.
+TEST_P(TcpProxySslIntegrationTest, CircuitBreakerOverflowWithDownstreamTls) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* threshold = cluster->mutable_circuit_breakers()->add_thresholds();
+    threshold->mutable_max_connections()->set_value(1);
+  });
+
+  initialize();
+
+  // Connection 1: should succeed.
+  auto client1 = std::make_unique<ClientSslConnection>(*this);
+  client1->waitForUpstreamConnection();
+
+  // Connection 2: should be rejected by circuit breaker and NOT crash Envoy.
+  auto client2 = std::make_unique<ClientSslConnection>(*this);
+  client2->waitForDisconnect();
+
+  // Clean up.
+  client1->close();
+}
+
 // Test that a half-close on the downstream side is proxied correctly.
 TEST_P(TcpProxySslIntegrationTest, DownstreamHalfClose) {
   setupConnections();

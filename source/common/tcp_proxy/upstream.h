@@ -51,7 +51,7 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
 private:
-  absl::optional<Upstream::TcpPoolData> conn_pool_data_;
+  std::optional<Upstream::TcpPoolData> conn_pool_data_;
   Tcp::ConnectionPool::Cancellable* upstream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
@@ -71,7 +71,7 @@ public:
   void onPoolReady(std::unique_ptr<Router::GenericUpstream>&& upstream,
                    Upstream::HostDescriptionConstSharedPtr host,
                    const Network::ConnectionInfoProvider& address_provider,
-                   StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) override {
+                   StreamInfo::StreamInfo& info, std::optional<Http::Protocol> protocol) override {
     upstream->enableTcpTunneling();
     Router::UpstreamRequest::onPoolReady(std::move(upstream), host, address_provider, info,
                                          protocol);
@@ -95,7 +95,7 @@ public:
   std::unique_ptr<Router::GenericConnPool> createConnPool(Upstream::HostConstSharedPtr host,
                                                           Upstream::ThreadLocalCluster&,
                                                           Upstream::LoadBalancerContext* context,
-                                                          absl::optional<Http::Protocol> protocol);
+                                                          std::optional<Http::Protocol> protocol);
 
   // GenericConnPool
   void newStream(GenericConnectionPoolCallbacks& callbacks) override;
@@ -106,7 +106,7 @@ public:
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(Http::RequestEncoder& request_encoder,
                    Upstream::HostDescriptionConstSharedPtr host, StreamInfo::StreamInfo& info,
-                   absl::optional<Http::Protocol>) override;
+                   std::optional<Http::Protocol>) override;
 
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr, bool);
   void onHttpPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
@@ -166,7 +166,7 @@ private:
                           Ssl::ConnectionInfoConstSharedPtr ssl_info);
   const TunnelingConfigHelper& config_;
   Http::CodecType type_;
-  absl::optional<Upstream::HttpPoolData> conn_pool_data_;
+  std::optional<Upstream::HttpPoolData> conn_pool_data_;
   Http::ConnectionPool::Cancellable* upstream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};
   Http::StreamDecoderFilterCallbacks* decoder_filter_callbacks_;
@@ -362,8 +362,8 @@ public:
     return const_cast<Router::FilterConfig&>(config_.routerFilterConfig());
   }
   Router::TimeoutData timeout() override { return {}; }
-  absl::optional<std::chrono::milliseconds> dynamicMaxStreamDuration() const override {
-    return absl::nullopt;
+  std::optional<std::chrono::milliseconds> dynamicMaxStreamDuration() const override {
+    return std::nullopt;
   }
   Http::RequestHeaderMap* downstreamHeaders() override;
   Http::RequestTrailerMap* downstreamTrailers() override { return nullptr; }

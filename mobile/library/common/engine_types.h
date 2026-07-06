@@ -41,7 +41,7 @@ struct EnvoyEventTracker {
 struct EnvoyError {
   envoy_error_code_t error_code_;
   std::string message_;
-  absl::optional<int> attempt_count_ = absl::nullopt;
+  std::optional<int> attempt_count_ = std::nullopt;
 };
 
 /** The callbacks for the stream. */

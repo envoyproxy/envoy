@@ -13,13 +13,13 @@ namespace HeaderToMetadataFilter {
 using namespace Envoy::Extensions::NetworkFilters;
 
 // Extract the value of the header.
-absl::optional<std::string> HeaderValueSelector::extract(Http::HeaderMap& map) const {
+std::optional<std::string> HeaderValueSelector::extract(Http::HeaderMap& map) const {
   const auto header_entry = map.get(header_);
   if (header_entry.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   // Catch the value in the header before removing.
-  absl::optional<std::string> value = std::string(header_entry[0]->value().getStringView());
+  std::optional<std::string> value = std::string(header_entry[0]->value().getStringView());
   if (remove_) {
     map.remove(header_);
   }
@@ -153,7 +153,7 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(
 
   for (const auto& rule : rules) {
     const auto& proto_rule = rule.rule();
-    absl::optional<std::string> value = rule.selector_->extract(headers);
+    std::optional<std::string> value = rule.selector_->extract(headers);
 
     if (value && proto_rule.has_on_present()) {
       applyKeyValue(std::move(value).value_or(""), rule, proto_rule.on_present(),

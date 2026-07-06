@@ -755,7 +755,7 @@ public:
     EXPECT_EQ(0UL,
               store_.counter(absl::StrCat("test.zookeeper.", opcode, "_decoder_error")).value());
     const auto histogram_name = fmt::format("test.zookeeper.{}_latency", response);
-    EXPECT_NE(absl::nullopt, findHistogram(histogram_name));
+    EXPECT_NE(std::nullopt, findHistogram(histogram_name));
   }
 
   Stats::HistogramOptConstRef findHistogram(const std::string& name) {
@@ -912,7 +912,7 @@ TEST_F(ZooKeeperFilterTest, DisablePerOpcodeRequestAndResponseBytesMetrics) {
   EXPECT_EQ(0UL, config_->stats().connect_resp_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   EXPECT_EQ(0UL, config_->stats().connect_decoder_error_.value());
-  EXPECT_NE(absl::nullopt, findHistogram("test.zookeeper.connect_response_latency"));
+  EXPECT_NE(std::nullopt, findHistogram("test.zookeeper.connect_response_latency"));
 }
 
 TEST_F(ZooKeeperFilterTest, DisablePerOpcodeRequestBytesMetrics) {
@@ -945,7 +945,7 @@ TEST_F(ZooKeeperFilterTest, DisablePerOpcodeRequestBytesMetrics) {
   EXPECT_EQ(24UL, config_->stats().connect_resp_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   EXPECT_EQ(0UL, config_->stats().connect_decoder_error_.value());
-  EXPECT_NE(absl::nullopt, findHistogram("test.zookeeper.connect_response_latency"));
+  EXPECT_NE(std::nullopt, findHistogram("test.zookeeper.connect_response_latency"));
 }
 
 TEST_F(ZooKeeperFilterTest, DisablePerOpcodeResponseBytesMetrics) {
@@ -978,7 +978,7 @@ TEST_F(ZooKeeperFilterTest, DisablePerOpcodeResponseBytesMetrics) {
   EXPECT_EQ(0UL, config_->stats().connect_resp_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   EXPECT_EQ(0UL, config_->stats().connect_decoder_error_.value());
-  EXPECT_NE(absl::nullopt, findHistogram("test.zookeeper.connect_response_latency"));
+  EXPECT_NE(std::nullopt, findHistogram("test.zookeeper.connect_response_latency"));
 }
 
 TEST_F(ZooKeeperFilterTest, Connect) {
@@ -1002,7 +1002,7 @@ TEST_F(ZooKeeperFilterTest, Connect) {
   EXPECT_EQ(24UL, config_->stats().connect_resp_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   EXPECT_EQ(0UL, config_->stats().connect_decoder_error_.value());
-  EXPECT_NE(absl::nullopt, findHistogram("test.zookeeper.connect_response_latency"));
+  EXPECT_NE(std::nullopt, findHistogram("test.zookeeper.connect_response_latency"));
 }
 
 TEST_F(ZooKeeperFilterTest, ConnectReadonly) {
@@ -1027,7 +1027,7 @@ TEST_F(ZooKeeperFilterTest, ConnectReadonly) {
   EXPECT_EQ(25UL, config_->stats().connect_resp_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   EXPECT_EQ(0UL, config_->stats().connect_decoder_error_.value());
-  EXPECT_NE(absl::nullopt, findHistogram("test.zookeeper.connect_response_latency"));
+  EXPECT_NE(std::nullopt, findHistogram("test.zookeeper.connect_response_latency"));
 }
 
 TEST_F(ZooKeeperFilterTest, Fallback) {
@@ -1619,7 +1619,7 @@ TEST_F(ZooKeeperFilterTest, MixedControlAndDataRequestsWithOneOnDataCall) {
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   EXPECT_EQ(0UL, config_->stats().auth_decoder_error_.value());
   EXPECT_EQ(0UL, config_->stats().create_decoder_error_.value());
-  EXPECT_NE(absl::nullopt, findHistogram("test.zookeeper.create_resp_latency"));
+  EXPECT_NE(std::nullopt, findHistogram("test.zookeeper.create_resp_latency"));
 }
 
 // |REQ1 -------|REQ2 ---------|

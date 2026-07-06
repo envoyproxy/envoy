@@ -153,9 +153,8 @@ Http::Code ConfigDumpHandler::handlerConfigDump(Http::ResponseHeaderMap& respons
                                                 Buffer::Instance& response,
                                                 AdminStream& admin_stream) const {
   Http::Utility::QueryParamsMulti query_params = admin_stream.queryParams();
-  const absl::optional<std::string> resource =
-      Utility::nonEmptyQueryParam(query_params, "resource");
-  const absl::optional<std::string> mask = Utility::nonEmptyQueryParam(query_params, "mask");
+  const std::optional<std::string> resource = Utility::nonEmptyQueryParam(query_params, "resource");
+  const std::optional<std::string> mask = Utility::nonEmptyQueryParam(query_params, "mask");
   const bool include_eds = shouldIncludeEdsInDump(query_params);
   const absl::StatusOr<Matchers::StringMatcherPtr> name_matcher =
       buildNameMatcher(query_params, server_.regexEngine());
@@ -167,7 +166,7 @@ Http::Code ConfigDumpHandler::handlerConfigDump(Http::ResponseHeaderMap& respons
 
   envoy::admin::v3::ConfigDump dump;
 
-  absl::optional<std::pair<Http::Code, std::string>> err;
+  std::optional<std::pair<Http::Code, std::string>> err;
   if (resource.has_value()) {
     err = addResourceToDump(dump, mask, resource.value(), **name_matcher, include_eds);
   } else {
@@ -187,8 +186,8 @@ Http::Code ConfigDumpHandler::handlerConfigDump(Http::ResponseHeaderMap& respons
   return Http::Code::OK;
 }
 
-absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResourceToDump(
-    envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
+std::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResourceToDump(
+    envoy::admin::v3::ConfigDump& dump, const std::optional<std::string>& mask,
     const std::string& resource, const Matchers::StringMatcher& name_matcher,
     bool include_eds) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
@@ -211,7 +210,7 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResourc
     if (!field_descriptor) {
       continue;
     } else if (!field_descriptor->is_repeated()) {
-      return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
+      return std::optional<std::pair<Http::Code, std::string>>{std::make_pair(
           Http::Code::BadRequest,
           fmt::format("{} is not a repeated field. Use ?mask={} to get only this field",
                       field_descriptor->name(), field_descriptor->name()))};
@@ -223,7 +222,7 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResourc
         Protobuf::FieldMask field_mask;
         ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
         if (!trimResourceMessage(field_mask, msg)) {
-          return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
+          return std::optional<std::pair<Http::Code, std::string>>{std::make_pair(
               Http::Code::BadRequest, absl::StrCat("FieldMask ", field_mask.DebugString(),
                                                    " could not be successfully used."))};
         }
@@ -234,15 +233,15 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResourc
 
     // We found the desired resource so there is no need to continue iterating over
     // the other keys.
-    return absl::nullopt;
+    return std::nullopt;
   }
 
-  return absl::optional<std::pair<Http::Code, std::string>>{
+  return std::optional<std::pair<Http::Code, std::string>>{
       std::make_pair(Http::Code::NotFound, fmt::format("{} not found in config dump", resource))};
 }
 
-absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addAllConfigToDump(
-    envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
+std::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addAllConfigToDump(
+    envoy::admin::v3::ConfigDump& dump, const std::optional<std::string>& mask,
     const Matchers::StringMatcher& name_matcher, bool include_eds) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
@@ -275,11 +274,11 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addAllConf
     std::ignore = config->PackFrom(*message);
   }
   if (dump.configs().empty() && mask.has_value()) {
-    return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
+    return std::optional<std::pair<Http::Code, std::string>>{std::make_pair(
         Http::Code::BadRequest,
         absl::StrCat("FieldMask ", *mask, " could not be successfully applied to any configs."))};
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 ProtobufTypes::MessagePtr

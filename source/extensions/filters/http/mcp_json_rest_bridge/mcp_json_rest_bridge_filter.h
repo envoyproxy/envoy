@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
@@ -17,7 +18,6 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "nlohmann/json.hpp" // IWYU pragma: keep
 
 namespace Envoy {
@@ -58,7 +58,7 @@ public:
     if (proto_config_.tool_config().has_tool_list_local()) {
       return proto_config_.tool_config();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   bool textContentStreamingEnabled(absl::string_view tool_name) const;
@@ -102,7 +102,7 @@ public:
         return tool_config;
       }
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   bool textContentStreamingEnabled(absl::string_view tool_name) const;
@@ -188,7 +188,7 @@ private:
     OperationFailed = 7,
   };
   McpOperation mcp_operation_ = McpOperation::Unspecified;
-  absl::optional<nlohmann::json> session_id_;
+  std::optional<nlohmann::json> session_id_;
   std::string server_name_;
   Buffer::OwnedImpl request_body_;
   std::string request_body_str_;

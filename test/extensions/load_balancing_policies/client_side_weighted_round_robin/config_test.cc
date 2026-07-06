@@ -1,8 +1,11 @@
 #include "envoy/config/core/v3/extension.pb.h"
 
+#include "source/extensions/load_balancing_policies/client_side_weighted_round_robin/client_side_weighted_round_robin_lb.h"
 #include "source/extensions/load_balancing_policies/client_side_weighted_round_robin/config.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/priority_set.h"
 
@@ -43,6 +46,52 @@ TEST(ClientSideWeightedRoundRobinConfigTest, ValidateFail) {
 
   auto thread_local_lb = thread_local_lb_factory->create({thread_local_priority_set, nullptr});
   EXPECT_NE(nullptr, thread_local_lb);
+}
+
+TEST(CswrrOobConfigResolution, EnableOobLoadReportEnablesWithPeriod) {
+  envoy::extensions::load_balancing_policies::client_side_weighted_round_robin::v3::
+      ClientSideWeightedRoundRobin proto;
+  proto.mutable_enable_oob_load_report()->set_value(true);
+  proto.mutable_oob_reporting_period()->set_seconds(42);
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<ThreadLocal::MockInstance> tls;
+  Upstream::ClientSideWeightedRoundRobinLbConfig config(proto, dispatcher, tls);
+
+  EXPECT_TRUE(config.enable_oob_load_report);
+  EXPECT_EQ(config.oob_manager_config.reporting_period, std::chrono::milliseconds(42000));
+}
+
+TEST(CswrrOobConfigResolution, OobReportingConfigOverridesParsed) {
+  envoy::extensions::load_balancing_policies::client_side_weighted_round_robin::v3::
+      ClientSideWeightedRoundRobin proto;
+  proto.mutable_enable_oob_load_report()->set_value(true);
+  proto.mutable_oob_reporting_period()->set_seconds(5);
+  auto* overrides = proto.mutable_oob_reporting_config();
+  overrides->set_port_value(9001);
+  overrides->set_authority("orca.example.com");
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<ThreadLocal::MockInstance> tls;
+  Upstream::ClientSideWeightedRoundRobinLbConfig config(proto, dispatcher, tls);
+
+  EXPECT_TRUE(config.enable_oob_load_report);
+  EXPECT_EQ(config.oob_manager_config.reporting_period, std::chrono::milliseconds(5000));
+  EXPECT_EQ(config.oob_manager_config.port_value, 9001u);
+  EXPECT_EQ(config.oob_manager_config.authority, "orca.example.com");
+}
+
+// oob_reporting_config without enable_oob_load_report=true: accepted, overrides unused.
+TEST(CswrrOobConfigResolution, OobReportingConfigIgnoredWhenNotEnabled) {
+  envoy::extensions::load_balancing_policies::client_side_weighted_round_robin::v3::
+      ClientSideWeightedRoundRobin proto;
+  proto.mutable_oob_reporting_config()->set_port_value(9001);
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<ThreadLocal::MockInstance> tls;
+  Upstream::ClientSideWeightedRoundRobinLbConfig config(proto, dispatcher, tls);
+
+  EXPECT_FALSE(config.enable_oob_load_report);
 }
 
 } // namespace

@@ -30,14 +30,14 @@
 #include "source/common/quic/quic_stat_names.h"
 #include "source/server/listener_manager_factory.h"
 
+#include "absl/types/span.h"
+
 namespace Envoy {
 namespace Server {
 
 namespace Configuration {
 using TransportSocketFactoryContextImpl = Server::GenericFactoryContextImpl;
 }
-
-class ListenerFilterChainFactoryBuilder;
 
 /**
  * Prod implementation of ListenerComponentFactory that creates real sockets and attempts to fetch
@@ -161,7 +161,8 @@ using ListenerImplPtr = std::unique_ptr<ListenerImpl>;
   GAUGE(total_listeners_active, NeverImport)                                                       \
   GAUGE(total_listeners_draining, NeverImport)                                                     \
   GAUGE(total_listeners_warming, NeverImport)                                                      \
-  GAUGE(workers_started, NeverImport)
+  GAUGE(workers_started, NeverImport)                                                              \
+  GAUGE(workers_pinned, NeverImport)
 
 /**
  * Struct definition for all listener manager stats. @see stats_macros.h
@@ -249,6 +250,15 @@ public:
 
   Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
 
+  // Returns the per-worker CPU assignment used to pin worker threads, mapping worker i to entry i.
+  // The result is computed once and cached. It is empty when worker CPU affinity is disabled or the
+  // worker count exceeds the available CPUs, in which case no worker is pinned.
+  absl::Span<const uint32_t> workerCpus();
+
+  // Returns true when reuse port BPF CPU steering can be used, that is every worker is pinned to a
+  // CPU and the kernel supports the steering program. The result is computed once and cached.
+  bool reusePortBpfCpuSteeringSupported();
+
   Instance& server_;
   std::unique_ptr<ListenerComponentFactory> factory_;
 
@@ -281,7 +291,7 @@ private:
   };
 
   bool doFinalPreWorkerListenerInit(ListenerImpl& listener);
-  void addListenerToWorker(Worker& worker, absl::optional<uint64_t> overridden_listener,
+  void addListenerToWorker(Worker& worker, std::optional<uint64_t> overridden_listener,
                            ListenerImpl& listener, ListenerCompletionCallback completion_callback);
 
   ProtobufTypes::MessagePtr dumpListenerConfigs(const Matchers::StringMatcher& name_matcher);
@@ -373,8 +383,14 @@ private:
   std::list<DrainingFilterChainsManager> draining_filter_chains_manager_;
 
   std::vector<WorkerPtr> workers_;
+  // The per-worker CPU assignment, lazily computed and cached by workerCpus(). worker_cpus_[i] is
+  // the CPU that worker i is pinned to; the vector is empty when no worker is pinned.
+  std::optional<std::vector<uint32_t>> worker_cpus_;
+  // Whether reuse port BPF CPU steering is usable, lazily computed and cached by
+  // reusePortBpfCpuSteeringSupported().
+  std::optional<bool> reuse_port_bpf_cpu_steering_supported_;
   bool workers_started_{};
-  absl::optional<StopListenersType> stop_listeners_type_;
+  std::optional<StopListenersType> stop_listeners_type_;
   Stats::ScopeSharedPtr scope_;
   ListenerManagerStats stats_;
   ConfigTracker::EntryOwnerPtr listeners_config_tracker_entry_;
@@ -386,28 +402,6 @@ private:
   Quic::QuicStatNames& quic_stat_names_;
   absl::flat_hash_set<uint64_t> stopped_listener_tags_;
   std::list<ListenerUpdateCallbacks*> update_callbacks_;
-};
-
-class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
-public:
-  ListenerFilterChainFactoryBuilder(
-      ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context);
-
-  absl::StatusOr<Network::DrainableFilterChainSharedPtr>
-  buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
-                   FilterChainFactoryContextCreator& context_creator,
-                   bool added_via_api) const override;
-
-private:
-  absl::StatusOr<Network::DrainableFilterChainSharedPtr> buildFilterChainInternal(
-      const envoy::config::listener::v3::FilterChain& filter_chain,
-      Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context,
-      bool added_via_api) const;
-
-  ListenerImpl& listener_;
-  ProtobufMessage::ValidationVisitor& validator_;
-  ListenerComponentFactory& listener_component_factory_;
-  Configuration::TransportSocketFactoryContextImpl& factory_context_;
 };
 
 class DefaultListenerManagerFactoryImpl : public ListenerManagerFactory {
