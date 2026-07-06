@@ -10,6 +10,7 @@
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/registry/registry.h"
+#include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
@@ -71,7 +72,7 @@ public:
   bool isQuic() const override;
   bool shouldBypassOverloadManager() const override;
 
-  void startDraining() override { is_draining_.store(true); }
+  void startDraining() override;
 
 private:
   Configuration::FactoryContext& parent_context_;
@@ -79,6 +80,7 @@ private:
   Stats::ScopeSharedPtr scope_;
   Stats::ScopeSharedPtr prefixed_scope_;
   Init::Manager& init_manager_;
+  Server::DrainManagerPtr drain_manager_;
   std::atomic<bool> is_draining_{false};
 };
 

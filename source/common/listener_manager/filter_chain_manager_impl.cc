@@ -83,9 +83,21 @@ PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
     Configuration::FactoryContext& parent_context, Init::Manager& init_manager)
     : parent_context_(parent_context), scope_(parent_context_.scope().createScope("")),
       prefixed_scope_(parent_context_.prefixedScope().createScope("")),
-      init_manager_(init_manager) {}
+      init_manager_(init_manager),
+      drain_manager_(parent_context_.serverFactoryContext().drainManager().createChildManager(
+          parent_context_.serverFactoryContext().mainThreadDispatcher())) {}
+
+void PerFilterChainFactoryContextImpl::startDraining() {
+  if (drain_manager_ != nullptr) {
+    drain_manager_->startDrainSequence(Network::DrainDirection::All, [] {});
+  }
+  is_draining_.store(true);
+}
 
 bool PerFilterChainFactoryContextImpl::drainClose(Network::DrainDirection scope) const {
+  if (drain_manager_ != nullptr) {
+    return drain_manager_->drainClose(scope) || parent_context_.drainDecision().drainClose(scope);
+  }
   return is_draining_.load() || parent_context_.drainDecision().drainClose(scope);
 }
 

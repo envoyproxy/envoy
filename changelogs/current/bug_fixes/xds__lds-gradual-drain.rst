@@ -1,0 +1,1 @@
+xds: fixed a bug where filter chain draining during LDS updates was immediate instead of gradual when configured with gradual drain strategy. Filter chain draining now respects the gradual drain strategy.
