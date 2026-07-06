@@ -128,7 +128,7 @@ TEST_P(UpstreamRbacIntegrationTest, ClusterContextStatsNotDoublePrefixed) {
   EXPECT_EQ("403", response->headers().getStatusValue());
 
   // The denied counter must exist under the cluster prefix exactly once.
-  EXPECT_NE(nullptr, test_server_->counter("cluster.cluster_0.rbac.denied"));
+  test_server_->waitForCounter("cluster.cluster_0.rbac.denied", testing::Eq(1));
   // It must not be double-prefixed.
   EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.cluster.cluster_0.rbac.denied"));
 
