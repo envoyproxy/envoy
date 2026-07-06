@@ -1362,6 +1362,7 @@ protected:
 
 using ClusterInfoConstSharedPtr = std::shared_ptr<const ClusterInfo>;
 
+class AdminEndpointProvider;
 class HealthChecker;
 
 /**
@@ -1437,6 +1438,12 @@ public:
    * Set up the drop_category value for the thread local cluster.
    */
   virtual void setDropCategory(absl::string_view drop_category) PURE;
+
+  /**
+   * @return the cluster's admin endpoint provider, used to render synthetic, display-only entries
+   *         on the admin /clusters page, or nullptr if the cluster has none. Defaults to nullptr.
+   */
+  virtual const AdminEndpointProvider* adminEndpointProvider() const { return nullptr; }
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;
