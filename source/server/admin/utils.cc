@@ -29,7 +29,7 @@ void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& h
 // Ok otherwise.
 absl::Status histogramBucketsParam(const Http::Utility::QueryParamsMulti& params,
                                    HistogramBucketsMode& histogram_buckets_mode) {
-  absl::optional<std::string> histogram_buckets_query_param =
+  std::optional<std::string> histogram_buckets_query_param =
       nonEmptyQueryParam(params, "histogram_buckets");
   histogram_buckets_mode = HistogramBucketsMode::Unset;
   if (histogram_buckets_query_param.has_value()) {
@@ -57,17 +57,17 @@ absl::Status histogramBucketsParam(const Http::Utility::QueryParamsMulti& params
 // Helper method to get a query parameter.
 // Returns the first value for that query parameter, unless that value is empty.
 // In that case, it returns nullopt.
-absl::optional<std::string> nonEmptyQueryParam(const Http::Utility::QueryParamsMulti& params,
-                                               const std::string& key) {
+std::optional<std::string> nonEmptyQueryParam(const Http::Utility::QueryParamsMulti& params,
+                                              const std::string& key) {
   const auto data = params.getFirstValue(key);
   if (data.has_value() && data.value().empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return data;
 }
 
 // Helper method to get the format parameter.
-absl::optional<std::string> formatParam(const Http::Utility::QueryParamsMulti& params) {
+std::optional<std::string> formatParam(const Http::Utility::QueryParamsMulti& params) {
   return nonEmptyQueryParam(params, "format");
 }
 

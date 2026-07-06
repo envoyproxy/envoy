@@ -52,6 +52,10 @@ bool DynamicModuleBootstrapExtensionConfig::enableClusterLifecycle() {
   if (cluster_lifecycle_enabled_) {
     return false;
   }
+  if (!server_initialized_) {
+    ENVOY_LOG(error, "cannot enable cluster lifecycle before server is initialized");
+    return false;
+  }
   cluster_lifecycle_enabled_ = true;
   cluster_update_callbacks_handle_ =
       context_.clusterManager().addThreadLocalClusterUpdateCallbacks(*this);
@@ -71,7 +75,7 @@ void DynamicModuleBootstrapExtensionConfig::onClusterAddOrUpdate(
   }
 }
 
-void DynamicModuleBootstrapExtensionConfig::onClusterRemoval(const std::string& cluster_name) {
+void DynamicModuleBootstrapExtensionConfig::onClusterRemoval(absl::string_view cluster_name) {
   if (in_module_config_ != nullptr && on_bootstrap_extension_cluster_removal_ != nullptr) {
     on_bootstrap_extension_cluster_removal_(thisAsVoidPtr(), in_module_config_,
                                             {cluster_name.data(), cluster_name.size()});
@@ -121,6 +125,11 @@ DynamicModuleBootstrapExtensionConfig::sendHttpCallout(uint64_t* callout_id_out,
                                                        absl::string_view cluster_name,
                                                        Http::RequestMessagePtr&& message,
                                                        uint64_t timeout_milliseconds) {
+  // The cluster manager is not available during bootstrap extension creation, so accessing it
+  // before the server is initialized would dereference a null cluster manager in release builds.
+  if (!server_initialized_) {
+    return envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound;
+  }
   // Access cluster manager lazily since it's not available during bootstrap extension creation.
   Upstream::ThreadLocalCluster* cluster =
       context_.clusterManager().getThreadLocalCluster(cluster_name);
@@ -303,6 +312,12 @@ newDynamicModuleBootstrapExtensionConfig(
     return on_timer_fired.status();
   }
 
+  auto on_file_changed = dynamic_module->getFunctionPointer<OnBootstrapExtensionFileChangedType>(
+      "envoy_dynamic_module_on_bootstrap_extension_file_changed");
+  if (!on_file_changed.ok()) {
+    return on_file_changed.status();
+  }
+
   auto on_admin_request = dynamic_module->getFunctionPointer<OnBootstrapExtensionAdminRequestType>(
       "envoy_dynamic_module_on_bootstrap_extension_admin_request");
   if (!on_admin_request.ok()) {
@@ -365,11 +380,14 @@ newDynamicModuleBootstrapExtensionConfig(
   config->on_bootstrap_extension_config_scheduled_ = on_config_scheduled.value();
   config->on_bootstrap_extension_http_callout_done_ = on_http_callout_done.value();
   config->on_bootstrap_extension_timer_fired_ = on_timer_fired.value();
+  config->on_bootstrap_extension_file_changed_ = on_file_changed.value();
   config->on_bootstrap_extension_admin_request_ = on_admin_request.value();
   config->on_bootstrap_extension_cluster_add_or_update_ = on_cluster_add_or_update.value();
   config->on_bootstrap_extension_cluster_removal_ = on_cluster_removal.value();
   config->on_bootstrap_extension_listener_add_or_update_ = on_listener_add_or_update.value();
   config->on_bootstrap_extension_listener_removal_ = on_listener_removal.value();
+
+  config->stat_creation_frozen_ = true;
 
   return config;
 }

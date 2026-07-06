@@ -22,14 +22,14 @@ LocalResponsePolicy::LocalResponsePolicy(
         config,
     Server::Configuration::ServerFactoryContext& context)
     : local_body_{config.has_body()
-                      ? absl::optional<std::string>(THROW_OR_RETURN_VALUE(
+                      ? std::optional<std::string>(THROW_OR_RETURN_VALUE(
                             Config::DataSource::read(config.body(), true, context.api()),
                             std::string))
-                      : absl::optional<std::string>{}},
+                      : std::optional<std::string>{}},
       status_code_{config.has_status_code()
-                       ? absl::optional<Envoy::Http::Code>(
+                       ? std::optional<Envoy::Http::Code>(
                              static_cast<Envoy::Http::Code>(config.status_code().value()))
-                       : absl::optional<Envoy::Http::Code>{}},
+                       : std::optional<Envoy::Http::Code>{}},
       header_parser_(THROW_OR_RETURN_VALUE(
           Envoy::Router::HeaderParser::configure(config.response_headers_to_add()),
           Router::HeaderParserPtr)) {
@@ -50,13 +50,15 @@ LocalResponsePolicy::LocalResponsePolicy(
 void LocalResponsePolicy::formatBody(const Envoy::Http::RequestHeaderMap& request_headers,
                                      const Envoy::Http::ResponseHeaderMap& response_headers,
                                      const StreamInfo::StreamInfo& stream_info,
-                                     std::string& body) const {
+                                     const Tracing::Span& active_span, std::string& body) const {
   if (local_body_.has_value()) {
     body = local_body_.value();
   }
 
   if (formatter_) {
-    body = formatter_->format({&request_headers, &response_headers, nullptr, body}, stream_info);
+    body = formatter_->format({&request_headers, &response_headers, nullptr, body,
+                               AccessLog::AccessLogType::NotSet, &active_span},
+                              stream_info);
   }
 }
 
@@ -73,12 +75,12 @@ Envoy::Http::FilterHeadersStatus LocalResponsePolicy::encodeHeaders(
   formatBody(encoder_callbacks->streamInfo().getRequestHeaders() == nullptr
                  ? *Envoy::Http::StaticEmptyHeaders::get().request_headers
                  : *encoder_callbacks->streamInfo().getRequestHeaders(),
-             headers, encoder_callbacks->streamInfo(), body);
+             headers, encoder_callbacks->streamInfo(), encoder_callbacks->activeSpan(), body);
 
   const auto mutate_headers = [this, encoder_callbacks](Envoy::Http::ResponseHeaderMap& headers) {
     header_parser_->evaluateHeaders(headers, encoder_callbacks->streamInfo());
   };
-  encoder_callbacks->sendLocalReply(code, body, mutate_headers, absl::nullopt, "");
+  encoder_callbacks->sendLocalReply(code, body, mutate_headers, std::nullopt, "");
   return Envoy::Http::FilterHeadersStatus::StopIteration;
 }
 

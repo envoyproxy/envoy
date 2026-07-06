@@ -1,6 +1,6 @@
 # This should match the schema defined in external_deps.bzl.
 
-PROTOBUF_VERSION = "33.2"
+PROTOBUF_VERSION = "35.1"
 
 # These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
 # and both must match the names from the protobuf releases (see
@@ -8,12 +8,12 @@ PROTOBUF_VERSION = "33.2"
 # The names change in upcoming versions.
 # The shas are calculated from the downloads on the releases page.
 PROTOC_VERSIONS = dict(
-    linux_aarch_64 = "706662a332683aa2fffe1c4ea61588279d31679cd42d91c7d60a69651768edb8",
-    linux_x86_64 = "b24b53f87c151bfd48b112fe4c3a6e6574e5198874f38036aff41df3456b8caf",
-    linux_ppcle_64 = "16b4a36c07daab458bc040523b1f333ddd37e1440fa71634f297a458c7fef4c4",
-    osx_aarch_64 = "5be1427127788c9f7dd7d606c3e69843dd3587327dea993917ffcb77e7234b44",
-    osx_x86_64 = "dba51cfcc85076d56e7de01a647865c5a7f995c3dce427d5215b53e50b7be43f",
-    win64 = "376770cd4073beb63db56fdd339260edb9957b3c4472e05a75f5f9ec8f98d8f5",
+    linux_aarch_64 = "01bf9d08808c7f96678b63f4bd8efa559bb4f83d5a7a270d5edaf507f9d5d9cf",
+    linux_x86_64 = "6930ebf62bd4ea607b98fff052596c6ee564b9835b4ce172c75a3f53ae9d91b7",
+    linux_ppcle_64 = "92da6d454ca3c30b0acf9bd3613dde973a179855742b1ca2859f30a4555cd6e5",
+    osx_aarch_64 = "193289af0470c6a1aada357d4fba0bbf8d78bfaac8b5e42ca30af2ef75583de2",
+    osx_x86_64 = "537d73604a344ded6fc94e98e07e529d4fe3e4a0b09e59905353950fafc2a1f7",
+    win64 = "5d3ff218d7d91eea95f7569bcb5a98f3030f8996d44151279d9772edcff76082",
 )
 
 REPOSITORY_LOCATIONS_SPEC = dict(
@@ -46,8 +46,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.3.31",
-        sha256 = "e6878f21ab2c7e80d6600a4c597fe5a95f196f534a8a4b9588e35c0e8d901717",
+        version = "0.3.35",
+        sha256 = "5179bc3f912d9c2dd5a6e5215e98222abe088847f021eba9f0f2e9a006deacaa",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
@@ -61,16 +61,22 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     boringssl = dict(
         # To update BoringSSL, which tracks BCR tags, open https://registry.bazel.build/modules/boringssl
         # and select an appropriate tag for the new version.
-        version = "0.20260327.0",
-        sha256 = "6af7037a8891d0e3d097dd61de6d195f6c2b532ed69d138a16da47c06a6cd022",
+        version = "0.20260413.0",
+        sha256 = "3560f7dd3f08e16b9f84d877a5be21ec62071564783009571af5fcc6fad734d2",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
     ),
     aws_lc = dict(
-        version = "1.71.0",
-        sha256 = "31b1eed775294825f084c0d4e09df53e1cf036fb98a202a8c2c342543828a985",
+        version = "1.72.0",
+        sha256 = "f214c0e06e043c4f18b836059ccb5ecbed781173e8eed106839ee2dd4f4cc157",
         strip_prefix = "aws-lc-{version}",
         urls = ["https://github.com/aws/aws-lc/archive/v{version}.tar.gz"],
+    ),
+    openssl = dict(
+        version = "3.5.7",
+        sha256 = "a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8",
+        strip_prefix = "openssl-{version}",
+        urls = ["https://github.com/openssl/openssl/releases/download/openssl-{version}/openssl-{version}.tar.gz"],
     ),
     aspect_bazel_lib = dict(
         version = "2.21.2",
@@ -101,6 +107,22 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "5f80964108981c6ad979c735f0b4877d5f49914c2a062f8e88282f26bf61de0c",
         strip_prefix = "liburing-liburing-{version}",
         urls = ["https://github.com/axboe/liburing/archive/liburing-{version}.tar.gz"],
+    ),
+    # libelf, used by libbpf for the sockmap socket interface. Built only when sockmap is enabled
+    # with --define=sockmap=enabled. Never built for releases.
+    elfutils = dict(
+        version = "0.195",
+        sha256 = "37629fdf7f1f3dc2818e138fca2b8094177d6c2d0f701d3bb650a561218dc026",
+        strip_prefix = "elfutils-{version}",
+        urls = ["https://sourceware.org/elfutils/ftp/{version}/elfutils-{version}.tar.bz2"],
+    ),
+    # eBPF loader for the sockmap socket interface. Built only when sockmap is enabled with
+    # --define=sockmap=enabled. Never built for releases.
+    libbpf = dict(
+        version = "1.7.0",
+        sha256 = "7ab5feffbf78557f626f2e3e3204788528394494715a30fc2070fcddc2051b7b",
+        strip_prefix = "libbpf-{version}",
+        urls = ["https://github.com/libbpf/libbpf/archive/refs/tags/v{version}.tar.gz"],
     ),
     # This dependency is built only when performance tracing is enabled with the
     # option --define=perf_tracing=enabled. It's never built for releases.
@@ -182,8 +204,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/jemalloc/jemalloc/releases/download/{version}/jemalloc-{version}.tar.bz2"],
     ),
     com_github_grpc_grpc = dict(
-        version = "1.76.0",
-        sha256 = "0af37b800953130b47c075b56683ee60bdc3eda3c37fc6004193f5b569758204",
+        version = "1.81.1",
+        sha256 = "48ae0d05f87206112d9e9144a923191ee1e482141a70686ec58dc86d0b40fddc",
         strip_prefix = "grpc-{version}",
         urls = ["https://github.com/grpc/grpc/archive/v{version}.tar.gz"],
     ),
@@ -272,10 +294,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/open-telemetry/opentelemetry-cpp/archive/refs/tags/v{version}.tar.gz"],
     ),
     skywalking_data_collect_protocol = dict(
-        sha256 = "5b7c49eff204c423b3d1ffc3b9ec84f2d77838b30464e4a3d6158cf0b6a8429a",
+        sha256 = "70e63dd30d9dfdcf0a0ef0976e19c7e21fa1411af13ec31452bd1da37e578e35",
         urls = ["https://github.com/apache/skywalking-data-collect-protocol/archive/v{version}.tar.gz"],
         strip_prefix = "skywalking-data-collect-protocol-{version}",
-        version = "10.3.0",
+        version = "10.4.0",
     ),
     cpp2sky = dict(
         sha256 = "d7e52f517de5a1dc7d927dd63a2e5aa5cf8c2dcfd8fcf6b64e179978daf1c3ed",
@@ -284,8 +306,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/SkyAPM/cpp2sky/archive/v{version}.tar.gz"],
     ),
     dd_trace_cpp = dict(
-        version = "2.0.0",
-        sha256 = "e4a0dabc3e186ce99c71685178448f93c501577102cdc50ddbf12cbaaba54713",
+        version = "2.1.0",
+        sha256 = "8152fb69e61518a5b55ecb96edcbb19585f8950b6f070ac98ebd0b6dd6177492",
         strip_prefix = "dd-trace-cpp-{version}",
         urls = ["https://github.com/DataDog/dd-trace-cpp/archive/v{version}.tar.gz"],
     ),
@@ -409,7 +431,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
         # test/common/json/json_sanitizer_test_util.cc.
-        sha256 = "6b6599b54c88d75904b7471f5ca34a725fa0af92e134dd1a32d5b395aa4b4ca8",
+        sha256 = "f0b6838e7522a8da96126d487068c959bc624926368f3024ac8fd03abd0a1ac4",
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-{version}.tar.gz"],
     ),
@@ -461,8 +483,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/{version}.tar.gz"],
     ),
     rules_java = dict(
-        version = "7.12.5",
-        sha256 = "17b18cb4f92ab7b94aa343ce78531b73960b1bed2ba166e5b02c9fdf0b0ac270",
+        version = "9.6.1",
+        sha256 = "9de4e178c2c4f98d32aafe5194c3f2b717ae10405caa11bdcb460ac2a6f61516",
         urls = ["https://github.com/bazelbuild/rules_java/releases/download/{version}/rules_java-{version}.tar.gz"],
     ),
     rules_python = dict(
@@ -497,8 +519,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bytecodealliance/wasm-micro-runtime/archive/{version}.tar.gz"],
     ),
     wasmtime = dict(
-        version = "24.0.4",
-        sha256 = "d714d987a50cfc7d0b384ef4720e7c757cf4f5b7df617cbf38e432a3dc6c400d",
+        version = "42.0.2",
+        sha256 = "96b94e150a3877d98cdc2e27bcd65ba89155ad67fa16c48fad6216664cb60d29",
         strip_prefix = "wasmtime-{version}",
         urls = ["https://github.com/bytecodealliance/wasmtime/archive/v{version}.tar.gz"],
     ),
@@ -547,8 +569,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "603f7ea475700dcdac7b58f5a05d6ccec70396f4",
-        sha256 = "4b3cd50cef5034eb0b5d49fa7345ec3414fbd1d4430af44a59a7645acfd12029",
+        version = "2e79733d0b831ab194dde343845aca66d5bedde3",
+        sha256 = "eeb92fb31981b3383b17dc1ec7ac8f67a5e52b615e899c88c7ee4edb671285cc",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),
@@ -583,8 +605,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/re2/releases/download/{version}/re2-{version}.zip"],
     ),
     kafka_source = dict(
-        version = "3.9.1",
-        sha256 = "c15b82940cfb9f67fce909d8600dc8bcfc42d2795da2c26c149d03a627f85234",
+        version = "3.9.2",
+        sha256 = "085bbee8208fea6d1cb22498afa6ffc3835037516643208f705420564b49b80e",
         strip_prefix = "kafka-{version}/clients/src/main/resources/common/message",
         urls = ["https://github.com/apache/kafka/archive/{version}.zip"],
     ),
@@ -601,8 +623,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/{version}.tar.gz"],
     ),
     proxy_wasm_cpp_host = dict(
-        version = "beb8a4ece9eede4ab21d89d723359607600296d4",
-        sha256 = "dbd2d449fca10c1cd655efe21eee34fe880f4ff5fe7f01562f7829ca8dd4b2bf",
+        version = "09e5f8d6658fdb77f3d5859b27141e79514e371c",
+        sha256 = "366e7598d4931a96fd1c5b0482f87076d863810049aa3a8ce921616592ed3e8c",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
     ),
@@ -671,8 +693,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/maxmind/libmaxminddb/releases/download/{version}/libmaxminddb-{version}.tar.gz"],
     ),
     thrift = dict(
-        version = "0.22.0",
-        sha256 = "c4649c5879dd56c88f1e7a1c03e0fbfcc3b2a2872fb81616bffba5aa8a225a37",
+        version = "0.23.0",
+        sha256 = "087ba9517063c8252e9e7fb4e3891a9fd85e20af80e0309e2276eff16791d75c",
         strip_prefix = "thrift-{version}/lib/py/",
         urls = ["https://github.com/apache/thrift/archive/refs/tags/v{version}.tar.gz"],
     ),
@@ -702,28 +724,55 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/ninja-build/ninja/archive/refs/tags/v{version}.tar.gz"],
     ),
     fips_cmake_linux_x86_64 = dict(
-        version = "4.3.1",
-        sha256 = "208d76804009cbe8ec9aea0aa052c857c6e59bd289b43b9941c99324dc78b1d8",
+        version = "4.3.2",
+        sha256 = "791ae3604841ca03cb3889a3ad89165346e4b180ae3448efd4b0caa9ef46d245",
         strip_prefix = "cmake-{version}-linux-x86_64",
         urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-linux-x86_64.tar.gz"],
     ),
     fips_cmake_linux_aarch64 = dict(
-        version = "4.3.1",
-        sha256 = "2c0eca48ac7d0e3a8b4120b801d48903b0630c8ff1e73c44a90398a300dec1ac",
+        version = "4.3.2",
+        sha256 = "377079ab739f5765176f427609d9a2015b756ea20d5cba908d279c3731a2f481",
         strip_prefix = "cmake-{version}-linux-aarch64",
         urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-linux-aarch64.tar.gz"],
     ),
     fips_go_linux_amd64 = dict(
-        version = "1.24.4",
-        sha256 = "77e5da33bb72aeaef1ba4418b6fe511bc4d041873cbf82e5aa6318740df98717",
+        version = "1.26.3",
+        sha256 = "2b2cfc7148493da5e73981bffbf3353af381d5f93e789c82c79aff64962eb556",
         strip_prefix = "go",
         urls = ["https://dl.google.com/go/go{version}.linux-amd64.tar.gz"],
     ),
     fips_go_linux_arm64 = dict(
-        version = "1.24.4",
-        sha256 = "d5501ee5aca0f258d5fe9bfaed401958445014495dc115f202d43d5210b45241",
+        version = "1.26.3",
+        sha256 = "9d89a3ea57d141c2b22d70083f2c8459ba3890f2d9e818e7e933b75614936565",
         strip_prefix = "go",
         urls = ["https://dl.google.com/go/go{version}.linux-arm64.tar.gz"],
+    ),
+    fips_clang_ppc64le = dict(
+        version = "14.0.0",
+        sha256 = "2d504c4920885c86b306358846178bc2232dfac83b47c3b1d05861a8162980e6",
+        strip_prefix = "clang+llvm-{version}-powerpc64le-linux-ubuntu-18.04",
+        urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/clang+llvm-{version}-powerpc64le-linux-ubuntu-18.04.tar.xz"],
+    ),
+    fips_go_ppc64le = dict(
+        version = "1.26.3",
+        sha256 = "dbd82b50530ead2beb1fd72215117380df3cb16332b51467116dc35b3691dd75",
+        strip_prefix = "go",
+        urls = ["https://dl.google.com/go/go{version}.linux-ppc64le.tar.gz"],
+    ),
+    fips_cmake_src = dict(
+        version = "4.3.2",
+        sha256 = "b0231eb39b3c3cabdc568c619df78208a7bd95ea10c9b2236d61218bac1b367d",
+        strip_prefix = "cmake-{version}",
+        urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}.tar.gz"],
+    ),
+    wuffs = dict(
+        version = "0.4.0-alpha.9",
+        sha256 = "9ca4f5401a76be244362de8b39138f01f2456c444b03584703a9f1db90491ba6",
+        strip_prefix = "wuffs-mirror-release-c-{version}",
+        urls = ["https://github.com/google/wuffs-mirror-release-c/archive/refs/tags/v{version}.tar.gz"],
+        # Wuffs: memory-safe, high-performance JSON (and other format) parser.
+        # The amalgamated C file at release/c/wuffs-v0.4.c is both the header
+        # (declarations) and implementation (when WUFFS_IMPLEMENTATION is defined).
     ),
 )
 

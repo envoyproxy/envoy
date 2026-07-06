@@ -9,7 +9,6 @@
 
 #include "test/extensions/filters/http/cache_v2/http_cache_implementation_test_common.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -41,7 +40,7 @@ TEST(Registration, GetFactory) {
   ASSERT_NE(factory, nullptr);
   envoy::extensions::filters::http::cache_v2::v3::CacheV2Config config;
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  config.mutable_typed_config()->PackFrom(*factory->createEmptyConfigProto());
+  std::ignore = config.mutable_typed_config()->PackFrom(*factory->createEmptyConfigProto());
   auto cache = factory->getCache(config, factory_context);
   ASSERT_OK(cache);
   EXPECT_EQ((*cache)->cacheInfo().name_, "envoy.extensions.http.cache_v2.simple");

@@ -30,7 +30,6 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/socket_interface_swap.h"
 #include "test/integration/ssl_utility.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "quiche/quic/core/crypto/quic_client_session_cache.h"
@@ -41,6 +40,7 @@
 #include "quiche/quic/test_tools/quic_session_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
+using testing::Eq;
 namespace Envoy {
 namespace Quic {
 class CodecClientCallbacksForTest : public Http::CodecClientCallbacks {
@@ -202,11 +202,13 @@ public:
     codec_client_.reset();
   }
 
-  void configureEarlyData(bool enabled, ConfigHelper* config_helper = nullptr) {
+  void configureTlsOptions(bool early_data_enabled, bool resumption_enabled,
+                           ConfigHelper* config_helper = nullptr) {
     if (config_helper == nullptr) {
       config_helper = &config_helper_;
     }
-    config_helper->addConfigModifier([enabled](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper->addConfigModifier([early_data_enabled, resumption_enabled](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ts = bootstrap.mutable_static_resources()
                      ->mutable_listeners(0)
                      ->mutable_filter_chains(0)
@@ -215,8 +217,9 @@ public:
       auto quic_transport_socket_config = MessageUtil::anyConvert<
           envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport>(
           *ts->mutable_typed_config());
-      quic_transport_socket_config.mutable_enable_early_data()->set_value(enabled);
-      ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+      quic_transport_socket_config.mutable_enable_early_data()->set_value(early_data_enabled);
+      quic_transport_socket_config.mutable_enable_resumption()->set_value(resumption_enabled);
+      std::ignore = ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
     });
   }
 
@@ -285,9 +288,9 @@ public:
 
   IntegrationCodecClientPtr makeRawHttpConnection(
       Network::ClientConnectionPtr&& conn,
-      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
-      absl::optional<envoy::config::core::v3::HttpProtocolOptions> common_http_options =
-          absl::nullopt,
+      std::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+      std::optional<envoy::config::core::v3::HttpProtocolOptions> common_http_options =
+          std::nullopt,
       bool wait_till_connected = true) override {
     ENVOY_LOG(debug, "Creating a new client {}",
               conn->connectionInfoProvider().localAddress()->asStringView());
@@ -296,10 +299,10 @@ public:
   }
 
   // Create Http3 codec client with the option not to wait for 1-RTT key establishment.
-  IntegrationCodecClientPtr makeRawHttp3Connection(
-      Network::ClientConnectionPtr&& conn,
-      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
-      bool wait_for_1rtt_key, absl::optional<bool> disable_qpack = absl::nullopt) {
+  IntegrationCodecClientPtr
+  makeRawHttp3Connection(Network::ClientConnectionPtr&& conn,
+                         std::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+                         bool wait_for_1rtt_key, std::optional<bool> disable_qpack = std::nullopt) {
     std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
     cluster->max_response_headers_count_ = 200;
     if (http2_options.has_value()) {
@@ -369,7 +372,7 @@ public:
     tls_context->mutable_common_tls_context()->add_alpn_protocols(client_alpn_);
 
     envoy::config::core::v3::TransportSocket message;
-    message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
+    std::ignore = message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
     auto& config_factory = Config::Utility::getAndCheckFactory<
         Server::Configuration::UpstreamTransportSocketConfigFactory>(message);
     transport_socket_factory_.reset(static_cast<QuicClientTransportSocketFactory*>(
@@ -467,24 +470,25 @@ public:
     constexpr auto timeout_first = std::chrono::seconds(15 * TIMEOUT_FACTOR);
     constexpr auto timeout_subsequent = std::chrono::milliseconds(10 * TIMEOUT_FACTOR);
     if (version_ == Network::Address::IpVersion::v4) {
-      test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_total", 8u, timeout_first);
+      test_server_->waitForCounter("listener.127.0.0.1_0.downstream_cx_total", Eq(8u),
+                                   timeout_first);
     } else {
-      test_server_->waitForCounterEq("listener.[__1]_0.downstream_cx_total", 8u, timeout_first);
+      test_server_->waitForCounter("listener.[__1]_0.downstream_cx_total", Eq(8u), timeout_first);
     }
     for (size_t i = 0; i < concurrency_; ++i) {
       if (version_ == Network::Address::IpVersion::v4) {
-        test_server_->waitForGaugeEq(
-            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_active", i), 1u,
+        test_server_->waitForGauge(
+            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_active", i), Eq(1u),
             timeout_subsequent);
-        test_server_->waitForCounterEq(
-            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_total", i), 1u,
+        test_server_->waitForCounter(
+            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_total", i), Eq(1u),
             timeout_subsequent);
       } else {
-        test_server_->waitForGaugeEq(
-            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_active", i), 1u,
+        test_server_->waitForGauge(
+            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_active", i), Eq(1u),
             timeout_subsequent);
-        test_server_->waitForCounterEq(
-            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_total", i), 1u,
+        test_server_->waitForCounter(
+            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_total", i), Eq(1u),
             timeout_subsequent);
       }
     }
@@ -571,25 +575,25 @@ public:
     constexpr auto timeout_first = std::chrono::seconds(15 * TIMEOUT_FACTOR);
     constexpr auto timeout_subsequent = std::chrono::milliseconds(10 * TIMEOUT_FACTOR);
     if (version_ == Network::Address::IpVersion::v4) {
-      test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_total", 16u,
-                                     timeout_first);
+      test_server_->waitForCounter("listener.127.0.0.1_0.downstream_cx_total", Eq(16u),
+                                   timeout_first);
     } else {
-      test_server_->waitForCounterEq("listener.[__1]_0.downstream_cx_total", 16u, timeout_first);
+      test_server_->waitForCounter("listener.[__1]_0.downstream_cx_total", Eq(16u), timeout_first);
     }
     for (size_t i = 0; i < concurrency_; ++i) {
       if (version_ == Network::Address::IpVersion::v4) {
-        test_server_->waitForGaugeEq(
-            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_active", i), 2u,
+        test_server_->waitForGauge(
+            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_active", i), Eq(2u),
             timeout_subsequent);
-        test_server_->waitForCounterEq(
-            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_total", i), 2u,
+        test_server_->waitForCounter(
+            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_total", i), Eq(2u),
             timeout_subsequent);
       } else {
-        test_server_->waitForGaugeEq(
-            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_active", i), 2u,
+        test_server_->waitForGauge(
+            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_active", i), Eq(2u),
             timeout_subsequent);
-        test_server_->waitForCounterEq(
-            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_total", i), 2u,
+        test_server_->waitForCounter(
+            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_total", i), Eq(2u),
             timeout_subsequent);
       }
     }

@@ -15,7 +15,6 @@
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -75,9 +74,9 @@ public:
   void expectMaxStreamDurationTimerCreate(std::chrono::milliseconds duration_msec);
   AssertionResult verifyHostUpstreamStats(uint64_t success, uint64_t error);
   void verifyAttemptCountInRequestBasic(bool set_include_attempt_count_in_request,
-                                        absl::optional<int> preset_count, int expected_count);
+                                        std::optional<int> preset_count, int expected_count);
   void verifyAttemptCountInResponseBasic(bool set_include_attempt_count_in_response,
-                                         absl::optional<int> preset_count, int expected_count);
+                                         std::optional<int> preset_count, int expected_count);
 
   // Helper functions for metadata test setup
   void setRouteMetadataMatchCriteria(const std::string& yaml_content);

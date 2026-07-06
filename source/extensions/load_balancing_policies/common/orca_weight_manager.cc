@@ -9,6 +9,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/orca/orca_load_metrics.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/status/status.h"
 #include "xds/data/orca/v3/orca_load_report.pb.h"
@@ -35,18 +36,41 @@ OrcaLoadReportHandler::OrcaLoadReportHandler(const OrcaWeightManagerConfig& conf
 double OrcaLoadReportHandler::getUtilizationFromOrcaReport(
     const OrcaLoadReportProto& orca_load_report,
     const std::vector<std::string>& metric_names_for_computing_utilization) {
-  // If application_utilization is valid, use it as the utilization metric.
-  double utilization = orca_load_report.application_utilization();
-  if (utilization > 0) {
-    return utilization;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.orca_weight_manager_use_named_metrics_first")) {
+    // By default (with runtime feature enabled) we prefer named metrics over application
+    // utilization, so if named metrics are not ignored if application utilization is
+    // available and set. See https://github.com/envoyproxy/envoy/pull/44196 for discussion.
+
+    // Find the most constrained utilization metric in `metric_names_for_computing_utilization`.
+    double utilization =
+        Envoy::Orca::getMaxUtilization(metric_names_for_computing_utilization, orca_load_report);
+    if (utilization > 0) {
+      return utilization;
+    }
+    // If named metrics are not available, use `application_utilization` as the utilization metric.
+    utilization = orca_load_report.application_utilization();
+    if (utilization > 0) {
+      return utilization;
+    }
+  } else {
+    // With the runtime flag disabled, we use application utilization if it is set over named
+    // metrics. This means that metric_names_for_computing_utilization is ignored if
+    // application_utilization is available and set.
+
+    // If application_utilization is valid, use it as the utilization metric.
+    double utilization = orca_load_report.application_utilization();
+    if (utilization > 0) {
+      return utilization;
+    }
+    // Otherwise, find the most constrained utilization metric.
+    utilization =
+        Envoy::Orca::getMaxUtilization(metric_names_for_computing_utilization, orca_load_report);
+    if (utilization > 0) {
+      return utilization;
+    }
   }
-  // Otherwise, find the most constrained utilization metric.
-  utilization =
-      Envoy::Orca::getMaxUtilization(metric_names_for_computing_utilization, orca_load_report);
-  if (utilization > 0) {
-    return utilization;
-  }
-  // If utilization is <= 0, use cpu_utilization.
+  // If utilization is <= 0, use `cpu_utilization` as the utilization metric.
   return orca_load_report.cpu_utilization();
 }
 
@@ -161,7 +185,7 @@ bool OrcaWeightManager::updateWeightsOnHosts(const Upstream::HostVector& hosts) 
   // Scan through all hosts and update their weights if they are valid.
   for (const auto& host_ptr : hosts) {
     // Get client side weight or `nullopt` if it is invalid (see above).
-    absl::optional<uint32_t> client_side_weight =
+    std::optional<uint32_t> client_side_weight =
         getWeightIfValidFromHost(*host_ptr, max_non_empty_since, min_last_update_time);
     // If `client_side_weight` is valid, then set it as the host weight and store it in
     // `weights` to calculate median valid weight across all hosts.
@@ -212,21 +236,21 @@ bool OrcaWeightManager::updateWeightsOnHosts(const Upstream::HostVector& hosts) 
 
 void OrcaWeightManager::addLbPolicyDataToHosts(const Upstream::HostVector& hosts) {
   for (const auto& host_ptr : hosts) {
-    if (!host_ptr->lbPolicyData().has_value()) {
+    if (!host_ptr->typedLbPolicyData<OrcaHostLbPolicyData>().has_value()) {
       ENVOY_LOG(trace, "Adding LB policy data to Host {}", getHostAddress(host_ptr.get()));
-      host_ptr->setLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(report_handler_));
+      host_ptr->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(report_handler_));
     }
   }
 }
 
-absl::optional<uint32_t>
+std::optional<uint32_t>
 OrcaWeightManager::getWeightIfValidFromHost(const Upstream::Host& host,
                                             MonotonicTime max_non_empty_since,
                                             MonotonicTime min_last_update_time) {
   auto client_side_data = host.typedLbPolicyData<OrcaHostLbPolicyData>();
   if (!client_side_data.has_value()) {
     ENVOY_LOG_MISC(trace, "Host does not have OrcaHostLbPolicyData {}", getHostAddress(&host));
-    return absl::nullopt;
+    return std::nullopt;
   }
   return client_side_data->getWeightIfValid(max_non_empty_since, min_last_update_time);
 }

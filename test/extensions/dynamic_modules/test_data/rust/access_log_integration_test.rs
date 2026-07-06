@@ -1,13 +1,19 @@
 //! Integration test module for access logger dynamic modules.
 //!
-//! This module implements a simple access logger that records log events and flush calls.
+//! This module exercises the unified `declare_all_init_functions!` registration: a single
+//! `.so` registers both an HTTP filter factory and an access-logger factory that dispatches
+//! to different implementations by `logger_name`. The C++ side rejects unknown logger names
+//! at config load time when the factory returns `None`.
 
 use envoy_proxy_dynamic_modules_rust_sdk::access_log::*;
 use envoy_proxy_dynamic_modules_rust_sdk::*;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-declare_init_functions!(init, new_nop_http_filter_config_fn);
-declare_access_logger!(TestAccessLoggerConfig);
+declare_all_init_functions!(
+  init,
+  http: new_nop_http_filter_config_fn,
+  access_logger: new_access_logger_config_fn,
+);
 
 /// Global counter for log events.
 static LOG_COUNT: AtomicU32 = AtomicU32::new(0);
@@ -21,13 +27,29 @@ fn init() -> bool {
   true
 }
 
-/// Dummy HTTP filter config function (required by declare_init_functions).
+/// Dummy HTTP filter config function (required by declare_all_init_functions).
 fn new_nop_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
   _envoy_filter_config: &mut EC,
   _name: &str,
   _config: &[u8],
 ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   None
+}
+
+/// Access logger factory function: dispatches to the correct config implementation based on
+/// `logger_name`. Returning `None` for an unknown name causes Envoy to reject the access-log
+/// configuration at config load time.
+fn new_access_logger_config_fn(
+  ctx: &ConfigContext,
+  name: &str,
+  config: &[u8],
+) -> Option<Box<dyn AccessLoggerConfig>> {
+  match name {
+    "test_logger" => TestAccessLoggerConfig::new(ctx, name, config)
+      .ok()
+      .map(|c| Box::new(c) as Box<dyn AccessLoggerConfig>),
+    _ => None,
+  }
 }
 
 /// Access logger configuration.
@@ -42,6 +64,12 @@ impl AccessLoggerConfig for TestAccessLoggerConfig {
     let log_counter = ctx
       .define_counter("test_log_count")
       .ok_or("Failed to define counter")?;
+    // Emit a metric directly from the config context (no log event), exercising the config-scoped
+    // emission path. This would typically be done from a scheduled background task.
+    let config_total = ctx
+      .define_counter("config_total")
+      .ok_or("Failed to define config counter")?;
+    ctx.increment_counter(config_total, 1);
     Ok(Self {
       _name: name.to_string(),
       log_counter,
@@ -117,6 +145,11 @@ impl AccessLogger for TestAccessLogger {
     // Test request ID and metadata.
     let _request_id = ctx.request_id();
     let _filter_state = ctx.get_filter_state("test_key");
+
+    // Test typed dynamic metadata accessors.
+    let _dm_string = ctx.get_dynamic_metadata("test_filter", "string_key");
+    let _dm_number = ctx.get_dynamic_metadata_number("test_filter", "handshake_state");
+    let _dm_bool = ctx.get_dynamic_metadata_bool("test_filter", "tls_enabled");
 
     // Test tracing (stubs that always return None).
     let _trace_id = ctx.get_trace_id();

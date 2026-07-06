@@ -24,6 +24,8 @@ namespace HttpFilters {
 namespace Oauth2 {
 
 namespace {
+constexpr absl::string_view WwwFormUrlEncodedReservedCharacters = ":/=&?+";
+
 constexpr const char* UrlBodyTemplateWithCredentialsForAuthCode =
     "grant_type=authorization_code&code={0}&client_id={1}&client_secret={2}&redirect_uri={3}&code_"
     "verifier={4}";
@@ -43,6 +45,16 @@ constexpr const char* UrlBodyTemplateWithoutSecretForAuthCode =
 constexpr const char* UrlBodyTemplateWithoutSecretForRefreshToken =
     "grant_type=refresh_token&refresh_token={0}&client_id={1}";
 
+constexpr const char* UrlBodyTemplateWithAssertionForAuthCode =
+    "grant_type=authorization_code&code={0}&client_id={1}"
+    "&client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-assertion-type%3Ajwt-bearer"
+    "&client_assertion={2}&redirect_uri={3}&code_verifier={4}";
+
+constexpr const char* UrlBodyTemplateWithAssertionForRefreshToken =
+    "grant_type=refresh_token&refresh_token={0}&client_id={1}"
+    "&client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-assertion-type%3Ajwt-bearer"
+    "&client_assertion={2}";
+
 } // namespace
 
 void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
@@ -52,16 +64,18 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
   ASSERT(state_ == OAuthState::Idle);
   state_ = OAuthState::PendingAccessToken;
 
-  const auto encoded_cb_url = Http::Utility::PercentEncoding::encode(cb_url, ":/=&?");
+  const auto encoded_cb_url =
+      Http::Utility::PercentEncoding::encode(cb_url, WwwFormUrlEncodedReservedCharacters);
   Http::RequestMessagePtr request = createPostRequest();
   std::string body;
 
   switch (auth_type) {
   case AuthType::UrlEncodedBody:
-    body = fmt::format(UrlBodyTemplateWithCredentialsForAuthCode, auth_code,
-                       Http::Utility::PercentEncoding::encode(client_id, ":/=&?"),
-                       Http::Utility::PercentEncoding::encode(secret, ":/=&?"), encoded_cb_url,
-                       code_verifier);
+    body = fmt::format(
+        UrlBodyTemplateWithCredentialsForAuthCode, auth_code,
+        Http::Utility::PercentEncoding::encode(client_id, WwwFormUrlEncodedReservedCharacters),
+        Http::Utility::PercentEncoding::encode(secret, WwwFormUrlEncodedReservedCharacters),
+        encoded_cb_url, code_verifier);
     break;
   case AuthType::BasicAuth: {
     const auto basic_auth_token = absl::StrCat(client_id, ":", secret);
@@ -76,9 +90,18 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
   case AuthType::TlsClientAuth:
     // For mTLS, authentication is done via the client certificate in the TLS handshake.
     // No client_secret is sent in the request body or headers.
-    body = fmt::format(UrlBodyTemplateWithoutSecretForAuthCode, auth_code,
-                       Http::Utility::PercentEncoding::encode(client_id, ":/=&?"), encoded_cb_url,
-                       code_verifier);
+    body = fmt::format(
+        UrlBodyTemplateWithoutSecretForAuthCode, auth_code,
+        Http::Utility::PercentEncoding::encode(client_id, WwwFormUrlEncodedReservedCharacters),
+        encoded_cb_url, code_verifier);
+    break;
+  case AuthType::PrivateKeyJwt:
+    // For private_key_jwt, the secret parameter contains the pre-built JWT assertion.
+    body = fmt::format(
+        UrlBodyTemplateWithAssertionForAuthCode, auth_code,
+        Http::Utility::PercentEncoding::encode(client_id, WwwFormUrlEncodedReservedCharacters),
+        Http::Utility::PercentEncoding::encode(secret, WwwFormUrlEncodedReservedCharacters),
+        encoded_cb_url, code_verifier);
     break;
   }
 
@@ -99,10 +122,11 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
 
   switch (auth_type) {
   case AuthType::UrlEncodedBody:
-    body = fmt::format(UrlBodyTemplateWithCredentialsForRefreshToken,
-                       Http::Utility::PercentEncoding::encode(refresh_token, ":/=&?"),
-                       Http::Utility::PercentEncoding::encode(client_id, ":/=&?"),
-                       Http::Utility::PercentEncoding::encode(secret, ":/=&?"));
+    body = fmt::format(
+        UrlBodyTemplateWithCredentialsForRefreshToken,
+        Http::Utility::PercentEncoding::encode(refresh_token, WwwFormUrlEncodedReservedCharacters),
+        Http::Utility::PercentEncoding::encode(client_id, WwwFormUrlEncodedReservedCharacters),
+        Http::Utility::PercentEncoding::encode(secret, WwwFormUrlEncodedReservedCharacters));
     break;
   case AuthType::BasicAuth: {
     const auto basic_auth_token = absl::StrCat(client_id, ":", secret);
@@ -117,9 +141,18 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
   case AuthType::TlsClientAuth:
     // For mTLS, authentication is done via the client certificate in the TLS handshake.
     // No client_secret is sent in the request body or headers.
-    body = fmt::format(UrlBodyTemplateWithoutSecretForRefreshToken,
-                       Http::Utility::PercentEncoding::encode(refresh_token, ":/=&?"),
-                       Http::Utility::PercentEncoding::encode(client_id, ":/=&?"));
+    body = fmt::format(
+        UrlBodyTemplateWithoutSecretForRefreshToken,
+        Http::Utility::PercentEncoding::encode(refresh_token, WwwFormUrlEncodedReservedCharacters),
+        Http::Utility::PercentEncoding::encode(client_id, WwwFormUrlEncodedReservedCharacters));
+    break;
+  case AuthType::PrivateKeyJwt:
+    // For private_key_jwt, the secret parameter contains the pre-built JWT assertion.
+    body = fmt::format(
+        UrlBodyTemplateWithAssertionForRefreshToken,
+        Http::Utility::PercentEncoding::encode(refresh_token, WwwFormUrlEncodedReservedCharacters),
+        Http::Utility::PercentEncoding::encode(client_id, WwwFormUrlEncodedReservedCharacters),
+        Http::Utility::PercentEncoding::encode(secret, WwwFormUrlEncodedReservedCharacters));
     break;
   }
 
@@ -128,6 +161,17 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
   ENVOY_STREAM_LOG(debug, "Dispatching OAuth request for update access token by refresh token.",
                    *decoder_callbacks_);
   dispatchRequest(std::move(request));
+}
+
+void OAuth2ClientImpl::cancel() {
+  parent_ = nullptr;
+  decoder_callbacks_ = nullptr;
+  Http::AsyncClient::Request* in_flight = in_flight_request_;
+  in_flight_request_ = nullptr;
+  if (in_flight != nullptr) {
+    in_flight->cancel();
+  }
+  state_ = OAuthState::Idle;
 }
 
 void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
@@ -144,13 +188,46 @@ void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
     in_flight_request_ =
         thread_local_cluster->httpAsyncClient().send(std::move(msg), *this, options);
   } else {
-    parent_->sendUnauthorizedResponse("Token endpoint cluster not found");
+    handleOAuthFailure(false, "Token endpoint cluster not found");
+  }
+}
+
+void OAuth2ClientImpl::handleOAuthFailure(bool is_request_dispatched, const std::string& reason,
+                                          const std::string& extra_details) {
+  const auto result = parent_->handleOAuthFailure(reason, extra_details);
+  if (is_request_dispatched) {
+    if (result == Http::FilterHeadersStatus::Continue) {
+      decoder_callbacks_->continueDecoding();
+    }
+  } else {
+    state_ = (result == Http::FilterHeadersStatus::Continue) ? OAuthState::FailureContinue
+                                                             : OAuthState::FailureStop;
+  }
+}
+
+void OAuth2ClientImpl::handleRefreshTokenFailure(bool is_request_dispatched) {
+  const auto result = parent_->onRefreshAccessTokenFailure();
+  if (is_request_dispatched) {
+    if (result == Http::FilterHeadersStatus::Continue) {
+      decoder_callbacks_->continueDecoding();
+    }
+  } else {
+    state_ = (result == Http::FilterHeadersStatus::Continue) ? OAuthState::FailureContinue
+                                                             : OAuthState::FailureStop;
   }
 }
 
 void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
                                  Http::ResponseMessagePtr&& message) {
+  // If not yet dispatched, onSuccess is called synchronously during decodeHeaders, not in an async
+  // token request. Set state_ for the caller to check instead of calling continueDecoding.
+  const bool is_request_dispatched = (in_flight_request_ != nullptr);
   in_flight_request_ = nullptr;
+
+  if (parent_ == nullptr) {
+    state_ = OAuthState::Idle;
+    return;
+  }
 
   ASSERT(state_ == OAuthState::PendingAccessToken ||
          state_ == OAuthState::PendingAccessTokenByRefreshToken);
@@ -166,12 +243,12 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
                      message->bodyAsString());
     switch (oldState) {
     case OAuthState::PendingAccessToken:
-      parent_->sendUnauthorizedResponse(
-          fmt::format("Failed to get access token, response code: {}, response body: {}",
-                      response_code, message->bodyAsString()));
+      handleOAuthFailure(is_request_dispatched, "Failed to get access token",
+                         fmt::format("response code: {}, response body: {}", response_code,
+                                     message->bodyAsString()));
       break;
     case OAuthState::PendingAccessTokenByRefreshToken:
-      parent_->onRefreshAccessTokenFailure();
+      handleRefreshTokenFailure(is_request_dispatched);
       break;
     default:
       PANIC("Malformed oauth client state");
@@ -186,16 +263,17 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
     MessageUtil::loadFromJson(response_body, response, ProtobufMessage::getNullValidationVisitor());
   }
   END_TRY catch (EnvoyException& e) {
-    parent_->sendUnauthorizedResponse(fmt::format(
-        "Failed to parse oauth response body: {}, exception: {}", response_body, e.what()));
+    handleOAuthFailure(is_request_dispatched, "Failed to parse oauth response body",
+                       fmt::format("response body: {}, exception: {}", response_body, e.what()));
     return;
   }
 
   // TODO(snowp): Should this be a pgv validation instead? A more readable log
   // message might be good enough reason to do this manually?
   if (!response.has_access_token()) {
-    parent_->sendUnauthorizedResponse(
-        fmt::format("No access token found in the token exchange response: {}", response_body));
+    handleOAuthFailure(is_request_dispatched,
+                       "No access token found in the token exchange response",
+                       fmt::format("response body: {}", response_body));
     return;
   }
 
@@ -208,9 +286,10 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
     expires_in = std::chrono::seconds{response.expires_in().value()};
   }
   if (expires_in <= 0s) {
-    parent_->sendUnauthorizedResponse(fmt::format(
-        "No default or explicit access token expiration found in the token exchange response: {}",
-        response_body));
+    handleOAuthFailure(
+        is_request_dispatched,
+        "No default or explicit access token expiration found in the token exchange response",
+        fmt::format("response body: {}", response_body));
     return;
   }
 
@@ -228,17 +307,27 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
 
 void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
                                  Http::AsyncClient::FailureReason) {
-  ENVOY_STREAM_LOG(debug, "OAuth request failed.", *decoder_callbacks_);
+  // If not yet dispatched, onFailure was called synchronously during decodeHeaders rather than in
+  // an async token request. Set state_ for the caller to check instead of calling continueDecoding.
+  const bool is_request_dispatched = (in_flight_request_ != nullptr);
   in_flight_request_ = nullptr;
+
+  if (parent_ == nullptr) {
+    state_ = OAuthState::Idle;
+    return;
+  }
+
+  ENVOY_STREAM_LOG(debug, "OAuth request failed.", *decoder_callbacks_);
   const OAuthState oldState = state_;
   state_ = OAuthState::Idle;
 
   switch (oldState) {
   case OAuthState::PendingAccessToken:
-    parent_->sendUnauthorizedResponse("Failed to get access token due to HTTP request failure");
+    handleOAuthFailure(is_request_dispatched,
+                       "Failed to get access token due to HTTP request failure");
     break;
   case OAuthState::PendingAccessTokenByRefreshToken:
-    parent_->onRefreshAccessTokenFailure();
+    handleRefreshTokenFailure(is_request_dispatched);
     break;
   default:
     PANIC("Malformed oauth client state");

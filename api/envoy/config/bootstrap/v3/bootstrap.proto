@@ -42,7 +42,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 43]
+// [#next-free-field: 44]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -433,6 +433,17 @@ message Bootstrap {
   // Optional configuration for memory allocation manager.
   // Memory releasing is only supported for `tcmalloc allocator <https://github.com/google/tcmalloc>`_.
   MemoryAllocatorManager memory_allocator_manager = 41;
+
+  // When enabled, Envoy pins each worker thread to a distinct CPU from the process affinity mask,
+  // worker ``i`` to the ``i-th`` CPU in ascending order. This improves CPU cache and ``NUMA``
+  // locality for high concurrency deployments on bare metal. It is available on Linux only and is
+  // ignored on other platforms. Pinning requires a worker count no greater than the number of CPUs
+  // in the process affinity mask. When the worker count exceeds the available CPUs no worker is
+  // pinned. Pinning is applied once when the workers start, so a later change to the process
+  // affinity mask does not re-pin.
+  //
+  // Defaults to ``false``.
+  bool enable_worker_cpu_affinity = 43;
 }
 
 // Administration interface :ref:`operations documentation
@@ -812,4 +823,32 @@ message MemoryAllocatorManager {
   //
   // Defaults to ``104857600`` (100 MB).
   uint64 max_unfreed_memory_bytes = 5;
+}
+
+// A placeholder proto so that users can explicitly configure the standard
+// Listener Manager via the bootstrap's :ref:`listener_manager <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.listener_manager>`.
+// [#not-implemented-hide:]
+message ListenerManager {
+}
+
+// A placeholder proto so that users can explicitly configure the standard
+// Validation Listener Manager via the bootstrap's :ref:`listener_manager <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.listener_manager>`.
+// [#not-implemented-hide:]
+message ValidationListenerManager {
+}
+
+// A placeholder proto so that users can explicitly configure the API
+// Listener Manager via the bootstrap's :ref:`listener_manager <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.listener_manager>`.
+// [#not-implemented-hide:]
+message ApiListenerManager {
+  enum ThreadingModel {
+    // Handle HTTP requests on the main Envoy thread which also processes platform-raised events and runs xDS clients.
+    MAIN_THREAD_ONLY = 0;
+
+    // Handle HTTP requests on a standalone worker thread.
+    STANDALONE_WORKER_THREAD = 1;
+  }
+
+  // Default to MainThreadOnly.
+  ThreadingModel threading_model = 1;
 }

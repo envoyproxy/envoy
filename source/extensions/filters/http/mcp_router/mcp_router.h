@@ -14,6 +14,7 @@
 #include "source/extensions/filters/http/mcp_router/session_codec.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/status/statusor.h"
 
 namespace Envoy {
@@ -41,6 +42,8 @@ enum class McpMethod {
   NotificationInitialized,
   NotificationCancelled,
   NotificationRootsListChanged,
+  // Client response to a server-to-client request (elicitation, sampling, roots).
+  ServerResponse,
 };
 
 McpMethod parseMethodString(absl::string_view method_str);
@@ -85,6 +88,7 @@ private:
   std::pair<std::string, std::string> parseToolName(const std::string& prefixed_name);
   std::pair<std::string, std::string> parseResourceUri(const std::string& uri);
   std::pair<std::string, std::string> parsePromptName(const std::string& prefixed_name);
+  std::pair<std::string, std::string> parseServerResponseId(const std::string& prefixed_id);
 
   // Rewrites the tool name in the buffer. Returns the size delta (new_size - old_size).
   ssize_t rewriteToolCallBody(Buffer::Instance& buffer);
@@ -94,6 +98,8 @@ private:
   ssize_t rewritePromptsGetBody(Buffer::Instance& buffer);
   // Rewrites the completion ref (prompt name or resource URI) in the buffer.
   ssize_t rewriteCompletionCompleteBody(Buffer::Instance& buffer);
+  // Rewrites the server response ID (strips backend prefix) in the buffer.
+  ssize_t rewriteServerResponseId(Buffer::Instance& buffer);
   // Helper to replace content at a position in the buffer, and return the delta.
   ssize_t rewriteAtPosition(Buffer::Instance& buffer, ssize_t pos, const std::string& search_str,
                             const std::string& replacement);
@@ -120,6 +126,7 @@ private:
   // Completion & logging.
   void handleCompletionComplete();
   void handleLoggingSetLevel();
+  void handleServerResponse();
 
   // Response aggregation.
   std::string aggregateInitialize(const std::vector<BackendResponse>& responses);
@@ -134,8 +141,9 @@ private:
   // Extracts JSON-RPC payload from a response, handling SSE event wrapping.
   std::string extractJsonRpcFromResponse(const BackendResponse& response);
 
-  // Initialize fanout connections to all backends.
-  void initializeFanout(AggregationCallback callback);
+  // Initialize fanout connections to all backends (or a subset if target_backends is provided).
+  void initializeFanout(AggregationCallback callback,
+                        const std::vector<std::string>& target_backends = {});
   // Initialize single backend connection.
   void initializeSingleBackend(const McpBackendConfig& backend,
                                std::function<void(BackendResponse)> callback);
@@ -143,6 +151,14 @@ private:
   void initializeSingleBackend(const McpBackendConfig& backend,
                                std::function<void(BackendResponse)> callback,
                                bool streaming_enabled);
+
+  // Lazy initialization helpers.
+  void lazyInitSingleBackend(const McpBackendConfig& backend,
+                             std::function<void(bool)> on_init_complete);
+  void lazyInitFanout(std::function<void(bool)> on_init_complete);
+  std::string buildSyntheticInitBody();
+  void resetStreamState();
+  void updateEncodedSessionId();
 
   // Stream data to established connection(s).
   void streamData(Buffer::Instance& data, bool end_stream);
@@ -153,6 +169,8 @@ private:
   void sendHttpError(uint64_t status_code, const std::string& message);
   Http::RequestHeaderMapPtr createUpstreamHeaders(const McpBackendConfig& backend,
                                                   const std::string& backend_session_id = "");
+  absl::StatusOr<envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig>
+  getClusterConfig();
 
   McpRouterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
@@ -169,6 +187,8 @@ private:
   std::string prompt_name_;          // Original prefixed prompt name (e.g., "time__greeting")
   std::string unprefixed_prompt_name_; // Unprefixed prompt name for backend (e.g., "greeting")
   std::string completion_ref_type_;    // Completion reference type: "ref/prompt" or "ref/resource"
+  std::string server_response_id_;     // Prefixed ID from client response (e.g., "time__42")
+  std::string original_response_id_;   // Original ID after stripping prefix (e.g., "42")
   bool needs_body_rewrite_{false};     // Whether tool/prompt name or URI rewriting is needed
 
   std::string route_name_{"default"};
@@ -195,6 +215,11 @@ private:
   bool initialized_{false};
   // Track if SSE headers were sent (for aggregation with SSE backends)
   bool sse_headers_sent_{false};
+
+  // Lazy initialization state.
+  bool lazy_init_pending_{false};
+  absl::flat_hash_set<std::string> initialized_backends_;
+  Buffer::OwnedImpl lazy_init_request_body_;
 };
 
 } // namespace McpRouter

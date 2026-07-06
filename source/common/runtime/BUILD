@@ -91,7 +91,7 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:api_version_lib",
-        "//source/common/config:subscription_base_interface",
+        "//source/common/config:resource_type_helper_lib",
         "//source/common/filesystem:directory_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:utility_lib",

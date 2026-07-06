@@ -24,7 +24,7 @@
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -97,7 +97,7 @@ protected:
       auto* to_add = added_resources.Add();
       to_add->set_name(config.name());
       to_add->set_version(version);
-      to_add->mutable_resource()->PackFrom(config);
+      std::ignore = to_add->mutable_resource()->PackFrom(config);
     }
     return added_resources;
   }

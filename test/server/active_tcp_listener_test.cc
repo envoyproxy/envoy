@@ -653,7 +653,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   EXPECT_CALL(balancer1, registerHandler(_));
   EXPECT_CALL(balancer1, unregisterHandler(_));
 
-  const absl::optional<std::string> netns = "/var/run/netns";
+  const std::optional<std::string> netns = "/var/run/netns";
   Network::Address::InstanceConstSharedPtr normal_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 10001, nullptr, netns));
   EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(normal_address));
@@ -701,9 +701,11 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
 
   // 1. Listener1 re-balance. Set the balance target to the the active listener itself.
   EXPECT_CALL(balancer1, pickTargetHandler(_))
-      .WillOnce(testing::DoAll(
-          testing::WithArg<0>(Invoke([](auto& target) { target.incNumConnections(); })),
-          ReturnRef(*active_listener1)));
+      .WillOnce(testing::DoAll(testing::WithArg<0>(Invoke([](auto& target) {
+                                 target.preIncNumConnections();
+                                 target.postIncNumConnections();
+                               })),
+                               ReturnRef(*active_listener1)));
 
   EXPECT_CALL(listener_config1, filterChainFactory())
       .WillRepeatedly(ReturnRef(filter_chain_factory_));
@@ -732,9 +734,11 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
 
   // 3. Listener2 re-balance. Set the balance target to the the active listener itself.
   EXPECT_CALL(balancer2, pickTargetHandler(_))
-      .WillOnce(testing::DoAll(
-          testing::WithArg<0>(Invoke([](auto& target) { target.incNumConnections(); })),
-          ReturnRef(*active_listener2)));
+      .WillOnce(testing::DoAll(testing::WithArg<0>(Invoke([](auto& target) {
+                                 target.preIncNumConnections();
+                                 target.postIncNumConnections();
+                               })),
+                               ReturnRef(*active_listener2)));
 
   EXPECT_CALL(listener_config2, filterChainFactory())
       .WillRepeatedly(ReturnRef(filter_chain_factory_));
@@ -810,9 +814,11 @@ TEST_F(ActiveTcpListenerTest, SkipRedirection) {
 
   // 1. Listener1 re-balance. Set the balance target to the the active listener itself.
   EXPECT_CALL(balancer1, pickTargetHandler(_))
-      .WillOnce(testing::DoAll(
-          testing::WithArg<0>(Invoke([](auto& target) { target.incNumConnections(); })),
-          ReturnRef(*active_listener1)));
+      .WillOnce(testing::DoAll(testing::WithArg<0>(Invoke([](auto& target) {
+                                 target.preIncNumConnections();
+                                 target.postIncNumConnections();
+                               })),
+                               ReturnRef(*active_listener1)));
 
   EXPECT_CALL(listener_config1, filterChainFactory())
       .WillRepeatedly(ReturnRef(filter_chain_factory_));
@@ -901,7 +907,8 @@ TEST_F(ActiveTcpListenerTest, Rebalance) {
   // active_listener1 re-balance. Set the balance target to the the active_listener2.
   EXPECT_CALL(balancer1, pickTargetHandler(_))
       .WillOnce(testing::DoAll(testing::WithArg<0>(Invoke([&active_listener2](auto&) {
-                                 active_listener2->incNumConnections();
+                                 active_listener2->preIncNumConnections();
+                                 active_listener2->postIncNumConnections();
                                })),
                                ReturnRef(*active_listener2)));
 

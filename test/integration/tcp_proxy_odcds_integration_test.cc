@@ -16,6 +16,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -42,8 +44,9 @@ public:
           *static_resources->mutable_clusters(0)->mutable_typed_extension_protocol_options();
       envoy::extensions::upstreams::http::v3::HttpProtocolOptions h2_options;
       h2_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
-      cluster_protocol_options["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"].PackFrom(
-          h2_options);
+      std::ignore =
+          cluster_protocol_options["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+              .PackFrom(h2_options);
 
       // Add on demand config to tcp_proxy config.
       ASSERT(static_resources->listeners_size() == 1);
@@ -69,7 +72,7 @@ public:
       )EOF"));
       tcp_proxy_config.mutable_on_demand()->mutable_timeout()->set_seconds(
           std::chrono::duration_cast<std::chrono::seconds>(odcds_timeout_).count());
-      config_blob->PackFrom(tcp_proxy_config);
+      std::ignore = config_blob->PackFrom(tcp_proxy_config);
     });
 
     // The first upstream serves the ADS request including the future on demand CDS request.
@@ -138,7 +141,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, SingleTcpClient) {
   result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
   RELEASE_ASSERT(result, result.message());
   odcds_stream_->startGrpcStream();
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt", 1);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.on_demand_cluster_attempt", Eq(1));
   // Verify the on-demand CDS request and respond with the prepared `new_cluster`.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {},
                                            odcds_stream_.get()));
@@ -188,8 +191,8 @@ TEST_P(TcpProxyOdcdsIntegrationTest, RepeatedRequest) {
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {},
                                            odcds_stream_.get()));
 
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt",
-                                 expected_upstream_connections);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.on_demand_cluster_attempt",
+                               Eq(expected_upstream_connections));
 
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TestTypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_.get());
@@ -304,7 +307,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownAllConnectionsOnClusterLookupTimeou
 
   // TODO: assert there is no more on-demand cds request since the first cluster is in flight.
   IntegrationTcpClientPtr tcp_client_2 = makeTcpConnection(lookupPort("tcp_proxy"));
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt", 2);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.on_demand_cluster_attempt", Eq(2));
 
   tcp_client_1->waitForHalfClose(true);
   tcp_client_2->waitForHalfClose(true);
@@ -349,8 +352,9 @@ public:
           *static_resources->mutable_clusters(0)->mutable_typed_extension_protocol_options();
       envoy::extensions::upstreams::http::v3::HttpProtocolOptions h2_options;
       h2_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
-      cluster_protocol_options["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"].PackFrom(
-          h2_options);
+      std::ignore =
+          cluster_protocol_options["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+              .PackFrom(h2_options);
 
       // Configure ADS.
       auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
@@ -380,7 +384,7 @@ public:
         tcp_proxy_config1.mutable_on_demand()->mutable_odcds_config()->mutable_ads();
         tcp_proxy_config1.mutable_on_demand()->mutable_timeout()->set_seconds(
             std::chrono::duration_cast<std::chrono::seconds>(odcds_timeout_).count());
-        tcp_proxy1->mutable_typed_config()->PackFrom(tcp_proxy_config1);
+        std::ignore = tcp_proxy1->mutable_typed_config()->PackFrom(tcp_proxy_config1);
 
         // Configure l2 to point to new_cluster2.
         auto* tcp_proxy2 = l2->mutable_filter_chains(0)->mutable_filters(0);
@@ -391,7 +395,7 @@ public:
         tcp_proxy_config2.mutable_on_demand()->mutable_odcds_config()->mutable_ads();
         tcp_proxy_config2.mutable_on_demand()->mutable_timeout()->set_seconds(
             std::chrono::duration_cast<std::chrono::seconds>(odcds_timeout_).count());
-        tcp_proxy2->mutable_typed_config()->PackFrom(tcp_proxy_config2);
+        std::ignore = tcp_proxy2->mutable_typed_config()->PackFrom(tcp_proxy_config2);
       } else {
         auto* config_blob =
             listener->mutable_filter_chains(0)->mutable_filters(0)->mutable_typed_config();
@@ -404,7 +408,7 @@ public:
         tcp_proxy_config.mutable_on_demand()->mutable_odcds_config()->mutable_ads();
         tcp_proxy_config.mutable_on_demand()->mutable_timeout()->set_seconds(
             std::chrono::duration_cast<std::chrono::seconds>(odcds_timeout_).count());
-        config_blob->PackFrom(tcp_proxy_config);
+        std::ignore = config_blob->PackFrom(tcp_proxy_config);
       }
     });
 
@@ -453,7 +457,7 @@ TEST_P(TcpProxyOdcdsAdsIntegrationTest, NoCdsConfigOnDemandDiscoveryBasic) {
   // Establish a tcp request to the Envoy.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
 
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt", 1);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.on_demand_cluster_attempt", Eq(1));
   // Verify the on-demand CDS request and respond with the prepared `new_cluster`.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {},
                                            odcds_stream_.get()));
@@ -496,7 +500,7 @@ TEST_P(TcpProxyOdcdsAdsIntegrationTest, NoCdsConfigOnDemandDiscoveryTwoRequests)
   RELEASE_ASSERT(result, result.message());
   odcds_stream_->startGrpcStream();
 
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt", 2);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.on_demand_cluster_attempt", Eq(2));
 
   // Verify the on-demand CDS request for "new_cluster".
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {},
@@ -547,7 +551,7 @@ TEST_P(TcpProxyOdcdsAdsIntegrationTest, NoCdsConfigOnDemandDiscoveryTwoListeners
   // Establish tcp request to first listener (cluster1).
   tcp_clients_.push_back(makeTcpConnection(lookupPort("tcp_proxy")));
 
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt", 1);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.on_demand_cluster_attempt", Eq(1));
 
   // Expect the ADS server to receive the request, but don't send the response yet.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster1"}, {},
@@ -556,7 +560,7 @@ TEST_P(TcpProxyOdcdsAdsIntegrationTest, NoCdsConfigOnDemandDiscoveryTwoListeners
   // Establish tcp request to second listener (cluster2).
   tcp_clients_.push_back(makeTcpConnection(lookupPort("tcp_proxy_2")));
 
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt", 2);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.on_demand_cluster_attempt", Eq(2));
 
   // Expect the ADS server to receive the request for new_cluster2.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster2"}, {},
@@ -588,7 +592,7 @@ TEST_P(TcpProxyOdcdsAdsIntegrationTest, NoCdsConfigOnDemandDiscoveryTwoListeners
   tcp_clients_[0]->close();
   tcp_clients_[1]->close();
 
-  test_server_->waitForCounterGe("tcp.tcpproxy_stats.on_demand_cluster_success", 2);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.on_demand_cluster_success", Ge(2));
 }
 
 } // namespace

@@ -484,8 +484,8 @@ TEST(HashTest, AnyWithKnownTypeMatch) {
   deterministichashtest::AnyContainer a1, a2;
   deterministichashtest::Recursion value;
   value.set_index(1);
-  a1.mutable_any()->PackFrom(value);
-  a2.mutable_any()->PackFrom(value);
+  std::ignore = a1.mutable_any()->PackFrom(value);
+  std::ignore = a2.mutable_any()->PackFrom(value);
   EXPECT_EQ(hash(a1), hash(a2));
 }
 
@@ -493,9 +493,9 @@ TEST(HashTest, AnyWithKnownTypeMismatch) {
   deterministichashtest::AnyContainer a1, a2;
   deterministichashtest::Recursion value;
   value.set_index(1);
-  a1.mutable_any()->PackFrom(value);
+  std::ignore = a1.mutable_any()->PackFrom(value);
   value.set_index(2);
-  a2.mutable_any()->PackFrom(value);
+  std::ignore = a2.mutable_any()->PackFrom(value);
   EXPECT_NE(hash(a1), hash(a2));
 }
 
@@ -503,8 +503,8 @@ TEST(HashTest, ValidateRepeatedAnyMismatchingType) {
   deterministichashtest::AnyContainer a1, a2;
   deterministichashtest::Recursion value;
   value.set_index(1);
-  a1.mutable_any()->PackFrom(value);
-  a2.mutable_any()->PackFrom(value);
+  std::ignore = a1.mutable_any()->PackFrom(value);
+  std::ignore = a2.mutable_any()->PackFrom(value);
   // Set a2 Any to a mismatching invalid type.
   a2.mutable_any()->set_type_url("RawMessage");
   EXPECT_NE(hash(a1), hash(a2));

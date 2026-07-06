@@ -59,6 +59,13 @@ public:
     EXPECT_CALL(decoder_callbacks_, decodingBuffer()).Times(AtLeast(0));
     EXPECT_CALL(decoder_callbacks_, route()).Times(AtLeast(0));
 
+    // Route both the filter-config-level and route-level VM-count gauge lookups at the same
+    // underlying store so `lua.lua_vm_count` is a single, consistent stat in tests, matching
+    // production where both sides read the same server root scope.
+    ON_CALL(api_, rootScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
+    ON_CALL(server_factory_context_.api_, rootScope())
+        .WillByDefault(ReturnRef(*stats_store_.rootScope()));
+
     EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
         .Times(AtLeast(0))
         .WillRepeatedly(Invoke([this](Buffer::Instance& data, bool) {
@@ -89,7 +96,8 @@ public:
       const envoy::extensions::filters::http::lua::v3::LuaPerRoute& per_route_proto_config) {
     // Setup filter config for Lua filter.
     config_ = std::make_shared<FilterConfig>(proto_config, tls_, cluster_manager_, api_,
-                                             *stats_store_.rootScope(), "test.");
+                                             *stats_store_.rootScope(), "test.",
+                                             server_factory_context_.options().concurrency());
     // Setup per route config for Lua filter.
     per_route_config_ =
         std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
@@ -152,6 +160,9 @@ public:
     EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
   }
 
+  // stats_store_ must be declared before config_ so that the sub-scope held by
+  // FilterConfig (lua_stats_scope_) is destroyed before the store itself.
+  Stats::TestUtil::TestStore stats_store_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Api::MockApi> api_;
@@ -167,7 +178,6 @@ public:
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
   Tracing::MockSpan child_span_;
-  Stats::TestUtil::TestStore stats_store_;
 
   const std::string HEADER_ONLY_SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -293,7 +303,7 @@ TEST(LuaHttpFilterConfigTest, BadCode) {
   proto_config.mutable_default_source_code()->set_inline_string(SCRIPT);
 
   EXPECT_THROW_WITH_MESSAGE(
-      FilterConfig(proto_config, tls, cluster_manager, api, *stats_store.rootScope(), "lua"),
+      FilterConfig(proto_config, tls, cluster_manager, api, *stats_store.rootScope(), "lua", 1),
       Filters::Common::Lua::LuaException,
       "script load error: [string \"...\"]:3: '=' expected near '<eof>'");
 }
@@ -1085,9 +1095,14 @@ TEST_F(LuaHttpFilterTest, HttpCallMultiSliceBody) {
   Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
   // Add body in multiple parts to create multiple buffer slices.
-  response_message->body().add("first");
-  response_message->body().add("second");
-  response_message->body().add("third");
+
+  auto& response_body = static_cast<Buffer::OwnedImpl&>(response_message->body());
+  response_body.appendSliceForTest("first");
+  response_body.appendSliceForTest("second");
+  response_body.appendSliceForTest("third");
+
+  ASSERT_EQ(3, response_message->body().getRawSlices().size());
+
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
                                  {"trace", "16"},
@@ -1993,11 +2008,11 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
         .WillOnce(Invoke([&immediate_response_headers](
                              Http::Code code, absl::string_view body,
                              std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                             const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                             const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                              absl::string_view details) {
           EXPECT_EQ(Http::Code::ServiceUnavailable, code);
           EXPECT_EQ("nope", body);
-          EXPECT_EQ(grpc_status, absl::nullopt);
+          EXPECT_EQ(grpc_status, std::nullopt);
           EXPECT_EQ(details, "lua_response");
           modify_headers(immediate_response_headers);
         }));
@@ -2042,11 +2057,11 @@ TEST_F(LuaHttpFilterTest, ImmediateResponseWithSendLocalReply) {
       .WillOnce(Invoke([&immediate_response_headers](
                            Http::Code code, absl::string_view body,
                            std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                           const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                            absl::string_view details) {
         EXPECT_EQ(Http::Code::ServiceUnavailable, code);
         EXPECT_EQ("nope", body);
-        EXPECT_EQ(grpc_status, absl::nullopt);
+        EXPECT_EQ(grpc_status, std::nullopt);
         EXPECT_EQ(details, "lua_response");
         modify_headers(immediate_response_headers);
       }));
@@ -2487,7 +2502,7 @@ TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadata) {
   typed_meta_value->mutable_struct_value()->MergeFrom(typed_metadata_struct);
 
   Protobuf::Any typed_config;
-  typed_config.PackFrom(main_struct);
+  std::ignore = typed_config.PackFrom(main_struct);
 
   // Add the typed metadata to the stream info
   stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
@@ -2570,7 +2585,7 @@ TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadataComplex) {
   addresses_value->mutable_list_value()->MergeFrom(addresses);
 
   Protobuf::Any typed_config;
-  typed_config.PackFrom(main_struct);
+  std::ignore = typed_config.PackFrom(main_struct);
 
   // Add the typed metadata to the stream info
   stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
@@ -3638,6 +3653,11 @@ TEST_F(LuaHttpFilterTest, Stats) {
   InSequence s;
   setup(REQUEST_RESPONSE_RUNTIME_ERROR_SCRIPT);
 
+  // One PerLuaCodeSetup accounts for (concurrency + 1) VMs: one per worker thread plus main.
+  const uint32_t expected_vm_count = server_factory_context_.options().concurrency() + 1;
+  EXPECT_EQ(expected_vm_count,
+            stats_store_.gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
+
   // Request error
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_LOG_CONTAINS("error", "[string \"...\"]:3: attempt to index global 'hello' (a nil value)",
@@ -3691,6 +3711,90 @@ TEST_F(LuaHttpFilterTest, StatsWithPerFilterPrefix) {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   });
   EXPECT_EQ(2, stats_store_.counter("test.lua.my_script.errors").value());
+}
+
+// The lua_vm_count gauge is updated once per PerLuaCodeSetup with (concurrency + 1), not per
+// worker thread, so its value does not depend on how many threads the mock TLS dispatches to.
+TEST_F(LuaHttpFilterTest, LuaVmCountGaugeInlineCode) {
+  setup(HEADER_ONLY_SCRIPT);
+  // One default_source_code PerLuaCodeSetup.
+  const uint32_t expected_vm_count = server_factory_context_.options().concurrency() + 1;
+  EXPECT_EQ(expected_vm_count,
+            stats_store_.gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
+}
+
+TEST_F(LuaHttpFilterTest, LuaVmCountGaugeWithSourceCodes) {
+  const std::string SCRIPT_A{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("x-script", "a")
+    end
+  )EOF"};
+  const std::string SCRIPT_B{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("x-script", "b")
+    end
+  )EOF"};
+
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.mutable_default_source_code()->set_inline_string(HEADER_ONLY_SCRIPT);
+  envoy::config::core::v3::DataSource src_a, src_b;
+  src_a.set_inline_string(SCRIPT_A);
+  src_b.set_inline_string(SCRIPT_B);
+  proto_config.mutable_source_codes()->insert({"a.lua", src_a});
+  proto_config.mutable_source_codes()->insert({"b.lua", src_b});
+
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+  setupConfig(proto_config, per_route_proto_config);
+  setupFilter();
+
+  // 1 default + 2 source_codes = 3 PerLuaCodeSetups, each contributing (concurrency + 1) VMs.
+  const uint32_t per_setup_vm_count = server_factory_context_.options().concurrency() + 1;
+  EXPECT_EQ(3 * per_setup_vm_count,
+            stats_store_.gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
+}
+
+TEST_F(LuaHttpFilterTest, LuaVmCountGaugeDecrementOnDestroy) {
+  // Use the normal single-script setup so the fixture destructor is satisfied.
+  setup(HEADER_ONLY_SCRIPT);
+  const uint32_t per_setup_vm_count = server_factory_context_.options().concurrency() + 1;
+  EXPECT_EQ(per_setup_vm_count,
+            stats_store_.gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
+
+  // Create a second FilterConfig in a local scope. Both read/write the same server-root-scope
+  // gauge, so its VM contributes to the same total.
+  {
+    envoy::extensions::filters::http::lua::v3::Lua extra_proto;
+    envoy::config::core::v3::DataSource src;
+    src.set_inline_string(HEADER_ONLY_SCRIPT);
+    extra_proto.mutable_source_codes()->insert({"extra.lua", src});
+    auto extra_config = std::make_shared<FilterConfig>(
+        extra_proto, tls_, cluster_manager_, api_, *stats_store_.rootScope(), "test.",
+        server_factory_context_.options().concurrency());
+    EXPECT_EQ(2 * per_setup_vm_count,
+              stats_store_.gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
+    // extra_config destroyed at end of scope → its PerLuaCodeSetup destructor fires.
+  }
+  EXPECT_EQ(per_setup_vm_count,
+            stats_store_.gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
+}
+
+TEST_F(LuaHttpFilterTest, LuaVmCountGaugeSharedBetweenRouteAndFilterConfig) {
+  // Both FilterConfig and FilterConfigPerRoute build their VM-count gauge directly from the
+  // server root scope using the exact same stat name ("lua.lua_vm_count"), so route-level and
+  // filter-config-level VMs are tracked in the exact same gauge, not separate ones.
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.mutable_default_source_code()->set_inline_string(HEADER_ONLY_SCRIPT);
+
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+  per_route_proto_config.mutable_source_code()->set_inline_string(HEADER_ONLY_SCRIPT);
+
+  setupConfig(proto_config, per_route_proto_config);
+  setupFilter();
+
+  // 1 filter-level PerLuaCodeSetup + 1 route-level PerLuaCodeSetup, same gauge.
+  const uint32_t per_setup_vm_count = server_factory_context_.options().concurrency() + 1;
+  EXPECT_EQ(2 * per_setup_vm_count,
+            stats_store_.gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 // Test clear route cache.
@@ -3900,7 +4004,7 @@ TEST_F(LuaHttpFilterTest, GetStreamInfoTypedMetadata) {
   // Pack the Struct into an Any
   Protobuf::Any typed_config;
   typed_config.set_type_url("type.googleapis.com/google.protobuf.Struct");
-  typed_config.PackFrom(main_struct);
+  std::ignore = typed_config.PackFrom(main_struct);
 
   stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
       {"envoy.filters.http.set_metadata", typed_config});
@@ -3982,7 +4086,7 @@ TEST_F(LuaHttpFilterTest, GetStreamInfoComplexTypedMetadata) {
   // Pack the Struct into an Any
   Protobuf::Any typed_config;
   typed_config.set_type_url("type.googleapis.com/google.protobuf.Struct");
-  typed_config.PackFrom(main_struct);
+  std::ignore = typed_config.PackFrom(main_struct);
 
   stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
       {"envoy.filters.http.complex_metadata", typed_config});
@@ -4497,6 +4601,74 @@ TEST_F(LuaHttpFilterTest, GetRouteFromHandleNoRoute) {
 
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
   EXPECT_EQ(2, stats_store_.counter("test.lua.executions").value());
+}
+
+// Test stats() API from Lua script.
+TEST_F(LuaHttpFilterTest, StatsApi) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local stats = request_handle:stats()
+
+      -- Test counter.
+      local counter = stats:counter("my_counter")
+      counter:inc()
+      counter:add(5)
+
+      -- Test gauge.
+      local gauge = stats:gauge("my_gauge")
+      gauge:set(100)
+      gauge:inc()
+      gauge:dec()
+      gauge:add(10)
+      gauge:sub(5)
+
+      -- Test histogram.
+      local histogram = stats:histogram("my_histogram", "ms")
+      histogram:recordValue(42)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  // Verify stats were created with the correct prefix.
+  EXPECT_EQ(6, stats_store_.counter("test.lua.my_counter").value());
+
+  auto gauge = stats_store_.findGaugeByString("test.lua.my_gauge");
+  ASSERT_TRUE(gauge.has_value());
+  EXPECT_EQ(105, gauge->get().value());
+
+  auto histogram = stats_store_.findHistogramByString("test.lua.my_histogram");
+  ASSERT_TRUE(histogram.has_value());
+  EXPECT_EQ(Stats::Histogram::Unit::Milliseconds, histogram->get().unit());
+}
+
+// Test stats() API with custom stat_prefix.
+TEST_F(LuaHttpFilterTest, StatsApiWithPrefix) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local stats = request_handle:stats()
+      local counter = stats:counter("requests")
+      counter:inc()
+    end
+  )EOF"};
+
+  InSequence s;
+  envoy::extensions::filters::http::lua::v3::Lua lua_config;
+  lua_config.mutable_default_source_code()->set_inline_string(SCRIPT);
+  lua_config.set_stat_prefix("custom_prefix");
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_config;
+  setupConfig(lua_config, per_route_config);
+  setupFilter();
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  // Verify the counter was created with the custom prefix.
+  EXPECT_EQ(1, stats_store_.counter("test.lua.custom_prefix.requests").value());
 }
 
 } // namespace

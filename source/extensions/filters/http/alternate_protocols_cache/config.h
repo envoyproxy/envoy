@@ -27,7 +27,7 @@ private:
           proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&
           proto_config,
       const std::string& stats_prefix,

@@ -24,6 +24,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -367,7 +368,7 @@ TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddressGetifaddrsFailure) {
 TEST(NetworkUtility, GetOriginalDst) {
   testing::NiceMock<Network::MockConnectionSocket> socket;
 #ifdef SOL_IP
-  EXPECT_CALL(socket, ipVersion()).WillOnce(testing::Return(absl::nullopt));
+  EXPECT_CALL(socket, ipVersion()).WillOnce(testing::Return(std::nullopt));
 #endif
   EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
 
@@ -391,6 +392,15 @@ TEST(NetworkUtility, GetOriginalDst) {
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))
       .WillOnce(DoAll(SetArg2Sockaddr(storage), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_EQ("12.34.56.78:9527", Utility::getOriginalDst(socket)->asString());
+
+  // Invalid family returned by SO_ORIGINAL_DST should cause addressFromSockAddr to fail and
+  // getOriginalDst to return nullptr
+  sin.sin_family = AF_UNSPEC;
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))
+      .WillOnce(DoAll(SetArg2Sockaddr(storage), Return(Api::SysCallIntResult{0, 0})));
+  EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
+
+  sin.sin_family = AF_INET;
 #ifndef WIN32
   // Transparent socket gets original dst from local address while connection tracking disabled
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))

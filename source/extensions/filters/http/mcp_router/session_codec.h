@@ -30,7 +30,7 @@ public:
     std::string subject;
     absl::flat_hash_map<std::string, std::string> backend_sessions;
   };
-  static absl::StatusOr<ParsedSession> parseCompositeSessionId(const std::string& composite);
+  static absl::StatusOr<ParsedSession> parseCompositeSessionId(absl::string_view composite);
 };
 
 } // namespace McpRouter

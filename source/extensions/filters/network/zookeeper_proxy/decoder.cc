@@ -42,26 +42,26 @@ const char* createFlagsToString(CreateFlags flags) {
   return "unknown";
 }
 
-absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnData(Buffer::Instance& data,
-                                                                  uint64_t& offset) {
+absl::StatusOr<std::optional<OpCodes>> DecoderImpl::decodeOnData(Buffer::Instance& data,
+                                                                 uint64_t& offset) {
   ENVOY_LOG(trace, "zookeeper_proxy: decoding request with {} bytes at offset {}", data.length(),
             offset);
 
   // Check message length.
   const absl::StatusOr<int32_t> len = helper_.peekInt32(data, offset);
   EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
-      len, absl::nullopt, fmt::format("peekInt32 for len: {}", len.status().message()));
+      len, std::nullopt, fmt::format("peekInt32 for len: {}", len.status().message()));
 
   ENVOY_LOG(trace, "zookeeper_proxy: decoding request with len {} at offset {}", len.value(),
             offset);
 
   absl::Status status = ensureMinLength(len.value(), XID_LENGTH + INT_LENGTH); // xid + opcode
   EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
-      status, absl::nullopt, fmt::format("ensureMinLength: {}", status.message()));
+      status, std::nullopt, fmt::format("ensureMinLength: {}", status.message()));
 
   status = ensureMaxLength(len.value());
   EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
-      status, absl::nullopt, fmt::format("ensureMaxLength: {}", status.message()));
+      status, std::nullopt, fmt::format("ensureMaxLength: {}", status.message()));
 
   auto start_time = time_source_.monotonicTime();
 
@@ -77,7 +77,7 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnData(Buffer::Instan
   //       as a regular data request, so we support that as well.
   const absl::StatusOr<int32_t> xid = helper_.peekInt32(data, offset);
   EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
-      xid, absl::nullopt, fmt::format("peerInt32 for xid: {}", xid.status().message()));
+      xid, std::nullopt, fmt::format("peerInt32 for xid: {}", xid.status().message()));
 
   ENVOY_LOG(trace, "zookeeper_proxy: decoding request with xid {} at offset {}", xid.value(),
             offset);
@@ -124,7 +124,7 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnData(Buffer::Instan
   // the session alive.
   const absl::StatusOr<int32_t> oc = helper_.peekInt32(data, offset);
   EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
-      oc, absl::nullopt, fmt::format("peekInt32 for opcode: {}", oc.status().message()));
+      oc, std::nullopt, fmt::format("peekInt32 for opcode: {}", oc.status().message()));
 
   ENVOY_LOG(trace, "zookeeper_proxy: decoding request with opcode {} at offset {}", oc.value(),
             offset);
@@ -244,8 +244,8 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnData(Buffer::Instan
   default:
     ENVOY_LOG(debug, "zookeeper_proxy: decodeOnData failed: unknown opcode {}",
               enumToSignedInt(opcode));
-    callbacks_.onDecodeError(absl::nullopt);
-    return absl::nullopt;
+    callbacks_.onDecodeError(std::nullopt);
+    return std::nullopt;
   }
 
   requests_by_xid_[xid.value()] = {opcode, std::move(start_time)};
@@ -253,15 +253,15 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnData(Buffer::Instan
   return opcode;
 }
 
-absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnWrite(Buffer::Instance& data,
-                                                                   uint64_t& offset) {
+absl::StatusOr<std::optional<OpCodes>> DecoderImpl::decodeOnWrite(Buffer::Instance& data,
+                                                                  uint64_t& offset) {
   ENVOY_LOG(trace, "zookeeper_proxy: decoding response with {} bytes at offset {}", data.length(),
             offset);
 
   // Check message length.
   const absl::StatusOr<int32_t> len = helper_.peekInt32(data, offset);
   EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
-      len, absl::nullopt, fmt::format("peekInt32 for len: {}", len.status().message()));
+      len, std::nullopt, fmt::format("peekInt32 for len: {}", len.status().message()));
 
   ENVOY_LOG(trace, "zookeeper_proxy: decoding response with len.value() {} at offset {}",
             len.value(), offset);
@@ -269,15 +269,15 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnWrite(Buffer::Insta
   absl::Status status =
       ensureMinLength(len.value(), XID_LENGTH + ZXID_LENGTH + INT_LENGTH); // xid + zxid + err
   EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
-      status, absl::nullopt, fmt::format("ensureMinLength: {}", status.message()));
+      status, std::nullopt, fmt::format("ensureMinLength: {}", status.message()));
 
   status = ensureMaxLength(len.value());
   EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
-      status, absl::nullopt, fmt::format("ensureMaxLength: {}", status.message()));
+      status, std::nullopt, fmt::format("ensureMaxLength: {}", status.message()));
 
   const absl::StatusOr<int32_t> xid = helper_.peekInt32(data, offset);
   EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
-      xid, absl::nullopt, fmt::format("peekInt32 for xid: {}", xid.status().message()));
+      xid, std::nullopt, fmt::format("peekInt32 for xid: {}", xid.status().message()));
 
   ENVOY_LOG(trace, "zookeeper_proxy: decoding response with xid {} at offset {}", xid.value(),
             offset);
@@ -347,7 +347,7 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnWrite(Buffer::Insta
     RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status,
                                             fmt::format("parseWatchEvent: {}", status.message()));
 
-    return absl::nullopt; // WATCH_XID is generated by the server, it has no corresponding opcode.
+    return std::nullopt; // WATCH_XID is generated by the server, it has no corresponding opcode.
   default:
     break;
   }
@@ -685,7 +685,7 @@ absl::Status DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& of
       EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, op);
       break;
     default:
-      callbacks_.onDecodeError(absl::nullopt);
+      callbacks_.onDecodeError(std::nullopt);
       return absl::InvalidArgumentError(
           fmt::format("unknown opcode within a transaction: {}", opcode.value()));
     }
@@ -911,15 +911,15 @@ absl::Status DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeTy
       // Peek packet length.
       len = helper_.peekInt32(data, offset);
       EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
-          len, absl::nullopt, fmt::format("peekInt32 for len: {}", len.status().message()));
+          len, std::nullopt, fmt::format("peekInt32 for len: {}", len.status().message()));
 
       status = ensureMinLength(len.value(), dtype == DecodeType::READ
                                                 ? XID_LENGTH + INT_LENGTH
                                                 : XID_LENGTH + ZXID_LENGTH + INT_LENGTH);
-      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, absl::nullopt);
+      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, std::nullopt);
 
       status = ensureMaxLength(len.value());
-      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, absl::nullopt);
+      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, std::nullopt);
 
       offset += len.value();
       if (offset <= data_len) {
@@ -928,7 +928,7 @@ absl::Status DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeTy
     }
     END_TRY catch (const EnvoyException& e) {
       IS_ENVOY_BUG(fmt::format("zookeeper_proxy: decodeAndBufferHelper failed: {}", e.what()));
-      callbacks_.onDecodeError(absl::nullopt);
+      callbacks_.onDecodeError(std::nullopt);
       return absl::OkStatus();
     }
   }
@@ -978,7 +978,7 @@ void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype, uint64_t full
       helper_.reset();
 
       const uint64_t current = offset;
-      absl::StatusOr<absl::optional<OpCodes>> opcode;
+      absl::StatusOr<std::optional<OpCodes>> opcode;
       switch (dtype) {
       case DecodeType::READ:
         opcode = decodeOnData(data, offset);
@@ -1001,7 +1001,7 @@ void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype, uint64_t full
   }
   END_TRY catch (const EnvoyException& e) {
     IS_ENVOY_BUG(fmt::format("zookeeper_proxy: decode failed: {}", e.what()));
-    callbacks_.onDecodeError(absl::nullopt);
+    callbacks_.onDecodeError(std::nullopt);
   }
 }
 
@@ -1034,18 +1034,18 @@ absl::Status DecoderImpl::parseWatchEvent(Buffer::Instance& data, uint64_t& offs
                                           const uint32_t len, const int64_t zxid,
                                           const int32_t error) {
   absl::Status status = ensureMinLength(len, SERVER_HEADER_LENGTH + (3 * INT_LENGTH));
-  EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, absl::nullopt);
+  EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, std::nullopt);
 
   const absl::StatusOr<int32_t> event_type = helper_.peekInt32(data, offset);
-  EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(event_type, absl::nullopt,
+  EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(event_type, std::nullopt,
                                                                event_type.status().message());
 
   const absl::StatusOr<int32_t> client_state = helper_.peekInt32(data, offset);
-  EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(client_state, absl::nullopt,
+  EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(client_state, std::nullopt,
                                                                client_state.status().message());
 
   const absl::StatusOr<std::string> path = helper_.peekString(data, offset);
-  EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, absl::nullopt,
+  EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, std::nullopt,
                                                                path.status().message());
 
   callbacks_.onWatchEvent(event_type.value(), client_state.value(), path.value(), zxid, error);

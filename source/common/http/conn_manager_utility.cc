@@ -94,12 +94,12 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action,
-    Server::OverloadManager& overload_manager) {
+    Server::OverloadManager& overload_manager, Runtime::Loader& runtime) {
   if (determineNextProtocol(connection, data) == Utility::AlpnNames::get().Http2) {
     Http2::CodecStats& stats = Http2::CodecStats::atomicGet(http2_codec_stats, scope);
     return std::make_unique<Http2::ServerConnectionImpl>(
         connection, callbacks, stats, random, http2_options, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action, overload_manager);
+        max_request_headers_count, headers_with_underscores_action, overload_manager, runtime);
   } else {
     Http1::CodecStats& stats = Http1::CodecStats::atomicGet(http1_codec_stats, scope);
     return std::make_unique<Http1::ServerConnectionImpl>(
@@ -323,7 +323,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   }
   mutateXfccRequestHeader(request_headers, stream_info, connection, config);
 
-  return {final_remote_address, absl::nullopt};
+  return {final_remote_address, std::nullopt};
 }
 
 void ConnectionManagerUtility::sanitizeTEHeader(RequestHeaderMap& request_headers) {
@@ -717,7 +717,14 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
   }
   if (clear_hop_by_hop) {
     response_headers.removeTransferEncoding();
-    response_headers.removeKeepAlive();
+    // Only preserve Keep-Alive for HTTP/1.x downstream connections when the feature is enabled.
+    // Keep-Alive is an HTTP/1.1 hop-by-hop header with no meaning in HTTP/2 or HTTP/3.
+    const auto protocol = stream_info.protocol();
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.preserve_downstream_keepalive") ||
+        !protocol.has_value() || *protocol >= Protocol::Http2) {
+      response_headers.removeKeepAlive();
+    }
     response_headers.removeProxyConnection();
   }
 
@@ -740,7 +747,7 @@ void ConnectionManagerUtility::setProxyStatusHeader(ResponseHeaderMap& response_
     // Writing the Proxy-Status header is gated on the existence of
     // |proxy_status_config|. The |details| field and other internals are generated in
     // fromStreamInfo().
-    if (absl::optional<StreamInfo::ProxyStatusError> proxy_status =
+    if (std::optional<StreamInfo::ProxyStatusError> proxy_status =
             StreamInfo::ProxyStatusUtils::fromStreamInfo(stream_info);
         proxy_status.has_value()) {
       response_headers.appendProxyStatus(
@@ -749,7 +756,7 @@ void ConnectionManagerUtility::setProxyStatusHeader(ResponseHeaderMap& response_
           ", ");
       // Apply the recommended response code, if configured and applicable.
       if (proxy_status_config->set_recommended_response_code()) {
-        if (absl::optional<Http::Code> response_code =
+        if (std::optional<Http::Code> response_code =
                 StreamInfo::ProxyStatusUtils::recommendedHttpStatusCode(*proxy_status);
             response_code.has_value()) {
           response_headers.setStatus(std::to_string(enumToInt(*response_code)));
@@ -811,18 +818,18 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
   return final_action;
 }
 
-absl::optional<uint32_t>
+std::optional<uint32_t>
 ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_headers,
                                              const ConnectionManagerConfig& config, uint32_t port) {
   if (config.shouldStripTrailingHostDot()) {
     HeaderUtility::stripTrailingHostDot(request_headers);
   }
   if (config.stripPortType() == Http::StripPortType::Any) {
-    return HeaderUtility::stripPortFromHost(request_headers, absl::nullopt);
+    return HeaderUtility::stripPortFromHost(request_headers, std::nullopt);
   } else if (config.stripPortType() == Http::StripPortType::MatchingHost) {
     return HeaderUtility::stripPortFromHost(request_headers, port);
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 } // namespace Http

@@ -32,7 +32,7 @@ struct LookupResult {
   std::unique_ptr<Http::ResponseHeaderMap> response_headers_;
   std::unique_ptr<Http::ResponseTrailerMap> response_trailers_;
   ResponseMetadata response_metadata_;
-  absl::optional<uint64_t> body_length_;
+  std::optional<uint64_t> body_length_;
   bool populated() const { return body_length_.has_value(); }
 };
 

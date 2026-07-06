@@ -128,9 +128,19 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(2UL, store_->gauges().size());
 
   StatNameManagedStorage nonexistent_name("nonexistent", store_->symbolTable());
-  EXPECT_EQ(scope_->findCounter(nonexistent_name.statName()), absl::nullopt);
-  EXPECT_EQ(scope_->findGauge(nonexistent_name.statName()), absl::nullopt);
-  EXPECT_EQ(scope_->findHistogram(nonexistent_name.statName()), absl::nullopt);
+  EXPECT_EQ(scope_->findCounter(nonexistent_name.statName()), std::nullopt);
+  EXPECT_EQ(scope_->findGauge(nonexistent_name.statName()), std::nullopt);
+  EXPECT_EQ(scope_->findHistogram(nonexistent_name.statName()), std::nullopt);
+}
+
+TEST_F(StatsIsolatedStoreImplTest, CleanupCallback) {
+  bool called = false;
+  {
+    IsolatedStoreImpl local_store(symbol_table_);
+    ScopeSharedPtr scope1 = local_store.rootScope()->createScope("scope1.");
+    scope1->setCleanupCallback([&called]() { called = true; });
+  }
+  EXPECT_TRUE(called);
 }
 
 TEST_F(StatsIsolatedStoreImplTest, PrefixIsStatName) {
@@ -138,6 +148,30 @@ TEST_F(StatsIsolatedStoreImplTest, PrefixIsStatName) {
   ScopeSharedPtr scope2 = scope1->scopeFromStatName(makeStatName("scope2"));
   Counter& c1 = scope2->counterFromString("c1");
   EXPECT_EQ("scope1.scope2.c1", c1.name());
+}
+
+// When scopeFromStatName / createScope is called with name_tags but no explicit `tagged_name`, the
+// joiner derives the child's flat prefix by appending the tag name/value pairs to the
+// tag-extracted name. IsolatedScopeImpl does not retain the tags afterwards, so subsequent
+// stats see no propagated tag metadata.
+TEST_F(StatsIsolatedStoreImplTest, ScopeFromTagsWithoutExplicitTaggedName) {
+  StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
+  ScopeSharedPtr cluster_scope =
+      scope_->scopeFromTaggedName(makeStatName("cluster"), StatNameTagSpan(name_tags), StatName());
+  EXPECT_EQ("cluster.cluster_name.foo", symbol_table_.toString(cluster_scope->prefix()));
+
+  Counter& c = cluster_scope->counterFromString("upstream_rq");
+  EXPECT_EQ("cluster.cluster_name.foo.upstream_rq", c.name());
+  EXPECT_EQ("cluster.cluster_name.foo.upstream_rq", c.tagExtractedName());
+  EXPECT_EQ(0, c.tags().size());
+
+  // Same behavior via the string-view createScope path.
+  std::vector<TagStringView> sv_tags{{"cluster_name", "bar"}};
+  ScopeSharedPtr bar_scope =
+      scope_->createScopeWithTaggedName("cluster", sv_tags, /*tagged_name=*/"");
+  EXPECT_EQ("cluster.cluster_name.bar", symbol_table_.toString(bar_scope->prefix()));
+  EXPECT_EQ("cluster.cluster_name.bar.upstream_rq",
+            bar_scope->counterFromString("upstream_rq").name());
 }
 
 TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
@@ -199,17 +233,16 @@ TEST_F(StatsIsolatedStoreImplTest, CounterWithTag) {
   StatNameTagVector tags{{makeStatName("tag1"), makeStatName("tag1Value")}};
   StatNameTagVector tags2{{makeStatName("tag1"), makeStatName("tag1Value2")}};
   StatName base = makeStatName("counter");
-  Counter& c1 = scope_->counterFromStatNameWithTags(base, tags);
-  Counter& c2 = scope_->counterFromStatNameWithTags(base, tags2);
+  Counter& c1 = scope_->counterFromTaggedName(base, StatNameTagSpan(tags), {});
+  Counter& c2 = scope_->counterFromTaggedName(base, StatNameTagSpan(tags2), {});
   EXPECT_EQ("counter.tag1.tag1Value", c1.name());
   EXPECT_EQ("counter", c1.tagExtractedName());
   EXPECT_THAT(c1.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value"}));
   EXPECT_EQ("counter.tag1.tag1Value2", c2.name());
   EXPECT_EQ("counter", c2.tagExtractedName());
   EXPECT_THAT(c2.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value2"}));
-  // Verify that counterFromStatNameWithTags with the same params returns
-  // the existing stat object.
-  EXPECT_EQ(&c1, &scope_->counterFromStatNameWithTags(base, tags));
+  // Verify that counterFromTaggedName with the same params returns the existing stat object.
+  EXPECT_EQ(&c1, &scope_->counterFromTaggedName(base, StatNameTagSpan(tags), {}));
 }
 
 TEST_F(StatsIsolatedStoreImplTest, GaugeWithTags) {
@@ -218,54 +251,54 @@ TEST_F(StatsIsolatedStoreImplTest, GaugeWithTags) {
   // tags2 being a subset of tags to ensure no collision in that case.
   StatNameTagVector tags2{{makeStatName("tag2"), makeStatName("tag2Value")}};
   StatName base = makeStatName("gauge");
-  Gauge& g1 = scope_->gaugeFromStatNameWithTags(base, tags, Gauge::ImportMode::Accumulate);
-  Gauge& g2 = scope_->gaugeFromStatNameWithTags(base, tags2, Gauge::ImportMode::Accumulate);
+  Gauge& g1 =
+      scope_->gaugeFromTaggedName(base, StatNameTagSpan(tags), {}, Gauge::ImportMode::Accumulate);
+  Gauge& g2 =
+      scope_->gaugeFromTaggedName(base, StatNameTagSpan(tags2), {}, Gauge::ImportMode::Accumulate);
   EXPECT_EQ("gauge.tag1.tag1Value.tag2.tag2Value", g1.name());
   EXPECT_EQ("gauge", g1.tagExtractedName());
   EXPECT_THAT(g1.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value"}, Tag{"tag2", "tag2Value"}));
   EXPECT_EQ("gauge.tag2.tag2Value", g2.name());
   EXPECT_EQ("gauge", g2.tagExtractedName());
   EXPECT_THAT(g2.tags(), testing::ElementsAre(Tag{"tag2", "tag2Value"}));
-  // Verify that gaugeFromStatNameWithTags with the same params returns
-  // the existing stat object.
-  EXPECT_EQ(&g1, &scope_->gaugeFromStatNameWithTags(base, tags, Gauge::ImportMode::Accumulate));
+  // Verify that gaugeFromTaggedName with the same params returns the existing stat object.
+  EXPECT_EQ(&g1, &scope_->gaugeFromTaggedName(base, StatNameTagSpan(tags), {},
+                                              Gauge::ImportMode::Accumulate));
 }
 
 TEST_F(StatsIsolatedStoreImplTest, TextReadoutWithTag) {
   StatNameTagVector tags{{makeStatName("tag1"), makeStatName("tag1Value")}};
   StatNameTagVector tags2{{makeStatName("tag1"), makeStatName("tag1Value2")}};
   StatName base = makeStatName("textreadout");
-  TextReadout& b1 = scope_->textReadoutFromStatNameWithTags(base, tags);
-  TextReadout& b2 = scope_->textReadoutFromStatNameWithTags(base, tags2);
+  TextReadout& b1 = scope_->textReadoutFromTaggedName(base, StatNameTagSpan(tags), {});
+  TextReadout& b2 = scope_->textReadoutFromTaggedName(base, StatNameTagSpan(tags2), {});
   EXPECT_EQ("textreadout.tag1.tag1Value", b1.name());
   EXPECT_EQ("textreadout", b1.tagExtractedName());
   EXPECT_THAT(b1.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value"}));
   EXPECT_EQ("textreadout.tag1.tag1Value2", b2.name());
   EXPECT_EQ("textreadout", b2.tagExtractedName());
   EXPECT_THAT(b2.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value2"}));
-  // Verify that textReadoutFromStatNameWithTags with the same params returns
-  // the existing stat object.
-  EXPECT_EQ(&b1, &scope_->textReadoutFromStatNameWithTags(base, tags));
+  // Verify that textReadoutFromTaggedName with the same params returns the existing stat object.
+  EXPECT_EQ(&b1, &scope_->textReadoutFromTaggedName(base, StatNameTagSpan(tags), {}));
 }
 
 TEST_F(StatsIsolatedStoreImplTest, HistogramWithTag) {
   StatNameTagVector tags{{makeStatName("tag1"), makeStatName("tag1Value")}};
   StatNameTagVector tags2{{makeStatName("tag1"), makeStatName("tag1Value2")}};
   StatName base = makeStatName("histogram");
-  Histogram& h1 =
-      scope_->histogramFromStatNameWithTags(base, tags, Stats::Histogram::Unit::Unspecified);
-  Histogram& h2 =
-      scope_->histogramFromStatNameWithTags(base, tags2, Stats::Histogram::Unit::Unspecified);
+  Histogram& h1 = scope_->histogramFromTaggedName(base, StatNameTagSpan(tags), {},
+                                                  Stats::Histogram::Unit::Unspecified);
+  Histogram& h2 = scope_->histogramFromTaggedName(base, StatNameTagSpan(tags2), {},
+                                                  Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ("histogram.tag1.tag1Value", h1.name());
   EXPECT_EQ("histogram", h1.tagExtractedName());
   EXPECT_THAT(h1.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value"}));
   EXPECT_EQ("histogram.tag1.tag1Value2", h2.name());
   EXPECT_EQ("histogram", h2.tagExtractedName());
   EXPECT_THAT(h2.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value2"}));
-  // Verify that histogramFromStatNameWithTags with the same params returns
-  // the existing stat object.
-  EXPECT_EQ(
-      &h1, &scope_->histogramFromStatNameWithTags(base, tags, Stats::Histogram::Unit::Unspecified));
+  // Verify that histogramFromTaggedName with the same params returns the existing stat object.
+  EXPECT_EQ(&h1, &scope_->histogramFromTaggedName(base, StatNameTagSpan(tags), {},
+                                                  Stats::Histogram::Unit::Unspecified));
 }
 
 TEST_F(StatsIsolatedStoreImplTest, ConstSymtabAccessor) {
@@ -323,9 +356,42 @@ TEST_F(StatsIsolatedStoreImplTest, NullImplCoverage) {
   NullCounterImpl& c = store_->nullCounter();
   c.inc();
   EXPECT_EQ(0, c.value());
+  c.add(1);
+  c.reset();
+  EXPECT_EQ(0, c.latch());
+  EXPECT_FALSE(c.used());
+  c.markUnused();
+  EXPECT_FALSE(c.hidden());
+  c.incRefCount();
+  EXPECT_TRUE(c.decRefCount());
+  EXPECT_EQ(0, c.use_count());
+
   NullGaugeImpl& g = store_->nullGauge();
   g.inc();
   EXPECT_EQ(0, g.value());
+  g.add(1);
+  g.dec();
+  g.set(1);
+  g.setParentValue(1);
+  g.sub(0);
+  EXPECT_EQ(Gauge::ImportMode::NeverImport, g.importMode());
+  g.mergeImportMode(Gauge::ImportMode::Accumulate);
+  EXPECT_FALSE(g.used());
+  g.markUnused();
+  EXPECT_FALSE(g.hidden());
+  g.incRefCount();
+  EXPECT_TRUE(g.decRefCount());
+  EXPECT_EQ(0, g.use_count());
+
+  NullTextReadoutImpl& t = store_->nullTextReadout();
+  t.set("foo");
+  EXPECT_EQ("", t.value());
+  EXPECT_FALSE(t.used());
+  t.markUnused();
+  EXPECT_FALSE(t.hidden());
+  t.incRefCount();
+  EXPECT_TRUE(t.decRefCount());
+  EXPECT_EQ(0, t.use_count());
 }
 
 TEST_F(StatsIsolatedStoreImplTest, StatNamesStruct) {
@@ -507,6 +573,113 @@ TEST_F(IsolatedStoreScopeMatcherTest, ChildScopeOverridesMatcher) {
   // "rejected_by_child" prefix IS rejected by the child's own matcher.
   Counter& rejected = child_scope->counterFromString("rejected_by_child.foo");
   EXPECT_EQ("", rejected.name());
+}
+
+// The explicit `tagged_name` controls the flat stat name while name_tags are still recorded;
+// `name` yields the tag-extracted name.
+TEST_F(StatsIsolatedStoreImplTest, CounterNameAndNameTags) {
+  StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
+  Counter& c =
+      scope_->counterFromTaggedName(makeStatName("cluster.upstream_rq"), StatNameTagSpan(name_tags),
+                                    makeStatName("cluster.foo.up"));
+  EXPECT_EQ("cluster.foo.up", c.name());
+  EXPECT_EQ("cluster.upstream_rq", c.tagExtractedName());
+  ASSERT_EQ(1, c.tags().size());
+  EXPECT_EQ("cluster_name", c.tags()[0].name_);
+  EXPECT_EQ("foo", c.tags()[0].value_);
+}
+
+// Without an explicit tagged_name, the name_tags are appended to prefix+tag_extracted_name (legacy
+// convention).
+TEST_F(StatsIsolatedStoreImplTest, CounterTagsAppendedWithoutTaggedName) {
+  StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
+  Counter& c = scope_->counterFromTaggedName(makeStatName("upstream_rq"),
+                                             StatNameTagSpan(name_tags), StatName());
+  EXPECT_EQ("upstream_rq.cluster_name.foo", c.name());
+  EXPECT_EQ("upstream_rq", c.tagExtractedName());
+  ASSERT_EQ(1, c.tags().size());
+}
+
+// IsolatedScopeImpl does not retain scope-level tags. scopeFromStatName uses the joiner to derive
+// the child's flat tagged_name (so the tag value still appears in the tagged_name when the caller
+// asks for it), but the child scope itself carries no tag metadata: subsequent stats see no
+// propagated tag.
+TEST_F(StatsIsolatedStoreImplTest, ScopeTagsAreNotPropagated) {
+  StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
+  ScopeSharedPtr cluster_scope = scope_->scopeFromTaggedName(
+      makeStatName("cluster"), StatNameTagSpan(name_tags), makeStatName("cluster.foo"));
+  EXPECT_EQ("cluster.foo", symbol_table_.toString(cluster_scope->prefix()));
+
+  Counter& c = cluster_scope->counterFromStatName(makeStatName("upstream_rq"));
+  EXPECT_EQ("cluster.foo.upstream_rq", c.name());
+  EXPECT_EQ("cluster.foo.upstream_rq", c.tagExtractedName());
+  EXPECT_EQ(0, c.tags().size());
+
+  // Per-stat name_tags still work: only the metric's own tag is attached.
+  StatNameTagVector own{{makeStatName("method"), makeStatName("get")}};
+  Counter& c2 =
+      cluster_scope->counterFromTaggedName(makeStatName("rq"), StatNameTagSpan(own), StatName());
+  EXPECT_EQ("cluster.foo.rq.method.get", c2.name());
+  EXPECT_EQ("cluster.foo.rq", c2.tagExtractedName());
+  ASSERT_EQ(1, c2.tags().size());
+  EXPECT_EQ("method", c2.tags()[0].name_);
+  EXPECT_EQ("get", c2.tags()[0].value_);
+}
+
+// The legacy createScope/counter APIs still work.
+TEST_F(StatsIsolatedStoreImplTest, LegacyScopeApiStillWorks) {
+  ScopeSharedPtr child = scope_->createScope("a.b");
+  Counter& c = child->counterFromString("c");
+  EXPECT_EQ("a.b.c", c.name());
+  EXPECT_EQ("a.b.c", c.tagExtractedName());
+  EXPECT_EQ(0, c.tags().size());
+}
+
+// The string_view createScope path uses the joiner to derive the child's flat tagged_name but drops
+// the scope-level tags (none propagate to child stats).
+TEST_F(StatsIsolatedStoreImplTest, CreateScopeWithTagStringViewsDropsScopeTags) {
+  std::vector<TagStringView> name_tags{{"cluster_name", "foo"}};
+  ScopeSharedPtr cluster_scope =
+      scope_->createScopeWithTaggedName("cluster", name_tags, "cluster.foo");
+  EXPECT_EQ("cluster.foo", symbol_table_.toString(cluster_scope->prefix()));
+
+  Counter& c = cluster_scope->counterFromString("upstream_rq");
+  EXPECT_EQ("cluster.foo.upstream_rq", c.name());
+  EXPECT_EQ("cluster.foo.upstream_rq", c.tagExtractedName());
+  EXPECT_EQ(0, c.tags().size());
+}
+
+TEST_F(StatsIsolatedStoreImplTest, CreateScopeWithTagStringViewsDropsScopeTags2) {
+  std::vector<TagStringView> name_tags{{"cluster_name", "foo"}};
+  ScopeSharedPtr cluster_scope =
+      scope_->createScopeWithTaggedName("cluster", name_tags, /*tagged_name=*/"");
+  EXPECT_EQ("cluster.cluster_name.foo", symbol_table_.toString(cluster_scope->prefix()));
+
+  Counter& c = cluster_scope->counterFromString("upstream_rq");
+  EXPECT_EQ("cluster.cluster_name.foo.upstream_rq", c.name());
+  EXPECT_EQ("cluster.cluster_name.foo.upstream_rq", c.tagExtractedName());
+  EXPECT_EQ(0, c.tags().size());
+}
+
+// The explicit tagged_name + name_tags combination works for histograms and text readouts too, not
+// just counters/gauges.
+TEST_F(StatsIsolatedStoreImplTest, HistogramAndTextReadoutNameAndNameTags) {
+  StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
+  Histogram& h = scope_->histogramFromTaggedName(
+      makeStatName("cluster.rq_time"), StatNameTagSpan(name_tags),
+      makeStatName("cluster.foo.rq_time"), Histogram::Unit::Unspecified);
+  EXPECT_EQ("cluster.foo.rq_time", h.name());
+  EXPECT_EQ("cluster.rq_time", h.tagExtractedName());
+  ASSERT_EQ(1, h.tags().size());
+  EXPECT_EQ("foo", h.tags()[0].value_);
+
+  TextReadout& t =
+      scope_->textReadoutFromTaggedName(makeStatName("cluster.version"), StatNameTagSpan(name_tags),
+                                        makeStatName("cluster.foo.version"));
+  EXPECT_EQ("cluster.foo.version", t.name());
+  EXPECT_EQ("cluster.version", t.tagExtractedName());
+  ASSERT_EQ(1, t.tags().size());
+  EXPECT_EQ("foo", t.tags()[0].value_);
 }
 
 } // namespace Stats

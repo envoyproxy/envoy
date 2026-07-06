@@ -99,7 +99,7 @@ void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
 }
 
 void DispatcherImpl::initializeStats(Stats::Scope& scope,
-                                     const absl::optional<std::string>& prefix) {
+                                     const std::optional<std::string>& prefix) {
   const std::string effective_prefix = prefix.has_value() ? *prefix : absl::StrCat(name_, ".");
   // This needs to be run in the dispatcher's thread, so that we have a thread id to log.
   post([this, &scope, effective_prefix] {
@@ -386,6 +386,7 @@ void DispatcherImpl::onFatalError(std::ostream& os) const {
   // Dump the state of the tracked objects in the dispatcher if thread safe. This generally
   // results in dumping the active state only for the thread which caused the fatal error.
   if (isThreadSafe()) {
+    // NOLINTNEXTLINE(modernize-loop-convert)
     for (auto iter = tracked_object_stack_.rbegin(); iter != tracked_object_stack_.rend(); ++iter) {
       (*iter)->dumpState(os);
     }

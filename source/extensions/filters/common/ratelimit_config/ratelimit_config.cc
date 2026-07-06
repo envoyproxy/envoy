@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/matcher/matcher.h"
@@ -45,6 +46,7 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
           absl::InvalidArgumentError("hits_addend must contain either a format or a number");
       return;
     }
+    is_negative_hits_ = config.hits_addend().is_negative_hits();
   }
 
   if (config.has_stage() || !config.disable_key().empty()) {
@@ -57,6 +59,18 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
     if (no_limit) {
       creation_status = absl::InvalidArgumentError("'limit' field is not supported");
       return;
+    }
+    switch (config.limit().override_specifier_case()) {
+    case ProtoRateLimit::Override::OverrideSpecifierCase::kDynamicMetadata:
+      limit_override_.emplace(
+          new Envoy::Router::DynamicMetadataRateLimitOverride(config.limit().dynamic_metadata()));
+      break;
+    case ProtoRateLimit::Override::OverrideSpecifierCase::kRateLimit:
+      limit_override_.emplace(
+          new Envoy::Router::StaticRateLimitOverride(config.limit().rate_limit()));
+      break;
+    case ProtoRateLimit::Override::OverrideSpecifierCase::OVERRIDE_SPECIFIER_NOT_SET:
+      PANIC_DUE_TO_CORRUPT_ENUM;
     }
   }
 
@@ -220,6 +234,14 @@ void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
 
   } else if (hits_addend_.has_value()) {
     descriptor.hits_addend_ = hits_addend_.value();
+  }
+
+  // Populate is_negative.
+  descriptor.is_negative_hits_ = is_negative_hits_;
+
+  // Populate the limit override if configured.
+  if (limit_override_) {
+    limit_override_.value()->populateOverride(descriptor, &stream_info.dynamicMetadata());
   }
 
   // Populate enable_x_rate_limit_headers.

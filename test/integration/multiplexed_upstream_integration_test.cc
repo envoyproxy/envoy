@@ -14,6 +14,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 
 class MultiplexedUpstreamIntegrationTest : public HttpProtocolIntegrationTest {
@@ -142,9 +144,11 @@ TEST_P(MultiplexedUpstreamIntegrationTest, TestSchemeAndXFP) {
 
 // Ensure Envoy handles streaming requests and responses simultaneously.
 void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -382,7 +386,9 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DISABLED_ManyLargeSimultaneousRequest
 
   config_helper_.prependFilter(R"EOF(
   name: random-pause-filter
-)EOF");
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.RandomPauseFilterConfig
+  )EOF");
 
   // TODO(kbaichoo): either change the ordering of how the responses wait on end stream or increase
   // the timeout since there will be delays added by the pause filter.
@@ -477,7 +483,11 @@ typed_config:
   // As with ProtocolIntegrationTest.HittingEncoderFilterLimit use a filter
   // which buffers response data but in this case, make sure the sendLocalReply
   // is gRPC.
-  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
+  config_helper_.prependFilter(R"EOF(
+    name: encoder-decoder-buffer-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
+  )EOF");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -591,7 +601,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, NoInitialStreams) {
   initialize();
 
   // Create the client connection and send a request.
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},
@@ -660,9 +670,11 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamFilterSendLocalReply) {
   envoy::config::core::v3::Http2ProtocolOptions config;
   config.mutable_max_concurrent_streams()->set_value(20000);
   mergeOptions(config);
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: local-reply-during-decode
-)EOF"),
+  config_helper_.prependFilter(R"EOF(
+    name: local-reply-during-decode
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringDecodeConfig
+  )EOF",
                                false);
 
   initialize();
@@ -694,7 +706,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamGoaway) {
 
   // Send a goaway from upstream.
   fake_upstream_connection_->encodeGoAway();
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_close_notify", Ge(1));
 
   // A new request should result in a new connection
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -769,10 +781,10 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DefaultAllowsUpstreamSafeRequestsUsin
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
 
   EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Ge(1));
 
   default_request_headers_.addCopy("second_request", "1");
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -802,7 +814,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DisableUpstreamEarlyData) {
                                       ->mutable_early_data_policy();
         envoy::extensions::early_data::v3::DefaultEarlyDataPolicy config;
         early_data_policy->set_name("envoy.route.early_data_policy.default");
-        early_data_policy->mutable_typed_config()->PackFrom(config);
+        std::ignore = early_data_policy->mutable_typed_config()->PackFrom(config);
       });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -817,7 +829,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DisableUpstreamEarlyData) {
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
 
   EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
 
@@ -855,7 +867,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamEarlyDataRejected) {
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
 
   EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
 
@@ -942,7 +954,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamDisconnectDuringEarlyData) {
   envoy::config::listener::v3::QuicProtocolOptions options;
   auto* crypto_stream_config = options.mutable_crypto_stream_config();
   crypto_stream_config->set_name("envoy.quic.crypto_stream.server.fail_handshake");
-  crypto_stream_config->mutable_typed_config()->PackFrom(Protobuf::Struct());
+  std::ignore = crypto_stream_config->mutable_typed_config()->PackFrom(Protobuf::Struct());
   mergeOptions(options);
 
   initialize();
@@ -958,7 +970,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamDisconnectDuringEarlyData) {
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
 
   EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
 
@@ -1002,7 +1014,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DownstreamDisconnectDuringEarlyData) 
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
 
   EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
 
@@ -1017,12 +1029,12 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DownstreamDisconnectDuringEarlyData) 
                                        {"second-request", "1"}});
     // Even though the fake upstream is not responding, the 2 GET requests should still be forwarded
     // as early data.
-    test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 2);
+    test_server_->waitForCounter("cluster.cluster_0.upstream_rq_total", Eq(2));
     EXPECT_EQ(1u,
               test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
     EXPECT_LE(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
     codec_client_->close();
-    test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_tx_reset", 1);
+    test_server_->waitForCounter("cluster.cluster_0.upstream_rq_tx_reset", Eq(1));
   }
   // Release the upstream lock and finish the handshake.
   waitForNextUpstreamConnection(std::vector<uint64_t>{0}, TestUtility::DefaultTimeout,
@@ -1052,7 +1064,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ConnPoolQueuingNonSafeRequest) {
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
 
   EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
 
@@ -1083,7 +1095,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ConnPoolQueuingNonSafeRequest) {
                                        {"forth-request", "1"}});
     // Even though the fake upstream is not responding, the 2 GET requests should still be forwarded
     // as early data.
-    test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 3);
+    test_server_->waitForCounter("cluster.cluster_0.upstream_rq_total", Eq(3));
     EXPECT_EQ(1u,
               test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
     EXPECT_LE(2u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());

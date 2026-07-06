@@ -20,7 +20,6 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/drain_manager.h"
 #include "test/mocks/server/hot_restart.h"
@@ -144,6 +143,7 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Stats::Scope&, scope, ());
   MOCK_METHOD(Stats::Scope&, statsScope, ());
+  MOCK_METHOD(Stats::Scope&, serverScope, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
 
   NiceMock<MockServerFactoryContext> server_context_;

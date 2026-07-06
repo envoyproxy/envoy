@@ -83,6 +83,12 @@ bool DynamicMetadataRateLimitOverride::populateOverride(
   return false;
 }
 
+bool StaticRateLimitOverride::populateOverride(RateLimit::Descriptor& descriptor,
+                                               const envoy::config::core::v3::Metadata*) const {
+  descriptor.limit_.emplace(RateLimit::RateLimitOverride{requests_per_unit_, unit_});
+  return true;
+}
+
 bool SourceClusterAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                                              const std::string& local_service_cluster,
                                              const Http::RequestHeaderMap&,
@@ -212,6 +218,24 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
     metadata_source = route ? &route->metadata() : nullptr;
     break;
   }
+  case envoy::config::route::v3::RateLimit::Action::MetaData::CLUSTER_ENTRY: {
+    OptRef<const Upstream::ClusterInfo> cluster_info = info.upstreamClusterInfo();
+    metadata_source = cluster_info.has_value() ? &cluster_info.ref().metadata() : nullptr;
+    break;
+  }
+  case envoy::config::route::v3::RateLimit::Action::MetaData::CLUSTER_LOCALITY_ENTRY: {
+    const auto upstream_info = info.upstreamInfo();
+    // Upstream host is only available after upstream host selection.
+    // This means that the cluster locality metadata can only be used on the
+    // response path (apply_on_stream_done is set to true) or in a scenario where host selection is
+    // done before the rate limit action is executed.
+    if (upstream_info.has_value() && upstream_info->upstreamHost()) {
+      metadata_source = upstream_info->upstreamHost()->localityMetadata().get();
+    } else {
+      metadata_source = nullptr;
+    }
+    break;
+  }
   }
 
   const std::string metadata_string_value =
@@ -244,7 +268,7 @@ bool QueryParametersAction::populateDescriptor(RateLimit::DescriptorEntry& descr
   Http::Utility::QueryParamsMulti query_parameters =
       Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
 
-  const absl::optional<std::string> query_param_value =
+  const std::optional<std::string> query_param_value =
       query_parameters.getFirstValue(query_param_name_);
 
   // If query parameter is not present and ``skip_if_absent`` is ``true``, skip this descriptor.
@@ -509,6 +533,9 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     case envoy::config::route::v3::RateLimit_Override::OverrideSpecifierCase::kDynamicMetadata:
       limit_override_.emplace(
           new DynamicMetadataRateLimitOverride(config.limit().dynamic_metadata()));
+      break;
+    case envoy::config::route::v3::RateLimit_Override::OverrideSpecifierCase::kRateLimit:
+      limit_override_.emplace(new StaticRateLimitOverride(config.limit().rate_limit()));
       break;
     case envoy::config::route::v3::RateLimit_Override::OverrideSpecifierCase::
         OVERRIDE_SPECIFIER_NOT_SET:

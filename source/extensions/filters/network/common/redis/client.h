@@ -117,7 +117,17 @@ using ClientPtr = std::unique_ptr<Client>;
 /**
  * Read policy to use for Redis cluster.
  */
-enum class ReadPolicy { Primary, PreferPrimary, Replica, PreferReplica, Any };
+enum class ReadPolicy {
+  Primary,
+  PreferPrimary,
+  Replica,
+  PreferReplica,
+  Any,
+  // Zone-aware routing: prefer replicas in same zone, fallback to any replica, then primary
+  LocalZoneAffinity,
+  // Zone-aware routing: prefer replicas in same zone, then primary in same zone, then any
+  LocalZoneAffinityReplicasAndPrimary
+};
 
 /**
  * Configuration for a redis connection pool.
@@ -214,14 +224,14 @@ public:
    * @param aws_iam_authenticator supplies the AWS IAM authenticator created during config
    * @return ClientPtr a new connection pool client.
    */
-  virtual ClientPtr create(
-      Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-      const ConfigSharedPtr& config, const RedisCommandStatsSharedPtr& redis_command_stats,
-      Stats::Scope& scope, const std::string& auth_username, const std::string& auth_password,
-      bool is_transaction_client,
-      absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
-      absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
-          aws_iam_authenticator) PURE;
+  virtual ClientPtr
+  create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+         const ConfigSharedPtr& config, const RedisCommandStatsSharedPtr& redis_command_stats,
+         Stats::Scope& scope, const std::string& auth_username, const std::string& auth_password,
+         bool is_transaction_client,
+         std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+         std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+             aws_iam_authenticator) PURE;
 };
 
 // A MULTI command sent when starting a transaction.

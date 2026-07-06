@@ -45,7 +45,8 @@ using MetadataConstSharedPtr = std::shared_ptr<const envoy::config::core::v3::Me
   COUNTER(rq_timeout)                                                                              \
   COUNTER(rq_total)                                                                                \
   GAUGE(cx_active)                                                                                 \
-  GAUGE(rq_active)
+  GAUGE(rq_active)                                                                                 \
+  GAUGE(rq_pending_active)
 
 /**
  * All per host stats defined. @see stats_macros.h
@@ -100,6 +101,11 @@ public:
 class HostLbPolicyData {
 public:
   virtual ~HostLbPolicyData() = default;
+
+  /**
+   * @return true if this host data wants router ORCA callbacks.
+   */
+  virtual bool receivesOrcaLoadReport() const PURE;
 
   /**
    * Invoked when a new orca report is received for this upstream host to
@@ -203,6 +209,15 @@ public:
   virtual const std::string& hostname() const PURE;
 
   /**
+   * @return the observability name associated with the host. Used in per-endpoint stats and other
+   * observability surfaces. This is configured with
+   * :ref:`stat_name <envoy_v3_api_field_config.endpoint.v3.Endpoint.stat_name>`. If this method
+   * returns an empty string view, then the host's address should be used as fallback for the
+   * observability name.
+   */
+  virtual absl::string_view observabilityName() const PURE;
+
+  /**
    * @return the transport socket factory responsible for this host.
    */
   virtual Network::UpstreamTransportSocketFactory& transportSocketFactory() const PURE;
@@ -259,6 +274,12 @@ public:
   virtual Network::Address::InstanceConstSharedPtr healthCheckAddress() const PURE;
 
   /**
+   * @return the address used to dial ORCA out-of-band load reporting streams
+   *         (xds.service.orca.v3.OpenRcaService).
+   */
+  virtual Network::Address::InstanceConstSharedPtr orcaReportingAddress() const PURE;
+
+  /**
    * @return the priority of the host.
    */
   virtual uint32_t priority() const PURE;
@@ -272,7 +293,7 @@ public:
    * @return timestamp of when host has transitioned from unhealthy to
    *         healthy state via an active healthchecking.
    */
-  virtual absl::optional<MonotonicTime> lastHcPassTime() const PURE;
+  virtual std::optional<MonotonicTime> lastHcPassTime() const PURE;
 
   /**
    * Set the timestamp of when the host has transitioned from unhealthy to healthy state via an
@@ -294,27 +315,39 @@ public:
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options = nullptr) const PURE;
 
   /**
-   * Set load balancing policy related data to the host.
+   * Add load balancing policy related data to the host.
    * NOTE: this method should only be called at main thread before the host is used
    * across worker threads.
    */
-  virtual void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) PURE;
+  virtual void addLbPolicyData(HostLbPolicyDataPtr lb_policy_data) PURE;
 
   /**
-   * Get the load balancing policy related data of the host.
-   * @return the optional reference to the load balancing policy related data of the host.
+   * @return the number of load balancing policy data entries on the host.
+   */
+  virtual size_t lbPolicyDataCount() const PURE;
+
+  /**
+   * Get a load balancing policy related data entry by index.
+   * @return the optional reference to the indexed load balancing policy related data.
    * Non-const reference is returned to allow the caller to modify the data if needed.
    * NOTE: the update to the data may be done at multiple threads concurrently and the caller
    * should ensure the thread safety of the data.
    */
-  virtual OptRef<HostLbPolicyData> lbPolicyData() const PURE;
+  virtual OptRef<HostLbPolicyData> lbPolicyDataAt(size_t index) const PURE;
 
   /**
    * Get the typed load balancing policy related data of the host.
    * @return the optional reference to the typed load balancing policy related data of the host.
    */
   template <class HostLbPolicyDataType> OptRef<HostLbPolicyDataType> typedLbPolicyData() const {
-    return makeOptRefFromPtr(dynamic_cast<HostLbPolicyDataType*>(lbPolicyData().ptr()));
+    for (size_t i = 0; i < lbPolicyDataCount(); ++i) {
+      auto data = lbPolicyDataAt(i);
+      if (auto* typed_data = dynamic_cast<HostLbPolicyDataType*>(data.ptr());
+          typed_data != nullptr) {
+        return makeOptRefFromPtr(typed_data);
+      }
+    }
+    return {};
   }
 };
 

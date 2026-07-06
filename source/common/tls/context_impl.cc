@@ -26,6 +26,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
+#include "source/common/tls/aws_lc_compat.h"
 #include "source/common/tls/cert_compression.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/stats.h"
@@ -324,14 +325,13 @@ ContextImpl::ContextImpl(
       }
 
       if (additional_init != nullptr) {
-        absl::Status init_status = additional_init(ctx, tls_certificate);
-        SET_AND_RETURN_IF_NOT_OK(creation_status, init_status);
+        SET_AND_RETURN_IF_NOT_OK(additional_init(ctx, tls_certificate), creation_status);
       }
     }
   }
 
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols(), creation_status);
-  SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
+  RETURN_ONLY_IF_NOT_OK_REF(creation_status);
 
   // Register stat names based on lists reported by BoringSSL.
   std::vector<const char*> list(SSL_get_all_cipher_names(nullptr, 0));
@@ -516,7 +516,7 @@ ValidationResults ContextImpl::customVerifyCertChain(
     stats_.fail_verify_error_.inc();
     ENVOY_LOG(debug, "verify cert failed: no cert chain");
     return {ValidationResults::ValidationStatus::Failed, Ssl::ClientValidationStatus::NotValidated,
-            SSL_AD_INTERNAL_ERROR, absl::nullopt};
+            SSL_AD_INTERNAL_ERROR, std::nullopt};
   }
   ASSERT(cert_validator_);
   const char* host_name = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
@@ -571,13 +571,6 @@ void ContextImpl::logHandshake(SSL* ssl) const {
   if (!cert.get()) {
     stats_.no_certificate_.inc();
   }
-
-  // Increment the `was_key_usage_invalid_` stats to indicate the given cert would have triggered an
-  // error but is allowed because the enforcement that rsa key usage and tls usage need to be
-  // matched has been disabled.
-  if (SSL_was_key_usage_invalid(ssl)) {
-    stats_.was_key_usage_invalid_.inc();
-  }
 }
 
 std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMethodProviders() {
@@ -593,24 +586,24 @@ std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMe
   return providers;
 }
 
-absl::optional<uint32_t> ContextImpl::daysUntilFirstCertExpires() const {
-  absl::optional<uint32_t> daysUntilExpiration = cert_validator_->daysUntilFirstCertExpires();
+std::optional<uint32_t> ContextImpl::daysUntilFirstCertExpires() const {
+  std::optional<uint32_t> daysUntilExpiration = cert_validator_->daysUntilFirstCertExpires();
   if (!daysUntilExpiration.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   for (auto& ctx : tls_contexts_) {
-    const absl::optional<uint32_t> tmp =
+    const std::optional<uint32_t> tmp =
         Utility::getDaysUntilExpiration(ctx.cert_chain_.get(), factory_context_.timeSource());
     if (!tmp.has_value()) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     daysUntilExpiration = std::min<uint32_t>(tmp.value(), daysUntilExpiration.value());
   }
   return daysUntilExpiration;
 }
 
-absl::optional<uint64_t> ContextImpl::secondsUntilFirstOcspResponseExpires() const {
-  absl::optional<uint64_t> secs_until_expiration;
+std::optional<uint64_t> ContextImpl::secondsUntilFirstOcspResponseExpires() const {
+  std::optional<uint64_t> secs_until_expiration;
   for (auto& ctx : tls_contexts_) {
     if (ctx.ocsp_response_) {
       uint64_t next_expiration = ctx.ocsp_response_->secondsUntilExpiration();
@@ -675,7 +668,7 @@ ValidationResults ContextImpl::customVerifyCertChainForQuic(
   if (SSL_CTX_get_verify_mode(ssl_ctx) == SSL_VERIFY_NONE) {
     // Skip validation if the TLS is configured SSL_VERIFY_NONE.
     return {ValidationResults::ValidationStatus::Successful,
-            Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt, absl::nullopt};
+            Envoy::Ssl::ClientValidationStatus::NotValidated, std::nullopt, std::nullopt};
   }
   ValidationResults result =
       cert_validator_->doVerifyCertChain(cert_chain, std::move(callback), transport_socket_options,

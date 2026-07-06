@@ -77,9 +77,9 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   for (auto& cluster : unique_clusters) {
 
     // Create the AWS IAM authenticator if required
-    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+    std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator;
-    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config;
+    std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config;
     auto cluster_optref = server_context.clusterManager().clusters().getCluster(cluster);
     if (cluster_optref.has_value()) {
       // Does our cluster have an AwsIam element available? If so, create a new authenticator for
@@ -102,11 +102,14 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
     Stats::ScopeSharedPtr stats_scope =
         context.scope().createScope(fmt::format("cluster.{}.redis_cluster", cluster));
+    // Get zone from LocalInfo for fallback when client_zone not explicitly configured
+    const std::string& local_zone = server_context.localInfo().zoneName();
     auto conn_pool_ptr = std::make_shared<ConnPool::InstanceImpl>(
         cluster, server_context.clusterManager(),
         Common::Redis::Client::ClientFactoryImpl::instance_, server_context.threadLocal(),
         proto_config.settings(), server_context.api(), std::move(stats_scope), redis_command_stats,
-        refresh_manager, filter_config->dns_cache_, aws_iam_config, aws_iam_authenticator);
+        refresh_manager, filter_config->dns_cache_, aws_iam_config, aws_iam_authenticator,
+        local_zone);
     conn_pool_ptr->init();
     upstreams.emplace(cluster, conn_pool_ptr);
   }

@@ -1,6 +1,6 @@
 # SSL library configuration
 
-Envoy uses [BoringSSL](https://github.com/google/boringssl) as its default SSL library.
+Envoy uses [BoringSSL](https://github.com/google/boringssl) as its default SSL library. [OpenSSL](https://github.com/openssl/openssl) is also supported by the build system as an alternative SSL library.
 
 For FIPS-compliant builds, Envoy supports both BoringSSL-FIPS and [AWS-LC](https://github.com/aws/aws-lc) FIPS,
 which provides FIPS support for the aarch64 and ppc64le architectures.
@@ -33,7 +33,7 @@ not be changed on the release branch unless a bug or security vulnerability whic
 bazel build --config=boringssl-fips //source/exe:envoy-static
 ```
 
-- **Supported architectures:** Linux x86_64 only
+- **Supported architectures:** Linux x86_64, aarch64
 - **Version string:** `BoringSSL-FIPS` (visible in `envoy --version`)
 
 ### AWS-LC FIPS
@@ -45,6 +45,26 @@ bazel build --config=aws-lc-fips //source/exe:envoy-static
 - **Supported architectures:** Linux x86_64, aarch64, ppc64le
 - **Version string:** `AWS-LC-FIPS` (visible in `envoy --version`)
 - **Note:** HTTP/3 (QUIC) is disabled for AWS-LC builds
+
+## OpenSSL
+
+BoringSSL is the supported and default SSL implementation in Envoy. OpenSSL is offered as an alternative.
+
+Differently from the other SSL implementations supported by Envoy, OpenSSL libraries are not statically linked into the Envoy binary. OpenSSL libraries (version 3.5 or higher) must be present at runtime. The current OpenSSL implementation will load them dynamically with `dlopen()`.
+
+FIPS mode in OpenSSL is enforced at runtime - not build time - through OpenSSL and/or operating system configuration.
+
+In order to build Envoy using OpenSSL instead of BoringSSL, run:
+
+```bash
+bazel build --config=openssl //source/exe:envoy-static
+```
+
+- **Supported architectures:** Linux x86_64, aarch64, ppc64le
+- **Version string:** `OpenSSL` (visible in `envoy --version`)
+- **Note:** HTTP/3 (QUIC) is disabled for OpenSSL builds
+
+**NOTE: Envoy builds with OpenSSL are not currently covered by [Envoy Security Policy](../SECURITY.md)**.
 
 ## Migration from `--define boringssl=fips`
 
@@ -74,6 +94,8 @@ envoy --version
 ```
 
 Look for:
+
 - `BoringSSL-FIPS` — BoringSSL FIPS build
 - `AWS-LC-FIPS` — AWS-LC FIPS build
 - `BoringSSL` — Standard (non-FIPS) build
+- `OpenSSL` — OpenSSL build

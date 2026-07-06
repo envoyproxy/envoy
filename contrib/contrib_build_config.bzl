@@ -32,6 +32,7 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
     "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
     "envoy.filters.network.metadata_exchange":                  "//contrib/istio/filters/network/metadata_exchange/source:config",
+    "envoy.filters.network.peer_metadata":                      "//contrib/istio/filters/network/peer_metadata/source:config",
 
     #
     # Listener filters
@@ -51,6 +52,7 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.stat_sinks.kafka":                            "//contrib/kafka/stat_sinks/source:config_lib",
+    "envoy.stat_sinks.wasm_filter":                      "//contrib/stat_sinks/wasm_filter/source:config_lib",
 
     #
     # Tap sinks
@@ -82,7 +84,11 @@ CONTRIB_EXTENSIONS = {
     # Connection Balance extensions
     #
 
-    "envoy.network.connection_balance.dlb":                     "//contrib/dlb/source:connection_balancer",
+    # Disabled: upstream Intel mirror (downloadmirror.intel.com) returns HTTP
+    # 202 Accepted instead of 200 OK, breaking @dlb external_http_archive
+    # fetches and aborting //contrib/exe:envoy-static. See
+    # https://github.com/envoyproxy/envoy/issues/45491
+    # "envoy.network.connection_balance.dlb":                     "//contrib/dlb/source:connection_balancer",
 
     #
     # Regex engines
@@ -117,4 +123,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.upstreams.http.tcp.golang":                          "//contrib/golang/upstreams/http/tcp/source:config",
+
+    #
+    # Reverse tunnel reporters
+    #
+
+    "envoy.bootstrap.reverse_tunnel.reverse_tunnel_reporting_service": "//contrib/reverse_tunnel_reporter/source:config",
 }

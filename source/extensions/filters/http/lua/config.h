@@ -25,7 +25,7 @@ private:
       const std::string& stats_prefix, DualInfo info,
       Server::Configuration::ServerFactoryContext& context) override;
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
       const std::string& stats_prefix,
       Server::Configuration::ServerFactoryContext& context) override;

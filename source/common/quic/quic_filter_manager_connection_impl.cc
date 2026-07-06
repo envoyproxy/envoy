@@ -235,19 +235,15 @@ void QuicFilterManagerConnectionImpl::closeConnectionImmediately() {
 
 void QuicFilterManagerConnectionImpl::onSendBufferHighWatermark() {
   ENVOY_CONN_LOG(trace, "onSendBufferHighWatermark", *this);
-  for (auto callback : callbacks_) {
-    callback->onAboveWriteBufferHighWatermark();
-  }
+  onFilterAboveHighWatermark();
 }
 
 void QuicFilterManagerConnectionImpl::onSendBufferLowWatermark() {
   ENVOY_CONN_LOG(trace, "onSendBufferLowWatermark", *this);
-  for (auto callback : callbacks_) {
-    callback->onBelowWriteBufferLowWatermark();
-  }
+  onFilterBelowLowWatermark();
 }
 
-absl::optional<std::chrono::milliseconds>
+std::optional<std::chrono::milliseconds>
 QuicFilterManagerConnectionImpl::lastRoundTripTime() const {
   if (quicConnection() == nullptr) {
     return {};
@@ -275,7 +271,7 @@ void QuicFilterManagerConnectionImpl::configureInitialCongestionWindow(
   }
 }
 
-absl::optional<uint64_t> QuicFilterManagerConnectionImpl::congestionWindowInBytes() const {
+std::optional<uint64_t> QuicFilterManagerConnectionImpl::congestionWindowInBytes() const {
   if (quicConnection() == nullptr) {
     return {};
   }
@@ -291,7 +287,7 @@ absl::optional<uint64_t> QuicFilterManagerConnectionImpl::congestionWindowInByte
 void QuicFilterManagerConnectionImpl::maybeHandleCloseDuringInitialize() {
   if (close_type_during_initialize_.has_value()) {
     close(close_type_during_initialize_.value());
-    close_type_during_initialize_ = absl::nullopt;
+    close_type_during_initialize_ = std::nullopt;
   }
 }
 

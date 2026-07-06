@@ -28,8 +28,7 @@ public:
     EXPECT_EQ(key, factory->name());
     auto object = factory->createFromBytes(value);
     ASSERT_NE(nullptr, object);
-    filter_state_.setData(key, std::move(object), StreamInfo::FilterState::StateType::ReadOnly,
-                          StreamInfo::FilterState::LifeSpan::FilterChain);
+    filter_state_.setData(key, std::move(object), StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 
 protected:
@@ -38,17 +37,17 @@ protected:
 
 TEST_F(TransportSocketOptionsImplTest, Nullptr) {
   EXPECT_EQ(nullptr, TransportSocketOptionsUtility::fromFilterState(filter_state_));
-  filter_state_.setData(
-      "random_key_has_no_effect", std::make_unique<UpstreamServerName>("www.example.com"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state_.setData("random_key_has_no_effect",
+                        std::make_unique<UpstreamServerName>("www.example.com"),
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_EQ(nullptr, TransportSocketOptionsUtility::fromFilterState(filter_state_));
 }
 
 TEST_F(TransportSocketOptionsImplTest, SharedFilterState) {
-  filter_state_.setData(
-      "random_key_has_effect", std::make_unique<UpstreamServerName>("www.example.com"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain,
-      StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  filter_state_.setData("random_key_has_effect",
+                        std::make_unique<UpstreamServerName>("www.example.com"),
+                        StreamInfo::FilterState::LifeSpan::FilterChain,
+                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
   auto objects = transport_socket_options->downstreamSharedFilterStateObjects();
   EXPECT_EQ(1, objects.size());
@@ -56,19 +55,18 @@ TEST_F(TransportSocketOptionsImplTest, SharedFilterState) {
 }
 
 TEST_F(TransportSocketOptionsImplTest, UpstreamServer) {
-  filter_state_.setData(
-      UpstreamServerName::key(), std::make_unique<UpstreamServerName>("www.example.com"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state_.setData(UpstreamServerName::key(),
+                        std::make_unique<UpstreamServerName>("www.example.com"),
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state_.setData(ProxyProtocolFilterState::key(),
                         std::make_unique<ProxyProtocolFilterState>(Network::ProxyProtocolData{
                             Network::Address::InstanceConstSharedPtr(
                                 new Network::Address::Ipv4Instance("202.168.0.13", 52000)),
                             Network::Address::InstanceConstSharedPtr(
                                 new Network::Address::Ipv4Instance("174.2.2.222", 80))}),
-                        StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
-  EXPECT_EQ(absl::make_optional<std::string>("www.example.com"),
+  EXPECT_EQ(std::make_optional<std::string>("www.example.com"),
             transport_socket_options->serverNameOverride());
   EXPECT_EQ("202.168.0.13:52000",
             transport_socket_options->proxyProtocolOptions()->src_addr_->asStringView());
@@ -78,25 +76,25 @@ TEST_F(TransportSocketOptionsImplTest, UpstreamServer) {
 TEST_F(TransportSocketOptionsImplTest, ApplicationProtocols) {
   std::vector<std::string> http_alpns{Http::Utility::AlpnNames::get().Http2,
                                       Http::Utility::AlpnNames::get().Http11};
-  filter_state_.setData(
-      ApplicationProtocols::key(), std::make_unique<ApplicationProtocols>(http_alpns),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state_.setData(ApplicationProtocols::key(),
+                        std::make_unique<ApplicationProtocols>(http_alpns),
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
-  EXPECT_EQ(absl::nullopt, transport_socket_options->serverNameOverride());
+  EXPECT_EQ(std::nullopt, transport_socket_options->serverNameOverride());
   EXPECT_EQ(http_alpns, transport_socket_options->applicationProtocolListOverride());
 }
 
 TEST_F(TransportSocketOptionsImplTest, Both) {
   std::vector<std::string> http_alpns{Http::Utility::AlpnNames::get().Http2,
                                       Http::Utility::AlpnNames::get().Http11};
-  filter_state_.setData(
-      UpstreamServerName::key(), std::make_unique<UpstreamServerName>("www.example.com"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
-  filter_state_.setData(
-      ApplicationProtocols::key(), std::make_unique<ApplicationProtocols>(http_alpns),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state_.setData(UpstreamServerName::key(),
+                        std::make_unique<UpstreamServerName>("www.example.com"),
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state_.setData(ApplicationProtocols::key(),
+                        std::make_unique<ApplicationProtocols>(http_alpns),
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
-  EXPECT_EQ(absl::make_optional<std::string>("www.example.com"),
+  EXPECT_EQ(std::make_optional<std::string>("www.example.com"),
             transport_socket_options->serverNameOverride());
   EXPECT_EQ(http_alpns, transport_socket_options->applicationProtocolListOverride());
 }
@@ -114,12 +112,11 @@ public:
 
 class NonHashableObj : public StreamInfo::FilterState::Object {};
 class HashableObj : public StreamInfo::FilterState::Object, public Hashable {
-  absl::optional<uint64_t> hash() const override { return 12345; };
+  std::optional<uint64_t> hash() const override { return 12345; };
 };
 
 TEST_F(TransportSocketOptionsImplTest, FilterStateHashable) {
   filter_state_.setData("hashable", std::make_shared<HashableObj>(),
-                        StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain,
                         StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
@@ -131,7 +128,6 @@ TEST_F(TransportSocketOptionsImplTest, FilterStateHashable) {
 
 TEST_F(TransportSocketOptionsImplTest, FilterStateNonHashable) {
   filter_state_.setData("non-hashable", std::make_shared<NonHashableObj>(),
-                        StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain,
                         StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
@@ -146,7 +142,7 @@ TEST_F(TransportSocketOptionsImplTest, DynamicObjects) {
   setFilterStateObject(ApplicationProtocols::key(), "h2,http/1.1");
   setFilterStateObject(UpstreamSubjectAltNames::key(), "www.example.com,example.com");
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
-  EXPECT_EQ(absl::make_optional<std::string>("www.example.com"),
+  EXPECT_EQ(std::make_optional<std::string>("www.example.com"),
             transport_socket_options->serverNameOverride());
   std::vector<std::string> http_alpns{"h2", "http/1.1"};
   EXPECT_EQ(http_alpns, transport_socket_options->applicationProtocolListOverride());
@@ -161,7 +157,7 @@ TEST_F(TransportSocketOptionsImplTest, DownstreamNetworkNamespace) {
   auto network_namespace_obj =
       std::make_unique<DownstreamNetworkNamespace>(network_namespace_filepath);
   EXPECT_EQ(network_namespace_filepath, network_namespace_obj->value());
-  EXPECT_EQ(absl::make_optional<std::string>(network_namespace_filepath),
+  EXPECT_EQ(std::make_optional<std::string>(network_namespace_filepath),
             network_namespace_obj->serializeAsString());
 
   // Test key.
@@ -174,7 +170,6 @@ TEST_F(TransportSocketOptionsImplTest, NetworkNamespaceSharedWithUpstream) {
   // Set network namespace as shared with upstream connection.
   filter_state_.setData(DownstreamNetworkNamespace::key(),
                         std::make_unique<DownstreamNetworkNamespace>(network_namespace_filepath),
-                        StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::Connection,
                         StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
 

@@ -111,7 +111,7 @@ Api::IoCallUint64Result receiveMessage(uint64_t max_rx_datagram_size, Buffer::In
 
 Address::InstanceConstSharedPtr
 Utility::parseInternetAddressNoThrow(const std::string& ip_address, uint16_t port, bool v6only,
-                                     absl::optional<std::string> network_namespace) {
+                                     std::optional<std::string> network_namespace) {
   StatusOr<sockaddr_in> sa4 = IpAddressParsing::parseIPv4(ip_address, port);
   if (sa4.ok()) {
     return instanceOrNull(Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(
@@ -128,7 +128,7 @@ Utility::parseInternetAddressNoThrow(const std::string& ip_address, uint16_t por
 
 Address::InstanceConstSharedPtr
 Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool v6only,
-                                            absl::optional<std::string> network_namespace) {
+                                            std::optional<std::string> network_namespace) {
   if (ip_address.empty()) {
     return nullptr;
   }
@@ -376,7 +376,14 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
     return nullptr;
   }
 
-  return Address::addressFromSockAddrOrDie(orig_addr, 0, -1, true /* default for v6 constructor */);
+  auto address_or_status =
+      Address::addressFromSockAddr(orig_addr, 0, true /* default for v6 constructor */);
+  if (!address_or_status.ok()) {
+    ENVOY_LOG_MISC(debug, "Failed to get address from sockaddr for getOriginalDst: {}",
+                   address_or_status.status().message());
+    return nullptr;
+  }
+  return *address_or_status;
 
 #else
   // TODO(zuercher): determine if connection redirection is possible under macOS (c.f. pfctl and

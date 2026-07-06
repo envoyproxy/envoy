@@ -106,6 +106,7 @@ public:
 
   NullCounterImpl& nullCounter() override { return null_counter_; }
   NullGaugeImpl& nullGauge() override { return null_gauge_; }
+  NullTextReadoutImpl& nullTextReadout() { return null_text_readout_; }
 
   bool iterate(const IterateFn<Counter>& fn) const override {
     return constRootScope()->iterate(fn);
@@ -141,27 +142,23 @@ private:
    */
   template <class Base> class IsolatedStatsCache {
   public:
-    using CounterAllocator = std::function<RefcountPtr<Base>(
-        const TagUtility::TagStatNameJoiner& joiner, StatNameTagVectorOptConstRef tags)>;
-    using GaugeAllocator =
-        std::function<RefcountPtr<Base>(const TagUtility::TagStatNameJoiner& joiner,
-                                        StatNameTagVectorOptConstRef tags, Gauge::ImportMode)>;
-    using HistogramAllocator =
-        std::function<RefcountPtr<Base>(const TagUtility::TagStatNameJoiner& joiner,
-                                        StatNameTagVectorOptConstRef tags, Histogram::Unit)>;
-    using TextReadoutAllocator =
-        std::function<RefcountPtr<Base>(const TagUtility::TagStatNameJoiner& joiner,
-                                        StatNameTagVectorOptConstRef tags, TextReadout::Type)>;
-    using BaseOptConstRef = absl::optional<std::reference_wrapper<const Base>>;
+    using CounterAllocator =
+        std::function<RefcountPtr<Base>(const TagUtility::TagStatNameJoiner& joiner)>;
+    using GaugeAllocator = std::function<RefcountPtr<Base>(
+        const TagUtility::TagStatNameJoiner& joiner, Gauge::ImportMode)>;
+    using HistogramAllocator = std::function<RefcountPtr<Base>(
+        const TagUtility::TagStatNameJoiner& joiner, Histogram::Unit)>;
+    using TextReadoutAllocator = std::function<RefcountPtr<Base>(
+        const TagUtility::TagStatNameJoiner& joiner, TextReadout::Type)>;
+    using BaseOptConstRef = std::optional<std::reference_wrapper<const Base>>;
 
     IsolatedStatsCache(CounterAllocator alloc) : counter_alloc_(alloc) {}
     IsolatedStatsCache(GaugeAllocator alloc) : gauge_alloc_(alloc) {}
     IsolatedStatsCache(HistogramAllocator alloc) : histogram_alloc_(alloc) {}
     IsolatedStatsCache(TextReadoutAllocator alloc) : text_readout_alloc_(alloc) {}
 
-    OptRef<Base> get(StatName prefix, StatName basename, StatNameTagVectorOptConstRef tags,
-                     SymbolTable& symbol_table, OptRef<const StatsMatcher> matcher = {}) {
-      TagUtility::TagStatNameJoiner joiner(prefix, basename, tags, symbol_table);
+    OptRef<Base> get(const TagUtility::TagStatNameJoiner& joiner,
+                     OptRef<const StatsMatcher> matcher = {}) {
       StatName name = joiner.nameWithTags();
 
       // If we have a matcher and it rejects this stat, we return nullopt.
@@ -174,15 +171,13 @@ private:
         return *stat->second;
       }
 
-      RefcountPtr<Base> new_stat = counter_alloc_(joiner, tags);
+      RefcountPtr<Base> new_stat = counter_alloc_(joiner);
       stats_.emplace(new_stat->statName(), new_stat);
       return *new_stat;
     }
 
-    OptRef<Base> get(StatName prefix, StatName basename, StatNameTagVectorOptConstRef tags,
-                     SymbolTable& symbol_table, Gauge::ImportMode import_mode,
+    OptRef<Base> get(const TagUtility::TagStatNameJoiner& joiner, Gauge::ImportMode import_mode,
                      OptRef<const StatsMatcher> matcher = {}) {
-      TagUtility::TagStatNameJoiner joiner(prefix, basename, tags, symbol_table);
       StatName name = joiner.nameWithTags();
 
       // If we have a matcher and it rejects this stat, we return nullopt.
@@ -196,15 +191,13 @@ private:
         return *stat->second;
       }
 
-      RefcountPtr<Base> new_stat = gauge_alloc_(joiner, tags, import_mode);
+      RefcountPtr<Base> new_stat = gauge_alloc_(joiner, import_mode);
       stats_.emplace(new_stat->statName(), new_stat);
       return *new_stat;
     }
 
-    OptRef<Base> get(StatName prefix, StatName basename, StatNameTagVectorOptConstRef tags,
-                     SymbolTable& symbol_table, Histogram::Unit unit,
+    OptRef<Base> get(const TagUtility::TagStatNameJoiner& joiner, Histogram::Unit unit,
                      OptRef<const StatsMatcher> matcher = {}) {
-      TagUtility::TagStatNameJoiner joiner(prefix, basename, tags, symbol_table);
       StatName name = joiner.nameWithTags();
 
       // If we have a matcher and it rejects this stat, we return nullopt.
@@ -217,15 +210,13 @@ private:
         return *stat->second;
       }
 
-      RefcountPtr<Base> new_stat = histogram_alloc_(joiner, tags, unit);
+      RefcountPtr<Base> new_stat = histogram_alloc_(joiner, unit);
       stats_.emplace(new_stat->statName(), new_stat);
       return *new_stat;
     }
 
-    OptRef<Base> get(StatName prefix, StatName basename, StatNameTagVectorOptConstRef tags,
-                     SymbolTable& symbol_table, TextReadout::Type type,
+    OptRef<Base> get(const TagUtility::TagStatNameJoiner& joiner, TextReadout::Type type,
                      OptRef<const StatsMatcher> matcher = {}) {
-      TagUtility::TagStatNameJoiner joiner(prefix, basename, tags, symbol_table);
       StatName name = joiner.nameWithTags();
 
       // If we have a matcher and it rejects this stat, we return nullopt.
@@ -238,7 +229,7 @@ private:
         return *stat->second;
       }
 
-      RefcountPtr<Base> new_stat = text_readout_alloc_(joiner, tags, type);
+      RefcountPtr<Base> new_stat = text_readout_alloc_(joiner, type);
       stats_.emplace(new_stat->statName(), new_stat);
       return *new_stat;
     }
@@ -274,7 +265,7 @@ private:
     BaseOptConstRef find(StatName name) const {
       auto stat = stats_.find(name);
       if (stat == stats_.end()) {
-        return absl::nullopt;
+        return std::nullopt;
       }
       return std::cref(*stat->second);
     }
@@ -317,7 +308,7 @@ private:
 
 class IsolatedScopeImpl : public Scope {
 public:
-  IsolatedScopeImpl(const std::string& prefix, IsolatedStoreImpl& store,
+  IsolatedScopeImpl(absl::string_view prefix, IsolatedStoreImpl& store,
                     StatsMatcherSharedPtr matcher = nullptr)
       : prefix_(prefix, store.symbolTable()), store_(store), scope_matcher_(std::move(matcher)) {}
 
@@ -325,46 +316,69 @@ public:
                     StatsMatcherSharedPtr matcher = nullptr)
       : prefix_(prefix, store.symbolTable()), store_(store), scope_matcher_(std::move(matcher)) {}
 
-  ~IsolatedScopeImpl() override { prefix_.free(store_.symbolTable()); }
+  ~IsolatedScopeImpl() override {
+    if (cleanup_callback_) {
+      cleanup_callback_();
+    }
+    prefix_.free(store_.symbolTable());
+  }
+
+  void setCleanupCallback(std::function<void()> callback) override {
+    cleanup_callback_ = std::move(callback);
+  }
 
   // Stats::Scope
   SymbolTable& symbolTable() override { return store_.symbolTable(); }
   const SymbolTable& constSymbolTable() const override { return store_.symbolTable(); }
-  Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef tags) override {
+  Counter& counterFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                                 StatName tagged_name) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
-    return store_.counters_.get(prefix(), name, tags, symbolTable(), matcher)
-        .value_or(store_.null_counter_);
+    const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(),
+                                               base_name, name_tags.value_or(StatNameTagSpan{}),
+                                               tagged_name, symbolTable());
+    return store_.counters_.get(joiner, matcher).value_or(store_.null_counter_);
   }
-  ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
-                             const ScopeStatsLimitSettings& limits = {},
-                             StatsMatcherSharedPtr matcher = nullptr) override;
-  ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
-                                   const ScopeStatsLimitSettings& limits = {},
-                                   StatsMatcherSharedPtr matcher = nullptr) override;
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                   Gauge::ImportMode import_mode) override {
+  Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                             StatName tagged_name, Gauge::ImportMode import_mode) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
-    auto gauge = store_.gauges_.get(prefix(), name, tags, symbolTable(), import_mode, matcher);
+    const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(),
+                                               base_name, name_tags.value_or(StatNameTagSpan{}),
+                                               tagged_name, symbolTable());
+    auto gauge = store_.gauges_.get(joiner, import_mode, matcher);
     if (!gauge.has_value()) {
       return store_.null_gauge_;
     }
     gauge->mergeImportMode(import_mode);
     return *gauge;
   }
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Histogram::Unit unit) override {
+  Histogram& histogramFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                                     StatName tagged_name, Histogram::Unit unit) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
-    return store_.histograms_.get(prefix(), name, tags, symbolTable(), unit, matcher)
-        .value_or(store_.null_histogram_);
+    const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(),
+                                               base_name, name_tags.value_or(StatNameTagSpan{}),
+                                               tagged_name, symbolTable());
+    return store_.histograms_.get(joiner, unit, matcher).value_or(store_.null_histogram_);
   }
-  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef tags) override {
+  TextReadout& textReadoutFromTaggedName(StatName base_name,
+                                         std::optional<StatNameTagSpan> name_tags,
+                                         StatName tagged_name) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
-    return store_.text_readouts_
-        .get(prefix(), name, tags, symbolTable(), TextReadout::Type::Default, matcher)
+    const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(),
+                                               base_name, name_tags.value_or(StatNameTagSpan{}),
+                                               tagged_name, symbolTable());
+    return store_.text_readouts_.get(joiner, TextReadout::Type::Default, matcher)
         .value_or(store_.null_text_readout_);
   }
+
+  ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name, TagStringViewSpan name_tags,
+                                           absl::string_view tagged_name, bool evictable,
+                                           const ScopeStatsLimitSettings& limits,
+                                           StatsMatcherSharedPtr matcher) override;
+  ScopeSharedPtr scopeFromTaggedName(StatName base_name, StatNameTagSpan name_tags,
+                                     StatName tagged_name, bool evictable,
+                                     const ScopeStatsLimitSettings& limits,
+                                     StatsMatcherSharedPtr matcher) override;
+
   CounterOptConstRef findCounter(StatName name) const override {
     return store_.counters_.find(name);
   }
@@ -413,7 +427,6 @@ public:
 protected:
   void addScopeToStore(const ScopeSharedPtr& scope) { store_.scopes_.push_back(scope); }
 
-private:
   template <class StatType> IterateFn<StatType> iterFilter(const IterateFn<StatType>& fn) const {
     // We determine here what's in the scope by looking at name
     // prefixes. Strictly speaking this is not correct, as the same stat can be
@@ -440,6 +453,7 @@ private:
   StatNameStorage prefix_;
   IsolatedStoreImpl& store_;
   StatsMatcherSharedPtr scope_matcher_;
+  std::function<void()> cleanup_callback_;
 };
 
 } // namespace Stats

@@ -9,6 +9,7 @@
 #include "envoy/http/codec.h"
 
 #include "source/common/http/codec_helper.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/quic/envoy_quic_simulated_watermark_buffer.h"
 #include "source/common/quic/envoy_quic_utils.h"
 
@@ -49,6 +50,9 @@ public:
                 [this]() { switchStreamBlockState(); })) {
     if (http3_options_.disable_connection_flow_control_for_streams()) {
       quic_stream_.DisableConnectionFlowControlForThisStream();
+    }
+    if (!PROTOBUF_GET_WRAPPED_OR_DEFAULT(http3_options_, disallow_obs_text, true)) {
+      header_validator_.SetObsTextOption(http2::adapter::ObsTextOption::kAllow);
     }
   }
 
@@ -198,7 +202,7 @@ protected:
   // Either reset the stream or close the connection according to
   // should_close_connection and configured http3 options.
   virtual void
-  onStreamError(absl::optional<bool> should_close_connection,
+  onStreamError(std::optional<bool> should_close_connection,
                 quic::QuicRstStreamErrorCode rst = quic::QUIC_BAD_APPLICATION_PAYLOAD) PURE;
 
   // TODO(danzh) remove this once QUICHE enforces content-length consistency.
@@ -241,6 +245,7 @@ protected:
 
   std::string quicStreamState();
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   http2::adapter::HeaderValidator& header_validator() { return header_validator_; }
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
@@ -293,7 +298,7 @@ private:
   Event::SchedulableCallbackPtr async_stream_blockage_change_;
 
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
-  absl::optional<size_t> content_length_;
+  std::optional<size_t> content_length_;
   size_t received_content_bytes_{0};
   http2::adapter::HeaderValidator header_validator_;
   size_t received_metadata_bytes_{0};

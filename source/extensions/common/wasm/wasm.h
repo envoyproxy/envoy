@@ -154,8 +154,8 @@ using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
 
 class PluginHandleSharedPtrThreadLocal : public ThreadLocal::ThreadLocalObject {
 public:
-  PluginHandleSharedPtr handle{};
-  MonotonicTime last_load{};
+  PluginHandleSharedPtr handle;
+  MonotonicTime last_load;
 
   PluginHandleSharedPtrThreadLocal(PluginHandleSharedPtr h, MonotonicTime t = {})
       : handle(std::move(h)), last_load(t) {}
@@ -192,7 +192,7 @@ public:
   PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
                Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
                Init::Manager& init_manager, envoy::config::core::v3::TrafficDirection direction,
-               const envoy::config::core::v3::Metadata* metadata, bool singleton);
+               bool singleton);
 
   std::shared_ptr<Context> createContext();
   Wasm* wasm();
@@ -224,7 +224,7 @@ private:
   PluginSharedPtr plugin_;
   RemoteAsyncDataProviderPtr remote_data_provider_;
   const bool is_singleton_handle_{};
-  WasmHandleSharedPtr base_wasm_{};
+  WasmHandleSharedPtr base_wasm_;
   absl::variant<absl::monostate, SinglePluginHandle, ThreadLocalPluginHandle> plugin_handle_;
 };
 

@@ -1,5 +1,4 @@
 #include "source/common/common/hex.h"
-#include "source/common/common/logger.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listener_filter_buffer_impl.h"
@@ -7,7 +6,6 @@
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -56,7 +54,7 @@ public:
   HttpInspectorTest()
       : cfg_(std::make_shared<Config>(*store_.rootScope())),
         io_handle_(
-            Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, absl::nullopt, {})),
+            Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, std::nullopt, {})),
         parser_impl_(GetParam()) {}
 
   void init() {

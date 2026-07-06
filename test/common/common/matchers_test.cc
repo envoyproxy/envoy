@@ -12,6 +12,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -453,49 +454,43 @@ TEST_F(StringMatcher, NoMatcherRejected) {
       fmt::format("Configuration must define a matcher: {}", matcher.DebugString()));
 }
 
-// Validates the amount of memory that is being used by the different string
-// matchers. Requested as part of https://github.com/envoyproxy/envoy/pull/37782.
-TEST_F(StringMatcher, Memory) {
-  const uint32_t matchers_num = 1000;
-  // Prefix matcher.
-  {
-    // Add 1000 Prefix-String Matchers of varying string lengths (1 to 1000).
-    std::vector<Matchers::StringMatcherImpl> all_matchers;
-    all_matchers.reserve(matchers_num);
-    Memory::TestUtil::MemoryTest memory_test;
-    for (uint32_t i = 0; i < matchers_num; ++i) {
-      envoy::type::matcher::v3::StringMatcher matcher;
-      matcher.set_prefix(std::string(i + 1, 'a'));
-      all_matchers.emplace_back(Matchers::StringMatcherImpl(matcher, context_));
-    }
-    const size_t prefix_consumed_bytes = memory_test.consumedBytes();
-    // The memory constraints were added to ensure that the amount of memory
-    // used by matchers is carefully analyzed. These constraints can be relaxed
-    // when additional features are added, but it should be done in a thoughtful manner.
-    // Adding 5*8192 bytes because tcmalloc consumption estimation may return
-    // different values depending on memory alignment.
-    EXPECT_MEMORY_LE(prefix_consumed_bytes, 530176 + 5 * 8192);
-  }
-  // Regex matcher.
-  {
-    // Add 1000 Regex-String Matchers of varying string lengths (1 to 1000).
-    std::vector<Matchers::StringMatcherImpl> all_matchers;
-    all_matchers.reserve(matchers_num);
-    Memory::TestUtil::MemoryTest memory_test;
-    for (uint32_t i = 0; i < matchers_num; ++i) {
-      envoy::type::matcher::v3::StringMatcher matcher;
-      matcher.mutable_safe_regex()->mutable_google_re2();
-      matcher.mutable_safe_regex()->set_regex(std::string(i + 1, 'a'));
-      all_matchers.emplace_back(Matchers::StringMatcherImpl(matcher, context_));
-    }
-    const size_t regex_consumed_bytes = memory_test.consumedBytes();
-    // The memory constraints were added to ensure that the amount of memory
-    // used by matchers is carefully analyzed. These constraints can be relaxed
-    // when additional features are added, but it should be done in a thoughtful  manner.
-    // Adding 10*8192 bytes because tcmalloc consumption estimation may return
-    // different values depending on memory alignment.
-    EXPECT_MEMORY_LE(regex_consumed_bytes, 15603776 + 10 * 8192);
-  }
+MATCHER_P(MemNotMoreThan, sz,
+          "does not use more than " + std::to_string(sz) +
+              ": think carefully before increasing this, and if you're sure, "
+              "update the corresponding expectation") {
+  return arg <= sz;
+}
+
+// Validates the per-matcher memory footprint of the different string matchers.
+// Requested as part of https://github.com/envoyproxy/envoy/pull/37782: each
+// variant alternative should carry only the data it needs, and
+// StringMatcherImpl should not retain the proto used to construct it.
+//
+// Bounds are expressed in terms of sizeof(std::string) and sizeof(void*) so
+// they are portable across libc++, libstdc++, and 32/64-bit builds.
+TEST_F(StringMatcher, SizeIsBounded) {
+  // String-holding alternatives: one std::string + one bool rounded up to
+  // pointer alignment.
+  const size_t string_alt_bound = sizeof(std::string) + sizeof(void*);
+  EXPECT_THAT(sizeof(Matchers::ExactStringMatcher), MemNotMoreThan(string_alt_bound));
+  EXPECT_THAT(sizeof(Matchers::PrefixStringMatcher), MemNotMoreThan(string_alt_bound));
+  EXPECT_THAT(sizeof(Matchers::SuffixStringMatcher), MemNotMoreThan(string_alt_bound));
+  EXPECT_THAT(sizeof(Matchers::ContainsStringMatcher), MemNotMoreThan(string_alt_bound));
+
+  // Pointer-holding alternatives: a single unique_ptr.
+  const size_t ptr_alt_bound = 2 * sizeof(void*);
+  EXPECT_THAT(sizeof(Matchers::RegexStringMatcher), MemNotMoreThan(ptr_alt_bound));
+  EXPECT_THAT(sizeof(Matchers::CustomStringMatcher), MemNotMoreThan(ptr_alt_bound));
+
+  // StringMatcherImpl layout — accounting for all four pointer-sized
+  // contributions:
+  //   [1] vtable pointer for ValueMatcher base       (+1 * sizeof(void*))
+  //   [2] vtable pointer for StringMatcher base      (+1 * sizeof(void*))
+  //   [3] absl::variant payload = max(sizeof(alternatives))
+  //         = sizeof(std::string) + sizeof(void*) (string + padded bool)
+  //   [4] absl::variant discriminant                 (+1 * sizeof(void*))
+  EXPECT_THAT(sizeof(Matchers::StringMatcherImpl),
+              MemNotMoreThan(sizeof(std::string) + 4 * sizeof(void*)));
 }
 
 class PathMatcher : public BaseTest {};
@@ -643,11 +638,11 @@ TEST_F(FilterStateMatcher, MatchAbsentFilterState) {
 
 class TestObject : public StreamInfo::FilterState::Object {
 public:
-  TestObject(absl::optional<std::string> value) : value_(value) {}
-  absl::optional<std::string> serializeAsString() const override { return value_; }
+  TestObject(std::optional<std::string> value) : value_(value) {}
+  std::optional<std::string> serializeAsString() const override { return value_; }
 
 private:
-  absl::optional<std::string> value_;
+  std::optional<std::string> value_;
 };
 
 TEST_F(FilterStateMatcher, MatchFilterStateWithoutString) {
@@ -656,8 +651,7 @@ TEST_F(FilterStateMatcher, MatchFilterStateWithoutString) {
   matcher.set_key(key);
   matcher.mutable_string_match()->set_exact("exact");
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state.setData(key, std::make_shared<TestObject>(absl::nullopt),
-                       StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state.setData(key, std::make_shared<TestObject>(std::nullopt));
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
@@ -671,8 +665,7 @@ TEST_F(FilterStateMatcher, MatchFilterStateDifferentString) {
   matcher.mutable_string_match()->set_exact(value);
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(key,
-                       std::make_shared<TestObject>(absl::make_optional<std::string>("different")),
-                       StreamInfo::FilterState::StateType::ReadOnly);
+                       std::make_shared<TestObject>(std::make_optional<std::string>("different")));
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
@@ -685,8 +678,7 @@ TEST_F(FilterStateMatcher, MatchFilterState) {
   matcher.set_key(key);
   matcher.mutable_string_match()->set_exact(value);
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state.setData(key, std::make_shared<TestObject>(absl::make_optional<std::string>(value)),
-                       StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state.setData(key, std::make_shared<TestObject>(std::make_optional<std::string>(value)));
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());
   EXPECT_TRUE((*filter_state_matcher)->match(filter_state));
@@ -706,10 +698,8 @@ TEST_F(FilterStateMatcher, MatchFilterStateAddressMatchIpv4) {
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(
-      key,
-      std::make_shared<Network::Address::InstanceAccessor>(
-          Envoy::Network::Utility::parseInternetAddressNoThrow("4.5.6.7", 456, false)),
-      StreamInfo::FilterState::StateType::Mutable);
+      key, std::make_shared<Network::Address::InstanceAccessor>(
+               Envoy::Network::Utility::parseInternetAddressNoThrow("4.5.6.7", 456, false)));
 
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());
@@ -730,10 +720,8 @@ TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv4) {
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(
-      key,
-      std::make_shared<Network::Address::InstanceAccessor>(
-          Envoy::Network::Utility::parseInternetAddressNoThrow("4.5.6.8", 456, false)),
-      StreamInfo::FilterState::StateType::Mutable);
+      key, std::make_shared<Network::Address::InstanceAccessor>(
+               Envoy::Network::Utility::parseInternetAddressNoThrow("4.5.6.8", 456, false)));
 
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());
@@ -754,10 +742,8 @@ TEST_F(FilterStateMatcher, MatchFilterStateAddressMatchIpv6) {
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(
-      key,
-      std::make_shared<Network::Address::InstanceAccessor>(
-          Envoy::Network::Utility::parseInternetAddressNoThrow("2001:db8::1", 8080, false)),
-      StreamInfo::FilterState::StateType::Mutable);
+      key, std::make_shared<Network::Address::InstanceAccessor>(
+               Envoy::Network::Utility::parseInternetAddressNoThrow("2001:db8::1", 8080, false)));
 
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());
@@ -778,10 +764,8 @@ TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv6) {
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(
-      key,
-      std::make_shared<Network::Address::InstanceAccessor>(
-          Envoy::Network::Utility::parseInternetAddressNoThrow("2001:db7::1", 8080, false)),
-      StreamInfo::FilterState::StateType::Mutable);
+      key, std::make_shared<Network::Address::InstanceAccessor>(
+               Envoy::Network::Utility::parseInternetAddressNoThrow("2001:db7::1", 8080, false)));
 
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());
@@ -864,11 +848,9 @@ TEST_F(FilterStateMatcher, AddressMatchWithInvertMatch) {
     matcher.mutable_address_match()->set_invert_match(test_case.invert_match);
 
     StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-    filter_state.setData(
-        key,
-        std::make_shared<Network::Address::InstanceAccessor>(
-            Envoy::Network::Utility::parseInternetAddressNoThrow(test_case.test_ip, 456, false)),
-        StreamInfo::FilterState::StateType::Mutable);
+    filter_state.setData(key, std::make_shared<Network::Address::InstanceAccessor>(
+                                  Envoy::Network::Utility::parseInternetAddressNoThrow(
+                                      test_case.test_ip, 456, false)));
 
     auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
     ASSERT_TRUE(filter_state_matcher.ok());

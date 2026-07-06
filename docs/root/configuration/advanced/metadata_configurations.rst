@@ -33,21 +33,24 @@ Each entry specifies where the metadata can be configured.
 
 **Type:** :ref:`envoy.config.metrics.v3.StatsMatcher <envoy_v3_api_msg_config.metrics.v3.StatsMatcher>`
 
-**Applicable to:** Upstream cluster (:ref:`Cluster.metadata <envoy_v3_api_field_config.cluster.v3.Cluster.metadata>`)
+**Applicable to:**
+
+- Upstream cluster (:ref:`Cluster.metadata <envoy_v3_api_field_config.cluster.v3.Cluster.metadata>`)
+- Listener (:ref:`Listener.metadata <envoy_v3_api_field_config.listener.v3.Listener.metadata>`)
 
 **Fields:** ``typed_filter_metadata``
 
-When present in a cluster's ``typed_filter_metadata``, Envoy uses the provided
+When present in a cluster's or listener's ``typed_filter_metadata``, Envoy uses the provided
 :ref:`StatsMatcher <envoy_v3_api_msg_config.metrics.v3.StatsMatcher>` as the stats matcher for that
-cluster's stats scope. This per-cluster matcher **replaces** (not supplements) the global stats
+resource's stats scope. This per-resource matcher **replaces** (not supplements) the global stats
 matcher configured in the bootstrap :ref:`StatsConfig
-<envoy_v3_api_msg_config.metrics.v3.StatsConfig>`. Child scopes created under the cluster scope
+<envoy_v3_api_msg_config.metrics.v3.StatsConfig>`. Child scopes created under the resource scope
 inherit the matcher unless overridden.
 
-This allows fine-grained control over which stats are created per cluster — for example, enabling a
-minimal set of stats on high-cardinality clusters to reduce memory and CPU overhead.
+This allows fine-grained control over which stats are created per cluster or listener — for example,
+enabling a minimal set of stats on high-cardinality resources to reduce memory and CPU overhead.
 
-Example:
+Cluster example:
 
 .. code-block:: yaml
 
@@ -75,3 +78,26 @@ Example:
 
 In this example, only stats whose names start with ``cluster.my_cluster.upstream_cx`` are created
 for ``my_cluster``, all other cluster stats are suppressed.
+
+Listener example:
+
+.. code-block:: yaml
+
+  listeners:
+  - name: my_listener
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 8080
+    stat_prefix: my_listener
+    metadata:
+      typed_filter_metadata:
+        envoy.stats_matcher:
+          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+          inclusion_list:
+            patterns:
+            - prefix: "listener.my_listener.downstream_cx"
+    filter_chains: []
+
+In this example, only stats whose names start with ``listener.my_listener.downstream_cx`` are
+created for ``my_listener``, all other listener stats are suppressed.

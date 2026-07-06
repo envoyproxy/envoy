@@ -1,4 +1,5 @@
 #include <chrono>
+#include <optional>
 
 #include "envoy/http/header_map.h"
 
@@ -10,9 +11,9 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/enum_test_utils.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "datadog/dict_writer.h"
 #include "datadog/error.h"
 #include "datadog/expected.h"
@@ -423,7 +424,7 @@ TEST_F(DatadogAgentHttpClientTest, OnErrorOther) {
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
   msg->body().add("{}");
 
-  const auto bogus_value = static_cast<Http::AsyncClient::FailureReason>(-1);
+  const auto bogus_value = uncheckedEnumCastForTest<Http::AsyncClient::FailureReason>(-1);
   callbacks_->onFailure(request_, bogus_value);
 }
 

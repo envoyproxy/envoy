@@ -138,7 +138,8 @@ public:
   ListenerFactoryContextBaseImpl(Envoy::Server::Instance& server,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
                                  const envoy::config::listener::v3::Listener& config,
-                                 Server::DrainManagerPtr drain_manager);
+                                 Server::DrainManagerPtr drain_manager, Stats::ScopeSharedPtr scope,
+                                 Stats::ScopeSharedPtr listener_scope);
 
   Init::Manager& initManager() override;
   Network::DrainDecision& drainDecision() override;
@@ -167,7 +168,8 @@ public:
   PerListenerFactoryContextImpl(Envoy::Server::Instance& server,
                                 ProtobufMessage::ValidationVisitor& validation_visitor,
                                 const envoy::config::listener::v3::Listener& config_message,
-                                ListenerImpl& listener_impl, DrainManagerPtr drain_manager);
+                                ListenerImpl& listener_impl, DrainManagerPtr drain_manager,
+                                Stats::ScopeSharedPtr scope, Stats::ScopeSharedPtr listener_scope);
 
   PerListenerFactoryContextImpl(
       std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base,
@@ -182,7 +184,11 @@ public:
   const Network::ListenerInfo& listenerInfo() const override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
   Configuration::ServerFactoryContext& serverFactoryContext() override;
+  envoy::config::core::v3::TrafficDirection direction() const override;
+  bool isQuic() const override;
+  bool shouldBypassOverloadManager() const override;
 
+  Stats::Scope& prefixedScope() override;
   Stats::Scope& listenerScope() override;
 
   ListenerFactoryContextBaseImpl& parentFactoryContext() { return *listener_factory_context_base_; }
@@ -359,7 +365,8 @@ public:
 private:
   ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-               bool workers_started, uint64_t hash, absl::Status& creation_status);
+               bool workers_started, uint64_t hash, Stats::ScopeSharedPtr scope,
+               Stats::ScopeSharedPtr listener_scope, absl::Status& creation_status);
   struct UdpListenerConfigImpl : public Network::UdpListenerConfig {
     UdpListenerConfigImpl(const envoy::config::listener::v3::UdpListenerConfig config)
         : config_(config) {}
@@ -417,6 +424,11 @@ private:
   absl::Status buildFilterChains(const envoy::config::listener::v3::Listener& config);
   absl::Status buildConnectionBalancer(const envoy::config::listener::v3::Listener& config,
                                        const Network::Address::Instance& address);
+  // Returns true when the listener should steer connections to workers using a reuse port BPF
+  // program. Requires a TCP listener with reuse port enabled, the CPU locality balancer configured,
+  // worker CPU affinity pinning every worker to a CPU, and a kernel that supports reuse port BPF
+  // steering.
+  bool reusePortBpfCpuSteeringEnabled(const envoy::config::listener::v3::Listener& config) const;
   void buildSocketOptions(const envoy::config::listener::v3::Listener& config);
   void buildOriginalDstListenerFilter(const envoy::config::listener::v3::Listener& config);
   void buildProxyProtocolListenerFilter(const envoy::config::listener::v3::Listener& config);

@@ -6,10 +6,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
-#include "test/mocks/tracing/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
@@ -162,7 +159,7 @@ TEST_F(FinalizerImplTest, TestAll) {
   const auto start_timestamp =
       SystemTime{std::chrono::duration_cast<SystemTime::duration>(std::chrono::hours{123})};
   EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(start_timestamp));
-  const absl::optional<std::chrono::nanoseconds> nanoseconds = std::chrono::nanoseconds{10};
+  const std::optional<std::chrono::nanoseconds> nanoseconds = std::chrono::nanoseconds{10};
   const MonotonicTime time = MonotonicTime(nanoseconds.value());
   MockTimeSystem time_system;
   EXPECT_CALL(time_system, monotonicTime())
@@ -280,7 +277,7 @@ TEST_F(FinalizerImplTest, TestAllWithLegacyRequestHeader) {
   const auto start_timestamp =
       SystemTime{std::chrono::duration_cast<SystemTime::duration>(std::chrono::hours{123})};
   EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(start_timestamp));
-  const absl::optional<std::chrono::nanoseconds> nanoseconds = std::chrono::nanoseconds{10};
+  const std::optional<std::chrono::nanoseconds> nanoseconds = std::chrono::nanoseconds{10};
   const MonotonicTime time = MonotonicTime(nanoseconds.value());
   MockTimeSystem time_system;
   EXPECT_CALL(time_system, monotonicTime())
@@ -365,6 +362,10 @@ TEST(NullTracerTest, BasicFunctionality) {
   span_ptr->injectContext(trace_context, upstream_context);
   span_ptr->log(SystemTime(), "fake_event");
   span_ptr->useLocalDecision();
+  span_ptr->disableLocalDecision();
+
+  // NullSpan is never exported
+  EXPECT_FALSE(span_ptr->exportedSpan());
 
   EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", SystemTime()));
 }
@@ -442,8 +443,8 @@ TEST_F(TracerImplTest, ChildGrpcUpstreamSpanTest) {
   const auto remote_address = Network::Address::InstanceConstSharedPtr{
       new Network::Address::Ipv4Instance(expected_ip, 0, nullptr)};
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
-  absl::optional<uint32_t> response_code(200);
+  std::optional<Http::Protocol> protocol = Http::Protocol::Http2;
+  std::optional<uint32_t> response_code(200);
   const std::string cluster_name = "fake cluster";
   const std::string ob_cluster_name = "ob fake cluster";
   EXPECT_CALL(stream_info_, responseCode()).WillRepeatedly(ReturnPointee(&response_code));

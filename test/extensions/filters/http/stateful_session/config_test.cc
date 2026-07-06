@@ -2,7 +2,6 @@
 
 #include "test/mocks/http/stateful_session.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
@@ -108,7 +107,7 @@ TEST(StatefulSessionFactoryConfigTest, SimpleConfigTestWithServerContext) {
   StatefulSessionFactoryConfig factory;
 
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);

@@ -149,6 +149,12 @@ The following overload actions are supported:
     - Envoy will reset expensive streams to terminate them. See
       :ref:`below <config_overload_manager_reset_streams>` for details on configuration.
 
+  * - envoy.overload_actions.close_idle_http_connections
+    - Envoy will close idle downstream HTTP/3 QUIC connections when the action is active.
+      When the action is *saturated*, connections will be closed aggressively (ignoring the idle timer threshold).
+      When the action is in a *scaled active* state, the idle timer threshold is still respected.
+      Note that this action is currently only supported for HTTP/3 QUIC connections.
+
 .. _config_overload_manager_shrink_heap:
 
 Shrink Heap
@@ -227,7 +233,7 @@ The following core load shed points are supported:
 
   * - envoy.load_shed_points.http_connection_manager_decode_headers
     - Envoy will reject new HTTP streams by sending a local reply. This occurs
-      right after the http codec has finished parsing headers but before the
+      right after the HTTP codec has finished parsing headers but before the
       :ref:`HTTP Filter Chain is instantiated <life_of_a_request>`.
 
   * - envoy.load_shed_points.http1_server_abort_dispatch

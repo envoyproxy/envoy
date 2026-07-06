@@ -119,7 +119,7 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
     // filter chain. Thus early fail the connection.
     if (connection_socket->ioHandle().isOpen()) {
       for (auto address_family : {quiche::IpAddressFamily::IP_V4, quiche::IpAddressFamily::IP_V6}) {
-        absl::optional<quic::QuicSocketAddress> address =
+        std::optional<quic::QuicSocketAddress> address =
             quic_config.GetPreferredAddressToSend(address_family);
         if (address.has_value() && address->IsInitialized() &&
             !listener_filter_manager->shouldAdvertiseServerPreferredAddress(address.value())) {
@@ -215,6 +215,7 @@ void EnvoyQuicDispatcher::updateListenerConfig(Network::ListenerConfig& new_list
 void EnvoyQuicDispatcher::closeIdleQuicConnections(bool is_saturated) {
   // This method is called from the worker thread, triggered by the
   // Overload Manager.
+  ASSERT(session_idle_list_ != nullptr);
   session_idle_list_->MaybeTerminateIdleSessions(is_saturated);
 }
 

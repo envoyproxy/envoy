@@ -450,7 +450,7 @@ LocalRefUniquePtr<jbyteArray> protoToJavaByteArray(JniHelper& jni_helper,
   size_t size = source.ByteSizeLong();
   LocalRefUniquePtr<jbyteArray> byte_array = jni_helper.newByteArray(size);
   auto bytes = jni_helper.getByteArrayElements(byte_array.get(), nullptr);
-  source.SerializeToArray(bytes.get(), size);
+  std::ignore = source.SerializeToArray(bytes.get(), size);
   return byte_array;
 }
 
@@ -707,6 +707,9 @@ envoy_stream_intel javaStreamIntelToCppStreamIntel(JniHelper& jni_helper,
       /* connection_id= */ static_cast<int64_t>(java_connection_id),
       /* attempt_count= */ static_cast<uint64_t>(java_attempt_count),
       /* consumed_bytes_from_response= */ static_cast<uint64_t>(java_consumed_bytes_from_response),
+      // TODO(bsoumith): Implement SCONE propagation in mobile language bindings
+      /* scone_max_kbps= */ -1,
+      /* scone_timestamp_ms= */ -1,
   };
 }
 
@@ -716,6 +719,7 @@ LocalRefUniquePtr<jobject> cppStreamIntelToJavaStreamIntel(JniHelper& jni_helper
       jni_helper.findClassFromCache("io/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel");
   auto java_stream_intel_init_method_id =
       jni_helper.getMethodIdFromCache(java_stream_intel_class, "<init>", "(JJJJ)V");
+  // TODO(bsoumith): Implement SCONE propagation in mobile language bindings
   return jni_helper.newObject(java_stream_intel_class, java_stream_intel_init_method_id,
                               static_cast<jlong>(stream_intel.stream_id),
                               static_cast<jlong>(stream_intel.connection_id),

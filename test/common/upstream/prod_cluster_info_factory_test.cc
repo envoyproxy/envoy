@@ -3,9 +3,9 @@
 
 #include "source/common/upstream/prod_cluster_info_factory.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
+#include "source/extensions/transport_sockets/tls/config.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
@@ -36,6 +36,33 @@ protected:
   ProdClusterInfoFactory factory_;
 };
 
+// alt_stat_name is preferred over name for stats scope generation.
+TEST_F(ProdClusterInfoFactoryTest, AltStatNamePreferred) {
+  const std::string yaml = R"EOF(
+    name: my_cluster
+    alt_stat_name: my_alt_cluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+
+  auto info = createClusterInfo(parseClusterFromV3Yaml(yaml));
+  ASSERT_NE(nullptr, info);
+  info->trafficStats();
+
+  // Stats scope should be generated with alt_stat_name, not name.
+  EXPECT_EQ(info->statsScope().symbolTable().toString(info->statsScope().prefix()),
+            "cluster.my_alt_cluster");
+}
+
 // Verify that a cluster without a stats matcher in metadata creates all stats normally.
 TEST_F(ProdClusterInfoFactoryTest, NoMetadataStatsMatcher) {
   const std::string yaml = R"EOF(
@@ -56,6 +83,9 @@ TEST_F(ProdClusterInfoFactoryTest, NoMetadataStatsMatcher) {
   auto info = createClusterInfo(parseClusterFromV3Yaml(yaml));
   ASSERT_NE(nullptr, info);
   info->trafficStats();
+
+  EXPECT_EQ(info->statsScope().symbolTable().toString(info->statsScope().prefix()),
+            "cluster.my_cluster");
 
   // Without a scope matcher, stats of any name are accepted.
   EXPECT_NE("", info->statsScope().counterFromString("upstream_cx_total").name());
@@ -131,6 +161,36 @@ TEST_F(ProdClusterInfoFactoryTest, MetadataStatsMatcherExclusionList) {
 
   // "cluster.my_cluster.upstream_rq_total" matches the exclusion prefix — rejected.
   EXPECT_EQ("", info->statsScope().counterFromString("upstream_rq_total").name());
+}
+
+TEST_F(ProdClusterInfoFactoryTest, SdsTlsCertificate) {
+  const std::string yaml = R"EOF(
+    name: hcs_sds_cluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        common_tls_context:
+          tls_certificate_sds_secret_configs:
+            - name: client_cert
+              sds_config:
+                ads: {}
+                resource_api_version: V3
+  )EOF";
+
+  auto info = createClusterInfo(parseClusterFromV3Yaml(yaml));
+  ASSERT_NE(nullptr, info);
 }
 
 } // namespace

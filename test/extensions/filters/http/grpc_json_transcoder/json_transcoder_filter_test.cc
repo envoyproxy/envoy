@@ -75,7 +75,7 @@ protected:
 
   std::string makeProtoDescriptor(std::function<void(FileDescriptorSet&)> process) {
     FileDescriptorSet descriptor_set;
-    descriptor_set.ParseFromString(
+    std::ignore = descriptor_set.ParseFromString(
         api_->fileSystem()
             .fileReadToEnd(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"))
             .value());
@@ -85,7 +85,7 @@ protected:
     TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
     std::string path = TestEnvironment::temporaryPath("envoy_test/proto.descriptor");
     std::ofstream file(path, std::ios::binary);
-    descriptor_set.SerializeToOstream(&file);
+    std::ignore = descriptor_set.SerializeToOstream(&file);
 
     return path;
   }
@@ -663,7 +663,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   expected_request.mutable_shelf()->set_theme("Children");
 
   bookstore::CreateShelfRequest request;
-  request.ParseFromString(frames[0].data_->toString());
+  std::ignore = request.ParseFromString(frames[0].data_->toString());
 
   EXPECT_EQ(expected_request.ByteSize(), frames[0].length_);
   EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
@@ -735,7 +735,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithPackageServiceMetho
   expected_request.mutable_shelf()->set_theme("Children");
 
   bookstore::CreateShelfRequest request;
-  request.ParseFromString(frames[0].data_->toString());
+  std::ignore = request.ParseFromString(frames[0].data_->toString());
 
   EXPECT_EQ(expected_request.ByteSize(), frames[0].length_);
   EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
@@ -797,7 +797,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ForwardUnaryPostGrpc) {
   expected_request.mutable_shelf()->set_theme("Children");
 
   bookstore::CreateShelfRequest forwarded_request;
-  forwarded_request.ParseFromString(frames[0].data_->toString());
+  std::ignore = forwarded_request.ParseFromString(frames[0].data_->toString());
 
   EXPECT_EQ(expected_request.ByteSize(), frames[0].length_);
   EXPECT_TRUE(MessageDifferencer::Equals(expected_request, forwarded_request));
@@ -827,7 +827,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ForwardUnaryPostGrpc) {
   EXPECT_EQ(1, frames.size());
 
   bookstore::Shelf forwarded_response;
-  forwarded_response.ParseFromString(frames[0].data_->toString());
+  std::ignore = forwarded_response.ParseFromString(frames[0].data_->toString());
 
   EXPECT_EQ(expected_response.ByteSize(), frames[0].length_);
   EXPECT_TRUE(MessageDifferencer::Equals(expected_response, forwarded_response));
@@ -1183,7 +1183,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithHttpBody) {
   expected_request.mutable_nested()->mutable_content()->set_data("hello world!");
 
   bookstore::EchoBodyRequest request;
-  request.ParseFromString(frames[0].data_->toString());
+  std::ignore = request.ParseFromString(frames[0].data_->toString());
 
   EXPECT_THAT(request, ProtoEq(expected_request));
 }
@@ -1292,7 +1292,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBody) {
     }
     expected_request.mutable_nested()->mutable_content()->set_data(text);
     bookstore::EchoBodyRequest request;
-    request.ParseFromString(frames[0].data_->toString());
+    std::ignore = request.ParseFromString(frames[0].data_->toString());
     EXPECT_THAT(request, ProtoEq(expected_request));
   }
 }
@@ -1342,20 +1342,20 @@ TEST_F(GrpcJsonTranscoderFilterTestWithLargerBuffer, TranscodingStreamPostWithLa
   expected_first_request.mutable_nested()->mutable_content()->set_data(
       std::string(JsonTranscoderConfig::MaxStreamedPieceSize, 'X'));
   bookstore::EchoBodyRequest request;
-  request.ParseFromString(frames[0].data_->toString());
+  std::ignore = request.ParseFromString(frames[0].data_->toString());
   EXPECT_THAT(request, ProtoEq(expected_first_request));
 
   // Second frame should have only 1MB of streamed content.
   bookstore::EchoBodyRequest expected_second_request;
   expected_second_request.mutable_nested()->mutable_content()->set_data(
       std::string(JsonTranscoderConfig::MaxStreamedPieceSize, 'X'));
-  request.ParseFromString(frames[1].data_->toString());
+  std::ignore = request.ParseFromString(frames[1].data_->toString());
   EXPECT_THAT(request, ProtoEq(expected_second_request));
 
   // Third frame should have the remaining 512 bytes of streamed content.
   bookstore::EchoBodyRequest expected_third_request;
   expected_third_request.mutable_nested()->mutable_content()->set_data(std::string(512, 'X'));
-  request.ParseFromString(frames[2].data_->toString());
+  std::ignore = request.ParseFromString(frames[2].data_->toString());
   EXPECT_THAT(request, ProtoEq(expected_third_request));
 }
 
@@ -2038,7 +2038,7 @@ TEST_P(GrpcJsonTranscoderFilterUnescapeTest, UnescapeSpec) {
   expected_request.set_arg(GetParam().expected_arg_);
 
   bookstore::EchoBodyRequest request;
-  request.ParseFromString(frames[0].data_->toString());
+  std::ignore = request.ParseFromString(frames[0].data_->toString());
 
   EXPECT_EQ(expected_request.ByteSize(), frames[0].length_);
   EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));

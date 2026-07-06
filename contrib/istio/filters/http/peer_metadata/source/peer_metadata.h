@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "source/common/singleton/const_singleton.h"
 #include "source/extensions/filters/common/expr/cel_state.h"
 #include "source/extensions/filters/http/common/factory_base.h"
@@ -19,8 +21,10 @@ using ::Envoy::Extensions::Filters::Common::Expr::CelStatePrototype;
 using ::Envoy::Extensions::Filters::Common::Expr::CelStateType;
 
 struct HeaderValues {
+  const Http::LowerCaseString Baggage{"baggage"};
   const Http::LowerCaseString ExchangeMetadataHeader{"x-envoy-peer-metadata"};
   const Http::LowerCaseString ExchangeMetadataHeaderId{"x-envoy-peer-metadata-id"};
+  const Http::LowerCaseString ExchangeMetadataOriginNetwork{"x-forwarded-network"};
 };
 
 using Headers = ConstSingleton<HeaderValues>;
@@ -36,8 +40,8 @@ struct Context {
 class DiscoveryMethod {
 public:
   virtual ~DiscoveryMethod() = default;
-  virtual absl::optional<PeerInfo> derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&,
-                                                  Context&) const PURE;
+  virtual std::optional<PeerInfo> derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&,
+                                                 Context&) const PURE;
   virtual void remove(Http::HeaderMap&) const {}
 };
 
@@ -47,12 +51,12 @@ class MXMethod : public DiscoveryMethod {
 public:
   MXMethod(bool downstream, const absl::flat_hash_set<std::string> additional_labels,
            Server::Configuration::ServerFactoryContext& factory_context);
-  absl::optional<PeerInfo> derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&,
-                                          Context&) const override;
+  std::optional<PeerInfo> derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&,
+                                         Context&) const override;
   void remove(Http::HeaderMap&) const override;
 
 private:
-  absl::optional<PeerInfo> lookup(absl::string_view id, absl::string_view value) const;
+  std::optional<PeerInfo> lookup(absl::string_view id, absl::string_view value) const;
   const bool downstream_;
   struct MXCache : public ThreadLocal::ThreadLocalObject {
     absl::flat_hash_map<std::string, PeerInfo> cache_;
@@ -86,6 +90,24 @@ private:
   const std::string value_;
   const bool skip_external_clusters_;
   bool skipMXHeaders(const bool, const StreamInfo::StreamInfo&) const;
+};
+
+class BaggagePropagationMethod : public PropagationMethod {
+public:
+  BaggagePropagationMethod(Server::Configuration::ServerFactoryContext& factory_context,
+                           const io::istio::http::peer_metadata::Config_Baggage&);
+  void inject(const StreamInfo::StreamInfo&, Http::HeaderMap&, Context&) const override;
+
+private:
+  std::string computeBaggageValue(Server::Configuration::ServerFactoryContext&) const;
+  const std::string value_;
+};
+
+class BaggageDiscoveryMethod : public DiscoveryMethod, public Logger::Loggable<Logger::Id::filter> {
+public:
+  BaggageDiscoveryMethod();
+  std::optional<PeerInfo> derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&,
+                                         Context&) const override;
 };
 
 class FilterConfig : public Logger::Loggable<Logger::Id::filter> {
@@ -131,7 +153,7 @@ private:
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
-class Filter : public Http::PassThroughFilter {
+class Filter : public Http::PassThroughFilter, public Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const FilterConfigSharedPtr& config) : config_(config) {}
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;

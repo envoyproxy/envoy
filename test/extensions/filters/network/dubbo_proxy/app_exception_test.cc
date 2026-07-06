@@ -77,6 +77,7 @@ TEST_F(AppExceptionTest, Encode) {
   EXPECT_TRUE(rpc_result.first->hasException());
   buffer.drain(buffer.length());
 
+  // NOLINTNEXTLINE(performance-unnecessary-copy-initialization)
   AppException new_app_exception(app_exception);
   EXPECT_EQ(new_app_exception.status_, ResponseStatus::ServiceNotFound);
 

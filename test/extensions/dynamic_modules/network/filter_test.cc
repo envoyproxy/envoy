@@ -26,6 +26,8 @@ public:
         cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
+    // Re-open stat creation so tests can call `define_*` from the test thread.
+    filter_config_->stat_creation_frozen_ = false;
 
     ON_CALL(connection_, dispatcher()).WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
     ON_CALL(read_callbacks_, connection()).WillByDefault(testing::ReturnRef(connection_));
@@ -58,9 +60,11 @@ TEST_F(DynamicModuleNetworkFilterTest, BasicDataFlow) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onWrite(write_data, false));
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onWrite(write_data, true));
 
-  // Verify buffers persist after callbacks for access from on_scheduled and other callbacks.
+  // The read buffer is the connection buffer and persists for access from on_scheduled and other
+  // callbacks. The write buffer is only valid during on_write, so it is cleared once the call
+  // returns.
   EXPECT_NE(nullptr, filter->currentReadBuffer());
-  EXPECT_NE(nullptr, filter->currentWriteBuffer());
+  EXPECT_EQ(nullptr, filter->currentWriteBuffer());
 }
 
 TEST_F(DynamicModuleNetworkFilterTest, AllConnectionEvents) {

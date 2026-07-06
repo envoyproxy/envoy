@@ -26,7 +26,7 @@ Http::FilterFactoryCb SetMetadataConfig::createFilterFactoryFromProtoTyped(
   };
 }
 
-Http::FilterFactoryCb SetMetadataConfig::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb> SetMetadataConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
   ConfigSharedPtr filter_config(
@@ -36,6 +36,13 @@ Http::FilterFactoryCb SetMetadataConfig::createFilterFactoryFromProtoWithServerC
     callbacks.addStreamDecoderFilter(
         Http::StreamDecoderFilterSharedPtr{new SetMetadataFilter(filter_config)});
   };
+}
+
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+SetMetadataConfig::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config,
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<Config>(proto_config, context.scope(), "");
 }
 
 REGISTER_FACTORY(SetMetadataConfig, Server::Configuration::NamedHttpFilterConfigFactory);

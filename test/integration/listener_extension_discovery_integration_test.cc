@@ -12,6 +12,9 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
+using testing::Ge;
+
 namespace {
 
 enum class ListenerMatcherType { NULLMATCHER, ANYMATCHER, NOTANYMATCHER };
@@ -53,7 +56,7 @@ public:
       auto* discovery = listener_filter->mutable_config_discovery();
       discovery->add_type_urls(filter_config_type_url);
       if (default_config != nullptr) {
-        discovery->mutable_default_config()->PackFrom(*default_config);
+        std::ignore = discovery->mutable_default_config()->PackFrom(*default_config);
       }
 
       discovery->set_apply_default_config_without_warming(apply_without_warming);
@@ -86,7 +89,7 @@ public:
           listener_filter->set_name(name);
           auto configuration = test::integration::filters::TestTcpListenerFilterConfig();
           configuration.set_drain_bytes(drain_bytes);
-          listener_filter->mutable_typed_config()->PackFrom(configuration);
+          std::ignore = listener_filter->mutable_typed_config()->PackFrom(configuration);
           addListenerFilterMatcher(listener_filter, matcher);
         });
   }
@@ -177,12 +180,12 @@ public:
     envoy::service::discovery::v3::Resource resource;
     resource.set_name(name);
 
-    typed_config.mutable_typed_config()->PackFrom(filter_config);
-    resource.mutable_resource()->PackFrom(typed_config);
+    std::ignore = typed_config.mutable_typed_config()->PackFrom(filter_config);
+    std::ignore = resource.mutable_resource()->PackFrom(typed_config);
     if (ttl) {
       resource.mutable_ttl()->set_seconds(1);
     }
-    response.add_resources()->PackFrom(resource);
+    std::ignore = response.add_resources()->PackFrom(resource);
     if (!second_connection) {
       ecds_stream_->sendGrpcMessage(response);
     } else {
@@ -246,7 +249,7 @@ public:
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
       config.set_stat_prefix("tcp_stats");
       config.set_cluster("cluster_0");
-      filter->mutable_typed_config()->PackFrom(config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(config);
     });
 
     ListenerExtensionDiscoveryIntegrationTestBase::initialize();
@@ -270,7 +273,7 @@ public:
   // upstream.
   void sendDataVerifyResults(uint32_t drain_bytes) {
     test_server_->waitUntilListenersReady();
-    test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+    test_server_->waitForGauge("listener_manager.workers_started", Ge(1));
     EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 
     IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
@@ -327,14 +330,14 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccess) {
 
   // Send 1st config update to have listener filter drain 5 bytes of data.
   sendXdsResponse(filter_name_, "1", 5);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", Ge(1));
   sendDataVerifyResults(5);
 
   // Send 2nd config update to have listener filter drain 3 bytes of data.
   sendXdsResponse(filter_name_, "2", 3);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 2);
+  test_server_->waitForCounter(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", Ge(2));
   sendDataVerifyResults(3);
 }
 
@@ -347,8 +350,8 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithAnyMatcher) {
 
   // Send config update to have listener filter drain 5 bytes of data.
   sendXdsResponse(filter_name_, "1", 5);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", Ge(1));
   // Send data, verify the listener filter doesn't drain any data.
   sendDataVerifyResults(0);
 }
@@ -362,8 +365,8 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithNotAnyMatcher)
 
   // Send config update to have listener filter drain 5 bytes of data.
   sendXdsResponse(filter_name_, "1", 5);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", Ge(1));
   // Send data, verify the listener filter drains five bytes data.
   sendDataVerifyResults(5);
 }
@@ -377,21 +380,21 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
 
   // Send 1st config update with TTL 1s, and have listener filter drain 5 bytes of data.
   sendXdsResponse(filter_name_, "1", 5, true);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", Ge(1));
   sendDataVerifyResults(5);
 
   // Wait for configuration expired. Then start a TCP connection.
   // The missing config listener filter will be installed to handle the connection.
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 2);
+  test_server_->waitForCounter(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", Ge(2));
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
   auto result = tcp_client->write(data_);
   if (result) {
     tcp_client->waitForDisconnect();
   }
   // The extension_config_missing stats counter increases by 1.
-  test_server_->waitForCounterGe("listener.listener_stat.extension_config_missing", 1);
+  test_server_->waitForCounter("listener.listener_stat.extension_config_missing", Ge(1));
 
   // Send the data again. The extension_config_missing stats counter increases to 2.
   tcp_client = makeTcpConnection(lookupPort(port_name_));
@@ -399,7 +402,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
   if (result) {
     tcp_client->waitForDisconnect();
   }
-  test_server_->waitForCounterGe("listener.listener_stat.extension_config_missing", 2);
+  test_server_->waitForCounter("listener.listener_stat.extension_config_missing", Ge(2));
 }
 
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWithDefault) {
@@ -411,13 +414,13 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWithDefault
 
   // Send 1st config update with TTL 1s, and have listener filter drain 5 bytes of data.
   sendXdsResponse(filter_name_, "1", 5, true);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", Ge(1));
   sendDataVerifyResults(5);
 
   // Wait for configuration expired. The default filter will be installed.
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 2);
+  test_server_->waitForCounter(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", Ge(2));
   // Start a TCP connection. The default filter drain 2 bytes.
   sendDataVerifyResults(default_drain_bytes_);
 }
@@ -431,8 +434,8 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicFailWithDefault) {
 
   // Send config update with invalid config (drain_bytes has to >=2).
   sendXdsResponse(filter_name_, "1", 1);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_fail", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_fail", Ge(1));
   // The default filter will be installed. Start a TCP connection. The default filter drain 2 bytes.
   sendDataVerifyResults(default_drain_bytes_);
 }
@@ -446,8 +449,8 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
 
   // Send config update with invalid config (drain_bytes has to >=2).
   sendXdsResponse(filter_name_, "1", 1);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_fail", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_fail", Ge(1));
   // The missing config filter will be installed and close the connection when a correction is
   // created.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
@@ -456,7 +459,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
     tcp_client->waitForDisconnect();
   }
   // The extension_config_missing stats counter increases by 1.
-  test_server_->waitForCounterGe("listener.listener_stat.extension_config_missing", 1);
+  test_server_->waitForCounter("listener.listener_stat.extension_config_missing", Ge(1));
 }
 
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
@@ -468,8 +471,8 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
   sendDataVerifyResults(default_drain_bytes_);
   // Send update should cause a different response.
   sendXdsResponse(filter_name_, "1", 3);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", Ge(1));
   sendDataVerifyResults(3);
 }
 
@@ -482,8 +485,8 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicWithoutWarmingConfigFail)
   sendDataVerifyResults(default_drain_bytes_);
   // Send config update with invalid config (drain_bytes has to >=2).
   sendXdsResponse(filter_name_, "1", 1);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_fail", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_fail", Ge(1));
   sendDataVerifyResults(default_drain_bytes_);
 }
 
@@ -495,8 +498,8 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameName) {
 
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   sendXdsResponse(filter_name_, "1", 3);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", Ge(1));
   // Each filter drain 3 bytes.
   sendDataVerifyResults(6);
 }
@@ -512,20 +515,20 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentName)
   // Send 1st config update.
   sendXdsResponse("foo", "1", 3);
   sendXdsResponse("bar", "1", 4, false, true);
-  test_server_->waitForCounterGe("extension_config_discovery.tcp_listener_filter.foo.config_reload",
-                                 1);
-  test_server_->waitForCounterGe("extension_config_discovery.tcp_listener_filter.bar.config_reload",
-                                 1);
+  test_server_->waitForCounter("extension_config_discovery.tcp_listener_filter.foo.config_reload",
+                               Ge(1));
+  test_server_->waitForCounter("extension_config_discovery.tcp_listener_filter.bar.config_reload",
+                               Ge(1));
   // The two filters drain 3 + 4  bytes.
   sendDataVerifyResults(7);
 
   // Send 2nd config update.
   sendXdsResponse("foo", "2", 4);
   sendXdsResponse("bar", "2", 5, false, true);
-  test_server_->waitForCounterGe("extension_config_discovery.tcp_listener_filter.foo.config_reload",
-                                 2);
-  test_server_->waitForCounterGe("extension_config_discovery.tcp_listener_filter.bar.config_reload",
-                                 2);
+  test_server_->waitForCounter("extension_config_discovery.tcp_listener_filter.foo.config_reload",
+                               Ge(2));
+  test_server_->waitForCounter("extension_config_discovery.tcp_listener_filter.bar.config_reload",
+                               Ge(2));
   // The two filters drain 4 + 5  bytes.
   sendDataVerifyResults(9);
 }
@@ -561,8 +564,8 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoDynamicTwoStaticFilterMixed
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   sendXdsResponse(filter_name_, "1", 3);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", Ge(1));
   // filter drain 3 + 2 + 3  + 2 bytes.
   sendDataVerifyResults(10);
 }
@@ -577,8 +580,8 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, DynamicStaticFilterMixedDiffer
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   sendXdsResponse(filter_name_, "1", 2);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", Ge(1));
   // filter drain 2 + 2 + 2 + 2 bytes.
   sendDataVerifyResults(8);
 }
@@ -593,8 +596,8 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, DynamicStaticFilterMixedWithMa
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   sendXdsResponse(filter_name_, "1", 3);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", Ge(1));
   // The filters with any matcher configured are disabled. They totally drain 2 + 3 bytes.
   sendDataVerifyResults(5);
 }
@@ -625,8 +628,8 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
 
   // Send 1st config update to have listener filter drain 5 bytes of data.
   sendXdsResponse(filter_name_, "1", 5);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", Ge(1));
 
   // Verify ECDS config dump are working correctly.
   BufferingStreamDecoderPtr response;
@@ -635,7 +638,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
   Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body()).value();
   size_t index = 0;
   auto array = json->getObjectArray("configs").value();
-  for (Json::ObjectSharedPtr obj_ptr : array) {
+  for (const Json::ObjectSharedPtr& obj_ptr : array) {
     EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type").value()) == 0);
     index++;
   }
@@ -647,13 +650,13 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
 
   // With /config_dump, the response has the format: EcdsConfigDump.
   envoy::admin::v3::EcdsConfigDump ecds_config_dump;
-  config_dump.configs(2).UnpackTo(&ecds_config_dump);
+  std::ignore = config_dump.configs(2).UnpackTo(&ecds_config_dump);
   EXPECT_EQ("1", ecds_config_dump.ecds_filters(0).version_info());
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("foo", filter_config.name());
   test::integration::filters::TestTcpListenerFilterConfig listener_config;
-  filter_config.typed_config().UnpackTo(&listener_config);
+  std::ignore = filter_config.typed_config().UnpackTo(&listener_config);
   EXPECT_EQ(5, listener_config.drain_bytes());
 }
 
@@ -667,11 +670,11 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, ConfigDumpWithFilterConfigRemo
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   // Send config update with TTL 1s.
   sendXdsResponse(filter_name_, "1", 5, true);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", Ge(1));
   // Wait for configuration expired.
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 2);
+  test_server_->waitForCounter(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", Ge(2));
 
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("200", request("admin", "GET", "/config_dump?resource=ecds_filters", response));
@@ -695,10 +698,10 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameFilterType
 
   sendXdsResponse("foo", "1", 3);
   sendXdsResponse("bar", "1", 4, false, true);
-  test_server_->waitForCounterGe("extension_config_discovery.tcp_listener_filter.foo.config_reload",
-                                 1);
-  test_server_->waitForCounterGe("extension_config_discovery.tcp_listener_filter.bar.config_reload",
-                                 1);
+  test_server_->waitForCounter("extension_config_discovery.tcp_listener_filter.foo.config_reload",
+                               Ge(1));
+  test_server_->waitForCounter("extension_config_discovery.tcp_listener_filter.bar.config_reload",
+                               Ge(1));
   // Verify ECDS config dump are working correctly.
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("200", request("admin", "GET", "/config_dump", response));
@@ -715,18 +718,18 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameFilterType
   TestUtility::loadFromJson(response->body(), config_dump);
   EXPECT_EQ(5, config_dump.configs_size());
   envoy::admin::v3::EcdsConfigDump ecds_config_dump;
-  config_dump.configs(2).UnpackTo(&ecds_config_dump);
+  std::ignore = config_dump.configs(2).UnpackTo(&ecds_config_dump);
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   test::integration::filters::TestTcpListenerFilterConfig listener_config;
   // Verify the first filter.
   EXPECT_EQ("1", ecds_config_dump.ecds_filters(0).version_info());
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
-  filter_config.typed_config().UnpackTo(&listener_config);
+  std::ignore = filter_config.typed_config().UnpackTo(&listener_config);
   EXPECT_TRUE(verifyConfigDumpData(filter_config, listener_config));
   // Verify the second filter.
   EXPECT_EQ("1", ecds_config_dump.ecds_filters(1).version_info());
   EXPECT_TRUE(ecds_config_dump.ecds_filters(1).ecds_filter().UnpackTo(&filter_config));
-  filter_config.typed_config().UnpackTo(&listener_config);
+  std::ignore = filter_config.typed_config().UnpackTo(&listener_config);
   EXPECT_TRUE(verifyConfigDumpData(filter_config, listener_config));
 }
 
@@ -742,10 +745,10 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsConfigDumpWith
 
   sendXdsResponse("foo", "1", 3);
   sendXdsResponse("bar", "1", 4, false, true);
-  test_server_->waitForCounterGe("extension_config_discovery.tcp_listener_filter.foo.config_reload",
-                                 1);
-  test_server_->waitForCounterGe("extension_config_discovery.tcp_listener_filter.bar.config_reload",
-                                 1);
+  test_server_->waitForCounter("extension_config_discovery.tcp_listener_filter.foo.config_reload",
+                               Ge(1));
+  test_server_->waitForCounter("extension_config_discovery.tcp_listener_filter.bar.config_reload",
+                               Ge(1));
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("200",
             request("admin", "GET", "/config_dump?resource=ecds_filters&name_regex=.a.", response));
@@ -754,13 +757,13 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsConfigDumpWith
   TestUtility::loadFromJson(response->body(), config_dump);
   EXPECT_EQ(1, config_dump.configs_size());
   envoy::admin::v3::EcdsConfigDump::EcdsFilterConfig ecds_msg;
-  config_dump.configs(0).UnpackTo(&ecds_msg);
+  std::ignore = config_dump.configs(0).UnpackTo(&ecds_msg);
   EXPECT_EQ("1", ecds_msg.version_info());
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_msg.ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("bar", filter_config.name());
   test::integration::filters::TestTcpListenerFilterConfig listener_config;
-  filter_config.typed_config().UnpackTo(&listener_config);
+  std::ignore = filter_config.typed_config().UnpackTo(&listener_config);
   EXPECT_EQ(4, listener_config.drain_bytes());
 }
 
@@ -838,10 +841,10 @@ TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, EcdsBasicSuccess) {
 
   // Send 1st config update to have listener filter add "abc" in filter state.
   sendXdsResponse(filter_name_, "v1", "abc");
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.quic_listener_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.quic_listener_filter." + filter_name_ + ".config_reload", Ge(1));
   test_server_->waitUntilListenersReady();
-  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+  test_server_->waitForGauge("listener_manager.workers_started", Ge(1));
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 
   testRouterHeaderOnlyRequestAndResponse();
@@ -867,8 +870,8 @@ TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, EcdsBasicSuccess) {
   // and allow connection migration.
   sendXdsResponse(filter_name_, "v2", "def", /*allow_server_migration=*/false,
                   /*allow_client_migration*/ true);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.quic_listener_filter." + filter_name_ + ".config_reload", 2);
+  test_server_->waitForCounter(
+      "extension_config_discovery.quic_listener_filter." + filter_name_ + ".config_reload", Ge(2));
   testRouterHeaderOnlyRequestAndResponse();
   log = waitForAccessLog(access_log_name_, 1);
   EXPECT_THAT(log, testing::HasSubstr("200 \"def\""));
@@ -901,12 +904,12 @@ TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, BadEcdsUpdateWithoutDefaul
 
   // This is a bad config with empty value string.
   sendXdsResponse(filter_name_, "v1", "");
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.quic_listener_filter." + filter_name_ + ".config_fail", 1);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.quic_listener_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.quic_listener_filter." + filter_name_ + ".config_fail", Ge(1));
+  test_server_->waitForCounter(
+      "extension_config_discovery.quic_listener_filter." + filter_name_ + ".config_reload", Ge(1));
   test_server_->waitUntilListenersReady();
-  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+  test_server_->waitForGauge("listener_manager.workers_started", Ge(1));
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 
   Network::ClientConnectionPtr conn = makeClientConnection(lookupPort(port_name_));
@@ -919,11 +922,11 @@ TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, BadEcdsUpdateWithoutDefaul
   EXPECT_EQ("QUIC_NO_ERROR with details: Closed by application with reason: no filter chain found",
             codec->connection()->transportFailureReason());
   // The extension_config_missing stats counter increases by 1.
-  test_server_->waitForCounterGe("listener.listener_stat.extension_config_missing", 1);
+  test_server_->waitForCounter("listener.listener_stat.extension_config_missing", Ge(1));
 
   sendXdsResponse(filter_name_, "v2", "abc");
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.quic_listener_filter." + filter_name_ + ".config_reload", 2);
+  test_server_->waitForCounter(
+      "extension_config_discovery.quic_listener_filter." + filter_name_ + ".config_reload", Ge(2));
   testRouterHeaderOnlyRequestAndResponse();
   codec_client_->close();
   std::string log = waitForAccessLog(access_log_name_, 0);
@@ -943,8 +946,8 @@ TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, ConfigDump) {
   // Send 1st config update to have listener filter add "abc" in filter state.
   sendXdsResponse(filter_name_, "v1", "abc", /*allow_server_migration=*/false,
                   /*allow_client_migration*/ true);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.quic_listener_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.quic_listener_filter." + filter_name_ + ".config_reload", Ge(1));
 
   // Verify ECDS config dump are working correctly.
   BufferingStreamDecoderPtr response;
@@ -965,13 +968,13 @@ TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, ConfigDump) {
 
   // With /config_dump, the response has the format: EcdsConfigDump.
   envoy::admin::v3::EcdsConfigDump ecds_config_dump;
-  config_dump.configs(2).UnpackTo(&ecds_config_dump);
+  std::ignore = config_dump.configs(2).UnpackTo(&ecds_config_dump);
   EXPECT_EQ("v1", ecds_config_dump.ecds_filters(0).version_info());
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ(filter_name_, filter_config.name());
   test::integration::filters::TestQuicListenerFilterConfig listener_config;
-  filter_config.typed_config().UnpackTo(&listener_config);
+  std::ignore = filter_config.typed_config().UnpackTo(&listener_config);
   EXPECT_EQ("abc", listener_config.added_value());
   EXPECT_FALSE(listener_config.allow_server_migration());
   EXPECT_TRUE(listener_config.allow_client_migration());

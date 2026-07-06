@@ -19,7 +19,7 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/matcher/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/load_balancer_context.h"
@@ -58,7 +58,7 @@ void verifyCaresDnsConfigAndUnpack(
   EXPECT_EQ(
       typed_dns_resolver_config.typed_config().type_url(),
       "type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig");
-  typed_dns_resolver_config.typed_config().UnpackTo(&cares);
+  std::ignore = typed_dns_resolver_config.typed_config().UnpackTo(&cares);
 }
 
 class AlpnSocketFactory : public Network::RawBufferSocketFactory {
@@ -696,7 +696,7 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
 
   create(parseBootstrapFromV3Yaml(yaml));
   const auto& cluster = cluster_manager_->clusters().getCluster("cluster_1");
-  EXPECT_NE(cluster, absl::nullopt);
+  EXPECT_NE(cluster, std::nullopt);
   EXPECT_TRUE(cluster->get().info()->loadBalancerConfig().has_value());
 }
 
@@ -865,7 +865,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecified) {
                                              resolvers);
   cares.add_resolvers()->MergeFrom(resolvers);
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
@@ -910,7 +910,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedMultipleResolvers) {
   Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.5", 81),
                                              resolvers);
   cares.add_resolvers()->MergeFrom(resolvers);
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
@@ -953,7 +953,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedOveridingDeprecatedReso
                                              resolvers);
   cares.add_resolvers()->MergeFrom(resolvers);
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
@@ -1505,12 +1505,12 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
   EXPECT_FALSE(all_clusters.active_clusters_.at("cluster_1").get().info()->addedViaApi());
 
   // Test for no hosts returning the correct values before we have hosts.
-  EXPECT_EQ(absl::nullopt,
+  EXPECT_EQ(std::nullopt,
             cluster_manager_->getThreadLocalCluster("cluster_1")
                 ->httpConnPool(
                     cluster_manager_->getThreadLocalCluster("cluster_1")->chooseHost(nullptr).host,
                     ResourcePriority::Default, Http::Protocol::Http11, nullptr));
-  EXPECT_EQ(absl::nullopt,
+  EXPECT_EQ(std::nullopt,
             cluster_manager_->getThreadLocalCluster("cluster_1")
                 ->tcpConnPool(
                     cluster_manager_->getThreadLocalCluster("cluster_1")->chooseHost(nullptr).host,
@@ -1544,9 +1544,9 @@ TEST_F(ClusterManagerImplTest, GetActiveOrWarmingCluster) {
   create(parseBootstrapFromV3Yaml(bootstrap_yaml));
 
   // Static cluster should be active.
-  EXPECT_NE(absl::nullopt, cluster_manager_->getActiveCluster("static_cluster"));
-  EXPECT_NE(absl::nullopt, cluster_manager_->getActiveOrWarmingCluster("static_cluster"));
-  EXPECT_EQ(absl::nullopt, cluster_manager_->getActiveOrWarmingCluster("non_existent_cluster"));
+  EXPECT_NE(std::nullopt, cluster_manager_->getActiveCluster("static_cluster"));
+  EXPECT_NE(std::nullopt, cluster_manager_->getActiveOrWarmingCluster("static_cluster"));
+  EXPECT_EQ(std::nullopt, cluster_manager_->getActiveOrWarmingCluster("non_existent_cluster"));
 
   // Now, add a dynamic cluster. It will start in warming state.
   const std::string warming_cluster_yaml = R"EOF(
@@ -1576,9 +1576,9 @@ TEST_F(ClusterManagerImplTest, GetActiveOrWarmingCluster) {
   EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(warming_cluster_config, "version1"));
 
   // The cluster should be in warming, not active.
-  EXPECT_EQ(absl::nullopt, cluster_manager_->getActiveCluster("warming_cluster"));
+  EXPECT_EQ(std::nullopt, cluster_manager_->getActiveCluster("warming_cluster"));
   OptRef<const Cluster> cluster = cluster_manager_->getActiveOrWarmingCluster("warming_cluster");
-  EXPECT_NE(absl::nullopt, cluster);
+  EXPECT_NE(std::nullopt, cluster);
   EXPECT_EQ("warming_cluster", cluster->info()->name());
 
   // Finish initialization. This should move it to active.
@@ -1586,10 +1586,10 @@ TEST_F(ClusterManagerImplTest, GetActiveOrWarmingCluster) {
 
   // Now the cluster should be active.
   cluster = cluster_manager_->getActiveCluster("warming_cluster");
-  EXPECT_NE(absl::nullopt, cluster);
+  EXPECT_NE(std::nullopt, cluster);
   EXPECT_EQ("warming_cluster", cluster->info()->name());
   cluster = cluster_manager_->getActiveOrWarmingCluster("warming_cluster");
-  EXPECT_NE(absl::nullopt, cluster);
+  EXPECT_NE(std::nullopt, cluster);
   EXPECT_EQ("warming_cluster", cluster->info()->name());
 }
 
@@ -1698,6 +1698,23 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithNonExistingHostStrict) 
   auto opt_cp = cluster_manager_->getThreadLocalCluster("cluster_1")
                     ->tcpConnPool(ResourcePriority::Default, &context);
   EXPECT_FALSE(opt_cp.has_value());
+}
+
+TEST_F(ClusterManagerImplTest, StrictOverrideHostNotFoundReturnsCustomFailureStatus) {
+  createWithBasicStaticCluster();
+  NiceMock<MockLoadBalancerContext> context;
+
+  // Non-existing host with strict mode and custom failure status (421).
+  Upstream::LoadBalancerContext::OverrideHost override_host{"127.0.0.2:12345", true,
+                                                            Http::Code::MisdirectedRequest};
+  EXPECT_CALL(context, overrideHostToSelect())
+      .WillRepeatedly(
+          Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host)));
+
+  auto result = cluster_manager_->getThreadLocalCluster("cluster_1")->chooseHost(&context);
+  EXPECT_EQ(nullptr, result.host);
+  ASSERT_TRUE(result.failure_status.has_value());
+  EXPECT_EQ(Http::Code::MisdirectedRequest, result.failure_status.value());
 }
 
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {
@@ -1826,6 +1843,66 @@ TEST_F(ClusterManagerImplTest, HttpPoolDataForwardsCallsToConnectionPool) {
 
   EXPECT_CALL(*pool_mock, drainConnections(ConnectionPool::DrainBehavior::DrainAndDelete));
   opt_cp.value().drainConnections(ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
+TEST_F(ClusterManagerImplTest, DrainConnectionsByPredicate) {
+  createWithBasicStaticCluster();
+  NiceMock<MockLoadBalancerContext> context;
+
+  auto* http_pool_mock = new Http::ConnectionPool::MockInstance();
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(http_pool_mock));
+  EXPECT_CALL(*http_pool_mock, addIdleCallback(_));
+
+  auto opt_http_cp =
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->httpConnPool(
+              cluster_manager_->getThreadLocalCluster("cluster_1")->chooseHost(nullptr).host,
+              ResourcePriority::Default, Http::Protocol::Http11, &context);
+  ASSERT_TRUE(opt_http_cp.has_value());
+
+  auto* tcp_pool_mock = new Tcp::ConnectionPool::MockInstance();
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(tcp_pool_mock));
+  EXPECT_CALL(*tcp_pool_mock, addIdleCallback(_));
+
+  auto opt_tcp_cp =
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->tcpConnPool(
+              cluster_manager_->getThreadLocalCluster("cluster_1")->chooseHost(nullptr).host,
+              ResourcePriority::Default, &context);
+  auto mock_option = std::make_shared<Network::MockSocketOption>();
+  auto given_option = std::make_shared<Network::MockSocketOption>();
+  auto pool_options = std::make_shared<Network::ConnectionSocket::Options>();
+  pool_options->push_back(mock_option);
+
+  http_pool_mock->socket_options_ = pool_options;
+  tcp_pool_mock->socket_options_ = pool_options;
+  EXPECT_CALL(*http_pool_mock, socketOptions())
+      .WillRepeatedly(ReturnRef(http_pool_mock->socket_options_));
+  EXPECT_CALL(*tcp_pool_mock, socketOptions())
+      .WillRepeatedly(ReturnRef(tcp_pool_mock->socket_options_));
+
+  // First verify predicate matching given_option (not in pool) does not drain
+  cluster_manager_->drainOrCloseConnPools(
+      [given_option](ConnectionPool::Instance& pool) {
+        return pool.socketOptions() != nullptr &&
+               std::find(pool.socketOptions()->begin(), pool.socketOptions()->end(),
+                         given_option) != pool.socketOptions()->end();
+      },
+      ConnectionPool::DrainBehavior::DrainExistingConnections);
+
+  // Next verify predicate matching mock_option (in pool) drains both pools
+  EXPECT_CALL(*http_pool_mock,
+              drainConnections(ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*tcp_pool_mock,
+              drainConnections(ConnectionPool::DrainBehavior::DrainExistingConnections));
+
+  cluster_manager_->drainOrCloseConnPools(
+      [mock_option](ConnectionPool::Instance& pool) {
+        return pool.socketOptions() != nullptr &&
+               std::find(pool.socketOptions()->begin(), pool.socketOptions()->end(), mock_option) !=
+                   pool.socketOptions()->end();
+      },
+      ConnectionPool::DrainBehavior::DrainExistingConnections);
 }
 
 class TestUpstreamNetworkFilter : public Network::WriteFilter {

@@ -20,7 +20,7 @@ envoy_extension_cc_test(
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/matching/actions/format_string:config",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
     ],
 )

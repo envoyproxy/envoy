@@ -220,7 +220,7 @@ typed_config:
                              ->Mutable(0)
                              ->mutable_typed_per_filter_config();
 
-          (*config)["grpc_json_transcoder"].PackFrom(per_route_config);
+          std::ignore = (*config)["grpc_json_transcoder"].PackFrom(per_route_config);
         };
 
     config_helper_.addConfigModifier(modifier);
@@ -1158,7 +1158,7 @@ std::string jsonStrToPbStrucStr(std::string json) {
   Envoy::Protobuf::Struct message;
   std::string structStr;
   TestUtility::loadFromJson(json, message);
-  TextFormat::PrintToString(message, &structStr);
+  std::ignore = TextFormat::PrintToString(message, &structStr);
   return structStr;
 }
 
@@ -1299,7 +1299,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UTF8) {
       false);
 }
 
-TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidation) {
+TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidationGrpcContentType) {
   HttpIntegrationTest::initialize();
 
   // Transcoding does not occur from a request with the gRPC content type.
@@ -1315,7 +1315,10 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidation) {
       Http::TestResponseHeaderMapImpl{
           {":status", "200"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
       "", true, false, R"({ "theme" : "Children")");
+}
 
+TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidationUnknownPath) {
+  HttpIntegrationTest::initialize();
   // Transcoding does not occur when unknown path is called.
   // HTTP Request to is passed directly to gRPC backend.
   // gRPC response is passed directly to HTTP client.
@@ -1328,7 +1331,10 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidation) {
       Http::TestResponseHeaderMapImpl{
           {":status", "200"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
       "", true, false, R"({ "theme" : "Children")");
+}
 
+TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidationUnknownQueryParam) {
+  HttpIntegrationTest::initialize();
   // Transcoding does not occur when unknown query param is included.
   // HTTP Request to is passed directly to gRPC backend.
   // gRPC response is passed directly to HTTP client.

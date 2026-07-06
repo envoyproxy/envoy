@@ -35,6 +35,7 @@ envoy_cc_test(
     deps = [
         "//test/mocks/event:event_mocks",
         "//test/mocks/io:io_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ] + select({
         "//bazel:linux": [
@@ -71,7 +72,7 @@ envoy_cc_test(
     }),
     rbe_pool = "6gig",
     deps = [
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ] + select({

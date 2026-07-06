@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/compression/compressor/factory.h"
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 #include "envoy/server/factory_context.h"
@@ -9,8 +11,6 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -180,8 +180,8 @@ public:
 
   // If a value is present, that value overrides
   // ResponseDirectionConfig::compressionEnabled.
-  absl::optional<bool> responseCompressionEnabled() const { return response_compression_enabled_; }
-  absl::optional<bool> removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
+  std::optional<bool> responseCompressionEnabled() const { return response_compression_enabled_; }
+  std::optional<bool> removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
 
   // Returns the per-route compressor factory if configured, nullptr otherwise.
   const Envoy::Compression::Compressor::CompressorFactory* compressorFactory() const {
@@ -189,14 +189,14 @@ public:
   }
 
   // Returns the content encoding for the per-route compressor if configured.
-  absl::optional<std::string> contentEncoding() const {
-    return compressor_factory_ ? absl::make_optional(compressor_factory_->contentEncoding())
-                               : absl::nullopt;
+  std::optional<std::string> contentEncoding() const {
+    return compressor_factory_ ? std::make_optional(compressor_factory_->contentEncoding())
+                               : std::nullopt;
   }
 
 private:
-  absl::optional<bool> response_compression_enabled_;
-  absl::optional<bool> remove_accept_encoding_header_;
+  std::optional<bool> response_compression_enabled_;
+  std::optional<bool> remove_accept_encoding_header_;
   Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory_;
 };
 
@@ -249,11 +249,11 @@ private:
   void weakenEtagHeader(Http::ResponseHeaderMap& headers);
   std::string createEnvoyCompressionStatusHeaderValue(
       absl::string_view encoding_type, absl::string_view status_to_set,
-      absl::optional<absl::string_view> original_length = std::nullopt);
+      std::optional<absl::string_view> original_length = std::nullopt);
   void insertEnvoyCompressionStatusHeader(
       Http::ResponseHeaderMap& headers, absl::string_view encoding_type,
       absl::string_view status_to_set,
-      absl::optional<absl::string_view> original_length = std::nullopt);
+      std::optional<absl::string_view> original_length = std::nullopt);
   void insertVaryHeader(Http::ResponseHeaderMap& headers);
 
   class EncodingDecision : public StreamInfo::FilterState::Object {

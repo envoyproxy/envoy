@@ -7,7 +7,6 @@
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
 
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/simulated_time_system.h"
@@ -70,7 +69,7 @@ protected:
   virtual absl::Status
   insert(LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& headers,
          const absl::string_view body,
-         const absl::optional<Http::TestResponseTrailerMapImpl> trailers = absl::nullopt);
+         const std::optional<Http::TestResponseTrailerMapImpl> trailers = std::nullopt);
 
   absl::Status insert(absl::string_view request_path,
                       const Http::TestResponseHeaderMapImpl& headers, const absl::string_view body);

@@ -18,7 +18,7 @@ namespace Http {
 class PrefixValue {
 public:
   const char* prefix() {
-    absl::WriterMutexLock lock(&m_);
+    absl::WriterMutexLock lock(m_);
     read_ = true;
     return prefix_.c_str();
   }
@@ -26,7 +26,7 @@ public:
   // The char* prefix is used directly, so must be available for the interval where prefix() may be
   // called.
   void setPrefix(const char* prefix) {
-    absl::WriterMutexLock lock(&m_);
+    absl::WriterMutexLock lock(m_);
     // The check for unchanged string is purely for integration tests - this
     // should not happen in production.
     RELEASE_ASSERT(!read_ || prefix_ == std::string(prefix),
@@ -338,6 +338,8 @@ public:
   struct {
     // per https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
     const std::string Bytestream{"bytestream"};
+    // per https://datatracker.ietf.org/doc/draft-ietf-webtrans-overview/
+    const std::string WebTransport{"webtransport"};
   } ProtocolValues;
 
   struct {

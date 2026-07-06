@@ -1,0 +1,87 @@
+goo.gle/debugproto
+config {
+  virtual_hosts {
+    name: "redirect"
+    domains: "redirect.lyft.com"
+    routes {
+      match {
+        safe_regex {
+          regex: "/foo/([0-9]{4})/(.*)"
+        }
+      }
+      redirect {
+        regex_rewrite {
+          pattern {
+            regex: "/foo/([0-9]{4})/(.*)"
+          }
+          substitution: "/\\2/\\1/baz"
+        }
+      }
+    }
+    routes {
+      match {
+        safe_regex {
+          regex: "/strip-query/([0-9]{4})/(.*)"
+        }
+      }
+      redirect {
+        strip_query: true
+        regex_rewrite {
+          pattern {
+            regex: "/strip-query/([0-9]{4})/(.*)"
+          }
+          substitution: "/\\2/\\1/baz"
+        }
+      }
+    }
+    routes {
+      match {
+        prefix: "/prefix/"
+      }
+      redirect {
+        regex_rewrite {
+          pattern {
+            regex: "/foo/([0-9]{4})/(.*)"
+          }
+          substitution: "/\\2/\\1/baz"
+        }
+      }
+    }
+    routes {
+      match {
+        prefix: "/prefix-strip-query/"
+      }
+      redirect {
+        strip_query: true
+        regex_rewrite {
+          pattern {
+            regex: "/strip-query/([0-9]{4})/(.*)"
+          }
+          substitution: "/\\2/\\1/baz"
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.foo.com"
+  }
+  headers {
+    key: ":path"
+    value: "/foo"
+  }
+  headers {
+    key: ":scheme"
+    value: "https"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "https"
+  }
+  headers {
+    key: "x-envoy-internal"
+    value: "true"
+  }
+}

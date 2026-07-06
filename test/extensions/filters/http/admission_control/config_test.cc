@@ -12,7 +12,6 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -150,8 +149,6 @@ success_criteria:
 // Verify the config defaults when not specified.
 TEST_F(AdmissionControlConfigTest, BasicTestMinimumConfigured) {
   // Empty config. No fields are required.
-  AdmissionControlProto proto;
-
   const std::string yaml = R"EOF(
 success_criteria:
   http_criteria:
@@ -243,9 +240,11 @@ success_criteria:
   AdmissionControlProto proto;
   TestUtility::loadFromYamlAndValidate(yaml, proto);
 
-  // createFilterFactoryFromProtoWithServerContext returns FilterFactoryCb directly
-  auto cb = admission_control_filter_factory.createFilterFactoryFromProtoWithServerContext(
-      proto, "stats_prefix", context_.serverFactoryContext());
+  // createHttpFilterFactoryFromProto returns a StatusOr<FilterFactoryCb>; unwrap with value().
+  auto cb =
+      admission_control_filter_factory
+          .createHttpFilterFactoryFromProto(proto, "stats_prefix", context_.serverFactoryContext())
+          .value();
 
   EXPECT_TRUE(cb != nullptr);
 

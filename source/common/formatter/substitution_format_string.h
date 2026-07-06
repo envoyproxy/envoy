@@ -15,6 +15,8 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/server/generic_factory_context.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Formatter {
 
@@ -44,9 +46,9 @@ public:
   /**
    * Generate a Json formatter object from proto::Struct config
    */
-  static FormatterPtr createJsonFormatter(const Protobuf::Struct& struct_format,
-                                          bool omit_empty_values,
-                                          const std::vector<CommandParserPtr>& commands = {});
+  static absl::StatusOr<FormatterPtr>
+  createJsonFormatter(const Protobuf::Struct& struct_format, bool omit_empty_values,
+                      const std::vector<CommandParserPtr>& commands = {});
 };
 
 } // namespace Formatter

@@ -85,7 +85,7 @@ CreateApiKeyRequest makeCreateApiKeyRequest(absl::string_view pb = R"pb(
       parent: "project-id"
     )pb") {
   CreateApiKeyRequest request;
-  Protobuf::TextFormat::ParseFromString(pb, &request);
+  std::ignore = Protobuf::TextFormat::ParseFromString(pb, &request);
   return request;
 }
 

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -31,7 +32,6 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -69,6 +69,8 @@ void HttpFilterTest::initialize(std::string&& yaml, bool is_upstream_filter) {
       {{"envoy.reloadable_features.ext_proc_stream_close_optimization", "true"}});
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.ext_proc_inject_data_with_state_update", "true"}});
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.ext_proc_return_stop_iteration", "true"}});
   client_ = std::make_unique<MockClient>();
   route_ = std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
@@ -235,7 +237,7 @@ void HttpFilterTest::setUpEncodingWatermarking(bool& watermarked) {
 
 void HttpFilterTest::processRequestHeaders(
     bool buffering_data,
-    absl::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HeadersResponse&)>>
+    std::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HeadersResponse&)>>
         cb) {
   ASSERT_TRUE(last_request_.has_request_headers());
   const auto& headers = last_request_.request_headers();
@@ -261,7 +263,7 @@ void HttpFilterTest::processRequestHeaders(
 
 void HttpFilterTest::processResponseHeaders(
     bool buffering_data,
-    absl::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HeadersResponse&)>>
+    std::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HeadersResponse&)>>
         cb) {
   ASSERT_TRUE(last_request_.has_response_headers());
   const auto& headers = last_request_.response_headers();
@@ -285,7 +287,7 @@ void HttpFilterTest::processResponseHeaders(
 }
 
 void HttpFilterTest::processResponseHeadersAfterTrailer(
-    absl::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HeadersResponse&)>>
+    std::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HeadersResponse&)>>
         cb) {
   HttpHeaders headers;
   auto response = std::make_unique<ProcessingResponse>();
@@ -298,7 +300,7 @@ void HttpFilterTest::processResponseHeadersAfterTrailer(
 }
 
 void HttpFilterTest::processRequestBody(
-    absl::optional<std::function<void(const HttpBody&, ProcessingResponse&, BodyResponse&)>> cb,
+    std::optional<std::function<void(const HttpBody&, ProcessingResponse&, BodyResponse&)>> cb,
     bool should_continue, const std::chrono::microseconds latency) {
   ASSERT_TRUE(last_request_.has_request_body());
 
@@ -322,7 +324,7 @@ void HttpFilterTest::processRequestBody(
 }
 
 void HttpFilterTest::processResponseBody(
-    absl::optional<std::function<void(const HttpBody&, ProcessingResponse&, BodyResponse&)>> cb,
+    std::optional<std::function<void(const HttpBody&, ProcessingResponse&, BodyResponse&)>> cb,
     bool should_continue) {
   ASSERT_TRUE(last_request_.has_response_body());
 
@@ -372,7 +374,7 @@ void HttpFilterTest::processResponseBodyStreamedAfterTrailer(
 }
 
 void HttpFilterTest::processRequestTrailers(
-    absl::optional<std::function<void(const HttpTrailers&, ProcessingResponse&, TrailersResponse&)>>
+    std::optional<std::function<void(const HttpTrailers&, ProcessingResponse&, TrailersResponse&)>>
         cb,
     bool should_continue) {
   ASSERT_TRUE(last_request_.has_request_trailers());
@@ -397,7 +399,7 @@ void HttpFilterTest::processRequestTrailers(
 }
 
 void HttpFilterTest::processResponseTrailers(
-    absl::optional<std::function<void(const HttpTrailers&, ProcessingResponse&, TrailersResponse&)>>
+    std::optional<std::function<void(const HttpTrailers&, ProcessingResponse&, TrailersResponse&)>>
         cb,
     bool should_continue) {
   ASSERT_TRUE(last_request_.has_response_trailers());
@@ -495,7 +497,7 @@ void HttpFilterTest::sendChunkRequestData(const uint32_t chunk_number, const boo
     Buffer::OwnedImpl req_data("foo");
     EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
     if (send_grpc) {
-      processRequestBody(absl::nullopt, false);
+      processRequestBody(std::nullopt, false);
     }
   }
 }
@@ -505,7 +507,7 @@ void HttpFilterTest::sendChunkResponseData(const uint32_t chunk_number, const bo
     Buffer::OwnedImpl resp_data("bar");
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
     if (send_grpc) {
-      processResponseBody(absl::nullopt, false);
+      processResponseBody(std::nullopt, false);
     }
   }
 }
@@ -570,7 +572,7 @@ void HttpFilterTest::streamingSmallChunksWithBodyMutation(bool empty_last_chunk,
         },
         true);
   } else {
-    processResponseBody(absl::nullopt, true);
+    processResponseBody(std::nullopt, true);
     want_response_body.add(last_chunk_str);
   }
 

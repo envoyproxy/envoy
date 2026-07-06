@@ -33,7 +33,7 @@ public:
     bool skipFilter() const { return skip_filter_; }
     void onStreamInfo(const StreamInfo::StreamInfo& stream_info) {
       if (matching_data_ == nullptr) {
-        matching_data_ = std::make_shared<Envoy::Http::Matching::HttpMatchingDataImpl>(stream_info);
+        matching_data_ = std::make_unique<Envoy::Http::Matching::HttpMatchingDataImpl>(stream_info);
       }
     }
 
@@ -49,7 +49,7 @@ public:
     Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
     Envoy::Http::StreamFilterBase* base_filter_{};
 
-    Envoy::Http::Matching::HttpMatchingDataImplSharedPtr matching_data_;
+    std::unique_ptr<Envoy::Http::Matching::HttpMatchingDataImpl> matching_data_;
     bool match_tree_evaluated_{};
     bool skip_filter_{};
   };
@@ -133,7 +133,7 @@ struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallba
     return delegated_callbacks_.setFilterConfigName(name);
   }
   OptRef<const Router::Route> route() const override { return delegated_callbacks_.route(); }
-  absl::optional<bool> filterDisabled(absl::string_view config_name) const override {
+  std::optional<bool> filterDisabled(absl::string_view config_name) const override {
     return delegated_callbacks_.filterDisabled(config_name);
   }
   const StreamInfo::StreamInfo& streamInfo() const override {

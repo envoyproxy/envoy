@@ -12,6 +12,7 @@
 #include "source/common/grpc/codec.h"
 #include "source/common/grpc/common.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/ssl/ssl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/version/version.h"
@@ -81,7 +82,7 @@ public:
       common_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
       setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                      fake_upstreams_.back()->localAddress());
-      access_log->mutable_typed_config()->PackFrom(access_log_config);
+      std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
     });
     BaseIntegrationTest::initialize();
   }
@@ -101,7 +102,7 @@ public:
           listener->mutable_filter_chains(0)->mutable_filters(0)->mutable_typed_config();
 
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy_config;
-      tcp_proxy->UnpackTo(&tcp_proxy_config);
+      std::ignore = tcp_proxy->UnpackTo(&tcp_proxy_config);
 
       auto* access_log = tcp_proxy_config.add_access_log();
       access_log->set_name("grpc_accesslog");
@@ -111,18 +112,18 @@ public:
       common_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
       setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                      fake_upstreams_.back()->localAddress());
-      access_log->mutable_typed_config()->PackFrom(access_log_config);
+      std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
 
       tcp_proxy_config.mutable_access_log_options()
           ->mutable_access_log_flush_interval()
           ->set_seconds(1); // 1s
 
-      tcp_proxy->PackFrom(tcp_proxy_config);
+      std::ignore = tcp_proxy->PackFrom(tcp_proxy_config);
     });
     BaseIntegrationTest::initialize();
   }
 
-  void setupTlsInspectorFilter(absl::optional<ConfigHelper::ServerSslOptions> server_ssl_options,
+  void setupTlsInspectorFilter(std::optional<ConfigHelper::ServerSslOptions> server_ssl_options,
                                bool enable_ja3_fingerprinting = false) {
     std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter(enable_ja3_fingerprinting);
     config_helper_.addListenerFilter(tls_inspector_config);
@@ -134,7 +135,7 @@ public:
       auto* filter = filter_chain->mutable_filters(0);
       envoy::extensions::filters::network::echo::v3::Echo echo;
       filter->set_name("envoy.filters.network.echo");
-      filter->mutable_typed_config()->PackFrom(echo);
+      std::ignore = filter->mutable_typed_config()->PackFrom(echo);
     });
     if (server_ssl_options.has_value()) {
       config_helper_.addSslConfig(server_ssl_options.value());
@@ -573,6 +574,10 @@ tcp_logs:
 TEST_P(TcpGrpcAccessLogIntegrationTest, SslTerminatedWithJA3) {
   setupTlsInspectorFilter(/*ssl_terminate=*/true,
                           /*enable_`ja3`_fingerprinting=*/true);
+  // The fingerprint includes the certificate compression extension, which is opt-in, so enable
+  // the runtime guard explicitly to keep the client hello deterministic.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
   initialize();
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setSni("sni");
@@ -583,8 +588,8 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, SslTerminatedWithJA3) {
   client_->close(Network::ConnectionCloseType::NoFlush);
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
-  ASSERT_TRUE(
-      waitForAccessLogRequest(fmt::format(R"EOF(
+  ASSERT_TRUE(waitForAccessLogRequest(fmt::format(
+      R"EOF(
 identifier:
   node:
     id: node_name
@@ -607,7 +612,7 @@ tcp_logs:
         tls_cipher_suite:
           value: 49199
         tls_sni_hostname: sni
-        ja3_fingerprint: "258098c50651a607e22864521af69746"
+        ja3_fingerprint: "{}"
         local_certificate_properties:
           subject_alt_name:
             uri: "spiffe://lyft.com/backend-team"
@@ -627,9 +632,10 @@ tcp_logs:
       access_log_type: NotSet
     connection_properties:
 )EOF",
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()))));
+      Network::Test::getLoopbackAddressString(ipVersion()),
+      Network::Test::getLoopbackAddressString(ipVersion()),
+      SSL_SELECT("258098c50651a607e22864521af69746", "cd865a85db6b1066e3af8cba28be21ee"),
+      Network::Test::getLoopbackAddressString(ipVersion()))));
 
   cleanup();
 }
@@ -638,6 +644,10 @@ tcp_logs:
 TEST_P(TcpGrpcAccessLogIntegrationTest, SslNotTerminated) {
   setupTlsInspectorFilter(/*ssl_terminate=*/false,
                           /*enable_`ja3`_fingerprinting=*/false);
+  // The forwarded client hello byte count includes the certificate compression extension, which
+  // is opt-in, so enable the runtime guard explicitly to keep the client hello deterministic.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
   initialize();
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setSni("sni");
@@ -648,8 +658,8 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, SslNotTerminated) {
   client_->close(Network::ConnectionCloseType::NoFlush);
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
-  ASSERT_TRUE(
-      waitForAccessLogRequest(fmt::format(R"EOF(
+  ASSERT_TRUE(waitForAccessLogRequest(
+      fmt::format(R"EOF(
 identifier:
   node:
     id: node_name
@@ -663,10 +673,10 @@ tcp_logs:
     common_properties:
       downstream_remote_address:
         socket_address:
-          address: {}
+          address: {0}
       downstream_local_address:
         socket_address:
-          address: {}
+          address: {0}
       upstream_remote_address:
         socket_address:
       upstream_local_address:
@@ -674,16 +684,14 @@ tcp_logs:
       access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
-          address: {}
+          address: {0}
       tls_properties:
         tls_sni_hostname: sni
     connection_properties:
-      received_bytes: 147
-      sent_bytes: 147
+      received_bytes: {1}
+      sent_bytes: {1}
 )EOF",
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()))));
+                  Network::Test::getLoopbackAddressString(ipVersion()), SSL_SELECT(147, 172))));
 
   cleanup();
 }
@@ -692,6 +700,10 @@ tcp_logs:
 TEST_P(TcpGrpcAccessLogIntegrationTest, SslNotTerminatedWithJA3) {
   setupTlsInspectorFilter(/*ssl_terminate=*/false,
                           /*enable_`ja3`_fingerprinting=*/true);
+  // The fingerprint and forwarded byte count include the certificate compression extension, which
+  // is opt-in, so enable the runtime guard explicitly to keep the client hello deterministic.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
   initialize();
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setSni("sni");
@@ -702,8 +714,8 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, SslNotTerminatedWithJA3) {
   client_->close(Network::ConnectionCloseType::NoFlush);
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
-  ASSERT_TRUE(
-      waitForAccessLogRequest(fmt::format(R"EOF(
+  ASSERT_TRUE(waitForAccessLogRequest(fmt::format(
+      R"EOF(
 identifier:
   node:
     id: node_name
@@ -717,10 +729,10 @@ tcp_logs:
     common_properties:
       downstream_remote_address:
         socket_address:
-          address: {}
+          address: {0}
       downstream_local_address:
         socket_address:
-          address: {}
+          address: {0}
       upstream_remote_address:
         socket_address:
       upstream_local_address:
@@ -728,17 +740,17 @@ tcp_logs:
       access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
-          address: {}
+          address: {0}
       tls_properties:
         tls_sni_hostname: sni
-        ja3_fingerprint: "258098c50651a607e22864521af69746"
+        ja3_fingerprint: "{1}"
     connection_properties:
-      received_bytes: 147
-      sent_bytes: 147
+      received_bytes: {2}
+      sent_bytes: {2}
 )EOF",
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()))));
+      Network::Test::getLoopbackAddressString(ipVersion()),
+      SSL_SELECT("258098c50651a607e22864521af69746", "cd865a85db6b1066e3af8cba28be21ee"),
+      SSL_SELECT(147, 172))));
 
   cleanup();
 }
@@ -747,6 +759,10 @@ tcp_logs:
 TEST_P(TcpGrpcAccessLogIntegrationTest, SslNotTerminatedWithJA3NoSNI) {
   setupTlsInspectorFilter(/*ssl_terminate=*/false,
                           /*enable_`ja3`_fingerprinting=*/true);
+  // The fingerprint and forwarded byte count include the certificate compression extension, which
+  // is opt-in, so enable the runtime guard explicitly to keep the client hello deterministic.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
   initialize();
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
@@ -756,8 +772,8 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, SslNotTerminatedWithJA3NoSNI) {
   client_->close(Network::ConnectionCloseType::NoFlush);
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
-  ASSERT_TRUE(
-      waitForAccessLogRequest(fmt::format(R"EOF(
+  ASSERT_TRUE(waitForAccessLogRequest(fmt::format(
+      R"EOF(
 identifier:
   node:
     id: node_name
@@ -771,10 +787,10 @@ tcp_logs:
     common_properties:
       downstream_remote_address:
         socket_address:
-          address: {}
+          address: {0}
       downstream_local_address:
         socket_address:
-          address: {}
+          address: {0}
       upstream_remote_address:
         socket_address:
       upstream_local_address:
@@ -782,16 +798,16 @@ tcp_logs:
       access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
-          address: {}
+          address: {0}
       tls_properties:
-        ja3_fingerprint: "c68cd85633d6847f599328eb2df750b7"
+        ja3_fingerprint: "{1}"
     connection_properties:
-      received_bytes: 135
-      sent_bytes: 135
+      received_bytes: {2}
+      sent_bytes: {2}
 )EOF",
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()))));
+      Network::Test::getLoopbackAddressString(ipVersion()),
+      SSL_SELECT("c68cd85633d6847f599328eb2df750b7", "bcab080434778b813a3903a51fdc90fc"),
+      SSL_SELECT(135, 160))));
 
   cleanup();
 }
@@ -806,6 +822,13 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, TlsHandshakeFailure_VerifyFailed) {
   setupTlsInspectorFilter(server_options);
   initialize();
 
+  const auto peer_certificate_properties = SSL_SELECT(R"EOF(
+          subject_alt_name:
+            - uri: "spiffe://lyft.com/frontend-team"
+          subject: "emailAddress=frontend-team@lyft.com,CN=Test Frontend Team,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
+          issuer: "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
+)EOF",
+                                                      "{}");
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setClientEcdsaCert(false);
   ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
@@ -815,8 +838,8 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, TlsHandshakeFailure_VerifyFailed) {
 
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
-  ASSERT_TRUE(
-      waitForAccessLogRequest(fmt::format(R"EOF(
+  ASSERT_TRUE(waitForAccessLogRequest(fmt::format(
+      R"EOF(
 identifier:
   node:
     id: node_name
@@ -834,7 +857,7 @@ tcp_logs:
       downstream_local_address:
         socket_address:
           address: {0}
-      downstream_transport_failure_reason: "TLS_error:|268435581:SSL routines:OPENSSL_internal:CERTIFICATE_VERIFY_FAILED:verify cert failed: cert hash and spki:TLS_error_end"
+      downstream_transport_failure_reason: "{3}"
       access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
@@ -842,23 +865,25 @@ tcp_logs:
       tls_properties:
         tls_version: TLSv1_2
         tls_cipher_suite:
-          value: 49199
+          value: {1}
         local_certificate_properties:
           subject_alt_name:
             - uri: "spiffe://lyft.com/backend-team"
           subject: "emailAddress=backend-team@lyft.com,CN=Test Backend Team,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
-        peer_certificate_properties:
-          subject_alt_name:
-            - uri: "spiffe://lyft.com/frontend-team"
-          subject: "emailAddress=frontend-team@lyft.com,CN=Test Frontend Team,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
-          issuer: "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
+        peer_certificate_properties: {2}
       upstream_remote_address:
         socket_address: {{}}
       upstream_local_address:
         socket_address: {{}}
     connection_properties: {{}}
 )EOF",
-                                          Network::Test::getLoopbackAddressString(ipVersion()))));
+      Network::Test::getLoopbackAddressString(ipVersion()), SSL_SELECT(49199, 65535),
+      peer_certificate_properties,
+      SSL_SELECT(
+          "TLS_error:|268435581:SSL routines:OPENSSL_internal:CERTIFICATE_VERIFY_FAILED:verify "
+          "cert failed: cert hash and spki:TLS_error_end",
+          "TLS_error:|268435581:SSL "
+          "routines:OPENSSL_internal:CERTIFICATE_VERIFY_FAILED:TLS_error_end"))));
   cleanup();
 }
 

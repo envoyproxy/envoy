@@ -29,6 +29,15 @@ using HttpUri = envoy::config::core::v3::HttpUri;
  */
 class OAuth2Client : public Http::AsyncClient::Callbacks {
 public:
+  // Tracks the state of the OAuth client across a single request lifecycle.
+  enum class OAuthState {
+    Idle,
+    PendingAccessToken,               // Async request for access token is in-flight.
+    PendingAccessTokenByRefreshToken, // Async request to refresh access token is in-flight.
+    FailureContinue, // Request failed; caller should continue decoding (allow-failed path).
+    FailureStop,     // Request failed; caller should stop (local reply or redirect already sent).
+  };
+
   virtual void asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
                                    const std::string& secret, const std::string& cb_url,
                                    const std::string& code_verifier,
@@ -40,6 +49,14 @@ public:
 
   virtual void setCallbacks(FilterCallbacks& callbacks) PURE;
   virtual void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) PURE;
+
+  virtual OAuthState getState() const PURE;
+
+  /**
+   * Cancels any in-flight token request and detaches from the filter so late async completions
+   * cannot invoke filter callbacks or decoder callbacks after stream teardown.
+   */
+  virtual void cancel() PURE;
 
   // Http::AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& m) override PURE;
@@ -55,16 +72,9 @@ public:
       : cm_(cm), uri_(uri), retry_policy_(std::move(retry_policy)),
         default_expires_in_(default_expires_in) {}
 
-  ~OAuth2ClientImpl() override {
-    if (in_flight_request_ != nullptr) {
-      in_flight_request_->cancel();
-    }
-  }
+  ~OAuth2ClientImpl() override { cancel(); }
 
   // OAuth2Client
-  /**
-   * Request the access token from the OAuth server. Calls the `onSuccess` on `onFailure` callbacks.
-   */
   void asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
                            const std::string& secret, const std::string& cb_url,
                            const std::string& code_verifier, AuthType auth_type) override;
@@ -76,6 +86,10 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
   }
+
+  OAuthState getState() const override { return state_; }
+
+  void cancel() override;
 
   // AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& m) override;
@@ -99,8 +113,6 @@ private:
   // if the filter ends before the request completes.
   Http::AsyncClient::Request* in_flight_request_{nullptr};
 
-  enum class OAuthState { Idle, PendingAccessToken, PendingAccessTokenByRefreshToken };
-
   // Due to the asynchronous nature of this functionality, it is helpful to have managed state which
   // is tracked here.
   OAuthState state_{OAuthState::Idle};
@@ -111,6 +123,15 @@ private:
    * @param request the HTTP request to be executed.
    */
   void dispatchRequest(Http::RequestMessagePtr&& request);
+
+  // Calls handleOAuthFailure and either calls continueDecoding() (async path) or sets state_
+  // (sync path) depending on whether the request was already dispatched.
+  void handleOAuthFailure(bool is_request_dispatched, const std::string& reason,
+                          const std::string& extra_details = "");
+
+  // Calls onRefreshAccessTokenFailure and either calls continueDecoding() (async path) or sets
+  // state_ (sync path) depending on whether the request was already dispatched.
+  void handleRefreshTokenFailure(bool is_request_dispatched);
 
   Http::RequestMessagePtr createPostRequest() {
     auto request = Http::Utility::prepareHeaders(uri_);

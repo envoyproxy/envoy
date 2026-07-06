@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -57,7 +58,7 @@ public:
 
   // Temporary storage for the serialized typed filter state value returned by
   // get_filter_state_typed. Valid until the end of the current event hook.
-  absl::optional<std::string> last_serialized_filter_state_;
+  std::optional<std::string> last_serialized_filter_state_;
 
   // Test-only setter for callbacks.
   void setCallbacksForTest(Network::ReadFilterCallbacks* read_callbacks) {
@@ -145,12 +146,10 @@ public:
   void onScheduled(uint64_t event_id);
 
   /**
-   * Get the dispatcher for the worker thread this filter is running on.
-   * Returns nullptr if callbacks are not set.
+   * Returns the worker dispatcher this filter is running on; safe to call from any thread.
+   * Returns nullptr until callbacks are wired and after the filter is destroyed.
    */
-  Event::Dispatcher* dispatcher() {
-    return read_callbacks_ != nullptr ? &read_callbacks_->connection().dispatcher() : nullptr;
-  }
+  Event::Dispatcher* dispatcher() { return cached_dispatcher_.load(std::memory_order_acquire); }
 
   /**
    * Returns the worker index assigned to this filter.
@@ -177,15 +176,21 @@ private:
   const DynamicModuleNetworkFilterConfigSharedPtr config_;
   envoy_dynamic_module_type_network_filter_module_ptr in_module_filter_ = nullptr;
 
+  // Worker-thread only; foreign threads must use `dispatcher()`.
   Network::ReadFilterCallbacks* read_callbacks_ = nullptr;
   Network::WriteFilterCallbacks* write_callbacks_ = nullptr;
 
-  // Current buffers. Set on the first on_read/on_write callback and kept for the lifetime of the
-  // connection so that modules can access buffered data outside of on_read/on_write callbacks.
+  // The connection read buffer, set on the first on_read callback and kept for the lifetime of the
+  // connection so modules can access buffered read data outside of on_read.
   Buffer::Instance* current_read_buffer_ = nullptr;
+  // The write buffer for the active on_write callback only. The connection reuses or moves it after
+  // on_write, so it is restored when the call returns rather than cached.
   Buffer::Instance* current_write_buffer_ = nullptr;
 
   bool destroyed_ = false;
+
+  // Worker dispatcher published at callback-init, cleared on destroy. Read via `dispatcher()`.
+  std::atomic<Event::Dispatcher*> cached_dispatcher_{nullptr};
 
   uint32_t worker_index_;
 
@@ -241,14 +246,24 @@ private:
  */
 class DynamicModuleNetworkFilterScheduler {
 public:
-  DynamicModuleNetworkFilterScheduler(DynamicModuleNetworkFilterWeakPtr filter,
-                                      Event::Dispatcher& dispatcher)
-      : filter_(std::move(filter)), dispatcher_(dispatcher) {}
+  explicit DynamicModuleNetworkFilterScheduler(DynamicModuleNetworkFilterWeakPtr filter)
+      : filter_(std::move(filter)) {}
 
+  // Safe to call from any thread. Reads only the weak_ptr and the atomic dispatcher cache (see
+  // `DynamicModuleNetworkFilter::dispatcher()`); it never dereferences `read_callbacks_` from a
+  // foreign thread.
   void commit(uint64_t event_id) {
-    dispatcher_.post([filter = filter_, event_id]() {
-      if (DynamicModuleNetworkFilterSharedPtr filter_shared = filter.lock()) {
-        filter_shared->onScheduled(event_id);
+    DynamicModuleNetworkFilterSharedPtr filter_shared = filter_.lock();
+    if (!filter_shared) {
+      return;
+    }
+    Event::Dispatcher* dispatcher = filter_shared->dispatcher();
+    if (dispatcher == nullptr) {
+      return;
+    }
+    dispatcher->post([filter = filter_, event_id]() {
+      if (DynamicModuleNetworkFilterSharedPtr fs = filter.lock()) {
+        fs->onScheduled(event_id);
       }
     });
   }
@@ -257,8 +272,6 @@ private:
   // The filter that this scheduler is associated with. Using a weak pointer to avoid unnecessarily
   // extending the lifetime of the filter.
   DynamicModuleNetworkFilterWeakPtr filter_;
-  // The dispatcher is used to post the event to the worker thread that filter_ is assigned to.
-  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace NetworkFilters

@@ -4,11 +4,13 @@
 # are allowed for any otherwise correctly spelled word.
 
 Allshard
+FCS
 FLUSHALL
 NUMPAT
 PUBSUB
 RANDOMKEY
 SLOWLOG
+addend
 addrlen
 defragmentation
 evictable
@@ -16,6 +18,7 @@ flushdb
 itr
 STREQ
 htonl
+htons
 ABI
 ACK
 ACL
@@ -62,9 +65,12 @@ BPF
 Bdecoded
 Bencoded
 CIO
+CBC
+cbc
 cbegin
 cend
 constness
+consume
 cstr
 deadcode
 DFP
@@ -80,6 +86,10 @@ Reserializer
 SION
 TRA
 Websockets
+webtransport
+WEBTRANSPORT
+signalling
+signalled
 abc
 abcd
 abd
@@ -111,6 +121,7 @@ ETX
 FS
 FIXME
 decrypted
+decrypts
 gperf
 HEXDIG
 HEXDIGIT
@@ -121,6 +132,7 @@ Mensah
 NAK
 OWS
 Preconnecting
+CONNECT
 RCVBUF
 RTCP
 RTLD
@@ -180,11 +192,13 @@ DST
 DW
 DWORD
 EAGAIN
+EINTR
 ECDH
 ECDHE
 ECDS
 ECDSA
 ECONNREFUSED
+ECONNRESET
 EDESTRUCTION
 EDF
 EINVAL
@@ -210,6 +224,7 @@ FB
 FCDS
 FCM
 FFFF
+FFI
 FIN
 FIPS
 FIRSTHDR
@@ -253,11 +268,20 @@ Grabbit
 HC
 HCM
 HDS
+HEXPIRE
+HEXPIREAT
+HEXPIRETIME
 HMAC
 HOL
 HPACK
+HPERSIST
+HPEXPIRE
+HPEXPIREAT
+HPEXPIRETIME
+HPTTL
 HTAB
 HTML
+HTTL
 HTTP
 HTTPS
 HV
@@ -376,10 +400,12 @@ OCSP
 OD
 ODCDS
 OKP
+middleware
 middlewildcard
 monostate
 mpd
 msan
+multicluster
 mutators
 mybucket
 myobject
@@ -503,10 +529,12 @@ SS
 SSD
 SSE
 SSL
+SSRF
 STDSTRING
 STL
 STRLEN
 STS
+subcluster
 SUBCOMMAND
 SVG
 SVID
@@ -546,6 +574,7 @@ UTC
 UTF
 UUID
 UUIDs
+Valkey
 VC
 VCHAR
 VCL
@@ -565,6 +594,7 @@ WS
 WSA
 WSABUF
 WSS
+WUFFS
 Welford's
 Wi
 XDS
@@ -600,6 +630,7 @@ alls
 alphanumerics
 amongst
 anno
+Anthropic
 anonymization
 anonymizing
 anys
@@ -702,6 +733,7 @@ ci
 ciphersuite
 ciphersuites
 ciphertext
+ciphertexts
 circllhist
 clientcert
 cloneable
@@ -712,6 +744,7 @@ codebase
 codec
 codecs
 codepath
+codepoint
 codepoints
 codings
 combinatorial
@@ -747,10 +780,13 @@ ctad
 ctor
 ctrl
 customizations
+cutover
 darwin
+datacenter
 datadog
 datagram
 datagrams
+datapath
 de
 deallocate
 deallocated
@@ -827,6 +863,7 @@ encodings
 endian
 endianness
 endl
+enricher
 enqueue
 enqueued
 enqueues
@@ -916,6 +953,7 @@ gso
 gzip
 hackery
 hacky
+handoff
 handshaker
 hardcoded
 hardcodes
@@ -934,6 +972,7 @@ healthz
 hermeticity
 highp
 hl
+hit
 hoc
 hostname
 hostnames
@@ -980,6 +1019,7 @@ iov
 iovcnt
 iovec
 iovecs
+iop
 ips
 iptables
 ish
@@ -1012,6 +1052,7 @@ ldd
 len
 lenenc
 lexically
+libbpf
 libc
 libevent
 libprotobuf
@@ -1135,9 +1176,11 @@ nulled
 nullopt
 nullptr
 num
+numfields
 numkeys
 oauth
 observability
+observations
 ocagent
 offsetof
 oneof
@@ -1146,6 +1189,7 @@ oob
 opcode
 openid
 openssl
+OpenAI
 opentracing
 optimizations
 optname
@@ -1292,6 +1336,7 @@ refcount
 referencee
 referer
 refetch
+refill
 reframed
 refvec
 regex
@@ -1401,7 +1446,9 @@ snapshotted
 sockaddr
 socketpair
 sockfd
+sockhash
 socklen
+sockmap
 sockopt
 sockopts
 somestring
@@ -1428,6 +1475,7 @@ str
 streambuf
 strerr
 strerror
+string
 stringbuf
 stringified
 stringify
@@ -1450,6 +1498,7 @@ submessages
 subnet
 subnets
 suboptimal
+subprocess
 subsecond
 subseconds
 subsegment
@@ -1466,6 +1515,7 @@ subzone
 sudo
 suf
 superclass
+superpod
 superroot
 superset
 supportability
@@ -1486,6 +1536,7 @@ tchars
 tcmalloc
 tcpdump
 teardown
+teardowns
 tempdir
 templated
 templating
@@ -1507,10 +1558,14 @@ timestamps
 timeval
 tmp
 tmpfile
+tmpfs
+token
 tokenize
 tokenized
+tokenizer
 tokenizes
 tokenizing
+tokio
 toolchain
 tos
 traceid
@@ -1552,6 +1607,7 @@ unittest
 unix
 unref
 unreferenced
+dereferenced
 unzigzag
 upcasts
 upsert
@@ -1578,6 +1634,8 @@ variadic
 varint
 vec
 vectorize
+VBC
+VBD
 ver
 verifier
 verifiers
@@ -1692,3 +1750,10 @@ nblk
 chr
 IWYU
 CRTP
+bitrate
+kbps
+dataset
+datasets
+smartptr
+JA3
+JA4

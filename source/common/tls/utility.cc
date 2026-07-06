@@ -12,6 +12,7 @@
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/ssl/ssl.h"
 
 #include "absl/strings/str_join.h"
 #include "openssl/x509v3.h"
@@ -448,19 +449,18 @@ std::chrono::seconds Utility::getExpirationUnixTime(const X509* cert) {
   return std::chrono::duration_cast<std::chrono::seconds>(expiration_time.time_since_epoch());
 }
 
-absl::optional<uint32_t> Utility::getDaysUntilExpiration(const X509* cert,
-                                                         TimeSource& time_source) {
+std::optional<uint32_t> Utility::getDaysUntilExpiration(const X509* cert, TimeSource& time_source) {
   if (cert == nullptr) {
-    return absl::make_optional(std::numeric_limits<uint32_t>::max());
+    return std::make_optional(std::numeric_limits<uint32_t>::max());
   }
   int days, seconds;
   if (ASN1_TIME_diff(&days, &seconds, currentASN1Time(time_source).get(),
                      X509_get0_notAfter(cert))) {
     if (days >= 0 && seconds >= 0) {
-      return absl::make_optional(days);
+      return std::make_optional(days);
     }
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 std::vector<std::string> Utility::getCertificateExtensionOids(X509& cert) {
@@ -529,7 +529,7 @@ SystemTime Utility::getExpirationTime(const X509& cert) {
   return std::chrono::system_clock::from_time_t(static_cast<time_t>(days) * 24 * 60 * 60 + seconds);
 }
 
-absl::optional<std::string> Utility::getLastCryptoError() {
+std::optional<std::string> Utility::getLastCryptoError() {
   auto err = ERR_get_error();
 
   if (err != 0) {
@@ -539,7 +539,7 @@ absl::optional<std::string> Utility::getLastCryptoError() {
     return std::string(errbuf);
   }
 
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 absl::string_view Utility::getErrorDescription(int err) {
@@ -624,7 +624,8 @@ std::vector<std::string> Utility::getCertificateCrlDpsForLogging(X509* cert) {
   if (dist_points != nullptr) {
     for (const DIST_POINT* dp : dist_points.get()) {
       if (dp->distpoint != nullptr && dp->distpoint->type == 0) {
-        GENERAL_NAMES* names = dp->distpoint->name.fullname;
+        GENERAL_NAMES* names =
+            ENVOY_OPENSSL_CAST(reinterpret_cast<GENERAL_NAMES*>, dp->distpoint->name.fullname);
         if (names != nullptr) {
           for (const GENERAL_NAME* general_name : names) {
             crldps.push_back(Utility::generalNameAsString(general_name));

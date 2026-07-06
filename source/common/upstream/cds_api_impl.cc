@@ -28,20 +28,21 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
                        ProtobufMessage::ValidationVisitor& validation_visitor,
                        Server::Configuration::ServerFactoryContext& factory_context,
                        bool support_multi_ads_sources, absl::Status& creation_status)
-    : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(validation_visitor,
-                                                                           "name"),
-      helper_(cm, factory_context.xdsManager(), "cds"), cm_(cm),
+    : helper_(cm, factory_context.xdsManager(), "cds"),
+      resource_type_helper_(validation_visitor, "name"), cm_(cm),
       scope_(scope.createScope("cluster_manager.cds.")), factory_context_(factory_context),
       stats_({ALL_CDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
       support_multi_ads_sources_(support_multi_ads_sources) {
-  const auto resource_name = getResourceName();
+  const auto resource_name = resource_type_helper_.getResourceName();
   absl::StatusOr<Config::SubscriptionPtr> subscription_or_error;
   if (cds_resources_locator == nullptr) {
     subscription_or_error = cm_.subscriptionFactory().subscriptionFromConfigSource(
-        cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
+        cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this,
+        resource_type_helper_.resourceDecoder(), {});
   } else {
     subscription_or_error = cm.subscriptionFactory().collectionSubscriptionFromUrl(
-        *cds_resources_locator, cds_config, resource_name, *scope_, *this, resource_decoder_);
+        *cds_resources_locator, cds_config, resource_name, *scope_, *this,
+        resource_type_helper_.resourceDecoder());
   }
   SET_AND_RETURN_IF_NOT_OK(subscription_or_error.status(), creation_status);
   subscription_ = std::move(*subscription_or_error);

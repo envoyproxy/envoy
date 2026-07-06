@@ -35,6 +35,12 @@ constexpr absl::string_view ERROR_FIELD = "error";
 
 // MCP Initialize constants
 constexpr absl::string_view LATEST_SUPPORTED_MCP_VERSION = "2025-11-25";
+// Based on the 2025-11-25 spec, if the MCP-Protocol-Version header is not
+// provided, the fallback protocol version is 2025-03-26.
+// https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#protocol-version-header
+constexpr absl::string_view FALLBACK_PROTOCOL_VERSION = "2025-03-26";
+constexpr absl::string_view MCP_VERSION_2024_11_05 = "2024-11-05";
+constexpr absl::string_view MCP_VERSION_2025_06_18 = "2025-06-18";
 constexpr absl::string_view PROTOCOL_VERSION_FIELD = "protocolVersion";
 constexpr absl::string_view CAPABILITIES_FIELD = "capabilities";
 constexpr absl::string_view TOOLS_FIELD = "tools";
@@ -45,9 +51,11 @@ constexpr absl::string_view VERSION_FIELD = "version";
 constexpr absl::string_view DEFAULT_SERVER_VERSION = "1.0.0";
 
 constexpr absl::string_view IS_MCP_REQUEST = "is_mcp_request";
+constexpr absl::string_view IS_EXCEEDING_LIMIT = "is_exceeding_limit";
 
 // HTTP header names
 constexpr absl::string_view MCP_SESSION_ID_HEADER = "mcp-session-id";
+constexpr absl::string_view MCP_PROTOCOL_VERSION_HEADER = "mcp-protocol-version";
 
 // Method names
 namespace Methods {
@@ -80,6 +88,9 @@ constexpr absl::string_view SAMPLING_CREATE_MESSAGE = "sampling/createMessage";
 
 // Utility
 constexpr absl::string_view PING = "ping";
+
+// Synthetic method for JSON-RPC responses (no "method" field).
+constexpr absl::string_view JSONRPC_RESPONSE = "__jsonrpc_response";
 
 // Notification prefix
 constexpr absl::string_view NOTIFICATION_PREFIX = "notifications/";

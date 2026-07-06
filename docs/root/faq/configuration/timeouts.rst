@@ -57,7 +57,12 @@ Connection timeouts apply to the entire HTTP connection and all streams the conn
   lifetime in this scenario prevents holding onto healthy connections even after they would otherwise be
   undiscoverable. To modify the max connection duration for downstream connections use the
   :ref:`common_http_protocol_options <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.common_http_protocol_options>`
-  field in the HTTP connection manager configuration. To modify the max connection duration for upstream connections use the
+  field in the HTTP connection manager configuration. Optionally, :ref:`max_connection_duration_jitter
+  <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration_jitter>` (downstream
+  only) can extend the effective duration by a random amount up to
+  ``max_connection_duration * jitter / 100``, preventing a thundering-herd of reconnects when many
+  connections are established at roughly the same time. To modify the max connection duration for
+  upstream connections use the
   :ref:`common_http_protocol_options <envoy_v3_api_field_config.cluster.v3.Cluster.common_http_protocol_options>` field in the cluster configuration.
 
 * The HTTP connection manager :ref:`drain_timeout
@@ -72,7 +77,11 @@ Connection timeouts apply to the entire HTTP connection and all streams the conn
   connection hits the :ref:`idle_timeout <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.idle_timeout>`,
   when :ref:`max_connection_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>`
   is reached, or during general server draining. The default grace period is *5000 milliseconds (5 seconds)*
-  if this option is not specified.
+  if this option is not specified. Optionally, :ref:`drain_timeout_jitter
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout_jitter>`
+  can extend the grace period by a random amount up to ``drain_timeout * jitter / 100``, staggering
+  the final ``GOAWAY`` across simultaneously-draining connections to mitigate thundering-herd
+  reconnects.
 
 See :ref:`below <faq_configuration_timeouts_transport_socket>` for other connection timeouts.
 
@@ -126,9 +135,21 @@ stream timeouts already introduced above.
 
   .. attention::
 
-    This timeout defaults to *15 seconds*, however, it is not compatible with streaming responses
-    (responses that never end), and will need to be disabled. Stream idle timeouts should be used
-    in the case of streaming APIs as described elsewhere on this page.
+    This timeout defaults to *15 seconds*. This is typically a problem for streaming responses
+    (or any responses that are not expected to end within 15 seconds), and will need to be
+    disabled by setting to 0, or set to a long enough value. Typically
+    :ref:`idle_timeout <envoy_v3_api_field_config.route.v3.RouteAction.idle_timeout>`
+    should be used in the case of streaming APIs as described elsewhere on this page.
+
+  .. attention::
+
+    This timeout will not be triggered by streaming *requests*, as it only begins when the
+    request is complete. If you wish to have a timeout that applies to streaming requests,
+    it is recommended to set ``timeout`` to 0 to disable it, and use
+    :ref:`max_stream_duration <envoy_v3_api_field_config.route.v3.RouteAction.max_stream_duration>`
+    and/or :ref:`idle_timeout <envoy_v3_api_field_config.route.v3.RouteAction.idle_timeout>`,
+    whose timers start when the request begins.
+
 * The route :ref:`idle_timeout <envoy_v3_api_field_config.route.v3.RouteAction.idle_timeout>` allows overriding
   of the HTTP connection manager :ref:`stream_idle_timeout
   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_idle_timeout>`

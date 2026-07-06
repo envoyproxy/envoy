@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "envoy/api/api.h"
 #include "envoy/common/random_generator.h"
@@ -18,8 +19,6 @@
 #include "source/common/config/remote_data_fetcher.h"
 #include "source/common/config/watched_directory.h"
 #include "source/common/init/target_impl.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Config {
@@ -62,9 +61,9 @@ absl::StatusOr<std::string> read(const envoy::config::core::v3::DataSource& sour
 
 /**
  * @param source data source.
- * @return absl::optional<std::string> path to DataSource if a filename, otherwise absl::nullopt.
+ * @return std::optional<std::string> path to DataSource if a filename, otherwise std::nullopt.
  */
-absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& source);
+std::optional<std::string> getPath(const envoy::config::core::v3::DataSource& source);
 
 template <class DataType>
 using DataTransform = std::function<absl::StatusOr<std::shared_ptr<DataType>>(absl::string_view)>;
@@ -95,7 +94,7 @@ public:
               std::shared_ptr<DataType> initial_data, uint64_t initial_hash,
               absl::AnyInvocable<void()> cleanup, absl::Status& creation_status)
       : dispatcher_(main_dispatcher), api_(api), options_(options), filename_(source.filename()),
-        data_transform_(data_transform_cb), hash_(initial_hash), cleanup_(std::move(cleanup)) {
+        data_transform_cb_(data_transform_cb), hash_(initial_hash), cleanup_(std::move(cleanup)) {
     slot_ =
         ThreadLocal::TypedSlot<typename DynamicData<DataType>::ThreadLocalData>::makeUnique(tls);
     slot_->set([initial_data = std::move(initial_data)](Event::Dispatcher&) {
@@ -148,7 +147,7 @@ private:
         return absl::OkStatus();
       }
     }
-    auto transformed_new_data_or_error = data_transform_(new_data_or_error.value());
+    auto transformed_new_data_or_error = data_transform_cb_(new_data_or_error.value());
     if (!transformed_new_data_or_error.ok()) {
       // Log an error but don't fail the watch to avoid throwing EnvoyException at runtime.
       ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::config), error,
@@ -173,7 +172,7 @@ private:
   Api::Api& api_;
   const ProviderOptions options_;
   const std::string filename_;
-  DataTransform<DataType> data_transform_;
+  DataTransform<DataType> data_transform_cb_;
   uint64_t hash_;
   absl::AnyInvocable<void()> cleanup_;
   ThreadLocal::TypedSlotPtr<ThreadLocalData> slot_;
@@ -214,7 +213,7 @@ public:
          ThreadLocal::SlotAllocator& tls, Api::Api& api, bool allow_empty,
          DataTransform<DataType> data_transform_cb, uint64_t max_size) {
     return create(source, main_dispatcher, tls, api, data_transform_cb,
-                  {.allow_empty = allow_empty, .max_size = max_size});
+                  {.allow_empty = allow_empty, .max_size = max_size}, {});
   }
 
   static absl::StatusOr<DataSourceProviderPtr<DataType>>
@@ -292,14 +291,14 @@ public:
   ProviderSingleton(Event::Dispatcher& main_dispatcher, ThreadLocal::SlotAllocator& tls,
                     Api::Api& api, DataTransform<DataType> data_transform_cb,
                     const ProviderOptions& options)
-      : dispatcher_(main_dispatcher), tls_(tls), api_(api), data_transform_(data_transform_cb),
+      : dispatcher_(main_dispatcher), tls_(tls), api_(api), data_transform_cb_(data_transform_cb),
         options_(options) {}
 
   absl::StatusOr<DataSourceProviderSharedPtr<DataType>> getOrCreate(const ProtoDataSource& source) {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (!usesFileWatching(source, options_)) {
-      return DataSourceProvider<DataType>::create(source, dispatcher_, tls_, api_, data_transform_,
-                                                  options_);
+      return DataSourceProvider<DataType>::create(source, dispatcher_, tls_, api_,
+                                                  data_transform_cb_, options_, {});
     }
     const size_t config_hash = MessageUtil::hash(source);
     auto it = dynamic_providers_.find(config_hash);
@@ -313,7 +312,7 @@ public:
     // Cleanup is guaranteed to execute on the main dispatcher during destruction but may happen
     // after the singleton is released.
     auto provider_or_error = DataSourceProvider<DataType>::create(
-        source, dispatcher_, tls_, api_, data_transform_, options_,
+        source, dispatcher_, tls_, api_, data_transform_cb_, options_,
         [weak_this = this->weak_from_this(), config_hash] {
           if (auto locked_this = weak_this.lock(); locked_this) {
             locked_this->cleanup(config_hash);
@@ -335,7 +334,7 @@ private:
   Event::Dispatcher& dispatcher_;
   ThreadLocal::SlotAllocator& tls_;
   Api::Api& api_;
-  DataTransform<DataType> data_transform_;
+  DataTransform<DataType> data_transform_cb_;
   const ProviderOptions options_;
   absl::flat_hash_map<size_t, std::weak_ptr<DataSourceProvider<DataType>>> dynamic_providers_;
 };

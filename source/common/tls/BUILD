@@ -57,6 +57,7 @@ envoy_cc_library(
     deps = [
         "//envoy/buffer:buffer_interface",
         "//envoy/network:io_handle_interface",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 
@@ -89,7 +90,6 @@ envoy_cc_library(
         "@abseil-cpp//absl/container:node_hash_set",
         "@abseil-cpp//absl/hash",
         "@abseil-cpp//absl/synchronization",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -103,7 +103,6 @@ envoy_cc_library(
         "@abseil-cpp//absl/container:node_hash_set",
         "@abseil-cpp//absl/hash",
         "@abseil-cpp//absl/synchronization",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -117,7 +116,6 @@ envoy_cc_library(
         "@abseil-cpp//absl/container:node_hash_set",
         "@abseil-cpp//absl/hash",
         "@abseil-cpp//absl/synchronization",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -150,6 +148,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/secret:sds_api_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/common/ssl:tls_certificate_config_impl_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
@@ -162,6 +161,7 @@ envoy_cc_library(
     deps = [
         ":context_config_lib",
         ":server_context_lib",
+        "//source/common/ssl:ssl_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
@@ -259,6 +259,7 @@ envoy_cc_library(
         "//source/common/common:safe_memcpy_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
+        "//source/common/ssl:ssl_lib",
     ],
 )
 

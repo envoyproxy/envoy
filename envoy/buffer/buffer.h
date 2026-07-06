@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/api/os_sys_calls.h"
@@ -16,8 +17,8 @@
 #include "source/common/common/utility.h"
 
 #include "absl/container/inlined_vector.h"
+#include "absl/functional/any_invocable.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 
 namespace Envoy {
@@ -233,8 +234,7 @@ public:
    * @param max_slices supplies an optional limit on the number of slices to fetch, for performance.
    * @return RawSliceVector with non-empty slices in the buffer.
    */
-  virtual RawSliceVector
-  getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const PURE;
+  virtual RawSliceVector getRawSlices(std::optional<uint64_t> max_slices = std::nullopt) const PURE;
 
   /**
    * Fetch the valid data pointer and valid data length of the first non-zero-length
@@ -552,9 +552,9 @@ public:
    *   high watermark.
    * @return a newly created InstancePtr.
    */
-  virtual InstancePtr createBuffer(std::function<void()> below_low_watermark,
-                                   std::function<void()> above_high_watermark,
-                                   std::function<void()> above_overflow_watermark) PURE;
+  virtual InstancePtr createBuffer(absl::AnyInvocable<void()> below_low_watermark,
+                                   absl::AnyInvocable<void()> above_high_watermark,
+                                   absl::AnyInvocable<void()> above_overflow_watermark) PURE;
 
   /**
    * Create and returns a buffer memory account.

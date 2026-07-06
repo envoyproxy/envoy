@@ -7,7 +7,6 @@
 #include "source/common/http/codec_client.h"
 
 #include "test/mocks/common.h"
-#include "test/mocks/event/mocks.h"
 
 namespace Envoy {
 /**
@@ -42,7 +41,7 @@ public:
  */
 struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
   void onPoolReady(Http::RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
-                   StreamInfo::StreamInfo&, absl::optional<Http::Protocol>) override {
+                   StreamInfo::StreamInfo&, std::optional<Http::Protocol>) override {
     outer_encoder_ = &encoder;
     host_ = host;
     pool_ready_.ready();

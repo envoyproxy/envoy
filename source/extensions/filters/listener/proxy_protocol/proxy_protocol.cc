@@ -19,6 +19,7 @@
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/common/base64.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/hex.h"
@@ -77,7 +78,7 @@ public:
     return s;
   }
 
-  absl::optional<std::string> serializeAsString() const override {
+  std::optional<std::string> serializeAsString() const override {
     Protobuf::Struct struct_proto;
     for (const auto& [key, value] : tlv_values_) {
       (*struct_proto.mutable_fields())[key] = ValueUtil::stringValue(value);
@@ -86,7 +87,7 @@ public:
     if (json_or_error.ok()) {
       return json_or_error.value();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   bool hasFieldSupport() const override { return true; }
@@ -308,8 +309,7 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
           std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolDataWithVersion{
               {socket.connectionInfoProvider().remoteAddress(),
                socket.connectionInfoProvider().localAddress(), parsed_tlvs_},
-              absl::make_optional(header_version_)}),
-          StreamInfo::FilterState::StateType::Mutable,
+              std::make_optional(header_version_)}),
           StreamInfo::FilterState::LifeSpan::Connection);
     } else {
       ENVOY_LOG(
@@ -326,8 +326,7 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
           std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolDataWithVersion{
               {proxy_protocol_header_.value().remote_address_,
                proxy_protocol_header_.value().local_address_, parsed_tlvs_},
-              absl::make_optional(header_version_)}),
-          StreamInfo::FilterState::StateType::Mutable,
+              std::make_optional(header_version_)}),
           StreamInfo::FilterState::LifeSpan::Connection);
     }
   }
@@ -368,7 +367,7 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
   return ReadOrParseState::Done;
 }
 
-absl::optional<size_t> Filter::lenV2Address(const char* buf) {
+std::optional<size_t> Filter::lenV2Address(const char* buf) {
   const uint8_t proto_family = buf[PROXY_PROTO_V2_SIGNATURE_LEN + 1];
   const int ver_cmd = buf[PROXY_PROTO_V2_SIGNATURE_LEN];
   size_t len;
@@ -387,7 +386,7 @@ absl::optional<size_t> Filter::lenV2Address(const char* buf) {
     break;
   default:
     ENVOY_LOG(debug, "Unsupported V2 proxy protocol address family");
-    return absl::nullopt;
+    return std::nullopt;
   }
   return len;
 }
@@ -606,9 +605,16 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
     absl::string_view tlv_value(reinterpret_cast<char const*>(buf + idx), tlv_value_length);
     auto key_value_pair = config_->isTlvTypeNeeded(tlv_type);
     if (nullptr != key_value_pair) {
-      // Sanitize any non utf8 characters.
-      auto sanitised_tlv_value = MessageUtil::sanitizeUtf8String(tlv_value);
-      std::string sanitised_value(sanitised_tlv_value.data(), sanitised_tlv_value.size());
+      // Encode the TLV value as configured.
+      std::string sanitised_value;
+      if (key_value_pair->value_string_encoding() ==
+          envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
+              BASE64) {
+        sanitised_value = Base64::encode(tlv_value.data(), tlv_value.size());
+      } else {
+        // Default sanitization is to replace non-UTF-8 characters with `!` character.
+        sanitised_value = MessageUtil::sanitizeUtf8String(tlv_value);
+      }
 
       if (config_->tlvLocation() ==
           envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::FILTER_STATE) {
@@ -624,7 +630,6 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
           auto new_obj = std::make_unique<TlvFilterStateObject>();
           tlv_filter_state_obj = new_obj.get();
           cb_->filterState().setData(kFilterStateKey, std::move(new_obj),
-                                     StreamInfo::FilterState::StateType::ReadOnly,
                                      StreamInfo::FilterState::LifeSpan::Connection);
           ENVOY_LOG(trace, "proxy_protocol: Created TLV FilterState object");
         }
@@ -651,7 +656,7 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
         } else {
           (*tlvs_metadata.mutable_typed_metadata())[key_value_pair->key()] = tlv_value;
           Protobuf::Any typed_metadata;
-          typed_metadata.PackFrom(tlvs_metadata);
+          std::ignore = typed_metadata.PackFrom(tlvs_metadata);
           cb_->setDynamicTypedMetadata(metadata_key, typed_metadata);
         }
         // Always populate untyped metadata for backwards compatibility.
@@ -746,7 +751,7 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
       ENVOY_LOG(debug, "Unsupported V2 proxy protocol version");
       return ReadOrParseState::Error;
     }
-    absl::optional<ssize_t> addr_len_opt = lenV2Address(buf);
+    std::optional<ssize_t> addr_len_opt = lenV2Address(buf);
     if (!addr_len_opt.has_value()) {
       return ReadOrParseState::Error;
     }

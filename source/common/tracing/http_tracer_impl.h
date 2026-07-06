@@ -36,13 +36,13 @@ public:
       return Http::HeaderMap::Iterate::Break;
     });
   }
-  absl::optional<absl::string_view> get(absl::string_view key) const override {
+  std::optional<absl::string_view> get(absl::string_view key) const override {
     Http::LowerCaseString lower_key{std::string(key)};
     const auto entry = request_headers_.get(lower_key);
     if (!entry.empty()) {
       return entry[0]->value().getStringView();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
   void set(absl::string_view, absl::string_view) override {}
   void remove(absl::string_view) override {}
@@ -74,8 +74,8 @@ public:
 class HttpTracerUtility {
 public:
   /**
-   * Adds information obtained from the downstream request headers as tags to the active span.
-   * Then finishes the span.
+   * Adds information obtained from the downstream request headers as tags if the span will be
+   * exported (per Span::exportedSpan), then finishes the span.
    */
   static void finalizeDownstreamSpan(Span& span, const Http::RequestHeaderMap* request_headers,
                                      const Http::ResponseHeaderMap* response_headers,

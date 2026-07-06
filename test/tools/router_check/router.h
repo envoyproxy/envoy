@@ -15,7 +15,7 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/global.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -149,7 +149,8 @@ private:
                           envoy::RouterCheckToolSchema::ValidationFailure& failure);
   bool compareRedirectPath(ToolConfig& tool_config,
                            const envoy::RouterCheckToolSchema::ValidationAssert& expected,
-                           envoy::RouterCheckToolSchema::ValidationFailure& failure);
+                           envoy::RouterCheckToolSchema::ValidationFailure& failure,
+                           const StreamInfo::StreamInfo& stream_info);
   bool compareRedirectCode(ToolConfig& tool_config,
                            const envoy::RouterCheckToolSchema::ValidationAssert& expected,
                            envoy::RouterCheckToolSchema::ValidationFailure& failure);

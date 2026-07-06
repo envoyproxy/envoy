@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "envoy/http/async_client.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listener_filter_buffer.h"
@@ -66,12 +68,10 @@ public:
   void onScheduled(uint64_t event_id);
 
   /**
-   * Get the dispatcher for the worker thread this filter is running on.
-   * Returns nullptr if callbacks are not set.
+   * Returns the worker dispatcher this filter is running on; safe to call from any thread.
+   * Returns nullptr until callbacks are wired and after the filter is destroyed.
    */
-  Event::Dispatcher* dispatcher() {
-    return callbacks_ != nullptr ? &callbacks_->dispatcher() : nullptr;
-  }
+  Event::Dispatcher* dispatcher() { return cached_dispatcher_.load(std::memory_order_acquire); }
 
   /**
    * Returns the worker index assigned to this filter.
@@ -99,6 +99,7 @@ private:
   const DynamicModuleListenerFilterConfigSharedPtr config_;
   envoy_dynamic_module_type_listener_filter_module_ptr in_module_filter_ = nullptr;
 
+  // Worker-thread only; foreign threads must use `dispatcher()`.
   Network::ListenerFilterCallbacks* callbacks_ = nullptr;
 
   // Current buffer, only valid during onData callback.
@@ -109,7 +110,10 @@ private:
 
   bool destroyed_ = false;
 
-  uint32_t worker_index_;
+  // Worker dispatcher published at callback-init, cleared on destroy. Read via `dispatcher()`.
+  std::atomic<Event::Dispatcher*> cached_dispatcher_{nullptr};
+
+  uint32_t worker_index_ = 0;
 
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
@@ -145,6 +149,29 @@ private:
 };
 
 /**
+ * Adapts a shared_ptr-owned DynamicModuleListenerFilter to the unique_ptr that the listener
+ * filter manager requires. Shared ownership is needed because the async HTTP callout and
+ * scheduler paths call shared_from_this. Every ListenerFilter method forwards to the filter.
+ */
+class SharedListenerFilterAdapter : public Network::ListenerFilter {
+public:
+  explicit SharedListenerFilterAdapter(DynamicModuleListenerFilterSharedPtr filter)
+      : filter_(std::move(filter)) {}
+
+  Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
+    return filter_->onAccept(cb);
+  }
+  Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override {
+    return filter_->onData(buffer);
+  }
+  void onClose() override { filter_->onClose(); }
+  size_t maxReadBytes() const override { return filter_->maxReadBytes(); }
+
+private:
+  const DynamicModuleListenerFilterSharedPtr filter_;
+};
+
+/**
  * This class is used to schedule a listener filter event hook from a different thread
  * than the one it was assigned to. This is created via
  * envoy_dynamic_module_callback_listener_filter_scheduler_new and deleted via
@@ -152,14 +179,24 @@ private:
  */
 class DynamicModuleListenerFilterScheduler {
 public:
-  DynamicModuleListenerFilterScheduler(DynamicModuleListenerFilterWeakPtr filter,
-                                       Event::Dispatcher& dispatcher)
-      : filter_(std::move(filter)), dispatcher_(dispatcher) {}
+  explicit DynamicModuleListenerFilterScheduler(DynamicModuleListenerFilterWeakPtr filter)
+      : filter_(std::move(filter)) {}
 
+  // Safe to call from any thread. Reads only the weak_ptr and the atomic dispatcher cache (see
+  // `DynamicModuleListenerFilter::dispatcher()`); it never dereferences `callbacks_` from a
+  // foreign thread.
   void commit(uint64_t event_id) {
-    dispatcher_.post([filter = filter_, event_id]() {
-      if (DynamicModuleListenerFilterSharedPtr filter_shared = filter.lock()) {
-        filter_shared->onScheduled(event_id);
+    DynamicModuleListenerFilterSharedPtr filter_shared = filter_.lock();
+    if (!filter_shared) {
+      return;
+    }
+    Event::Dispatcher* dispatcher = filter_shared->dispatcher();
+    if (dispatcher == nullptr) {
+      return;
+    }
+    dispatcher->post([filter = filter_, event_id]() {
+      if (DynamicModuleListenerFilterSharedPtr fs = filter.lock()) {
+        fs->onScheduled(event_id);
       }
     });
   }
@@ -168,8 +205,6 @@ private:
   // The filter that this scheduler is associated with. Using a weak pointer to avoid unnecessarily
   // extending the lifetime of the filter.
   DynamicModuleListenerFilterWeakPtr filter_;
-  // The dispatcher is used to post the event to the worker thread that filter_ is assigned to.
-  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace ListenerFilters

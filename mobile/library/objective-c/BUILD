@@ -54,7 +54,7 @@ envoy_objc_library(
         ":envoy_key_value_store_bridge_impl_lib",
         ":envoy_key_value_store_lib",
         ":envoy_objc_bridge_lib",
-        "//library/cc:engine_builder_lib",
+        "//library/cc:mobile_engine_builder_lib",
         "//library/cc:network_change_monitor_interface",
         "//library/common:internal_engine_lib",
         "//library/common/api:c_types",

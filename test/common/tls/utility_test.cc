@@ -12,6 +12,7 @@
 #include "test/common/tls/test_data/long_validity_cert_info.h"
 #include "test/common/tls/test_data/san_dns_cert_info.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -235,7 +236,7 @@ TEST(UtilityTest, TestDaysUntilExpiration) {
   Event::SimulatedTimeSystem time_source;
   time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
 
-  EXPECT_EQ(absl::nullopt, Utility::getDaysUntilExpiration(cert.get(), time_source));
+  EXPECT_EQ(std::nullopt, Utility::getDaysUntilExpiration(cert.get(), time_source));
 }
 
 TEST(UtilityTest, TestDaysUntilExpirationWithNull) {
@@ -325,7 +326,9 @@ TEST(UtilityTest, SslErrorDescriptionTest) {
       {SSL_ERROR_SSL, "SSL"},
       {SSL_ERROR_WANT_READ, "WANT_READ"},
       {SSL_ERROR_WANT_WRITE, "WANT_WRITE"},
+#ifdef SSL_ERROR_WANT_PRIVATE_KEY_OPERATION
       {SSL_ERROR_WANT_PRIVATE_KEY_OPERATION, "WANT_PRIVATE_KEY_OPERATION"},
+#endif
   };
 
   for (const auto& test_data : test_set) {

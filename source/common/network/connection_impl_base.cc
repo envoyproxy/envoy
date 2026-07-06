@@ -28,6 +28,14 @@ void ConnectionImplBase::removeConnectionCallbacks(ConnectionCallbacks& callback
   }
 }
 
+void ConnectionImplBase::onDrain() {
+  for (ConnectionCallbacks* callback : callbacks_) {
+    if (callback != nullptr) {
+      callback->onDrain();
+    }
+  }
+}
+
 OptRef<const StreamInfo::StreamInfo> ConnectionImplBase::trackedStream() const {
   return streamInfo();
 }
@@ -76,6 +84,29 @@ void ConnectionImplBase::onDelayedCloseTimeout() {
   }
   closeConnectionImmediatelyWithDetails(
       StreamInfo::LocalCloseReasons::get().TriggeredDelayedCloseTimeout);
+}
+
+void ConnectionImplBase::onFilterAboveHighWatermark() {
+  ++above_high_watermark_count_;
+  if (above_high_watermark_count_ == 1) {
+    for (ConnectionCallbacks* callback : callbacks_) {
+      if (callback) {
+        callback->onAboveWriteBufferHighWatermark();
+      }
+    }
+  }
+}
+
+void ConnectionImplBase::onFilterBelowLowWatermark() {
+  ASSERT(above_high_watermark_count_ > 0);
+  --above_high_watermark_count_;
+  if (above_high_watermark_count_ == 0) {
+    for (ConnectionCallbacks* callback : callbacks_) {
+      if (callback) {
+        callback->onBelowWriteBufferLowWatermark();
+      }
+    }
+  }
 }
 
 } // namespace Network

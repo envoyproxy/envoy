@@ -1,7 +1,8 @@
 #include "source/extensions/filters/http/file_system_buffer/config.h"
 #include "source/extensions/filters/http/file_system_buffer/filter.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -319,7 +320,7 @@ TEST_F(FileSystemBufferFilterConfigTest, ValidConfigWithServerContext) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   FileSystemBufferFilterFactory factory;
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

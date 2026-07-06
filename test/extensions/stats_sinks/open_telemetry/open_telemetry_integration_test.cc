@@ -17,6 +17,8 @@
 #include "opentelemetry/proto/resource/v1/resource.pb.h"
 
 using testing::AssertionResult;
+using testing::Eq;
+using testing::Ge;
 
 namespace Envoy {
 namespace {
@@ -88,7 +90,7 @@ public:
       envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
       driver_.configureExporter(sink_config, fake_upstreams_.back()->localAddress());
       sink_config.set_prefix(stat_prefix_);
-      metrics_sink->mutable_typed_config()->PackFrom(sink_config);
+      std::ignore = metrics_sink->mutable_typed_config()->PackFrom(sink_config);
 
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(500));
@@ -132,6 +134,20 @@ public:
       checker(metrics, known_counter_exists, known_gauge_exists, known_histogram_exists);
 
       driver_.sendResponse(otlp_collector_request_);
+    }
+
+    // Drain any metrics-export streams that piled up on the connection while we were
+    // looping above. Each iteration of the loop only handles one stream, but the
+    // stats flush timer keeps firing and queuing more. Leaving them unresponded to
+    // keeps cluster.otlp_collector.upstream_rq_active > 0, which then trips the
+    // subsequent expectUpstreamRequestFinished() wait in the EnvoyGrpc variant.
+    while (true) {
+      FakeStreamPtr pending;
+      if (!fake_metrics_service_connection_->waitForNewStream(*dispatcher_, pending,
+                                                              std::chrono::milliseconds(10))) {
+        break;
+      }
+      driver_.sendResponse(pending);
     }
 
     EXPECT_TRUE(known_counter_exists);
@@ -214,9 +230,9 @@ private:
             // GoogleGrpc uses its own stream tracking; EnvoyGrpc uses Envoy's cluster stats.
             [client_type](IntegrationTestServer& server) {
               if (client_type == Grpc::ClientType::GoogleGrpc) {
-                server.waitForCounterGe("grpc.otlp_collector.streams_closed_0", 1);
+                server.waitForCounter("grpc.otlp_collector.streams_closed_0", Ge(1));
               } else {
-                server.waitForGaugeEq("cluster.otlp_collector.upstream_rq_active", 0);
+                server.waitForGauge("cluster.otlp_collector.upstream_rq_active", Eq(0));
               }
             }};
   }
@@ -245,7 +261,7 @@ private:
             },
             // HTTP uses standard cluster request tracking.
             [](IntegrationTestServer& server) {
-              server.waitForGaugeEq("cluster.otlp_collector.upstream_rq_active", 0);
+              server.waitForGauge("cluster.otlp_collector.upstream_rq_active", Eq(0));
             }};
   }
 
@@ -317,7 +333,7 @@ public:
                      fake_upstreams_.back()->localAddress());
 
       // Add custom conversion rules.
-      Protobuf::TextFormat::ParseFromString(
+      std::ignore = Protobuf::TextFormat::ParseFromString(
           R"pb(matcher_list {
                      matchers {
                        predicate {
@@ -406,7 +422,7 @@ public:
                    })pb",
           sink_config.mutable_custom_metric_conversions());
 
-      metrics_sink->mutable_typed_config()->PackFrom(sink_config);
+      std::ignore = metrics_sink->mutable_typed_config()->PackFrom(sink_config);
 
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(500));
@@ -434,8 +450,20 @@ public:
       }
 
       if (metric.name() == getFullStatName("custom.upstream_rq_time") && metric.has_histogram()) {
+        // Require exactly 1 data point for cluster_0.
+        // otlp_collector's own upstream_rq_time
+        // sample (from stats-export RPCs) may or may
+        // include another data point, which we are not
+        // interested in.
+        const int data_points_with_cluster_0 =
+            std::ranges::count_if(metric.histogram().data_points(), [](const auto& dp) {
+              return std::ranges::any_of(dp.attributes(), [](const auto& attr) {
+                return attr.key() == "envoy.cluster_name" &&
+                       attr.value().string_value() == "cluster_0";
+              });
+            });
+        EXPECT_EQ(1, data_points_with_cluster_0);
         known_histogram_exists = true;
-        EXPECT_EQ(1, metric.histogram().data_points().size());
       }
     }
   }
@@ -501,7 +529,7 @@ public:
       header->mutable_header()->set_key("x-custom-formatter");
       header->mutable_header()->set_value("%HOSTNAME%");
 
-      sink->mutable_typed_config()->PackFrom(config);
+      std::ignore = sink->mutable_typed_config()->PackFrom(config);
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(100));
     });

@@ -192,6 +192,12 @@ envoy::config::cluster::v3::Cluster HdsDelegate::createClusterConfig(
   // Add healthchecks to cluster
   for (auto& health_check : cluster_health_check.health_checks()) {
     cluster_config.add_health_checks()->MergeFrom(health_check);
+    // gRPC health checking requires HTTP/2. Enable it on the cluster so that
+    // ClusterInfo gets the HTTP2 feature flag and the gRPC health checker
+    // passes validation.
+    if (health_check.has_grpc_health_check()) {
+      cluster_config.mutable_http2_protocol_options();
+    }
   }
 
   // Add transport_socket_match to cluster for use in host connections.
@@ -387,7 +393,8 @@ HdsCluster::HdsCluster(Server::Configuration::ServerFactoryContext& server_conte
           HostImpl::create(info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
                            const_locality_shared_pool->getObject(locality_endpoints.locality()),
                            host.endpoint().health_check_config(), 0,
-                           envoy::config::core::v3::UNKNOWN),
+                           envoy::config::core::v3::UNKNOWN, {},
+                           host.endpoint().observability_name()),
           std::unique_ptr<HostImpl>));
       // Add this host/endpoint pointer to our flat list of endpoints for health checking.
       hosts_->push_back(endpoint);
@@ -506,7 +513,8 @@ void HdsCluster::updateHosts(
             HostImpl::create(info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
                              const_locality_shared_pool->getObject(endpoints.locality()),
                              endpoint.endpoint().health_check_config(), 0,
-                             envoy::config::core::v3::UNKNOWN),
+                             envoy::config::core::v3::UNKNOWN, {},
+                             endpoint.endpoint().observability_name()),
             std::unique_ptr<HostImpl>));
 
         // Set the initial health status as in HdsCluster::initialize.
@@ -542,7 +550,7 @@ void HdsCluster::updateHosts(
   hosts_per_locality_ =
       std::make_shared<Envoy::Upstream::HostsPerLocalityImpl>(std::move(hosts_by_locality), false);
   priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {},
-                            hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
+                            hosts_added, hosts_removed, std::nullopt, std::nullopt);
 }
 
 ClusterSharedPtr HdsCluster::create() { return nullptr; }
@@ -571,7 +579,7 @@ void HdsCluster::initialize(std::function<absl::Status()> callback) {
     }
     // Use the ungrouped and grouped hosts lists to retain locality structure in the priority set.
     priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {},
-                              *hosts_, {}, absl::nullopt, absl::nullopt);
+                              *hosts_, {}, std::nullopt, std::nullopt);
 
     initialized_ = true;
   }

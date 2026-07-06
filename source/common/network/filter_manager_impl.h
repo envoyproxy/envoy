@@ -101,6 +101,18 @@ public:
    * @param action for how the connection will be closed.
    */
   virtual void closeConnection(ConnectionCloseAction action) PURE;
+
+  /**
+   * Called when a filter's internal write buffer has gone above its high watermark.
+   * This propagates backpressure to the connection, which may notify ConnectionCallbacks.
+   */
+  virtual void onFilterAboveHighWatermark() PURE;
+
+  /**
+   * Called when a filter's internal write buffer has drained below its low watermark.
+   * Must be paired with a prior onFilterAboveHighWatermark() call.
+   */
+  virtual void onFilterBelowLowWatermark() PURE;
 };
 
 /**
@@ -182,6 +194,13 @@ private:
 
     void disableClose(bool disable) override;
 
+    void onAboveWriteBufferHighWatermark() override {
+      parent_.connection_.onFilterAboveHighWatermark();
+    }
+    void onBelowWriteBufferLowWatermark() override {
+      parent_.connection_.onFilterBelowLowWatermark();
+    }
+
     FilterManagerImpl& parent_;
     WriteFilterSharedPtr filter_;
     bool pending_close_{false};
@@ -200,7 +219,7 @@ private:
   std::list<ActiveReadFilterPtr> upstream_filters_;
   std::list<ActiveWriteFilterPtr> downstream_filters_;
   State state_;
-  absl::optional<ConnectionCloseAction> latched_close_action_;
+  std::optional<ConnectionCloseAction> latched_close_action_;
   AccessLog::InstanceSharedPtrVector access_logs_;
 };
 

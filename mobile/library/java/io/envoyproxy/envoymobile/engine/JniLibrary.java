@@ -202,6 +202,13 @@ public class JniLibrary {
   protected static native String dumpStats(long engine);
 
   /**
+   * Drains connections matching the given socket tag.
+   * @param engine, handle to the engine.
+   * @param tag,    socket tag.
+   */
+  protected static native void drainConnectionsBySocketTag(long engine, int tag);
+
+  /**
    * Register a platform-provided key-value store implementation.
    *
    * @param name,    unique name identifying this key-value store.
@@ -339,14 +346,14 @@ public class JniLibrary {
       long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
       long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
       boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, int dnsNumRetries,
-      boolean enableDrainPostDnsRefresh, boolean enableHttp3, String http3ConnectionOptions,
-      String http3ClientConnectionOptions, byte[][] quicHints, byte[][] quicCanonicalSuffixes,
-      boolean enableGzipDecompression, boolean enableBrotliDecompression,
-      int numTimeoutsToTriggerPortMigration, boolean enableSocketTagging,
-      boolean enableInterfaceBinding, long h2ConnectionKeepaliveIdleIntervalMilliseconds,
-      long h2ConnectionKeepaliveTimeoutSeconds, long maxConnectionsPerHost,
-      long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds, String appVersion, String appId,
-      boolean trustChainVerification, byte[][] filterChain,
+      boolean enableDrainPostDnsRefresh, boolean enableHttp3, boolean enableEarlyData,
+      String http3ConnectionOptions, String http3ClientConnectionOptions, byte[][] quicHints,
+      byte[][] quicCanonicalSuffixes, boolean enableGzipDecompression,
+      boolean enableBrotliDecompression, int numTimeoutsToTriggerPortMigration,
+      boolean enableSocketTagging, boolean enableInterfaceBinding,
+      long h2ConnectionKeepaliveIdleIntervalMilliseconds, long h2ConnectionKeepaliveTimeoutSeconds,
+      long maxConnectionsPerHost, long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds,
+      String appVersion, String appId, boolean trustChainVerification, byte[][] filterChain,
       boolean enablePlatformCertificatesValidation, String upstreamTlsSni, byte[][] runtimeGuards,
       long h3ConnectionKeepaliveInitialIntervalMilliseconds, boolean useQuicPlatformPacketWriter,
       boolean enableQuicConnectionMigration, boolean migrateIdleQuicConnection,

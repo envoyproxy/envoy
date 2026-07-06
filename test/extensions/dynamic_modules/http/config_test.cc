@@ -8,6 +8,7 @@
 #include "source/common/crypto/utility.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/background_fetch_manager.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/dynamic_modules/factory.h"
@@ -28,6 +29,20 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Server {
 namespace Configuration {
+
+namespace {
+
+// Reads the value of a ``dynamic_modules.<leaf>`` failure counter tagged with the given filter
+// name.
+uint64_t failureCounter(Stats::Scope& scope, absl::string_view leaf, absl::string_view filter) {
+  Stats::StatNameDynamicPool pool(scope.symbolTable());
+  Stats::StatNameTagVector tags{{pool.add("config_name"), pool.add(filter)}};
+  return Stats::Utility::counterFromElements(
+             scope, {Stats::DynamicName("dynamic_modules"), Stats::DynamicName(leaf)}, tags)
+      .value();
+}
+
+} // namespace
 
 class DynamicModuleFilterConfigTest : public Event::TestUsingSimulatedTime, public testing::Test {
 protected:
@@ -131,9 +146,11 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceWithoutInitManagerThrows) {
 
   // The ServerFactoryContext path has no init manager, so remote sources should be rejected.
   DynamicModuleConfigFactory factory;
-  EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProtoWithServerContext(
-                              proto_config, "stats", context_.server_factory_context_),
-                          EnvoyException, "Remote module sources require an init manager");
+  EXPECT_THROW_WITH_REGEX(
+      factory
+          .createHttpFilterFactoryFromProto(proto_config, "stats", context_.server_factory_context_)
+          .value(),
+      EnvoyException, "Remote module sources require an init manager");
 }
 
 TEST_F(DynamicModuleFilterConfigTest, RemoteSourceRegistersInitTarget) {
@@ -195,6 +212,10 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchFailureFailOpen) {
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(testing::_)).Times(0);
   cb_or_error.value()(filter_callbacks);
+
+  // The fail-open remote fetch failure is otherwise invisible; it must bump remote_fetch_error.
+  EXPECT_EQ(1U, failureCounter(context_.server_factory_context_.scope(), "remote_fetch_error",
+                               "test_filter"));
 }
 
 TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchSuccess) {
@@ -318,6 +339,10 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchSuccessInvalidModule) {
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(testing::_)).Times(0);
   cb_or_error.value()(filter_callbacks);
+
+  // Fetched bytes that fail to load as a module bump remote_fetch_error.
+  EXPECT_EQ(1U, failureCounter(context_.server_factory_context_.scope(), "remote_fetch_error",
+                               "test_filter"));
 }
 
 // Remote fetch returns a valid shared object that loads successfully, but the module is missing
@@ -379,6 +404,10 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchSuccessMissingFilterSymbo
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(testing::_)).Times(0);
   cb_or_error.value()(filter_callbacks);
+
+  // The module loaded but its HTTP filter symbols could not be resolved during config init.
+  EXPECT_EQ(1U, failureCounter(context_.server_factory_context_.scope(), "config_init_error",
+                               "test_filter"));
 
   // Clean up the temp file.
   std::filesystem::path temp_path = Extensions::DynamicModules::moduleTempPath(sha256);
@@ -446,7 +475,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteCacheHitAfterFetch) {
   DynamicModuleConfigFactory factory2;
   auto result2 =
       factory2.createFilterFactory(proto_config, "", context_.server_factory_context_, stats_scope_,
-                                   /*init_manager=*/nullptr);
+                                   /*init_manager=*/std::nullopt);
   EXPECT_TRUE(result2.ok()) << result2.status().message();
 
   // Verify the cache-loaded factory callback installs the filter.
@@ -505,6 +534,60 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeCacheHit) {
   std::filesystem::remove(cached_path);
 }
 
+// When the cache path holds a file whose contents do not match the expected SHA256, the
+// factory must remove the tampered file and refuse to dlopen it. The fall-through fetch
+// path then reports the cache miss in NACK mode.
+TEST_F(DynamicModuleFilterConfigTest, NackModeCacheHitTamperedFileIsRejected) {
+  const std::string module_path = Extensions::DynamicModules::testSharedObjectPath("no_op", "c");
+  std::ifstream input(module_path, std::ios::binary);
+  ASSERT_TRUE(input.good());
+  const std::string module_bytes((std::istreambuf_iterator<char>(input)),
+                                 std::istreambuf_iterator<char>());
+
+  Buffer::OwnedImpl hash_buffer(module_bytes);
+  const std::string expected_sha256 =
+      Hex::encode(Common::Crypto::UtilitySingleton::get().getSha256Digest(hash_buffer));
+
+  // Pre-populate the cache path with attacker-controlled bytes that hash to something other
+  // than ``expected_sha256``. Without the SHA256 verification this would be dlopen'd as is.
+  auto cached_path = Extensions::DynamicModules::moduleTempPath(expected_sha256);
+  std::filesystem::create_directories(cached_path.parent_path());
+  {
+    std::ofstream tampered(cached_path, std::ios::binary);
+    tampered << "not the expected module bytes";
+  }
+  ASSERT_TRUE(std::filesystem::exists(cached_path));
+
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  dynamic_module_config:
+    module:
+      remote:
+        http_uri:
+          uri: https://example.com/module.so
+          cluster: cluster_1
+          timeout: 5s
+        sha256: ")EOF",
+                                                                    expected_sha256, R"EOF("
+    do_not_close: true
+    nack_on_cache_miss: true
+  filter_name: "test_filter"
+  )EOF"));
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  DynamicModuleConfigFactory factory;
+  auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  // The verification step removes the tampered file and the code falls through to the fetch
+  // path; in NACK mode the fetch path reports "not cached".
+  EXPECT_FALSE(cb_or_error.ok());
+  EXPECT_THAT(cb_or_error.status().message(), testing::HasSubstr("not cached"));
+
+  // The tampered cache entry must have been removed by the factory so a subsequent legitimate
+  // fetch can repopulate it.
+  EXPECT_FALSE(std::filesystem::exists(cached_path));
+}
+
 // A cache miss with nack_on_cache_miss rejects the config.
 TEST_F(DynamicModuleFilterConfigTest, NackModeCacheMissReturnsError) {
   const std::string yaml = R"EOF(
@@ -528,6 +611,10 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeCacheMissReturnsError) {
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_FALSE(cb_or_error.ok());
   EXPECT_THAT(cb_or_error.status().message(), testing::HasSubstr("not cached"));
+
+  // A NACK-mode cache miss rejects the config; it bumps remote_fetch_error.
+  EXPECT_EQ(1U, failureCounter(context_.server_factory_context_.scope(), "remote_fetch_error",
+                               "test_filter"));
 }
 
 // The background fetch triggered by NACK mode writes the module to disk, so a subsequent
@@ -581,7 +668,7 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeBackgroundFetchPopulatesCache) {
   // so the background fetch writes the module to disk before we return.
   DynamicModuleConfigFactory factory;
   auto result1 = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
-                                             stats_scope_, &init_manager_);
+                                             stats_scope_, init_manager_);
   EXPECT_FALSE(result1.ok());
   EXPECT_THAT(result1.status().message(), testing::HasSubstr("not cached"));
 
@@ -590,7 +677,7 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeBackgroundFetchPopulatesCache) {
 
   // Second call finds the cached file and succeeds.
   auto result2 = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
-                                             stats_scope_, &init_manager_);
+                                             stats_scope_, init_manager_);
   EXPECT_TRUE(result2.ok()) << result2.status().message();
 
   // Clean up.
@@ -620,7 +707,7 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeBackgroundFetchFailure) {
   // Cluster is not initialized, so the fetch fails immediately.
   DynamicModuleConfigFactory factory;
   auto result1 = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
-                                             stats_scope_, &init_manager_);
+                                             stats_scope_, init_manager_);
   EXPECT_FALSE(result1.ok());
   EXPECT_THAT(result1.status().message(), testing::HasSubstr("not cached"));
 
@@ -630,7 +717,7 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeBackgroundFetchFailure) {
 
   // Second call cleans up the completed (failed) entry and starts a new fetch.
   auto result2 = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
-                                             stats_scope_, &init_manager_);
+                                             stats_scope_, init_manager_);
   EXPECT_FALSE(result2.ok());
   EXPECT_THAT(result2.status().message(), testing::HasSubstr("not cached"));
 }
@@ -656,7 +743,7 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeWithoutInitManager) {
 
   DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
-                                            stats_scope_, /*init_manager=*/nullptr);
+                                            stats_scope_, /*init_manager=*/std::nullopt);
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(), testing::HasSubstr("not cached"));
   EXPECT_THAT(result.status().message(), testing::Not(testing::HasSubstr("init manager")));
@@ -699,7 +786,7 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeInFlightDedup) {
 
   // First call: starts a background fetch.
   auto result1 = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
-                                             stats_scope_, &init_manager_);
+                                             stats_scope_, init_manager_);
   EXPECT_FALSE(result1.ok());
   EXPECT_THAT(result1.status().message(), testing::HasSubstr("not cached"));
   EXPECT_NE(captured_cb, nullptr);
@@ -707,7 +794,7 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeInFlightDedup) {
   // Second call while the fetch is still in-flight: no new send_ expected (WillOnce above
   // would fail if a second call happened).
   auto result2 = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
-                                             stats_scope_, &init_manager_);
+                                             stats_scope_, init_manager_);
   EXPECT_FALSE(result2.ok());
   EXPECT_THAT(result2.status().message(), testing::HasSubstr("not cached"));
 
@@ -764,7 +851,7 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeBackgroundFetchBadModule) {
 
   DynamicModuleConfigFactory factory;
   auto result1 = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
-                                             stats_scope_, &init_manager_);
+                                             stats_scope_, init_manager_);
   EXPECT_FALSE(result1.ok());
   EXPECT_THAT(result1.status().message(), testing::HasSubstr("not cached"));
 
@@ -774,7 +861,7 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeBackgroundFetchBadModule) {
 
   // Next config push finds the cached file, tries to load it, and gets a load error.
   auto result2 = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
-                                             stats_scope_, &init_manager_);
+                                             stats_scope_, init_manager_);
   EXPECT_FALSE(result2.ok());
   EXPECT_THAT(result2.status().message(),
               testing::HasSubstr("Cached remote module failed to load"));
@@ -844,7 +931,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteCacheInvalidationOnMissingFile) {
   // Second call with init_manager=nullptr: file is gone, so it needs an init manager.
   auto result2 =
       factory.createFilterFactory(proto_config, "", context_.server_factory_context_, stats_scope_,
-                                  /*init_manager=*/nullptr);
+                                  /*init_manager=*/std::nullopt);
   EXPECT_FALSE(result2.ok());
   EXPECT_THAT(result2.status().message(),
               testing::HasSubstr("Remote module sources require an init manager"));

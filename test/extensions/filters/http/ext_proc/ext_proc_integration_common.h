@@ -11,6 +11,7 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/http/common.h"
+#include "test/extensions/filters/http/ext_proc/ext_proc_test_filters.pb.h"
 #include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/filters/common.h"
@@ -43,16 +44,20 @@ using test::integration::filters::LoggingTestFilterConfig;
 
 struct ConfigOptions {
   enum class FilterSetup {
+    // NOLINTNEXTLINE(readability-identifier-naming)
     kNone,
+    // NOLINTNEXTLINE(readability-identifier-naming)
     kDownstream,
+    // NOLINTNEXTLINE(readability-identifier-naming)
     kCompositeMatchOnRequestHeaders,
+    // NOLINTNEXTLINE(readability-identifier-naming)
     kCompositeMatchOnResponseHeaders,
   };
 
   FilterSetup filter_setup = FilterSetup::kDownstream;
   bool valid_grpc_server = true;
   bool add_logging_filter = false;
-  absl::optional<LoggingTestFilterConfig> logging_filter_config = absl::nullopt;
+  std::optional<LoggingTestFilterConfig> logging_filter_config = std::nullopt;
   bool http1_codec = false;
   bool add_metadata = false;
   bool add_response_processor = false;
@@ -102,17 +107,20 @@ protected:
       envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config,
       const std::string& ext_proc_filter_name);
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool IsEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
 
   void setPerRouteConfig(Route* route, const ExtProcPerRoute& cfg);
   void setPerHostConfig(VirtualHost& vh, const ExtProcPerRoute& cfg);
   void protocolConfigEncoding(ProcessingRequest& request);
 
+  void twoExtProcFiltersFullDuplexConfig();
+
   IntegrationStreamDecoderPtr sendDownstreamRequest(
-      absl::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers);
+      std::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers);
   IntegrationStreamDecoderPtr sendDownstreamRequestWithBody(
       absl::string_view body,
-      absl::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers,
+      std::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers,
       bool add_content_length = false);
   IntegrationStreamDecoderPtr sendDownstreamRequestWithBodyAndTrailer(absl::string_view body);
 
@@ -126,28 +134,34 @@ protected:
 
   void processGenericMessage(
       FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const ProcessingRequest&, ProcessingResponse&)>> cb);
+      std::optional<std::function<bool(const ProcessingRequest&, ProcessingResponse&)>> cb);
   void processRequestHeadersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb);
+      std::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb);
   void processRequestTrailersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb);
+      std::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb);
   void processResponseHeadersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb);
+      std::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb);
   void
   processRequestBodyMessage(FakeUpstream& grpc_upstream, bool first_message,
-                            absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb,
+                            std::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb,
                             bool check_downstream_flow_control = false);
-  void processResponseBodyMessage(
-      FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb);
+  void
+  processResponseBodyMessage(FakeUpstream& grpc_upstream, bool first_message,
+                             std::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb);
   void processResponseTrailersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb);
+      std::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb);
   void processAndRespondImmediately(FakeUpstream& grpc_upstream, bool first_message,
-                                    absl::optional<std::function<void(ImmediateResponse&)>> cb);
+                                    std::optional<std::function<void(ImmediateResponse&)>> cb);
+  // Packing two ProcessingResponses into one gRPC message.
+  // If @param immediate_response is true, the 1st ProcessingResponse is an immediate_response.
+  // Otherwise, the 1st ProcessingResponse is an empty request_trailers response.
+  // The 2nd ProcessingResponse is an empty response_trailers response.
+  void packTwoResponsesInOneMessage(FakeUpstream& grpc_upstream, bool immediate_response,
+                                    std::optional<std::function<void(ImmediateResponse&)>> cb);
 
   // ext_proc server sends back a response to tell Envoy to stop the
   // original timer and start a new timer.
@@ -193,21 +207,24 @@ protected:
   void serverSendBodyRespDuplexStreamed(uint32_t total_resp_body_msg,
                                         FakeStreamPtr& processor_stream, bool end_of_stream = true,
                                         bool response = false, absl::string_view body_sent = "");
-  void serverSendTrailerRespDuplexStreamed();
+  void serverSendTrailerRespDuplexStreamed(FakeStreamPtr& processor_stream, bool response = false);
   void initializeLogConfig(std::string& access_log_path);
   void prependExtProcCompositeFilter(const Protobuf::Message& match_input);
 
-  std::unique_ptr<SimpleFilterConfig<DynamicMetadataToHeadersFilter>> simple_filter_config_;
+  std::unique_ptr<UniqueSimpleFilterConfig<
+      DynamicMetadataToHeadersFilter,
+      test::extensions::filters::http::ext_proc::DynamicMetadataToHeadersFilterConfig>>
+      simple_filter_config_;
   std::unique_ptr<
       Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory>>
       registration_;
   std::unique_ptr<TestOnProcessingResponseFactory> processing_response_factory_;
   std::unique_ptr<Envoy::Registry::InjectFactory<OnProcessingResponseFactory>>
       processing_response_factory_registration_;
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_1_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_;
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_1_;
   bool protocol_config_encoded_ = false;
-  ProtocolConfiguration protocol_config_{};
+  ProtocolConfiguration protocol_config_;
   uint32_t max_message_timeout_ms_{0};
   std::vector<FakeUpstream*> grpc_upstreams_;
   FakeHttpConnectionPtr processor_connection_;

@@ -1,5 +1,6 @@
 """Bazel rules for building Envoy dynamic modules."""
 
+load("@envoy_repo//:compiler.bzl", "LLVM_PATH")
 load("@rules_cc//cc:defs.bzl", "cc_import")
 
 def envoy_dynamic_module_prefix_symbols(name, module_name, archive, tags = [], **kwargs):
@@ -61,19 +62,30 @@ def envoy_dynamic_module_prefix_symbols(name, module_name, archive, tags = [], *
     # NOTE: The case statement is kept outside $() command substitution for
     # compatibility with bash 3.2 (macOS default), which cannot parse case
     # pattern delimiters inside $().
+    archive_select_cmd = (
+        "ARCH=\"\"; " +
+        "for f in $(SRCS); do case $$f in *.pic.a) continue;; *.a) ARCH=$$f; break;; esac; done; " +
+        "[ -z \"$$ARCH\" ] && " +
+        "for f in $(SRCS); do case $$f in *.a) ARCH=$$f; break;; esac; done; "
+    )
     native.genrule(
         name = renamed_name,
         srcs = [archive, ":" + redefine_syms_name],
         outs = [name + "_renamed.a"],
-        cmd = (
-            "ARCH=\"\"; " +
-            "for f in $(SRCS); do case $$f in *.pic.a) continue;; *.a) ARCH=$$f; break;; esac; done; " +
-            "[ -z \"$$ARCH\" ] && " +
-            "for f in $(SRCS); do case $$f in *.a) ARCH=$$f; break;; esac; done; " +
-            "$(location @llvm_toolchain_llvm//:objcopy) " +
-            "--redefine-syms=$(location :" + redefine_syms_name + ") $$ARCH $@"
-        ),
-        tools = ["@llvm_toolchain_llvm//:objcopy"],
+        cmd = archive_select_cmd + select({
+            "@envoy_repo//:use_local_llvm": (
+                "%s/bin/llvm-objcopy " % LLVM_PATH +
+                "--redefine-syms=$(location :" + redefine_syms_name + ") $$ARCH $@"
+            ),
+            "//conditions:default": (
+                "$(location @llvm_toolchain_llvm//:objcopy) " +
+                "--redefine-syms=$(location :" + redefine_syms_name + ") $$ARCH $@"
+            ),
+        }),
+        tools = select({
+            "@envoy_repo//:use_local_llvm": [],
+            "//conditions:default": ["@llvm_toolchain_llvm//:objcopy"],
+        }),
         tags = tags,
     )
 

@@ -13,6 +13,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/network/addr_family_aware_socket_option_impl.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 
 #include "fmt/ostream.h"
@@ -637,6 +638,7 @@ ConnectivityManagerImplSharedPtr ConnectivityManagerFactory::get() {
       SINGLETON_MANAGER_REGISTERED_NAME(connectivity_manager), [this] {
         Envoy::Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl
             cache_manager_factory{context_};
+
         return std::make_shared<ConnectivityManagerImpl>(
             context_.serverFactoryContext().clusterManager(), cache_manager_factory.get());
       });

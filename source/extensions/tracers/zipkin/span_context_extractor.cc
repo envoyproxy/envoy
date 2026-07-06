@@ -21,11 +21,11 @@ bool validSamplingFlags(char c) {
   return false;
 }
 
-absl::optional<bool> getSamplingFlags(char c) {
+std::optional<bool> getSamplingFlags(char c) {
   if (validSamplingFlags(c)) {
     return c == '0' ? false : true;
   } else {
-    return absl::nullopt;
+    return std::nullopt;
   }
 }
 
@@ -45,7 +45,7 @@ SpanContextExtractor::SpanContextExtractor(Tracing::TraceContext& trace_context,
 
 SpanContextExtractor::~SpanContextExtractor() = default;
 
-absl::optional<bool> SpanContextExtractor::extractSampled() {
+std::optional<bool> SpanContextExtractor::extractSampled() {
   bool sampled(false);
   // Try B3 single format first.
   auto b3_header_entry = ZipkinCoreConstants::get().B3.get(trace_context_);
@@ -69,7 +69,7 @@ absl::optional<bool> SpanContextExtractor::extractSampled() {
       sampled_pos = 50;
       break;
     default:
-      return absl::nullopt; // invalid length
+      return std::nullopt; // invalid length
     }
     return getSamplingFlags(b3[sampled_pos]);
   }
@@ -98,7 +98,7 @@ absl::optional<bool> SpanContextExtractor::extractSampled() {
     }
   }
 
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 std::pair<SpanContext, bool> SpanContextExtractor::extractSpanContext(bool is_sampled) {
@@ -171,7 +171,7 @@ SpanContextExtractor::extractSpanContextFromB3SingleFormat(bool is_sampled) {
   ASSERT(b3_head_entry.has_value());
   // This is an implicitly untrusted header, so only the first value is used.
   const std::string b3(b3_head_entry.value());
-  if (!b3.length()) {
+  if (b3.empty()) {
     throw ExtractorException("Invalid input: empty");
   }
 
