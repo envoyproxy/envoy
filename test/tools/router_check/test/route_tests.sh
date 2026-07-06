@@ -8,7 +8,7 @@ PATH_BIN="${TEST_SRCDIR}/envoy"/test/tools/router_check/router_check_tool
 # Config json path
 PATH_CONFIG="${TEST_SRCDIR}/envoy"/test/tools/router_check/test/config
 
-TESTS=("ContentType" "ClusterHeader" "DirectResponse" "HeaderMatchedRouting" "Redirect" "Redirect2" "Redirect3" "Redirect4" "Runtime" "TestRoutes" "Weighted")
+TESTS=("DefaultRuntime" "ContentType" "ClusterHeader" "DirectResponse" "HeaderMatchedRouting" "Redirect" "Redirect2" "Redirect3" "Redirect4" "Runtime" "TestRoutes" "Weighted")
 
 # Testing expected matches
 for t in "${TESTS[@]}"

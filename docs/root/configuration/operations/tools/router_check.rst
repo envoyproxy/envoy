@@ -16,7 +16,7 @@ virtual host name, manual path rewrite, manual host rewrite, path redirect, and
 header field matches. Extensions for other test cases can be added. Details about installing the tool
 and sample tool input/output can be found at :ref:`installation <install_tools_route_table_check_tool>`.
 
-The route table check tool config is composed of an array of json test objects. Each test object is composed of
+The tests in the route table check tool config is composed of an array of json test objects. Each test object is composed of
 three parts.
 
 Test name
@@ -38,6 +38,8 @@ This test case asserts that GET requests to ``api.lyft.com/api/locations`` are r
 
 .. code-block:: yaml
 
+  runtime:
+     re2.max_program_size.error_level: 32768
   tests:
   - test_name: cluster_name_test
     input:
@@ -95,6 +97,7 @@ Available test parameters
 
 .. code-block:: yaml
 
+  runtime: ...
   tests:
   - test_name: ...
     input:
