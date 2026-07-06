@@ -123,6 +123,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/server/admin:stats_params_lib",
+        "//test/mocks/stats:stats_mocks",
     ],
 )
 

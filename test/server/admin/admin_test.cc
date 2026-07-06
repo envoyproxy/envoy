@@ -187,6 +187,7 @@ TEST_P(AdminInstanceTest, Help) {
   /stats: print server stats
       usedonly: Only include stats that have been written by system since restart
       filter: Regular expression (Google re2) for filtering stats
+      invert_filter: Invert the filter regex
       format: Format to use; One of (html, active-html, text, json)
       type: Stat types to include.; One of (All, Counters, Histograms, Gauges, TextReadouts)
       histogram_buckets: Histogram bucket display mode; One of (cumulative, disjoint, detailed, summary)
@@ -194,6 +195,7 @@ TEST_P(AdminInstanceTest, Help) {
       usedonly: Only include stats that have been written by system since restart
       text_readouts: Render text_readouts as new gaugues with value 0 (increases Prometheus data size)
       filter: Regular expression (Google re2) for filtering stats
+      invert_filter: Invert the filter regex
       histogram_buckets: Histogram bucket display mode; One of (cumulative, summary)
   /stats/recentlookups: Show recent stat-name lookups
   /stats/recentlookups/clear (POST): clear list of stat-name lookups and counter
