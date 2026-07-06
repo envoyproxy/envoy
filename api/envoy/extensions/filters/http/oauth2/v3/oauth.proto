@@ -197,7 +197,6 @@ message OAuth2TokenForwarding {
 // Configuration for the ``post_logout_redirect_uri`` parameter used in OpenID Connect
 // `RP-Initiated Logout requests <https://openid.net/specs/openid-connect-rpinitiated-1_0.html>`_.
 // This configuration is ignored if ``end_session_endpoint`` is not set.
-// [#next-free-field: 3]
 message PostLogoutRedirectUri {
   oneof config {
     option (validate.required) = true;
