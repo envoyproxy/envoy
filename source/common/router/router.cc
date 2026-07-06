@@ -110,7 +110,10 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
     std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
         Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
             server_factory_ctx);
-    std::string prefix = context.scope().symbolTable().toString(context.scope().prefix());
+    // Pass the connection manager's stat prefix as a string so upstream filters qualify their
+    // own stats consistently (e.g. "http.ingress.rbac."). The scope has an empty prefix;
+    // stat_prefix carries the full "http.<stat_prefix>." string.
+    std::string prefix = context.scope().symbolTable().toString(stat_prefix);
     upstream_ctx_ = std::make_unique<Upstream::UpstreamFactoryContextImpl>(
         server_factory_ctx, context.initManager(), context.scope());
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,

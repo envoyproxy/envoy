@@ -1451,12 +1451,14 @@ ClusterInfoImpl::ClusterInfoImpl(
         return;
       }
 
-      std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
+      // The scope passed via upstream_context_ already carries the "cluster.<name>." prefix,
+      // so pass an empty stats_prefix string. Upstream filters qualify their own stats by
+      // prepending the stats_prefix string to their metric names; passing the scope prefix
+      // again here would produce double-prefixed names (e.g. "cluster.X.cluster.X.rbac.").
       Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                               Server::Configuration::UpstreamHttpFilterConfigFactory>
           helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
-                 factory_context.serverFactoryContext().clusterManager(), upstream_context_,
-                 prefix);
+                 factory_context.serverFactoryContext().clusterManager(), upstream_context_, "");
       SET_AND_RETURN_IF_NOT_OK(helper.processFilters(http_protocol_options_->http_filters_,
                                                      "upstream http", "upstream http",
                                                      http_filter_factories_),
