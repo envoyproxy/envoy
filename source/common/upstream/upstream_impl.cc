@@ -1455,10 +1455,14 @@ ClusterInfoImpl::ClusterInfoImpl(
       // so pass an empty stats_prefix string. Upstream filters qualify their own stats by
       // prepending the stats_prefix string to their metric names; passing the scope prefix
       // again here would produce double-prefixed names (e.g. "cluster.X.cluster.X.rbac.").
+      // Use a named variable: FilterChainHelper stores stats_prefix by reference, so a temporary
+      // (e.g. "") would dangle after the constructor returns.
+      const std::string empty_stats_prefix;
       Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                               Server::Configuration::UpstreamHttpFilterConfigFactory>
           helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
-                 factory_context.serverFactoryContext().clusterManager(), upstream_context_, "");
+                 factory_context.serverFactoryContext().clusterManager(), upstream_context_,
+                 empty_stats_prefix);
       SET_AND_RETURN_IF_NOT_OK(helper.processFilters(http_protocol_options_->http_filters_,
                                                      "upstream http", "upstream http",
                                                      http_filter_factories_),
