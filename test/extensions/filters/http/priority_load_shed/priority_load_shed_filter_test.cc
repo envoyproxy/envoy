@@ -78,7 +78,7 @@ buckets:
   EXPECT_CALL(decoder_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::CoreResponseFlag::OverloadManager));
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, "envoy overloaded",
-                                                 _, absl::optional<Grpc::Status::GrpcStatus>(),
+                                                 _, std::optional<Grpc::Status::GrpcStatus>(),
                                                  StreamInfo::ResponseCodeDetails::get().Overload));
 
   auto headers = defaultHeaders();
@@ -99,7 +99,7 @@ buckets:
 
   EXPECT_CALL(low_priority_bucket_, shouldShedLoad()).Times(0);
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "missing priority header",
-                                                 _, absl::optional<Grpc::Status::GrpcStatus>(),
+                                                 _, std::optional<Grpc::Status::GrpcStatus>(),
                                                  "priority_load_shed.missing_header"));
   auto headers = defaultHeaders();
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
@@ -123,7 +123,7 @@ default_load_shed_point: "envoy.load_shed_points.priority.default"
   EXPECT_CALL(decoder_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::CoreResponseFlag::OverloadManager));
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, "envoy overloaded",
-                                                 _, absl::optional<Grpc::Status::GrpcStatus>(),
+                                                 _, std::optional<Grpc::Status::GrpcStatus>(),
                                                  StreamInfo::ResponseCodeDetails::get().Overload));
 
   auto headers = defaultHeaders();
@@ -144,7 +144,7 @@ buckets:
 
   EXPECT_CALL(low_priority_bucket_, shouldShedLoad()).Times(0);
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "invalid priority header",
-                                                 _, absl::optional<Grpc::Status::GrpcStatus>(),
+                                                 _, std::optional<Grpc::Status::GrpcStatus>(),
                                                  "priority_load_shed.invalid_header"));
   auto headers = defaultHeaders();
   headers.addCopy("x-message-priority", "not-an-integer");
@@ -205,7 +205,7 @@ buckets:
 
   EXPECT_CALL(low_priority_bucket_, shouldShedLoad()).Times(0);
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "invalid priority header",
-                                                 _, absl::optional<Grpc::Status::GrpcStatus>(),
+                                                 _, std::optional<Grpc::Status::GrpcStatus>(),
                                                  "priority_load_shed.invalid_header"));
   auto headers = defaultHeaders();
   headers.addCopy("x-message-priority", "-1");
@@ -225,7 +225,7 @@ buckets:
 
   EXPECT_CALL(low_priority_bucket_, shouldShedLoad()).Times(0);
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "invalid priority header",
-                                                 _, absl::optional<Grpc::Status::GrpcStatus>(),
+                                                 _, std::optional<Grpc::Status::GrpcStatus>(),
                                                  "priority_load_shed.invalid_header"));
   auto headers = defaultHeaders();
   headers.addCopy("x-message-priority", "bad-first-value");
@@ -265,7 +265,7 @@ buckets:
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
                              "priority value does not match any configured bucket", _,
-                             absl::optional<Grpc::Status::GrpcStatus>(),
+                             std::optional<Grpc::Status::GrpcStatus>(),
                              "priority_load_shed.bucket_unmatched"));
   auto headers = defaultHeaders();
   headers.addCopy("x-message-priority", "32");
@@ -287,7 +287,7 @@ buckets:
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
                              "priority value does not match any configured bucket", _,
-                             absl::optional<Grpc::Status::GrpcStatus>(),
+                             std::optional<Grpc::Status::GrpcStatus>(),
                              "priority_load_shed.bucket_unmatched"));
   auto headers = defaultHeaders();
   headers.addCopy("x-message-priority", "5");
@@ -312,7 +312,7 @@ default_load_shed_point: "envoy.load_shed_points.priority.default"
   EXPECT_CALL(decoder_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::CoreResponseFlag::OverloadManager));
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, "envoy overloaded",
-                                                 _, absl::optional<Grpc::Status::GrpcStatus>(),
+                                                 _, std::optional<Grpc::Status::GrpcStatus>(),
                                                  StreamInfo::ResponseCodeDetails::get().Overload));
 
   auto headers = defaultHeaders();

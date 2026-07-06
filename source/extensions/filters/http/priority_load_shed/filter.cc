@@ -110,7 +110,7 @@ PriorityLoadShedStats PriorityLoadShedFilterConfig::generateStats(const std::str
 
 Http::FilterHeadersStatus PriorityLoadShedFilter::rejectBadRequest(absl::string_view message,
                                                                    absl::string_view details) {
-  decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, message, nullptr, absl::nullopt,
+  decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, message, nullptr, std::nullopt,
                                      details);
   return Http::FilterHeadersStatus::StopIteration;
 }
@@ -164,7 +164,7 @@ Http::FilterHeadersStatus PriorityLoadShedFilter::decodeHeaders(Http::RequestHea
   config_->stats().shed_.inc();
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::OverloadManager);
   decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "envoy overloaded", nullptr,
-                                     absl::nullopt,
+                                     std::nullopt,
                                      StreamInfo::ResponseCodeDetails::get().Overload);
   return Http::FilterHeadersStatus::StopIteration;
 }
