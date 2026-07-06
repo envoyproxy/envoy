@@ -1516,6 +1516,12 @@ WEAK_STUB(HttpSetFilterStateTyped,
                                                                     {nullptr, 0}))
 WEAK_STUB(HttpGetFilterStateTyped,
           envoy_dynamic_module_callback_http_get_filter_state_typed(nullptr, {nullptr, 0}, nullptr))
+WEAK_STUB(HttpSetFilterStateObject,
+          envoy_dynamic_module_callback_http_set_filter_state_object(
+              nullptr, {nullptr, 0}, nullptr, nullptr,
+              envoy_dynamic_module_type_filter_state_life_span_FilterChain))
+WEAK_STUB(HttpGetFilterStateObject,
+          envoy_dynamic_module_callback_http_get_filter_state_object(nullptr, {nullptr, 0}))
 WEAK_STUB(HttpAddCustomFlag,
           envoy_dynamic_module_callback_http_add_custom_flag(nullptr, {nullptr, 0}))
 WEAK_STUB(HttpFilterSchedulerNew, envoy_dynamic_module_callback_http_filter_scheduler_new(nullptr))

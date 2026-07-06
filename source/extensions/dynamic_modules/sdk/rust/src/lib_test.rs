@@ -3905,6 +3905,70 @@ pub extern "C" fn envoy_dynamic_module_callback_http_filter_reset_stream(
   RESET_STREAM_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
 }
 
+// Single-slot store backing the filter state object FFI stubs below.
+static FILTER_STATE_OBJECT: std::sync::atomic::AtomicPtr<std::ffi::c_void> =
+  std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_set_filter_state_object(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  module_object: abi::envoy_dynamic_module_type_filter_state_object_module_ptr,
+  _destructor: abi::envoy_dynamic_module_type_filter_state_object_destructor,
+  _life_span: abi::envoy_dynamic_module_type_filter_state_life_span,
+) -> bool {
+  FILTER_STATE_OBJECT.store(module_object, std::sync::atomic::Ordering::SeqCst);
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_filter_state_object(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_filter_state_object_module_ptr {
+  FILTER_STATE_OBJECT.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[test]
+fn test_http_filter_state_object_round_trip() {
+  use std::sync::atomic::Ordering;
+  static DROPPED: AtomicUsize = AtomicUsize::new(0);
+  struct Live;
+  impl Drop for Live {
+    fn drop(&mut self) {
+      DROPPED.fetch_add(1, Ordering::SeqCst);
+    }
+  }
+  extern "C" fn destructor(object: *mut std::ffi::c_void) {
+    drop(unsafe { Box::from_raw(object as *mut Live) });
+  }
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let object = Box::into_raw(Box::new(Live)) as *mut std::ffi::c_void;
+  // SAFETY: `object` is a freshly boxed Live and `destructor` frees exactly that type without
+  // unwinding.
+  assert!(unsafe {
+    envoy_filter.set_filter_state_object(
+      b"key",
+      object,
+      destructor,
+      abi::envoy_dynamic_module_type_filter_state_life_span::Request,
+    )
+  });
+
+  // The rebuilt filter recovers the same pointer across recreate_stream.
+  let recovered = envoy_filter.get_filter_state_object(b"key");
+  assert_eq!(recovered, Some(object));
+  assert_eq!(DROPPED.load(Ordering::SeqCst), 0);
+
+  // Envoy calls the destructor once when the entry is destroyed; the boxed value is freed exactly
+  // once with no double free.
+  destructor(recovered.unwrap());
+  assert_eq!(DROPPED.load(Ordering::SeqCst), 1);
+}
+
 static NETWORK_CLOSE_CALLED: AtomicBool = AtomicBool::new(false);
 
 #[no_mangle]

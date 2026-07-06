@@ -4219,6 +4219,26 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_http_get_filter_state_t
   return false;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_http_set_filter_state_object(
+    envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_filter_state_object_module_ptr,
+    envoy_dynamic_module_type_filter_state_object_destructor,
+    envoy_dynamic_module_type_filter_state_life_span) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_http_set_filter_state_object: not implemented in this "
+      "context");
+  return false;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_filter_state_object_module_ptr
+envoy_dynamic_module_callback_http_get_filter_state_object(
+    envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_http_get_filter_state_object: not implemented in this "
+      "context");
+  return nullptr;
+}
+
 __attribute__((weak)) void
 envoy_dynamic_module_callback_http_add_custom_flag(envoy_dynamic_module_type_http_filter_envoy_ptr,
                                                    envoy_dynamic_module_type_module_buffer) {

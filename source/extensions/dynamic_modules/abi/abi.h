@@ -2420,6 +2420,73 @@ bool envoy_dynamic_module_callback_http_get_filter_state_typed(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
 
+// Lifespan of a filter state entry. Mirrors StreamInfo::FilterState::LifeSpan. Entries at Request
+// or Connection lifespan are carried into the new stream on recreate_stream; FilterChain entries
+// are not.
+typedef enum envoy_dynamic_module_type_filter_state_life_span {
+  envoy_dynamic_module_type_filter_state_life_span_FilterChain = 0,
+  envoy_dynamic_module_type_filter_state_life_span_Request = 1,
+  envoy_dynamic_module_type_filter_state_life_span_Connection = 2,
+} envoy_dynamic_module_type_filter_state_life_span;
+
+// OWNERSHIP: module-owned opaque object stored in filter state. Envoy never dereferences it; it
+// calls the supplied destructor exactly once when the entry is destroyed. THREADING: created and
+// accessed on the worker thread owning the stream.
+typedef void* envoy_dynamic_module_type_filter_state_object_module_ptr;
+
+// Destructor for a filter state object. Envoy calls it exactly once, on the worker thread, when the
+// entry is destroyed (stream/connection end per life_span, or overwrite of the same key). It runs
+// on the teardown path outside any module callback guard, so it must not unwind: a panic crossing
+// this boundary is undefined behavior. The Rust SDK enforces this by requiring an
+// ``extern "C"`` destructor, which aborts on unwind.
+typedef void (*envoy_dynamic_module_type_filter_state_object_destructor)(
+    envoy_dynamic_module_type_filter_state_object_module_ptr module_object);
+
+/**
+ * envoy_dynamic_module_callback_http_set_filter_state_object is called by the module to store an
+ * opaque, module-owned object in the filter state under the given key. Envoy never interprets the
+ * object; it wraps it in a non-serializable FilterState::Object and calls destructor(module_object)
+ * exactly once when that wrapper is destroyed. Objects stored at Request or Connection lifespan
+ * survive recreate_stream (carried into the new stream's parent filter state); FilterChain-lifespan
+ * objects do not.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state.
+ * @param module_object is the opaque object to store. Ownership transfers to Envoy.
+ * @param destructor is called exactly once with module_object when the entry is destroyed, or
+ * before returning false so a failed store never leaks the object. It must not unwind; see the
+ * destructor typedef.
+ * @param life_span is the lifespan of the entry. A Connection-lifespan entry may outlive the
+ * stream, so its object and destructor must remain valid until the connection ends.
+ * @return true if stored. Returns false, after running the destructor, if the stream info or filter
+ * state is not available, or if the key already holds an entry at a different life_span.
+ */
+bool envoy_dynamic_module_callback_http_set_filter_state_object(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_filter_state_object_module_ptr module_object,
+    envoy_dynamic_module_type_filter_state_object_destructor destructor,
+    envoy_dynamic_module_type_filter_state_life_span life_span);
+
+/**
+ * envoy_dynamic_module_callback_http_get_filter_state_object is called by the module to borrow the
+ * opaque object previously stored under the given key. Ownership stays with Envoy; the module must
+ * not free the returned pointer. After a recreate_stream, the rebuilt filter calls this with the
+ * same key to recover the carried-over object.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state.
+ * @return the stored object, or NULL if the stream info is not available, the key does not exist,
+ * or the entry was not stored via set_filter_state_object. Valid until the entry is destroyed or
+ * overwritten.
+ */
+envoy_dynamic_module_type_filter_state_object_module_ptr
+envoy_dynamic_module_callback_http_get_filter_state_object(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key);
+
 // ---------------------- Other HTTP filter callbacks ----------------------------
 
 /**
