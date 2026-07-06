@@ -34,6 +34,8 @@ envoy_extension_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/stats:isolated_store_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/filters/network/reverse_tunnel/drain_aware_hcm:drain_aware_config",
@@ -42,6 +44,7 @@ envoy_extension_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:overload_manager_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:utility_lib",
     ],
 )

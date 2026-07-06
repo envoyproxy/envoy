@@ -18,6 +18,7 @@ flushdb
 itr
 STREQ
 htonl
+htons
 ABI
 ACK
 ACL
@@ -785,6 +786,7 @@ datacenter
 datadog
 datagram
 datagrams
+datapath
 de
 deallocate
 deallocated
@@ -1048,6 +1050,7 @@ ldd
 len
 lenenc
 lexically
+libbpf
 libc
 libevent
 libprotobuf
@@ -1441,7 +1444,9 @@ snapshotted
 sockaddr
 socketpair
 sockfd
+sockhash
 socklen
+sockmap
 sockopt
 sockopts
 somestring

@@ -482,6 +482,15 @@ WEAK_STUB(ClusterConfigDefineHistogram,
 WEAK_STUB(ClusterConfigRecordHistogramValue,
           envoy_dynamic_module_callback_cluster_config_record_histogram_value(nullptr, 0, nullptr,
                                                                               0, 0))
+WEAK_STUB(ClusterWorkerTimerNew, envoy_dynamic_module_callback_cluster_worker_timer_new(nullptr))
+WEAK_STUB(ClusterWorkerTimerEnable,
+          envoy_dynamic_module_callback_cluster_worker_timer_enable(nullptr, 0))
+WEAK_STUB(ClusterWorkerTimerDisable,
+          envoy_dynamic_module_callback_cluster_worker_timer_disable(nullptr))
+WEAK_STUB(ClusterWorkerTimerEnabled,
+          envoy_dynamic_module_callback_cluster_worker_timer_enabled(nullptr))
+WEAK_STUB(ClusterWorkerTimerDelete,
+          envoy_dynamic_module_callback_cluster_worker_timer_delete(nullptr))
 
 WEAK_STUB(LbGetClusterName, envoy_dynamic_module_callback_lb_get_cluster_name(nullptr, nullptr))
 WEAK_STUB(LbGetHostsCount, envoy_dynamic_module_callback_lb_get_hosts_count(nullptr, 0))
@@ -1507,6 +1516,12 @@ WEAK_STUB(HttpSetFilterStateTyped,
                                                                     {nullptr, 0}))
 WEAK_STUB(HttpGetFilterStateTyped,
           envoy_dynamic_module_callback_http_get_filter_state_typed(nullptr, {nullptr, 0}, nullptr))
+WEAK_STUB(HttpSetFilterStateObject,
+          envoy_dynamic_module_callback_http_set_filter_state_object(
+              nullptr, {nullptr, 0}, nullptr, nullptr,
+              envoy_dynamic_module_type_filter_state_life_span_FilterChain))
+WEAK_STUB(HttpGetFilterStateObject,
+          envoy_dynamic_module_callback_http_get_filter_state_object(nullptr, {nullptr, 0}))
 WEAK_STUB(HttpAddCustomFlag,
           envoy_dynamic_module_callback_http_add_custom_flag(nullptr, {nullptr, 0}))
 WEAK_STUB(HttpFilterSchedulerNew, envoy_dynamic_module_callback_http_filter_scheduler_new(nullptr))
@@ -1676,6 +1691,27 @@ WEAK_STUB(FormatterGetHeadersSize,
               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader))
 WEAK_STUB(FormatterGetLocalReplyBody,
           envoy_dynamic_module_callback_formatter_get_local_reply_body(nullptr, nullptr))
+WEAK_STUB(HealthCheckerSchedulerNew,
+          envoy_dynamic_module_callback_health_checker_scheduler_new(nullptr))
+WEAK_STUB(HealthCheckerSchedulerReport,
+          envoy_dynamic_module_callback_health_checker_scheduler_report(
+              nullptr, envoy_dynamic_module_type_host_health_Healthy))
+WEAK_STUB(HealthCheckerSchedulerDelete,
+          envoy_dynamic_module_callback_health_checker_scheduler_delete(nullptr))
+WEAK_STUB(HealthCheckerGetHostAddress,
+          envoy_dynamic_module_callback_health_checker_get_host_address(nullptr, nullptr))
+WEAK_STUB(HealthCheckerGetHostMetadataString,
+          envoy_dynamic_module_callback_health_checker_get_host_metadata_string(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(HealthCheckerGetHostMetadataNumber,
+          envoy_dynamic_module_callback_health_checker_get_host_metadata_number(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(HealthCheckerGetHostMetadataBool,
+          envoy_dynamic_module_callback_health_checker_get_host_metadata_bool(nullptr, {nullptr, 0},
+                                                                              {nullptr, 0},
+                                                                              nullptr))
+WEAK_STUB(HealthCheckerGetHostHealth,
+          envoy_dynamic_module_callback_health_checker_get_host_health(nullptr))
 
 } // namespace
 } // namespace DynamicModules
