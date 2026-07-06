@@ -1097,8 +1097,8 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
     ENVOY_STREAM_LOG(error, "Failed to build HTTP request for method: {} with status: {}",
                      *decoder_callbacks_, tool_name, http_request.status());
     sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestToolTranscodingFailure,
-                      generateErrorJsonResponse(-32602, "Failed to build HTTP request").dump(), nullptr,
-                      McpConstants::Methods::TOOLS_CALL, params);
+                      generateErrorJsonResponse(-32602, "Failed to build HTTP request").dump(),
+                      nullptr, McpConstants::Methods::TOOLS_CALL, params);
     return;
   }
 

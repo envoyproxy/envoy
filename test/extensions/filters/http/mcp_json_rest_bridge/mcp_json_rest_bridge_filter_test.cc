@@ -402,11 +402,10 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidInputJsonReturnsError) {
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
-  EXPECT_CALL(
-      decoder_callbacks_,
-      sendLocalReply(Eq(Http::Code::BadRequest),
-                     StrEq(R"json({"code":-32700,"message":"JSON parse error"})json"), _, _,
-                     StrEq("REQUEST_FAILED_TO_PARSE_JSON_RPC")));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::BadRequest),
+                             StrEq(R"json({"code":-32700,"message":"JSON parse error"})json"), _, _,
+                             StrEq("REQUEST_FAILED_TO_PARSE_JSON_RPC")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
@@ -795,11 +794,11 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolTranscodingFailureReturnsError) {
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Eq(Http::Code::BadRequest),
-                             StrEq(R"json({"code":-32602,"message":"Failed to build HTTP request"})json"),
-                             _, _,
-                             StrEq("REQUEST_TOOL_TRANSCODING_FAILURE")));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Eq(Http::Code::BadRequest),
+                     StrEq(R"json({"code":-32602,"message":"Failed to build HTTP request"})json"),
+                     _, _, StrEq("REQUEST_TOOL_TRANSCODING_FAILURE")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
@@ -827,7 +826,8 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolTranscodingFailureReturnsError) {
   response_headers_ = {{"content-type", "text/plain"}, {"content-length", "123456"}};
   EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
-  Buffer::OwnedImpl response_body(R"json({"code":-32602,"message":"Failed to build HTTP request"})json");
+  Buffer::OwnedImpl response_body(
+      R"json({"code":-32602,"message":"Failed to build HTTP request"})json");
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
@@ -1479,11 +1479,11 @@ TEST_F(McpJsonRestBridgeFilterTest,
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(
-                  Eq(Http::Code::BadRequest),
-                  StrEq(R"json({"code":-32602,"message":"Unsupported protocol version"})json"), _,
-                  _, StrEq("REQUEST_UNSUPPORTED_PROTOCOL_VERSION")));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Eq(Http::Code::BadRequest),
+                     StrEq(R"json({"code":-32602,"message":"Unsupported protocol version"})json"),
+                     _, _, StrEq("REQUEST_UNSUPPORTED_PROTOCOL_VERSION")));
   Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","method":"notifications/initialized"})json");
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
@@ -1541,11 +1541,11 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListUnsupportedProtocolVersionReturnsBa
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(
-                  Eq(Http::Code::BadRequest),
-                  StrEq(R"json({"code":-32602,"message":"Unsupported protocol version"})json"), _,
-                  _, StrEq("REQUEST_UNSUPPORTED_PROTOCOL_VERSION")));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Eq(Http::Code::BadRequest),
+                     StrEq(R"json({"code":-32602,"message":"Unsupported protocol version"})json"),
+                     _, _, StrEq("REQUEST_UNSUPPORTED_PROTOCOL_VERSION")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
@@ -1608,11 +1608,11 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsCallUnsupportedProtocolVersionReturnsBa
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(
-                  Eq(Http::Code::BadRequest),
-                  StrEq(R"json({"code":-32602,"message":"Unsupported protocol version"})json"), _,
-                  _, StrEq("REQUEST_UNSUPPORTED_PROTOCOL_VERSION")));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Eq(Http::Code::BadRequest),
+                     StrEq(R"json({"code":-32602,"message":"Unsupported protocol version"})json"),
+                     _, _, StrEq("REQUEST_UNSUPPORTED_PROTOCOL_VERSION")));
   Buffer::OwnedImpl body(
       R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"list_api_keys","arguments":{"parent":"projects/test-codelab","pageSize":1}}})json");
   EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
@@ -1696,8 +1696,7 @@ max_request_body_size:
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
   EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Eq(Http::Code::PayloadTooLarge), _, _, _,
-                             StrEq("REQUEST_TOO_LARGE")));
+              sendLocalReply(Eq(Http::Code::PayloadTooLarge), _, _, _, StrEq("REQUEST_TOO_LARGE")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
