@@ -121,7 +121,6 @@ envoy_cc_library(
         "//source/common/network:socket_option_factory_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/stream_info:stream_info_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -440,7 +439,6 @@ envoy_cc_library(
         "//source/common/common:scalar_to_byte_vector_lib",
         "//source/common/common:utility_lib",
         "//source/common/memory:aligned_allocator_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -457,7 +455,6 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -480,18 +477,33 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "reuse_port_bpf_cpu_steering_option_lib",
+    srcs = ["reuse_port_bpf_cpu_steering_option_impl.cc"],
+    hdrs = ["reuse_port_bpf_cpu_steering_option_impl.h"],
+    deps = [
+        "//envoy/network:socket_interface",
+        "//source/common/common:macros",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/common:scalar_to_byte_vector_lib",
+        "//source/common/common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "socket_option_factory_lib",
     srcs = ["socket_option_factory.cc"],
     hdrs = ["socket_option_factory.h"],
     deps = [
         ":addr_family_aware_socket_option_lib",
         ":address_lib",
+        ":reuse_port_bpf_cpu_steering_option_lib",
         ":socket_option_lib",
         ":win32_redirect_records_option_lib",
         "//envoy/network:address_interface",
         "//envoy/network:listen_socket_interface",
         "//source/common/common:logger_lib",
-        "@abseil-cpp//absl/types:optional",
+        "@abseil-cpp//absl/types:span",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

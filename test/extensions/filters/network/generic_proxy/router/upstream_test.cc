@@ -74,7 +74,7 @@ public:
 
   MOCK_METHOD(void, onConnectionClose, (Network::ConnectionEvent event));
   MOCK_METHOD(void, onDecodingSuccess,
-              (ResponseHeaderFramePtr response_header_frame, absl::optional<StartTime> start_time));
+              (ResponseHeaderFramePtr response_header_frame, std::optional<StartTime> start_time));
   MOCK_METHOD(void, onDecodingSuccess, (ResponseCommonFramePtr response_common_frame));
   MOCK_METHOD(void, onDecodingFailure, (absl::string_view reason));
 
@@ -165,11 +165,11 @@ TEST_F(UpstreamTest, OwnedGenericUpstreamWillNotBeReused) {
 }
 
 TEST_F(UpstreamTest, NoHealthyUpstream) {
-  EXPECT_CALL(thread_local_cluster_, tcpConnPool(_, _)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(thread_local_cluster_, tcpConnPool(_, _)).WillOnce(Return(std::nullopt));
   auto generic_upstream = createBoundGenericUpstream();
   EXPECT_EQ(nullptr, generic_upstream);
 
-  EXPECT_CALL(thread_local_cluster_, tcpConnPool(_, _)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(thread_local_cluster_, tcpConnPool(_, _)).WillOnce(Return(std::nullopt));
   auto owned_upstream = createOwnedGenericUpstream();
   EXPECT_EQ(nullptr, owned_upstream);
 }

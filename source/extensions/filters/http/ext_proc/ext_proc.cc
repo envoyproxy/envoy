@@ -85,27 +85,26 @@ constexpr absl::string_view RequestTrailerProcessingEffectField =
 constexpr absl::string_view ResponseTrailerProcessingEffectField =
     "response_trailer_processing_effect";
 
-absl::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config) {
+std::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config) {
   if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
     return config.overrides().processing_mode();
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
-absl::optional<envoy::config::core::v3::GrpcService>
+std::optional<envoy::config::core::v3::GrpcService>
 getFilterGrpcService(const ExternalProcessor& config) {
   if (config.has_grpc_service()) {
     return config.grpc_service();
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
-absl::optional<envoy::config::core::v3::GrpcService>
-initGrpcService(const ExtProcPerRoute& config) {
+std::optional<envoy::config::core::v3::GrpcService> initGrpcService(const ExtProcPerRoute& config) {
   if (config.has_overrides() && config.overrides().has_grpc_service()) {
     return config.overrides().grpc_service();
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 std::vector<std::string> initNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns) {
@@ -116,59 +115,59 @@ std::vector<std::string> initNamespaces(const Protobuf::RepeatedPtrField<std::st
   return namespaces;
 }
 
-absl::optional<std::vector<std::string>>
+std::optional<std::vector<std::string>>
 initUntypedForwardingNamespaces(const ExtProcPerRoute& config) {
   if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
       !config.overrides().metadata_options().has_forwarding_namespaces()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return {initNamespaces(config.overrides().metadata_options().forwarding_namespaces().untyped())};
 }
 
-absl::optional<std::vector<std::string>>
+std::optional<std::vector<std::string>>
 initTypedForwardingNamespaces(const ExtProcPerRoute& config) {
   if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
       !config.overrides().metadata_options().has_forwarding_namespaces()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return {initNamespaces(config.overrides().metadata_options().forwarding_namespaces().typed())};
 }
 
-absl::optional<std::vector<std::string>>
+std::optional<std::vector<std::string>>
 initUntypedReceivingNamespaces(const ExtProcPerRoute& config) {
   if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
       !config.overrides().metadata_options().has_receiving_namespaces()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return {initNamespaces(config.overrides().metadata_options().receiving_namespaces().untyped())};
 }
-absl::optional<std::vector<std::string>>
+std::optional<std::vector<std::string>>
 initUntypedClusterMetadataForwardingNamespaces(const ExtProcPerRoute& config) {
   if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
       !config.overrides().metadata_options().has_cluster_metadata_forwarding_namespaces()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return {initNamespaces(
       config.overrides().metadata_options().cluster_metadata_forwarding_namespaces().untyped())};
 }
 
-absl::optional<std::vector<std::string>>
+std::optional<std::vector<std::string>>
 initTypedClusterMetadataForwardingNamespaces(const ExtProcPerRoute& config) {
   if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
       !config.overrides().metadata_options().has_cluster_metadata_forwarding_namespaces()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return {initNamespaces(
       config.overrides().metadata_options().cluster_metadata_forwarding_namespaces().typed())};
 }
 
-absl::optional<ProcessingMode> mergeProcessingMode(const FilterConfigPerRoute& less_specific,
-                                                   const FilterConfigPerRoute& more_specific) {
+std::optional<ProcessingMode> mergeProcessingMode(const FilterConfigPerRoute& less_specific,
+                                                  const FilterConfigPerRoute& more_specific) {
   if (more_specific.disabled()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return more_specific.processingMode().has_value() ? more_specific.processingMode()
                                                     : less_specific.processingMode();
@@ -493,7 +492,7 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
   return struct_msg;
 }
 
-absl::optional<std::string> ExtProcLoggingInfo::serializeAsString() const {
+std::optional<std::string> ExtProcLoggingInfo::serializeAsString() const {
   std::vector<std::string> parts;
   parts.reserve(8);
 
@@ -640,10 +639,9 @@ FilterConfigPerRoute::FilterConfigPerRoute(
           initUntypedClusterMetadataForwardingNamespaces(config)),
       typed_cluster_metadata_forwarding_namespaces_(
           initTypedClusterMetadataForwardingNamespaces(config)),
-      failure_mode_allow_(
-          config.overrides().has_failure_mode_allow()
-              ? absl::optional<bool>(config.overrides().failure_mode_allow().value())
-              : absl::nullopt),
+      failure_mode_allow_(config.overrides().has_failure_mode_allow()
+                              ? std::optional<bool>(config.overrides().failure_mode_allow().value())
+                              : std::nullopt),
       processing_request_modifier_factory_cb_(
           createProcessingRequestModifierCb(config.overrides(), builder, context)) {}
 
@@ -777,7 +775,7 @@ Filter::StreamOpenState Filter::openStream() {
                        .setParentSpan(decoder_callbacks_->activeSpan())
                        .setParentContext(grpc_context)
                        .setBufferBodyForRetry(grpc_service_.has_retry_policy())
-                       .setSampled(absl::nullopt)
+                       .setSampled(std::nullopt)
                        .setRemoteCloseTimeout(config_->remoteCloseTimeout());
 
     ExternalProcessorClient* grpc_client = dynamic_cast<ExternalProcessorClient*>(client_.get());
@@ -2087,8 +2085,8 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
   }
   const auto grpc_status =
       response.has_grpc_status()
-          ? absl::optional<Grpc::Status::GrpcStatus>(response.grpc_status().status())
-          : absl::nullopt;
+          ? std::optional<Grpc::Status::GrpcStatus>(response.grpc_status().status())
+          : std::nullopt;
   const auto mutate_headers = [this, &response](Http::ResponseHeaderMap& headers) {
     if (response.has_headers()) {
       Effect imm_resp_effect = Effect::None;
@@ -2118,7 +2116,7 @@ void Filter::mergePerRouteConfig() {
 
   route_config_merged_ = true;
 
-  absl::optional<FilterConfigPerRoute> merged_config;
+  std::optional<FilterConfigPerRoute> merged_config;
   for (const FilterConfigPerRoute& typed_cfg :
        Http::Utility::getAllPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_)) {
     if (!merged_config.has_value()) {
@@ -2168,7 +2166,7 @@ void Filter::mergePerRouteConfig() {
 
   // For metadata namespaces, we only override the existing value if we have a
   // value from our merged config. We indicate a lack of value from the merged
-  // config with absl::nullopt
+  // config with std::nullopt
 
   if (merged_config->untypedForwardingMetadataNamespaces().has_value()) {
     untyped_forwarding_namespaces_ = merged_config->untypedForwardingMetadataNamespaces().value();

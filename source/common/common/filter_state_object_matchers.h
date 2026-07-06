@@ -6,6 +6,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/stream_info/filter_state.h"
 
+#include "source/common/matcher/address_matcher.h"
 #include "source/common/network/cidr_range.h"
 
 namespace Envoy {
@@ -26,8 +27,7 @@ public:
   bool match(const StreamInfo::FilterState::Object& object) const override;
 
 private:
-  std::unique_ptr<Envoy::Network::Address::IpList> ip_list_;
-  const bool invert_match_;
+  const Envoy::Matcher::AddressMatcher address_matcher_;
 };
 
 class FilterStateStringMatcher : public FilterStateObjectMatcher {

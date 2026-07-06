@@ -3905,6 +3905,70 @@ pub extern "C" fn envoy_dynamic_module_callback_http_filter_reset_stream(
   RESET_STREAM_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
 }
 
+// Single-slot store backing the filter state object FFI stubs below.
+static FILTER_STATE_OBJECT: std::sync::atomic::AtomicPtr<std::ffi::c_void> =
+  std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_set_filter_state_object(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  module_object: abi::envoy_dynamic_module_type_filter_state_object_module_ptr,
+  _destructor: abi::envoy_dynamic_module_type_filter_state_object_destructor,
+  _life_span: abi::envoy_dynamic_module_type_filter_state_life_span,
+) -> bool {
+  FILTER_STATE_OBJECT.store(module_object, std::sync::atomic::Ordering::SeqCst);
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_filter_state_object(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_filter_state_object_module_ptr {
+  FILTER_STATE_OBJECT.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[test]
+fn test_http_filter_state_object_round_trip() {
+  use std::sync::atomic::Ordering;
+  static DROPPED: AtomicUsize = AtomicUsize::new(0);
+  struct Live;
+  impl Drop for Live {
+    fn drop(&mut self) {
+      DROPPED.fetch_add(1, Ordering::SeqCst);
+    }
+  }
+  extern "C" fn destructor(object: *mut std::ffi::c_void) {
+    drop(unsafe { Box::from_raw(object as *mut Live) });
+  }
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let object = Box::into_raw(Box::new(Live)) as *mut std::ffi::c_void;
+  // SAFETY: `object` is a freshly boxed Live and `destructor` frees exactly that type without
+  // unwinding.
+  assert!(unsafe {
+    envoy_filter.set_filter_state_object(
+      b"key",
+      object,
+      destructor,
+      abi::envoy_dynamic_module_type_filter_state_life_span::Request,
+    )
+  });
+
+  // The rebuilt filter recovers the same pointer across recreate_stream.
+  let recovered = envoy_filter.get_filter_state_object(b"key");
+  assert_eq!(recovered, Some(object));
+  assert_eq!(DROPPED.load(Ordering::SeqCst), 0);
+
+  // Envoy calls the destructor once when the entry is destroyed; the boxed value is freed exactly
+  // once with no double free.
+  destructor(recovered.unwrap());
+  assert_eq!(DROPPED.load(Ordering::SeqCst), 1);
+}
+
 static NETWORK_CLOSE_CALLED: AtomicBool = AtomicBool::new(false);
 
 #[no_mangle]
@@ -4168,6 +4232,56 @@ fn test_catch_unwind_http_scheduled_after_poison_is_skipped() {
     result.is_ok(),
     "late on_scheduled should be skipped after CatchUnwind is poisoned",
   );
+}
+
+// Regression test for CatchUnwind re-entrancy. Envoy can synchronously re-enter the same wrapper
+// while an outer callback is still on the stack (e.g. a callback that completes a response with
+// end-of-stream). Here on_scheduled re-derives `&mut CatchUnwind` from the raw wrapper pointer (as
+// every FFI entry point does) and calls a status-returning callback. The take()-based poisoning
+// misread this as a poisoned filter and panicked/failed closed; borrowing in place lets the
+// re-entrant callback run.
+#[test]
+fn test_catch_unwind_http_reentrant_status_callback_is_not_poisoned() {
+  thread_local! {
+    static WRAPPER_PTR: std::cell::Cell<*mut std::ffi::c_void> =
+      const { std::cell::Cell::new(std::ptr::null_mut()) };
+    static RESPONSE_HEADERS_RAN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+  }
+  struct ReentrantFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ReentrantFilter {
+    fn on_scheduled(&mut self, envoy_filter: &mut EHF, _event_id: u64) {
+      let ptr = WRAPPER_PTR.with(|p| p.get()) as *mut CatchUnwind<ReentrantFilter>;
+      // SAFETY: mirrors the FFI entry points re-deriving &mut from the raw filter ptr while an
+      // outer callback (this on_scheduled) is still on the stack.
+      let wrapper = unsafe { &mut *ptr };
+      HttpFilter::on_response_headers(wrapper, envoy_filter, false);
+    }
+    fn on_response_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+      RESPONSE_HEADERS_RAN.with(|c| c.set(true));
+      abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+    }
+  }
+
+  RESET_STREAM_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+  RESPONSE_HEADERS_RAN.with(|c| c.set(false));
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(ReentrantFilter);
+  WRAPPER_PTR
+    .with(|p| p.set(&mut wrapper as *mut CatchUnwind<ReentrantFilter> as *mut std::ffi::c_void));
+
+  HttpFilter::on_scheduled(&mut wrapper, &mut envoy_filter, 1);
+
+  // The re-entrant status-returning callback ran instead of being misread as poisoned.
+  assert!(RESPONSE_HEADERS_RAN.with(std::cell::Cell::get));
+  // No false fail-closed: the legitimate re-entrancy did not trip the panic guard.
+  assert!(!RESET_STREAM_CALLED.load(std::sync::atomic::Ordering::SeqCst));
 }
 
 // =============================================================================

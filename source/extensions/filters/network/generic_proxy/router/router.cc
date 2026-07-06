@@ -22,11 +22,11 @@ namespace {
 
 struct ReasonViewAndFlag {
   absl::string_view view;
-  absl::optional<StreamInfo::CoreResponseFlag> flag;
+  std::optional<StreamInfo::CoreResponseFlag> flag;
 };
 
 static constexpr ReasonViewAndFlag ReasonViewAndFlags[] = {
-    {"local_reset", absl::nullopt},
+    {"local_reset", std::nullopt},
     {"connection_failure", StreamInfo::CoreResponseFlag::UpstreamConnectionFailure},
     {"connection_termination", StreamInfo::CoreResponseFlag::UpstreamConnectionTermination},
     {"overflow", StreamInfo::CoreResponseFlag::UpstreamOverflow},
@@ -232,7 +232,7 @@ void UpstreamRequest::onUpstreamResponseComplete(bool drain_close) {
 }
 
 void UpstreamRequest::onDecodingSuccess(ResponseHeaderFramePtr response_header_frame,
-                                        absl::optional<StartTime> start_time) {
+                                        std::optional<StartTime> start_time) {
   if (response_stream_header_received_) {
     ENVOY_LOG(error, "upstream request: multiple StreamResponse received");
     resetStream(StreamResetReason::ProtocolError, {});
@@ -407,7 +407,7 @@ void RouterFilter::onTimeout() {
 void RouterFilter::onDestroy() { onFilterComplete(); }
 
 void RouterFilter::completeAndSendLocalReply(absl::Status status, absl::string_view details,
-                                             absl::optional<StreamInfo::CoreResponseFlag> flag) {
+                                             std::optional<StreamInfo::CoreResponseFlag> flag) {
   if (flag.has_value()) {
     callbacks_->streamInfo().setResponseFlag(flag.value());
   }

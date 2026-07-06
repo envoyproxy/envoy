@@ -320,6 +320,13 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
     .withf(|ns, entries| ns == "ns_req_header_batch_empty" && entries.is_empty())
     .return_const(())
     .once();
+  envoy_filter
+    .expect_set_dynamic_metadata_bytes()
+    .withf(|ns, key, value| {
+      ns == "ns_req_header_bytes" && key == "key" && value == &[0xff, 0x00, 0xfe]
+    })
+    .return_const(())
+    .once();
   // Route/Cluster/Host metadata.
   envoy_filter
     .expect_get_metadata_string()

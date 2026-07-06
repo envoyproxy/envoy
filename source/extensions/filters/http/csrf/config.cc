@@ -21,7 +21,7 @@ Http::FilterFactoryCb CsrfFilterFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
-Http::FilterFactoryCb CsrfFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb> CsrfFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
   CsrfFilterConfigSharedPtr config =

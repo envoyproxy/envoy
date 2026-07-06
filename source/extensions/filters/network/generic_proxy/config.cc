@@ -121,7 +121,7 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
     std::vector<Formatter::CommandParserPtr> command_parsers;
     command_parsers.push_back(createGenericProxyCommandParser());
     tracing_config = std::make_unique<Tracing::ConnectionManagerTracingConfig>(
-        context.listenerInfo().direction(), proto_config.tracing(), command_parsers);
+        context.direction(), proto_config.tracing(), command_parsers);
   }
 
   // Access log configuration.

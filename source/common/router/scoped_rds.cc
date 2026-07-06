@@ -458,7 +458,7 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
     return status;
   }
   if (any_applied || !to_be_removed_rds_providers.empty()) {
-    setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));
+    setLastConfigInfo(std::optional<LastConfigInfo>({std::nullopt, version_info}));
   }
   stats_.all_scopes_.set(scoped_route_map_.size());
   stats_.config_reload_.inc();
@@ -619,7 +619,8 @@ ScopedRoutesConfigProviderManager::dumpConfigs(const Matchers::StringMatcher& na
         if (!name_matcher.match(it.second->configProto().name())) {
           continue;
         }
-        dynamic_config->mutable_scoped_route_configs()->Add()->PackFrom(it.second->configProto());
+        std::ignore = dynamic_config->mutable_scoped_route_configs()->Add()->PackFrom(
+            it.second->configProto());
       }
       TimestampUtil::systemClockToTimestamp(subscription->lastUpdated(),
                                             *dynamic_config->mutable_last_updated());
@@ -629,14 +630,14 @@ ScopedRoutesConfigProviderManager::dumpConfigs(const Matchers::StringMatcher& na
   for (const auto& provider : immutableConfigProviders(ConfigProviderInstanceType::Inline)) {
     const auto protos_info =
         provider->configProtoInfoVector<envoy::config::route::v3::ScopedRouteConfiguration>();
-    ASSERT(protos_info != absl::nullopt);
+    ASSERT(protos_info != std::nullopt);
     auto* inline_config = config_dump->mutable_inline_scoped_route_configs()->Add();
     inline_config->set_name(static_cast<InlineScopedRoutesConfigProvider*>(provider)->name());
     for (const auto& config_proto : protos_info.value().config_protos_) {
       if (!name_matcher.match(config_proto->name())) {
         continue;
       }
-      inline_config->mutable_scoped_route_configs()->Add()->PackFrom(*config_proto);
+      std::ignore = inline_config->mutable_scoped_route_configs()->Add()->PackFrom(*config_proto);
     }
     TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
                                           *inline_config->mutable_last_updated());

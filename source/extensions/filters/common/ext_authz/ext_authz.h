@@ -132,7 +132,7 @@ struct Response {
 
   // The gRPC status returned by the authorization server when it is making a
   // gRPC call.
-  absl::optional<Grpc::Status::GrpcStatus> grpc_status{absl::nullopt};
+  std::optional<Grpc::Status::GrpcStatus> grpc_status{std::nullopt};
 };
 
 using ResponsePtr = std::unique_ptr<Response>;

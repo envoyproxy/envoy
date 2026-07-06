@@ -107,7 +107,7 @@ public:
    * @param options - if provided, options are passed through to shutdownListener.
    */
   virtual void
-  drainListeners(OptRef<const Network::ExtraShutdownListenerOptions> options = absl::nullopt) PURE;
+  drainListeners(OptRef<const Network::ExtraShutdownListenerOptions> options = std::nullopt) PURE;
 
   /**
    * @return DrainManager& singleton for use by the entire server.

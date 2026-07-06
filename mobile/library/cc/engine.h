@@ -45,6 +45,7 @@ public:
   envoy_status_t setProxySettings(absl::string_view host, const uint16_t port);
 
   envoy_status_t terminate();
+  void drainConnectionsBySocketTag(uint32_t tag);
   Envoy::InternalEngine* engine() { return engine_; }
 
 private:

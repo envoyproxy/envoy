@@ -76,7 +76,7 @@ Http::FilterFactoryCb BasicAuthFilterFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
-Http::FilterFactoryCb BasicAuthFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb> BasicAuthFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const BasicAuth& proto_config, const std::string& stats_prefix,
     Server::Configuration::ServerFactoryContext& context) {
   UserMap users = readHtpasswd(THROW_OR_RETURN_VALUE(

@@ -16,6 +16,7 @@ envoy_cc_library(
     external_deps = ["grpc_transcoding"],
     deps = [
         "//source/common/common:logger_lib",
+        "//source/common/json/wuffs_json:wuffs_json_cursor_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/mcp:constants_lib",
         "@envoy_api//envoy/extensions/filters/http/mcp/v3:pkg_cc_proto",
@@ -45,7 +46,6 @@ envoy_cc_library(
         "//source/extensions/filters/common/mcp:filter_state_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/filters/http/mcp/v3:pkg_cc_proto",
     ],
 )

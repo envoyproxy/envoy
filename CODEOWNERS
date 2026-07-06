@@ -290,6 +290,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/network/dns_resolver/apple @yanavlasov @mattklein123
 /*/extensions/network/dns_resolver/getaddrinfo @fredyw @mattklein123
 /*/extensions/network/dns_resolver/hickory @agrawroh @yanavlasov @wbpcode
+# sockmap socket interface
+/*/extensions/network/socket_interface/sockmap/ @agrawroh @wbpcode @yanavlasov
 # compression code
 /*/extensions/filters/http/decompressor @kbaichoo @mattklein123
 /*/extensions/filters/http/compressor @kbaichoo @mattklein123
@@ -311,6 +313,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # rbac
 /*/extensions/filters/network/rbac @yangminzhu @yanavlasov
 /*/extensions/filters/http/rbac @yangminzhu @yanavlasov
+/*/extensions/filters/http/upstream_rbac @yangminzhu @yanavlasov @fl0Lec
 /*/extensions/filters/common/rbac @yangminzhu @yanavlasov
 # tap
 /*/extensions/filters/http/tap @mattklein123 @xu1zhou
@@ -436,6 +439,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/transport_sockets/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/upstreams/http/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/tracers/dynamic_modules @agrawroh @mathetake @wbpcode
+/*/extensions/health_checkers/dynamic_modules @basundhara-c @agrawroh @mathetake @wbpcode
 # Linux network namespace override
 /*/extensions/local_address_selectors/filter_state_override @tonya11en @kyessenov
 

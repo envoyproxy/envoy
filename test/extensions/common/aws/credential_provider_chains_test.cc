@@ -1,4 +1,5 @@
 #include "source/extensions/common/aws/credential_provider_chains.h"
+#include "source/extensions/common/aws/credential_providers/instance_profile_credentials_provider.h"
 
 #include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -558,6 +559,31 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityPreservesExistingWatchedD
   CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
   EXPECT_EQ(filename, "/test/path/token");
   EXPECT_EQ(watched_dir, "/custom/watch/dir");
+}
+
+TEST_F(CustomCredentialsProviderChainTest, AssumeRoleInnerChainSubscriptionsSetup) {
+  envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
+  credential_provider_config.set_custom_credential_provider_chain(true);
+  auto* assume_role = credential_provider_config.mutable_assume_role_credential_provider();
+  assume_role->set_role_arn("test-role-arn");
+  assume_role->set_role_session_name("test-session");
+  assume_role->mutable_credential_provider()->set_custom_credential_provider_chain(true);
+  assume_role->mutable_credential_provider()->mutable_instance_profile_credential_provider();
+
+  auto chain = Envoy::Extensions::Common::Aws::CommonCredentialsProviderChain::
+      customCredentialsProviderChain(context_, "us-east-1", credential_provider_config);
+
+  EXPECT_TRUE(chain.ok());
+  EXPECT_EQ(1, chain.value()->getNumProviders());
+
+  auto instance_profile_provider =
+      context_.singletonManager()
+          .getTyped<Envoy::Extensions::Common::Aws::InstanceProfileCredentialsProvider>(
+              "instance_profile_credentials_provider_singleton");
+  ASSERT_NE(instance_profile_provider, nullptr);
+
+  MetadataCredentialsProviderBaseFriend provider_friend(instance_profile_provider);
+  EXPECT_EQ(1, provider_friend.getSubscribersCount());
 }
 
 } // namespace Aws

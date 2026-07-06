@@ -70,15 +70,15 @@ GrpcJsonReverseTranscoderConfig::GrpcJsonReverseTranscoderConfig(
       Grpc::Common::typeUrlPrefix(), &descriptor_pool_));
   max_request_body_size_ =
       transcoder_config.has_max_request_body_size()
-          ? absl::make_optional(transcoder_config.max_request_body_size().value())
+          ? std::make_optional(transcoder_config.max_request_body_size().value())
           : std::nullopt;
   max_response_body_size_ =
       transcoder_config.has_max_response_body_size()
-          ? absl::make_optional(transcoder_config.max_response_body_size().value())
+          ? std::make_optional(transcoder_config.max_response_body_size().value())
           : std::nullopt;
   api_version_header_ = transcoder_config.api_version_header().empty()
                             ? std::nullopt
-                            : absl::make_optional(transcoder_config.api_version_header());
+                            : std::make_optional(transcoder_config.api_version_header());
 
   const auto& print_options = transcoder_config.request_json_print_options();
   request_translate_options_.json_print_options.always_print_enums_as_ints =

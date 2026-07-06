@@ -38,15 +38,15 @@ public:
       : method_(std::move(method)), json_(Json::Factory::loadFromProtobufStruct(proto_struct)),
         is_mcp_request_(is_mcp_request), is_exceeding_limit_(is_exceeding_limit) {}
 
-  absl::optional<std::string> serializeAsString() const override {
+  std::optional<std::string> serializeAsString() const override {
     if (json_ == nullptr || json_->empty()) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     return json_->asJsonString();
   }
 
-  absl::optional<absl::string_view> method() const {
-    return method_.empty() ? absl::nullopt : absl::optional<absl::string_view>(method_);
+  std::optional<absl::string_view> method() const {
+    return method_.empty() ? std::nullopt : std::optional<absl::string_view>(method_);
   }
 
   const Json::ObjectSharedPtr& json() const { return json_; }
