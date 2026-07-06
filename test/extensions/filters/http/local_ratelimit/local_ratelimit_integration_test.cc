@@ -190,7 +190,7 @@ protected:
   void sendAndVerifyRequest(const std::string& cluster, const std::string& expected_status,
                             size_t expected_body_size) {
     auto response = makeRequest(cluster);
-    waitForNextUpstreamRequest();
+    waitForNextUpstreamRequest(0, std::chrono::seconds(30));
     upstream_request_->encodeHeaders(default_response_headers_, 1);
     verifyResponse(std::move(response), expected_status, expected_body_size);
     EXPECT_TRUE(upstream_request_->complete());
@@ -200,7 +200,7 @@ protected:
                             const std::string& expected_remaining,
                             const std::string& expected_reset) {
     auto response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
-    waitForNextUpstreamRequest();
+    waitForNextUpstreamRequest(0, std::chrono::seconds(30));
     upstream_request_->encodeHeaders(default_response_headers_, 1);
     verifyResponse(std::move(response), "200", 0, expected_limit, expected_remaining,
                    expected_reset);
