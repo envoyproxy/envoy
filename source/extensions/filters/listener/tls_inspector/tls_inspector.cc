@@ -222,7 +222,7 @@ ParseState Filter::getParserState(int handshake_status) {
           (client_tls_version_ < Config::TLS_MIN_SUPPORTED_VERSION ||
            client_tls_version_ > Config::TLS_MAX_SUPPORTED_VERSION)) {
         config_->stats().tls_not_found_.inc();
-        setDynamicMetadata(failureReasonClientHelloWrongTlsVersion());
+        setDynamicMetadata(failureReasonClientHelloInvalidTlsVersion());
         setDownstreamTransportFailureReason();
         return ParseState::Error;
       }
@@ -431,8 +431,8 @@ const std::string& Filter::failureReasonClientHelloNotDetected() {
   CONSTRUCT_ON_FIRST_USE(std::string, "ClientHelloNotDetected");
 }
 
-const std::string& Filter::failureReasonClientHelloWrongTlsVersion() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "ClientHelloWrongTlsVersion");
+const std::string& Filter::failureReasonClientHelloInvalidTlsVersion() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "ClientHelloInvalidTlsVersion");
 }
 
 } // namespace TlsInspector

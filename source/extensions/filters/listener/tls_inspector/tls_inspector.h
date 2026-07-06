@@ -103,7 +103,7 @@ public:
   static const std::string& failureReasonKey();
   static const std::string& failureReasonClientHelloTooLarge();
   static const std::string& failureReasonClientHelloNotDetected();
-  static const std::string& failureReasonClientHelloWrongTlsVersion();
+  static const std::string& failureReasonClientHelloInvalidTlsVersion();
 
 private:
   ParseState parseClientHello(const void* data, size_t len, uint64_t bytes_already_processed);

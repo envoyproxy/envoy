@@ -1217,7 +1217,7 @@ TEST_P(TlsInspectorTest, TlsVersionTooLow) {
   Protobuf::Struct expected_metadata;
   auto& fields = *expected_metadata.mutable_fields();
   fields[Filter::failureReasonKey()].set_string_value(
-      Filter::failureReasonClientHelloWrongTlsVersion());
+      Filter::failureReasonClientHelloInvalidTlsVersion());
   EXPECT_CALL(cb_, setDynamicMetadata(Filter::dynamicMetadataKey(), ProtoEq(expected_metadata)));
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
@@ -1231,6 +1231,48 @@ TEST_P(TlsInspectorTest, TlsVersionTooLowAllowedByRuntime) {
   const std::string servername("example.com");
   // Generate ClientHello with SSL v3 version (0x0300)
   std::vector<uint8_t> client_hello = CreateClientHello(servername, 0, true, 0x0300);
+  mockSysCallForPeek(client_hello);
+
+  EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  auto state = filter_->onData(*buffer_);
+  // With guard false, it proceeds as a normal TLS connection for inspection
+  EXPECT_EQ(Network::FilterStatus::Continue, state);
+  EXPECT_EQ(1, cfg_->stats().tls_found_.value());
+  EXPECT_EQ(0, cfg_->stats().tls_not_found_.value());
+}
+
+TEST_P(TlsInspectorTest, TlsVersionTooHigh) {
+  init();
+  const std::string servername("example.com");
+  // Generate ClientHello with non existent version (1.3 is 0x0304)
+  std::vector<uint8_t> client_hello = CreateClientHello(servername, 0, true, 0x0305);
+  mockSysCallForPeek(client_hello);
+  EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  // trigger the event to copy the client hello message into buffer
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  Protobuf::Struct expected_metadata;
+  auto& fields = *expected_metadata.mutable_fields();
+  fields[Filter::failureReasonKey()].set_string_value(
+      Filter::failureReasonClientHelloInvalidTlsVersion());
+  EXPECT_CALL(cb_, setDynamicMetadata(Filter::dynamicMetadataKey(), ProtoEq(expected_metadata)));
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, state);
+  EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
+}
+
+TEST_P(TlsInspectorTest, TlsVersionTooHighAllowedByRuntime) {
+  Runtime::maybeSetRuntimeGuard(
+      "envoy.reloadable_features.tls_inspector_enforce_client_tls_version", false);
+  init();
+  const std::string servername("example.com");
+  // Generate ClientHello with SSL v3 version (0x0300)
+  std::vector<uint8_t> client_hello = CreateClientHello(servername, 0, true, 0x0305);
   mockSysCallForPeek(client_hello);
 
   EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
