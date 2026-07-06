@@ -25,16 +25,21 @@ public:
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& response_headers,
+                                          bool) override {
     if (dual_reply_) {
       decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "second_reply", nullptr,
                                          std::nullopt, "second_reply");
       return Http::FilterHeadersStatus::StopIteration;
     }
+    if (saw_on_local_reply_) {
+      response_headers.addCopy(Http::LowerCaseString{"saw-on-local-reply"}, "yes");
+    }
     return Http::FilterHeadersStatus::Continue;
   }
 
   Http::LocalErrorStatus onLocalReply(const LocalReplyData&) override {
+    saw_on_local_reply_ = true;
     if (reset_) {
       return Http::LocalErrorStatus::ContinueAndResetStream;
     }
@@ -43,6 +48,7 @@ public:
 
   bool reset_{};
   bool dual_reply_{};
+  bool saw_on_local_reply_{};
 };
 
 class OnLocalReplyFilterConfig
