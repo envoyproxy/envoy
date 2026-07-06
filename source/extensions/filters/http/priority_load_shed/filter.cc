@@ -164,8 +164,7 @@ Http::FilterHeadersStatus PriorityLoadShedFilter::decodeHeaders(Http::RequestHea
   config_->stats().shed_.inc();
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::OverloadManager);
   decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "envoy overloaded", nullptr,
-                                     std::nullopt,
-                                     StreamInfo::ResponseCodeDetails::get().Overload);
+                                     std::nullopt, StreamInfo::ResponseCodeDetails::get().Overload);
   return Http::FilterHeadersStatus::StopIteration;
 }
 
