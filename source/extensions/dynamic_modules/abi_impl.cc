@@ -85,6 +85,19 @@ uint32_t envoy_dynamic_module_callback_get_concurrency() {
   return context->options().concurrency();
 }
 
+bool envoy_dynamic_module_callback_runtime_feature_enabled(
+    envoy_dynamic_module_type_module_buffer key) {
+  using namespace Envoy;
+  auto context = Server::Configuration::ServerFactoryContextInstance::getExisting();
+  if (context == nullptr) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_runtime_feature_enabled called before the server "
+                 "context was initialized");
+    return false;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  return context->runtime().snapshot().getBoolean(key_view, false);
+}
+
 bool envoy_dynamic_module_callback_is_validation_mode() {
   using namespace Envoy;
   if (!Thread::MainThread::isMainOrTestThread()) {

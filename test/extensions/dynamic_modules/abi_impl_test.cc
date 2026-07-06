@@ -252,6 +252,37 @@ TEST(CommonAbiImplTest, SharedDataRegistryMultipleKeys) {
 }
 
 // =============================================================================
+// Runtime Feature Tests
+// =============================================================================
+
+TEST(CommonAbiImplTest, RuntimeFeatureEnabledReturnsTrue) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.runtime_loader_.snapshot_, getBoolean("my.feature.flag", false))
+      .WillByDefault(Return(true));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  envoy_dynamic_module_type_module_buffer key = {"my.feature.flag", 15};
+  EXPECT_TRUE(envoy_dynamic_module_callback_runtime_feature_enabled(key));
+}
+
+TEST(CommonAbiImplTest, RuntimeFeatureEnabledReturnsFalse) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.runtime_loader_.snapshot_, getBoolean("my.feature.flag", false))
+      .WillByDefault(Return(false));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  envoy_dynamic_module_type_module_buffer key = {"my.feature.flag", 15};
+  EXPECT_FALSE(envoy_dynamic_module_callback_runtime_feature_enabled(key));
+}
+
+TEST(CommonAbiImplTest, RuntimeFeatureEnabledBeforeServerContextFailsClosed) {
+  envoy_dynamic_module_type_module_buffer key = {"my.feature.flag", 15};
+  EXPECT_ENVOY_BUG(EXPECT_FALSE(envoy_dynamic_module_callback_runtime_feature_enabled(key)),
+                   "envoy_dynamic_module_callback_runtime_feature_enabled called before the server "
+                   "context was initialized");
+}
+
+// =============================================================================
 // Weak symbol stub tests for network filter, listener filter, access logger, and
 // UDP listener filter callbacks. These verify that the weak stubs installed in
 // abi_impl.cc trigger ENVOY_BUG when called from a context that does not compile

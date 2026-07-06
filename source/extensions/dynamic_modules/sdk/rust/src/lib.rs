@@ -200,6 +200,28 @@ pub unsafe fn is_validation_mode() -> bool {
   unsafe { abi::envoy_dynamic_module_callback_is_validation_mode() }
 }
 
+/// Check if a runtime feature flag is enabled. Returns `true` if the key exists and is set to a
+/// truthy value, `false` otherwise.
+#[macro_export]
+macro_rules! runtime_feature_enabled {
+  ($key:expr) => {{
+    #[cfg(not(test))]
+    {
+      let key: &str = $key;
+      let buf = $crate::abi::envoy_dynamic_module_type_module_buffer {
+        ptr: key.as_ptr() as *const ::std::os::raw::c_char,
+        length: key.len(),
+      };
+      unsafe { $crate::abi::envoy_dynamic_module_callback_runtime_feature_enabled(buf) }
+    }
+    #[cfg(test)]
+    {
+      let _ = $key;
+      false
+    }
+  }};
+}
+
 /// Register a function pointer under a name in the process-wide function registry.
 ///
 /// This allows modules loaded in the same process to expose functions that other modules can
@@ -1185,8 +1207,8 @@ pub static NEW_FORMATTER_CONFIG_FUNCTION: OnceLock<NewFormatterConfigFunction> =
 /// # Example
 ///
 /// ```
-/// use envoy_proxy_dynamic_modules_rust_sdk::*;
 /// use envoy_proxy_dynamic_modules_rust_sdk::formatter::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
 ///
 /// fn program_init() -> bool {
 ///   true

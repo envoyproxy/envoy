@@ -496,6 +496,21 @@ void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level
  */
 bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level level);
 
+// --------------------------------- Runtime -----------------------------------
+
+/**
+ * envoy_dynamic_module_callback_runtime_feature_enabled is called by the module to check if a
+ * runtime feature flag is enabled. This can be used to dynamically toggle module behavior without
+ * restarting Envoy by using RTDS or admin runtime overrides.
+ *
+ * This is thread-safe and can be called from any thread.
+ *
+ * @param key is the runtime feature key to check.
+ * @return true if the key exists and is set to a truthy value, false otherwise.
+ */
+bool envoy_dynamic_module_callback_runtime_feature_enabled(
+    envoy_dynamic_module_type_module_buffer key);
+
 // --------------------------------- Threading -----------------------------------
 
 /**

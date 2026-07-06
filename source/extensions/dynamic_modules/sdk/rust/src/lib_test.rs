@@ -8091,3 +8091,8 @@ fn test_mock_envoy_transport_socket_fd_and_write_rearm() {
     IoResult::keep_open(0, false)
   );
 }
+
+#[test]
+fn test_runtime_feature_enabled() {
+  assert!(!runtime_feature_enabled!("some.feature.flag"));
+}
