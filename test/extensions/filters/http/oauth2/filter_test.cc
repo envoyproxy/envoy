@@ -1208,7 +1208,7 @@ TEST_F(OAuth2Test, RequestSignoutWithCustomPostLogoutRedirectUri) {
   credentials->mutable_token_secret()->set_name("secret");
   credentials->mutable_hmac_secret()->set_name("hmac");
   p.set_end_session_endpoint("https://auth.example.com/oauth/logout");
-  p.set_post_logout_redirect_uri("https://traffic.example.com/loggedout");
+  p.mutable_post_logout_redirect_uri()->set_uri("https://traffic.example.com/loggedout");
   p.add_auth_scopes("openid");
 
   // Create the OAuth config.
@@ -1271,7 +1271,7 @@ TEST_F(OAuth2Test, RequestSignoutWithFormattedPostLogoutRedirectUri) {
   credentials->mutable_token_secret()->set_name("secret");
   credentials->mutable_hmac_secret()->set_name("hmac");
   p.set_end_session_endpoint("https://auth.example.com/oauth/logout");
-  p.set_post_logout_redirect_uri("%REQ(:scheme)%://app.example.com/loggedout");
+  p.mutable_post_logout_redirect_uri()->set_uri("%REQ(:scheme)%://app.example.com/loggedout");
   p.add_auth_scopes("openid");
 
   auto secret_reader = std::make_shared<MockSecretReader>();
@@ -1313,7 +1313,7 @@ TEST_F(OAuth2Test, RequestSignoutWithFormattedPostLogoutRedirectUri) {
 
 /**
  * Scenario: The OAuth filter receives a sign out request, ``end_session_endpoint`` is configured,
- * and ``disable_post_logout_redirect_uri`` is true.
+ * and ``post_logout_redirect_uri.disabled`` is true.
  *
  * Expected behavior: the filter should redirect to the end session endpoint without including the
  * ``post_logout_redirect_uri`` query parameter at all.
@@ -1333,7 +1333,7 @@ TEST_F(OAuth2Test, RequestSignoutWithDisabledPostLogoutRedirectUri) {
   credentials->mutable_token_secret()->set_name("secret");
   credentials->mutable_hmac_secret()->set_name("hmac");
   p.set_end_session_endpoint("https://auth.example.com/oauth/logout");
-  p.set_disable_post_logout_redirect_uri(true);
+  p.mutable_post_logout_redirect_uri()->set_disabled(true);
   p.add_auth_scopes("openid");
 
   // Create the OAuth config.
@@ -1373,75 +1373,15 @@ TEST_F(OAuth2Test, RequestSignoutWithDisabledPostLogoutRedirectUri) {
 }
 
 /**
- * Scenario: Both ``post_logout_redirect_uri`` and ``disable_post_logout_redirect_uri`` are set.
+ * Scenario: ``post_logout_redirect_uri.uri`` contains an invalid header-formatter string.
  *
- * Expected behavior: ``disable_post_logout_redirect_uri`` wins; the configured URI is not emitted
- * and the ``post_logout_redirect_uri`` query parameter is omitted from the logout URL.
+ * Expected behavior: because the URI formatter is only compiled when it will actually be used
+ * (``end_session_endpoint`` is set and a ``uri`` is configured), an invalid format string does not
+ * fail config load when ``end_session_endpoint`` is unset. Conversely, the same invalid format
+ * string fails config load once ``end_session_endpoint`` is set, proving validation still happens
+ * when the value is actually used.
  */
-TEST_F(OAuth2Test, RequestSignoutDisableOverridesCustomPostLogoutRedirectUri) {
-  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
-  auto* endpoint = p.mutable_token_endpoint();
-  endpoint->set_cluster("auth.example.com");
-  endpoint->set_uri("auth.example.com/_oauth");
-  endpoint->mutable_timeout()->set_seconds(1);
-  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
-  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
-  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
-  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
-  auto credentials = p.mutable_credentials();
-  credentials->set_client_id(TEST_CLIENT_ID);
-  credentials->mutable_token_secret()->set_name("secret");
-  credentials->mutable_hmac_secret()->set_name("hmac");
-  p.set_end_session_endpoint("https://auth.example.com/oauth/logout");
-  p.set_post_logout_redirect_uri("https://app.example.com/loggedout");
-  p.set_disable_post_logout_redirect_uri(true);
-  p.add_auth_scopes("openid");
-
-  auto secret_reader = std::make_shared<MockSecretReader>();
-  FilterConfigSharedPtr test_config_;
-  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                                secret_reader, scope_, "test.");
-  init(test_config_);
-
-  Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(), "/_signout"},
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Scheme.get(), "https"},
-      {Http::Headers::get().Cookie.get(), "IdToken=xyztoken"},
-  };
-
-  Http::TestResponseHeaderMapImpl response_headers{
-      {Http::Headers::get().Status.get(), "302"},
-      {Http::Headers::get().SetCookie.get(),
-       "OauthHMAC=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
-      {Http::Headers::get().SetCookie.get(),
-       "BearerToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
-      {Http::Headers::get().SetCookie.get(),
-       "IdToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
-      {Http::Headers::get().SetCookie.get(),
-       "RefreshToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
-      {Http::Headers::get().SetCookie.get(),
-       "OauthExpires=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
-      {Http::Headers::get().Location.get(), "https://auth.example.com/oauth/"
-                                            "logout?id_token_hint=xyztoken&client_id=1"},
-  };
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
-
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(request_headers, false));
-}
-
-/**
- * Scenario: ``post_logout_redirect_uri`` contains an invalid header-formatter string.
- *
- * Expected behavior: because the field is documented to be ignored when either
- * ``end_session_endpoint`` is not set or post logout redirect is disabled, the
- * formatter is never compiled and the config loads successfully.
- * Conversely, the same invalid format string fails config load when the field is not
- * disabled, proving validation still happens when the value is actually used.
- */
-TEST_F(OAuth2Test, InvalidPostLogoutRedirectUriIgnoredWhenDisabled) {
+TEST_F(OAuth2Test, InvalidPostLogoutRedirectUriValidatedOnlyWhenUsed) {
   envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
   auto* endpoint = p.mutable_token_endpoint();
   endpoint->set_cluster("auth.example.com");
@@ -1456,7 +1396,7 @@ TEST_F(OAuth2Test, InvalidPostLogoutRedirectUriIgnoredWhenDisabled) {
   credentials->mutable_token_secret()->set_name("secret");
   credentials->mutable_hmac_secret()->set_name("hmac");
   // Invalid header-formatter command (PATH does not accept argument 'A').
-  p.set_post_logout_redirect_uri("%PATH(A)%");
+  p.mutable_post_logout_redirect_uri()->set_uri("%PATH(A)%");
   p.add_auth_scopes("openid");
 
   auto secret_reader = std::make_shared<MockSecretReader>();
@@ -1466,15 +1406,8 @@ TEST_F(OAuth2Test, InvalidPostLogoutRedirectUriIgnoredWhenDisabled) {
   EXPECT_NO_THROW(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
                                                  secret_reader, scope_, "test."));
 
-  // Post logout redirect uri disabled: the invalid formatter is never compiled,
-  // so the config loads without throwing.
+  // End_session_endpoint is set: the invalid formatter is compiled and the config fails to load.
   p.set_end_session_endpoint("https://auth.example.com/oauth/logout");
-  p.set_disable_post_logout_redirect_uri(true);
-  EXPECT_NO_THROW(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                                 secret_reader, scope_, "test."));
-
-  // Not disabled: the invalid formatter is compiled and the config fails to load.
-  p.set_disable_post_logout_redirect_uri(false);
   EXPECT_THROW(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
                                               secret_reader, scope_, "test."),
                EnvoyException);

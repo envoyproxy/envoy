@@ -655,14 +655,13 @@ FilterConfig::FilterConfig(
       authorization_endpoint_(proto_config.authorization_endpoint()),
       end_session_endpoint_(proto_config.end_session_endpoint()),
       post_logout_redirect_uri_formatter_(
-          (proto_config.post_logout_redirect_uri().empty() ||
-           proto_config.end_session_endpoint().empty() ||
-           proto_config.disable_post_logout_redirect_uri())
+          (proto_config.post_logout_redirect_uri().uri().empty() ||
+           proto_config.end_session_endpoint().empty())
               ? nullptr
               : THROW_OR_RETURN_VALUE(
-                    Formatter::FormatterImpl::create(proto_config.post_logout_redirect_uri()),
+                    Formatter::FormatterImpl::create(proto_config.post_logout_redirect_uri().uri()),
                     Formatter::FormatterPtr)),
-      disable_post_logout_redirect_uri_(proto_config.disable_post_logout_redirect_uri()),
+      disable_post_logout_redirect_uri_(proto_config.post_logout_redirect_uri().disabled()),
       authorization_query_params_(buildAutorizationQueryParams(proto_config)),
       client_id_(proto_config.credentials().client_id()),
       redirect_uri_(proto_config.redirect_uri()),
