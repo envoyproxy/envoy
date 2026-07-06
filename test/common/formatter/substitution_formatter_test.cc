@@ -31,6 +31,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -38,6 +39,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using Envoy::StatusHelpers::HasStatus;
 using testing::Const;
 using testing::HasSubstr;
 using testing::Invoke;
@@ -5930,8 +5932,8 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterGridTest) {
 TEST(SubstitutionFormatterTest, CoalesceFormatterErrorCases) {
   // Empty JSON config.
   {
-    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%COALESCE()%").IgnoreError(),
-                              EnvoyException, "COALESCE requires parameters");
+    EXPECT_THAT(SubstitutionFormatParser::parse("%COALESCE()%"),
+                HasStatus(absl::StatusCode::kInvalidArgument, "COALESCE requires parameters"));
   }
 
   // Invalid JSON.
