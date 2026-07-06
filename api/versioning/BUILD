@@ -263,6 +263,7 @@ proto_library(
         "//envoy/extensions/grpc_service/channel_credentials/tls/v3:pkg",
         "//envoy/extensions/grpc_service/channel_credentials/xds/v3:pkg",
         "//envoy/extensions/health_check/event_sinks/file/v3:pkg",
+        "//envoy/extensions/health_checkers/dynamic_modules/v3:pkg",
         "//envoy/extensions/health_checkers/redis/v3:pkg",
         "//envoy/extensions/health_checkers/thrift/v3:pkg",
         "//envoy/extensions/http/cache/file_system_http_cache/v3:pkg",
