@@ -313,8 +313,7 @@ TEST_F(UpstreamRbacFilterTest, ClusterContextEmptyPrefixNoDoublePrefix) {
       ProtobufMessage::getStrictValidationVisitor());
 
   EXPECT_TRUE(stats_store_.findCounterByString("cluster.cluster_0.rbac.allowed").has_value());
-  EXPECT_FALSE(stats_store_
-                   .findCounterByString("cluster.cluster_0.cluster.cluster_0.rbac.allowed")
+  EXPECT_FALSE(stats_store_.findCounterByString("cluster.cluster_0.cluster.cluster_0.rbac.allowed")
                    .has_value());
 }
 
