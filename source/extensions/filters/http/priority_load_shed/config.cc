@@ -14,7 +14,7 @@ PriorityLoadShedFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::priority_load_shed::v3::PriorityLoadShed& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   auto& server_context = context.serverFactoryContext();
-  Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager()
+  Server::OverloadManager& overload_manager = context.shouldBypassOverloadManager()
                                                   ? server_context.nullOverloadManager()
                                                   : server_context.overloadManager();
 
