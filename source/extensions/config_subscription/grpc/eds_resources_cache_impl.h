@@ -36,9 +36,6 @@ private:
     ArenaWrappedProto<envoy::config::endpoint::v3::ClusterLoadAssignment> resource_;
     std::vector<EdsResourceRemovalCallback*> removal_cbs_;
 
-    ResourceData(ResourceData&&) = default;
-    ResourceData& operator=(ResourceData&&) = default;
-
     ResourceData(const envoy::config::endpoint::v3::ClusterLoadAssignment& resource)
         : resource_(resource) {}
   };
