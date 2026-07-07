@@ -1108,15 +1108,16 @@ bool ParentHistogramImpl::decRefCount() {
   }
 
   // Fast path: when this is not the last reference, drop it without taking
-  // the store's histogram lock; the CAS loop only ever moves the count from
-  // observed values >= 2 to values >= 1, so it can never reach zero here. See
-  // StatsSharedImpl::decRefCount() in allocator.cc, which uses the same
-  // pattern, for the full reasoning.
-  uint32_t count = ref_count_.load(std::memory_order_relaxed);
-  ASSERT(count >= 1);
-  while (count > 1) {
-    if (ref_count_.compare_exchange_weak(count, count - 1, std::memory_order_release,
-                                         std::memory_order_relaxed)) {
+  // the store's histogram lock; the CAS loop can only move the count between
+  // values >= 1, so it can never reach zero here. This mirrors the fast path
+  // in StatsSharedImpl::decRefCount() (see allocator.cc and #45821); the case
+  // analysis there applies unchanged, with the store's histogram lock playing
+  // the role of the allocator's mutex.
+  ASSERT(ref_count_ >= 1);
+  uint32_t ref_count_snapshot = ref_count_.load(std::memory_order_relaxed);
+  while (ref_count_snapshot > 1) {
+    if (ref_count_.compare_exchange_weak(ref_count_snapshot, ref_count_snapshot - 1,
+                                         std::memory_order_acq_rel)) {
       return false;
     }
   }
