@@ -176,7 +176,7 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
                                                              DEFAULT_MAX_REQUEST_BODY_SIZE)),
       max_response_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_response_body_size,
                                                               DEFAULT_MAX_RESPONSE_BODY_SIZE)),
-      clear_route_cache_(proto_config_.clear_route_cache()) {
+      clear_route_cache_(!proto_config_.disable_clear_route_cache()) {
   for (const auto& tool : proto_config.tool_config().tools()) {
     tool_entries_[tool.name()] = {tool.http_rule(), tool.text_content_streaming_enabled()};
   }

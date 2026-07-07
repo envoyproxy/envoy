@@ -417,7 +417,6 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidProtocolVersionParamsReturnsError) {
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolCallRedirectUrlAndBodyToBackendResponseRewriteToJsonRpc) {
-  proto_config_.set_clear_route_cache(true);
   makeFilter();
 
   request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
@@ -462,7 +461,6 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallRedirectUrlAndBodyToBackendResponseR
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithoutHttpRuleBody) {
-  proto_config_.set_clear_route_cache(true);
   makeFilter();
 
   request_headers_ = {{":path", "/mcp"}, {":method", "POST"}};
@@ -485,7 +483,6 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithoutHttpRuleBody) {
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithEscapedQueryParamKey) {
-  proto_config_.set_clear_route_cache(true);
   makeFilter();
 
   request_headers_ = {{":path", "/mcp"}, {":method", "POST"}};
@@ -680,7 +677,6 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolArgumentsMustBeObjectReturnsError) {
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, OptionalToolArguments) {
-  proto_config_.set_clear_route_cache(true);
   makeFilter();
 
   request_headers_ = {{":path", "/mcp"}, {":method", "POST"}};
@@ -715,7 +711,6 @@ TEST_F(McpJsonRestBridgeFilterTest, OptionalToolArguments) {
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, BackendErrorReturnsToolCallError) {
-  proto_config_.set_clear_route_cache(true);
   makeFilter();
 
   request_headers_ = {{":path", "/mcp"}};
@@ -781,7 +776,6 @@ TEST_F(McpJsonRestBridgeFilterTest, RejectInvalidUtf8BackendResponse) {
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolListRewritePathForRequestAndTranslateResponse) {
-  proto_config_.set_clear_route_cache(true);
   makeFilter();
 
   request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
@@ -816,7 +810,6 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolListRewritePathForRequestAndTranslateRes
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, EncodeDataReturnsStopIterationNoBufferWhenNotEndOfStream) {
-  proto_config_.set_clear_route_cache(true);
   makeFilter();
 
   request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
@@ -851,7 +844,6 @@ TEST_F(McpJsonRestBridgeFilterTest, EncodeDataReturnsStopIterationNoBufferWhenNo
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolListWithNumericStringId) {
-  proto_config_.set_clear_route_cache(true);
   makeFilter();
 
   request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
@@ -963,7 +955,6 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidResponseStatusCodeReturnsServerError)
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, QueryParamsFromMcpPathIsIgnored) {
-  proto_config_.set_clear_route_cache(true);
   makeFilter();
 
   request_headers_ = {{":method", "POST"}, {":path", "/mcp?foo=bar"}};
@@ -994,7 +985,6 @@ TEST_F(McpJsonRestBridgeFilterTest, QueryParamsFromMcpPathIsIgnored) {
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithTransferEncodingChunkedRemovesContentLength) {
-  proto_config_.set_clear_route_cache(true);
   makeFilter();
 
   // 1. Request Path
@@ -1097,7 +1087,6 @@ TEST_F(McpJsonRestBridgeFilterTest,
 
 TEST_F(McpJsonRestBridgeFilterTest,
        NotificationsInitializedSupportedProtocolVersionProcessRequest) {
-  proto_config_.set_clear_route_cache(true);
   makeFilter();
 
   request_headers_ = {{":path", "/mcp"}, {"mcp-protocol-version", "2025-11-25"}};
@@ -1150,7 +1139,6 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListUnsupportedProtocolVersionReturnsBa
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolsListSupportedProtocolVersionProcessRequest) {
-  proto_config_.set_clear_route_cache(true);
   makeFilter();
 
   request_headers_ = {{":path", "/mcp"}, {"mcp-protocol-version", "2025-11-25"}};
@@ -1199,7 +1187,6 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsCallUnsupportedProtocolVersionReturnsBa
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolsCallSupportedProtocolVersionProcessRequest) {
-  proto_config_.set_clear_route_cache(true);
   makeFilter();
 
   request_headers_ = {{":path", "/mcp"}, {"mcp-protocol-version", "2025-11-25"}};
@@ -1268,7 +1255,6 @@ max_request_body_size:
 TEST_F(McpJsonRestBridgeFilterTest, ResponseBodyExceedsLimitReturnsError) {
   proto_config_.Clear();
   TestUtility::loadFromYaml(R"yaml(
-clear_route_cache: true
 max_response_body_size:
   value: 10
 tool_config:
@@ -1309,7 +1295,6 @@ tool_config:
 TEST_F(McpJsonRestBridgeFilterTest, DynamicMetadataStoredWhenConfigured) {
   proto_config_.Clear();
   TestUtility::loadFromYaml(R"yaml(
-clear_route_cache: true
 request_storage_mode: DYNAMIC_METADATA
 tool_config:
   tools:
@@ -1361,7 +1346,6 @@ public:
   void SetUp() override {
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
     TestUtility::loadFromYaml(R"yaml(
-clear_route_cache: true
 tool_config:
   tools:
     - name: get_api_key
@@ -1525,7 +1509,6 @@ TEST_F(McpJsonRestBridgeStreamingFilterTest, TrailersEmptyBodyEmitsPrefixAndSuff
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, TraceContextExtractionDisabled) {
-  proto_config_.set_clear_route_cache(true);
   makeFilter();
 
   request_headers_ = {{":method", "POST"},
@@ -1560,7 +1543,6 @@ public:
   void SetUp() override {
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
     TestUtility::loadFromYaml(R"yaml(
-clear_route_cache: true
 trace_context_extraction: {}
 tool_config:
   tools:
@@ -2089,7 +2071,6 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListLocalEmpty) {
 }
 TEST_F(McpJsonRestBridgeFilterTest, ToolsCallPerRouteConfig) {
   proto_config_.Clear();
-  proto_config_.set_clear_route_cache(true);
   auto* static_tool = proto_config_.mutable_tool_config()->add_tools();
   static_tool->set_name("my_tool");
   static_tool->mutable_http_rule()->set_get("/static/path");
@@ -2311,12 +2292,13 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListLocalPerRouteConfig) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, true));
 }
 
-TEST_F(McpJsonRestBridgeFilterTest, DefaultClearRouteCacheIsFalse) {
+TEST_F(McpJsonRestBridgeFilterTest, DefaultClearRouteCacheIsTrue) {
   makeFilter();
-  EXPECT_FALSE(config_->clearRouteCache());
+  EXPECT_TRUE(config_->clearRouteCache());
 }
 
-TEST_F(McpJsonRestBridgeFilterTest, ToolCallDoesNotClearRouteCache) {
+TEST_F(McpJsonRestBridgeFilterTest, DisabledClearRouteCacheDoesNotClearForToolCall) {
+  proto_config_.set_disable_clear_route_cache(true);
   makeFilter();
   request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
   Buffer::OwnedImpl request_body(
@@ -2332,7 +2314,8 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallDoesNotClearRouteCache) {
             Http::FilterDataStatus::Continue);
 }
 
-TEST_F(McpJsonRestBridgeFilterTest, ToolsListDoesNotClearRouteCache) {
+TEST_F(McpJsonRestBridgeFilterTest, DisabledClearRouteCacheDoesNotClearForToolsList) {
+  proto_config_.set_disable_clear_route_cache(true);
   makeFilter();
   request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
   Buffer::OwnedImpl request_body(R"json({"jsonrpc":"2.0","id":123,"method":"tools/list"})json");
