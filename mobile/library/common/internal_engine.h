@@ -10,7 +10,7 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/notification.h"
-#include "absl/types/optional.h"
+#include <optional>
 #include "extension_registry.h"
 #include "library/common/engine_common.h"
 #include "library/common/engine_types.h"
@@ -34,8 +34,8 @@ public:
    */
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
                  std::unique_ptr<EnvoyEventTracker> event_tracker,
-                 absl::optional<int> thread_priority = absl::nullopt,
-                 absl::optional<size_t> high_watermark = absl::nullopt, bool enable_logger = true,
+                 std::optional<int> thread_priority = std::nullopt,
+                 std::optional<size_t> high_watermark = std::nullopt, bool enable_logger = true,
                  bool use_worker_thread = false);
 
   /**
@@ -75,7 +75,7 @@ public:
   // to http client functions of the same name after doing a dispatcher post
   // (thread context switch)
   envoy_status_t startStream(envoy_stream_t stream, EnvoyStreamCallbacks&& stream_callbacks,
-                             bool explicit_flow_control);
+                             bool explicit_flow_control, absl::string_view listener_name = "");
 
   /**
    * Send the headers over an open HTTP stream. This function can be invoked
@@ -193,6 +193,7 @@ public:
    * Dumps Envoy stats into string. Returns an empty string when an error occurred.
    */
   std::string dumpStats();
+  void drainConnectionsBySocketTag(uint32_t tag);
 
   /**
    * Get cluster manager from the Engine.
@@ -217,7 +218,7 @@ private:
 
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
                  std::unique_ptr<EnvoyEventTracker> event_tracker,
-                 absl::optional<int> thread_priority, absl::optional<size_t> high_watermark,
+                 std::optional<int> thread_priority, std::optional<size_t> high_watermark,
                  Thread::PosixThreadFactoryPtr thread_factory, bool enable_logger = true,
                  bool use_worker_thread = false);
 
@@ -241,6 +242,8 @@ private:
   // Called when it's been determined that the default network has changed.
   void resetHttpPropertiesAndDrainHosts(bool has_ipv6_connectivity);
 
+  void removeActiveStream(envoy_stream_t stream);
+
   Event::ProvisionalDispatcher& requestDispatcher() const {
     return use_worker_thread_ ? *request_dispatcher_ : *main_dispatcher_;
   }
@@ -252,13 +255,13 @@ private:
   std::unique_ptr<EngineCallbacks> callbacks_;
   std::unique_ptr<EnvoyLogger> logger_;
   std::unique_ptr<EnvoyEventTracker> event_tracker_;
-  absl::optional<int> thread_priority_;
-  absl::optional<size_t> high_watermark_;
+  std::optional<int> thread_priority_;
+  std::optional<size_t> high_watermark_;
   Assert::ActionRegistrationPtr assert_handler_registration_;
   Assert::ActionRegistrationPtr bug_handler_registration_;
   Thread::MutexBasicLockable mutex_;
   Thread::CondVar cv_;
-  Http::ClientPtr http_client_;
+  absl::flat_hash_map<envoy_stream_t, Http::Client*> active_streams_;
   Network::ConnectivityManagerImplSharedPtr connectivity_manager_;
   Event::ProvisionalDispatcherPtr main_dispatcher_;
   // Used by the cerr logger to ensure logs don't overwrite each other.
@@ -276,9 +279,6 @@ private:
   Network::Address::InstanceConstSharedPtr prev_local_addr_{nullptr};
   bool enable_logger_{true};
   bool use_worker_thread_{false};
-  // If use_worker_thread_ is true, http_client_handle_ will point to the http_client_ in the
-  // ApiListenerWorker. Otherwise, it will point to http_client_.
-  Http::Client* http_client_handle_{nullptr};
   // If use_worker_thread_ is true, request_dispatcher_ will point to the dispatcher_ in the
   // ApiListenerWorker. Otherwise, it will be null.
   Event::ProvisionalDispatcherPtr request_dispatcher_;

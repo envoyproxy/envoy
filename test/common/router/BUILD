@@ -28,13 +28,21 @@ envoy_package()
 envoy_cc_test(
     name = "config_impl_test",
     size = "large",
+    tags = ["skip_on_windows"],
     deps = [":config_impl_test_lib"],
 )
 
 envoy_cc_test_library(
     name = "config_impl_test_lib",
     srcs = ["config_impl_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
     rbe_pool = "6gig",
+    tags = ["skip_on_windows"],
     deps = [
         ":route_fuzz_proto_cc_proto",
         "//envoy/common:hashable_interface",
@@ -46,6 +54,7 @@ envoy_cc_test_library(
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
         "//source/common/stream_info:upstream_address_lib",
+        "//source/extensions/formatter/cel:config",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/fuzz:utility_lib",
         "//test/mocks/router:router_mocks",
@@ -459,7 +468,6 @@ envoy_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:utility_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",

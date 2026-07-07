@@ -24,6 +24,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
@@ -189,6 +190,17 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, Setup) {
   } // Destructor called here
 }
 
+// When the parent ReverseConnectionIOHandle is destroyed first, it detaches its still-live children
+// so a surviving tunnel's parent() returns nullptr instead of a dangling pointer.
+TEST_F(DownstreamReverseConnectionIOHandleTest, ParentTeardownDetachesChild) {
+  auto child = createHandle(io_handle_.get(), "detach_key");
+  EXPECT_EQ(child->parent(), io_handle_.get());
+
+  // Destroying the parent runs cleanup(), which detaches its registered children.
+  io_handle_.reset();
+  EXPECT_EQ(child->parent(), nullptr);
+}
+
 // Test close() method and all edge cases.
 TEST_F(DownstreamReverseConnectionIOHandleTest, CloseMethod) {
   // Test with parent - should notify parent and reset socket.
@@ -281,7 +293,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadRpingEchoScenarios) {
 
     // Read should process RPING and return the size (indicating RPING was handled).
     Buffer::OwnedImpl buffer;
-    auto result = handle->read(buffer, absl::nullopt);
+    auto result = handle->read(buffer, std::nullopt);
 
     EXPECT_EQ(result.return_value_, rping_msg.size());
     EXPECT_EQ(result.err_, nullptr);
@@ -323,7 +335,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadRpingEchoScenarios) {
 
     // Read should process RPING and return only app data size.
     Buffer::OwnedImpl buffer;
-    auto result = handle->read(buffer, absl::nullopt);
+    auto result = handle->read(buffer, std::nullopt);
 
     EXPECT_EQ(result.return_value_, app_data.size()); // Only app data size
     EXPECT_EQ(result.err_, nullptr);
@@ -362,7 +374,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadRpingEchoScenarios) {
 
     // Read should return all HTTP data without processing.
     Buffer::OwnedImpl buffer;
-    auto result = handle->read(buffer, absl::nullopt);
+    auto result = handle->read(buffer, std::nullopt);
 
     EXPECT_EQ(result.return_value_, http_data.size());
     EXPECT_EQ(result.err_, nullptr);
@@ -408,7 +420,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadPartialDataAndStateTransitio
 
     // Read should return the partial data as-is.
     Buffer::OwnedImpl buffer;
-    auto result = handle->read(buffer, absl::nullopt);
+    auto result = handle->read(buffer, std::nullopt);
 
     EXPECT_EQ(result.return_value_, 3);
     EXPECT_EQ(result.err_, nullptr);
@@ -441,7 +453,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadPartialDataAndStateTransitio
 
     // Read should return HTTP data and disable echo.
     Buffer::OwnedImpl buffer;
-    auto result = handle->read(buffer, absl::nullopt);
+    auto result = handle->read(buffer, std::nullopt);
 
     EXPECT_EQ(result.return_value_, http_data.size());
     EXPECT_EQ(result.err_, nullptr);
@@ -485,7 +497,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadEchoDisabledAndErrorHandling
     ASSERT_EQ(written, static_cast<ssize_t>(http_data.size()));
 
     Buffer::OwnedImpl buffer1;
-    handle->read(buffer1, absl::nullopt);
+    handle->read(buffer1, std::nullopt);
     EXPECT_EQ(buffer1.toString(), http_data);
 
     // Now send RPING - it should pass through without echo.
@@ -493,7 +505,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadEchoDisabledAndErrorHandling
     ASSERT_EQ(written, static_cast<ssize_t>(rping_msg.size()));
 
     Buffer::OwnedImpl buffer2;
-    auto result = handle->read(buffer2, absl::nullopt);
+    auto result = handle->read(buffer2, std::nullopt);
 
     EXPECT_EQ(result.return_value_, rping_msg.size());
     EXPECT_EQ(result.err_, nullptr);
@@ -530,7 +542,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadEchoDisabledAndErrorHandling
     close(fds[1]);
 
     Buffer::OwnedImpl buffer;
-    auto result = handle->read(buffer, absl::nullopt);
+    auto result = handle->read(buffer, std::nullopt);
 
     EXPECT_EQ(result.return_value_, 0); // EOF
     EXPECT_EQ(result.err_, nullptr);    // No error, just EOF

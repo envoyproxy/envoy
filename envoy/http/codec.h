@@ -21,8 +21,35 @@
 
 #include "source/common/http/status.h"
 
+namespace webtransport {
+class Session;
+class SessionVisitor;
+} // namespace webtransport
+
 namespace Envoy {
 namespace Http {
+
+// TODO(wbpcode): The webtransport::Session should be used ideally. However, the
+// webtransport::Session does not provide the SetVisitor method which is necessary for bridging the
+// downstream and upstream session.
+class WebTransportSession {
+public:
+  virtual ~WebTransportSession() = default;
+
+  /**
+   * Set a visitor for this WebTransport session. The visitor will be notified of session-level
+   * events such as incoming streams and datagrams. This is only used for negotiated WebTransport
+   * sessions, and should not be set for non-WebTransport sessions.
+   *
+   * @param visitor supplies the visitor to set.
+   */
+  virtual void setWebTransportVisitor(std::unique_ptr<webtransport::SessionVisitor> visitor) PURE;
+
+  /**
+   * @return a pointer to the webtransport::Session.
+   */
+  virtual webtransport::Session* rawWebTransportSession() PURE;
+};
 
 enum class CodecType { HTTP1, HTTP2, HTTP3 };
 
@@ -75,7 +102,7 @@ public:
 };
 
 using Http1StreamEncoderOptionsOptRef =
-    absl::optional<std::reference_wrapper<Http1StreamEncoderOptions>>;
+    std::optional<std::reference_wrapper<Http1StreamEncoderOptions>>;
 
 /**
  * Encodes an HTTP stream. This interface contains methods common to both the request and response
@@ -107,7 +134,7 @@ public:
 
   /**
    * Return the HTTP/1 stream encoder options if applicable. If the stream is not HTTP/1 returns
-   * absl::nullopt.
+   * std::nullopt.
    */
   virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 };
@@ -268,7 +295,7 @@ public:
    */
   virtual void sendLocalReply(Code code, absl::string_view body,
                               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
 
   /**
@@ -331,6 +358,16 @@ public:
    * the handle.
    */
   virtual ResponseDecoderHandlePtr createResponseDecoderHandle() PURE;
+
+  /**
+   * @return the WebTransport session of the *downstream* stream paired with this decoder, if any.
+   *
+   * Only decoders on the router's upstream path (which are paired 1:1 with a downstream stream)
+   * implement this; they reach the downstream StreamDecoderFilterCallbacks and return its
+   * webTransportSession(). It lets the upstream codec obtain the downstream WebTransport session so
+   * it can bridge the two directly. All other response decoders inherit the default empty OptRef.
+   */
+  virtual OptRef<WebTransportSession> downstreamWebTransportSession() { return {}; }
 };
 
 /**
@@ -465,14 +502,21 @@ public:
   virtual const StreamInfo::BytesMeterSharedPtr& bytesMeter() PURE;
 
   /**
-   * @return absl::optional<uint32_t> the codec level stream ID if available
+   * @return std::optional<uint32_t> the codec level stream ID if available
    * or nullopt if not applicable or not yet assigned.
    *
    * HTTP/1 streams return nullopt.
    * HTTP/2 streams return the HTTP/2 stream ID or nullopt if not available.
    * HTTP/3 streams return the HTTP/3 stream ID or nullopt if not available.
    */
-  virtual absl::optional<uint32_t> codecStreamId() const PURE;
+  virtual std::optional<uint32_t> codecStreamId() const PURE;
+
+  /**
+   * @return the WebTransport session this stream carries, if it is a negotiated WebTransport
+   * CONNECT stream. Only HTTP/3 codec streams that have created a WebTransportHttp3 session return
+   * a value; all other streams inherit the default empty OptRef.
+   */
+  virtual OptRef<WebTransportSession> webTransportSession() { return {}; }
 };
 
 /**
@@ -483,9 +527,9 @@ public:
   virtual ~ReceivedSettings() = default;
 
   /**
-   * @return value of SETTINGS_MAX_CONCURRENT_STREAMS, or absl::nullopt if it was not present.
+   * @return value of SETTINGS_MAX_CONCURRENT_STREAMS, or std::nullopt if it was not present.
    */
-  virtual const absl::optional<uint32_t>& maxConcurrentStreams() const PURE;
+  virtual const std::optional<uint32_t>& maxConcurrentStreams() const PURE;
 };
 
 /**
@@ -647,6 +691,39 @@ public:
    * when both the stream and the connection go under the low watermark limit, and the callee must
    * ensure that the flow of data does not resume until all callers which were above their high
    * watermarks have gone below.
+   */
+  virtual void onBelowWriteBufferLowWatermark() PURE;
+};
+
+/**
+ * Callbacks for upstream request watermark limits, as observed on the request (decode) path.
+ *
+ * These are the mirror image of DownstreamWatermarkCallbacks: where the downstream callbacks fire
+ * when the downstream connection/stream backs up (a slow client reading the response), these fire
+ * when the upstream backs up while accepting the request body. The connection manager already
+ * receives this signal via
+ * StreamDecoderFilterCallbacks::onDecoderFilterAboveWriteBufferHighWatermark (raised by the
+ * router's UpstreamRequest) and read-disables the downstream codec to slow the original source;
+ * subscribing here additionally lets a filter that produces request data on its own (e.g. by
+ * replaying a buffered body via injectDecodedDataToFilterChain) pause and resume in step with the
+ * upstream.
+ */
+class UpstreamWatermarkCallbacks {
+public:
+  virtual ~UpstreamWatermarkCallbacks() = default;
+
+  /**
+   * Called when the upstream request path goes over its high watermark. As with
+   * DownstreamWatermarkCallbacks, this may be called more than once (e.g. for the stream and the
+   * connection independently), and the implementation is responsible for unwinding multiple high
+   * and low watermark calls.
+   */
+  virtual void onAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when the upstream request path goes from over its high watermark to under its low
+   * watermark. The implementation must not resume the flow of data until a matching number of low
+   * watermark callbacks have been received for the outstanding high watermark callbacks.
    */
   virtual void onBelowWriteBufferLowWatermark() PURE;
 };

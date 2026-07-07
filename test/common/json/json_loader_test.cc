@@ -5,6 +5,7 @@
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -60,6 +61,65 @@ protected:
   }
   Api::ApiPtr api_;
 };
+
+TEST_F(JsonLoaderTest, DeeplyNestedJsonDestructorStackOverflow) {
+  const int depth = 100000;
+  std::string json;
+  json.reserve(depth * 2 + 10);
+  for (int i = 0; i < depth; ++i) {
+    json.push_back('[');
+  }
+  for (int i = 0; i < depth; ++i) {
+    json.push_back(']');
+  }
+
+  auto status_or_object = Factory::loadFromString(json);
+  EXPECT_FALSE(status_or_object.ok());
+  EXPECT_EQ(status_or_object.status().code(), absl::StatusCode::kInternal);
+  EXPECT_THAT(status_or_object.status().message(),
+              testing::HasSubstr("JSON nesting depth exceeds limit of"));
+}
+
+TEST_F(JsonLoaderTest, DeeplyNestedJsonObjectDestructorStackOverflowConfigurable) {
+  const int depth = 100000;
+  std::string json;
+  json.reserve(depth * 12 + 10);
+  for (int i = 0; i < depth; ++i) {
+    json.append("{\"a\":");
+  }
+  json.append("1"); // leaf value
+  for (int i = 0; i < depth; ++i) {
+    json.push_back('}');
+  }
+
+  auto status_or_object = Factory::loadFromString(json);
+  EXPECT_FALSE(status_or_object.ok());
+  EXPECT_EQ(status_or_object.status().code(), absl::StatusCode::kInternal);
+  EXPECT_THAT(status_or_object.status().message(),
+              testing::HasSubstr("JSON nesting depth exceeds limit of"));
+}
+
+// Verify that with the default nesting depth limit relaxed, Envoy still does not crash when
+// unwinding deeply nested JSON objects.
+TEST_F(JsonLoaderTest, DeeplyNestedJsonDestructorStackOverflowRuntimeOff) {
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+      {{"limit_json_parser_nesting_depth", false}});
+  const int depth = 100000;
+  std::string json;
+  json.reserve(depth * 2 + 10);
+  for (int i = 0; i < depth; ++i) {
+    json.push_back('[');
+  }
+  for (int i = 0; i < depth; ++i) {
+    json.push_back(']');
+  }
+
+  auto status_or_object = Factory::loadFromString(json);
+  EXPECT_FALSE(status_or_object.ok());
+  EXPECT_EQ(status_or_object.status().code(), absl::StatusCode::kInternal);
+  EXPECT_THAT(status_or_object.status().message(),
+              testing::HasSubstr("JSON nesting depth exceeds limit of"));
+}
 
 TEST_F(JsonLoaderTest, Basic) {
   EXPECT_FALSE(Factory::loadFromString("{").status().ok());

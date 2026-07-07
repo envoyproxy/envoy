@@ -71,12 +71,13 @@ public:
       bool allow_expired_certificate = false,
       std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
           san_matchers = {},
-      std::string ca_cert = "", absl::optional<uint32_t> verify_depth = absl::nullopt)
+      std::string ca_cert = "", std::optional<uint32_t> verify_depth = std::nullopt,
+      bool suppress_client_ca_list = false)
       : allow_expired_certificate_(allow_expired_certificate), api_(Api::createApiForTest()),
         custom_validator_config_(custom_config), san_matchers_(san_matchers), ca_cert_(ca_cert),
-        max_verify_depth_(verify_depth) {};
+        max_verify_depth_(verify_depth), suppress_client_ca_list_(suppress_client_ca_list) {};
   TestCertificateValidationContextConfig()
-      : api_(Api::createApiForTest()), custom_validator_config_(absl::nullopt) {};
+      : api_(Api::createApiForTest()), custom_validator_config_(std::nullopt) {};
 
   const std::string& caCert() const override { return ca_cert_; }
   const std::string& caCertPath() const override { return ca_cert_path_; }
@@ -92,10 +93,10 @@ public:
     return san_matchers_;
   }
   const std::vector<std::string>& verifyCertificateHashList() const override {
-    CONSTRUCT_ON_FIRST_USE(std::vector<std::string>, {});
+    CONSTRUCT_ON_FIRST_USE(std::vector<std::string>);
   }
   const std::vector<std::string>& verifyCertificateSpkiList() const override {
-    CONSTRUCT_ON_FIRST_USE(std::vector<std::string>, {});
+    CONSTRUCT_ON_FIRST_USE(std::vector<std::string>);
   }
   bool allowExpiredCertificate() const override { return allow_expired_certificate_; }
   envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
@@ -106,7 +107,7 @@ public:
             CertificateValidationContext_TrustChainVerification_VERIFY_TRUST_CHAIN;
   }
 
-  const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
+  const std::optional<envoy::config::core::v3::TypedExtensionConfig>&
   customValidatorConfig() const override {
     return custom_validator_config_;
   }
@@ -114,20 +115,23 @@ public:
   Api::Api& api() const override { return *api_; }
   bool onlyVerifyLeafCertificateCrl() const override { return false; }
 
-  absl::optional<uint32_t> maxVerifyDepth() const override { return max_verify_depth_; }
+  std::optional<uint32_t> maxVerifyDepth() const override { return max_verify_depth_; }
   bool autoSniSanMatch() const override { return auto_sni_san_match_; }
+
+  bool suppressClientCaList() const override { return suppress_client_ca_list_; }
 
 private:
   bool allow_expired_certificate_{false};
   Api::ApiPtr api_;
-  const absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_;
+  const std::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_;
   const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
       san_matchers_;
   const std::string ca_cert_;
   const std::string ca_cert_path_{"TEST_CA_CERT_PATH"};
   const std::string ca_cert_name_{"TEST_CA_CERT_NAME"};
-  const absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
+  const std::optional<uint32_t> max_verify_depth_{std::nullopt};
   const bool auto_sni_san_match_{false};
+  const bool suppress_client_ca_list_{false};
 };
 
 } // namespace Tls

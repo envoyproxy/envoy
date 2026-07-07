@@ -1,3 +1,5 @@
+#include <limits>
+
 #include "source/common/api/api_impl.h"
 
 #include "test/mocks/common.h"
@@ -58,8 +60,9 @@ protected:
   }
 
   void createTestConnection(const std::string& node_id, const std::string& cluster_id,
-                            const std::string& tenant_id = "tenant1") {
-    reporter_->reportConnectionEvent(node_id, cluster_id, tenant_id);
+                            const std::string& tenant_id = "tenant1",
+                            int64_t initiation_time_ms = 0) {
+    reporter_->reportConnectionEvent(node_id, cluster_id, tenant_id, initiation_time_ms);
   }
 
   void createTestDisconnection(const std::string& node_id, const std::string& cluster_id) {
@@ -298,7 +301,7 @@ TEST_F(EventReporterTest, DefaultStatPrefix) {
   EXPECT_CALL(*mock_client1_, receiveEvents(_));
   EXPECT_CALL(*mock_client2_, receiveEvents(_));
 
-  default_reporter->reportConnectionEvent("node1", "cluster1", "tenant1");
+  default_reporter->reportConnectionEvent("node1", "cluster1", "tenant1", 0);
   runDispatcher();
 
   EXPECT_EQ(
@@ -473,6 +476,59 @@ TEST_F(EventReporterTest, LargeDuplicateCount) {
   EXPECT_EQ(3, getCounterValue("reverse_tunnel_full_pulls_total"));
 }
 
+TEST_F(EventReporterTest, InitiationTimeUsedAsCreatedAt) {
+  // When a valid initiation_time_ms is provided, the Connected event's created_at
+  // should reflect the DP-side timestamp, not the local wall clock.
+  const int64_t dp_timestamp_ms = 1700000000000; // 2023-11-14T22:13:20Z
+  const auto expected_time = Envoy::SystemTime(std::chrono::milliseconds(dp_timestamp_ms));
+
+  EXPECT_CALL(*mock_client1_, receiveEvents(_))
+      .WillOnce(Invoke([&expected_time](const ReverseTunnelEvent::TunnelUpdates& updates) {
+        ASSERT_EQ(1, updates.connections.size());
+        EXPECT_EQ(expected_time, updates.connections[0]->created_at);
+        EXPECT_EQ("node1", updates.connections[0]->node_id);
+      }));
+  EXPECT_CALL(*mock_client2_, receiveEvents(_));
+
+  createTestConnection("node1", "cluster1", "tenant1", dp_timestamp_ms);
+  runDispatcher();
+}
+
+TEST_F(EventReporterTest, ZeroInitiationTimeFallsBackToTimeSource) {
+  // When initiation_time_ms is 0 (header absent), created_at should come from
+  // the injected time source, not the raw wall clock.
+  const auto before = context_.timeSource().systemTime();
+
+  EXPECT_CALL(*mock_client1_, receiveEvents(_))
+      .WillOnce(Invoke([&before](const ReverseTunnelEvent::TunnelUpdates& updates) {
+        ASSERT_EQ(1, updates.connections.size());
+        EXPECT_GE(updates.connections[0]->created_at, before);
+        EXPECT_LE(updates.connections[0]->created_at, before + std::chrono::seconds(5));
+      }));
+  EXPECT_CALL(*mock_client2_, receiveEvents(_));
+
+  createTestConnection("node1", "cluster1", "tenant1", 0);
+  runDispatcher();
+}
+
+TEST_F(EventReporterTest, OverflowInitiationTimeFallsBackToTimeSource) {
+  // A maliciously large initiation_time_ms (e.g. int64 max) would overflow when converted into
+  // SystemTime's finer-grained duration. It must be rejected and fall back to the injected time
+  // source rather than triggering undefined behavior.
+  const auto before = context_.timeSource().systemTime();
+
+  EXPECT_CALL(*mock_client1_, receiveEvents(_))
+      .WillOnce(Invoke([&before](const ReverseTunnelEvent::TunnelUpdates& updates) {
+        ASSERT_EQ(1, updates.connections.size());
+        EXPECT_GE(updates.connections[0]->created_at, before);
+        EXPECT_LE(updates.connections[0]->created_at, before + std::chrono::seconds(5));
+      }));
+  EXPECT_CALL(*mock_client2_, receiveEvents(_));
+
+  createTestConnection("node1", "cluster1", "tenant1", std::numeric_limits<int64_t>::max());
+  runDispatcher();
+}
+
 // --- Factory tests ---
 
 class MockReverseTunnelReporterClientFactory : public ReverseTunnelReporterClientFactory {
@@ -539,7 +595,7 @@ TEST_F(EventReporterFactoryTest, CreateReporterWithRegisteredClient) {
 
   auto* client_entry = reporter_config.add_clients();
   client_entry->set_name("mock_client_factory");
-  client_entry->mutable_typed_config()->PackFrom(Protobuf::Struct());
+  std::ignore = client_entry->mutable_typed_config()->PackFrom(Protobuf::Struct());
 
   auto reporter = factory_.createReporter(context_, std::move(config));
   EXPECT_NE(nullptr, reporter);
@@ -554,7 +610,7 @@ TEST_F(EventReporterFactoryTest, CreateClientWithUnknownFactoryThrows) {
 
   auto* client_entry = reporter_config.add_clients();
   client_entry->set_name("nonexistent_client_factory");
-  client_entry->mutable_typed_config()->PackFrom(Protobuf::Struct());
+  std::ignore = client_entry->mutable_typed_config()->PackFrom(Protobuf::Struct());
 
   EXPECT_THROW_WITH_REGEX(factory_.createReporter(context_, std::move(config)), EnvoyException,
                           "Unknown Reporter Client Factory: 'nonexistent_client_factory'");

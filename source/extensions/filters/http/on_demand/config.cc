@@ -20,7 +20,7 @@ Http::FilterFactoryCb OnDemandFilterFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
-Http::FilterFactoryCb OnDemandFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb> OnDemandFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
     const std::string&, Server::Configuration::ServerFactoryContext& context) {
   OnDemandFilterConfigSharedPtr config = std::make_shared<OnDemandFilterConfig>(

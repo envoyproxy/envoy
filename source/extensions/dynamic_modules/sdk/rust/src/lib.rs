@@ -17,6 +17,8 @@ pub mod dns_resolver;
 // directly.
 #[doc(hidden)]
 pub mod ffi_helpers;
+pub mod formatter;
+pub mod health_checker;
 pub mod http;
 pub mod listener;
 pub mod load_balancer;
@@ -216,7 +218,8 @@ pub unsafe fn is_validation_mode() -> bool {
 /// # Safety
 ///
 /// The `function_ptr` must point to a valid function that remains valid for the lifetime of the
-/// process.
+/// process. A module that registers functions must be loaded with `do_not_close` set to `true` to
+/// avoid being unloaded while the registry still hands out the pointer.
 pub unsafe fn register_function(key: &str, function_ptr: *const std::ffi::c_void) -> bool {
   unsafe {
     abi::envoy_dynamic_module_callback_register_function(
@@ -264,9 +267,11 @@ pub fn get_function(key: &str) -> Option<*const std::ffi::c_void> {
 ///
 /// # Safety
 ///
-/// The `data_ptr` must point to valid data that remains valid for the lifetime of the process.
-/// Callers are responsible for agreeing on the data type out-of-band, since the registry stores
-/// opaque pointers.
+/// The `data_ptr` must point to data that remains valid while reachable through the registry. A
+/// module that registers a pointer into its own memory must either be loaded with `do_not_close`
+/// set to `true` or overwrite the pointer on each reload before any consumer reads it. Callers
+/// are responsible for agreeing on the data type out-of-band, since the registry stores opaque
+/// pointers.
 pub unsafe fn register_shared_data(key: &str, data_ptr: *const std::ffi::c_void) -> bool {
   unsafe {
     abi::envoy_dynamic_module_callback_register_shared_data(
@@ -656,6 +661,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `dns_resolver:` — [`NewDnsResolverConfigFunction`] for DNS resolvers
 /// - `transport_socket:` — [`NewTransportSocketFactoryConfigFunction`] for transport sockets
 /// - `access_logger:` — [`NewAccessLoggerConfigFunction`] for access loggers
+/// - `formatter:` — [`NewFormatterConfigFunction`] for formatters
 /// - `stat_sink:` — [`NewStatSinkConfigFunction`] for stats sinks
 ///
 /// # Examples
@@ -862,11 +868,25 @@ macro_rules! declare_all_init_functions {
       "NEW_ACCESS_LOGGER_CONFIG_FUNCTION"
     );
   };
+  (@register formatter : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_FORMATTER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_FORMATTER_CONFIG_FUNCTION"
+    );
+  };
   (@register stat_sink : $fn:expr) => {
     envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
       envoy_proxy_dynamic_modules_rust_sdk::NEW_STAT_SINK_CONFIG_FUNCTION,
       $fn,
       "NEW_STAT_SINK_CONFIG_FUNCTION"
+    );
+  };
+  (@register health_checker : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_HEALTH_CHECKER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_HEALTH_CHECKER_CONFIG_FUNCTION"
     );
   };
 }
@@ -1140,6 +1160,73 @@ pub static NEW_ACCESS_LOGGER_CONFIG_FUNCTION: OnceLock<NewAccessLoggerConfigFunc
   OnceLock::new();
 
 // =================================================================================================
+// Formatter Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new formatter command parser configuration.
+///
+/// The `name` is the value of `formatter_name` from the `dynamic_modules` formatter
+/// configuration, allowing a single module to dispatch to different command parser
+/// implementations. The `config` is the raw bytes from the `formatter_config` field. Returning
+/// `None` causes Envoy to reject the formatter configuration.
+pub type NewFormatterConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn formatter::FormatterConfig>>;
+
+/// The global factory function for formatter command parsers. This is set via the `formatter:` arm
+/// of [`declare_all_init_functions!`] (or the [`declare_formatter_init_functions!`] shim) and is
+/// not intended to be set directly.
+pub static NEW_FORMATTER_CONFIG_FUNCTION: OnceLock<NewFormatterConfigFunction> = OnceLock::new();
+
+/// Declare the init functions for a formatter dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with [`NewFormatterConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::formatter::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_formatter_config(_name: &str, _config: &[u8]) -> Option<Box<dyn FormatterConfig>> {
+///   None
+/// }
+///
+/// declare_formatter_init_functions!(program_init, new_formatter_config);
+/// ```
+#[macro_export]
+macro_rules! declare_formatter_init_functions {
+  ($f:ident, $new_formatter_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_FORMATTER_CONFIG_FUNCTION,
+          $new_formatter_config_fn,
+          "NEW_FORMATTER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      })) {
+        ::std::result::Result::Ok(v) => v,
+        ::std::result::Result::Err(payload) => {
+          $crate::log_ffi_panic("envoy_dynamic_module_on_program_init", payload);
+          ::std::ptr::null()
+        },
+      }
+    }
+  };
+}
+
+// =================================================================================================
 // Stats Sink Dynamic Module
 // =================================================================================================
 
@@ -1220,6 +1307,24 @@ macro_rules! declare_stat_sink_init_functions {
     }
   };
 }
+
+// =================================================================================================
+// Health Checker Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new health checker configuration.
+///
+/// The `name` is the value of `health_checker_name` from the `dynamic_modules` health-check
+/// configuration, allowing a single module to dispatch to different health checker implementations.
+/// The `config` is the raw configuration bytes. Returning `None` causes Envoy to reject the
+/// health-check configuration.
+pub type NewHealthCheckerConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn health_checker::HealthCheckerConfig>>;
+
+/// The global factory function for health checker configurations. This is set via the
+/// `health_checker:` arm of [`declare_all_init_functions!`] and is not intended to be set directly.
+pub static NEW_HEALTH_CHECKER_CONFIG_FUNCTION: OnceLock<NewHealthCheckerConfigFunction> =
+  OnceLock::new();
 
 // =================================================================================================
 // Cluster Dynamic Module

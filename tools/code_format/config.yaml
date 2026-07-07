@@ -91,6 +91,7 @@ paths:
     # valid situation identified so far is template functions used for config
     # processing.
     - envoy/common/exception.h
+    - source/common/access_log/access_log_impl.cc
     - source/common/filter/config_discovery_impl.h
     - source/common/config/utility.h
     - source/common/matcher/matcher.h
@@ -156,6 +157,7 @@ paths:
     - source/extensions/access_loggers
     # Bootstrap extension factories must throw per interface documentation.
     - source/extensions/bootstrap/dynamic_modules/factory.cc
+    - source/extensions/network/socket_interface/sockmap/socket_interface.cc
     - source/extensions/clusters/eds/
     - source/extensions/clusters/logical_dns
     - source/extensions/clusters/original_dst
@@ -183,11 +185,13 @@ paths:
     - source/extensions/filters/http/ext_authz
     - source/extensions/filters/http/ext_proc
     - source/extensions/filters/http/file_system_buffer
+    - source/extensions/filters/http/filter_chain/filter.cc
     - source/extensions/filters/http/gcp_authn
     - source/extensions/filters/http/grpc_field_extraction
     - source/extensions/filters/http/grpc_json_reverse_transcoder
     - source/extensions/filters/http/grpc_json_transcoder
     - source/extensions/filters/http/grpc_stats
+    - source/extensions/filters/http/header_mutation/config.cc
     - source/extensions/filters/http/health_check
     - source/extensions/filters/http/json_to_metadata
     - source/extensions/filters/http/jwt_authn

@@ -1068,7 +1068,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
                            ->Mutable(0)
                            ->mutable_typed_per_filter_config();
 
-        (*config)["rbac"].PackFrom(per_route_config);
+        std::ignore = (*config)["rbac"].PackFrom(per_route_config);
       });
   config_helper_.prependFilter(RBAC_CONFIG);
 
@@ -1484,7 +1484,7 @@ TEST_P(RBACIntegrationTest, MatcherRouteOverride) {
                            ->Mutable(0)
                            ->mutable_typed_per_filter_config();
 
-        (*config)["rbac"].PackFrom(per_route_config);
+        std::ignore = (*config)["rbac"].PackFrom(per_route_config);
       });
   config_helper_.prependFilter(RBAC_MATCHER_CONFIG);
 

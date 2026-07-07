@@ -36,7 +36,7 @@ public:
     return aws_cluster_manager_->onClusterAddOrUpdate(cluster_name, command);
   }
 
-  void onClusterRemoval(const std::string& cluster_name) {
+  void onClusterRemoval(absl::string_view cluster_name) {
     return aws_cluster_manager_->onClusterRemoval(cluster_name);
   }
 

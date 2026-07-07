@@ -12,6 +12,8 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules/network:__pkg__",
     "//test/extensions/dynamic_modules/stat_sink:__pkg__",
     "//test/extensions/dynamic_modules/udp:__pkg__",
+    "//test/extensions/formatter/dynamic_modules:__pkg__",
+    "//test/extensions/health_checkers/dynamic_modules:__pkg__",
     "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
     "//test/extensions/network/dns_resolver/hickory:__pkg__",
@@ -42,6 +44,8 @@ test_program(name = "program_init_fail")
 test_program(name = "abi_version_mismatch")
 
 test_program(name = "no_http_config_new")
+
+test_program(name = "http_filter_config_new_fail")
 
 test_program(name = "http_filter_per_route_config_new_fail")
 
@@ -147,6 +151,20 @@ test_program(name = "access_log_missing_logger_destroy")
 
 test_program(name = "access_log_config_new_fail")
 
+test_program(name = "formatter_no_op")
+
+test_program(name = "formatter_missing_config_new")
+
+test_program(name = "formatter_missing_config_destroy")
+
+test_program(name = "formatter_missing_parse")
+
+test_program(name = "formatter_missing_provider_destroy")
+
+test_program(name = "formatter_missing_format")
+
+test_program(name = "formatter_config_new_fail")
+
 test_program(name = "cluster_no_op")
 
 test_program(name = "cluster_run_on_all_workers")
@@ -232,3 +250,17 @@ test_program(name = "stat_sink_missing_histogram_complete")
 test_program(name = "stat_sink_integration_test")
 
 test_program(name = "dns_resolver_config_new_fail")
+
+test_program(name = "health_checker_no_op")
+
+test_program(name = "health_checker_missing_config_new")
+
+test_program(name = "health_checker_missing_config_destroy")
+
+test_program(name = "health_checker_missing_session_new")
+
+test_program(name = "health_checker_missing_session_on_interval")
+
+test_program(name = "health_checker_missing_session_destroy")
+
+test_program(name = "health_checker_session_new_null")

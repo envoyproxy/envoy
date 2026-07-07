@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <format>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/common/optref.h"
@@ -16,7 +18,6 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/functional/overload.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "absl/types/variant.h"
 #include "xds/type/matcher/v3/matcher.pb.h"
 
@@ -143,12 +144,12 @@ public:
   virtual ~OnMatchFactory() = default;
 
   // Instantiates a nested matcher sub-tree or an action.
-  // Returns absl::nullopt if neither sub-tree or action is specified.
-  virtual absl::optional<OnMatchFactoryCb<DataType>>
+  // Returns std::nullopt if neither sub-tree or action is specified.
+  virtual std::optional<OnMatchFactoryCb<DataType>>
   createOnMatch(const xds::type::matcher::v3::Matcher::OnMatch&) PURE;
   // Instantiates a nested matcher sub-tree or an action.
-  // Returns absl::nullopt if neither sub-tree or action is specified.
-  virtual absl::optional<OnMatchFactoryCb<DataType>>
+  // Returns std::nullopt if neither sub-tree or action is specified.
+  virtual std::optional<OnMatchFactoryCb<DataType>>
   createOnMatch(const envoy::config::common::matcher::v3::Matcher::OnMatch&) PURE;
 };
 
@@ -217,7 +218,7 @@ protected:
   // Internally handle recursion & keep_matching logic in matcher implementations.
   // This should be called against initial matching & on-no-match results.
   static inline ActionMatchResult
-  handleRecursionAndSkips(const absl::optional<OnMatch<DataType>>& on_match, const DataType& data,
+  handleRecursionAndSkips(const std::optional<OnMatch<DataType>>& on_match, const DataType& data,
                           SkippedMatchCb skipped_match_cb) {
     if (!on_match.has_value()) {
       return ActionMatchResult::noMatch();
@@ -314,14 +315,12 @@ public:
   /**
    * @return the default "string" data or nil. Life time must be bound by "this".
    */
-  absl::optional<absl::string_view> stringData() const {
+  std::optional<absl::string_view> stringData() const {
     return absl::visit(
         absl::Overload{
-            [](const std::string& arg) { return absl::make_optional<absl::string_view>(arg); },
-            [](const absl::string_view& arg) {
-              return absl::make_optional<absl::string_view>(arg);
-            },
-            [](const auto&) { return absl::optional<absl::string_view>(); }},
+            [](const std::string& arg) { return std::make_optional<absl::string_view>(arg); },
+            [](const absl::string_view& arg) { return std::make_optional<absl::string_view>(arg); },
+            [](const auto&) { return std::optional<absl::string_view>(); }},
         data_);
   }
 
@@ -489,7 +488,7 @@ public:
   createCustomMatcherFactoryCb(const Protobuf::Message& config,
                                Server::Configuration::ServerFactoryContext& factory_context,
                                DataInputFactoryCb<DataType> data_input,
-                               absl::optional<OnMatchFactoryCb<DataType>> on_no_match,
+                               std::optional<OnMatchFactoryCb<DataType>> on_no_match,
                                OnMatchFactory<DataType>& on_match_factory) PURE;
   std::string category() const override {
     // Static assert to guide implementors to understand what is required.
@@ -507,3 +506,20 @@ namespace fmt {
 // Allow fmtlib to use operator << defined in DataInputGetResult
 template <> struct formatter<::Envoy::Matcher::DataInputGetResult> : ostream_formatter {};
 } // namespace fmt
+
+namespace std {
+template <> struct formatter<::Envoy::Matcher::DataInputGetResult, char> {
+  template <class ParseContext> constexpr ParseContext::iterator parse(ParseContext& ctx) {
+    return ctx.begin();
+  }
+
+  template <class FmtContext>
+  FmtContext::iterator format(const ::Envoy::Matcher::DataInputGetResult& s,
+                              FmtContext& ctx) const {
+    std::ostringstream out;
+    out << s;
+    return std::ranges::copy(std::move(out).str(), ctx.out()).out;
+  }
+};
+
+} // namespace std

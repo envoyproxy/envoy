@@ -164,6 +164,7 @@ common:libc++ --@envoy//bazel:libc++=true
 build:libstdc++ --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build:libstdc++ --@envoy//bazel:libc++=false
 build:libstdc++ --@envoy//bazel:libstdc++=true
+build:libstdc++ --repo_env=BAZEL_USE_LIBSTDCPP=True
 
 
 #############################################################################

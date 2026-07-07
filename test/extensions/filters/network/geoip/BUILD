@@ -1,16 +1,20 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "geoip_filter_test",
     srcs = ["geoip_filter_test.cc"],
+    extension_names = ["envoy.filters.network.geoip"],
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/formatter:substitution_formatter_lib",
@@ -19,7 +23,7 @@ envoy_cc_test(
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
         "//source/extensions/filters/network/geoip:geoip_filter_lib",
-        "//test/extensions/filters/http/geoip:geoip_mocks",
+        "//test/mocks/geoip:geoip_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:logging_lib",
@@ -29,13 +33,14 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    extension_names = ["envoy.filters.network.geoip"],
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/network/geoip:config",
-        "//test/extensions/filters/http/geoip:geoip_mocks",
+        "//test/mocks/geoip:geoip_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
@@ -43,12 +48,18 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "geoip_filter_integration_test",
     size = "large",
     srcs = ["geoip_filter_integration_test.cc"],
     data = [
         "//test/extensions/geoip_providers/maxmind/test_data:geolocation_databases",
+    ],
+    extension_names = [
+        "envoy.filters.network.geoip",
+        "envoy.filters.network.set_filter_state",
+        "envoy.filters.network.tcp_proxy",
+        "envoy.geoip_providers.maxmind",
     ],
     tags = ["skip_on_windows"],
     deps = [

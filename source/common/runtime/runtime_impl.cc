@@ -150,7 +150,7 @@ Snapshot::ConstStringOptRef SnapshotImpl::get(absl::string_view key) const {
   ASSERT(!isRuntimeFeature(key)); // Make sure runtime guarding is only used for getBoolean
   auto entry = key.empty() ? values_.end() : values_.find(key);
   if (entry == values_.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return entry->second.raw_string_value_;
   }
@@ -593,8 +593,8 @@ RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& 
   if (!valid.ok()) {
     return valid;
   }
-  const auto& runtime =
-      dynamic_cast<const envoy::service::runtime::v3::Runtime&>(resources[0].get().resource());
+  const auto& runtime = Envoy::Protobuf::DynamicCastMessage<envoy::service::runtime::v3::Runtime>(
+      resources[0].get().resource());
   if (runtime.name() != resource_name_) {
     return absl::InvalidArgumentError(
         fmt::format("Unexpected RTDS runtime (expecting {}): {}", resource_name_, runtime.name()));

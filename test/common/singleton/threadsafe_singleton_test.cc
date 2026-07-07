@@ -5,6 +5,7 @@
 #include "source/common/singleton/threadsafe_singleton.h"
 #include "source/common/stats/isolated_store_impl.h"
 
+#include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 

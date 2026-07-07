@@ -236,7 +236,7 @@ void Utility::extractCommonAccessLogProperties(
               stream_info.startTime().time_since_epoch())
               .count()));
 
-  absl::optional<std::chrono::nanoseconds> dur = stream_info.requestComplete();
+  std::optional<std::chrono::nanoseconds> dur = stream_info.requestComplete();
   if (dur) {
     common_access_log.mutable_duration()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
@@ -371,7 +371,7 @@ bool extractFilterStateData(const StreamInfo::FilterState& filter_state, const s
       if (dynamic_cast<Protobuf::Any*>(serialized_proto.get()) != nullptr) {
         any.Swap(dynamic_cast<Protobuf::Any*>(serialized_proto.get()));
       } else {
-        any.PackFrom(*serialized_proto);
+        std::ignore = any.PackFrom(*serialized_proto);
       }
     }
     return true;

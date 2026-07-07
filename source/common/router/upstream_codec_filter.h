@@ -79,6 +79,12 @@ public:
     const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
       return filter_.callbacks_->upstreamCallbacks()->upstreamStreamOptions();
     }
+    // Reaches the downstream stream's WebTransport session (via the upstream filter callbacks,
+    // which delegate to the router's downstream StreamDecoderFilterCallbacks) so the upstream codec
+    // can bridge it to the upstream session.
+    OptRef<Http::WebTransportSession> downstreamWebTransportSession() override {
+      return filter_.callbacks_->upstreamCallbacks()->downstreamWebTransportSession();
+    }
 
   private:
     void maybeEndDecode(bool end_stream);
@@ -90,7 +96,7 @@ public:
   CodecBridge bridge_;
   OptRef<Http::RequestHeaderMap> latched_headers_;
   absl::Status deferred_reset_status_;
-  absl::optional<bool> latched_end_stream_;
+  std::optional<bool> latched_end_stream_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   bool calling_encode_headers_ = false;
 

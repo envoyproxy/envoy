@@ -3,6 +3,7 @@
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
 #include "test/common/tls/mock_ssl_handshaker.h"
+#include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
@@ -272,6 +273,43 @@ TEST_F(ReverseConnectionUtilityTest, BuildTenantScopedIdentifierWithoutTenant) {
   EXPECT_EQ(composite, "node-1");
 }
 
+TEST_F(ReverseConnectionUtilityTest, ClusterScopedIdentifierRoundTripWithTenant) {
+  const std::string node_id = ReverseConnectionUtility::buildTenantScopedIdentifier("t", "node-1");
+  const std::string cluster_id =
+      ReverseConnectionUtility::buildTenantScopedIdentifier("t", "cluster-1");
+
+  const std::string composite =
+      ReverseConnectionUtility::buildClusterScopedIdentifier(node_id, cluster_id);
+  EXPECT_EQ(composite, "t:cluster-1:node-1");
+
+  const auto [recovered_node, recovered_cluster] =
+      ReverseConnectionUtility::splitClusterScopedIdentifier(composite);
+  EXPECT_EQ(recovered_node, node_id);
+  EXPECT_EQ(recovered_cluster, cluster_id);
+}
+
+TEST_F(ReverseConnectionUtilityTest, ClusterScopedIdentifierRoundTripWithoutTenant) {
+  const std::string composite =
+      ReverseConnectionUtility::buildClusterScopedIdentifier("node-1", "cluster-1");
+  EXPECT_EQ(composite, "cluster-1:node-1");
+
+  const auto [recovered_node, recovered_cluster] =
+      ReverseConnectionUtility::splitClusterScopedIdentifier(composite);
+  EXPECT_EQ(recovered_node, "node-1");
+  EXPECT_EQ(recovered_cluster, "cluster-1");
+}
+
+TEST_F(ReverseConnectionUtilityTest, ClusterScopedIdentifierEmptyCluster) {
+  const std::string composite =
+      ReverseConnectionUtility::buildClusterScopedIdentifier("node-1", "");
+  EXPECT_EQ(composite, "node-1");
+
+  const auto [recovered_node, recovered_cluster] =
+      ReverseConnectionUtility::splitClusterScopedIdentifier(composite);
+  EXPECT_EQ(recovered_node, "node-1");
+  EXPECT_EQ(recovered_cluster, "");
+}
+
 TEST_F(ReverseConnectionUtilityTest, ApplySslQuietCloseWithoutSsl) {
   NiceMock<Network::MockConnection> connection;
   EXPECT_CALL(connection, ssl()).WillOnce(Return(nullptr));
@@ -294,6 +332,29 @@ TEST_F(ReverseConnectionUtilityTest, ApplySslQuietCloseOnValidSslHandshaker) {
   ReverseConnectionUtility::applySslQuietClose(connection);
 
   EXPECT_EQ(1, SSL_get_quiet_shutdown(ssl));
+}
+
+// addJitter adds an upward, bounded jitter using the supplied random generator.
+TEST_F(ReverseConnectionUtilityTest, AddJitterUpwardDeterministic) {
+  NiceMock<Random::MockRandomGenerator> random;
+  // 15% of 10000 = 1500 jitter window; 10000 + (700 % 1500) = 10700.
+  EXPECT_CALL(random, random()).WillRepeatedly(Return(700));
+  EXPECT_EQ(ReverseConnectionUtility::addJitter(10000, 15, random), 10700);
+}
+
+// A 0% jitter (or sub-1% interval) returns the interval unchanged.
+TEST_F(ReverseConnectionUtilityTest, AddJitterZeroPercentIsNoOp) {
+  NiceMock<Random::MockRandomGenerator> random;
+  EXPECT_EQ(ReverseConnectionUtility::addJitter(10000, 0, random), 10000);
+}
+
+// The jittered interval never drops below the base nor reaches base*(1 + jitter%).
+TEST_F(ReverseConnectionUtilityTest, AddJitterStaysWithinUpperBound) {
+  NiceMock<Random::MockRandomGenerator> random;
+  EXPECT_CALL(random, random()).WillRepeatedly(Return(123456789ULL));
+  const uint64_t result = ReverseConnectionUtility::addJitter(10000, 15, random);
+  EXPECT_GE(result, 10000);
+  EXPECT_LT(result, 11500);
 }
 
 } // namespace ReverseConnection

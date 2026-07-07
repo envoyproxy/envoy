@@ -259,7 +259,6 @@ absl::Status ProcessorState::handleHeaderContinue() {
   } else if (body_mode_ == ProcessingMode::STREAMED ||
              body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED) {
     sendBufferedDataInStreamedMode(false);
-    continueIfNecessary();
     return absl::OkStatus();
   } else if (body_mode_ == ProcessingMode::BUFFERED_PARTIAL) {
     return handleBufferedPartialMode();
@@ -443,7 +442,7 @@ ProcessorState::handleStreamedBodyCallback(const CommonResponse& common_response
 absl::StatusOr<bool>
 ProcessorState::handleBufferedPartialBodyCallback(const CommonResponse& common_response) {
   Buffer::OwnedImpl chunk_data;
-  absl::optional<QueuedChunk> chunk = dequeueStreamingChunk(chunk_data);
+  std::optional<QueuedChunk> chunk = dequeueStreamingChunk(chunk_data);
   if (!chunk) {
     ENVOY_BUG(false, "Bad partial body callback state");
     return absl::InternalError("Invalid chunk in partial body callback");
@@ -574,7 +573,7 @@ void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stre
   }
 }
 
-absl::optional<QueuedChunk> ProcessorState::dequeueStreamingChunk(Buffer::OwnedImpl& out_data) {
+std::optional<QueuedChunk> ProcessorState::dequeueStreamingChunk(Buffer::OwnedImpl& out_data) {
   return chunk_queue_.pop(out_data);
 }
 
@@ -602,7 +601,7 @@ void ProcessorState::continueIfNecessary() {
 
 bool ProcessorState::handleStreamedBodyResponse(const CommonResponse& common_response) {
   Buffer::OwnedImpl chunk_data;
-  absl::optional<QueuedChunk> chunk = dequeueStreamingChunk(chunk_data);
+  std::optional<QueuedChunk> chunk = dequeueStreamingChunk(chunk_data);
   if (!chunk.has_value()) {
     IS_ENVOY_BUG("Bad streamed body callback state");
     return false;
@@ -861,9 +860,9 @@ void ChunkQueue::push(Buffer::Instance& data, bool end_stream) {
   received_data_.move(data);
 }
 
-absl::optional<QueuedChunk> ChunkQueue::pop(Buffer::OwnedImpl& out_data) {
+std::optional<QueuedChunk> ChunkQueue::pop(Buffer::OwnedImpl& out_data) {
   if (queue_.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   QueuedChunk chunk = queue_.front();
