@@ -7,6 +7,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/trace_config.h"
+#include "envoy/tracing/trace_tag.h"
 
 namespace Envoy {
 namespace Tracing {
@@ -74,6 +75,17 @@ public:
    * @param value the value to associate with the tag
    */
   virtual void setTag(absl::string_view name, absl::string_view value) PURE;
+
+  /**
+   * Attach metadata to a Span using a structured Tag definition.
+   * Implementations can override this to specialize tag naming based on ID (e.g. OTel).
+   * @param tag the tag metadata object
+   * @param value the value to associate with the tag
+   */
+  virtual void setTag(const Tag& tag, absl::string_view value) {
+    // Default implementation delegates to string-based name
+    setTag(tag.name(), value);
+  }
 
   /**
    * Record an event associated with a span, to be handled in an implementation-dependent fashion.

@@ -30,6 +30,7 @@ using ExpectedSpansSharedPtr = std::shared_ptr<std::vector<ExpectedSpan>>;
 
 class Span : public Tracing::Span {
 public:
+  using Tracing::Span::setTag;
   Span(const std::string& operation_name, ExpectedSpansSharedPtr& expected_spans)
       : operation_name_(operation_name), expected_spans_(expected_spans) {
     ENVOY_LOG_MISC(trace, "TestTracer creating span with operation: {}", operation_name);

@@ -455,16 +455,15 @@ TEST_F(RouterTestChildSpan, BasicFlow) {
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/1.0")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamAddress, Eq("10.0.0.5:9211")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().PeerAddress, Eq("10.0.0.5:9211")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamCluster, Eq("fake_cluster")));
   EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.5:9211")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.5:9211")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
-  EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+              setTag(Tracing::Tags::get().UpstreamClusterName, Eq("observability_name")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpStatusCode, Eq("200")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().ResponseFlags, Eq("-")));
   EXPECT_CALL(callbacks_.tracing_config_, modifySpan(_, true));
   EXPECT_CALL(*child_span, finishSpan());
   ASSERT(response_decoder);
@@ -513,18 +512,17 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
 
   // The reset occurs after the upstream response, so the span has a valid status code but also an
   // error.
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/1.0")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamAddress, Eq("10.0.0.5:9211")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().PeerAddress, Eq("10.0.0.5:9211")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamCluster, Eq("fake_cluster")));
   EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.5:9211")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.5:9211")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
-  EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("UR")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ErrorReason), Eq("remote reset")));
+              setTag(Tracing::Tags::get().UpstreamClusterName, Eq("observability_name")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpStatusCode, Eq("200")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().ResponseFlags, Eq("UR")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().ErrorReason, Eq("remote reset")));
   EXPECT_CALL(callbacks_.tracing_config_, modifySpan(_, true));
 
   EXPECT_CALL(*child_span, finishSpan());
@@ -563,19 +561,17 @@ TEST_F(RouterTestChildSpan, CancelFlow) {
 
   // Destroy the router, causing the upstream request to be cancelled.
   // Response code on span is 0 because the upstream never sent a response.
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/1.0")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamAddress, Eq("10.0.0.5:9211")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().PeerAddress, Eq("10.0.0.5:9211")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamCluster, Eq("fake_cluster")));
   EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.5:9211")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.5:9211")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
-  EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
-  EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().Canceled), Eq(Tracing::Tags::get().True)));
+              setTag(Tracing::Tags::get().UpstreamClusterName, Eq("observability_name")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpStatusCode, Eq("0")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().ResponseFlags, Eq("-")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True));
   EXPECT_CALL(callbacks_.tracing_config_, modifySpan(_, true));
 
   EXPECT_CALL(*child_span, finishSpan());
@@ -615,19 +611,18 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
 
   // The span should be annotated with the reset-related fields.
+  EXPECT_CALL(*child_span_1, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(*child_span_1, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/1.0")));
+  EXPECT_CALL(*child_span_1, setTag(Tracing::Tags::get().UpstreamAddress, Eq("10.0.0.5:9211")));
+  EXPECT_CALL(*child_span_1, setTag(Tracing::Tags::get().PeerAddress, Eq("10.0.0.5:9211")));
+  EXPECT_CALL(*child_span_1, setTag(Tracing::Tags::get().UpstreamCluster, Eq("fake_cluster")));
   EXPECT_CALL(*child_span_1,
-              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
-  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.5:9211")));
-  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.5:9211")));
-  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
-  EXPECT_CALL(*child_span_1,
-              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
-  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
-  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("UR")));
-  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)))
+              setTag(Tracing::Tags::get().UpstreamClusterName, Eq("observability_name")));
+  EXPECT_CALL(*child_span_1, setTag(Tracing::Tags::get().HttpStatusCode, Eq("0")));
+  EXPECT_CALL(*child_span_1, setTag(Tracing::Tags::get().ResponseFlags, Eq("UR")));
+  EXPECT_CALL(*child_span_1, setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True))
       .Times(2);
-  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().ErrorReason), Eq("remote reset")));
+  EXPECT_CALL(*child_span_1, setTag(Tracing::Tags::get().ErrorReason, Eq("remote reset")));
   EXPECT_CALL(callbacks_.tracing_config_, modifySpan(_, true));
 
   EXPECT_CALL(*child_span_1, finishSpan());
@@ -654,7 +649,7 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
   EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router observability_name egress", _))
       .WillOnce(Return(child_span_2));
   EXPECT_CALL(callbacks_, tracingConfig()).Times(2);
-  EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().RetryCount), Eq("1")));
+  EXPECT_CALL(*child_span_2, setTag(Tracing::Tags::get().RetryCount, Eq("1")));
 
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
@@ -663,16 +658,15 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
   // Upstream responds back with a normal response. Span should be annotated as usual.
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(*child_span_2, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(*child_span_2, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/1.0")));
+  EXPECT_CALL(*child_span_2, setTag(Tracing::Tags::get().UpstreamAddress, Eq("10.0.0.5:9211")));
+  EXPECT_CALL(*child_span_2, setTag(Tracing::Tags::get().PeerAddress, Eq("10.0.0.5:9211")));
+  EXPECT_CALL(*child_span_2, setTag(Tracing::Tags::get().UpstreamCluster, Eq("fake_cluster")));
   EXPECT_CALL(*child_span_2,
-              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
-  EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.5:9211")));
-  EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.5:9211")));
-  EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
-  EXPECT_CALL(*child_span_2,
-              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
-  EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
-  EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+              setTag(Tracing::Tags::get().UpstreamClusterName, Eq("observability_name")));
+  EXPECT_CALL(*child_span_2, setTag(Tracing::Tags::get().HttpStatusCode, Eq("200")));
+  EXPECT_CALL(*child_span_2, setTag(Tracing::Tags::get().ResponseFlags, Eq("-")));
   EXPECT_CALL(callbacks_.tracing_config_, modifySpan(_, true));
 
   EXPECT_CALL(*child_span_2, finishSpan());

@@ -25,6 +25,7 @@ envoy_cc_library(
         "common_values.h",
     ],
     deps = [
+        "//envoy/tracing:trace_tag_interface",
         "//source/common/singleton:const_singleton",
     ],
 )

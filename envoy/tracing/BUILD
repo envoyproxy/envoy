@@ -32,10 +32,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "trace_tag_interface",
+    hdrs = ["trace_tag.h"],
+    deps = ["@abseil-cpp//absl/strings"],
+)
+
+envoy_cc_library(
     name = "trace_driver_interface",
     hdrs = ["trace_driver.h"],
     deps = [
         ":trace_config_interface",
+        ":trace_tag_interface",
         "//envoy/stream_info:stream_info_interface",
     ],
 )

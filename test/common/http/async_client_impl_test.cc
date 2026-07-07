@@ -648,17 +648,16 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
 
   expectSuccess(request, 200);
 
-  EXPECT_CALL(*child_span, setTag(Eq("onBeforeFinalizeUpstreamSpan"), Eq("called")));
+  EXPECT_CALL(*child_span, setTag("onBeforeFinalizeUpstreamSpan", Eq("called")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamAddress, Eq("10.0.0.1:443")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().PeerAddress, Eq("10.0.0.1:443")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamCluster, Eq("fake_cluster")));
   EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.1:443")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
-  EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+              setTag(Tracing::Tags::get().UpstreamClusterName, Eq("observability_name")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpStatusCode, Eq("200")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().ResponseFlags, Eq("-")));
   EXPECT_CALL(*child_span, finishSpan());
 
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
@@ -702,17 +701,16 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
 
   expectSuccess(request, 200);
 
-  EXPECT_CALL(*child_span, setTag(Eq("onBeforeFinalizeUpstreamSpan"), Eq("called")));
+  EXPECT_CALL(*child_span, setTag("onBeforeFinalizeUpstreamSpan", Eq("called")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamAddress, Eq("10.0.0.1:443")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().PeerAddress, Eq("10.0.0.1:443")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamCluster, Eq("fake_cluster")));
   EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.1:443")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
-  EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+              setTag(Tracing::Tags::get().UpstreamClusterName, Eq("observability_name")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpStatusCode, Eq("200")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().ResponseFlags, Eq("-")));
   EXPECT_CALL(*child_span, finishSpan());
 
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
@@ -754,17 +752,16 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpanKeepParentSampling) {
 
   expectSuccess(request, 200);
 
-  EXPECT_CALL(*child_span, setTag(Eq("onBeforeFinalizeUpstreamSpan"), Eq("called")));
+  EXPECT_CALL(*child_span, setTag("onBeforeFinalizeUpstreamSpan", Eq("called")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamAddress, Eq("10.0.0.1:443")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().PeerAddress, Eq("10.0.0.1:443")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamCluster, Eq("fake_cluster")));
   EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.1:443")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
-  EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+              setTag(Tracing::Tags::get().UpstreamClusterName, Eq("observability_name")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpStatusCode, Eq("200")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().ResponseFlags, Eq("-")));
   EXPECT_CALL(*child_span, finishSpan());
 
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
@@ -1902,21 +1899,19 @@ TEST_F(AsyncClientImplTracingTest, CancelRequest) {
       }));
   AsyncClient::Request* request = client_.send(std::move(message_), callbacks_, options);
 
-  EXPECT_CALL(*child_span, setTag(Eq("onBeforeFinalizeUpstreamSpan"), Eq("called")));
-  EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.1:443")));
+  EXPECT_CALL(*child_span, setTag("onBeforeFinalizeUpstreamSpan", Eq("called")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamAddress, Eq("10.0.0.1:443")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().PeerAddress, Eq("10.0.0.1:443")));
 
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamCluster, Eq("fake_cluster")));
   EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
-  EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().Canceled), Eq(Tracing::Tags::get().True)));
+              setTag(Tracing::Tags::get().UpstreamClusterName, Eq("observability_name")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpStatusCode, Eq("0")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().ResponseFlags, Eq("-")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True));
   EXPECT_CALL(*child_span, finishSpan());
 
   request->cancel();
@@ -1947,21 +1942,19 @@ TEST_F(AsyncClientImplTracingTest, CancelRequestAfterComplete) {
       }));
   AsyncClient::Request* request = client_.send(std::move(message_), callbacks_, options);
 
-  EXPECT_CALL(*child_span, setTag(Eq("onBeforeFinalizeUpstreamSpan"), Eq("called")));
-  EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.1:443")));
+  EXPECT_CALL(*child_span, setTag("onBeforeFinalizeUpstreamSpan", Eq("called")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamAddress, Eq("10.0.0.1:443")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().PeerAddress, Eq("10.0.0.1:443")));
 
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamCluster, Eq("fake_cluster")));
   EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
-  EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().Canceled), Eq(Tracing::Tags::get().True)));
+              setTag(Tracing::Tags::get().UpstreamClusterName, Eq("observability_name")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpStatusCode, Eq("0")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().ResponseFlags, Eq("-")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True));
   EXPECT_CALL(*child_span, finishSpan());
   request->cancel();
 }
@@ -2039,19 +2032,18 @@ TEST_F(AsyncClientImplTracingTest, DestroyWithActiveRequest) {
         EXPECT_EQ(&request, sent_request);
         EXPECT_EQ(reason, AsyncClient::FailureReason::Reset);
       }));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamAddress, Eq("10.0.0.1:443")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().PeerAddress, Eq("10.0.0.1:443")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamCluster, Eq("fake_cluster")));
   EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.1:443")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
-  EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)))
+              setTag(Tracing::Tags::get().UpstreamClusterName, Eq("observability_name")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpStatusCode, Eq("0")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().ResponseFlags, Eq("-")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True))
       .Times(AnyNumber());
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ErrorReason), Eq("Reset")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().ErrorReason, Eq("Reset")));
   EXPECT_CALL(*child_span, finishSpan());
 }
 
@@ -2233,18 +2225,17 @@ TEST_F(AsyncClientImplTracingTest, RequestTimeout) {
 
   expectSuccess(request, 504);
 
-  EXPECT_CALL(*child_span, setTag(Eq("onBeforeFinalizeUpstreamSpan"), Eq("called")));
+  EXPECT_CALL(*child_span, setTag("onBeforeFinalizeUpstreamSpan", Eq("called")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamAddress, Eq("10.0.0.1:443")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().PeerAddress, Eq("10.0.0.1:443")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamCluster, Eq("fake_cluster")));
   EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.1:443")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
-  EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("504")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("UT")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)))
+              setTag(Tracing::Tags::get().UpstreamClusterName, Eq("observability_name")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().HttpStatusCode, Eq("504")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().ResponseFlags, Eq("UT")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True))
       .Times(AnyNumber());
   EXPECT_CALL(*child_span, finishSpan());
   timer_->invokeCallback();

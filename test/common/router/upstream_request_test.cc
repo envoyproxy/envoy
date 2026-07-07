@@ -2,6 +2,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/router/upstream_request.h"
+#include "source/common/tracing/common_values.h"
 
 #include "test/common/http/common.h"
 #include "test/common/memory/memory_test_utility.h"
@@ -98,9 +99,10 @@ TEST_F(UpstreamRequestTest, DecodeHeadersGrpcSpanAnnotations) {
   auto* child_span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(router_filter_interface_.callbacks_.active_span_, spawnChild_)
       .WillOnce(Return(child_span));
-  EXPECT_CALL(*child_span, setTag).Times(AnyNumber());
-  EXPECT_CALL(*child_span, setTag(Eq("grpc.status_code"), Eq("1")));
-  EXPECT_CALL(*child_span, setTag(Eq("grpc.message"), Eq("failure")));
+  EXPECT_CALL(*child_span, setTag(testing::An<absl::string_view>(), _)).Times(AnyNumber());
+  EXPECT_CALL(*child_span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(AnyNumber());
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().GrpcStatusCode, Eq("1")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().GrpcMessage, Eq("failure")));
 
   // System under test.
   initialize();
@@ -125,9 +127,10 @@ TEST_F(UpstreamRequestTest,
   auto* child_span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(router_filter_interface_.callbacks_.active_span_, spawnChild_)
       .WillOnce(Return(child_span));
-  EXPECT_CALL(*child_span, setTag).Times(AnyNumber());
-  EXPECT_CALL(*child_span, setTag(Eq("grpc.status_code"), Eq("1")));
-  EXPECT_CALL(*child_span, setTag(Eq("grpc.message"), Eq("failure")));
+  EXPECT_CALL(*child_span, setTag(testing::An<absl::string_view>(), _)).Times(AnyNumber());
+  EXPECT_CALL(*child_span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(AnyNumber());
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().GrpcStatusCode, Eq("1")));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().GrpcMessage, Eq("failure")));
 
   // System under test.
   initialize();

@@ -21,8 +21,20 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the OpenTelemetry tracer.
 //  [#extension: envoy.tracers.opentelemetry]
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message OpenTelemetryConfig {
+  // Configures usage of Semantic Conventions standard tag names.
+  //
+  // Based on the `OTEL_SEMCONV_STABILITY_OPT_IN` environment variable concept
+  // from https://opentelemetry.io/docs/specs/semconv/http/http-metrics/.
+  message OtelSemconvStabilityOptIn {
+    // Emit legacy Envoy attributes. Default false.
+    google.protobuf.BoolValue emit_legacy_tags = 1;
+
+    // Emit the new stable semantic convention tags. Default false.
+    google.protobuf.BoolValue emit_semantic_convention_tags = 2;
+  }
+
   // The upstream gRPC cluster that will receive OTLP traces.
   // Note that the tracer drops traces if the server does not read data fast enough.
   // This field can be left empty to disable reporting traces to the gRPC service.
@@ -76,4 +88,8 @@ message OpenTelemetryConfig {
   // Specifies whether to set the ``service.name`` resource attribute.
   // If not specified, the default is to set this attribute.
   google.protobuf.BoolValue set_service_name_resource_attribute = 8;
+
+  // Configures which OpenTelemetry semantic convention stability levels to opt-in to. If not
+  // specified, the default is to emit only legacy Envoy tags.
+  OtelSemconvStabilityOptIn otel_semconv_stability_opt_in = 9;
 }

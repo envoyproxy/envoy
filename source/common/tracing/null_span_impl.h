@@ -18,6 +18,7 @@ public:
   }
 
   // Tracing::Span
+  using Span::setTag;
   void setOperation(absl::string_view) override {}
   void setTag(absl::string_view, absl::string_view) override {}
   void log(SystemTime, const std::string&) override {}

@@ -489,8 +489,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
   // Check for child span tagging when the request is allowed.
-  EXPECT_CALL(child_span_, setTag(Eq("ext_authz_http_status"), Eq("OK")));
-  EXPECT_CALL(child_span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(child_span_, setTag("ext_authz_http_status", Eq("OK")));
+  EXPECT_CALL(child_span_, setTag("ext_authz_status", Eq("ext_authz_ok")));
   client_->onBeforeFinalizeUpstreamSpan(child_span_, &check_response->headers());
 
   EXPECT_CALL(request_callbacks_,
@@ -615,8 +615,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
   // Check for child span tagging when the request is denied.
-  EXPECT_CALL(child_span_, setTag(Eq("ext_authz_http_status"), Eq("Forbidden")));
-  EXPECT_CALL(child_span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
+  EXPECT_CALL(child_span_, setTag("ext_authz_http_status", Eq("Forbidden")));
+  EXPECT_CALL(child_span_, setTag("ext_authz_status", Eq("ext_authz_unauthorized")));
   client_->onBeforeFinalizeUpstreamSpan(child_span_, &check_response->headers());
 
   EXPECT_CALL(request_callbacks_,

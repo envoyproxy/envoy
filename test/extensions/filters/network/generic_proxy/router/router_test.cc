@@ -169,7 +169,10 @@ public:
 
   void expectInjectContextToUpstreamRequest() { EXPECT_CALL(*child_span_, injectContext(_, _)); }
   void expectFinalizeUpstreamSpanAny() {
-    EXPECT_CALL(*child_span_, setTag(_, _)).Times(testing::AnyNumber());
+    EXPECT_CALL(*child_span_, setTag(testing::An<absl::string_view>(), _))
+        .Times(testing::AnyNumber());
+    EXPECT_CALL(*child_span_, setTag(testing::An<const Tracing::Tag&>(), _))
+        .Times(testing::AnyNumber());
     EXPECT_CALL(*child_span_, finishSpan());
   }
   void expectFinalizeUpstreamSpanWithError() {

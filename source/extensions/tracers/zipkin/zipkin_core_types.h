@@ -304,6 +304,7 @@ private:
  */
 class Span : public ZipkinBase, public Tracing::Span {
 public:
+  using Tracing::Span::setTag;
   /**
    * Default constructor. Creates an empty span.
    */

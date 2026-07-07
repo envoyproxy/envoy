@@ -1,11 +1,28 @@
 #pragma once
 
-#include <string>
+#include "envoy/tracing/trace_tag.h"
 
 #include "source/common/singleton/const_singleton.h"
-
 namespace Envoy {
 namespace Tracing {
+
+/**
+ * OpenTelemetry standard HTTP/Network semantic convention tag names.
+ * Follows: https://opentelemetry.io/docs/specs/semconv/http/http-spans/
+ */
+class SemanticConventionTagValues {
+public:
+  const std::string HttpRequestMethod = "http.request.method";
+  const std::string HttpResponseStatusCode = "http.response.status_code";
+  const std::string UrlFull = "url.full";
+  const std::string HttpRequestResendCount = "http.request.resend_count";
+  const std::string HttpRequestSize = "http.request.body.size";
+  const std::string HttpResponseSize = "http.response.body.size";
+  const std::string NetworkPeerAddress = "network.peer.address";
+  const std::string UserAgentOriginal = "user_agent.original";
+};
+
+using SemanticConventionTags = ConstSingleton<SemanticConventionTagValues>;
 
 /**
  * Tracing tag names.
@@ -13,49 +30,56 @@ namespace Tracing {
 class TracingTagValues {
 public:
   // OpenTracing standard tag names.
-  const std::string Component = "component";
-  const std::string DbInstance = "db.instance";
-  const std::string DbStatement = "db.statement";
-  const std::string DbUser = "db.user";
-  const std::string DbType = "db.type";
-  const std::string Error = "error";
-  const std::string HttpMethod = "http.method";
-  const std::string HttpStatusCode = "http.status_code";
-  const std::string HttpUrl = "http.url";
-  const std::string MessageBusDestination = "message_bus.destination";
+  const Tag Component{"component", TagName::Component};
+  const Tag DbInstance{"db.instance", TagName::DbInstance};
+  const Tag DbStatement{"db.statement", TagName::DbStatement};
+  const Tag DbUser{"db.user", TagName::DbUser};
+  const Tag DbType{"db.type", TagName::DbType};
+  const Tag Error{"error", TagName::Error};
+  const Tag HttpMethod{"http.method", TagName::HttpMethod,
+                       SemanticConventionTags::get().HttpRequestMethod};
+  const Tag HttpStatusCode{"http.status_code", TagName::HttpStatusCode,
+                           SemanticConventionTags::get().HttpResponseStatusCode};
+  const Tag HttpUrl{"http.url", TagName::HttpUrl, SemanticConventionTags::get().UrlFull};
+  const Tag MessageBusDestination{"message_bus.destination", TagName::MessageBusDestination};
   // Downstream remote address for the downstream span and upstream remote address for the upstream
   // span.
-  const std::string PeerAddress = "peer.address";
-  const std::string PeerHostname = "peer.hostname";
-  const std::string PeerIpv4 = "peer.ipv4";
-  const std::string PeerIpv6 = "peer.ipv6";
-  const std::string PeerPort = "peer.port";
-  const std::string PeerService = "peer.service";
-  const std::string SpanKind = "span.kind";
+  const Tag PeerAddress{"peer.address", TagName::PeerAddress,
+                        SemanticConventionTags::get().NetworkPeerAddress};
+  const Tag PeerHostname{"peer.hostname", TagName::PeerHostname};
+  const Tag PeerIpv4{"peer.ipv4", TagName::PeerIpv4};
+  const Tag PeerIpv6{"peer.ipv6", TagName::PeerIpv6};
+  const Tag PeerPort{"peer.port", TagName::PeerPort};
+  const Tag PeerService{"peer.service", TagName::PeerService};
+  const Tag SpanKind{"span.kind", TagName::SpanKind};
 
   // Non-standard tag names.
-  const std::string DownstreamCluster = "downstream_cluster";
-  const std::string ErrorReason = "error.reason";
-  const std::string GrpcAuthority = "grpc.authority";
-  const std::string GrpcContentType = "grpc.content_type";
-  const std::string GrpcMessage = "grpc.message";
-  const std::string GrpcPath = "grpc.path";
-  const std::string GrpcStatusCode = "grpc.status_code";
-  const std::string GrpcTimeout = "grpc.timeout";
-  const std::string GuidXClientTraceId = "guid:x-client-trace-id";
-  const std::string GuidXRequestId = "guid:x-request-id";
-  const std::string HttpProtocol = "http.protocol";
-  const std::string NodeId = "node_id";
-  const std::string RequestSize = "request_size";
-  const std::string ResponseFlags = "response_flags";
-  const std::string ResponseSize = "response_size";
-  const std::string RetryCount = "retry.count";
-  const std::string Status = "status";
-  const std::string UpstreamAddress = "upstream_address";
-  const std::string UpstreamCluster = "upstream_cluster";
-  const std::string UpstreamClusterName = "upstream_cluster.name";
-  const std::string UserAgent = "user_agent";
-  const std::string Zone = "zone";
+  const Tag DownstreamCluster{"downstream_cluster", TagName::DownstreamCluster};
+  const Tag ErrorReason{"error.reason", TagName::ErrorReason};
+  const Tag GrpcAuthority{"grpc.authority", TagName::GrpcAuthority};
+  const Tag GrpcContentType{"grpc.content_type", TagName::GrpcContentType};
+  const Tag GrpcMessage{"grpc.message", TagName::GrpcMessage};
+  const Tag GrpcPath{"grpc.path", TagName::GrpcPath};
+  const Tag GrpcStatusCode{"grpc.status_code", TagName::GrpcStatusCode};
+  const Tag GrpcTimeout{"grpc.timeout", TagName::GrpcTimeout};
+  const Tag GuidXClientTraceId{"guid:x-client-trace-id", TagName::GuidXClientTraceId};
+  const Tag GuidXRequestId{"guid:x-request-id", TagName::GuidXRequestId};
+  const Tag HttpProtocol{"http.protocol", TagName::HttpProtocol};
+  const Tag NodeId{"node_id", TagName::NodeId};
+  const Tag RequestSize{"request_size", TagName::RequestSize,
+                        SemanticConventionTags::get().HttpRequestSize};
+  const Tag ResponseFlags{"response_flags", TagName::ResponseFlags};
+  const Tag ResponseSize{"response_size", TagName::ResponseSize,
+                         SemanticConventionTags::get().HttpResponseSize};
+  const Tag RetryCount{"retry.count", TagName::RetryCount,
+                       SemanticConventionTags::get().HttpRequestResendCount};
+  const Tag Status{"status", TagName::Status};
+  const Tag UpstreamAddress{"upstream_address", TagName::UpstreamAddress};
+  const Tag UpstreamCluster{"upstream_cluster", TagName::UpstreamCluster};
+  const Tag UpstreamClusterName{"upstream_cluster.name", TagName::UpstreamClusterName};
+  const Tag UserAgent{"user_agent", TagName::UserAgent,
+                      SemanticConventionTags::get().UserAgentOriginal};
+  const Tag Zone{"zone", TagName::Zone};
 
   // Tag values.
   const std::string Canceled = "canceled";
