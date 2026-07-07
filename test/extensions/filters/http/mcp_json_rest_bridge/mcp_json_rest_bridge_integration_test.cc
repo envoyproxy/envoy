@@ -1205,15 +1205,18 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallWithHeaderAndCookieBindings) {
           - name: "list_api_keys"
             http_rule:
               get: "/v1/{parent=projects/*}/apiKeys"
-              header_parameter_bindings:
-                - name: "x-api-key"
+              bindings:
+                - type: HEADER
+                  name: "x-api-key"
                   argument_path: "api_key"
-                - name: "x-request-id"
+                - type: HEADER
+                  name: "x-request-id"
                   argument_path: "request_id"
-              cookie_parameter_bindings:
-                - name: "SESSION_ID"
+                - type: COOKIE
+                  name: "SESSION_ID"
                   argument_path: "session_id"
-                - name: "PREF"
+                - type: COOKIE
+                  name: "PREF"
                   argument_path: "pref"
   )EOF";
 
@@ -1306,6 +1309,95 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallWithHeaderAndCookieBindings) {
     }
   })";
   EXPECT_EQ(nlohmann::json::parse(response->body()), nlohmann::json::parse(expected_rpc_response));
+}
+
+TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallIgnoresRestrictedHeaders) {
+  const std::string config = R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+      tool_config:
+        tools:
+          - name: "test_tool"
+            http_rule:
+              get: "/v1/test"
+              bindings:
+                - type: HEADER
+                  name: "host"
+                  argument_path: "host_arg"
+                - type: HEADER
+                  name: "content-length"
+                  argument_path: "cl_arg"
+                - type: HEADER
+                  name: "x-envoy-restricted"
+                  argument_path: "x_envoy_arg"
+                - type: HEADER
+                  name: "x-allowed-header"
+                  argument_path: "allowed_arg"
+  )EOF";
+
+  initializeFilter(config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "id": 123,
+    "method": "tools/call",
+    "params": {
+      "name": "test_tool",
+      "arguments": {
+        "host_arg": "evil.com",
+        "cl_arg": "999",
+        "x_envoy_arg": "malicious",
+        "allowed_arg": "safe"
+      }
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  waitForNextUpstreamRequest();
+
+  // Verify HTTP method and path
+  EXPECT_THAT(upstream_request_->headers().getMethodValue(), StrEq("GET"));
+  EXPECT_THAT(upstream_request_->headers().getPathValue(), StrEq("/v1/test"));
+
+  // Verify allowed header is forwarded
+  auto allowed_headers =
+      upstream_request_->headers().get(Http::LowerCaseString("x-allowed-header"));
+  ASSERT_EQ(allowed_headers.size(), 1);
+  EXPECT_THAT(allowed_headers[0]->value().getStringView(), StrEq("safe"));
+
+  // Verify restricted headers are ignored
+  EXPECT_THAT(upstream_request_->headers().getHostValue(), StrEq("host")); // Unchanged
+  EXPECT_TRUE(
+      upstream_request_->headers().get(Http::LowerCaseString("x-envoy-restricted")).empty());
+  // content-length might be set or not depending on body, but shouldn't be "999"
+  if (upstream_request_->headers().ContentLength()) {
+    EXPECT_THAT(upstream_request_->headers().getContentLengthValue(), Not(StrEq("999")));
+  }
+
+  // Send upstream response.
+  Http::TestResponseHeaderMapImpl response_headers;
+  response_headers.setStatus(200);
+  response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+
+  upstream_request_->encodeHeaders(response_headers, false);
+
+  Buffer::OwnedImpl response_data;
+  response_data.add(R"({"status":"ok"})");
+  upstream_request_->encodeData(response_data, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
 }
 
 } // namespace

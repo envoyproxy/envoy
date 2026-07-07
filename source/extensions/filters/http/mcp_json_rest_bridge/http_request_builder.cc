@@ -63,15 +63,8 @@ absl::Status constructQueryParams(std::vector<QueryParam>& query_params, const H
     }
   }
 
-  // Skip if it's part of header parameter bindings.
-  for (const auto& binding : http_rule.header_parameter_bindings()) {
-    absl::string_view arg_path = binding.argument_path();
-    if (path == arg_path || (absl::StartsWith(path, arg_path) && path[arg_path.size()] == '.')) {
-      return absl::OkStatus();
-    }
-  }
-  // Skip if it's part of cookie parameter bindings.
-  for (const auto& binding : http_rule.cookie_parameter_bindings()) {
+  // Skip if it's part of parameter bindings.
+  for (const auto& binding : http_rule.bindings()) {
     absl::string_view arg_path = binding.argument_path();
     if (path == arg_path || (absl::StartsWith(path, arg_path) && path[arg_path.size()] == '.')) {
       return absl::OkStatus();
@@ -152,10 +145,7 @@ absl::StatusOr<json> constructRequestBody(const HttpRule& http_rule,
     for (const auto& path : templates) {
       removeJsonPath(body, path);
     }
-    for (const auto& binding : http_rule.header_parameter_bindings()) {
-      removeJsonPath(body, binding.argument_path());
-    }
-    for (const auto& binding : http_rule.cookie_parameter_bindings()) {
+    for (const auto& binding : http_rule.bindings()) {
       removeJsonPath(body, binding.argument_path());
     }
     return body;
@@ -163,23 +153,19 @@ absl::StatusOr<json> constructRequestBody(const HttpRule& http_rule,
   return getJsonValue(arguments, body_rule);
 }
 
-absl::Status
-populateHeadersParams(const Protobuf::RepeatedPtrField<HttpRule::ParameterBinding>& bindings,
-                      const json& arguments,
-                      absl::flat_hash_map<std::string, std::string>& params_map) {
-  for (const auto& binding : bindings) {
-    absl::StatusOr<json> value = getJsonValue(arguments, binding.argument_path());
-    if (!value.ok()) {
-      // This is expected when the parameter is optional.
-      continue;
-    }
-    std::string value_str = jsonValueToString(*std::move(value));
-    if (!Http::HeaderUtility::headerValueIsValid(value_str)) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("Invalid header value for parameter: ", binding.name()));
-    }
-    params_map[binding.name()] = std::move(value_str);
+absl::Status populateHeaderParam(const HttpRule::ParameterBinding& binding, const json& arguments,
+                                 absl::flat_hash_map<std::string, std::string>& params_map) {
+  absl::StatusOr<json> value = getJsonValue(arguments, binding.argument_path());
+  if (!value.ok()) {
+    // This is expected when the parameter is optional.
+    return absl::OkStatus();
   }
+  std::string value_str = jsonValueToString(*std::move(value));
+  if (!Http::HeaderUtility::headerValueIsValid(value_str)) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Invalid header value for parameter: ", binding.name()));
+  }
+  params_map[binding.name()] = std::move(value_str);
   return absl::OkStatus();
 }
 
@@ -205,22 +191,18 @@ bool cookieValueIsValid(absl::string_view value) {
   return true;
 }
 
-absl::Status
-populateCookiesParams(const Protobuf::RepeatedPtrField<HttpRule::ParameterBinding>& bindings,
-                      const json& arguments,
-                      std::vector<std::pair<std::string, std::string>>& cookies_params) {
-  for (const auto& binding : bindings) {
-    absl::StatusOr<json> value = getJsonValue(arguments, binding.argument_path());
-    if (!value.ok()) {
-      continue;
-    }
-    std::string value_str = jsonValueToString(*std::move(value));
-    if (!cookieValueIsValid(value_str)) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("Invalid cookie value for parameter: ", binding.name()));
-    }
-    cookies_params.push_back({binding.name(), std::move(value_str)});
+absl::Status populateCookieParam(const HttpRule::ParameterBinding& binding, const json& arguments,
+                                 std::vector<std::pair<std::string, std::string>>& cookies_params) {
+  absl::StatusOr<json> value = getJsonValue(arguments, binding.argument_path());
+  if (!value.ok()) {
+    return absl::OkStatus();
   }
+  std::string value_str = jsonValueToString(*std::move(value));
+  if (!cookieValueIsValid(value_str)) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Invalid cookie value for parameter: ", binding.name()));
+  }
+  cookies_params.push_back({binding.name(), std::move(value_str)});
   return absl::OkStatus();
 }
 
@@ -295,11 +277,18 @@ absl::StatusOr<HttpRequest> buildHttpRequest(
   }
 
   absl::flat_hash_map<std::string, std::string> headers_params;
-  RETURN_IF_NOT_OK(
-      populateHeadersParams(http_rule.header_parameter_bindings(), arguments, headers_params));
   std::vector<std::pair<std::string, std::string>> cookies_params;
-  RETURN_IF_NOT_OK(
-      populateCookiesParams(http_rule.cookie_parameter_bindings(), arguments, cookies_params));
+
+  for (const auto& binding : http_rule.bindings()) {
+    if (binding.type() == HttpRule::ParameterBinding::HEADER) {
+      RETURN_IF_NOT_OK(populateHeaderParam(binding, arguments, headers_params));
+    } else if (binding.type() == HttpRule::ParameterBinding::COOKIE) {
+      RETURN_IF_NOT_OK(populateCookieParam(binding, arguments, cookies_params));
+    } else {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Unsupported parameter binding type: ", binding.type()));
+    }
+  }
 
   return HttpRequest{
       .url = *std::move(url),

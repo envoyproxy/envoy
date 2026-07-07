@@ -38,15 +38,18 @@ tool_config:
     - name: list_api_keys
       http_rule:
         get: "/v1/{parent=projects/*}/apiKeys"
-        header_parameter_bindings:
-          - name: "header"
+        bindings:
+          - type: HEADER
+            name: "header"
             argument_path: "header"
-          - name: "header_2"
+          - type: HEADER
+            name: "header_2"
             argument_path: "header_2"
-        cookie_parameter_bindings:
-          - name: "cookie"
+          - type: COOKIE
+            name: "cookie"
             argument_path: "cookie"
-          - name: "cookie_2"
+          - type: COOKIE
+            name: "cookie_2"
             argument_path: "cookie_2"
     - name: get_api_key
       http_rule:

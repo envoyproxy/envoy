@@ -283,10 +283,29 @@ message ToolConfig {
 // [#next-free-field: 9]
 message HttpRule {
   // Represents a mapping from a request message field to an HTTP element.
+  // If the specified argument is missing from the tools/call request, the binding is silently
+  // ignored and the corresponding HTTP element (header or cookie) is not added.
   message ParameterBinding {
+    // The target HTTP element type to bind to.
+    enum Type {
+      // Unspecified element type.
+      TYPE_UNSPECIFIED = 0;
+      // The argument value is bound to an HTTP request header.
+      // Conceptually maps to an OpenAPI parameter with ``in: header``.
+      HEADER = 1;
+      // The argument value is bound to an HTTP request cookie.
+      // Conceptually maps to an OpenAPI parameter with ``in: cookie``.
+      COOKIE = 2;
+    }
+    // The type of the HTTP element to bind to.
+    Type type = 1;
     // The name of the HTTP header (e.g., "X-API-Key", "Authorization") or the
     // name of the cookie (e.g.,"SESSION_ID"). Note: Envoy normalizes the header names to lowercase.
-    string name = 1
+    // The following headers are reserved for Envoy's internal use and cannot be overridden by
+    // bindings: ``content-length``, ``transfer-encoding``, ``host``, ``:authority``, ``cookie``,
+    // ``accept-encoding``, and any header starting with ``x-envoy-``. Attempting to bind to these
+    // will be ignored.
+    string name = 2
         [(validate.rules).string =
              {min_len: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
@@ -294,7 +313,7 @@ message HttpRule {
     // request. Uses dot-notation for nested fields.
     // E.g. if arguments object is ``{"user":{"auth_token":"foo"}}``, then
     // ``argument_path`` should be "user.auth_token".
-    string argument_path = 2 [(validate.rules).string = {min_len: 1}];
+    string argument_path = 3 [(validate.rules).string = {min_len: 1}];
   }
 
   // Determines the HTTP method and the URL path template.
@@ -332,12 +351,8 @@ message HttpRule {
   string body = 6;
 
   // Bindings to extract values from the 'arguments' object of a tools/call
-  // request and inject them as HTTP headers.
-  repeated ParameterBinding header_parameter_bindings = 7;
-
-  // Bindings to extract values from the 'arguments' object of a tools/call
-  // request and inject them as HTTP cookies.
-  repeated ParameterBinding cookie_parameter_bindings = 8;
+  // request and inject them as HTTP elements.
+  repeated ParameterBinding bindings = 7;
 }
 
 // Per-route override configuration for the MCP JSON REST Bridge filter.

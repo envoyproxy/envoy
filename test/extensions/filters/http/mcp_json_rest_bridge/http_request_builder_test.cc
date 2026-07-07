@@ -265,11 +265,12 @@ TEST(HttpRequestBuilderTest, FailToExtractValueFromParameterBindingReturnOk) {
   HttpRule http_rule;
   TestUtility::loadFromYaml(R"yaml(
     get: "/v1"
-    header_parameter_bindings:
-    - name: "foo"
+    bindings:
+    - type: HEADER
+      name: "foo"
       argument_path: "foo_key"
-    cookie_parameter_bindings:
-    - name: "bar"
+    - type: COOKIE
+      name: "bar"
       argument_path: "bar_key"
   )yaml",
                             http_rule);
@@ -283,8 +284,9 @@ TEST(HttpRequestBuilderTest, WildCardBodyAndParameterBindingPathNotFoundInEmptyO
   TestUtility::loadFromYaml(R"yaml(
     get: "/v1/{parent=projects/*}"
     body: "*"
-    header_parameter_bindings:
-    - name: "X-Header-Key"
+    bindings:
+    - type: HEADER
+      name: "X-Header-Key"
       argument_path: "nested.header_key"
   )yaml",
                             http_rule);
@@ -311,15 +313,18 @@ TEST(HttpRequestBuilderTest, HeaderAndCookieParamsPopulatedCorrectly) {
   HttpRule http_rule;
   TestUtility::loadFromYaml(R"yaml(
     get: "/v1/{parent=projects/*}/apiKeys"
-    header_parameter_bindings:
-    - name: "X-Api-Key"
+    bindings:
+    - type: HEADER
+      name: "X-Api-Key"
       argument_path: "api_key"
-    - name: "Authorization"
+    - type: HEADER
+      name: "Authorization"
       argument_path: "auth_token"
-    cookie_parameter_bindings:
-    - name: "SESSION_ID"
+    - type: COOKIE
+      name: "SESSION_ID"
       argument_path: "session_id"
-    - name: "PREF"
+    - type: COOKIE
+      name: "PREF"
       argument_path: "pref"
   )yaml",
                             http_rule);
@@ -355,11 +360,12 @@ TEST(HttpRequestBuilderTest, WildCardBodyExcludesHeaderAndCookieBindings) {
   TestUtility::loadFromYaml(R"yaml(
     post: "/v1/{parent=projects/*}"
     body: "*"
-    header_parameter_bindings:
-    - name: "X-Api-Key"
+    bindings:
+    - type: HEADER
+      name: "X-Api-Key"
       argument_path: "api_key"
-    cookie_parameter_bindings:
-    - name: "SESSION_ID"
+    - type: COOKIE
+      name: "SESSION_ID"
       argument_path: "session_id"
   )yaml",
                             http_rule);
@@ -389,11 +395,12 @@ TEST(HttpRequestBuilderTest, NestedArgumentPathForBindings) {
   HttpRule http_rule;
   TestUtility::loadFromYaml(R"yaml(
     get: "/v1/resources"
-    header_parameter_bindings:
-    - name: "X-Auth-Token"
+    bindings:
+    - type: HEADER
+      name: "X-Auth-Token"
       argument_path: "user.auth_token"
-    cookie_parameter_bindings:
-    - name: "SESSION"
+    - type: COOKIE
+      name: "SESSION"
       argument_path: "context.session_id"
   )yaml",
                             http_rule);
@@ -428,11 +435,12 @@ TEST(HttpRequestBuilderTest, SpecificBodyFieldWithHeaderCookieBindings) {
   TestUtility::loadFromYaml(R"yaml(
     put: "/v1/{parent=projects/*}"
     body: "payload"
-    header_parameter_bindings:
-    - name: "X-Request-Id"
+    bindings:
+    - type: HEADER
+      name: "X-Request-Id"
       argument_path: "request_id"
-    cookie_parameter_bindings:
-    - name: "TOKEN"
+    - type: COOKIE
+      name: "TOKEN"
       argument_path: "token"
   )yaml",
                             http_rule);
@@ -461,8 +469,9 @@ TEST(HttpRequestBuilderTest, InvalidHeaderValueRejection) {
   HttpRule http_rule;
   TestUtility::loadFromYaml(R"yaml(
     get: "/v1"
-    header_parameter_bindings:
-    - name: "X-Header-Key"
+    bindings:
+    - type: HEADER
+      name: "X-Header-Key"
       argument_path: "header_key"
   )yaml",
                             http_rule);
@@ -479,8 +488,9 @@ TEST(HttpRequestBuilderTest, InvalidCookieValueRejection) {
   HttpRule http_rule;
   TestUtility::loadFromYaml(R"yaml(
     get: "/v1"
-    cookie_parameter_bindings:
-    - name: "SESSION"
+    bindings:
+    - type: COOKIE
+      name: "SESSION"
       argument_path: "session_id"
   )yaml",
                             http_rule);
@@ -515,8 +525,9 @@ TEST(HttpRequestBuilderTest, ValidQuotedCookieValueAllowed) {
   HttpRule http_rule;
   TestUtility::loadFromYaml(R"yaml(
     get: "/v1"
-    cookie_parameter_bindings:
-    - name: "SESSION"
+    bindings:
+    - type: COOKIE
+      name: "SESSION"
       argument_path: "session_id"
   )yaml",
                             http_rule);
