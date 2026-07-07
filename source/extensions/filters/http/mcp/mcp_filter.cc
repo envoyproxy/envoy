@@ -371,7 +371,7 @@ void McpFilter::sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp
     setDynamicMetadataStatus(std::move(metadata));
   }
 
-  decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, error_msg, nullptr, absl::nullopt,
+  decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, error_msg, nullptr, std::nullopt,
                                      statusToString(status));
 }
 

@@ -185,7 +185,7 @@ TEST_F(McpFilterTest, RejectNoMcpModePopulatesFilterState) {
   EXPECT_FALSE(filter_state_obj->isMcpRequest());
   EXPECT_FALSE(filter_state_obj->isExceedingLimit());
   EXPECT_EQ(filter_state_obj->status(), Filters::Common::Mcp::Status::NoMcp);
-  EXPECT_EQ(filter_state_obj->method(), absl::nullopt);
+  EXPECT_EQ(filter_state_obj->method(), std::nullopt);
 }
 
 // Test REJECT_NO_MCP mode - allow valid SSE
