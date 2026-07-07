@@ -946,12 +946,7 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeStreamingData(Buffer::Inst
     ENVOY_STREAM_LOG(debug, "Streaming: forwarding chunk ({} raw bytes, {} escaped bytes).",
                      *encoder_callbacks_, len, output_to_add.size());
   }
-
   data.add(output_to_add);
-
-  // TODO(guoyilin42): There will be a case that end_stream is not set in the encodeData call.
-  // This is body + trailer case where encodeTrailer call represents the end of response body.
-  // In that case, we should add the streaming_json_suffix at encodeTrailer call.
   if (end_stream) {
     ENVOY_STREAM_LOG(debug, "Streaming: appending suffix, stream complete.", *encoder_callbacks_);
     data.add(streaming_json_suffix_);
