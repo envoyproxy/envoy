@@ -381,6 +381,8 @@ private:
     Envoy::Quic::QuicPacketWriterFactory* quicPacketWriterFactory() override {
       return quic_writer_factory_.get();
     }
+#else
+    Envoy::Quic::QuicPacketWriterFactory* quicPacketWriterFactory() override { return nullptr; }
 #endif
     Network::UdpListenerWorkerRouter&
     listenerWorkerRouter(const Network::Address::Instance& address) override {
