@@ -1388,22 +1388,24 @@ public:
     Stats::StatNameTagVector c1Tags{{makeStat("cluster"), makeStat("c1")}};
     Stats::StatNameTagVector c2Tags{{makeStat("cluster"), makeStat("c2")}};
 
-    Stats::Counter& c1 = store_->rootScope()->counterFromStatNameWithTags(
-        makeStat("cluster.upstream.cx.total"), c1Tags);
+    Stats::Counter& c1 = store_->rootScope()->counterFromTaggedName(
+        makeStat("cluster.upstream.cx.total"), Stats::StatNameTagSpan(c1Tags), {});
     c1.add(10);
-    Stats::Counter& c2 = store_->rootScope()->counterFromStatNameWithTags(
-        makeStat("cluster.upstream.cx.total"), c2Tags);
+    Stats::Counter& c2 = store_->rootScope()->counterFromTaggedName(
+        makeStat("cluster.upstream.cx.total"), Stats::StatNameTagSpan(c2Tags), {});
     c2.add(20);
 
-    Stats::Gauge& g1 = store_->rootScope()->gaugeFromStatNameWithTags(
-        makeStat("cluster.upstream.cx.active"), c1Tags, Stats::Gauge::ImportMode::Accumulate);
+    Stats::Gauge& g1 = store_->rootScope()->gaugeFromTaggedName(
+        makeStat("cluster.upstream.cx.active"), Stats::StatNameTagSpan(c1Tags), {},
+        Stats::Gauge::ImportMode::Accumulate);
     g1.set(11);
-    Stats::Gauge& g2 = store_->rootScope()->gaugeFromStatNameWithTags(
-        makeStat("cluster.upstream.cx.active"), c2Tags, Stats::Gauge::ImportMode::Accumulate);
+    Stats::Gauge& g2 = store_->rootScope()->gaugeFromTaggedName(
+        makeStat("cluster.upstream.cx.active"), Stats::StatNameTagSpan(c2Tags), {},
+        Stats::Gauge::ImportMode::Accumulate);
     g2.set(12);
 
-    Stats::TextReadout& t1 = store_->rootScope()->textReadoutFromStatNameWithTags(
-        makeStat("control_plane.identifier"), c1Tags);
+    Stats::TextReadout& t1 = store_->rootScope()->textReadoutFromTaggedName(
+        makeStat("control_plane.identifier"), Stats::StatNameTagSpan(c1Tags), {});
     t1.set("cp-1");
   }
 };

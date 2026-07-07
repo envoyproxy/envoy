@@ -12,6 +12,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/http/client_codec_factory.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/address.h"
 #include "envoy/stats/scope.h"
@@ -2060,27 +2061,27 @@ TEST_F(HostImplTest, CreateOrcaReportingConnectionDialsDataAddress) {
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(*connection, connectionInfoSetter()).Times(testing::AnyNumber());
   EXPECT_CALL(*connection, streamInfo()).Times(testing::AnyNumber());
-  Host::CreateConnectionData data =
-      host->createOrcaReportingConnection(dispatcher, /*transport_socket_options=*/nullptr,
-                                          /*metadata=*/nullptr);
+  Host::CreateConnectionData data = host->createOrcaReportingConnection(
+      dispatcher, /*transport_socket_options=*/nullptr, host->transportSocketFactory(),
+      host->orcaReportingAddress());
   EXPECT_EQ(data.host_description_.get(), host.get());
 }
 
-TEST_F(HostImplTest, CreateOrcaReportingConnectionWithMetadataResolvesTransportSocket) {
+TEST_F(HostImplTest, CreateOrcaReportingConnectionDoesNotResolveTransportSocket) {
   MockClusterMockPrioritySet cluster;
   auto* matcher = new NiceMock<MockTransportSocketMatcher>();
   cluster.info_->transport_socket_matcher_.reset(matcher);
   Network::Address::InstanceConstSharedPtr address =
       *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
-  envoy::config::core::v3::Metadata orca_metadata;
+  // Construction resolves the default factory once; the connection call must not resolve again.
+  EXPECT_CALL(*matcher, resolve(_, _, _))
+      .WillOnce(Return(TransportSocketMatcher::MatchData(*matcher->socket_factory_, matcher->stats_,
+                                                         "orca-test")));
   auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "", address, nullptr, nullptr, 1,
       std::make_shared<const envoy::config::core::v3::Locality>(),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
       envoy::config::core::v3::UNKNOWN));
-  EXPECT_CALL(*matcher, resolve(&orca_metadata, _, _))
-      .WillOnce(Return(TransportSocketMatcher::MatchData(*matcher->socket_factory_, matcher->stats_,
-                                                         "orca-test")));
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   auto* connection = new testing::StrictMock<Network::MockClientConnection>();
   EXPECT_CALL(dispatcher, createClientConnection_(address, _, _, _)).WillOnce(Return(connection));
@@ -2088,7 +2089,69 @@ TEST_F(HostImplTest, CreateOrcaReportingConnectionWithMetadataResolvesTransportS
   EXPECT_CALL(*connection, connectionInfoSetter()).Times(testing::AnyNumber());
   EXPECT_CALL(*connection, streamInfo()).Times(testing::AnyNumber());
   host->createOrcaReportingConnection(dispatcher, /*transport_socket_options=*/nullptr,
-                                      &orca_metadata);
+                                      host->transportSocketFactory(), host->orcaReportingAddress());
+}
+
+TEST_F(HostImplTest, CreateOrcaReportingConnectionUsesHappyEyeballsForHostAddress) {
+  MockClusterMockPrioritySet cluster;
+  Network::Address::InstanceConstSharedPtr address =
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  AddressVector address_list = {
+      address,
+      *Network::Utility::resolveUrl("tcp://10.0.0.2:1234"),
+  };
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
+      cluster.info_, "", address, nullptr, nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(),
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::config::core::v3::UNKNOWN, address_list));
+
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  auto* connection = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection, setBufferLimits(0));
+  EXPECT_CALL(*connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*connection, connectionInfoSetter());
+  EXPECT_CALL(dispatcher, createClientConnection_(address_list[0], _, _, _))
+      .WillOnce(Return(connection));
+  EXPECT_CALL(dispatcher, createTimer_(_));
+  EXPECT_CALL(*connection, streamInfo());
+
+  // Dialing the host's own address keeps the data path's happy-eyeballs fallback. A distinct
+  // but value-equal instance must behave the same: addresses are compared by value, not pointer.
+  Host::CreateConnectionData data = host->createOrcaReportingConnection(
+      dispatcher, /*transport_socket_options=*/nullptr, host->transportSocketFactory(),
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234"));
+  EXPECT_NE(connection, data.connection_.get());
+}
+
+TEST_F(HostImplTest, CreateOrcaReportingConnectionSkipsAddressListForOverriddenAddress) {
+  MockClusterMockPrioritySet cluster;
+  Network::Address::InstanceConstSharedPtr address =
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  AddressVector address_list = {
+      address,
+      *Network::Utility::resolveUrl("tcp://10.0.0.2:1234"),
+  };
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
+      cluster.info_, "", address, nullptr, nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(),
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::config::core::v3::UNKNOWN, address_list));
+
+  Network::Address::InstanceConstSharedPtr overridden =
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:9001");
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  auto* connection = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection, setBufferLimits(0));
+  EXPECT_CALL(*connection, connectionInfoSetter());
+  EXPECT_CALL(dispatcher, createClientConnection_(overridden, _, _, _))
+      .WillOnce(Return(connection));
+  EXPECT_CALL(*connection, streamInfo());
+
+  // A port-overridden dial must not fall back to the original-port address list.
+  Host::CreateConnectionData data = host->createOrcaReportingConnection(
+      dispatcher, /*transport_socket_options=*/nullptr, host->transportSocketFactory(), overridden);
+  EXPECT_EQ(connection, data.connection_.get());
 }
 
 TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
@@ -5495,6 +5558,78 @@ public:
   TestFilterConfigFactoryBase& parent_;
 };
 struct TestFilterProtocolOptionsConfig : public Upstream::ProtocolOptionsConfig {};
+
+// A protocol options object that also exposes an upstream client codec factory via the
+// ProtocolOptionsConfig hook. Used to verify that configuring more than one such factory on a
+// single cluster is rejected.
+struct TestCodecFactoryProtocolOptions : public Upstream::ProtocolOptionsConfig,
+                                         public Http::ClientCodecFactory {
+  OptRef<const Http::ClientCodecFactory> upstreamHttpClientCodecFactory() const override {
+    return *this;
+  }
+  Http::ClientConnectionPtr createClientCodec(const Context&) const override { return nullptr; }
+};
+
+// A network filter config factory (registered under a configurable name) whose protocol options
+// object implements ClientCodecFactory.
+class TestCodecFactoryConfigFactory
+    : public Server::Configuration::NamedNetworkFilterConfigFactory {
+public:
+  explicit TestCodecFactoryConfigFactory(std::string name) : name_(std::move(name)) {}
+
+  absl::StatusOr<Network::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext&) override {
+    PANIC("not implemented");
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override { PANIC("not implemented"); }
+  ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+  absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr>
+  createProtocolOptionsConfig(const Protobuf::Message&,
+                              Server::Configuration::ProtocolOptionsFactoryContext&) override {
+    return std::make_shared<TestCodecFactoryProtocolOptions>();
+  }
+  std::string name() const override { return name_; }
+  std::set<std::string> configTypes() override { return {}; };
+
+  const std::string name_;
+};
+
+// Configuring two protocol options objects that both expose a ClientCodecFactory on the same
+// cluster is a misconfiguration and must be rejected deterministically.
+TEST_F(ClusterInfoImplTest, MultipleUpstreamClientCodecFactoriesRejected) {
+  TestCodecFactoryConfigFactory factory_a("envoy.test.codec_a");
+  TestCodecFactoryConfigFactory factory_b("envoy.test.codec_b");
+  Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry_a(
+      factory_a);
+  Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry_b(
+      factory_b);
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.test.codec_a: { "@type": type.googleapis.com/google.protobuf.Struct }
+      envoy.test.codec_b: { "@type": type.googleapis.com/google.protobuf.Struct }
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      makeCluster(yaml), EnvoyException,
+      "multiple upstream HTTP client codec factories configured on a single cluster via "
+      "typed_extension_protocol_options; at most one is allowed");
+}
 
 // Cluster extension protocol options fails validation when configured for filter that does not
 // support options.

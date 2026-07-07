@@ -31,7 +31,7 @@ TEST(OnDemandFilterConfigTest, OnDemandFilterWithServerContext) {
   envoy::extensions::filters::http::on_demand::v3::OnDemand config;
 
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(config, "stats", context).value();
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);

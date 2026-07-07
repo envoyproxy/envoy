@@ -1826,6 +1826,54 @@ TEST_F(OutlierDetectorImplTest, EjectionActiveValueIsAccountedWithoutMetricStora
             cluster_.info_->stats_store_.counter("outlier_detection.ejections_overflow").value());
 }
 
+// Regression test for the degraded-host outlier-detection null dereference when a host is removed
+// while a cross-thread degrade post is in flight. setHostDegraded() posts to the main thread;
+// setHostDegradedMainThread() then does host_monitors_[host]->degrade(...). Unlike the eject path
+// (which guards `if (host_monitors_.count(host) == 0) return;`), the degrade path had no such
+// guard, so if a cluster update removes the host (host_monitors_.erase) before the posted callback
+// runs, host_monitors_[host] default-inserts a null monitor and ->degrade() dereferences it. We
+// reproduce the interleaving deterministically (no real threads) by intercepting the post, removing
+// the host, then firing the captured callback.
+// PRE-fix: ->degrade() on a null DetectorHostMonitorImpl -> crash. POST-fix: the removed host is
+// skipped and the test completes cleanly.
+TEST_F(OutlierDetectorImplTest, CrossThreadDegradeRemoveRace) {
+  const std::string yaml = R"EOF(
+interval: 10s
+base_ejection_time: 30s
+consecutive_5xx: 5
+detect_degraded_hosts: true
+  )EOF";
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
+  TestUtility::loadFromYaml(yaml, outlier_detection);
+
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection,
+                                                              dispatcher_, runtime_, time_system_,
+                                                              event_logger_, random_)
+                                             .value());
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  // Report a degraded response; capture (do not run) the resulting main-thread post.
+  Event::PostCb post_cb;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
+  hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
+
+  // Remove the host before the cross-thread degrade event is delivered (host_monitors_.erase).
+  HostVector old_hosts = std::move(hosts_);
+  cluster_.prioritySet().getMockHostSet(0)->runCallbacks({}, old_hosts);
+
+  // Fire the deferred degrade callback against the now-removed host.
+  // PRE-fix this dereferences a null monitor and crashes; POST-fix it is a no-op.
+  ASSERT_TRUE(post_cb != nullptr);
+  post_cb();
+
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+}
+
 TEST_F(OutlierDetectorImplTest, CrossThreadRemoveRace) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});

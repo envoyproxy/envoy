@@ -33,7 +33,11 @@ enum class Operator { PathGlob, TextGlob };
  */
 struct Variable {
   Variable(absl::string_view name, std::vector<absl::variant<Operator, Literal>> match)
-      : name_(name), match_(match) {}
+      : name_(name), match_(std::move(match)), prefix_(""), suffix_("") {}
+
+  Variable(absl::string_view name, std::vector<absl::variant<Operator, Literal>> match,
+           absl::string_view prefix, absl::string_view suffix)
+      : name_(name), match_(std::move(match)), prefix_(prefix), suffix_(suffix) {}
 
   std::string debugString() const;
 
@@ -41,6 +45,12 @@ struct Variable {
 
   // The pattern which this variable matches.
   std::vector<absl::variant<Operator, Literal>> match_;
+
+  // Literal prefix that appears before the variable in the same path segment.
+  absl::string_view prefix_;
+
+  // Literal suffix that appears after the variable in the same path segment.
+  absl::string_view suffix_;
 };
 
 using ParsedSegment = absl::variant<Operator, Variable, Literal>;
@@ -106,6 +116,13 @@ absl::StatusOr<ParsedResult<Operator>> parseOperator(absl::string_view pattern);
  * Parses a variable in the front of `pattern`.
  */
 absl::StatusOr<ParsedResult<Variable>> parseVariable(absl::string_view pattern);
+
+/**
+ * Parses a mixed variable/literal segment that contains both literal text and a variable.
+ * For example: "api{version}" or "v{id}.json" or "MyFunction('{param}')".
+ * Returns a Variable with prefix and suffix set appropriately.
+ */
+absl::StatusOr<ParsedResult<Variable>> parseMixedVariableLiteral(absl::string_view pattern);
 
 /**
  * Converts input path to ParsedPathPattern.

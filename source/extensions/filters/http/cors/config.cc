@@ -27,7 +27,7 @@ Http::FilterFactoryCb CorsFilterFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
-Http::FilterFactoryCb CorsFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb> CorsFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::cors::v3::Cors&, const std::string& stats_prefix,
     Server::Configuration::ServerFactoryContext& context) {
   CorsFilterConfigSharedPtr config =

@@ -424,6 +424,11 @@ private:
   absl::Status buildFilterChains(const envoy::config::listener::v3::Listener& config);
   absl::Status buildConnectionBalancer(const envoy::config::listener::v3::Listener& config,
                                        const Network::Address::Instance& address);
+  // Returns true when the listener should steer connections to workers using a reuse port BPF
+  // program. Requires a TCP listener with reuse port enabled, the CPU locality balancer configured,
+  // worker CPU affinity pinning every worker to a CPU, and a kernel that supports reuse port BPF
+  // steering.
+  bool reusePortBpfCpuSteeringEnabled(const envoy::config::listener::v3::Listener& config) const;
   void buildSocketOptions(const envoy::config::listener::v3::Listener& config);
   void buildOriginalDstListenerFilter(const envoy::config::listener::v3::Listener& config);
   void buildProxyProtocolListenerFilter(const envoy::config::listener::v3::Listener& config);

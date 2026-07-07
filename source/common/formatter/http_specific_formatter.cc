@@ -355,17 +355,18 @@ QueryParameterFormatter::formatValue(const Context& context,
   return ValueUtil::optionalStringValue(format(context, stream_info));
 }
 
-QueryParametersFormatter::DecodeOption
-QueryParametersFormatter::parseDecodeOption(absl::string_view decoding) {
-
+absl::StatusOr<FormatterProviderPtr>
+QueryParametersFormatter::create(absl::string_view decoding, std::optional<size_t> max_length) {
+  DecodeOption decode_option;
   if (decoding.empty() || decoding == "ORIG") {
-    return DecodeOption::Original;
+    decode_option = DecodeOption::Original;
   } else if (decoding == "DECODED") {
-    return DecodeOption::Decoded;
+    decode_option = DecodeOption::Decoded;
   } else {
-    throw EnvoyException(fmt::format(
+    return absl::InvalidArgumentError(fmt::format(
         "Invalid QUERY_PARAMS option: '{}', only 'ORIG'/'DECODED' are allowed", decoding));
   }
+  return std::make_unique<QueryParametersFormatter>(decode_option, max_length);
 }
 
 // FormatterProvider
@@ -598,8 +599,8 @@ BuiltInHttpCommandParser::getKnownFormatters() {
        {"QUERY_PARAMS",
         {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](absl::string_view decoding, std::optional<size_t> max_length) {
-           return std::make_unique<QueryParametersFormatter>(
-               QueryParametersFormatter::parseDecodeOption(decoding), max_length);
+           return THROW_OR_RETURN_VALUE(QueryParametersFormatter::create(decoding, max_length),
+                                        FormatterProviderPtr);
          }}},
        {"PATH",
         {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED,

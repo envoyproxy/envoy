@@ -193,10 +193,20 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
   return thread_local_cluster->httpAsyncClient().send(std::move(message), callbacks, options);
 }
 
+// Looks up (creating if necessary) the process-wide `lua.lua_vm_count` gauge directly on the
+// given server root scope. Both the filter-config-level and route-level VM setups call this same
+// helper against the server root scope so the stat name is always identical, regardless of
+// listener/route stat prefixes.
+Stats::Gauge& lookupLuaVmCountGauge(Stats::Scope& server_scope) {
+  Stats::StatNameManagedStorage stat_name("lua.lua_vm_count", server_scope.symbolTable());
+  return server_scope.gaugeFromStatName(stat_name.statName(), Stats::Gauge::ImportMode::Accumulate);
+}
+
 } // namespace
 
-PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls)
-    : lua_state_(lua_code, tls) {
+PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
+                                 Stats::Gauge& vm_count_gauge, uint32_t concurrency)
+    : lua_state_(lua_code, tls), vm_count_gauge_(vm_count_gauge), vm_count_delta_(concurrency + 1) {
   lua_state_.registerType<Filters::Common::Lua::BufferWrapper>();
   lua_state_.registerType<Filters::Common::Lua::MetadataMapWrapper>();
   lua_state_.registerType<Filters::Common::Lua::MetadataMapIterator>();
@@ -242,7 +252,11 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   if (lua_state_.getGlobalRef(response_function_slot_) == LUA_REFNIL) {
     ENVOY_LOG(info, "envoy_on_response() function not found. Lua filter will not hook responses.");
   }
+
+  vm_count_gauge_.add(vm_count_delta_);
 }
+
+PerLuaCodeSetup::~PerLuaCodeSetup() { vm_count_gauge_.sub(vm_count_delta_); }
 
 StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
                                          Http::RequestOrResponseHeaderMap& headers, bool end_stream,
@@ -833,7 +847,8 @@ StreamHandleWrapper::getTimestampResolution(absl::string_view unit_parameter) {
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
                            ThreadLocal::SlotAllocator& tls,
                            Upstream::ClusterManager& cluster_manager, Api::Api& api,
-                           Stats::Scope& scope, const std::string& stats_prefix)
+                           Stats::Scope& scope, const std::string& stats_prefix,
+                           uint32_t concurrency)
     : cluster_manager_(cluster_manager),
       clear_route_cache_(
           proto_config.has_clear_route_cache() ? proto_config.clear_route_cache().value() : true),
@@ -842,6 +857,8 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
           scope.createScope(proto_config.stat_prefix().empty()
                                 ? absl::StrCat(stats_prefix, "lua")
                                 : absl::StrCat(stats_prefix, "lua.", proto_config.stat_prefix()))) {
+  Stats::Gauge& vm_count_gauge = lookupLuaVmCountGauge(api.rootScope());
+
   if (proto_config.has_default_source_code()) {
     if (!proto_config.inline_code().empty()) {
       throw EnvoyException("Error: Only one of `inline_code` or `default_source_code` can be set "
@@ -850,15 +867,18 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
 
     const std::string code = THROW_OR_RETURN_VALUE(
         Config::DataSource::read(proto_config.default_source_code(), true, api), std::string);
-    default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(code, tls);
+    default_lua_code_setup_ =
+        std::make_unique<PerLuaCodeSetup>(code, tls, vm_count_gauge, concurrency);
   } else if (!proto_config.inline_code().empty()) {
-    default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(proto_config.inline_code(), tls);
+    default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(proto_config.inline_code(), tls,
+                                                                vm_count_gauge, concurrency);
   }
 
   for (const auto& source : proto_config.source_codes()) {
     const std::string code =
         THROW_OR_RETURN_VALUE(Config::DataSource::read(source.second, true, api), std::string);
-    auto per_lua_code_setup_ptr = std::make_unique<PerLuaCodeSetup>(code, tls);
+    auto per_lua_code_setup_ptr =
+        std::make_unique<PerLuaCodeSetup>(code, tls, vm_count_gauge, concurrency);
     if (!per_lua_code_setup_ptr) {
       continue;
     }
@@ -877,7 +897,9 @@ FilterConfigPerRoute::FilterConfigPerRoute(
     // Read and parse the inline Lua code defined in the route configuration.
     const std::string code_str = THROW_OR_RETURN_VALUE(
         Config::DataSource::read(config.source_code(), true, context.api()), std::string);
-    per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal());
+    Stats::Gauge& vm_count_gauge = lookupLuaVmCountGauge(context.api().rootScope());
+    per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(
+        code_str, context.threadLocal(), vm_count_gauge, context.options().concurrency());
   }
 }
 

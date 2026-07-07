@@ -1739,7 +1739,7 @@ public:
 
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view, Upstream::ThreadLocalClusterCommand&) override {}
-  void onClusterRemoval(const std::string&) override {}
+  void onClusterRemoval(absl::string_view) override {}
 
 private:
   Upstream::ClusterUpdateCallbacksHandlePtr cluster_removal_cb_handle_;
