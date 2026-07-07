@@ -1060,7 +1060,6 @@ private:
 #ifdef ENVOY_ENABLE_QUIC
   Quic::QuicStatNames quic_stat_names_ = Quic::QuicStatNames(stats_store_.symbolTable());
 #endif
-
   bool initialized_ = false;
 };
 
