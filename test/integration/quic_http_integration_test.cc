@@ -2191,7 +2191,7 @@ public:
       auto* common_tls =
           quic_transport.mutable_downstream_tls_context()->mutable_common_tls_context();
       ConfigHelper::initializeTlsKeyLog(*common_tls, options);
-      ts->mutable_typed_config()->PackFrom(quic_transport);
+      ASSERT_TRUE(ts->mutable_typed_config()->PackFrom(quic_transport));
     });
   }
 
