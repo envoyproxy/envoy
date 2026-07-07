@@ -275,6 +275,11 @@ quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() const {
 void EnvoyQuicServerSession::ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
                                               const quic::QuicSocketAddress& peer_address,
                                               const quic::QuicReceivedPacket& packet) {
+  // The first packet processed by the server session carries the client's initial ClientHello,
+  // so record its arrival as the downstream handshake start. The setter only keeps the first
+  // value, so subsequent packets don't overwrite it.
+  streamInfo().downstreamTiming().onDownstreamHandshakeStart(dispatcher_.timeSource());
+
   // If L4 filters causes the connection to be closed early during initialization, now
   // is the time to actually close the connection.
   maybeHandleCloseDuringInitialize();

@@ -141,6 +141,15 @@ bool SslHandshakerImpl::peerCertificateValidated() const {
 
 Network::PostIoAction SslHandshakerImpl::doHandshake() {
   ASSERT(state_ != Ssl::SocketState::HandshakeComplete && state_ != Ssl::SocketState::ShutdownSent);
+
+  // On the server side the handshake is only driven once downstream data (the ClientHello) has
+  // arrived, so the first time we step the handshake corresponds to the ClientHello being
+  // received. Record this as the downstream handshake start.
+  if (SSL_is_server(ssl())) {
+    handshake_callbacks_->connection().streamInfo().downstreamTiming().onDownstreamHandshakeStart(
+        handshake_callbacks_->connection().dispatcher().timeSource());
+  }
+
   int rc = SSL_do_handshake(ssl());
   if (rc == 1) {
     state_ = Ssl::SocketState::HandshakeComplete;

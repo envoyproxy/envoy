@@ -938,6 +938,19 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   filter_manager_.streamInfo().downstreamTiming().setDownstreamConnectionBegin(
       connection_manager_.read_callbacks_->connection().streamInfo().startTimeMonotonic());
 
+  // Copy the connection-level downstream TLS handshake time points onto the request-level stream
+  // info so they are available to COMMON_DURATION (DX_HS_BEG/DX_HS_END) access logging.
+  const auto& connection_downstream_timing =
+      connection_manager_.read_callbacks_->connection().streamInfo().downstreamTiming();
+  if (connection_downstream_timing.downstreamHandshakeStart().has_value()) {
+    filter_manager_.streamInfo().downstreamTiming().setDownstreamHandshakeStart(
+        connection_downstream_timing.downstreamHandshakeStart().value());
+  }
+  if (connection_downstream_timing.downstreamHandshakeComplete().has_value()) {
+    filter_manager_.streamInfo().downstreamTiming().setDownstreamHandshakeComplete(
+        connection_downstream_timing.downstreamHandshakeComplete().value());
+  }
+
   // TODO(chaoqin-li1123): can this be moved to the on demand filter?
   auto factory = Envoy::Config::Utility::getFactoryByName<RouteConfigUpdateRequesterFactory>(
       kRouteFactoryName);

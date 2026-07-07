@@ -410,6 +410,24 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter rtt_format("DOWNSTREAM_CX_RTT");
+
+    // No round trip time set yet.
+    EXPECT_EQ(std::nullopt, rtt_format.format({}, stream_info));
+    EXPECT_THAT(rtt_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    StreamInfoFormatter rtt_format("DOWNSTREAM_CX_RTT");
+
+    stream_info.downstream_connection_info_provider_->setRoundTripTime(
+        std::chrono::milliseconds(42));
+
+    EXPECT_EQ("42", rtt_format.format({}, stream_info));
+    EXPECT_THAT(rtt_format.formatValue({}, stream_info), ProtoEq(ValueUtil::numberValue(42.0)));
+  }
+
+  {
     StreamInfoFormatter bytes_retransmitted_format("BYTES_RETRANSMITTED");
     EXPECT_CALL(stream_info, bytesRetransmitted()).WillRepeatedly(Return(1));
     EXPECT_EQ("1", bytes_retransmitted_format.format({}, stream_info));
@@ -1688,8 +1706,9 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     std::vector<std::string> time_points{
-        "DS_RX_BEG", "DS_RX_END", "US_CX_BEG", "US_CX_END", "US_HS_END", "US_TX_BEG",
-        "US_TX_END", "US_RX_BEG", "US_RX_END", "DS_TX_BEG", "DS_TX_END", "custom_time_point",
+        "DS_RX_BEG", "DS_RX_END",         "US_CX_BEG", "US_CX_END", "US_HS_END",
+        "US_TX_BEG", "US_TX_END",         "US_RX_BEG", "US_RX_END", "DS_TX_BEG",
+        "DS_TX_END", "custom_time_point", "DX_HS_BEG", "DX_HS_END",
     };
 
     std::vector<std::string> precisions{"ms", "us", "ns"};
@@ -1788,6 +1807,16 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
       // custom_time_point
       stream_info.downstream_timing_.setValue("custom_time_point",
                                               MonotonicTime(std::chrono::nanoseconds(12000000)));
+
+      // DX_HS_BEG
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(13000000))));
+      stream_info.downstream_timing_.onDownstreamHandshakeStart(time_system);
+
+      // DX_HS_END
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(14000000))));
+      stream_info.downstream_timing_.onDownstreamHandshakeComplete(time_system);
 
       for (size_t start_index = 0; start_index < time_points.size(); start_index++) {
         for (size_t end_index = 0; end_index < time_points.size(); end_index++) {

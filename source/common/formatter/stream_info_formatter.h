@@ -194,15 +194,20 @@ private:
   static constexpr absl::string_view LastDownstreamRxByteReceived =
       "DS_RX_END"; // Downstream request receiving end.
   static constexpr absl::string_view DownstreamConnectionBegin =
-      "DS_CX_BEG"; // Downstream connection begin.
+      "DS_CX_BEG"; // Downstream connection begin. The downstream connection establishment time.
+                   // NOTE: This is different from the US_CX_BEG which is the connection
+                   // establishment begin because the downstream connection begin is the time when
+                   // the downstream connection is actually established and accepted by Envoy.
   static constexpr absl::string_view DownstreamConnectionEnd =
-      "DS_CX_END"; // Downstream connection end.
+      "DS_CX_END"; // Downstream connection end. The downstream connection close time.
+                   // NOTE: This is different from the US_CX_END which is the connection
+                   // establishment end and not the connection end.
   static constexpr absl::string_view UpstreamConnectStart =
       "US_CX_BEG"; // Upstream TCP connection establishment start.
   static constexpr absl::string_view UpstreamConnectEnd =
-      "US_CX_END"; // Upstream TCP connection establishment start.
+      "US_CX_END"; // Upstream TCP connection establishment end.
   static constexpr absl::string_view UpstreamTLSConnectEnd =
-      "US_HS_END"; // Upstream TLS connection establishment start.
+      "US_HS_END"; // Upstream TLS connection establishment end.
   static constexpr absl::string_view FirstUpstreamTxByteSent =
       "US_TX_BEG"; // Upstream request sending begin.
   static constexpr absl::string_view LastUpstreamTxByteSent =
@@ -217,6 +222,10 @@ private:
       "DS_TX_BEG"; // Downstream response sending begin.
   static constexpr absl::string_view LastDownstreamTxByteSent =
       "DS_TX_END"; // Downstream response sending end.
+  static constexpr absl::string_view DownstreamHandshakeStart =
+      "DX_HS_BEG"; // Downstream TLS handshake begin, i.e. the time the ClientHello was received.
+  static constexpr absl::string_view DownstreamHandshakeEnd =
+      "DX_HS_END"; // Downstream TLS handshake end.
 
   TimePointGetter time_point_beg_;
   TimePointGetter time_point_end_;

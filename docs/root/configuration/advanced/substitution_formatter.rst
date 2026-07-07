@@ -357,8 +357,16 @@ Current supported substitution commands include:
     The ``START`` and ``END`` time points are specified by the following values (all values
     here are case-sensitive):
 
-    * ``DS_CX_BEG``: The time point of the downstream connection begin.
-    * ``DS_CX_END``: The time point of the downstream connection end.
+    * ``DS_CX_BEG``: The time point at which the downstream connection was established (accepted)
+      by Envoy, i.e. the connection start time. Note this is unlike ``US_CX_BEG``/``US_CX_END``,
+      which mark the begin and end of the upstream connection *establishment*; ``DS_CX_BEG`` is the
+      single time point at which the already-established downstream connection begins.
+    * ``DS_CX_END``: The time point at which the downstream connection was closed, i.e. the
+      connection close time. Note this is unlike ``US_CX_END``, which marks the end of the upstream
+      connection *establishment* rather than the connection close.
+    * ``DX_HS_BEG``: The time point of the downstream TLS handshake begin, i.e. when the
+      ClientHello was received.
+    * ``DX_HS_END``: The time point of the downstream TLS handshake end.
     * ``DS_RX_BEG``: The time point of the downstream request receiving begin.
     * ``DS_RX_END``: The time point of the downstream request receiving end.
     * ``US_CX_BEG``: The time point of the upstream TCP connect begin.
@@ -401,8 +409,16 @@ Current supported substitution commands include:
     The connection time points are populated for TCP connections and specified by the following
     values (all values here are case-sensitive):
 
-    * ``DS_CX_BEG``: The time point of the downstream connection begin.
-    * ``DS_CX_END``: The time point of the downstream connection end.
+    * ``DS_CX_BEG``: The time point at which the downstream connection was established (accepted)
+      by Envoy, i.e. the connection start time. Note this is unlike ``US_CX_BEG``/``US_CX_END``,
+      which mark the begin and end of the upstream connection *establishment*; ``DS_CX_BEG`` is the
+      single time point at which the already-established downstream connection begins.
+    * ``DS_CX_END``: The time point at which the downstream connection was closed, i.e. the
+      connection close time. Note this is unlike ``US_CX_END``, which marks the end of the upstream
+      connection *establishment* rather than the connection close.
+    * ``DX_HS_BEG``: The time point of the downstream TLS handshake begin, i.e. when the
+      ClientHello was received.
+    * ``DX_HS_END``: The time point of the downstream TLS handshake end.
     * ``US_CX_BEG``: The time point of the upstream TCP connect begin.
     * ``US_CX_END``: The time point of the upstream TCP connect end.
 
@@ -469,6 +485,17 @@ Current supported substitution commands include:
 
   TCP
     Total duration in milliseconds from the start of the connection to the TLS handshake being completed.
+
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+  Renders a numeric value in typed JSON logs.
+
+``%DOWNSTREAM_CX_RTT%``
+  HTTP/TCP
+    The last measured round trip time in milliseconds of the downstream connection, as reported by
+    the underlying transport (e.g. the kernel TCP stack). It will appear as ``"-"`` in the access
+    logs if the round trip time is not available.
 
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
