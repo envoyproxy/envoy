@@ -223,9 +223,9 @@ private:
   static constexpr absl::string_view LastDownstreamTxByteSent =
       "DS_TX_END"; // Downstream response sending end.
   static constexpr absl::string_view DownstreamHandshakeStart =
-      "DX_HS_BEG"; // Downstream TLS handshake begin, i.e. the time the ClientHello was received.
+      "DS_HS_BEG"; // Downstream TLS handshake begin, i.e. the time the ClientHello was received.
   static constexpr absl::string_view DownstreamHandshakeEnd =
-      "DX_HS_END"; // Downstream TLS handshake end.
+      "DS_HS_END"; // Downstream TLS handshake end.
 
   TimePointGetter time_point_beg_;
   TimePointGetter time_point_end_;

@@ -1708,7 +1708,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     std::vector<std::string> time_points{
         "DS_RX_BEG", "DS_RX_END",         "US_CX_BEG", "US_CX_END", "US_HS_END",
         "US_TX_BEG", "US_TX_END",         "US_RX_BEG", "US_RX_END", "DS_TX_BEG",
-        "DS_TX_END", "custom_time_point", "DX_HS_BEG", "DX_HS_END",
+        "DS_TX_END", "custom_time_point", "DS_HS_BEG", "DS_HS_END",
     };
 
     std::vector<std::string> precisions{"ms", "us", "ns"};
@@ -1808,12 +1808,12 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
       stream_info.downstream_timing_.setValue("custom_time_point",
                                               MonotonicTime(std::chrono::nanoseconds(12000000)));
 
-      // DX_HS_BEG
+      // DS_HS_BEG
       EXPECT_CALL(time_system, monotonicTime)
           .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(13000000))));
       stream_info.downstream_timing_.onDownstreamHandshakeStart(time_system);
 
-      // DX_HS_END
+      // DS_HS_END
       EXPECT_CALL(time_system, monotonicTime)
           .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(14000000))));
       stream_info.downstream_timing_.onDownstreamHandshakeComplete(time_system);
