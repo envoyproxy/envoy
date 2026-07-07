@@ -1570,6 +1570,57 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true, "details");
 }
 
+// A filter that subscribes via addUpstreamWatermarkCallbacks() is notified when the upstream backs
+// up (onDecoderFilterAboveWriteBufferHighWatermark) and drains, in addition to the codec being
+// read-disabled. This is what lets a filter producing its own request data pace against the
+// upstream.
+TEST_F(HttpConnectionManagerImplTest, ForwardsUpstreamWatermarkToSubscribers) {
+  setup();
+  setUpEncoderAndDecoder(false, false);
+  sendRequestHeadersAndData();
+
+  NiceMock<MockUpstreamWatermarkCallbacks> watermark_callbacks;
+  ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
+  decoder_filters_[0]->callbacks_->addUpstreamWatermarkCallbacks(watermark_callbacks);
+
+  auto& stream = response_encoder_.stream_;
+
+  // Upstream backs up: the codec is read-disabled and the subscriber is notified.
+  EXPECT_CALL(stream, readDisable(true));
+  EXPECT_CALL(watermark_callbacks, onAboveWriteBufferHighWatermark());
+  decoder_filters_[0]->callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
+
+  // Upstream drains: reads are re-enabled and the subscriber is notified.
+  EXPECT_CALL(stream, readDisable(false));
+  EXPECT_CALL(watermark_callbacks, onBelowWriteBufferLowWatermark());
+  decoder_filters_[0]->callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
+
+  // Raise the watermark again, then verify a late subscriber is brought up to the current
+  // back-pressure state immediately on registration.
+  EXPECT_CALL(stream, readDisable(true));
+  EXPECT_CALL(watermark_callbacks, onAboveWriteBufferHighWatermark());
+  decoder_filters_[0]->callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
+
+  NiceMock<MockUpstreamWatermarkCallbacks> late_subscriber;
+  EXPECT_CALL(late_subscriber, onAboveWriteBufferHighWatermark());
+  decoder_filters_[0]->callbacks_->addUpstreamWatermarkCallbacks(late_subscriber);
+
+  // Clean up the subscriptions before the stream is torn down.
+  decoder_filters_[0]->callbacks_->removeUpstreamWatermarkCallbacks(watermark_callbacks);
+  decoder_filters_[0]->callbacks_->removeUpstreamWatermarkCallbacks(late_subscriber);
+
+  // Send a full response.
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  expectOnDestroy();
+  decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true, "details");
+}
+
 TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOnWithLazyCreation) {
   setup();
 
