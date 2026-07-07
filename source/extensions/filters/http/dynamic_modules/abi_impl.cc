@@ -13,6 +13,7 @@
 #include "source/common/tracing/null_span_impl.h"
 #include "source/common/tracing/tracer_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
+#include "source/extensions/dynamic_modules/abi_context_accessors.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
 namespace Envoy {
@@ -1910,11 +1911,14 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
           return ssl->uriSanPeerCertificate().front();
         },
         result);
-  default:
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
-                        "Unsupported attribute ID {} as string",
-                        static_cast<int64_t>(attribute_id));
+  default: {
+    // Fall back to the shared context accessor for stream-info-based attributes that are not
+    // served from the live request state above.
+    if (const auto stream_info = filter->streamInfo(); stream_info != nullptr) {
+      ok = ContextAccessor::getAttributeString(*stream_info, attribute_id, result);
+    }
     break;
+  }
   }
   return ok;
 }
@@ -1980,9 +1984,14 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
     }
     break;
   }
-  default:
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
-                        "Unsupported attribute ID {} as int", static_cast<int64_t>(attribute_id));
+  default: {
+    // Fall back to the shared context accessor for stream-info-based attributes that are not
+    // served from the live request state above.
+    if (const auto stream_info = filter->streamInfo(); stream_info != nullptr) {
+      ok = ContextAccessor::getAttributeInt(*stream_info, attribute_id, result);
+    }
+    break;
+  }
   }
   return ok;
 }
@@ -2001,9 +2010,14 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_bool(
     }
     break;
   }
-  default:
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
-                        "Unsupported attribute ID {} as bool", static_cast<int64_t>(attribute_id));
+  default: {
+    // Fall back to the shared context accessor for stream-info-based attributes that are not
+    // served from the live request state above.
+    if (const auto stream_info = filter->streamInfo(); stream_info != nullptr) {
+      ok = ContextAccessor::getAttributeBool(*stream_info, attribute_id, result);
+    }
+    break;
+  }
   }
   return ok;
 }

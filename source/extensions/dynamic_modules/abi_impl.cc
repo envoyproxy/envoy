@@ -4324,6 +4324,54 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_http_filter_get_attribu
   return false;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_network_filter_get_attribute_string(
+    envoy_dynamic_module_type_network_filter_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_network_filter_get_attribute_string: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_network_filter_get_attribute_int(
+    envoy_dynamic_module_type_network_filter_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    uint64_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_network_filter_get_attribute_int: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_network_filter_get_attribute_bool(
+    envoy_dynamic_module_type_network_filter_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    bool*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_network_filter_get_attribute_bool: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_listener_filter_get_attribute_string(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_listener_filter_get_attribute_string: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_listener_filter_get_attribute_int(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    uint64_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_listener_filter_get_attribute_int: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_listener_filter_get_attribute_bool(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    bool*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_listener_filter_get_attribute_bool: "
+               "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) envoy_dynamic_module_type_http_callout_init_result
 envoy_dynamic_module_callback_http_filter_http_callout(
     envoy_dynamic_module_type_http_filter_envoy_ptr, uint64_t*,
