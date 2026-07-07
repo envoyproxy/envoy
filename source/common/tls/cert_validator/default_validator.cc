@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "envoy/network/transport_socket.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/private_key/private_key.h"
@@ -23,6 +24,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/hex.h"
 #include "source/common/common/matchers.h"
+#include "source/common/common/thread.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/network/address_impl.h"
@@ -44,6 +46,56 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
+SINGLETON_MANAGER_REGISTRATION(crl_cache);
+
+absl::StatusOr<SharedCrlListSharedPtr> CrlCache::getOrCreate(const std::string& crl_pem,
+                                                             const std::string& crl_path) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // Release entries whose last referencing context has been torn down so the
+  // map does not grow without bound across xDS updates.
+  absl::erase_if(cache_, [](const auto& entry) { return entry.second.expired(); });
+
+  if (auto it = cache_.find(crl_pem); it != cache_.end()) {
+    if (SharedCrlListSharedPtr existing = it->second.lock()) {
+      return existing;
+    }
+  }
+
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(crl_pem.data()), crl_pem.size()));
+  RELEASE_ASSERT(bio != nullptr, "");
+  // Based on BoringSSL's X509_load_cert_crl_file().
+  bssl::UniquePtr<STACK_OF(X509_INFO)> list(
+      PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
+  if (list == nullptr) {
+    return absl::InvalidArgumentError(absl::StrCat("Failed to load CRL from ", crl_path));
+  }
+
+  auto shared_crl_list = std::make_shared<SharedCrlList>();
+  for (const X509_INFO* item : list.get()) {
+    if (item->crl) {
+      shared_crl_list->crls.push_back(bssl::UpRef(item->crl));
+    }
+  }
+  cache_[crl_pem] = shared_crl_list;
+  return shared_crl_list;
+}
+
+size_t CrlCache::size() const {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  size_t count = 0;
+  for (const auto& entry : cache_) {
+    if (!entry.second.expired()) {
+      ++count;
+    }
+  }
+  return count;
+}
+
+std::shared_ptr<CrlCache> getCrlCache(Singleton::Manager& singleton_manager) {
+  return singleton_manager.getTyped<CrlCache>(SINGLETON_MANAGER_REGISTERED_NAME(crl_cache),
+                                              [] { return std::make_shared<CrlCache>(); });
+}
 
 DefaultCertValidator::DefaultCertValidator(
     const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
@@ -130,26 +182,21 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
   }
 
   if (config_ != nullptr && !config_->certificateRevocationList().empty()) {
-    bssl::UniquePtr<BIO> bio(
-        BIO_new_mem_buf(const_cast<char*>(config_->certificateRevocationList().data()),
-                        config_->certificateRevocationList().size()));
-    RELEASE_ASSERT(bio != nullptr, "");
-
-    // Based on BoringSSL's X509_load_cert_crl_file().
-    bssl::UniquePtr<STACK_OF(X509_INFO)> list(
-        PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
-    if (list == nullptr) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("Failed to load CRL from ", config_->certificateRevocationListPath()));
-    }
+    // Parse the CRL through a process-wide cache so that identical CRL content
+    // referenced from many TLS contexts is materialized in memory only once.
+    crl_cache_ = getCrlCache(context_.singletonManager());
+    absl::StatusOr<SharedCrlListSharedPtr> shared_crl_or_error = crl_cache_->getOrCreate(
+        config_->certificateRevocationList(), config_->certificateRevocationListPath());
+    RETURN_IF_NOT_OK_REF(shared_crl_or_error.status());
+    shared_crl_ = std::move(*shared_crl_or_error);
 
     for (auto& ctx : contexts) {
       X509_STORE* store = SSL_CTX_get_cert_store(ctx);
       X509_STORE_set_flags(store, X509_V_FLAG_PARTIAL_CHAIN);
-      for (const X509_INFO* item : list.get()) {
-        if (item->crl) {
-          X509_STORE_add_crl(store, item->crl);
-        }
+      for (const auto& crl : shared_crl_->crls) {
+        // X509_STORE_add_crl takes its own reference, so the shared CRL stays
+        // valid for the store's lifetime even after this cache entry is released.
+        X509_STORE_add_crl(store, crl.get());
       }
       X509_STORE_set_flags(store, config_->onlyVerifyLeafCertificateCrl()
                                       ? X509_V_FLAG_CRL_CHECK
