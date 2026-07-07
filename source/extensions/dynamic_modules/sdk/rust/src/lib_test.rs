@@ -1527,11 +1527,14 @@ struct MockUpstreamHost {
 }
 
 static MOCK_UPSTREAM_HOST: std::sync::Mutex<Option<MockUpstreamHost>> = std::sync::Mutex::new(None);
+static MOCK_UPSTREAM_CONNECTION_ID: std::sync::atomic::AtomicU64 =
+  std::sync::atomic::AtomicU64::new(0);
 static MOCK_START_TLS_RESULT: std::sync::atomic::AtomicBool =
   std::sync::atomic::AtomicBool::new(false);
 
 fn reset_upstream_host_mock() {
   *MOCK_UPSTREAM_HOST.lock().unwrap() = None;
+  MOCK_UPSTREAM_CONNECTION_ID.store(0, std::sync::atomic::Ordering::SeqCst);
   MOCK_START_TLS_RESULT.store(false, std::sync::atomic::Ordering::SeqCst);
 }
 
@@ -1665,6 +1668,13 @@ pub extern "C" fn envoy_dynamic_module_callback_network_filter_has_upstream_host
   _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
 ) -> bool {
   MOCK_UPSTREAM_HOST.lock().unwrap().is_some()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+) -> u64 {
+  MOCK_UPSTREAM_CONNECTION_ID.load(std::sync::atomic::Ordering::SeqCst)
 }
 
 #[no_mangle]
@@ -1835,6 +1845,62 @@ fn test_has_upstream_host_false() {
   };
 
   assert!(!filter.has_upstream_host());
+}
+
+#[test]
+fn test_get_upstream_connection_id() {
+  reset_upstream_host_mock();
+  MOCK_UPSTREAM_CONNECTION_ID.store(54321, std::sync::atomic::Ordering::SeqCst);
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  assert_eq!(filter.get_upstream_connection_id(), 54321);
+}
+
+#[test]
+fn test_get_upstream_connection_id_unavailable() {
+  reset_upstream_host_mock();
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  assert_eq!(filter.get_upstream_connection_id(), 0);
+}
+
+static MOCK_HTTP_UPSTREAM_CONNECTION_ID: std::sync::atomic::AtomicU64 =
+  std::sync::atomic::AtomicU64::new(0);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_upstream_connection_id(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+) -> u64 {
+  MOCK_HTTP_UPSTREAM_CONNECTION_ID.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[test]
+fn test_http_get_upstream_connection_id() {
+  MOCK_HTTP_UPSTREAM_CONNECTION_ID.store(98765, std::sync::atomic::Ordering::SeqCst);
+
+  let filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+
+  assert_eq!(filter.get_upstream_connection_id(), 98765);
+  MOCK_HTTP_UPSTREAM_CONNECTION_ID.store(0, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[test]
+fn test_http_get_upstream_connection_id_unavailable() {
+  MOCK_HTTP_UPSTREAM_CONNECTION_ID.store(0, std::sync::atomic::Ordering::SeqCst);
+
+  let filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+
+  assert_eq!(filter.get_upstream_connection_id(), 0);
 }
 
 // =============================================================================
@@ -3903,6 +3969,70 @@ pub extern "C" fn envoy_dynamic_module_callback_http_filter_reset_stream(
   _details: abi::envoy_dynamic_module_type_module_buffer,
 ) {
   RESET_STREAM_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+// Single-slot store backing the filter state object FFI stubs below.
+static FILTER_STATE_OBJECT: std::sync::atomic::AtomicPtr<std::ffi::c_void> =
+  std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_set_filter_state_object(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  module_object: abi::envoy_dynamic_module_type_filter_state_object_module_ptr,
+  _destructor: abi::envoy_dynamic_module_type_filter_state_object_destructor,
+  _life_span: abi::envoy_dynamic_module_type_filter_state_life_span,
+) -> bool {
+  FILTER_STATE_OBJECT.store(module_object, std::sync::atomic::Ordering::SeqCst);
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_filter_state_object(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_filter_state_object_module_ptr {
+  FILTER_STATE_OBJECT.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[test]
+fn test_http_filter_state_object_round_trip() {
+  use std::sync::atomic::Ordering;
+  static DROPPED: AtomicUsize = AtomicUsize::new(0);
+  struct Live;
+  impl Drop for Live {
+    fn drop(&mut self) {
+      DROPPED.fetch_add(1, Ordering::SeqCst);
+    }
+  }
+  extern "C" fn destructor(object: *mut std::ffi::c_void) {
+    drop(unsafe { Box::from_raw(object as *mut Live) });
+  }
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let object = Box::into_raw(Box::new(Live)) as *mut std::ffi::c_void;
+  // SAFETY: `object` is a freshly boxed Live and `destructor` frees exactly that type without
+  // unwinding.
+  assert!(unsafe {
+    envoy_filter.set_filter_state_object(
+      b"key",
+      object,
+      destructor,
+      abi::envoy_dynamic_module_type_filter_state_life_span::Request,
+    )
+  });
+
+  // The rebuilt filter recovers the same pointer across recreate_stream.
+  let recovered = envoy_filter.get_filter_state_object(b"key");
+  assert_eq!(recovered, Some(object));
+  assert_eq!(DROPPED.load(Ordering::SeqCst), 0);
+
+  // Envoy calls the destructor once when the entry is destroyed; the boxed value is freed exactly
+  // once with no double free.
+  destructor(recovered.unwrap());
+  assert_eq!(DROPPED.load(Ordering::SeqCst), 1);
 }
 
 static NETWORK_CLOSE_CALLED: AtomicBool = AtomicBool::new(false);

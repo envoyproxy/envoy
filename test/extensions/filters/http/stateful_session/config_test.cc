@@ -107,7 +107,7 @@ TEST(StatefulSessionFactoryConfigTest, SimpleConfigTestWithServerContext) {
   StatefulSessionFactoryConfig factory;
 
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);

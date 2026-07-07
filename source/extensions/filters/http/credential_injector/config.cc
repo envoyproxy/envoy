@@ -55,8 +55,8 @@ CredentialInjectorFilterFactory::createFilterFactoryFromProtoTyped(
                                             dual_info.init_manager);
 }
 
-Envoy::Http::FilterFactoryCb
-CredentialInjectorFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Envoy::Http::FilterFactoryCb>
+CredentialInjectorFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::credential_injector::v3::CredentialInjector&
         proto_config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {

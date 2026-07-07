@@ -288,4 +288,30 @@ TEST_P(DynamicModulesNetworkSdkIntegrationTest, DynamicMetadataBatch) {
   tcp_client->close();
 }
 
+TEST_P(DynamicModulesNetworkSdkIntegrationTest, UpstreamConnectionId) {
+  if (GetParam() != "rust") {
+    GTEST_SKIP() << "the upstream_connection_id filter is only in the rust test module";
+  }
+
+  initializeSdkFilter("upstream_connection_id");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->connected());
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(tcp_client->write("hello", false));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  ASSERT_TRUE(fake_upstream_connection->write("world"));
+  tcp_client->waitForData("world");
+
+  ASSERT_TRUE(tcp_client->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+}
+
 } // namespace Envoy

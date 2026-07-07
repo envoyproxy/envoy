@@ -3311,6 +3311,74 @@ TEST_F(ReverseConnectionIOHandleTest, CloseNoDoubleCloseWithPipeFds) {
   io_handle_.reset();
 }
 
+// markTunnelDrainingAndDialReplacement() drops the draining tunnel from tracking and arms the
+// retry timer so the maintenance loop dials a replacement on the next dispatcher pass.
+TEST_F(ReverseConnectionIOHandleTest, MarkTunnelDrainingDropsKeyAndDialsReplacement) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  // Capture the retry timer created during initializeFileEvent so we can assert it is re-armed.
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  EXPECT_CALL(*mock_timer, enableTimer(_, _)).Times(testing::AnyNumber());
+
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  // Track a host with a single live tunnel.
+  const std::string host = "192.168.1.1";
+  const std::string connection_key = "192.168.1.1:12345";
+  addHostConnectionInfo(host, "remote-cluster", 1);
+  getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
+
+  // The replacement is dialed immediately (0ms) rather than waiting for the periodic tick.
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(0), _));
+
+  io_handle_->markTunnelDrainingAndDialReplacement(connection_key);
+
+  // The draining tunnel is no longer tracked, leaving a deficit for the maintenance loop to fill.
+  EXPECT_EQ(getHostConnectionInfo(host).connection_keys.count(connection_key), 0);
+}
+
+// Draining an unknown connection key is a benign no-op: nothing is dropped and no immediate
+// replacement dial is triggered.
+TEST_F(ReverseConnectionIOHandleTest, MarkTunnelDrainingUnknownKeyIsNoOp) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  EXPECT_CALL(*mock_timer, enableTimer(_, _)).Times(testing::AnyNumber());
+  // An unknown key must not arm an immediate (0ms) replacement dial.
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(0), _)).Times(0);
+
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  io_handle_->markTunnelDrainingAndDialReplacement("203.0.113.9:9999");
+}
+
+// Closing a connection key that is no longer tracked (e.g. it was already dropped when the tunnel
+// began draining) is a benign no-op and must not crash.
+TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedUnknownKeyIsNoOp) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  io_handle_->onDownstreamConnectionClosed("203.0.113.9:9999");
+  EXPECT_TRUE(getHostToConnInfoMap().empty());
+}
+
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions

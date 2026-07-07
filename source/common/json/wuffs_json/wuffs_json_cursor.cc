@@ -204,18 +204,23 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
           absl::StrCat("wuffs json: ", wuffs_base__status__message(&status)));
     }
     if (status.repr == wuffs_base__suspension__short_read) {
-      // Wuffs rewound iop_a_src to before the incomplete token before
-      // suspending (the iop_a_src-- unread loop for NUMBER; no-op for
-      // LITERAL since match7 is peek-only). Save those bytes so the next
-      // feed() call can prepend them and give Wuffs a contiguous view.
+      // When Wuffs suspends mid-token it resets its read cursor to before the
+      // incomplete token, so source_buf.meta.ri points back to the token start.
+      // For NUMBER, Wuffs walks the cursor back byte-by-byte after reading digits since
+      // Wuffs need to read digits greedily, advancing iop_a_src until it sees a
+      // terminator character (whitespace, ,, }, ]) which means number is done.
+      // For LITERAL(null/true/false), Wuffs knows the exact length before reading so it checks the
+      // keyword without advancing the cursor at all, so no rewind is needed.
       if (source_buf.meta.ri < effective_chunk.size()) {
         // LITERAL is always 4–5 bytes (null/true/false) — completely bounded.
-        // NUMBER, in real-world, its values is also bounded: a 64-bit integer is at most 20 digits;
-        // a float with sign, decimal, and exponent at most ~25 chars.
-        // TODO(tyxia): cap pending_bytes_ for malicious inputs that send arbitrarily large NUMBER
-        // tokens one byte at a time.
-        pending_bytes_.assign(effective_chunk.data() + source_buf.meta.ri,
-                              effective_chunk.size() - source_buf.meta.ri);
+        // For NUMBER split across chunks: cap pending_bytes_ to kMaxPendingBytes (see its
+        // declaration). Numbers that arrive complete with their terminator in the same chunk
+        // never reach this path and are bounded by the upstream max_body_bytes limit instead.
+        const size_t leftover = effective_chunk.size() - source_buf.meta.ri;
+        if (leftover > kMaxPendingBytes) {
+          return absl::InvalidArgumentError("wuffs json: number token too large");
+        }
+        pending_bytes_.assign(effective_chunk.data() + source_buf.meta.ri, leftover);
       }
       break;
     }
