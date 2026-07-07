@@ -13,6 +13,7 @@
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
+#include "source/extensions/dynamic_modules/abi_context_accessors.h"
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 #include "source/extensions/filters/network/dynamic_modules/filter_config.h"
 
@@ -1315,6 +1316,29 @@ uint32_t envoy_dynamic_module_callback_network_filter_get_worker_index(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   return filter->workerIndex();
+}
+
+bool envoy_dynamic_module_callback_network_filter_get_attribute_string(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  return ContextAccessor::getAttributeString(filter->connection().streamInfo(), attribute_id,
+                                             result);
+}
+
+bool envoy_dynamic_module_callback_network_filter_get_attribute_int(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  return ContextAccessor::getAttributeInt(filter->connection().streamInfo(), attribute_id, result);
+}
+
+bool envoy_dynamic_module_callback_network_filter_get_attribute_bool(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  return ContextAccessor::getAttributeBool(filter->connection().streamInfo(), attribute_id, result);
 }
 
 } // extern "C"

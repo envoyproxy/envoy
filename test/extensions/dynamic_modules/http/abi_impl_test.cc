@@ -1506,6 +1506,12 @@ TEST(ABIImpl, attribute_bool) {
       &filter, envoy_dynamic_module_type_attribute_id_ConnectionMtls, &result));
   EXPECT_FALSE(result);
 
+  // HealthCheck is not handled locally and is served by delegating to the shared ContextAccessor.
+  EXPECT_CALL(stream_info, healthCheck()).WillRepeatedly(testing::Return(true));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_bool(
+      &filter, envoy_dynamic_module_type_attribute_id_HealthCheck, &result));
+  EXPECT_TRUE(result);
+
   // Unsupported attribute.
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_bool(
       &filter, envoy_dynamic_module_type_attribute_id_RequestPath, &result));
@@ -2530,6 +2536,17 @@ TEST(ABIImpl, GetAttributes) {
       &filter, envoy_dynamic_module_type_attribute_id_ResponseCode, &result_number));
   EXPECT_EQ(result_number, 200);
 
+  // envoy_dynamic_module_type_attribute_id_ResponseFlags
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
+      &filter_without_callbacks, envoy_dynamic_module_type_attribute_id_ResponseFlags,
+      &result_number));
+  // NoHealthyUpstream (bit 1) and DnsResolutionFailed (bit 26).
+  const uint64_t response_flags = (1ULL << 1) | (1ULL << 26);
+  EXPECT_CALL(stream_info, legacyResponseFlags()).WillRepeatedly(testing::Return(response_flags));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
+      &filter, envoy_dynamic_module_type_attribute_id_ResponseFlags, &result_number));
+  EXPECT_EQ(result_number, response_flags);
+
   // envoy_dynamic_module_type_attribute_id_UpstreamPort
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
       &filter, envoy_dynamic_module_type_attribute_id_UpstreamPort, &result_number));
@@ -2550,6 +2567,12 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
       &filter, envoy_dynamic_module_type_attribute_id_ConnectionId, &result_number));
   EXPECT_EQ(result_number, 8386);
+
+  // envoy_dynamic_module_type_attribute_id_UpstreamRequestAttemptCount
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(testing::Return(3));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
+      &filter, envoy_dynamic_module_type_attribute_id_UpstreamRequestAttemptCount, &result_number));
+  EXPECT_EQ(result_number, 3);
 }
 
 // When the request header map is present but a typed header is absent, the attribute must be

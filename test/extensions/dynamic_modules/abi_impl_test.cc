@@ -1547,6 +1547,24 @@ WEAK_STUB(HttpFilterGetAttributeInt,
 WEAK_STUB(HttpFilterGetAttributeBool,
           envoy_dynamic_module_callback_http_filter_get_attribute_bool(
               nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(NetworkFilterGetAttributeString,
+          envoy_dynamic_module_callback_network_filter_get_attribute_string(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(NetworkFilterGetAttributeInt,
+          envoy_dynamic_module_callback_network_filter_get_attribute_int(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(NetworkFilterGetAttributeBool,
+          envoy_dynamic_module_callback_network_filter_get_attribute_bool(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(ListenerFilterGetAttributeString,
+          envoy_dynamic_module_callback_listener_filter_get_attribute_string(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(ListenerFilterGetAttributeInt,
+          envoy_dynamic_module_callback_listener_filter_get_attribute_int(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(ListenerFilterGetAttributeBool,
+          envoy_dynamic_module_callback_listener_filter_get_attribute_bool(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
 WEAK_STUB(HttpFilterHttpCallout,
           envoy_dynamic_module_callback_http_filter_http_callout(nullptr, nullptr, {nullptr, 0},
                                                                  nullptr, 0, {nullptr, 0}, 0))

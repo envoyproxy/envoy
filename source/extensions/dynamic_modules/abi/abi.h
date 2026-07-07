@@ -4899,6 +4899,61 @@ void envoy_dynamic_module_callback_network_filter_config_scheduler_commit(
 uint32_t envoy_dynamic_module_callback_network_filter_get_worker_index(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
 
+/**
+ * envoy_dynamic_module_callback_network_filter_get_attribute_string is called by the module to get
+ * the string attribute value. If the attribute is not accessible or the
+ * value is not a string, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the pointer variable where the pointer to the buffer
+ * of the string value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_attribute_string(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_attribute_int is called by the module to get
+ * an integer attribute value. If the attribute is not accessible or the
+ * value is not an integer, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the integer value of the attribute will be
+ * stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_attribute_int(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_attribute_bool is called by the module to get
+ * a boolean attribute value. If the attribute is not accessible or the
+ * value is not a boolean, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the bool value of the attribute will be
+ * stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_attribute_bool(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
+
 // =============================================================================
 // ============================= Listener Filter ===============================
 // =============================================================================
@@ -6138,6 +6193,61 @@ void envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(
  */
 uint32_t envoy_dynamic_module_callback_listener_filter_get_worker_index(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_attribute_string is called by the module to get
+ * the string attribute value. If the attribute is not accessible or the
+ * value is not a string, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the pointer variable where the pointer to the buffer
+ * of the string value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_attribute_string(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_attribute_int is called by the module to get
+ * an integer attribute value. If the attribute is not accessible or the
+ * value is not an integer, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the integer value of the attribute will be
+ * stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_attribute_int(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_attribute_bool is called by the module to get
+ * a boolean attribute value. If the attribute is not accessible or the
+ * value is not a boolean, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the bool value of the attribute will be
+ * stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_attribute_bool(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
 
 // =============================================================================
 // ========================== UDP Listener Filter ==============================
