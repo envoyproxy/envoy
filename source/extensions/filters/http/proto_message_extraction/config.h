@@ -27,7 +27,7 @@ private:
           ProtoMessageExtractionConfig& proto_config,
       const std::string&, Envoy::Server::Configuration::FactoryContext&) override;
 
-  Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::proto_message_extraction::v3::
           ProtoMessageExtractionConfig& proto_config,
       const std::string&, Envoy::Server::Configuration::ServerFactoryContext&) override;

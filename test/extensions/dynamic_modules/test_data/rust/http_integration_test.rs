@@ -153,6 +153,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
       Some(Box::new(ConfigStreamConfig { stream_done }))
     },
     "list_metadata_callbacks" => Some(Box::new(ListMetadataCallbacksFilterConfig {})),
+    "filter_state_object_recreate" => Some(Box::new(FilterStateObjectRecreateFilterConfig {})),
     _ => panic!("Unknown filter name: {name}"),
   }
 }
@@ -163,6 +164,82 @@ fn new_http_filter_per_route_config_fn(name: &str, config: &[u8]) -> Option<Box<
       value: String::from_utf8(config.to_owned()).unwrap(),
     })),
     _ => panic!("Unknown filter name: {name}"),
+  }
+}
+
+/// A live, non-serializable object: the endpoints of an in-flight async exchange. Live channel
+/// handles cannot be reduced to bytes, so the byte-oriented filter state API cannot carry them;
+/// they must survive recreate_stream as a live object.
+struct LiveExchange {
+  sender: std::sync::mpsc::Sender<u64>,
+  receiver: std::sync::mpsc::Receiver<u64>,
+}
+
+const LIVE_OBJECT_KEY: &[u8] = b"envoy.dynamic_modules.test.live_object";
+
+/// Frees the boxed [`LiveExchange`] exactly once when Envoy destroys the filter state entry.
+extern "C" fn drop_live_exchange(object: *mut std::ffi::c_void) {
+  drop(unsafe { Box::from_raw(object as *mut LiveExchange) });
+}
+
+/// A HTTP filter that keeps a live object alive across recreate_stream, the way a filter holding the
+/// endpoints of an async exchange would. The first instance queues a token on the live channel and
+/// parks it in filter state at Request lifespan, then recreates the stream, which destroys the
+/// instance. The rebuilt instance re-attaches to the same live object and drains the queued token,
+/// proving the live handles survived the recreate (a serialized copy would not carry the message).
+struct FilterStateObjectRecreateFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for FilterStateObjectRecreateFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(FilterStateObjectRecreateFilter {})
+  }
+}
+
+struct FilterStateObjectRecreateFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateObjectRecreateFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    match envoy_filter.get_filter_state_object(LIVE_OBJECT_KEY) {
+      None => {
+        let (sender, receiver) = std::sync::mpsc::channel::<u64>();
+        // Queue a token on the live channel before this instance is destroyed by the recreate.
+        sender.send(0xABCD).unwrap();
+        let object =
+          Box::into_raw(Box::new(LiveExchange { sender, receiver })) as *mut std::ffi::c_void;
+        // SAFETY: `object` is a freshly boxed LiveExchange and `drop_live_exchange` frees exactly
+        // that type without unwinding.
+        assert!(unsafe {
+          envoy_filter.set_filter_state_object(
+            LIVE_OBJECT_KEY,
+            object,
+            drop_live_exchange,
+            abi::envoy_dynamic_module_type_filter_state_life_span::Request,
+          )
+        });
+        assert!(envoy_filter.recreate_stream(None));
+        abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+      },
+      Some(object) => {
+        // The rebuilt instance re-attaches to the same live object and drains the token the
+        // destroyed instance queued, then round-trips it to show both endpoints are still live.
+        let exchange = unsafe { &*(object as *const LiveExchange) };
+        let token = exchange.receiver.recv().unwrap();
+        exchange.sender.send(token).unwrap();
+        let token = exchange.receiver.recv().unwrap();
+        let token_str = format!("{token:#x}");
+        envoy_filter.send_response(
+          200,
+          &[("x-live-object-value", token_str.as_bytes())],
+          None,
+          None,
+        );
+        abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+      },
+    }
   }
 }
 

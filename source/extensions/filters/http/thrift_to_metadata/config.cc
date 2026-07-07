@@ -25,7 +25,7 @@ Http::FilterFactoryCb ThriftToMetadataConfig::createFilterFactoryFromProtoTyped(
   };
 }
 
-Http::FilterFactoryCb ThriftToMetadataConfig::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb> ThriftToMetadataConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::thrift_to_metadata::v3::ThriftToMetadata& proto_config,
     const std::string&, Server::Configuration::ServerFactoryContext& context) {
   std::shared_ptr<FilterConfig> config =

@@ -32,7 +32,7 @@ TEST(ConnectGrpcBridgeFilterConfigTest, ConnectGrpcBridgeFilterWithServerContext
   ConnectGrpcFilterConfigFactory factory;
   envoy::extensions::filters::http::connect_grpc_bridge::v3::FilterConfig config;
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_)).Times(AtLeast(1));
   cb(filter_callback);

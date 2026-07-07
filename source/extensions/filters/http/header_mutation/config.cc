@@ -22,8 +22,8 @@ HeaderMutationFactoryConfig::createFilterFactoryFromProtoTyped(
   };
 }
 
-Http::FilterFactoryCb
-HeaderMutationFactoryConfig::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+HeaderMutationFactoryConfig::createHttpFilterFactoryFromProtoTyped(
     const ProtoConfig& config, const std::string&,
     Server::Configuration::ServerFactoryContext& context) {
   absl::Status creation_status = absl::OkStatus();
