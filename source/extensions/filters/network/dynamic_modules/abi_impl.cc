@@ -1151,6 +1151,19 @@ bool envoy_dynamic_module_callback_network_filter_has_upstream_host(
   return filter->readCallbacks()->upstreamHost() != nullptr;
 }
 
+uint64_t envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  if (filter->readCallbacks() == nullptr) {
+    return 0;
+  }
+  const auto upstream = filter->connection().streamInfo().upstreamInfo();
+  if (!upstream || !upstream->upstreamConnectionId().has_value()) {
+    return 0;
+  }
+  return upstream->upstreamConnectionId().value();
+}
+
 // -----------------------------------------------------------------------------
 // StartTLS Support Callbacks
 // -----------------------------------------------------------------------------
