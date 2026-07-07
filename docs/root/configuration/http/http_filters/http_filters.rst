@@ -9,6 +9,7 @@ HTTP filters
   a2a_filter
   adaptive_concurrency_filter
   admission_control_filter
+  aws_eventstream_parser_filter
   aws_lambda_filter
   api_key_auth_filter
   aws_request_signing_filter
