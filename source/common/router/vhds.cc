@@ -16,6 +16,7 @@
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/stats/prefix_utility.h"
 
 namespace Envoy {
 namespace Router {
@@ -23,7 +24,7 @@ namespace Router {
 absl::StatusOr<VhdsSubscriptionPtr> VhdsSubscription::createVhdsSubscription(
     RouteConfigUpdatePtr& config_update_info,
     Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-    Rds::RouteConfigProvider* route_config_provider) {
+    Rds::RouteConfigProvider* route_config_provider, bool rds) {
   const auto& vhds_config_source =
       config_update_info->protobufConfigurationCast().vhds().config_source();
   // VHDS only supports Delta xDS. This can be specified either explicitly via DELTA_GRPC
@@ -55,20 +56,39 @@ absl::StatusOr<VhdsSubscriptionPtr> VhdsSubscription::createVhdsSubscription(
 
   auto status = absl::OkStatus();
   auto ret = std::unique_ptr<VhdsSubscription>(new VhdsSubscription(
-      config_update_info, factory_context, stat_prefix, route_config_provider, status));
+      config_update_info, factory_context, stat_prefix, route_config_provider, rds, status));
   RETURN_IF_ERROR(status);
   return ret;
+}
+
+Stats::ScopeSharedPtr createStatsScope(Stats::Scope& scope, absl::string_view stat_prefix,
+                                       absl::string_view vhds_prefix, absl::string_view name) {
+  // Defensively check that the stat_prefix is of the form "http.<conn_manager_prefix>."
+  if (!absl::StartsWith(stat_prefix, "http.") || !absl::EndsWith(stat_prefix, ".")) {
+    // Full flat name of the scope.
+    const std::string tagged_name = absl::StrCat(stat_prefix, vhds_prefix, name, ".");
+    return scope.createScopeWithTaggedName(tagged_name, {}, {});
+  }
+
+  // Merge the stat prefix from the connection manager with the RDS route.
+  // TODO(wbpcode): there is no default tag for VHDS here so we concatenate the vhds_prefix with the
+  // name as the single base name without tags.
+  const auto merged_prefix = Stats::mergeStatPrefix(scope.symbolTable(), stat_prefix,
+                                                    absl::StrCat(vhds_prefix, name, "."));
+  // http.[<stat_prefix>.]rds.vhds.(<vhds_config_name>.)<base_stat>
+  return scope.scopeFromTaggedName(merged_prefix.baseName(), merged_prefix.nameTags(),
+                                   merged_prefix.name());
 }
 
 // Implements callbacks to handle DeltaDiscovery protocol for VirtualHostDiscoveryService
 VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                                    Server::Configuration::ServerFactoryContext& factory_context,
                                    const std::string& stat_prefix,
-                                   Rds::RouteConfigProvider* route_config_provider,
+                                   Rds::RouteConfigProvider* route_config_provider, bool rds,
                                    absl::Status& status)
     : config_update_info_(config_update_info),
-      scope_(factory_context.scope().createScope(
-          stat_prefix + "vhds." + config_update_info_->protobufConfigurationCast().name() + ".")),
+      scope_(createStatsScope(factory_context.scope(), stat_prefix, rds ? "rds.vhds." : "vhds.",
+                              config_update_info_->protobufConfigurationCast().name())),
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
       init_target_(fmt::format("VhdsConfigSubscription {}",
                                config_update_info_->protobufConfigurationCast().name()),

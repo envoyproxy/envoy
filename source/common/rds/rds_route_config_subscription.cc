@@ -1,10 +1,51 @@
 #include "source/common/rds/rds_route_config_subscription.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/rds/util.h"
+#include "source/common/stats/prefix_utility.h"
+
+#include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Rds {
+
+namespace {
+
+Stats::ScopeSharedPtr createStatsScope(Stats::Scope& scope, absl::string_view stat_prefix,
+                                       absl::string_view rds_type,
+                                       absl::string_view route_config_name) {
+
+  // If this is not for HTTP RDS (i.e. thrift/dubbo/generic), keep the previous
+  // behavior because there are no default tags for them.
+  // TODO(wbpcode): we should support all of them in the future.
+  if (!absl::StartsWith(stat_prefix, "http.") || !absl::EndsWith(stat_prefix, ".") ||
+      rds_type != "RDS") {
+    // Full flat name of the scope. For example:
+    // http.[CONN_MANAGER_PREFIX.]rds.(<route_config_name>.)
+    const std::string tagged_name =
+        absl::StrCat(stat_prefix, absl::AsciiStrToLower(rds_type), ".", route_config_name, ".");
+    return scope.createScopeWithTaggedName(tagged_name, {}, {});
+  }
+
+  const std::string lower_rds_type_and_dot = absl::AsciiStrToLower(rds_type) + ".";
+
+  // Merge the stat prefix from the connection manager with the RDS route.
+  const auto merged_prefix = Stats::mergeStatPrefix(
+      scope.symbolTable(),
+      /*prefix=*/stat_prefix,
+      /*base_name=*/lower_rds_type_and_dot,
+      /*tags=*/
+      {Stats::TagStringView{Envoy::Config::TagNames::get().RDS_ROUTE_CONFIG, route_config_name}},
+      /*name=*/absl::StrCat(lower_rds_type_and_dot, route_config_name, "."));
+
+  // http.[<stat_prefix>.]rds.(<route_config_name>.)<base_stat>
+  return scope.scopeFromTaggedName(merged_prefix.baseName(), merged_prefix.nameTags(),
+                                   merged_prefix.name());
+}
+
+} // namespace
 
 absl::StatusOr<std::unique_ptr<RdsRouteConfigSubscription>> RdsRouteConfigSubscription::create(
     RouteConfigUpdatePtr&& config_update,
@@ -31,7 +72,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const std::string& rds_type, RouteConfigProviderManager& route_config_provider_manager,
     absl::Status& creation_status)
     : route_config_name_(route_config_name),
-      scope_(factory_context.scope().createScope(stat_prefix + route_config_name_ + ".")),
+      scope_(createStatsScope(factory_context.scope(), stat_prefix, rds_type, route_config_name_)),
       factory_context_(factory_context),
       parent_init_target_(
           fmt::format("RdsRouteConfigSubscription {} init {}", rds_type, route_config_name_),

@@ -47,8 +47,8 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     absl::Status& creation_status)
     : Rds::RdsRouteConfigSubscription(std::move(config_update), std::move(resource_decoder),
                                       rds.config_source(), rds.route_config_name(),
-                                      manager_identifier, factory_context, stat_prefix + "rds.",
-                                      "RDS", route_config_provider_manager, creation_status),
+                                      manager_identifier, factory_context, stat_prefix, "RDS",
+                                      route_config_provider_manager, creation_status),
       config_update_info_(static_cast<RouteConfigUpdateReceiver*>(
           Rds::RdsRouteConfigSubscription::config_update_info_.get())) {}
 
@@ -65,7 +65,7 @@ absl::Status RdsRouteConfigSubscription::beforeProviderUpdate(
     maybeCreateInitManager(routeConfigUpdate()->configInfo().value().version_, noop_init_manager,
                            resume_rds);
     auto subscription_or_error = VhdsSubscription::createVhdsSubscription(
-        config_update_info_, factory_context_, stat_prefix_, route_config_provider_);
+        config_update_info_, factory_context_, stat_prefix_, route_config_provider_, true);
     RETURN_IF_NOT_OK_REF(subscription_or_error.status());
     vhds_subscription_ = std::move(subscription_or_error.value());
     vhds_subscription_->registerInitTargetWithInitManager(

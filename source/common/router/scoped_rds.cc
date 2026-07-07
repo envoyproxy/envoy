@@ -15,14 +15,17 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/resource_name.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/watcher_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/scoped_config_impl.h"
+#include "source/common/stats/prefix_utility.h"
 
-#include "absl/strings/str_join.h"
+#include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 
 // Types are deeply nested under Envoy::Config::ConfigProvider; use 'using-directives' across all
 // ConfigProvider related types for consistency.
@@ -34,6 +37,39 @@ using Envoy::Config::ScopedResume;
 
 namespace Envoy {
 namespace Router {
+
+namespace {
+
+// The scoped RDS stats scope is "http.<conn_manager_prefix>.scoped_rds.<name>.". `stat_prefix` is
+// always of the form "http.<conn_manager_prefix>.", so recover the inner connection manager prefix
+// and emit it
+// (along with the scoped route config name) as a tag rather than baking it into the tag-extracted
+// scope name.
+Stats::ScopeSharedPtr createScopedRdsStatsScope(Stats::Scope& scope, absl::string_view stat_prefix,
+                                                absl::string_view name) {
+  // Defensively check that the stat_prefix is of the form "http.<conn_manager_prefix>."
+  if (!absl::StartsWith(stat_prefix, "http.") || !absl::EndsWith(stat_prefix, ".")) {
+    // Full flat name of the scope.
+    const std::string tagged_name = absl::StrCat(stat_prefix, "scoped_rds.", name, ".");
+    return scope.createScopeWithTaggedName(tagged_name, {}, {});
+  }
+
+  // Merge the stat prefix from the connection manager with the RDS route.
+  const auto merged_prefix = Stats::mergeStatPrefix(
+      scope.symbolTable(),
+      /*prefix=*/stat_prefix,
+      /*base_name=*/"scoped_rds.",
+      /*tags=*/
+      {Stats::TagStringView{Envoy::Config::TagNames::get().SCOPED_RDS_CONFIG, name}},
+      /*name=*/absl::StrCat("scoped_rds.", name, "."));
+
+  // http.[<stat_prefix>.]scoped_rds.(<scoped_route_config_name>.)<base_stat>
+  return scope.scopeFromTaggedName(merged_prefix.baseName(), merged_prefix.nameTags(),
+                                   merged_prefix.name());
+}
+
+} // namespace
+
 namespace ScopedRoutesConfigProviderUtil {
 ConfigProviderPtr create(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -139,7 +175,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     : DeltaConfigSubscriptionInstance("SRDS", manager_identifier, config_provider_manager,
                                       factory_context),
       factory_context_(factory_context), name_(name),
-      scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
+      scope_(createScopedRdsStatsScope(factory_context.scope(), stat_prefix, name)),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
       resource_type_helper_(factory_context.messageValidationContext().dynamicValidationVisitor(),
                             "name"),
