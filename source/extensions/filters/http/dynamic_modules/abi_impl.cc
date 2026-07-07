@@ -2701,6 +2701,16 @@ bool envoy_dynamic_module_callback_http_set_upstream_override_host(
   return true;
 }
 
+uint64_t envoy_dynamic_module_callback_http_get_upstream_connection_id(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  const auto* upstream_info = filter->upstreamInfo();
+  if (upstream_info == nullptr || !upstream_info->upstreamConnectionId().has_value()) {
+    return 0;
+  }
+  return upstream_info->upstreamConnectionId().value();
+}
+
 // ------------------- Stream Control Callbacks -------------------------
 
 void envoy_dynamic_module_callback_http_filter_reset_stream(

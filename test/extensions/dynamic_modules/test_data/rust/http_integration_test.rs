@@ -154,6 +154,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     },
     "list_metadata_callbacks" => Some(Box::new(ListMetadataCallbacksFilterConfig {})),
     "filter_state_object_recreate" => Some(Box::new(FilterStateObjectRecreateFilterConfig {})),
+    "upstream_connection_id" => Some(Box::new(UpstreamConnectionIdFilterConfig {})),
     _ => panic!("Unknown filter name: {name}"),
   }
 }
@@ -413,6 +414,27 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PassthroughHttpFilter {
     envoy_log_error!("on_request_headers called");
     envoy_log_critical!("on_request_headers called");
     envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+}
+
+struct UpstreamConnectionIdFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for UpstreamConnectionIdFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(UpstreamConnectionIdFilter {})
+  }
+}
+
+struct UpstreamConnectionIdFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamConnectionIdFilter {
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    assert!(envoy_filter.get_upstream_connection_id() > 0);
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }
 
