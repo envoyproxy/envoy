@@ -479,6 +479,9 @@ pub trait EnvoyNetworkFilter {
   /// Check if an upstream host has been selected for this connection.
   fn has_upstream_host(&self) -> bool;
 
+  /// Get the upstream connection ID, or 0 if not available.
+  fn get_upstream_connection_id(&self) -> u64;
+
   /// Signal to the filter manager to enable secure transport mode in upstream connection.
   /// This is done when upstream connection's transport socket is of startTLS type.
   /// Returns true if the upstream transport was successfully converted to secure mode.
@@ -1711,6 +1714,12 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
 
   fn has_upstream_host(&self) -> bool {
     unsafe { abi::envoy_dynamic_module_callback_network_filter_has_upstream_host(self.raw) }
+  }
+
+  fn get_upstream_connection_id(&self) -> u64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(self.raw)
+    }
   }
 
   fn start_upstream_secure_transport(&mut self) -> bool {

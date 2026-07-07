@@ -717,6 +717,8 @@ WEAK_STUB(NetworkFilterGetUpstreamHostCluster,
           envoy_dynamic_module_callback_network_filter_get_upstream_host_cluster(nullptr, nullptr))
 WEAK_STUB(NetworkFilterHasUpstreamHost,
           envoy_dynamic_module_callback_network_filter_has_upstream_host(nullptr))
+WEAK_STUB(NetworkFilterGetUpstreamConnectionId,
+          envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(nullptr))
 WEAK_STUB(NetworkFilterStartUpstreamSecureTransport,
           envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(nullptr))
 WEAK_STUB(NetworkFilterReadEnabled,
@@ -1625,6 +1627,8 @@ WEAK_STUB(HttpGetClusterHostCount,
 WEAK_STUB(HttpSetUpstreamOverrideHost,
           envoy_dynamic_module_callback_http_set_upstream_override_host(nullptr, {nullptr, 0},
                                                                         false))
+WEAK_STUB(HttpGetUpstreamConnectionId,
+          envoy_dynamic_module_callback_http_get_upstream_connection_id(nullptr))
 WEAK_STUB(HttpFilterResetStream,
           envoy_dynamic_module_callback_http_filter_reset_stream(
               nullptr, envoy_dynamic_module_type_http_filter_stream_reset_reason_LocalReset,

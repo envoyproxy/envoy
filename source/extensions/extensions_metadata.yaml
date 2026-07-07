@@ -1768,6 +1768,11 @@ envoy.upstreams.http.dynamic_modules:
   - envoy.upstreams
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.upstreams.http.reverse_tunnel:
+  categories:
+  - envoy.upstream_options
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
 envoy.upstreams.http.tcp:
   categories:
   - envoy.upstreams

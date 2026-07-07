@@ -20,7 +20,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
-Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
   const auto filter_config = std::make_shared<FilterConfig>(proto_config, server_context.scope(),

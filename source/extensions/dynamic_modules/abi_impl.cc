@@ -1747,6 +1747,14 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_network_filter_has_upst
   return false;
 }
 
+__attribute__((weak)) uint64_t
+envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(
+    envoy_dynamic_module_type_network_filter_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_network_filter_get_upstream_connection_id: "
+               "not implemented in this context");
+  return 0;
+}
+
 __attribute__((weak)) bool
 envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(
     envoy_dynamic_module_type_network_filter_envoy_ptr) {
@@ -4589,6 +4597,13 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_http_set_upstream_overr
   IS_ENVOY_BUG("envoy_dynamic_module_callback_http_set_upstream_override_host: not implemented in "
                "this context");
   return false;
+}
+
+__attribute__((weak)) uint64_t envoy_dynamic_module_callback_http_get_upstream_connection_id(
+    envoy_dynamic_module_type_http_filter_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_http_get_upstream_connection_id: not "
+               "implemented in this context");
+  return 0;
 }
 
 __attribute__((weak)) void envoy_dynamic_module_callback_http_filter_reset_stream(
