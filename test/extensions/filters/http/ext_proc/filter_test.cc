@@ -4467,6 +4467,50 @@ TEST_F(HttpFilterTest, EmitTypedDynamicMetadataNotAllowed) {
   filter_->onDestroy();
 }
 
+// Verify that when returning a response with typed_dynamic_metadata field set, but
+// receiving_namespaces configuration is left as default (empty/unconfigured), the filter does
+// not emit it.
+TEST_F(HttpFilterTest, EmitTypedDynamicMetadataDefaultReceivingNamespaces) {
+  // Configure the filter to only pass response headers to ext server without specifying
+  // receiving_namespaces.
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SEND"
+    request_body_mode: "NONE"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  )EOF");
+
+  Buffer::OwnedImpl empty_chunk;
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  processResponseHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
+    Protobuf::Struct foobar;
+    (*foobar.mutable_fields())["foo"].set_string_value("bar");
+    Protobuf::Any typed_val;
+    EXPECT_TRUE(typed_val.PackFrom(foobar));
+    (*resp.mutable_typed_dynamic_metadata())["envoy.filters.http.ext_proc"] = typed_val;
+  });
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  const auto& typed_metadata = dynamic_metadata_.typed_filter_metadata();
+  EXPECT_FALSE(typed_metadata.contains("envoy.filters.http.ext_proc"));
+
+  filter_->onDestroy();
+}
+
 // Verify that when returning an response with dynamic_metadata field set, the filter emits
 // dynamic metadata to namespaces other than its own.
 TEST_F(HttpFilterTest, EmitDynamicMetadataArbitraryNamespace) {

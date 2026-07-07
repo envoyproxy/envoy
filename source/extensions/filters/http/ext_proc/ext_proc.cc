@@ -1635,9 +1635,8 @@ void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
   (*req.mutable_attributes())[FilterName] = std::move(attributes);
 }
 
-void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
-                                const ProcessingResponse& response) {
-  // Handle untyped metadata
+void Filter::setUntypedDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
+                                       const ProcessingResponse& response) {
   if (!state.untypedReceivingMetadataNamespaces().empty() && response.has_dynamic_metadata()) {
     const auto& response_metadata = response.dynamic_metadata().fields();
     const auto& receiving_namespaces = state.untypedReceivingMetadataNamespaces();
@@ -1653,17 +1652,19 @@ void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const Processor
         ENVOY_STREAM_LOG(debug,
                          "processing response included dynamic metadata for namespace not "
                          "configured for receiving: {}",
-                         *decoder_callbacks_, context_key.first);
+                         *cb, context_key.first);
       }
     }
   } else if (response.has_dynamic_metadata()) {
     ENVOY_STREAM_LOG(debug,
                      "processing response included dynamic metadata, but no receiving "
                      "namespaces are configured.",
-                     *decoder_callbacks_);
+                     *cb);
   }
+}
 
-  // Handle typed metadata
+void Filter::setTypedDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
+                                     const ProcessingResponse& response) {
   if (!state.typedReceivingMetadataNamespaces().empty() &&
       !response.typed_dynamic_metadata().empty()) {
     const auto& response_typed_metadata = response.typed_dynamic_metadata();
@@ -1680,15 +1681,21 @@ void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const Processor
         ENVOY_STREAM_LOG(debug,
                          "processing response included typed dynamic metadata for namespace not "
                          "configured for receiving: {}",
-                         *decoder_callbacks_, context_key.first);
+                         *cb, context_key.first);
       }
     }
   } else if (!response.typed_dynamic_metadata().empty()) {
     ENVOY_STREAM_LOG(debug,
                      "processing response included typed dynamic metadata, but no typed receiving "
                      "namespaces are configured.",
-                     *decoder_callbacks_);
+                     *cb);
   }
+}
+
+void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
+                                const ProcessingResponse& response) {
+  setUntypedDynamicMetadata(cb, state, response);
+  setTypedDynamicMetadata(cb, state, response);
 }
 
 void Filter::setEncoderDynamicMetadata(const ProcessingResponse& response) {

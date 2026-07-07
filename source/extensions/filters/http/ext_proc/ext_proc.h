@@ -643,6 +643,10 @@ private:
   Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
   void setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
                           const envoy::service::ext_proc::v3::ProcessingResponse& response);
+  void setUntypedDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
+                                 const envoy::service::ext_proc::v3::ProcessingResponse& response);
+  void setTypedDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
+                               const envoy::service::ext_proc::v3::ProcessingResponse& response);
   void setEncoderDynamicMetadata(const envoy::service::ext_proc::v3::ProcessingResponse& response);
   void setDecoderDynamicMetadata(const envoy::service::ext_proc::v3::ProcessingResponse& response);
   void addDynamicMetadata(const ProcessorState& state,
