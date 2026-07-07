@@ -51,9 +51,7 @@ following the build instructions from the `Security Policy for BoringCrypto modu
 <https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp3678.pdf>`_,
 using ``--config=boringssl-fips`` Bazel option. Currently, the BoringSSL/FIPS build will only work Linux-x86_64.
 
-AWS-LC FIPS can also be used with ``--config=aws-lc-fips``, and has wider architecture support.
-
-When Envoy has been built for FIPS, you should see ``BoringSSL-FIPS`` or ``AWS-LC-FIPS``
+When Envoy has been built for FIPS, you should see ``BoringSSL-FIPS``
 in the :option:`--version` output. When built with OpenSSL, the output will show ``OpenSSL``.
 
 It's important to note that while using FIPS-compliant module is necessary for FIPS compliance,

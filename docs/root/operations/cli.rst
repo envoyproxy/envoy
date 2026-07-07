@@ -388,7 +388,7 @@ following are the command line options that Envoy supports.
 
   * build mode - either ``RELEASE`` or ``DEBUG``,
 
-  * TLS library - ``BoringSSL``, ``BoringSSL-FIPS``, ``AWS-LC-FIPS``, or ``OpenSSL``.
+  * TLS library - ``BoringSSL``, ``BoringSSL-FIPS``, or ``OpenSSL``.
 
 .. option:: --enable-core-dump
 
