@@ -16,11 +16,8 @@
 #include "source/common/runtime/runtime_protos.h"
 #include "source/server/active_udp_listener.h"
 
+#include "quiche/quic/core/quic_packet_writer.h"
 #include "quiche/quic/load_balancer/load_balancer_encoder.h"
-
-namespace quic {
-class QuicPacketWriter;
-} // namespace quic
 
 namespace Envoy {
 namespace Quic {
