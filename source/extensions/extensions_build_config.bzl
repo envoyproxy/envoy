@@ -77,6 +77,7 @@ EXTENSIONS = {
     # Health checkers
     #
 
+    "envoy.health_checkers.dynamic_modules":            "//source/extensions/health_checkers/dynamic_modules:config",
     "envoy.health_checkers.redis":                      "//source/extensions/health_checkers/redis:config",
     "envoy.health_checkers.thrift":                     "//source/extensions/health_checkers/thrift:config",
     "envoy.health_checkers.tcp":                        "//source/extensions/health_checkers/tcp:health_checker_lib",
@@ -406,6 +407,7 @@ EXTENSIONS = {
 
     "envoy.upstreams.http.dynamic_modules":              "//source/extensions/upstreams/http/dynamic_modules:config",
     "envoy.upstreams.http.http":                        "//source/extensions/upstreams/http/http:config",
+    "envoy.upstreams.http.reverse_tunnel":              "//source/extensions/upstreams/http/reverse_tunnel:config",
     "envoy.upstreams.http.tcp":                         "//source/extensions/upstreams/http/tcp:config",
     "envoy.upstreams.http.udp":                         "//source/extensions/upstreams/http/udp:config",
 

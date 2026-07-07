@@ -353,7 +353,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcInvalid) {
   initialize();
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
-  EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Invoke([](const std::string&) {
+  EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Invoke([](absl::string_view) {
     return absl::InvalidArgumentError("failure");
   }));
   EXPECT_EQ(

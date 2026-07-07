@@ -52,7 +52,7 @@ TEST(Factory, ValidConfigWithServerContext) {
   CredentialInjectorFilterFactory factory;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_THROW_WITH_REGEX(
-      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context),
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value(),
       EnvoyException,
       ".*Didn't find a registered implementation for 'undefined_credential' with "
       "type URL: 'test.mock_credential.Unregistered'.*");

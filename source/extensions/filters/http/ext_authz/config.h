@@ -26,11 +26,12 @@ private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override {
-    return createFilterFactoryFromProtoWithServerContextTyped(proto_config, stats_prefix,
-                                                              context.serverFactoryContext());
+    return THROW_OR_RETURN_VALUE(createHttpFilterFactoryFromProtoTyped(
+                                     proto_config, stats_prefix, context.serverFactoryContext()),
+                                 Http::FilterFactoryCb);
   }
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
       const std::string& stats_prefix,
       Server::Configuration::ServerFactoryContext& server_context) override;

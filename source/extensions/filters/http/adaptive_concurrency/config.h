@@ -26,7 +26,7 @@ public:
     return createFilterFactory(proto_config, stats_prefix, context.serverFactoryContext(),
                                context.scope());
   }
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency&
           proto_config,
       const std::string& stats_prefix,
