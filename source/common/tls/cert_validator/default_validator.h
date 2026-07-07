@@ -29,6 +29,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
+#include "openssl/sha.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
 
@@ -83,7 +84,7 @@ private:
   // Keyed by a SHA-256 digest of the CRL PEM (rather than the PEM itself, to
   // avoid holding a second full copy of potentially large CRL data); stores a
   // weak_ptr so entries do not outlive the contexts that use them.
-  absl::flat_hash_map<std::string, std::weak_ptr<CrlList>> cache_;
+  absl::flat_hash_map<std::array<uint8_t, SHA256_DIGEST_LENGTH>, std::weak_ptr<CrlList>> cache_;
 };
 
 // Returns the process-wide CRL cache, creating it on first use.

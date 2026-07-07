@@ -56,9 +56,8 @@ absl::StatusOr<CrlListSharedPtr> CrlCache::getOrCreate(const std::string& crl_pe
   // Key by a SHA-256 digest of the CRL rather than the CRL itself, to avoid
   // holding a second full copy of potentially large CRL data. SHA-256 is
   // collision resistant, so distinct CRLs never share a cache entry.
-  uint8_t digest[SHA256_DIGEST_LENGTH];
-  SHA256(reinterpret_cast<const uint8_t*>(crl_pem.data()), crl_pem.size(), digest);
-  const std::string key(reinterpret_cast<const char*>(digest), SHA256_DIGEST_LENGTH);
+  std::array<uint8_t, SHA256_DIGEST_LENGTH> key;
+  SHA256(reinterpret_cast<const uint8_t*>(crl_pem.data()), crl_pem.size(), key.data());
 
   if (auto it = cache_.find(key); it != cache_.end()) {
     if (CrlListSharedPtr existing = it->second.lock(); existing != nullptr) {
