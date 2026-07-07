@@ -7,8 +7,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-void DecoderFilterChainBridge::registerReplayWatermarks(
-    ExternalBuffer::ReplayWatermarkHandler& handler) {
+void DecoderFilterChainBridge::registerReplayWatermarks(ReplayWatermarkHandler& handler) {
   handler_ = &handler;
   callbacks_.addUpstreamWatermarkCallbacks(*this);
   registered_ = true;
@@ -27,8 +26,7 @@ void DecoderFilterChainBridge::onUnrecoverableError() {
                             std::nullopt, "ai_protocol_manager_external_buffer_error");
 }
 
-void EncoderFilterChainBridge::registerReplayWatermarks(
-    ExternalBuffer::ReplayWatermarkHandler& handler) {
+void EncoderFilterChainBridge::registerReplayWatermarks(ReplayWatermarkHandler& handler) {
   handler_ = &handler;
   decoder_callbacks_.addDownstreamWatermarkCallbacks(*this);
   registered_ = true;

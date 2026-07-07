@@ -1,9 +1,8 @@
 #pragma once
 
-#include "envoy/external_buffer/external_buffer.h"
-
 #include "source/common/common/logger.h"
-#include "source/common/external_buffer/buffer_manager.h"
+#include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
+#include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
@@ -37,7 +36,7 @@ namespace AiProtocolManager {
 class AiProtocolManagerFilter : public Http::PassThroughFilter,
                                 public Logger::Loggable<Logger::Id::filter> {
 public:
-  explicit AiProtocolManagerFilter(ExternalBuffer::ExternalBufferFactory& buffer_factory)
+  explicit AiProtocolManagerFilter(ExternalBufferFactory& buffer_factory)
       : buffer_factory_(buffer_factory) {}
 
   // Http::StreamFilterBase
@@ -51,8 +50,8 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
 
 private:
-  ExternalBuffer::ExternalBufferFactory& buffer_factory_;
-  ExternalBuffer::BufferManagerPtr decode_manager_;
+  ExternalBufferFactory& buffer_factory_;
+  BufferManagerPtr decode_manager_;
 };
 
 } // namespace AiProtocolManager

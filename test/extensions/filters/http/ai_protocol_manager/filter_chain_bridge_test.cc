@@ -20,7 +20,7 @@ namespace {
 
 // Records the watermark callbacks the bridge forwards, so a test can verify the
 // path-specific Envoy watermarks reach the BufferManager's handler interface.
-class RecordingHandler : public ExternalBuffer::ReplayWatermarkHandler {
+class RecordingHandler : public ReplayWatermarkHandler {
 public:
   void onReplayAboveHighWatermark() override { ++above_; }
   void onReplayBelowLowWatermark() override { ++below_; }

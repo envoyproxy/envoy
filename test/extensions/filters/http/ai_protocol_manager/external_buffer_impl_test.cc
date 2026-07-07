@@ -3,7 +3,7 @@
 #include <vector>
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/external_buffer/external_buffer_impl.h"
+#include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 
 #include "test/test_common/utility.h"
 
@@ -11,7 +11,9 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace ExternalBuffer {
+namespace Extensions {
+namespace HttpFilters {
+namespace AiProtocolManager {
 namespace {
 
 class InMemoryExternalBufferTest : public testing::Test {
@@ -239,5 +241,7 @@ TEST_F(InMemoryExternalBufferTest, FactoryCreatesUsableBuffer) {
 }
 
 } // namespace
-} // namespace ExternalBuffer
+} // namespace AiProtocolManager
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

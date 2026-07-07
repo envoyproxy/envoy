@@ -1,4 +1,4 @@
-#include "source/common/external_buffer/buffer_manager.h"
+#include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 
 #include <algorithm>
 #include <utility>
@@ -6,7 +6,9 @@
 #include "source/common/buffer/buffer_impl.h"
 
 namespace Envoy {
-namespace ExternalBuffer {
+namespace Extensions {
+namespace HttpFilters {
+namespace AiProtocolManager {
 
 BufferManager::BufferManager(ExternalBufferFactory& buffer_factory, FilterChainBridgePtr bridge)
     : buffer_factory_(buffer_factory), bridge_(std::move(bridge)) {
@@ -315,5 +317,7 @@ void BufferManager::onReplayBelowLowWatermark() {
   }
 }
 
-} // namespace ExternalBuffer
+} // namespace AiProtocolManager
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
