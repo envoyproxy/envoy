@@ -460,6 +460,7 @@ void McpJsonRestBridgeFilter::buildStreamingPrefixAndSuffix(bool is_error) {
   if (is_sse_response_) {
     json ref = {
         {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
+        // session_id_ is guaranteed to be set because it is verified in validateJsonRpcIdAndMethod.
         {McpConstants::ID_FIELD, *session_id_},
         {McpConstants::RESULT_FIELD,
          {
@@ -469,7 +470,7 @@ void McpJsonRestBridgeFilter::buildStreamingPrefixAndSuffix(bool is_error) {
     };
     std::string ref_json = ref.dump();
     std::string marker = absl::StrCat("\"", McpConstants::CONTENT_FIELD, "\":[]");
-    size_t pos = ref_json.find(marker);
+    size_t pos = ref_json.rfind(marker);
     if (pos == std::string::npos) {
       IS_ENVOY_BUG("JSON-RPC streaming marker not found in serialized envelope");
       return;
@@ -482,6 +483,7 @@ void McpJsonRestBridgeFilter::buildStreamingPrefixAndSuffix(bool is_error) {
   // Build a reference JSON-RPC envelope with an empty text placeholder.
   json ref = {
       {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
+      // session_id_ is guaranteed to be set because it is verified in validateJsonRpcIdAndMethod.
       {McpConstants::ID_FIELD, *session_id_},
       {McpConstants::RESULT_FIELD,
        {
@@ -495,7 +497,7 @@ void McpJsonRestBridgeFilter::buildStreamingPrefixAndSuffix(bool is_error) {
 
   // Locate the empty-string placeholder for the text value: `"text":""`.
   std::string marker = absl::StrCat("\"", McpConstants::TEXT_FIELD, "\":\"\"");
-  size_t pos = ref_json.find(marker);
+  size_t pos = ref_json.rfind(marker);
   if (pos == std::string::npos) {
     IS_ENVOY_BUG("JSON-RPC streaming marker not found in serialized envelope");
     return;
