@@ -96,7 +96,6 @@ void BacktraceAction::onNonFatalSignal(int /*sig*/, siginfo_t* info, void* conte
   }
 
   // Claim the slot identified by the TID of this thread.
-  // The backtrace may be dropped here if the timer already freed the slot.
   const int64_t mytid = Thread::getCurrentThreadId();
   for (auto& slot : signal_slots_) {
     if (slot.state.load(std::memory_order_acquire) != SlotState::Signaled ||
