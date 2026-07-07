@@ -45,7 +45,8 @@ public:
           proto_config.set_library_path(genSoPath());
           proto_config.set_plugin_name(bridge_name);
 
-          cluster->mutable_upstream_config()->mutable_typed_config()->PackFrom(proto_config);
+          std::ignore =
+              cluster->mutable_upstream_config()->mutable_typed_config()->PackFrom(proto_config);
         });
 
     initialize();

@@ -57,12 +57,12 @@ public:
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view cluster_name,
                             Upstream::ThreadLocalClusterCommand& get_cluster) override;
-  void onClusterRemoval(const std::string& cluster_name) override;
+  void onClusterRemoval(absl::string_view cluster_name) override;
 
   // Upstream::LoadBalancer
   Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
   Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext* context) override;
-  absl::optional<Upstream::SelectedPoolAndConnection>
+  std::optional<Upstream::SelectedPoolAndConnection>
   selectExistingConnection(Upstream::LoadBalancerContext* context, const Upstream::Host& host,
                            std::vector<uint8_t>& hash_key) override;
   OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override;
@@ -72,7 +72,7 @@ public:
 
   // Map attempt count to cluster index.
   // Returns nullopt when attempt count exceeds the number of available clusters.
-  absl::optional<size_t> mapAttemptToClusterIndex(uint32_t attempt_count) const;
+  std::optional<size_t> mapAttemptToClusterIndex(uint32_t attempt_count) const;
 
   // Get cluster by index.
   Upstream::ThreadLocalCluster* getClusterByIndex(size_t cluster_index) const;
@@ -95,7 +95,7 @@ public:
     return std::make_unique<CompositeClusterLoadBalancer>(
         cluster_.info(), cluster_.cluster_manager_, cluster_.clusters_);
   }
-  bool recreateOnHostChange() const override { return false; }
+  bool recreateOnHostChangeDeprecated() const override { return false; }
 
   const Cluster& cluster_;
 };

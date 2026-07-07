@@ -168,7 +168,7 @@ response_rules:
   writeMessage(Buffer::OwnedImpl& buffer, NetworkFilters::ThriftProxy::TransportType transport_type,
                NetworkFilters::ThriftProxy::ProtocolType protocol_type,
                NetworkFilters::ThriftProxy::MessageType message_type,
-               absl::optional<NetworkFilters::ThriftProxy::ReplyType> reply_type = absl::nullopt) {
+               std::optional<NetworkFilters::ThriftProxy::ReplyType> reply_type = std::nullopt) {
     Buffer::OwnedImpl proto_buffer;
     ProtocolConverterSharedPtr protocol_converter = std::make_shared<ProtocolConverter>();
     ProtocolPtr protocol = createProtocol(protocol_type);

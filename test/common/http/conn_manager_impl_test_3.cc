@@ -445,6 +445,49 @@ TEST_F(HttpConnectionManagerImplTest, CannotContinueEncodingAfterRecreateStream)
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Verify that recreateStream() does not crash when the buffered request body was above the high
+// watermark. Moving the buffer triggers readDisable(false) via the low watermark callback.
+TEST_F(HttpConnectionManagerImplTest, RecreateStreamWithWatermarkedBufferDoesNotCrash) {
+  setup();
+  decoder_filters_.push_back(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([this](FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.setFilterConfigName("");
+        bool applied_filters = false;
+        if (log_handler_ != nullptr) {
+          auto factory = createLogHandlerFactoryCb(log_handler_);
+          factory(callbacks);
+          applied_filters = true;
+        }
+        auto factory =
+            createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{decoder_filters_[0]});
+        factory(callbacks);
+        applied_filters = true;
+        return applied_filters;
+      }))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(response_encoder_.stream_, bufferLimit()).WillRepeatedly(Return(1));
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([this]() -> FilterHeadersStatus {
+        Buffer::OwnedImpl data("hello");
+        decoder_filters_[0]->callbacks_->addDecodedData(data, /*streaming=*/true);
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(response_encoder_.stream_, readDisable(true));
+
+  startRequest(true);
+
+  EXPECT_CALL(response_encoder_.stream_, readDisable(false));
+
+  EXPECT_TRUE(decoder_filters_[0]->callbacks_->recreateStream(nullptr));
+
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 // Use filter direct decode/encodeData() calls without trailers.
 TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataNoTrailers) {
   setup();
@@ -1587,7 +1630,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteFound) {
 TEST_F(HttpConnectionManagerImplTest, NewConnection) {
   setup(SetupOpts().setUseSrds(true));
 
-  filter_callbacks_.connection_.stream_info_.protocol_ = absl::nullopt;
+  filter_callbacks_.connection_.stream_info_.protocol_ = std::nullopt;
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol());
   EXPECT_EQ(Network::FilterStatus::Continue, conn_manager_->onNewConnection());
   EXPECT_EQ(0U, stats_.named_.downstream_cx_http3_total_.value());
@@ -2650,8 +2693,8 @@ TEST_F(HttpConnectionManagerImplTest, CommonDurationDownstreamConnectionTimePoin
   const MonotonicTime connection_begin(std::chrono::milliseconds(5));
   filter_callbacks_.connection_.stream_info_.start_time_monotonic_ = connection_begin;
 
-  absl::optional<MonotonicTime> logged_connection_begin;
-  absl::optional<MonotonicTime> logged_connection_end;
+  std::optional<MonotonicTime> logged_connection_begin;
+  std::optional<MonotonicTime> logged_connection_end;
   EXPECT_CALL(*handler, log(_, _))
       .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         auto timing = stream_info.downstreamTiming();
@@ -2702,7 +2745,7 @@ TEST_F(HttpConnectionManagerImplTest, CommonDurationDownstreamConnectionTimePoin
   const MonotonicTime connection_begin(std::chrono::milliseconds(5));
   filter_callbacks_.connection_.stream_info_.start_time_monotonic_ = connection_begin;
 
-  std::vector<absl::optional<MonotonicTime>> logged_connection_ends;
+  std::vector<std::optional<MonotonicTime>> logged_connection_ends;
   EXPECT_CALL(*handler, log(_, _))
       .Times(2)
       .WillRepeatedly(

@@ -79,7 +79,7 @@ TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsEmptyOptionalIfGetSocketFails) 
       .WillOnce(Return(Api::SysCallBoolResult{false, -1}));
 
   IoSocketHandleImpl io_handle;
-  EXPECT_THAT(io_handle.lastRoundTripTime(), Eq(absl::optional<std::chrono::microseconds>{}));
+  EXPECT_THAT(io_handle.lastRoundTripTime(), Eq(std::optional<std::chrono::microseconds>{}));
 }
 
 TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsRttIfSuccessful) {
@@ -304,7 +304,7 @@ TEST_P(IoSocketHandleImplTest, InterfaceNameForLoopback) {
 class IoSocketHandleImplTestWrapper {
 public:
   void runGetAddressTests(const int cache_size) {
-    IoSocketHandleImpl io_handle(-1, false, absl::nullopt, cache_size);
+    IoSocketHandleImpl io_handle(-1, false, std::nullopt, cache_size);
 
     // New address.
     sockaddr_storage ss = Test::getV6SockAddr("2001:DB8::1234", 51234);

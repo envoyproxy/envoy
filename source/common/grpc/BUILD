@@ -77,7 +77,6 @@ envoy_cc_library(
     hdrs = ["status.h"],
     deps = [
         "//envoy/grpc:status",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -108,7 +107,6 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -125,7 +123,6 @@ envoy_cc_library(
         "//source/common/common:hash_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -145,7 +142,6 @@ envoy_cc_library(
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
         "//source/common/grpc:status_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

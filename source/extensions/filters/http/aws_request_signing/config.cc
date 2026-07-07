@@ -51,8 +51,8 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
   return createFilterFactoryFromProtoHelper(config, stats_prefix, server_context, dual_info.scope);
 }
 
-Http::FilterFactoryCb
-AwsRequestSigningFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+AwsRequestSigningFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const AwsRequestSigningProtoConfig& config, const std::string& stats_prefix,
     Server::Configuration::ServerFactoryContext& server_context) {
   auto result = createFilterFactoryFromProtoHelper(config, stats_prefix, server_context,
@@ -87,8 +87,6 @@ AwsRequestSigningFilterFactory::createSigner(
 
   std::string region = config.region();
 
-  envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
-
   // If we have an overriding credential provider configuration, read it here as it may contain
   // references to the region
   envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider credential_file_config = {};
@@ -101,7 +99,7 @@ AwsRequestSigningFilterFactory::createSigner(
   if (region.empty()) {
     auto region_provider =
         std::make_shared<Extensions::Common::Aws::RegionProviderChain>(credential_file_config);
-    absl::optional<std::string> regionOpt;
+    std::optional<std::string> regionOpt;
     if (config.signing_algorithm() == AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A) {
       regionOpt = region_provider->getRegionSet();
     } else {

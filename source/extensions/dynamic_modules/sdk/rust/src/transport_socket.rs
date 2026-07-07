@@ -171,18 +171,27 @@ pub trait EnvoyTransportSocket {
   fn io_write(&self, data: &[u8]) -> (IoStatus, usize);
   /// Shuts down the write side of the underlying socket so the peer observes end of stream.
   fn io_shutdown_write(&self);
+  /// Returns the native OS file descriptor of the underlying socket, or `None` when unavailable.
+  /// The descriptor is owned by Envoy and is only valid while the connection is open, so the module
+  /// must not close it.
+  fn get_fd(&self) -> Option<i32>;
   /// Appends `data` to the read buffer.
   fn read_buffer_add(&self, data: &[u8]);
   /// Appends the current contents of the write buffer to `out`.
   fn copy_write_buffer(&self, out: &mut Vec<u8>);
   /// Drains `length` bytes from the start of the write buffer.
   fn write_buffer_drain(&self, length: usize);
+  /// Returns the number of bytes currently queued in the write buffer.
+  fn write_buffer_length(&self) -> usize;
   /// Raises `event` on the underlying connection.
   fn raise_event(&self, event: ConnectionEvent);
   /// Returns whether Envoy expects the read buffer to be drained for flow-control reasons.
   fn should_drain_read_buffer(&self) -> bool;
   /// Requests that a future event-loop iteration schedules a read.
   fn set_is_readable(&self);
+  /// Schedules a write on a future event-loop iteration. A module calls this when it defers
+  /// buffered bytes for its own reasons rather than because the socket reported it would block.
+  fn set_is_writable(&self);
   /// Requests that the connection flush its write buffer, for example after queuing handshake
   /// bytes outside of a write step.
   fn flush_write_buffer(&self);
@@ -260,6 +269,15 @@ impl EnvoyTransportSocket for EnvoyTransportSocketImpl {
     }
   }
 
+  fn get_fd(&self) -> Option<i32> {
+    let fd = unsafe { abi::envoy_dynamic_module_callback_transport_socket_get_fd(self.raw) };
+    if fd < 0 {
+      None
+    } else {
+      Some(fd)
+    }
+  }
+
   fn read_buffer_add(&self, data: &[u8]) {
     if data.is_empty() {
       return;
@@ -315,6 +333,10 @@ impl EnvoyTransportSocket for EnvoyTransportSocketImpl {
     }
   }
 
+  fn write_buffer_length(&self) -> usize {
+    unsafe { abi::envoy_dynamic_module_callback_transport_socket_write_buffer_length(self.raw) }
+  }
+
   fn raise_event(&self, event: ConnectionEvent) {
     let abi_event: abi::envoy_dynamic_module_type_network_connection_event = event.into();
     unsafe {
@@ -331,6 +353,12 @@ impl EnvoyTransportSocket for EnvoyTransportSocketImpl {
   fn set_is_readable(&self) {
     unsafe {
       abi::envoy_dynamic_module_callback_transport_socket_set_is_readable(self.raw);
+    }
+  }
+
+  fn set_is_writable(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_transport_socket_set_is_writable(self.raw);
     }
   }
 

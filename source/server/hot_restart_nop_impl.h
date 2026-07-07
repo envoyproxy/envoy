@@ -23,11 +23,11 @@ public:
   void registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr,
                                      std::shared_ptr<Network::UdpListenerConfig>) override {}
   OptRef<Network::ParentDrainedCallbackRegistrar> parentDrainedCallbackRegistrar() override {
-    return absl::nullopt;
+    return std::nullopt;
   }
   void initialize(Event::Dispatcher&, Server::Instance&) override {}
-  absl::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() override {
-    return absl::nullopt;
+  std::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() override {
+    return std::nullopt;
   }
   void sendParentTerminateRequest() override {}
   ServerStatsFromParent mergeParentStatsIfAny(Stats::StoreRoot&) override { return {}; }

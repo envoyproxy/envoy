@@ -30,7 +30,7 @@ public:
   // RouteConfigProvider
   ConfigConstSharedPtr config() const override { return tls_->config_; }
 
-  const absl::optional<ConfigInfo>& configInfo() const override;
+  const std::optional<ConfigInfo>& configInfo() const override;
   SystemTime lastUpdated() const override { return config_update_info_->lastUpdated(); }
   absl::Status onConfigUpdate() override;
 

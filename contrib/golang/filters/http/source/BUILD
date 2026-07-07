@@ -43,7 +43,6 @@ envoy_cc_library(
         "//source/extensions/filters/common/expr:cel_state_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
-        "@abseil-cpp//absl/types:optional",
         "@cel-cpp//eval/public:activation",
         "@cel-cpp//eval/public:builtin_func_registrar",
         "@cel-cpp//eval/public:cel_expr_builder_factory",

@@ -136,7 +136,7 @@ private:
     return nullptr;
   }
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const test::integration::filters::ServerFactoryContextFilterConfig& proto_config,
       const std::string&, Server::Configuration::ServerFactoryContext& server_context) override {
     FilterConfigSharedPtr filter_config =
@@ -175,7 +175,7 @@ private:
     };
   }
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const test::integration::filters::ServerFactoryContextFilterConfigDual& proto_config,
       const std::string&, Server::Configuration::ServerFactoryContext& server_context) override {
     auto filter_config =

@@ -14,7 +14,7 @@ Envoy::ConnectionPool::ActiveClientPtr HttpConnPoolImplMixed::instantiateActiveC
   uint32_t initial_streams = Http2::ActiveClient::calculateInitialStreamsLimit(
       http_server_properties_cache_, origin_, host());
   return std::make_unique<Tcp::ActiveTcpClient>(
-      *this, Envoy::ConnectionPool::ConnPoolImplBase::host(), initial_streams, absl::nullopt);
+      *this, Envoy::ConnectionPool::ConnPoolImplBase::host(), initial_streams, std::nullopt);
 }
 
 CodecClientPtr
@@ -33,7 +33,7 @@ void HttpConnPoolImplMixed::onConnected(Envoy::ConnectionPool::ActiveClient& cli
   // HTTP client is associated with that connection. When the first call returns, the
   // Network::Connection will inform the new callback (the HTTP client) that it
   // is connected. The early return is to ignore that second call.
-  if (client.protocol() != absl::nullopt) {
+  if (client.protocol() != std::nullopt) {
     return;
   }
 

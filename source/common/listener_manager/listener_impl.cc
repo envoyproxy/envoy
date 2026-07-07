@@ -458,7 +458,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     }
   }
 
-  const absl::optional<std::string> runtime_val =
+  const std::optional<std::string> runtime_val =
       listener_factory_context_->serverFactoryContext().runtime().snapshot().get(
           cx_limit_runtime_key_);
   if (runtime_val && runtime_val->empty()) {
@@ -764,6 +764,11 @@ void ListenerImpl::buildListenSocketOptions(
     if (reuse_port_) {
       addListenSocketOptions(listen_socket_options_list_[i],
                              Network::SocketOptionFactory::buildReusePortOptions());
+      if (reusePortBpfCpuSteeringEnabled(config)) {
+        addListenSocketOptions(listen_socket_options_list_[i],
+                               Network::SocketOptionFactory::buildReusePortBpfCpuSteeringOptions(
+                                   parent_.workerCpus()));
+      }
     }
     if (!address_opts_list[i]->empty()) {
       addListenSocketOptions(listen_socket_options_list_[i], address_opts_list[i]);
@@ -867,12 +872,28 @@ ListenerImpl::validateFilterChains(const envoy::config::listener::v3::Listener& 
 
 absl::Status ListenerImpl::buildFilterChains(const envoy::config::listener::v3::Listener& config) {
   transport_factory_context_->setInitManager(*dynamic_init_manager_);
-  ListenerFilterChainFactoryBuilder builder(*this, *transport_factory_context_);
+  // The only connection oriented UDP transport protocol right now is QUIC.
+  const bool is_quic = udpListenerConfig().has_value() &&
+                       !udpListenerConfig()->listenerFactory().isTransportConnectionless();
+  ListenerFilterChainFactoryBuilder builder(is_quic, validation_visitor_, *parent_.factory_,
+                                            *transport_factory_context_);
   return filter_chain_manager_->addFilterChains(
       config.has_filter_chain_matcher() ? &config.filter_chain_matcher() : nullptr,
       config.filter_chains(),
       config.has_default_filter_chain() ? &config.default_filter_chain() : nullptr, builder,
       *filter_chain_manager_);
+}
+
+bool ListenerImpl::reusePortBpfCpuSteeringEnabled(
+    const envoy::config::listener::v3::Listener& config) const {
+  // Steering maps each receiving CPU to the worker pinned to it. The listener manager tracks the
+  // global prerequisites (worker CPU affinity and kernel support) once for all workers. The mapping
+  // is fixed at startup, so a listener added later via LDS can steer too.
+  return socket_type_ == Network::Socket::Type::Stream && reuse_port_ &&
+         config.has_connection_balance_config() &&
+         config.connection_balance_config().balance_type_case() ==
+             envoy::config::listener::v3::Listener_ConnectionBalanceConfig::kCpuLocalityBalance &&
+         parent_.reusePortBpfCpuSteeringSupported();
 }
 
 absl::Status
@@ -918,6 +939,21 @@ ListenerImpl::buildConnectionBalancer(const envoy::config::listener::v3::Listene
                 config.connection_balance_config().extend_balance(), *listener_factory_context_));
         break;
       }
+      case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::kCpuLocalityBalance:
+        // CPU locality balancing is performed by the kernel reuse port BPF program installed as a
+        // listen socket option, so no user space balancer is needed and the no-op balancer is
+        // always used. When steering is not available the kernel distributes connections with its
+        // default reuse port hashing instead.
+        if (!reusePortBpfCpuSteeringEnabled(config)) {
+          ENVOY_LOG(warn,
+                    "the CPU locality connection balancer is configured for TCP listener '{}' but "
+                    "reuse port BPF CPU steering is not active, so new connections are not steered "
+                    "to CPU-local workers.",
+                    config.name());
+        }
+        connection_balancers_.emplace(address.asString(),
+                                      std::make_shared<Network::NopConnectionBalancerImpl>());
+        break;
       case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::BALANCE_TYPE_NOT_SET: {
         return absl::InvalidArgumentError("No valid balance type for connection balance");
       }
@@ -1005,6 +1041,18 @@ ProtobufMessage::ValidationVisitor& PerListenerFactoryContextImpl::messageValida
 Configuration::ServerFactoryContext& PerListenerFactoryContextImpl::serverFactoryContext() {
   return listener_factory_context_base_->serverFactoryContext();
 }
+envoy::config::core::v3::TrafficDirection PerListenerFactoryContextImpl::direction() const {
+  return listener_factory_context_base_->listenerInfo().direction();
+}
+bool PerListenerFactoryContextImpl::isQuic() const {
+  return listener_factory_context_base_->listenerInfo().isQuic();
+}
+bool PerListenerFactoryContextImpl::shouldBypassOverloadManager() const {
+  return listener_factory_context_base_->listenerInfo().shouldBypassOverloadManager();
+}
+Stats::Scope& PerListenerFactoryContextImpl::prefixedScope() {
+  return listener_factory_context_base_->listenerScope();
+}
 Stats::Scope& PerListenerFactoryContextImpl::listenerScope() {
   return listener_factory_context_base_->listenerScope();
 }
@@ -1051,7 +1099,7 @@ bool ListenerImpl::createQuicListenerFilterChain(Network::QuicListenerFilterMana
 }
 
 void ListenerImpl::dumpListenerConfig(Protobuf::Any& dump) const {
-  dump.PackFrom(config_maybe_partial_filter_chains_);
+  std::ignore = dump.PackFrom(config_maybe_partial_filter_chains_);
 }
 
 void ListenerImpl::debugLog(const std::string& message) {

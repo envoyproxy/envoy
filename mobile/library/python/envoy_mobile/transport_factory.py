@@ -42,14 +42,23 @@ class EnvoyTransportFactory:
                 if builder is None:
                     builder = envoy_engine.EngineBuilder()
 
+                # Wait for the engine to be fully running before returning.
+                # This ensures DNS and other subsystems are initialized.
+                running_event = threading.Event()
+                builder.set_on_engine_running(running_event.set)
+
                 # Build and start the engine
                 cls._engine = builder.build()
+
+                # Timeout after 10 seconds to avoid infinite hang if it fails.
+                if not running_event.wait(timeout=10.0):
+                    raise RuntimeError("Envoy Mobile engine failed to start within 10 seconds")
 
             return cls._engine
 
     @classmethod
     def get_async_transport(
-        cls, builder: Optional[envoy_engine.EngineBuilder] = None
+        cls, builder: Optional[envoy_engine.EngineBuilder] = None, listener_name: str = ""
     ) -> AsyncEnvoyClientTransport:
         """Create an AsyncEnvoyClientTransport using the shared engine.
 
@@ -60,11 +69,11 @@ class EnvoyTransportFactory:
             An AsyncEnvoyClientTransport instance.
         """
         engine = cls.get_shared_engine(builder)
-        return AsyncEnvoyClientTransport(engine)
+        return AsyncEnvoyClientTransport(engine, listener_name)
 
     @classmethod
     def get_sync_transport(
-        cls, builder: Optional[envoy_engine.EngineBuilder] = None
+        cls, builder: Optional[envoy_engine.EngineBuilder] = None, listener_name: str = ""
     ) -> EnvoyClientTransport:
         """Create an EnvoyClientTransport using the shared engine.
 
@@ -75,4 +84,4 @@ class EnvoyTransportFactory:
             An EnvoyClientTransport instance.
         """
         engine = cls.get_shared_engine(builder)
-        return EnvoyClientTransport(engine)
+        return EnvoyClientTransport(engine, listener_name)

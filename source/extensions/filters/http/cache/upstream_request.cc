@@ -217,7 +217,7 @@ void UpstreamRequest::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
         // Add metadata associated with the cached response. Right now this is only response_time;
         const ResponseMetadata metadata = {config_->timeSource().systemTime()};
         insert_queue_->insertHeaders(*headers, metadata, end_stream);
-        // insert_status_ remains absl::nullopt if end_stream == false, as we have not completed the
+        // insert_status_ remains std::nullopt if end_stream == false, as we have not completed the
         // insertion yet.
         if (end_stream) {
           setInsertStatus(InsertStatus::InsertSucceeded);

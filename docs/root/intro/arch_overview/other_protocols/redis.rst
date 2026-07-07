@@ -213,6 +213,9 @@ For details on each command's usage see the official
   GEORADIUSBYMEMBER, Geospatial
   HDEL, Hash
   HEXISTS, Hash
+  HEXPIRE, Hash
+  HEXPIREAT, Hash
+  HEXPIRETIME, Hash
   HGET, Hash
   HGETALL, Hash
   HINCRBY, Hash
@@ -221,12 +224,18 @@ For details on each command's usage see the official
   HLEN, Hash
   HMGET, Hash
   HMSET, Hash
+  HPERSIST, Hash
+  HPEXPIRE, Hash
+  HPEXPIREAT, Hash
+  HPEXPIRETIME, Hash
+  HPTTL, Hash
+  HRANDFIELD, Hash
   HSCAN, Hash
   HSET, Hash
   HSETNX, Hash
   HSTRLEN, Hash
+  HTTL, Hash
   HVALS, Hash
-  HRANDFIELD, Hash
   PFADD, HyperLogLog
   PFCOUNT, HyperLogLog
   PFMERGE, HyperLogLog

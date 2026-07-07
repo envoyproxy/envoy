@@ -71,9 +71,9 @@ struct DnsFilterStats {
 };
 
 struct DnsEndpointConfig {
-  absl::optional<AddressConstPtrVec> address_list;
-  absl::optional<std::string> cluster_name;
-  absl::optional<DnsSrvRecordPtr> service_list;
+  std::optional<AddressConstPtrVec> address_list;
+  std::optional<std::string> cluster_name;
+  std::optional<DnsSrvRecordPtr> service_list;
 };
 
 using DnsVirtualDomainConfig = absl::flat_hash_map<std::string, DnsEndpointConfig>;

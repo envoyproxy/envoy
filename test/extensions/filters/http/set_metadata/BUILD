@@ -21,6 +21,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/set_metadata:config",
         "//test/integration:http_integration_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
 )

@@ -266,7 +266,7 @@ int StreamInfoWrapper::luaRouteName(lua_State* state) {
 }
 
 int StreamInfoWrapper::luaVirtualClusterName(lua_State* state) {
-  const absl::optional<std::string>& name = stream_info_.virtualClusterName();
+  const std::optional<std::string>& name = stream_info_.virtualClusterName();
   if (name.has_value()) {
     const std::string& virtual_cluster_name = name.value();
     lua_pushlstring(state, virtual_cluster_name.data(), virtual_cluster_name.length());
@@ -441,7 +441,7 @@ int FilterStateWrapper::luaGet(lua_State* state) {
     return 0;
   }
 
-  absl::optional<std::string> string_value = object->serializeAsString();
+  std::optional<std::string> string_value = object->serializeAsString();
   if (string_value.has_value()) {
     const std::string& value = string_value.value();
 

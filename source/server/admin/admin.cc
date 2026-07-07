@@ -93,7 +93,7 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
 
   ::envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("default_universal_header_validator_for_admin");
-  config.mutable_typed_config()->PackFrom(uhv_config);
+  std::ignore = config.mutable_typed_config()->PackFrom(uhv_config);
 
   auto* factory = Envoy::Config::Utility::getFactory<Http::HeaderValidatorFactoryConfig>(config);
   ENVOY_BUG(factory != nullptr, "Default UHV is not linked into binary.");
@@ -169,6 +169,9 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
           makeHandler("/heap_dump", "dump current Envoy heap (if supported)",
                       MAKE_ADMIN_HANDLER(tcmalloc_profiling_handler_.handlerHeapDump), false,
                       false),
+          makeHandler("/peak_heap_dump", "dump peak Envoy heap (if supported)",
+                      MAKE_ADMIN_HANDLER(tcmalloc_profiling_handler_.handlerPeakHeapDump), false,
+                      false),
           makeHandler("/allocprofiler", "enable/disable the allocation profiler (if supported)",
                       MAKE_ADMIN_HANDLER(tcmalloc_profiling_handler_.handlerAllocationProfiler),
                       false, true,
@@ -198,6 +201,10 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                         "If fine grain logging is enabled, use __FILE__ or a glob experision as "
                         "the logger name. "
                         "For example, source/common*:warning"},
+                       {Admin::ParamDescriptor::Type::String, "group",
+                        "Change given logger group to desired level, set to "
+                        "<logger_group_name>:<desired_level>. "
+                        "logger_group_name must be a logger name."},
                        {Admin::ParamDescriptor::Type::Enum, "level",
                         "desired logging level, this will change all loggers's level",
                         prepend("", LogsHandler::levelStrings())}}),
@@ -548,7 +555,7 @@ void AdminImpl::closeSocket() {
 
 void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
   if (listener_) {
-    handler->addListener(absl::nullopt, *listener_, server_.runtime(),
+    handler->addListener(std::nullopt, *listener_, server_.runtime(),
                          server_.api().randomGenerator());
   }
 }

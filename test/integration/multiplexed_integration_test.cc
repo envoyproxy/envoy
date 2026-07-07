@@ -22,6 +22,7 @@
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"

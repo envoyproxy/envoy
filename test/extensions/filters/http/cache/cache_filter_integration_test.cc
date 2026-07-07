@@ -373,7 +373,7 @@ TEST_P(CacheIntegrationTest, ServeHeadRequest) {
 
   // Send first request, and get response from upstream.
   {
-    // Since it is a head request, no need to encodeData => the response_body is absl::nullopt.
+    // Since it is a head request, no need to encodeData => the response_body is std::nullopt.
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
         request_headers, simulateUpstreamResponse(response_headers, empty_body_, empty_trailers_));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));

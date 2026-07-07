@@ -253,7 +253,7 @@ void ZooKeeperFilter::onConnect(const bool readonly) {
   }
 }
 
-void ZooKeeperFilter::onDecodeError(const absl::optional<OpCodes> opcode) {
+void ZooKeeperFilter::onDecodeError(const std::optional<OpCodes> opcode) {
   config_->stats_.decoder_error_.inc();
 
   if (config_->enable_per_opcode_decoder_error_metrics_ && opcode.has_value() &&
@@ -268,7 +268,7 @@ void ZooKeeperFilter::onDecodeError(const absl::optional<OpCodes> opcode) {
   setDynamicMetadata("opname", "error");
 }
 
-void ZooKeeperFilter::onRequestBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) {
+void ZooKeeperFilter::onRequestBytes(const std::optional<OpCodes> opcode, const uint64_t bytes) {
   config_->stats_.request_bytes_.add(bytes);
 
   if (config_->enable_per_opcode_request_bytes_metrics_ && opcode.has_value()) {
@@ -283,7 +283,7 @@ void ZooKeeperFilter::onRequestBytes(const absl::optional<OpCodes> opcode, const
   setDynamicMetadata("bytes", std::to_string(bytes));
 }
 
-void ZooKeeperFilter::onResponseBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) {
+void ZooKeeperFilter::onResponseBytes(const std::optional<OpCodes> opcode, const uint64_t bytes) {
   config_->stats_.response_bytes_.add(bytes);
 
   if (config_->enable_per_opcode_response_bytes_metrics_ && opcode.has_value()) {

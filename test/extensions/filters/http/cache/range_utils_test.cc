@@ -131,13 +131,13 @@ TEST(AdjustByteRange, NoRangeRequest) {
 }
 
 TEST(ParseRangeHeaderTest, InvalidUnit) {
-  absl::optional<std::vector<RawByteRange>> result = RangeUtils::parseRangeHeader("bits=3-4", 5);
+  std::optional<std::vector<RawByteRange>> result = RangeUtils::parseRangeHeader("bits=3-4", 5);
 
   ASSERT_FALSE(result.has_value());
 }
 
 TEST(ParseRangeHeaderTest, SingleRange) {
-  absl::optional<std::vector<RawByteRange>> result = RangeUtils::parseRangeHeader("bytes=3-4", 5);
+  std::optional<std::vector<RawByteRange>> result = RangeUtils::parseRangeHeader("bytes=3-4", 5);
 
   ASSERT_TRUE(result.has_value());
   auto result_vector = result.value();
@@ -149,7 +149,7 @@ TEST(ParseRangeHeaderTest, SingleRange) {
 }
 
 TEST(ParseRangeHeaderTest, MissingFirstBytePos) {
-  absl::optional<std::vector<RawByteRange>> result = RangeUtils::parseRangeHeader("bytes=-5", 5);
+  std::optional<std::vector<RawByteRange>> result = RangeUtils::parseRangeHeader("bytes=-5", 5);
 
   ASSERT_TRUE(result.has_value());
   auto result_vector = result.value();
@@ -160,7 +160,7 @@ TEST(ParseRangeHeaderTest, MissingFirstBytePos) {
 }
 
 TEST(ParseRangeHeaderTest, MissingLastBytePos) {
-  absl::optional<std::vector<RawByteRange>> result = RangeUtils::parseRangeHeader("bytes=6-", 5);
+  std::optional<std::vector<RawByteRange>> result = RangeUtils::parseRangeHeader("bytes=6-", 5);
 
   ASSERT_TRUE(result.has_value());
   auto result_vector = result.value();
@@ -172,7 +172,7 @@ TEST(ParseRangeHeaderTest, MissingLastBytePos) {
 }
 
 TEST(ParseRangeHeaderTest, MultipleRanges) {
-  absl::optional<std::vector<RawByteRange>> result =
+  std::optional<std::vector<RawByteRange>> result =
       RangeUtils::parseRangeHeader("bytes=345-456,-567,6789-", 5);
 
   ASSERT_TRUE(result.has_value());
@@ -193,7 +193,7 @@ TEST(ParseRangeHeaderTest, MultipleRanges) {
 TEST(ParseRangeHeaderTest, LongRangeHeaderValue) {
   absl::string_view header_value = "bytes=1000-1000,1001-1001,1002-1002,1003-1003,1004-1004,1005-"
                                    "1005,1006-1006,1007-1007,1008-1008,100-";
-  absl::optional<std::vector<RawByteRange>> result = RangeUtils::parseRangeHeader(header_value, 10);
+  std::optional<std::vector<RawByteRange>> result = RangeUtils::parseRangeHeader(header_value, 10);
 
   ASSERT_TRUE(result.has_value());
   auto result_vector = result.value();
@@ -202,14 +202,14 @@ TEST(ParseRangeHeaderTest, LongRangeHeaderValue) {
 }
 
 TEST(ParseRangeHeaderTest, ZeroRangeLimit) {
-  absl::optional<std::vector<RawByteRange>> result =
+  std::optional<std::vector<RawByteRange>> result =
       RangeUtils::parseRangeHeader("bytes=1000-1000", 0);
 
   ASSERT_FALSE(result.has_value());
 }
 
 TEST(ParseRangeHeaderTest, OverRangeLimit) {
-  absl::optional<std::vector<RawByteRange>> result =
+  std::optional<std::vector<RawByteRange>> result =
       RangeUtils::parseRangeHeader("bytes=1000-1000,1001-1001", 1);
 
   ASSERT_FALSE(result.has_value());
@@ -264,14 +264,14 @@ INSTANTIATE_TEST_SUITE_P(
 // clang-format on
 
 TEST_P(ParseInvalidRangeHeaderTest, InvalidRangeReturnsEmpty) {
-  absl::optional<std::vector<RawByteRange>> result = RangeUtils::parseRangeHeader(headerValue(), 5);
+  std::optional<std::vector<RawByteRange>> result = RangeUtils::parseRangeHeader(headerValue(), 5);
   ASSERT_FALSE(result.has_value());
 }
 
 TEST(CreateRangeDetailsTest, NoRangeHeader) {
   Envoy::Http::TestRequestHeaderMapImpl headers =
       Envoy::Http::TestRequestHeaderMapImpl{{":method", "GET"}};
-  absl::optional<RangeDetails> result = RangeUtils::createRangeDetails(headers, 5);
+  std::optional<RangeDetails> result = RangeUtils::createRangeDetails(headers, 5);
 
   ASSERT_FALSE(result.has_value());
 }
@@ -284,7 +284,7 @@ TEST(CreateRangeDetailsTest, SingleSatisfiableRange) {
                                                         {"range", "bytes=1-99"}};
   const Envoy::Http::HeaderMap::GetResult range_header =
       request_headers.get(Envoy::Http::Headers::get().Range);
-  absl::optional<RangeDetails> result = RangeUtils::createRangeDetails(request_headers, 4);
+  std::optional<RangeDetails> result = RangeUtils::createRangeDetails(request_headers, 4);
   ASSERT_TRUE(result.has_value());
   RangeDetails& spec = result.value();
   EXPECT_TRUE(spec.satisfiable_);
@@ -308,7 +308,7 @@ TEST(GetRangeDetailsTest, MultipleSatisfiableRanges) {
                                                         {":authority", "example.com"},
                                                         {"range", "bytes=1-99,3-,-3"}};
 
-  absl::optional<RangeDetails> result = RangeUtils::createRangeDetails(request_headers, 4);
+  std::optional<RangeDetails> result = RangeUtils::createRangeDetails(request_headers, 4);
 
   EXPECT_FALSE(result.has_value());
 }
@@ -320,7 +320,7 @@ TEST(GetRangeDetailsTest, NotSatisfiableRange) {
                                                         {":authority", "example.com"},
                                                         {"range", "bytes=100-"}};
 
-  absl::optional<RangeDetails> result = RangeUtils::createRangeDetails(request_headers, 4);
+  std::optional<RangeDetails> result = RangeUtils::createRangeDetails(request_headers, 4);
   ASSERT_TRUE(result.has_value());
   EXPECT_FALSE(result->satisfiable_);
   ASSERT_TRUE(result->ranges_.empty());
