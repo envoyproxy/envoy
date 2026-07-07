@@ -1033,72 +1033,94 @@ private:
 // The CRL cache returns one shared parsed representation for identical content,
 // so a CRL referenced from many contexts is materialized in memory only once.
 TEST(CrlCacheTest, SharesIdenticalCrlContent) {
-  CrlCache cache;
+  auto cache = std::make_shared<CrlCache>();
   const std::string crl = TestEnvironment::readFileToStringForTest(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
 
-  absl::StatusOr<SharedCrlListSharedPtr> first = cache.getOrCreate(crl, "ca_cert.crl");
+  absl::StatusOr<CrlListSharedPtr> first = cache->getOrCreate(crl, "ca_cert.crl");
   ASSERT_TRUE(first.ok()) << first.status().message();
-  absl::StatusOr<SharedCrlListSharedPtr> second = cache.getOrCreate(crl, "ca_cert.crl");
+  absl::StatusOr<CrlListSharedPtr> second = cache->getOrCreate(crl, "ca_cert.crl");
   ASSERT_TRUE(second.ok()) << second.status().message();
 
-  // Both lookups return the same SharedCrlList and the same parsed X509_CRL.
+  // Both lookups return the same CrlList and the same parsed X509_CRL.
   EXPECT_EQ(first->get(), second->get());
   ASSERT_FALSE((*first)->crls.empty());
   EXPECT_EQ((*first)->crls[0].get(), (*second)->crls[0].get());
-  EXPECT_EQ(cache.size(), 1);
+  EXPECT_EQ(cache->size(), 1);
 }
 
 // Distinct CRL content is cached separately.
 TEST(CrlCacheTest, SeparatesDistinctCrlContent) {
-  CrlCache cache;
+  auto cache = std::make_shared<CrlCache>();
   const std::string crl1 = TestEnvironment::readFileToStringForTest(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
   const std::string crl2 = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.crl"));
 
-  absl::StatusOr<SharedCrlListSharedPtr> first = cache.getOrCreate(crl1, "ca_cert.crl");
+  absl::StatusOr<CrlListSharedPtr> first = cache->getOrCreate(crl1, "ca_cert.crl");
   ASSERT_TRUE(first.ok()) << first.status().message();
-  absl::StatusOr<SharedCrlListSharedPtr> second =
-      cache.getOrCreate(crl2, "intermediate_ca_cert.crl");
+  absl::StatusOr<CrlListSharedPtr> second = cache->getOrCreate(crl2, "intermediate_ca_cert.crl");
   ASSERT_TRUE(second.ok()) << second.status().message();
 
   EXPECT_NE(first->get(), second->get());
-  EXPECT_EQ(cache.size(), 2);
+  EXPECT_EQ(cache->size(), 2);
 }
 
 // An entry is released once the last reference to it is dropped, so the cache
 // does not grow without bound as CRLs are rotated via xDS.
 TEST(CrlCacheTest, ReleasesUnreferencedEntries) {
-  CrlCache cache;
+  auto cache = std::make_shared<CrlCache>();
   const std::string crl = TestEnvironment::readFileToStringForTest(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
 
   {
-    absl::StatusOr<SharedCrlListSharedPtr> entry = cache.getOrCreate(crl, "ca_cert.crl");
+    absl::StatusOr<CrlListSharedPtr> entry = cache->getOrCreate(crl, "ca_cert.crl");
     ASSERT_TRUE(entry.ok()) << entry.status().message();
-    EXPECT_EQ(cache.size(), 1);
+    EXPECT_EQ(cache->size(), 1);
   }
   // The only reference is gone, so the entry is released.
-  EXPECT_EQ(cache.size(), 0);
+  EXPECT_EQ(cache->size(), 0);
 
   // Re-adding the same content succeeds and repopulates the cache.
-  absl::StatusOr<SharedCrlListSharedPtr> reloaded = cache.getOrCreate(crl, "ca_cert.crl");
+  absl::StatusOr<CrlListSharedPtr> reloaded = cache->getOrCreate(crl, "ca_cert.crl");
   ASSERT_TRUE(reloaded.ok()) << reloaded.status().message();
-  EXPECT_EQ(cache.size(), 1);
+  EXPECT_EQ(cache->size(), 1);
 }
 
 // Invalid CRL content returns an error and is not cached.
 TEST(CrlCacheTest, ReturnsErrorForInvalidCrl) {
-  CrlCache cache;
+  auto cache = std::make_shared<CrlCache>();
   const std::string invalid = TestEnvironment::readFileToStringForTest(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/not_a_crl.crl"));
 
-  absl::StatusOr<SharedCrlListSharedPtr> result = cache.getOrCreate(invalid, "not_a_crl.crl");
+  absl::StatusOr<CrlListSharedPtr> result = cache->getOrCreate(invalid, "not_a_crl.crl");
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("Failed to load CRL from not_a_crl.crl"));
-  EXPECT_EQ(cache.size(), 0);
+  EXPECT_EQ(cache->size(), 0);
+}
+
+// A returned CrlList keeps the cache alive, so a caller only needs to hold the
+// CrlList (this is what lets the validator store a single shared_ptr).
+TEST(CrlCacheTest, CrlListKeepsCacheAlive) {
+  std::weak_ptr<CrlCache> weak_cache;
+  CrlListSharedPtr crl_list;
+  {
+    auto cache = std::make_shared<CrlCache>();
+    weak_cache = cache;
+    const std::string crl = TestEnvironment::readFileToStringForTest(
+        TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
+    absl::StatusOr<CrlListSharedPtr> result = cache->getOrCreate(crl, "ca_cert.crl");
+    ASSERT_TRUE(result.ok()) << result.status().message();
+    crl_list = std::move(*result);
+  }
+  // The local cache reference is gone, but the CrlList still holds it alive.
+  EXPECT_FALSE(weak_cache.expired());
+  EXPECT_EQ(crl_list->cache.get(), weak_cache.lock().get());
+
+  // Dropping the CrlList releases the cache.
+  crl_list.reset();
+  EXPECT_TRUE(weak_cache.expired());
 }
 
 // Two validators created from the same factory context share a single parsed

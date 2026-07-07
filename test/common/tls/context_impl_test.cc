@@ -223,6 +223,68 @@ TEST_F(SslContextImplTest, TestCrlSharedAcrossContexts) {
   EXPECT_EQ(crl_cache->size(), 2);
 }
 
+// Validates the lifetime of a CRL shared between two TLS contexts: deleting one
+// context leaves the CRL valid and still enforced for the other, and tearing
+// down both contexts is safe. Primarily intended to run under ASAN/TSAN to catch
+// lifetime regressions in the shared-CRL handling.
+TEST_F(SslContextImplTest, TestCrlSharedContextLifetime) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"
+  require_client_certificate: true
+  )EOF";
+
+  auto make_factory = [&]() {
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+    auto cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+    return *ServerSslSocketFactory::create(std::move(cfg), manager_, *store_.rootScope());
+  };
+
+  auto factory_a = make_factory();
+  auto factory_b = make_factory();
+
+  // Both contexts reference the same CRL content, so it is parsed and held once.
+  auto crl_cache = getCrlCache(server_factory_context_.singletonManager());
+  EXPECT_EQ(crl_cache->size(), 1);
+
+  // A client certificate that ca_cert.crl revokes.
+  bssl::UniquePtr<X509> revoked_cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+
+  // Confirms the given context still enforces revocation through the shared CRL.
+  auto expect_revocation_enforced = [&](ServerSslSocketFactory& factory) {
+    Network::TransportSocketPtr socket = factory.createDownstreamTransportSocket();
+    SSL_CTX* ssl_ctx = extractSslCtx(socket.get());
+    bssl::UniquePtr<X509_STORE_CTX> store_ctx(X509_STORE_CTX_new());
+    ASSERT_TRUE(X509_STORE_CTX_init(store_ctx.get(), SSL_CTX_get_cert_store(ssl_ctx),
+                                    revoked_cert.get(), nullptr));
+    EXPECT_EQ(X509_verify_cert(store_ctx.get()), 0);
+    EXPECT_EQ(X509_STORE_CTX_get_error(store_ctx.get()), X509_V_ERR_CERT_REVOKED);
+  };
+
+  expect_revocation_enforced(*factory_b);
+
+  // Delete one context; destroying the factory removes its context. The shared
+  // CRL must remain valid and enforced for the surviving context.
+  factory_a.reset();
+  EXPECT_EQ(crl_cache->size(), 1);
+  expect_revocation_enforced(*factory_b);
+
+  // Delete the second context; the cache entry is released with no crash.
+  factory_b.reset();
+  EXPECT_EQ(crl_cache->size(), 0);
+}
+
 // Envoy's default cipher preference is server's.
 TEST_F(SslContextImplTest, TestServerCipherPreference) {
   const std::string yaml = R"EOF(
