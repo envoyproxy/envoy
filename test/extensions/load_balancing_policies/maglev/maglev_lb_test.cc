@@ -1,4 +1,5 @@
 #include <memory>
+#include <optional>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
@@ -14,8 +15,6 @@
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -35,13 +34,13 @@ public:
         should_select_another_host_(should_select_another_host) {}
 
   // Upstream::LoadBalancerContext
-  absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
+  std::optional<uint64_t> computeHashKey() override { return hash_key_; }
   uint32_t hostSelectionRetryCount() const override { return retry_count_; };
   bool shouldSelectAnotherHost(const Host& host) override {
     return should_select_another_host_(host);
   }
 
-  absl::optional<uint64_t> hash_key_;
+  std::optional<uint64_t> hash_key_;
   uint32_t retry_count_;
   HostPredicate should_select_another_host_;
 };

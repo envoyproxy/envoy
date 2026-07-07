@@ -67,10 +67,12 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         ":common_lib",
+        "//envoy/http:client_codec_factory_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:codec_client_lib",
         "//source/common/http:exception_lib",
+        "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/upstream:upstream_includes",

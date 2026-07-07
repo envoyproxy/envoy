@@ -23,7 +23,7 @@ private:
       const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
       const std::string& stats_prefix,
       Server::Configuration::ServerFactoryContext& context) override;

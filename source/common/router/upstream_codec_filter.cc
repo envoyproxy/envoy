@@ -77,7 +77,7 @@ Http::FilterHeadersStatus UpstreamCodecFilter::decodeHeaders(Http::RequestHeader
                            StringUtil::replaceAllEmptySpace(deferred_reset_status_.message()), "}");
     deferred_reset_status_ = absl::OkStatus();
     callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, status.message(), nullptr,
-                               absl::nullopt, details);
+                               std::nullopt, details);
     return Http::FilterHeadersStatus::StopIteration;
   }
   upstreamTiming().onFirstUpstreamTxByteSent(callbacks_->dispatcher().timeSource());

@@ -90,7 +90,7 @@ TEST_F(HeapShrinkerTest, CustomTimerInterval) {
   envoy::config::overload::v3::ShrinkHeapConfig config;
   config.mutable_timer_interval()->set_seconds(5);
   EXPECT_CALL(overload_manager_, getShrinkHeapConfig())
-      .WillRepeatedly(Return(absl::make_optional(config)));
+      .WillRepeatedly(Return(std::make_optional(config)));
   EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
       .WillOnce(Invoke([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
         action_cb = cb;
@@ -119,7 +119,7 @@ TEST_F(HeapShrinkerTest, CustomMaxUnfreedMemoryBytes) {
   envoy::config::overload::v3::ShrinkHeapConfig config;
   config.mutable_max_unfreed_memory_bytes()->set_value(50 * 1024 * 1024); // 50MB
   EXPECT_CALL(overload_manager_, getShrinkHeapConfig())
-      .WillRepeatedly(Return(absl::make_optional(config)));
+      .WillRepeatedly(Return(std::make_optional(config)));
   EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
       .WillOnce(Invoke([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
         action_cb = cb;
@@ -137,7 +137,7 @@ TEST_F(HeapShrinkerTest, CustomMaxUnfreedMemoryBytes) {
 
 TEST_F(HeapShrinkerTest, NoConfigUsesDefaults) {
   Server::OverloadActionCb action_cb;
-  EXPECT_CALL(overload_manager_, getShrinkHeapConfig()).WillRepeatedly(Return(absl::nullopt));
+  EXPECT_CALL(overload_manager_, getShrinkHeapConfig()).WillRepeatedly(Return(std::nullopt));
   EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
       .WillOnce(Invoke([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
         action_cb = cb;

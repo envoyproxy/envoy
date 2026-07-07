@@ -35,11 +35,11 @@ public:
   }
 
   // It push message into internal message buffer.
-  // If the buffer is full, it will return absl::nullopt.
-  absl::optional<uint64_t> bufferMessage(RequestType& message) {
+  // If the buffer is full, it will return std::nullopt.
+  std::optional<uint64_t> bufferMessage(RequestType& message) {
     const auto buffer_size = message.ByteSizeLong();
     if (current_buffer_bytes_ + buffer_size > max_buffer_bytes_) {
-      return absl::nullopt;
+      return std::nullopt;
     }
 
     auto id = publishId();

@@ -415,7 +415,7 @@ TEST_F(ConnectionHandlerTest, DisableInternalListener) {
                   internal_listener->socket_factories_[0].get()),
               localAddress())
       .WillRepeatedly(ReturnRef(local_address));
-  handler_->addListener(absl::nullopt, *internal_listener, runtime_, random_);
+  handler_->addListener(std::nullopt, *internal_listener, runtime_, random_);
   auto internal_listener_cb = handler_->findByAddress(local_address);
   ASSERT_TRUE(internal_listener_cb.has_value());
 
@@ -443,7 +443,7 @@ TEST_F(ConnectionHandlerTest, InternalListenerInplaceUpdate) {
                   internal_listener->socket_factories_[0].get()),
               localAddress())
       .WillRepeatedly(ReturnRef(local_address));
-  handler_->addListener(absl::nullopt, *internal_listener, runtime_, random_);
+  handler_->addListener(std::nullopt, *internal_listener, runtime_, random_);
 
   ASSERT_NE(internal_listener, nullptr);
 

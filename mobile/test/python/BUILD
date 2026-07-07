@@ -50,3 +50,14 @@ py_test(
         requirement("httpx"),
     ],
 )
+
+py_test(
+    name = "httpx_transport_fetch_test",
+    srcs = ["httpx_transport_fetch_test.py"],
+    main = "httpx_transport_fetch_test.py",
+    deps = [
+        ":echo_test_server",
+        "//library/python:envoy_mobile_lib",
+        requirement("httpx"),
+    ],
+)

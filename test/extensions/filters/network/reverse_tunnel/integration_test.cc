@@ -383,7 +383,7 @@ void ReverseTunnelFilterIntegrationTest::runEndToEndReverseConnectionHandshakeSc
     rt_config.set_auto_close_connections(false);
     rt_config.set_request_path(upstream_request_path_);
     rt_config.set_request_method(envoy::config::core::v3::GET);
-    rt_filter->mutable_typed_config()->PackFrom(rt_config);
+    std::ignore = rt_filter->mutable_typed_config()->PackFrom(rt_config);
 
     auto* rc_listener = bootstrap.mutable_static_resources()->add_listeners();
     rc_listener->set_name("reverse_connection_listener");
@@ -1149,7 +1149,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithDynamicMetadataSuccess)
 
     envoy::config::listener::v3::Filter filter;
     filter.set_name("envoy.test.metadata_setter");
-    filter.mutable_typed_config()->PackFrom(filter_config);
+    std::ignore = filter.mutable_typed_config()->PackFrom(filter_config);
 
     ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -1201,7 +1201,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithDynamicMetadataFailure)
 
     envoy::config::listener::v3::Filter filter;
     filter.set_name("envoy.test.metadata_setter");
-    filter.mutable_typed_config()->PackFrom(filter_config);
+    std::ignore = filter.mutable_typed_config()->PackFrom(filter_config);
 
     ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -1277,7 +1277,7 @@ typed_config:
 
     envoy::config::listener::v3::Filter filter;
     filter.set_name("envoy.test.metadata_setter");
-    filter.mutable_typed_config()->PackFrom(filter_config);
+    std::ignore = filter.mutable_typed_config()->PackFrom(filter_config);
 
     ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -1348,7 +1348,7 @@ typed_config:
 
     envoy::config::listener::v3::Filter filter;
     filter.set_name("envoy.test.metadata_setter");
-    filter.mutable_typed_config()->PackFrom(filter_config);
+    std::ignore = filter.mutable_typed_config()->PackFrom(filter_config);
 
     ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -1419,7 +1419,7 @@ typed_config:
 
     envoy::config::listener::v3::Filter filter;
     filter.set_name("envoy.test.metadata_setter");
-    filter.mutable_typed_config()->PackFrom(filter_config);
+    std::ignore = filter.mutable_typed_config()->PackFrom(filter_config);
 
     ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -1457,9 +1457,9 @@ TEST_P(ReverseTunnelFilterIntegrationTest, IntegrationTenantIsolationEndToEnd) {
       if (extension.name() == "envoy.bootstrap.reverse_tunnel.upstream_socket_interface") {
         envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
             UpstreamReverseConnectionSocketInterface config;
-        extension.typed_config().UnpackTo(&config);
+        std::ignore = extension.typed_config().UnpackTo(&config);
         config.mutable_enable_tenant_isolation()->set_value(true);
-        extension.mutable_typed_config()->PackFrom(config);
+        std::ignore = extension.mutable_typed_config()->PackFrom(config);
         break;
       }
     }
@@ -1507,9 +1507,9 @@ TEST_P(ReverseTunnelFilterIntegrationTest, IntegrationTenantIsolationMultipleTen
       if (extension.name() == "envoy.bootstrap.reverse_tunnel.upstream_socket_interface") {
         envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
             UpstreamReverseConnectionSocketInterface config;
-        extension.typed_config().UnpackTo(&config);
+        std::ignore = extension.typed_config().UnpackTo(&config);
         config.mutable_enable_tenant_isolation()->set_value(true);
-        extension.mutable_typed_config()->PackFrom(config);
+        std::ignore = extension.mutable_typed_config()->PackFrom(config);
         break;
       }
     }
@@ -1565,9 +1565,9 @@ TEST_P(ReverseTunnelFilterIntegrationTest, IntegrationTenantIsolationStartupVali
       if (extension.name() == "envoy.bootstrap.reverse_tunnel.upstream_socket_interface") {
         envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
             UpstreamReverseConnectionSocketInterface config;
-        extension.typed_config().UnpackTo(&config);
+        std::ignore = extension.typed_config().UnpackTo(&config);
         config.mutable_enable_tenant_isolation()->set_value(true);
-        extension.mutable_typed_config()->PackFrom(config);
+        std::ignore = extension.mutable_typed_config()->PackFrom(config);
         break;
       }
     }

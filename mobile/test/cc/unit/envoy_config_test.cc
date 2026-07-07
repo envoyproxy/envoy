@@ -501,7 +501,7 @@ TEST(TestConfig, AddNativeFilters) {
   Protobuf::Any typed_config;
   typed_config.set_type_url("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer");
   std::string serialized_buffer;
-  buffer.SerializeToString(&serialized_buffer);
+  std::ignore = buffer.SerializeToString(&serialized_buffer);
   typed_config.set_value(serialized_buffer);
 
   engine_builder.addNativeFilter(filter_name1, typed_config);

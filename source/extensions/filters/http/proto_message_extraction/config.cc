@@ -31,8 +31,8 @@ Envoy::Http::FilterFactoryCb FilterFactoryCreator::createFilterFactoryFromProtoT
   };
 }
 
-Envoy::Http::FilterFactoryCb
-FilterFactoryCreator::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Envoy::Http::FilterFactoryCb>
+FilterFactoryCreator::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::proto_message_extraction::v3::
         ProtoMessageExtractionConfig& proto_config,
     const std::string&, Envoy::Server::Configuration::ServerFactoryContext& context) {

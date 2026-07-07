@@ -18,7 +18,7 @@ TEST(GenericStatusCodeFormatterProviderTest, GenericStatusCodeFormatterProviderT
   StreamInfo::MockStreamInfo stream_info;
 
   EXPECT_EQ(formatter.format(Formatter::Context().setExtension(context), stream_info),
-            absl::nullopt);
+            std::nullopt);
   EXPECT_TRUE(formatter.formatValue(Formatter::Context().setExtension(context), stream_info)
                   .has_null_value());
 
@@ -39,15 +39,15 @@ TEST(StringValueFormatterProviderTest, StringValueFormatterProviderTest) {
     FormatterContextExtension context;
     StringValueFormatterProvider formatter(
         [](const Formatter::Context& context,
-           const StreamInfo::StreamInfo&) -> absl::optional<std::string> {
-          CHECK_DATA_OR_RETURN(context, request_, absl::nullopt);
+           const StreamInfo::StreamInfo&) -> std::optional<std::string> {
+          CHECK_DATA_OR_RETURN(context, request_, std::nullopt);
           return std::string(checked_data->request_->path());
         },
         9);
     StreamInfo::MockStreamInfo stream_info;
 
     EXPECT_EQ(formatter.format(Formatter::Context().setExtension(context), stream_info),
-              absl::nullopt);
+              std::nullopt);
     EXPECT_TRUE(formatter.formatValue(Formatter::Context().setExtension(context), stream_info)
                     .has_null_value());
 

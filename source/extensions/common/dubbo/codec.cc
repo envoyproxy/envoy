@@ -287,7 +287,7 @@ MessageMetadataSharedPtr DirectResponseUtil::heartbeatResponse(MessageMetadata& 
 
 MessageMetadataSharedPtr DirectResponseUtil::localResponse(MessageMetadata& request,
                                                            ResponseStatus status,
-                                                           absl::optional<RpcResponseType> type,
+                                                           std::optional<RpcResponseType> type,
                                                            absl::string_view content) {
   if (!request.hasContext()) {
     request.setContext(std::make_unique<Context>());

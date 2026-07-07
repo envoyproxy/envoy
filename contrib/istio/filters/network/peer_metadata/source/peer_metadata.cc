@@ -164,7 +164,7 @@ std::optional<Envoy::Protobuf::Any> Filter::discoverPeerMetadata() {
 
   Envoy::Protobuf::Struct data = ::Istio::Common::convertWorkloadMetadataToStruct(*metadata);
   Envoy::Protobuf::Any wrapped;
-  wrapped.PackFrom(data);
+  std::ignore = wrapped.PackFrom(data);
   return wrapped;
 }
 
@@ -369,6 +369,15 @@ void UpstreamFilter::populatePeerMetadata(const ::Istio::Common::WorkloadMetadat
   cel->setValue(absl::string_view(proto.SerializeAsString()));
   callbacks_->connection().streamInfo().filterState()->setData(
       ::Istio::Common::UpstreamPeer, std::move(cel), StreamInfo::FilterState::LifeSpan::Connection);
+  // Also store the WorkloadMetadataObject under the *_obj key, mirroring the
+  // metadata_exchange network filter. istio.stats reads the object directly
+  // (peerInfoRead/peerInfo prefer it); its CelState fallback uses BaggageToken
+  // keys that are incompatible with convertWorkloadMetadataToStruct's output, so
+  // without this the peer identity is lost over HBONE.
+  callbacks_->connection().streamInfo().filterState()->setData(
+      ::Istio::Common::UpstreamPeerObj,
+      std::make_shared<::Istio::Common::WorkloadMetadataObject>(peer),
+      StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 void UpstreamFilter::populateNoPeerMetadata() {

@@ -15,7 +15,7 @@ namespace Http {
 
 namespace {
 
-static const absl::optional<std::chrono::seconds> kNoTtl = absl::nullopt;
+static const std::optional<std::chrono::seconds> kNoTtl = std::nullopt;
 class HttpServerPropertiesCacheImplTest : public testing::TestWithParam<bool> {
 public:
   HttpServerPropertiesCacheImplTest()
@@ -222,7 +222,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesAfterTruncation) {
 TEST_P(HttpServerPropertiesCacheImplTest, ToAndFromOriginString) {
   initialize();
   std::string origin_str = "https://hostname1:1";
-  absl::optional<HttpServerPropertiesCache::Origin> origin =
+  std::optional<HttpServerPropertiesCache::Origin> origin =
       HttpServerPropertiesCacheImpl::stringToOrigin(origin_str);
   ASSERT_TRUE(origin.has_value());
   EXPECT_EQ(1, origin.value().port_);
@@ -233,7 +233,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, ToAndFromOriginString) {
 
   // Test with no scheme or port.
   std::string origin_str2 = "://:1";
-  absl::optional<HttpServerPropertiesCache::Origin> origin2 =
+  std::optional<HttpServerPropertiesCache::Origin> origin2 =
       HttpServerPropertiesCacheImpl::stringToOrigin(origin_str2);
   ASSERT_TRUE(origin2.has_value());
   EXPECT_EQ(1, origin2.value().port_);
@@ -274,7 +274,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, ToAndFromString) {
   initialize();
   auto testAltSvc = [&](const std::string& original_alt_svc,
                         const std::string& expected_alt_svc) -> void {
-    absl::optional<HttpServerPropertiesCacheImpl::OriginData> origin_data =
+    std::optional<HttpServerPropertiesCacheImpl::OriginData> origin_data =
         HttpServerPropertiesCacheImpl::originDataFromString(original_alt_svc,
                                                             dispatcher_.timeSource(), true);
     ASSERT(origin_data.has_value());

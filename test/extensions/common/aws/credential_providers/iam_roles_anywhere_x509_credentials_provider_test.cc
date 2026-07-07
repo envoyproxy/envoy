@@ -739,7 +739,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   TestUtility::loadFromYamlAndValidate(yaml, private_key_data_source);
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context_, certificate_data_source, private_key_data_source, absl::nullopt);
+      context_, certificate_data_source, private_key_data_source, std::nullopt);
   auto status = provider->initialize();
   EXPECT_TRUE(status.ok());
   auto credentials = provider->getCredentials();
@@ -976,7 +976,7 @@ TEST(EmptyPem, PemToAlgorithmSerialExpiration) {
   SystemTime time;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration("", algorithm, serial, time);
@@ -994,7 +994,7 @@ TEST(ExpiredPem, PemToAlgorithmSerialExpiration) {
   SystemTime time;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status =
@@ -1015,7 +1015,7 @@ TEST(PemTooLarge, PemToAlgorithmSerialExpiration) {
   SystemTime time;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration(large_cert, algorithm, serial, time);
@@ -1035,7 +1035,7 @@ TEST(JunkPem, PemToAlgorithmSerialExpiration) {
   SystemTime time;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration(junk_pem, algorithm, serial, time);
@@ -1057,7 +1057,7 @@ TEST(ValidPemWithAppendedJunk, PemToAlgorithmSerialExpiration) {
   SystemTime time;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration(junk_pem, algorithm, serial, time);
@@ -1077,7 +1077,7 @@ TEST(JunkPem, PemToDerB64) {
   std::string out_cert;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_cert, out_cert, false);
@@ -1095,7 +1095,7 @@ TEST(JunkPemChain, PemToDerB64) {
   std::string out_cert;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_cert, out_cert, true);
@@ -1114,7 +1114,7 @@ TEST(JunkCertStartLine, PemToDerB64) {
   std::string out_cert;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_cert, out_cert, false);
@@ -1134,7 +1134,7 @@ TEST(JunkChainStartLine, PemToDerB64) {
   std::string out_cert;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_cert, out_cert, true);
@@ -1152,7 +1152,7 @@ TEST(SingleCertTooLarge, PemToDerB64) {
   std::string out_cert;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_cert, out_cert, false);
@@ -1171,7 +1171,7 @@ TEST(ChainTooLarge, PemToDerB64) {
   std::string out_chain;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_chain, out_chain, true);
@@ -1213,7 +1213,7 @@ TEST(ChainParse, PemToDerB64) {
   std::string out_chain;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
   auto status = provider->initialize();
   EXPECT_FALSE(status.ok());
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));

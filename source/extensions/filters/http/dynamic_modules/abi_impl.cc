@@ -472,6 +472,44 @@ getMutableDynamicMetadataListValue(envoy_dynamic_module_type_http_filter_envoy_p
   return nullptr;
 }
 
+// Wraps an opaque, module-owned object in filter state and calls the module destructor exactly once
+// on destruction. Non-serializable: it declines serialization and field support so it is never
+// written to bytes. Holds a shared_ptr to the filter config so the module .so cannot unload while
+// this live destructor pointer into it exists; a Connection-lifespan entry may outlive the stream.
+class DynamicModuleFilterStateObject : public StreamInfo::FilterState::Object {
+public:
+  DynamicModuleFilterStateObject(
+      DynamicModuleHttpFilterConfigSharedPtr config,
+      envoy_dynamic_module_type_filter_state_object_module_ptr object,
+      envoy_dynamic_module_type_filter_state_object_destructor destructor)
+      : config_(std::move(config)), object_(object), destructor_(destructor) {}
+  ~DynamicModuleFilterStateObject() override {
+    if (destructor_ != nullptr) {
+      destructor_(object_);
+    }
+  }
+  envoy_dynamic_module_type_filter_state_object_module_ptr object() const { return object_; }
+
+private:
+  const DynamicModuleHttpFilterConfigSharedPtr config_;
+  envoy_dynamic_module_type_filter_state_object_module_ptr object_;
+  envoy_dynamic_module_type_filter_state_object_destructor destructor_;
+};
+
+StreamInfo::FilterState::LifeSpan
+toFilterStateLifeSpan(envoy_dynamic_module_type_filter_state_life_span life_span) {
+  switch (life_span) {
+  case envoy_dynamic_module_type_filter_state_life_span_FilterChain:
+    return StreamInfo::FilterState::LifeSpan::FilterChain;
+  case envoy_dynamic_module_type_filter_state_life_span_Request:
+    return StreamInfo::FilterState::LifeSpan::Request;
+  case envoy_dynamic_module_type_filter_state_life_span_Connection:
+    return StreamInfo::FilterState::LifeSpan::Connection;
+  }
+  IS_ENVOY_BUG("unknown filter state life_span");
+  return StreamInfo::FilterState::LifeSpan::FilterChain;
+}
+
 } // namespace
 
 extern "C" {
@@ -1568,6 +1606,70 @@ bool envoy_dynamic_module_callback_http_get_filter_state_typed(
   return true;
 }
 
+bool envoy_dynamic_module_callback_http_set_filter_state_object(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_filter_state_object_module_ptr module_object,
+    envoy_dynamic_module_type_filter_state_object_destructor destructor,
+    envoy_dynamic_module_type_filter_state_life_span life_span) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto* stream_info = filter->streamInfo();
+  // Ownership transferred to Envoy; on every failure path free the object rather than leak it.
+  auto free_object = [&]() {
+    if (destructor != nullptr) {
+      destructor(module_object);
+    }
+  };
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    free_object();
+    return false;
+  }
+  const auto& filter_state = stream_info->filterState();
+  if (!filter_state) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "filter state is not available");
+    free_object();
+    return false;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  filter_state->setData(key_view,
+                        std::make_shared<DynamicModuleFilterStateObject>(
+                            filter->getFilterConfigSharedPtr(), module_object, destructor),
+                        toFilterStateLifeSpan(life_span));
+  // setData is a no-op when the key already exists at a conflicting life_span. The wrapper is then
+  // destroyed and the destructor has already freed the object. Confirm our object was stored by
+  // pointer identity (an address compare, never a dereference) and report a failed store otherwise.
+  auto* stored = filter_state->getDataMutable<DynamicModuleFilterStateObject>(key_view);
+  return stored != nullptr && stored->object() == module_object;
+}
+
+envoy_dynamic_module_type_filter_state_object_module_ptr
+envoy_dynamic_module_callback_http_get_filter_state_object(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto* stream_info = filter->streamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return nullptr;
+  }
+  const auto& filter_state = stream_info->filterState();
+  if (!filter_state) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "filter state is not available");
+    return nullptr;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  auto* object = filter_state->getDataMutable<DynamicModuleFilterStateObject>(key_view);
+  if (object == nullptr) {
+    return nullptr;
+  }
+  return object->object();
+}
+
 void envoy_dynamic_module_callback_http_clear_route_cache(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
@@ -1662,7 +1764,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     if (stream_info) {
       auto stream_id_provider = stream_info->getStreamIdProvider();
       if (stream_id_provider.has_value()) {
-        const absl::optional<absl::string_view> request_id = stream_id_provider->toStringView();
+        const std::optional<absl::string_view> request_id = stream_id_provider->toStringView();
         if (request_id.has_value()) {
           *result = {request_id->data(), request_id->size()};
           ok = true;
@@ -1773,7 +1875,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
         filter->connection(),
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->dnsSansLocalCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->dnsSansLocalCertificate().front();
         },
@@ -1783,7 +1885,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
         filter->connection(),
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->dnsSansPeerCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->dnsSansPeerCertificate().front();
         },
@@ -1793,7 +1895,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
         filter->connection(),
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->uriSanLocalCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->uriSanLocalCertificate().front();
         },
@@ -1803,7 +1905,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
         filter->connection(),
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->uriSanPeerCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->uriSanPeerCertificate().front();
         },
@@ -2597,6 +2699,16 @@ bool envoy_dynamic_module_callback_http_set_upstream_override_host(
   filter->decoder_callbacks_->setUpstreamOverrideHost(
       Upstream::LoadBalancerContext::OverrideHost{std::string(host_view), strict});
   return true;
+}
+
+uint64_t envoy_dynamic_module_callback_http_get_upstream_connection_id(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  const auto* upstream_info = filter->upstreamInfo();
+  if (upstream_info == nullptr || !upstream_info->upstreamConnectionId().has_value()) {
+    return 0;
+  }
+  return upstream_info->upstreamConnectionId().value();
 }
 
 // ------------------- Stream Control Callbacks -------------------------

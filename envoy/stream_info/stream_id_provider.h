@@ -1,11 +1,11 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace StreamInfo {
@@ -23,12 +23,12 @@ public:
   /**
    * @return the optional string view of the stream id.
    */
-  virtual absl::optional<absl::string_view> toStringView() const PURE;
+  virtual std::optional<absl::string_view> toStringView() const PURE;
 
   /**
    * @return the optional integer view of the stream id.
    */
-  virtual absl::optional<uint64_t> toInteger() const PURE;
+  virtual std::optional<uint64_t> toInteger() const PURE;
 };
 using StreamIdProviderSharedPtr = std::shared_ptr<StreamIdProvider>;
 

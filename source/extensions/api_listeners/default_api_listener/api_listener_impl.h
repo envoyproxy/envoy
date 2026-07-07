@@ -159,9 +159,9 @@ protected:
       Network::ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
         return connection_info_provider_;
       }
-      absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
+      std::optional<Network::Connection::UnixDomainSocketPeerCredentials>
       unixSocketPeerCredentials() const override {
-        return absl::nullopt;
+        return std::nullopt;
       }
       void setConnectionStats(const Network::Connection::ConnectionStats&) override {}
       Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
@@ -187,9 +187,9 @@ protected:
         IS_ENVOY_BUG("Unexpected function call");
         return false;
       }
-      absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; }
+      std::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; }
       void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
-      absl::optional<uint64_t> congestionWindowInBytes() const override { return {}; }
+      std::optional<uint64_t> congestionWindowInBytes() const override { return {}; }
       // ScopeTrackedObject
       void dumpState(std::ostream& os, int) const override { os << "SyntheticConnection"; }
 

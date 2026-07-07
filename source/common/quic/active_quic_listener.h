@@ -94,7 +94,7 @@ private:
   quic::QuicVersionManager version_manager_;
   std::unique_ptr<EnvoyQuicDispatcher> quic_dispatcher_;
   const bool kernel_worker_routing_;
-  absl::optional<Runtime::FeatureFlag> enabled_;
+  std::optional<Runtime::FeatureFlag> enabled_;
   Network::UdpPacketWriter* udp_packet_writer_;
   quic::QuicPacketWriter* quic_packet_writer_{nullptr};
 
@@ -155,10 +155,9 @@ protected:
 private:
   friend class ActiveQuicListenerFactoryPeer;
 
-  absl::optional<std::reference_wrapper<EnvoyQuicCryptoServerStreamFactoryInterface>>
+  std::optional<std::reference_wrapper<EnvoyQuicCryptoServerStreamFactoryInterface>>
       crypto_server_stream_factory_;
-  absl::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>>
-      proof_source_factory_;
+  std::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>> proof_source_factory_;
   EnvoyQuicConnectionDebugVisitorFactoryInterfacePtr connection_debug_visitor_factory_;
   EnvoyQuicConnectionIdGeneratorFactoryPtr quic_cid_generator_factory_;
   EnvoyQuicServerPreferredAddressConfigPtr server_preferred_address_config_;

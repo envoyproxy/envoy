@@ -27,7 +27,7 @@ TEST(HeaderBasedSessionStateFactoryTest, SessionStateTest) {
     // No valid address in the request headers.
     Envoy::Http::TestRequestHeaderMapImpl request_headers;
     auto session_state = factory.create(request_headers);
-    EXPECT_EQ(absl::nullopt, session_state->upstreamAddress());
+    EXPECT_EQ(std::nullopt, session_state->upstreamAddress());
 
     Envoy::Http::TestResponseHeaderMapImpl response_headers;
     session_state->onUpdate("1.2.3.4:80", response_headers);

@@ -41,12 +41,12 @@ private:
                   std::string& body) const;
 
   // Body read from local data source.
-  const absl::optional<std::string> local_body_;
+  const std::optional<std::string> local_body_;
 
   // body format
   Formatter::FormatterPtr formatter_;
 
-  const absl::optional<Envoy::Http::Code> status_code_;
+  const std::optional<Envoy::Http::Code> status_code_;
   const std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
 };
 } // namespace CustomResponse

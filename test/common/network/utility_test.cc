@@ -368,7 +368,7 @@ TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddressGetifaddrsFailure) {
 TEST(NetworkUtility, GetOriginalDst) {
   testing::NiceMock<Network::MockConnectionSocket> socket;
 #ifdef SOL_IP
-  EXPECT_CALL(socket, ipVersion()).WillOnce(testing::Return(absl::nullopt));
+  EXPECT_CALL(socket, ipVersion()).WillOnce(testing::Return(std::nullopt));
 #endif
   EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
 

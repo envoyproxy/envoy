@@ -22,13 +22,11 @@ public:
     host_set_ = std::make_unique<HostSetImpl>(0, false, kDefaultOverProvisioningFactor);
   }
 
-  absl::optional<uint32_t> chooseDegradedLocality() {
+  std::optional<uint32_t> chooseDegradedLocality() {
     return locality_wrr_->chooseDegradedLocality();
   }
 
-  absl::optional<uint32_t> chooseHealthyLocality() {
-    return locality_wrr_->chooseHealthyLocality();
-  }
+  std::optional<uint32_t> chooseHealthyLocality() { return locality_wrr_->chooseHealthyLocality(); }
 
   std::unique_ptr<HostSetImpl> host_set_;
   std::unique_ptr<LocalityWrr> locality_wrr_ = nullptr;
@@ -38,8 +36,8 @@ public:
 TEST_F(LocalityWrrTest, HostSetEmpty) {
   locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
 
-  EXPECT_EQ(chooseHealthyLocality(), absl::nullopt);
-  EXPECT_EQ(chooseDegradedLocality(), absl::nullopt);
+  EXPECT_EQ(chooseHealthyLocality(), std::nullopt);
+  EXPECT_EQ(chooseDegradedLocality(), std::nullopt);
 }
 
 TEST_F(LocalityWrrTest, AllHostsUnhealthy) {
@@ -58,7 +56,7 @@ TEST_F(LocalityWrrTest, AllHostsUnhealthy) {
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1, 1}};
   auto hosts_const_shared = std::make_shared<const HostVector>(hosts);
   host_set_->updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality),
-                         locality_weights, {}, {}, absl::nullopt);
+                         locality_weights, {}, {}, std::nullopt);
   locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
 
   EXPECT_FALSE(chooseHealthyLocality().has_value());
@@ -96,7 +94,7 @@ TEST_F(LocalityWrrTest, NotWarmedHostsLocality) {
           HostsPerLocalityImpl::empty(),
           makeHostsFromHostsPerLocality<ExcludedHostVector>(excluded_hosts_per_locality),
           excluded_hosts_per_locality),
-      locality_weights, {}, {}, absl::nullopt);
+      locality_weights, {}, {}, std::nullopt);
   locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
 
   // We should RR between localities with equal weight.
@@ -144,7 +142,7 @@ TEST_F(LocalityWrrTest, UnweightedLocalities) {
   host_set_->updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
                                            std::make_shared<const HealthyHostVector>(hosts),
                                            hosts_per_locality),
-                         locality_weights, {}, {}, absl::nullopt);
+                         locality_weights, {}, {}, std::nullopt);
 
   locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
 
@@ -171,7 +169,7 @@ TEST_F(LocalityWrrTest, WeightedLocalities) {
   host_set_->updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
                                            std::make_shared<const HealthyHostVector>(hosts),
                                            hosts_per_locality),
-                         locality_weights, {}, {}, absl::nullopt);
+                         locality_weights, {}, {}, std::nullopt);
 
   locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
 
@@ -201,7 +199,7 @@ TEST_F(LocalityWrrTest, MissingWeight) {
   host_set_->updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
                                            std::make_shared<const HealthyHostVector>(hosts),
                                            hosts_per_locality),
-                         locality_weights, {}, {}, absl::nullopt);
+                         locality_weights, {}, {}, std::nullopt);
   locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
 
   EXPECT_EQ(0, chooseHealthyLocality().value());
@@ -241,7 +239,7 @@ TEST_F(LocalityWrrTest, WeightedAllChosen) {
     host_set_->updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
                                              std::make_shared<const HealthyHostVector>(hosts),
                                              hosts_per_locality),
-                           locality_weights, {}, {}, i, absl::nullopt);
+                           locality_weights, {}, {}, i, std::nullopt);
     locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, i);
 
     locality_picked_count[chooseHealthyLocality().value()]++;
@@ -282,7 +280,7 @@ TEST_F(LocalityWrrTest, UnhealthyFailover) {
                                              makeHostsFromHostsPerLocality<HealthyHostVector>(
                                                  healthy_hosts_per_locality),
                                              healthy_hosts_per_locality),
-                           locality_weights, {}, {}, absl::nullopt);
+                           locality_weights, {}, {}, std::nullopt);
     locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
   };
 
@@ -337,11 +335,11 @@ TEST(OverProvisioningFactorTest, LocalityPickChanges) {
     host_set.updateHosts(updateHostsParams(std::make_shared<const HostVector>(hosts),
                                            hosts_per_locality, healthy_hosts,
                                            healthy_hosts_per_locality),
-                         locality_weights, {}, {}, absl::nullopt);
+                         locality_weights, {}, {}, std::nullopt);
     LocalityWrr locality_wrr(host_set, 0);
     uint32_t cnts[] = {0, 0};
     for (uint32_t i = 0; i < 100; ++i) {
-      absl::optional<uint32_t> locality_index = locality_wrr.chooseHealthyLocality();
+      std::optional<uint32_t> locality_index = locality_wrr.chooseHealthyLocality();
       if (!locality_index.has_value()) {
         // It's possible locality scheduler is nullptr (when factor is 0).
         continue;

@@ -23,7 +23,7 @@ private:
           GrpcJsonReverseTranscoder& proto_config,
       const std::string&, Server::Configuration::FactoryContext& context) override;
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
           GrpcJsonReverseTranscoder& proto_config,
       const std::string&, Server::Configuration::ServerFactoryContext& context) override;

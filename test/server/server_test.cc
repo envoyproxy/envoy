@@ -1553,7 +1553,8 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
   EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
       .WillOnce(
           Invoke([](const Protobuf::Message& config, Configuration::ServerFactoryContext& ctx) {
-            const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
+            const auto* proto =
+                Envoy::Protobuf::DynamicCastMessage<test::common::config::DummyConfig>(&config);
             EXPECT_NE(nullptr, proto);
             EXPECT_EQ(proto->a(), "foo");
             auto mock_extension = std::make_unique<MockBootstrapExtension>();
@@ -1738,7 +1739,7 @@ public:
 
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view, Upstream::ThreadLocalClusterCommand&) override {}
-  void onClusterRemoval(const std::string&) override {}
+  void onClusterRemoval(absl::string_view) override {}
 
 private:
   Upstream::ClusterUpdateCallbacksHandlePtr cluster_removal_cb_handle_;

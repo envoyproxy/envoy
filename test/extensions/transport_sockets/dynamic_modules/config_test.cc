@@ -133,7 +133,8 @@ TEST_F(DynamicModuleTransportSocketConfigTest, ImplementsSecureTransport) {
 
 TEST_F(DynamicModuleTransportSocketConfigTest, WithTransportSocketConfig) {
   auto config = buildProtoConfig(kReferenceModule, "xor");
-  config.mutable_transport_socket_config()->PackFrom(ValueUtil::stringValue("config_bytes"));
+  std::ignore =
+      config.mutable_transport_socket_config()->PackFrom(ValueUtil::stringValue("config_bytes"));
   auto factory_or_error = upstream_factory_.createTransportSocketFactory(config, context_);
   EXPECT_TRUE(factory_or_error.ok()) << factory_or_error.status().message();
 }
@@ -210,14 +211,13 @@ public:
     ON_CALL(callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
   }
 
-  Network::TransportSocketPtr
-  createSocket(const std::string& socket_name,
-               absl::optional<std::string> config_bytes = absl::nullopt) {
+  Network::TransportSocketPtr createSocket(const std::string& socket_name,
+                                           std::optional<std::string> config_bytes = std::nullopt) {
     auto config = buildProtoConfig(kReferenceModule, socket_name);
     if (config_bytes.has_value()) {
       Protobuf::BytesValue bytes_value;
       bytes_value.set_value(*config_bytes);
-      config.mutable_transport_socket_config()->PackFrom(bytes_value);
+      std::ignore = config.mutable_transport_socket_config()->PackFrom(bytes_value);
     }
     auto factory_or_error = factory_.createTransportSocketFactory(config, context_, {});
     EXPECT_TRUE(factory_or_error.ok()) << factory_or_error.status().message();

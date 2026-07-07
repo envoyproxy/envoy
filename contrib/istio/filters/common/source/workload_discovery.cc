@@ -230,6 +230,21 @@ private:
 
 SINGLETON_MANAGER_REGISTRATION(workload_metadata_provider)
 
+// Holds the bootstrap-supplied ConfigSource so the provider singleton can be created lazily the
+// first time a filter looks it up via getProvider(). For statically configured listeners the
+// filter config factory runs on the main thread during config load -- after the cluster manager
+// exists but before the bootstrap extension's onServerInitialized() would otherwise create the
+// provider -- so deferring creation to getProvider() lets static config work too (dynamically
+// delivered listeners are created post-init and were already fine).
+class WorkloadDiscoveryConfigHolder : public Singleton::Instance {
+public:
+  explicit WorkloadDiscoveryConfigHolder(const envoy::config::core::v3::ConfigSource& config_source)
+      : config_source_(config_source) {}
+  const envoy::config::core::v3::ConfigSource config_source_;
+};
+
+SINGLETON_MANAGER_REGISTRATION(workload_discovery_config)
+
 class WorkloadDiscoveryExtension : public Server::BootstrapExtension {
 public:
   WorkloadDiscoveryExtension(Server::Configuration::ServerFactoryContext& factory_context,
@@ -238,11 +253,10 @@ public:
 
   // Server::Configuration::BootstrapExtension
   void onServerInitialized(Server::Instance&) override {
-    provider_ = factory_context_.singletonManager().getTyped<WorkloadMetadataProvider>(
-        SINGLETON_MANAGER_REGISTERED_NAME(workload_metadata_provider), [&] {
-          return std::make_shared<WorkloadMetadataProviderImpl>(config_.config_source(),
-                                                                factory_context_);
-        });
+    // Ensures the provider is created (loading workloads) even when no filter references it.
+    // If a statically configured filter already created it via GetProvider() during config load,
+    // this returns the existing instance.
+    provider_ = GetProvider(factory_context_);
   }
 
   void onWorkerThreadInitialized() override {};
@@ -262,6 +276,14 @@ public:
     const auto& message =
         MessageUtil::downcastAndValidate<const istio::workload::BootstrapExtension&>(
             config, context.messageValidationVisitor());
+    // Stash the config source (main thread, early) so getProvider() can lazily create the provider
+    // when a filter -- including a statically configured one -- first looks it up.
+    context.singletonManager().getTyped<WorkloadDiscoveryConfigHolder>(
+        SINGLETON_MANAGER_REGISTERED_NAME(workload_discovery_config),
+        [&]() mutable {
+          return std::make_shared<WorkloadDiscoveryConfigHolder>(message.config_source());
+        },
+        /*pin=*/true);
     return std::make_unique<WorkloadDiscoveryExtension>(context, message);
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -274,8 +296,27 @@ REGISTER_FACTORY(WorkloadDiscoveryFactory, Server::Configuration::BootstrapExten
 
 WorkloadMetadataProviderSharedPtr
 GetProvider(Server::Configuration::ServerFactoryContext& context) {
+  // If the provider already exists (created by the bootstrap extension's onServerInitialized(), or
+  // by an earlier lazy creation below) return it.
+  if (auto existing = context.singletonManager().getTyped<WorkloadMetadataProvider>(
+          SINGLETON_MANAGER_REGISTERED_NAME(workload_metadata_provider))) {
+    return existing;
+  }
+  // Otherwise create it now if the bootstrap extension stashed its config. This makes statically
+  // configured filters -- whose config factories run on the main thread during config load, before
+  // onServerInitialized() -- work too; if the holder is absent the extension is not configured.
+  auto config_holder = context.singletonManager().getTyped<WorkloadDiscoveryConfigHolder>(
+      SINGLETON_MANAGER_REGISTERED_NAME(workload_discovery_config));
+  if (config_holder == nullptr) {
+    return nullptr;
+  }
   return context.singletonManager().getTyped<WorkloadMetadataProvider>(
-      SINGLETON_MANAGER_REGISTERED_NAME(workload_metadata_provider));
+      SINGLETON_MANAGER_REGISTERED_NAME(workload_metadata_provider),
+      [&] {
+        return std::make_shared<WorkloadMetadataProviderImpl>(config_holder->config_source_,
+                                                              context);
+      },
+      /*pin=*/true);
 }
 
 } // namespace WorkloadDiscovery
