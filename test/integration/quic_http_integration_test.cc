@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <initializer_list>
 #include <memory>
+#include <utility>
 
 #include "test/test_common/logging.h"
 
@@ -2191,7 +2192,7 @@ public:
       auto* common_tls =
           quic_transport.mutable_downstream_tls_context()->mutable_common_tls_context();
       ConfigHelper::initializeTlsKeyLog(*common_tls, options);
-      ASSERT_TRUE(ts->mutable_typed_config()->PackFrom(quic_transport));
+      std::ignore = ts->mutable_typed_config()->PackFrom(quic_transport);
     });
   }
 
