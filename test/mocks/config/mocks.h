@@ -6,6 +6,8 @@
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/config/xds_config_tracker.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/callback_impl.h"
@@ -33,6 +35,47 @@ public:
                const std::string& system_version_info));
   MOCK_METHOD(void, onConfigUpdateFailed,
               (Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
+};
+
+class MockXdsConfigTracker : public XdsConfigTracker {
+public:
+  MockXdsConfigTracker();
+  ~MockXdsConfigTracker() override;
+
+  MOCK_METHOD(void, onConfigAccepted,
+              (const absl::string_view type_url, const std::vector<DecodedResourcePtr>& resources),
+              (override));
+  MOCK_METHOD(void, onConfigAccepted,
+              (const absl::string_view type_url,
+               absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+               const Protobuf::RepeatedPtrField<std::string>& removed_resources),
+              (override));
+  MOCK_METHOD(void, onConfigRejected,
+              (const envoy::service::discovery::v3::DiscoveryResponse& message,
+               const absl::string_view error_detail),
+              (override));
+  MOCK_METHOD(void, onConfigRejected,
+              (const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+               const absl::string_view error_detail),
+              (override));
+};
+
+class MockXdsResourcesDelegate : public XdsResourcesDelegate {
+public:
+  MockXdsResourcesDelegate();
+  ~MockXdsResourcesDelegate() override;
+
+  MOCK_METHOD(std::vector<envoy::service::discovery::v3::Resource>, getResources,
+              (const XdsSourceId& source_id,
+               const absl::flat_hash_set<std::string>& resource_names),
+              (const, override));
+  MOCK_METHOD(void, onConfigUpdated,
+              (const XdsSourceId& source_id, const std::vector<DecodedResourceRef>& resources),
+              (override));
+  MOCK_METHOD(void, onResourceLoadFailed,
+              (const XdsSourceId& source_id, const std::string& resource_name,
+               const std::optional<EnvoyException>& exception),
+              (override));
 };
 
 class MockOpaqueResourceDecoder : public OpaqueResourceDecoder {
