@@ -365,7 +365,14 @@ TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryNotResponding) {
   // before attempting to accept a second connection.
   bool second_failure_via_transient_failure = false;
   if (clientType() == Grpc::ClientType::GoogleGrpc) {
+    // Poll for up to 200*TIMEOUT_FACTOR ms (real time, no simulated clock advancement).
+    // The gRPC completion queue typically propagates the UNAVAILABLE failure to Envoy's
+    // main thread within a few milliseconds; 200ms (×TIMEOUT_FACTOR for slow builds)
+    // provides ample margin while still being much shorter than the 30s default timeout
+    // that would otherwise trigger the "don't use DefaultTimeout" test guard.
     const auto deadline = absl::Now() + absl::Milliseconds(200 * TIMEOUT_FACTOR);
+    // 5ms between polls: short enough to detect the failure promptly without busy-looping.
+    constexpr absl::Duration kPollInterval = absl::Milliseconds(5);
     while (absl::Now() < deadline) {
       const auto counter =
           TestUtility::findCounter(test_server_->statStore(), "cluster_manager.cds.update_failure");
@@ -373,7 +380,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryNotResponding) {
         second_failure_via_transient_failure = true;
         break;
       }
-      absl::SleepFor(absl::Milliseconds(5));
+      absl::SleepFor(kPollInterval);
     }
   }
   if (!second_failure_via_transient_failure) {
