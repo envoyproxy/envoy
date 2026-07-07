@@ -2765,7 +2765,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetAttributeBool) {
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetAttributeString) {
-  const absl::optional<std::string> details = "via_upstream";
+  const std::optional<std::string> details = "via_upstream";
   EXPECT_CALL(connection_.stream_info_, responseCodeDetails())
       .WillRepeatedly(testing::ReturnRef(details));
   envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
