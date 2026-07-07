@@ -24,7 +24,7 @@ private:
                                     const std::string& stats_prefix,
                                     Server::Configuration::FactoryContext& context) override;
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const ProtoConfig& proto_config, const std::string& stats_prefix,
       Server::Configuration::ServerFactoryContext& context) override;
 

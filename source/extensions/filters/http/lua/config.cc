@@ -25,7 +25,7 @@ absl::StatusOr<Http::FilterFactoryCb> LuaFilterConfig::createFilterFactoryFromPr
   };
 }
 
-Envoy::Http::FilterFactoryCb LuaFilterConfig::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Envoy::Http::FilterFactoryCb> LuaFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
   FilterConfigConstSharedPtr filter_config(

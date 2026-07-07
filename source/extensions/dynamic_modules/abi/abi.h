@@ -3268,6 +3268,15 @@ bool envoy_dynamic_module_callback_http_set_upstream_override_host(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer host, bool strict);
 
+/**
+ * Get the upstream connection ID.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @return the upstream connection ID, or 0 if not available.
+ */
+uint64_t envoy_dynamic_module_callback_http_get_upstream_connection_id(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
 // ------------------- Stream Control Callbacks -------------------------
 
 /**
@@ -4642,6 +4651,15 @@ bool envoy_dynamic_module_callback_network_filter_get_upstream_host_cluster(
  * @return true if an upstream host is set, false otherwise.
  */
 bool envoy_dynamic_module_callback_network_filter_has_upstream_host(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * Get the upstream connection ID.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return the upstream connection ID, or 0 if not available.
+ */
+uint64_t envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
 
 // ---------------------- StartTLS Support Callbacks ---------------------------

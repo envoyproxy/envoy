@@ -4,6 +4,8 @@
 #include <sys/stat.h>
 
 #include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -12,6 +14,8 @@
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Api {

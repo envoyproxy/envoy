@@ -77,7 +77,7 @@ metadata:
   SetMetadataConfig factory;
 
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
   cb(filter_callbacks);

@@ -92,41 +92,39 @@ public:
   // RefcountInterface
   void incRefCount() override { ref_count_.fetch_add(1, std::memory_order_relaxed); }
   bool decRefCount() override {
-    // Fast path: when this is not the last reference, drop it without taking
-    // the allocator's lock. The CAS loop only ever moves the count from
-    // observed values >= 2 to values >= 1, so it can never reach zero here;
-    // release ordering makes this thread's accesses to the stat visible to
-    // whichever thread ends up destroying it. Avoiding the lock matters for
-    // performance: flushing metrics to sinks briefly references every stat
-    // (see MetricSnapshotImpl), so with large stat counts a lock per release
-    // makes the ref-count a main-thread bottleneck during flushes (see
-    // #43836).
-    uint32_t count = ref_count_.load(std::memory_order_relaxed);
-    ASSERT(count >= 1);
-    while (count > 1) {
-      if (ref_count_.compare_exchange_weak(count, count - 1, std::memory_order_release,
-                                           std::memory_order_relaxed)) {
+    ASSERT(ref_count_ >= 1);
+    // Takes a snapshot of the current ref_count_
+    uint32_t ref_count_snapshot = ref_count_.load(std::memory_order_relaxed);
+
+    // Checks if ref_count_snapshot is 1. If it is 1, then a decrement would free memory, and we
+    // would need to acquire the allocator mutex.
+    //
+    // If ref_count_snapshot is > 1, then there are some important cases where thread
+    // interruptions might change what happens:
+    //
+    // First case: ref_count_ is unchanged (ref_count_ == ref_count_snapshot)
+    // Zero or more threads touch ref_count_ before compare_exchange_weak is called.
+    // compare_exchange_weak returns true, and decRefCount returns false.
+    //
+    // Second case: ref_count_ is changed (ref_count_ != ref_count_snapshot && ref_count_ > 1)
+    // One or more threads touch ref_count_ before compare_exchange_weak is called.
+    // compare_exchange_weak returns false, ref_count_snapshot is set to be ref_count_. Loop
+    // restarts.
+    //
+    // Third case: ref_count_ is changed (ref_count_ != ref_count_snapshot && ref_count <= 1)
+    // One or more threads touch ref_count_ before compare_exchange_weak is called.
+    // compare_exchange_weak returns false. ref_count_snapshot is set to be ref_count_. Loop
+    // restarts, but exits out of the while loop because conditional is false (a decrement would
+    // free memory; check start of comment).
+    while (ref_count_snapshot > 1) {
+      if (ref_count_.compare_exchange_weak(ref_count_snapshot, ref_count_snapshot - 1,
+                                           std::memory_order_acq_rel)) {
         return false;
       }
     }
-
-    // Slow path: we observed ourselves holding the last reference, so we must
-    // hold the allocator's lock for the final decrement. Otherwise another
-    // thread may simultaneously try to allocate the same name'd stat after we
-    // decrement it, and we'll wind up with a dtor/update race. To avoid this
-    // we must hold the lock until the stat is removed from the map.
-    //
-    // The observation above is only a hint: the count can rise again before
-    // we take the lock, if another thread re-shares this stat from the
-    // allocator's map (which requires the lock), in which case the decrement
-    // below does not hit zero and nothing is destroyed. It cannot fall below
-    // one, because our own reference is still counted. The transition to zero
-    // therefore always happens with the lock held, atomically with removal
-    // from the map. The sequentially-consistent decrement below also acquires
-    // the release sequence of all fast-path decrements, so every thread's
-    // accesses to the stat happen-before its destruction.
+    // Another thread may call incRefCount at this point. The lock path still does the right thing
+    // because the stat is not freed if ref_count_ is not 0.
     Thread::LockGuard lock(alloc_.mutex_);
-    ASSERT(ref_count_ >= 1);
     if (--ref_count_ == 0) {
       alloc_.sync().syncPoint(Allocator::DecrementToZeroSyncPoint);
       removeFromSetLockHeld();

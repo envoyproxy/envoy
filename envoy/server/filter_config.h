@@ -326,6 +326,30 @@ public:
 
   /**
    * Create a particular http filter factory implementation. If the implementation is unable to
+   * produce a factory with the provided parameters, it should return an error status.
+   * The returned callback should always be initialized.
+   *
+   * NOTE: for backwards compatibility, this method will default to calling
+   * createFilterFactoryFromProtoWithServerContext, which will throw an exception if not
+   * implemented. This new method will be used to replace
+   * createFilterFactoryFromProtoWithServerContext in the future and this delegation will be
+   * removed.
+   *
+   * @param config supplies the general Protobuf message to be marshaled into a filter-specific
+   * configuration.
+   * @param stat_prefix prefix for stat logging
+   * @param context supplies the filter's context.
+   * @return Http::FilterFactoryCb the factory creation function.
+   */
+  virtual absl::StatusOr<Http::FilterFactoryCb>
+  createHttpFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
+                                   Server::Configuration::ServerFactoryContext& context) {
+    // Delegate to createFilterFactoryFromProtoWithServerContext for backwards compatibility.
+    return createFilterFactoryFromProtoWithServerContext(config, stat_prefix, context);
+  }
+
+  /**
+   * Create a particular http filter factory implementation. If the implementation is unable to
    * produce a factory with the provided parameters or this method is not supported, it should throw
    * an EnvoyException. The returned callback should always be initialized.
    * @param config supplies the general Protobuf message to be marshaled into a filter-specific
@@ -334,6 +358,7 @@ public:
    * @param context supplies the filter's ServerFactoryContext.
    * @return Http::FilterFactoryCb the factory creation function.
    */
+  [[deprecated("Use createHttpFilterFactoryFromProto instead")]]
   virtual Http::FilterFactoryCb
   createFilterFactoryFromProtoWithServerContext(const Protobuf::Message&, const std::string&,
                                                 Server::Configuration::ServerFactoryContext&) {
