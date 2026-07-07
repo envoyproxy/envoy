@@ -26,7 +26,7 @@ public:
     return createFilterFactory(proto_config, stat_prefix, context, dual_info.scope,
                                dual_info.init_manager);
   }
-  Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const FilterConfig& proto_config, const std::string& stat_prefix,
       Server::Configuration::ServerFactoryContext& context) override;
 

@@ -2305,6 +2305,47 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, HasUpstreamHostNullCallbacks) 
 }
 
 // =============================================================================
+// Tests for get_upstream_connection_id.
+// =============================================================================
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetUpstreamConnectionId) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  upstream_info->setUpstreamConnectionId(54321);
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(upstream_info));
+  EXPECT_CALL(connection_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+
+  EXPECT_EQ(54321,
+            envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(filterPtr()));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetUpstreamConnectionIdMissing) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(upstream_info));
+  EXPECT_CALL(connection_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+
+  EXPECT_EQ(0,
+            envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(filterPtr()));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetUpstreamConnectionIdNoUpstreamInfo) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(connection_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+
+  EXPECT_EQ(0,
+            envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(filterPtr()));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetUpstreamConnectionIdNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+
+  EXPECT_EQ(0, envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(
+                   static_cast<void*>(filter.get())));
+}
+
+// =============================================================================
 // Tests for startUpstreamSecureTransport (StartTLS).
 // =============================================================================
 

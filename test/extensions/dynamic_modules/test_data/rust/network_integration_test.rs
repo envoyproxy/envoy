@@ -29,6 +29,7 @@ fn new_network_filter_config_fn<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkF
     "half_close" => Some(Box::new(HalfCloseFilterConfig)),
     "buffer_limits" => Some(Box::new(BufferLimitsFilterConfig)),
     "dynamic_metadata" => Some(Box::new(DynamicMetadataFilterConfig)),
+    "upstream_connection_id" => Some(Box::new(UpstreamConnectionIdFilterConfig)),
     _ => panic!("unknown filter name: {name}"),
   }
 }
@@ -373,6 +374,32 @@ impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for DynamicMetadataFilter {
       Some(vec![0xff, 0x00, 0xfe])
     );
 
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  }
+}
+
+// =============================================================================
+// Upstream Connection ID Test Filter
+// =============================================================================
+
+struct UpstreamConnectionIdFilterConfig;
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for UpstreamConnectionIdFilterConfig {
+  fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+    Box::new(UpstreamConnectionIdFilter)
+  }
+}
+
+struct UpstreamConnectionIdFilter;
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for UpstreamConnectionIdFilter {
+  fn on_write(
+    &mut self,
+    envoy_filter: &mut ENF,
+    _data_length: usize,
+    _end_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+    assert!(envoy_filter.get_upstream_connection_id() > 0);
     abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
   }
 }

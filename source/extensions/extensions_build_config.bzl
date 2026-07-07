@@ -406,6 +406,7 @@ EXTENSIONS = {
 
     "envoy.upstreams.http.dynamic_modules":              "//source/extensions/upstreams/http/dynamic_modules:config",
     "envoy.upstreams.http.http":                        "//source/extensions/upstreams/http/http:config",
+    "envoy.upstreams.http.reverse_tunnel":              "//source/extensions/upstreams/http/reverse_tunnel:config",
     "envoy.upstreams.http.tcp":                         "//source/extensions/upstreams/http/tcp:config",
     "envoy.upstreams.http.udp":                         "//source/extensions/upstreams/http/udp:config",
 

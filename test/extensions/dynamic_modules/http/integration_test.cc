@@ -172,6 +172,25 @@ TEST_P(DynamicModulesIntegrationTest, PassThrough) {
   EXPECT_EQ(10U, response->body().size());
 }
 
+TEST_P(DynamicModulesIntegrationTest, UpstreamConnectionId) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the upstream_connection_id filter is only in the rust test module";
+  }
+
+  initializeFilter("upstream_connection_id");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
 TEST_P(DynamicModulesIntegrationTest, HeaderCallbacks) { runHeaderCallbacksTest(false); }
 
 TEST_P(DynamicModulesIntegrationTest, HeaderCallbacksWithUpstreamFilter) {

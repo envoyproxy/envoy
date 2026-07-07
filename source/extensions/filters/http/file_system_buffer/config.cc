@@ -34,8 +34,8 @@ Http::FilterFactoryCb FileSystemBufferFilterFactory::createFilterFactoryFromProt
   };
 }
 
-Http::FilterFactoryCb
-FileSystemBufferFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+FileSystemBufferFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const ProtoFileSystemBufferFilterConfig& config,
     const std::string& stats_prefix ABSL_ATTRIBUTE_UNUSED,
     Server::Configuration::ServerFactoryContext& context) {
