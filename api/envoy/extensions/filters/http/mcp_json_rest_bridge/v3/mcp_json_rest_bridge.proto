@@ -280,7 +280,7 @@ message ToolConfig {
 //    - If specify a field: Only that specific argument becomes the HTTP JSON body.
 //    - If empty: No body is sent.
 // 3. Query: Any leaf arguments not mapped to Path or Body are added as URL query parameters.
-// [#next-free-field: 9]
+// [#next-free-field: 8]
 message HttpRule {
   // Represents a mapping from a request message field to an HTTP element.
   // If the specified argument is missing from the tools/call request, the binding is silently
@@ -290,15 +290,19 @@ message HttpRule {
     enum Type {
       // Unspecified element type.
       TYPE_UNSPECIFIED = 0;
+
       // The argument value is bound to an HTTP request header.
       // Conceptually maps to an OpenAPI parameter with ``in: header``.
       HEADER = 1;
+
       // The argument value is bound to an HTTP request cookie.
       // Conceptually maps to an OpenAPI parameter with ``in: cookie``.
       COOKIE = 2;
     }
+
     // The type of the HTTP element to bind to.
     Type type = 1;
+
     // The name of the HTTP header (e.g., "X-API-Key", "Authorization") or the
     // name of the cookie (e.g.,"SESSION_ID"). Note: Envoy normalizes the header names to lowercase.
     // The following headers are reserved for Envoy's internal use and cannot be overridden by
