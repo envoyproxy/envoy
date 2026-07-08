@@ -167,7 +167,7 @@ protocol: TWITTER
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THAT(factory.createFilterFactoryFromProto(*proto_config, "stats", context),
               HasStatus(absl::StatusCode::kInvalidArgument,
-                        "thrift_to_metadata filter: TWITTER protocol is not supported"));
+                        "thrift_to_metadata filter: Protocol TWITTER is not supported"));
 }
 
 TEST(Factory, BasicWithServerContext) {
