@@ -828,7 +828,6 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
     return;
   }
 
-  // TODO(guoyilin42): Consider supporting local response for tools/list in addition to the GET.
   if (method == McpConstants::Methods::TOOLS_LIST) {
     std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
         tool_list_local_tools = (per_route_config == nullptr)

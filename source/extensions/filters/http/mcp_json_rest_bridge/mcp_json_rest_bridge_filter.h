@@ -71,30 +71,41 @@ absl::string_view bridgeStatusToString(BridgeStatus status);
 
 namespace BridgeStatusValues {
 inline constexpr absl::string_view STATUS = "status";
-inline constexpr absl::string_view OK = "OK";
-inline constexpr absl::string_view REQUEST_NOT_POST = "REQUEST_NOT_POST";
-inline constexpr absl::string_view REQUEST_TOO_LARGE = "REQUEST_TOO_LARGE";
-inline constexpr absl::string_view REQUEST_PARSE_ERROR = "REQUEST_FAILED_TO_PARSE_JSON_RPC";
+inline constexpr absl::string_view OK = "mcp_json_rest_bridge_ok";
+inline constexpr absl::string_view REQUEST_NOT_POST = "mcp_json_rest_bridge_request_not_post";
+inline constexpr absl::string_view REQUEST_TOO_LARGE = "mcp_json_rest_bridge_request_too_large";
+inline constexpr absl::string_view REQUEST_PARSE_ERROR =
+    "mcp_json_rest_bridge_request_failed_to_parse_json_rpc";
 inline constexpr absl::string_view REQUEST_UNSUPPORTED_PROTOCOL_VERSION =
-    "REQUEST_UNSUPPORTED_PROTOCOL_VERSION";
+    "mcp_json_rest_bridge_request_unsupported_protocol_version";
 inline constexpr absl::string_view REQUEST_INITIALIZE_NOT_VALID =
-    "REQUEST_INITIALIZE_REQUEST_NOT_VALID";
-inline constexpr absl::string_view REQUEST_METHOD_NOT_SUPPORTED = "REQUEST_METHOD_NOT_SUPPORTED";
-inline constexpr absl::string_view REQUEST_METHOD_NOT_FOUND = "REQUEST_METHOD_NOT_FOUND";
-inline constexpr absl::string_view REQUEST_METHOD_NOT_STRING = "REQUEST_METHOD_NOT_STRING";
-inline constexpr absl::string_view REQUEST_ID_NOT_FOUND = "REQUEST_ID_NOT_FOUND";
-inline constexpr absl::string_view REQUEST_TOOL_PARAMS_NOT_FOUND = "REQUEST_TOOL_PARAMS_NOT_FOUND";
-inline constexpr absl::string_view REQUEST_TOOL_NAME_NOT_FOUND = "REQUEST_TOOL_NAME_NOT_FOUND";
-inline constexpr absl::string_view REQUEST_UNKNOWN_TOOL = "REQUEST_UNKNOWN_TOOL";
+    "mcp_json_rest_bridge_request_initialize_request_not_valid";
+inline constexpr absl::string_view REQUEST_METHOD_NOT_SUPPORTED =
+    "mcp_json_rest_bridge_request_method_not_supported";
+inline constexpr absl::string_view REQUEST_METHOD_NOT_FOUND =
+    "mcp_json_rest_bridge_request_method_not_found";
+inline constexpr absl::string_view REQUEST_METHOD_NOT_STRING =
+    "mcp_json_rest_bridge_request_method_not_string";
+inline constexpr absl::string_view REQUEST_ID_NOT_FOUND =
+    "mcp_json_rest_bridge_request_id_not_found";
+inline constexpr absl::string_view REQUEST_TOOL_PARAMS_NOT_FOUND =
+    "mcp_json_rest_bridge_request_tool_params_not_found";
+inline constexpr absl::string_view REQUEST_TOOL_NAME_NOT_FOUND =
+    "mcp_json_rest_bridge_request_tool_name_not_found";
+inline constexpr absl::string_view REQUEST_UNKNOWN_TOOL =
+    "mcp_json_rest_bridge_request_unknown_tool";
 inline constexpr absl::string_view REQUEST_TOOL_ARGUMENTS_INVALID =
-    "REQUEST_TOOL_ARGUMENTS_INVALID";
+    "mcp_json_rest_bridge_request_tool_arguments_invalid";
 inline constexpr absl::string_view REQUEST_TOOL_TRANSCODING_FAILURE =
-    "REQUEST_TOOL_TRANSCODING_FAILURE";
-inline constexpr absl::string_view REQUEST_PASSTHROUGH = "REQUEST_PASSTHROUGH";
-inline constexpr absl::string_view RESPONSE_TOO_LARGE = "RESPONSE_TOO_LARGE";
-inline constexpr absl::string_view RESPONSE_INVALID_UTF8 = "RESPONSE_INVALID_UTF8";
-inline constexpr absl::string_view RESPONSE_BACKEND_ERROR = "RESPONSE_BACKEND_ERROR";
-inline constexpr absl::string_view RESPONSE_PARSE_ERROR = "RESPONSE_FAILED_TO_PARSE_JSON";
+    "mcp_json_rest_bridge_request_tool_transcoding_failure";
+inline constexpr absl::string_view REQUEST_PASSTHROUGH = "mcp_json_rest_bridge_request_passthrough";
+inline constexpr absl::string_view RESPONSE_TOO_LARGE = "mcp_json_rest_bridge_response_too_large";
+inline constexpr absl::string_view RESPONSE_INVALID_UTF8 =
+    "mcp_json_rest_bridge_response_invalid_utf8";
+inline constexpr absl::string_view RESPONSE_BACKEND_ERROR =
+    "mcp_json_rest_bridge_response_backend_error";
+inline constexpr absl::string_view RESPONSE_PARSE_ERROR =
+    "mcp_json_rest_bridge_response_failed_to_parse_json";
 } // namespace BridgeStatusValues
 
 /**

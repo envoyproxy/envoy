@@ -8,7 +8,7 @@
       pass-through, and error states.
     - Export the status to dynamic metadata. The status defaults to OK on success,
       and is updated to the specific error status on failures.
-    - Record a specific status `mcp_json_rest_bridge_filter_request_passthrough`
+    - Record a specific status `mcp_json_rest_bridge_request_passthrough`
       in dynamic metadata when the filter falls back to pass-through mode due to
       missing configuration (e.g., an unconfigured `tools/list` request).
     - Export `backend_response_code` to dynamic metadata when the backend returns

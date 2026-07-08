@@ -86,7 +86,7 @@ TEST_F(McpJsonRestBridgeFilterTest, InitializeRequestReturnsServerInfoLocalRespo
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "OK",
+    "status": "mcp_json_rest_bridge_ok",
     "method": "initialize",
     "params": {
       "protocolVersion": "2025-06-18"
@@ -152,7 +152,7 @@ TEST_F(McpJsonRestBridgeFilterTest, NotificationsInitializedMethodReturnsAccepte
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "OK",
+    "status": "mcp_json_rest_bridge_ok",
     "method": "notifications/initialized"
   })json",
                             expected_metadata);
@@ -177,11 +177,11 @@ TEST_F(McpJsonRestBridgeFilterTest, MissingMethodFieldReturnsError) {
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Eq(Http::Code::BadRequest),
                              StrEq(R"json({"code":-32601,"message":"Missing method field"})json"),
-                             _, _, StrEq("REQUEST_METHOD_NOT_FOUND")));
+                             _, _, StrEq("mcp_json_rest_bridge_request_method_not_found")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "REQUEST_METHOD_NOT_FOUND"
+    "status": "mcp_json_rest_bridge_request_method_not_found"
   })json",
                             expected_metadata);
 
@@ -220,11 +220,11 @@ TEST_F(McpJsonRestBridgeFilterTest, UnsupportedMethodReturnsError) {
           Eq(Http::Code::BadRequest),
           StrEq(
               R"json({"code":-32601,"message":"Method unsupported_method is not supported"})json"),
-          _, _, StrEq("REQUEST_METHOD_NOT_SUPPORTED")));
+          _, _, StrEq("mcp_json_rest_bridge_request_method_not_supported")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "REQUEST_METHOD_NOT_SUPPORTED",
+    "status": "mcp_json_rest_bridge_request_method_not_supported",
     "method": "unsupported_method"
   })json",
                             expected_metadata);
@@ -263,11 +263,11 @@ TEST_F(McpJsonRestBridgeFilterTest, NonStringMethodReturnsError) {
       decoder_callbacks_,
       sendLocalReply(Eq(Http::Code::BadRequest),
                      StrEq(R"json({"code":-32601,"message":"Method field is not a string"})json"),
-                     _, _, StrEq("REQUEST_METHOD_NOT_STRING")));
+                     _, _, StrEq("mcp_json_rest_bridge_request_method_not_string")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "REQUEST_METHOD_NOT_STRING"
+    "status": "mcp_json_rest_bridge_request_method_not_string"
   })json",
                             expected_metadata);
 
@@ -304,11 +304,11 @@ TEST_F(McpJsonRestBridgeFilterTest, MissingIdFieldReturnsError) {
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Eq(Http::Code::BadRequest),
                              StrEq(R"json({"code":-32600,"message":"Missing ID field"})json"), _, _,
-                             StrEq("REQUEST_ID_NOT_FOUND")));
+                             StrEq("mcp_json_rest_bridge_request_id_not_found")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "REQUEST_ID_NOT_FOUND",
+    "status": "mcp_json_rest_bridge_request_id_not_found",
     "method": "tools/list"
   })json",
                             expected_metadata);
@@ -375,7 +375,7 @@ TEST_F(McpJsonRestBridgeFilterTest, IdFieldWithFloatReturnsError) {
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Eq(Http::Code::BadRequest),
                              StrEq(R"json({"code":-32600,"message":"Missing ID field"})json"), _, _,
-                             StrEq("REQUEST_ID_NOT_FOUND")));
+                             StrEq("mcp_json_rest_bridge_request_id_not_found")));
 
   Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","id":123.45,"method":"tools/list"})json");
   EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
@@ -405,11 +405,11 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidInputJsonReturnsError) {
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Eq(Http::Code::BadRequest),
                              StrEq(R"json({"code":-32700,"message":"JSON parse error"})json"), _, _,
-                             StrEq("REQUEST_FAILED_TO_PARSE_JSON_RPC")));
+                             StrEq("mcp_json_rest_bridge_request_failed_to_parse_json_rpc")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "REQUEST_FAILED_TO_PARSE_JSON_RPC"
+    "status": "mcp_json_rest_bridge_request_failed_to_parse_json_rpc"
   })json",
                             expected_metadata);
 
@@ -448,11 +448,11 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidProtocolVersionParamsReturnsError) {
           Eq(Http::Code::BadRequest),
           StrEq(
               R"json({"code":-32602,"message":"Missing valid protocolVersion in initialize request"})json"),
-          _, _, StrEq("REQUEST_INITIALIZE_REQUEST_NOT_VALID")));
+          _, _, StrEq("mcp_json_rest_bridge_request_initialize_request_not_valid")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "REQUEST_INITIALIZE_REQUEST_NOT_VALID",
+    "status": "mcp_json_rest_bridge_request_initialize_request_not_valid",
     "method": "initialize",
     "params": {
       "protocolVersion": 123
@@ -497,7 +497,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallRedirectUrlAndBodyToBackendResponseR
 
   Protobuf::Struct expected_request_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "OK",
+    "status": "mcp_json_rest_bridge_ok",
     "method": "tools/call",
     "params": {
       "name": "create_api_key",
@@ -517,7 +517,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallRedirectUrlAndBodyToBackendResponseR
 
   Protobuf::Struct expected_response_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "OK",
+    "status": "mcp_json_rest_bridge_ok",
     "method": "tools/call",
     "params": {
       "name": "create_api_key",
@@ -619,11 +619,11 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolNameNotFoundReturnsError) {
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Eq(Http::Code::BadRequest),
                              StrEq(R"json({"code":-32602,"message":"Tool name not found"})json"), _,
-                             _, StrEq("REQUEST_TOOL_NAME_NOT_FOUND")));
+                             _, StrEq("mcp_json_rest_bridge_request_tool_name_not_found")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "REQUEST_TOOL_NAME_NOT_FOUND",
+    "status": "mcp_json_rest_bridge_request_tool_name_not_found",
     "method": "tools/call"
   })json",
                             expected_metadata);
@@ -661,11 +661,11 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidToolNameReturnsError) {
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Eq(Http::Code::BadRequest),
                              StrEq(R"json({"code":-32602,"message":"Tool name not found"})json"), _,
-                             _, StrEq("REQUEST_TOOL_NAME_NOT_FOUND")));
+                             _, StrEq("mcp_json_rest_bridge_request_tool_name_not_found")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "REQUEST_TOOL_NAME_NOT_FOUND",
+    "status": "mcp_json_rest_bridge_request_tool_name_not_found",
     "method": "tools/call",
     "params": {
       "name": {}
@@ -708,11 +708,11 @@ TEST_F(McpJsonRestBridgeFilterTest, UnknownToolReturnsError) {
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Eq(Http::Code::BadRequest),
                              StrEq(R"json({"code":-32602,"message":"Unknown tool"})json"), _, _,
-                             StrEq("REQUEST_UNKNOWN_TOOL")));
+                             StrEq("mcp_json_rest_bridge_request_unknown_tool")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "REQUEST_UNKNOWN_TOOL",
+    "status": "mcp_json_rest_bridge_request_unknown_tool",
     "method": "tools/call",
     "params": {
       "name": "unknown_tool",
@@ -755,11 +755,11 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolParamsNotFoundReturnsError) {
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Eq(Http::Code::BadRequest),
                              StrEq(R"json({"code":-32602,"message":"Invalid params"})json"), _, _,
-                             StrEq("REQUEST_TOOL_PARAMS_NOT_FOUND")));
+                             StrEq("mcp_json_rest_bridge_request_tool_params_not_found")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "REQUEST_TOOL_PARAMS_NOT_FOUND",
+    "status": "mcp_json_rest_bridge_request_tool_params_not_found",
     "method": "tools/call"
   })json",
                             expected_metadata);
@@ -798,11 +798,11 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolTranscodingFailureReturnsError) {
       decoder_callbacks_,
       sendLocalReply(Eq(Http::Code::BadRequest),
                      StrEq(R"json({"code":-32602,"message":"Failed to build HTTP request"})json"),
-                     _, _, StrEq("REQUEST_TOOL_TRANSCODING_FAILURE")));
+                     _, _, StrEq("mcp_json_rest_bridge_request_tool_transcoding_failure")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "REQUEST_TOOL_TRANSCODING_FAILURE",
+    "status": "mcp_json_rest_bridge_request_tool_transcoding_failure",
     "method": "tools/call",
     "params": {
       "name": "create_api_key",
@@ -849,11 +849,11 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolArgumentsMustBeObjectReturnsError) {
               sendLocalReply(
                   Eq(Http::Code::BadRequest),
                   StrEq(R"json({"code":-32602,"message":"Tool arguments must be an object"})json"),
-                  _, _, StrEq("REQUEST_TOOL_ARGUMENTS_INVALID")));
+                  _, _, StrEq("mcp_json_rest_bridge_request_tool_arguments_invalid")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "REQUEST_TOOL_ARGUMENTS_INVALID",
+    "status": "mcp_json_rest_bridge_request_tool_arguments_invalid",
     "method": "tools/call",
     "params": {
       "name": "create_api_key",
@@ -934,7 +934,7 @@ TEST_F(McpJsonRestBridgeFilterTest, BackendErrorReturnsToolCallError) {
     testing::InSequence s;
     Protobuf::Struct expected_request_metadata;
     MessageUtil::loadFromJson(R"json({
-      "status": "OK",
+      "status": "mcp_json_rest_bridge_ok",
       "method": "tools/call",
       "params": {
         "name": "create_api_key",
@@ -954,7 +954,7 @@ TEST_F(McpJsonRestBridgeFilterTest, BackendErrorReturnsToolCallError) {
 
     Protobuf::Struct expected_response_metadata;
     MessageUtil::loadFromJson(R"json({
-      "status": "RESPONSE_BACKEND_ERROR",
+      "status": "mcp_json_rest_bridge_response_backend_error",
       "method": "tools/call",
       "params": {
         "name": "create_api_key",
@@ -1008,7 +1008,7 @@ TEST_F(McpJsonRestBridgeFilterTest, RejectInvalidUtf8BackendResponse) {
     testing::InSequence s;
     Protobuf::Struct expected_request_metadata;
     MessageUtil::loadFromJson(R"json({
-      "status": "OK",
+      "status": "mcp_json_rest_bridge_ok",
       "method": "tools/call",
       "params": {
         "name": "create_api_key",
@@ -1028,7 +1028,7 @@ TEST_F(McpJsonRestBridgeFilterTest, RejectInvalidUtf8BackendResponse) {
 
     Protobuf::Struct expected_response_metadata;
     MessageUtil::loadFromJson(R"json({
-      "status": "RESPONSE_INVALID_UTF8",
+      "status": "mcp_json_rest_bridge_response_invalid_utf8",
       "method": "tools/call",
       "params": {
         "name": "create_api_key",
@@ -1083,7 +1083,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolListRewritePathForRequestAndTranslateRes
     testing::InSequence s;
     Protobuf::Struct expected_request_metadata;
     MessageUtil::loadFromJson(R"json({
-      "status": "OK",
+      "status": "mcp_json_rest_bridge_ok",
       "method": "tools/list"
     })json",
                               expected_request_metadata);
@@ -1094,7 +1094,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolListRewritePathForRequestAndTranslateRes
 
     Protobuf::Struct expected_response_metadata;
     MessageUtil::loadFromJson(R"json({
-      "status": "OK",
+      "status": "mcp_json_rest_bridge_ok",
       "method": "tools/list",
       "backend_response_code": 200
     })json",
@@ -1152,7 +1152,7 @@ tool_config:
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "REQUEST_PASSTHROUGH",
+    "status": "mcp_json_rest_bridge_request_passthrough",
     "method": "tools/list"
   })json",
                             expected_metadata);
@@ -1238,7 +1238,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ErrorToolListResponseReturnsServerError) {
     testing::InSequence s;
     Protobuf::Struct expected_request_metadata;
     MessageUtil::loadFromJson(R"json({
-      "status": "OK",
+      "status": "mcp_json_rest_bridge_ok",
       "method": "tools/list"
     })json",
                               expected_request_metadata);
@@ -1249,7 +1249,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ErrorToolListResponseReturnsServerError) {
 
     Protobuf::Struct expected_response_metadata;
     MessageUtil::loadFromJson(R"json({
-      "status": "RESPONSE_BACKEND_ERROR",
+      "status": "mcp_json_rest_bridge_response_backend_error",
       "method": "tools/list",
       "backend_response_code": 500
     })json",
@@ -1289,7 +1289,7 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidToolListResponseReturnsServerError) {
     testing::InSequence s;
     Protobuf::Struct expected_request_metadata;
     MessageUtil::loadFromJson(R"json({
-      "status": "OK",
+      "status": "mcp_json_rest_bridge_ok",
       "method": "tools/list"
     })json",
                               expected_request_metadata);
@@ -1300,7 +1300,7 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidToolListResponseReturnsServerError) {
 
     Protobuf::Struct expected_response_metadata;
     MessageUtil::loadFromJson(R"json({
-      "status": "RESPONSE_FAILED_TO_PARSE_JSON",
+      "status": "mcp_json_rest_bridge_response_failed_to_parse_json",
       "method": "tools/list",
       "backend_response_code": 200
     })json",
@@ -1340,7 +1340,7 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidResponseStatusCodeReturnsServerError)
     testing::InSequence s;
     Protobuf::Struct expected_request_metadata;
     MessageUtil::loadFromJson(R"json({
-      "status": "OK",
+      "status": "mcp_json_rest_bridge_ok",
       "method": "tools/list"
     })json",
                               expected_request_metadata);
@@ -1351,7 +1351,7 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidResponseStatusCodeReturnsServerError)
 
     Protobuf::Struct expected_response_metadata;
     MessageUtil::loadFromJson(R"json({
-      "status": "RESPONSE_BACKEND_ERROR",
+      "status": "mcp_json_rest_bridge_response_backend_error",
       "method": "tools/list",
       "backend_response_code": 500
     })json",
@@ -1483,11 +1483,11 @@ TEST_F(McpJsonRestBridgeFilterTest,
       decoder_callbacks_,
       sendLocalReply(Eq(Http::Code::BadRequest),
                      StrEq(R"json({"code":-32602,"message":"Unsupported protocol version"})json"),
-                     _, _, StrEq("REQUEST_UNSUPPORTED_PROTOCOL_VERSION")));
+                     _, _, StrEq("mcp_json_rest_bridge_request_unsupported_protocol_version")));
   Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","method":"notifications/initialized"})json");
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "REQUEST_UNSUPPORTED_PROTOCOL_VERSION",
+    "status": "mcp_json_rest_bridge_request_unsupported_protocol_version",
     "method": "notifications/initialized"
   })json",
                             expected_metadata);
@@ -1545,11 +1545,11 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListUnsupportedProtocolVersionReturnsBa
       decoder_callbacks_,
       sendLocalReply(Eq(Http::Code::BadRequest),
                      StrEq(R"json({"code":-32602,"message":"Unsupported protocol version"})json"),
-                     _, _, StrEq("REQUEST_UNSUPPORTED_PROTOCOL_VERSION")));
+                     _, _, StrEq("mcp_json_rest_bridge_request_unsupported_protocol_version")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "REQUEST_UNSUPPORTED_PROTOCOL_VERSION",
+    "status": "mcp_json_rest_bridge_request_unsupported_protocol_version",
     "method": "tools/list"
   })json",
                             expected_metadata);
@@ -1587,7 +1587,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListSupportedProtocolVersionProcessRequ
   Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","id":123,"method":"tools/list"})json");
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "OK",
+    "status": "mcp_json_rest_bridge_ok",
     "method": "tools/list"
   })json",
                             expected_metadata);
@@ -1612,7 +1612,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsCallUnsupportedProtocolVersionReturnsBa
       decoder_callbacks_,
       sendLocalReply(Eq(Http::Code::BadRequest),
                      StrEq(R"json({"code":-32602,"message":"Unsupported protocol version"})json"),
-                     _, _, StrEq("REQUEST_UNSUPPORTED_PROTOCOL_VERSION")));
+                     _, _, StrEq("mcp_json_rest_bridge_request_unsupported_protocol_version")));
   Buffer::OwnedImpl body(
       R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"list_api_keys","arguments":{"parent":"projects/test-codelab","pageSize":1}}})json");
   EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
@@ -1695,12 +1695,12 @@ max_request_body_size:
 
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Eq(Http::Code::PayloadTooLarge), _, _, _, StrEq("REQUEST_TOO_LARGE")));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Eq(Http::Code::PayloadTooLarge), _, _, _,
+                                                 StrEq("mcp_json_rest_bridge_request_too_large")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "REQUEST_TOO_LARGE"
+    "status": "mcp_json_rest_bridge_request_too_large"
   })json",
                             expected_metadata);
 
@@ -1741,7 +1741,7 @@ tool_config:
             Http::FilterHeadersStatus::StopIteration);
   Protobuf::Struct expected_request_metadata;
   MessageUtil::loadFromJson(R"json({
-      "status": "OK",
+      "status": "mcp_json_rest_bridge_ok",
       "method": "tools/call",
       "params": {
         "name": "create_api_key",
@@ -1761,7 +1761,7 @@ tool_config:
 
   Protobuf::Struct expected_response_metadata;
   MessageUtil::loadFromJson(R"json({
-      "status": "RESPONSE_TOO_LARGE",
+      "status": "mcp_json_rest_bridge_response_too_large",
       "method": "tools/call",
       "params": {
         "name": "create_api_key",
@@ -1790,7 +1790,7 @@ tool_config:
           Eq(Http::Code::InternalServerError),
           StrEq(
               R"json({"error":{"code":-32000,"message":"Response body too large"},"id":123,"jsonrpc":"2.0"})json"),
-          _, _, StrEq("RESPONSE_TOO_LARGE")));
+          _, _, StrEq("mcp_json_rest_bridge_response_too_large")));
   Buffer::OwnedImpl body("12345678901"); // 11 bytes
   EXPECT_EQ(filter_->encodeData(body, /*end_stream=*/true),
             Http::FilterDataStatus::StopIterationNoBuffer);
@@ -2427,11 +2427,11 @@ TEST_P(McpHttpMethodFilterTest, NonPostMethodsReturnMethodNotAllowed) {
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Eq(Http::Code::MethodNotAllowed), StrEq("Method Not Allowed"), _,
                              Eq(Grpc::Status::WellKnownGrpcStatus::InvalidArgument),
-                             StrEq("REQUEST_NOT_POST")));
+                             StrEq("mcp_json_rest_bridge_request_not_post")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "REQUEST_NOT_POST"
+    "status": "mcp_json_rest_bridge_request_not_post"
   })json",
                             expected_metadata);
 
@@ -2648,7 +2648,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsCallPerRouteConfigOverridesStaticTool) 
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Eq(Http::Code::BadRequest),
                              StrEq(R"json({"code":-32602,"message":"Unknown tool"})json"), _, _,
-                             StrEq("REQUEST_UNKNOWN_TOOL")));
+                             StrEq("mcp_json_rest_bridge_request_unknown_tool")));
 
   Buffer::OwnedImpl body(
       R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"static_only_tool","arguments":{}}})json");
