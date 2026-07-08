@@ -6,6 +6,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -19,6 +20,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace OnDemand {
+
+using StatusHelpers::HasStatus;
 
 class OnDemandFilterTest : public testing::Test {
 public:
@@ -327,15 +330,20 @@ TEST(OnDemandConfigTest, Basic) {
   ProtobufMessage::StrictValidationVisitorImpl visitor;
   envoy::extensions::filters::http::on_demand::v3::OnDemand config;
 
-  OnDemandFilterConfig config1(config, cm, visitor);
+  absl::Status status1 = absl::OkStatus();
+  OnDemandFilterConfig config1(config, cm, visitor, status1);
+  EXPECT_TRUE(status1.ok());
 
   config.mutable_odcds();
-  OnDemandFilterConfig config2(config, cm, visitor);
+  absl::Status status2 = absl::OkStatus();
+  OnDemandFilterConfig config2(config, cm, visitor, status2);
+  EXPECT_TRUE(status2.ok());
 
   config.mutable_odcds()->set_resources_locator("foo");
-  EXPECT_THROW_WITH_MESSAGE(
-      { OnDemandFilterConfig config3(config, cm, visitor); }, EnvoyException,
-      "foo does not have a xdstp:, http: or file: scheme");
+  absl::Status status3 = absl::OkStatus();
+  OnDemandFilterConfig config3(config, cm, visitor, status3);
+  EXPECT_THAT(status3, HasStatus(absl::StatusCode::kInvalidArgument,
+                                 "foo does not have a xdstp:, http: or file: scheme"));
 }
 
 } // namespace OnDemand
