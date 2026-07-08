@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <vector>
 
 #include "contrib/kafka/filters/network/source/mesh/librdkafka_utils.h"
