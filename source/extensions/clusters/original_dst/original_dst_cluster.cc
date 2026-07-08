@@ -239,18 +239,26 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
   HostVectorSharedPtr all_hosts(new HostVector(first_host_set.hosts()));
   all_hosts->emplace_back(host);
 
-  // updateHostsParams() called without partitioning the hosts, because health does not matter for
-  // ORIGINAL_DST clusters (hosts are used without regard for health signal).
-  auto healthy_hosts = std::make_shared<HealthyHostVector>(*all_hosts);
-  auto degraded_hosts = std::make_shared<DegradedHostVector>();
-  auto excluded_hosts = std::make_shared<ExcludedHostVector>();
-  priority_set_.updateHosts(
-      0,
-      HostSetImpl::updateHostsParams(std::move(all_hosts), HostsPerLocalityImpl::empty(),
-                                     std::move(healthy_hosts), HostsPerLocalityImpl::empty(),
-                                     std::move(degraded_hosts), HostsPerLocalityImpl::empty(),
-                                     std::move(excluded_hosts), HostsPerLocalityImpl::empty()),
-      {}, {std::move(host)}, {}, absl::nullopt, absl::nullopt);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.skip_partition_original_dst_hosts")) {
+    // OriginalDstCluster::LoadBalancer selects the exact destination address from host_map_ and
+    // does not consult HostSet health partitions. Preserve all hosts in healthy_hosts so that host
+    // set updates expose the complete routable destination set.
+    auto healthy_hosts = std::make_shared<HealthyHostVector>(*all_hosts);
+    auto degraded_hosts = std::make_shared<DegradedHostVector>();
+    auto excluded_hosts = std::make_shared<ExcludedHostVector>();
+    priority_set_.updateHosts(
+        0,
+        HostSetImpl::updateHostsParams(std::move(all_hosts), HostsPerLocalityImpl::empty(),
+                                       std::move(healthy_hosts), HostsPerLocalityImpl::empty(),
+                                       std::move(degraded_hosts), HostsPerLocalityImpl::empty(),
+                                       std::move(excluded_hosts), HostsPerLocalityImpl::empty()),
+        {}, {std::move(host)}, {}, absl::nullopt, absl::nullopt);
+  } else {
+    priority_set_.updateHosts(0,
+                              HostSetImpl::partitionHosts(all_hosts, HostsPerLocalityImpl::empty()),
+                              {}, {std::move(host)}, {}, absl::nullopt, absl::nullopt);
+  }
 }
 
 void OriginalDstCluster::cleanup() {
@@ -319,19 +327,26 @@ void OriginalDstCluster::cleanup() {
       new_host_map->erase(addr);
     }
     setHostMap(new_host_map);
-
-    // updateHostsParams() called without partitioning the hosts, because health does not matter for
-    // ORIGINAL_DST clusters (hosts are used without regard for health signal).
-    auto healthy_hosts = std::make_shared<HealthyHostVector>(*keeping_hosts);
-    auto degraded_hosts = std::make_shared<DegradedHostVector>();
-    auto excluded_hosts = std::make_shared<ExcludedHostVector>();
-    priority_set_.updateHosts(
-        0,
-        HostSetImpl::updateHostsParams(std::move(keeping_hosts), HostsPerLocalityImpl::empty(),
-                                       std::move(healthy_hosts), HostsPerLocalityImpl::empty(),
-                                       std::move(degraded_hosts), HostsPerLocalityImpl::empty(),
-                                       std::move(excluded_hosts), HostsPerLocalityImpl::empty()),
-        {}, {}, to_be_removed, false, absl::nullopt);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.skip_partition_original_dst_hosts")) {
+      // OriginalDstCluster::LoadBalancer selects the exact destination address from host_map_ and
+      // does not consult HostSet health partitions. Preserve all hosts in healthy_hosts so that
+      // host set updates expose the complete routable destination set.
+      auto healthy_hosts = std::make_shared<HealthyHostVector>(*keeping_hosts);
+      auto degraded_hosts = std::make_shared<DegradedHostVector>();
+      auto excluded_hosts = std::make_shared<ExcludedHostVector>();
+      priority_set_.updateHosts(
+          0,
+          HostSetImpl::updateHostsParams(std::move(keeping_hosts), HostsPerLocalityImpl::empty(),
+                                         std::move(healthy_hosts), HostsPerLocalityImpl::empty(),
+                                         std::move(degraded_hosts), HostsPerLocalityImpl::empty(),
+                                         std::move(excluded_hosts), HostsPerLocalityImpl::empty()),
+          {}, {}, to_be_removed, false, absl::nullopt);
+    } else {
+      priority_set_.updateHosts(
+          0, HostSetImpl::partitionHosts(keeping_hosts, HostsPerLocalityImpl::empty()), {}, {},
+          to_be_removed, false, absl::nullopt);
+    }
   }
 
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
