@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
 
+#include <limits>
+
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
@@ -159,7 +161,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
             absl::SimpleAtoi(length_headers[0]->value().getStringView().substr(
                                  0, length_headers[0]->value().getStringView().find(',')),
                              &response_message_length_)) {
-          headers.setContentLength(response_message_length_ + Grpc::GRPC_FRAME_HEADER_SIZE);
+          headers.setContentLength(static_cast<uint64_t>(response_message_length_) +
+                                   Grpc::GRPC_FRAME_HEADER_SIZE);
         } else {
           // If the response from upstream does not specify the content length, stand in an error
           // message.
@@ -177,9 +180,19 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
         uint64_t content_length = 0;
         if (!length_header.empty() && absl::SimpleAtoi(length_header, &content_length) &&
             content_length > 0) {
+          // A single protobuf message cannot exceed 2GB.
+          if (content_length > std::numeric_limits<uint32_t>::max()) {
+            decoder_callbacks_->sendLocalReply(
+                Http::Code::OK,
+                "envoy reverse bridge: upstream response too large for gRPC frame", nullptr,
+                Grpc::Status::WellKnownGrpcStatus::Internal,
+                RcDetails::get().GrpcBridgeFailedWrongContentLength);
+            return Http::FilterHeadersStatus::StopIteration;
+          }
           response_message_length_ = static_cast<uint32_t>(content_length);
           content_length_from_header_ = true;
-          headers.setContentLength(response_message_length_ + Grpc::GRPC_FRAME_HEADER_SIZE);
+          headers.setContentLength(static_cast<uint64_t>(response_message_length_) +
+                                   Grpc::GRPC_FRAME_HEADER_SIZE);
         } else {
           // No Content-Length available; fall back to buffering the entire response.
           adjustContentLength(headers,

@@ -1112,6 +1112,41 @@ TEST_F(ReverseBridgeTest, WithholdGrpcFramesContentLengthMismatch) {
   }
 }
 
+// Verify that a Content-Length exceeding uint32_t max is rejected with a local reply
+// (a single protobuf message cannot exceed 2GB).
+TEST_F(ReverseBridgeTest, WithholdGrpcFramesContentLengthTooLarge) {
+  initialize();
+  decoder_callbacks_.is_grpc_request_ = true;
+
+  {
+    EXPECT_CALL(decoder_callbacks_, route())
+        .WillRepeatedly(Return(OptRef<const Router::Route>{}));
+    EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+    Http::TestRequestHeaderMapImpl headers({{"content-type", "application/grpc"},
+                                            {"content-length", "25"},
+                                            {":path", "/testing.ExampleService/SendData"}});
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  }
+
+  {
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("abcdefgh", 8);
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
+  }
+
+  // Upstream claims Content-Length larger than uint32_t max.
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Http::Code::OK,
+                     "envoy reverse bridge: upstream response too large for gRPC frame", _,
+                     std::make_optional(static_cast<Grpc::Status::GrpcStatus>(Grpc::Status::Internal)), _));
+
+  Http::TestResponseHeaderMapImpl headers({{":status", "200"},
+                                            {"content-length", "5000000000"},
+                                            {"content-type", "application/x-protobuf"}});
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->encodeHeaders(headers, false));
+}
+
 } // namespace
 } // namespace GrpcHttp1ReverseBridge
 } // namespace HttpFilters
