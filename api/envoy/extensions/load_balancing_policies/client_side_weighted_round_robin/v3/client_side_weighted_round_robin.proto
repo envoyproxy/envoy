@@ -34,11 +34,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // For a load report to update an endpoint's weight it must set :ref:`rps_fractional
 // <envoy_v3_api_field_.xds.data.orca.v3.OrcaLoadReport.rps_fractional>` (used as
-// qps) greater than 0 and provide a utilization signal greater than 0 (see
+// qps) greater than 0, and the resolved utilization (see
 // :ref:`metric_names_for_computing_utilization
-// <envoy_v3_api_field_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin.metric_names_for_computing_utilization>`).
-// Reports that fail to do so are ignored, and an endpoint with no valid weight is
-// assigned the median weight of the endpoints that have one.
+// <envoy_v3_api_field_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin.metric_names_for_computing_utilization>`)
+// must be greater than 0. Reports that fail to do so are ignored, and an endpoint
+// with no valid weight is assigned the median weight of the endpoints that have one.
 //
 // Note that Envoy will forward the ORCA response headers/trailers from the upstream
 // cluster to the downstream client. This means that if the downstream client is also
