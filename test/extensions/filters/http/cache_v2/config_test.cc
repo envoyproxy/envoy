@@ -51,19 +51,17 @@ TEST_F(CacheFilterFactoryTest, Disabled) {
 
 TEST_F(CacheFilterFactoryTest, NoTypedConfig) {
   auto status_or = factory_.createFilterFactoryFromProto(config_, "stats", context_);
-  EXPECT_THAT(status_or,
-              HasStatus(absl::StatusCode::kInvalidArgument,
-                        "at least one of typed_config or disabled must be set"));
+  EXPECT_THAT(status_or, HasStatus(absl::StatusCode::kInvalidArgument,
+                                   "at least one of typed_config or disabled must be set"));
 }
 
 TEST_F(CacheFilterFactoryTest, UnregisteredTypedConfig) {
   std::ignore = config_.mutable_typed_config()->PackFrom(
       envoy::extensions::filters::http::cache_v2::v3::CacheV2Config());
   auto status_or = factory_.createFilterFactoryFromProto(config_, "stats", context_);
-  EXPECT_THAT(status_or,
-              HasStatus(absl::StatusCode::kInvalidArgument,
-                        "Didn't find a registered implementation for type: "
-                        "'envoy.extensions.filters.http.cache_v2.v3.CacheV2Config'"));
+  EXPECT_THAT(status_or, HasStatus(absl::StatusCode::kInvalidArgument,
+                                   "Didn't find a registered implementation for type: "
+                                   "'envoy.extensions.filters.http.cache_v2.v3.CacheV2Config'"));
 }
 
 class FailToCreateCacheFactory : public HttpCacheFactory {
