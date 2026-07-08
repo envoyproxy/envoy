@@ -146,10 +146,11 @@ TEST_F(QuicPlatformTest, QuicServerStats) {
 }
 
 TEST_F(QuicPlatformTest, QuicStackTraceTest) {
-#if !defined(ENVOY_CONFIG_COVERAGE) && !defined(GCC_COMPILER)
+#if !defined(ENVOY_CONFIG_COVERAGE) && !defined(GCC_COMPILER) && !(defined(__s390x__) && defined(NDEBUG))
   // This doesn't work in coverage build because part of the stacktrace will be overwritten by
   // __llvm_coverage_mapping
   // Stack trace under gcc with optimizations on (-c opt) doesn't include the test name
+  // Stack trace on s390x optimized builds do not preserve the test name
   EXPECT_THAT(QuicStackTrace(), HasSubstr("QuicStackTraceTest"));
 #endif
 }
