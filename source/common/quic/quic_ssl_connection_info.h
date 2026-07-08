@@ -8,6 +8,27 @@
 namespace Envoy {
 namespace Quic {
 
+namespace {
+std::string GetTlsVersionFromString(absl::string_view quiche_version) {
+  if (quiche_version == "TLS_VERSION_1_3") {
+    return "TLSv1.3";
+  }
+  if (quiche_version == "TLS_VERSION_1_2") {
+    return "TLSv1.2";
+  }
+  if (quiche_version == "TLS_VERSION_1_1") {
+    return "TLSv1.1";
+  }
+  if (quiche_version == "TLS_VERSION_1_0" || quiche_version == "TLS_VERSION_1") {
+    return "TLSv1";
+  }
+  if (quiche_version == "TLS_VERSION_QUIC") {
+    return "QUIC";
+  }
+  return std::string(quiche_version);
+}
+} // namespace
+
 // A wrapper of a QUIC session to be passed around as an indicator of ssl support and to provide
 // access to the SSL object in QUIC crypto stream.
 class QuicSslConnectionInfo : public Extensions::TransportSockets::Tls::ConnectionInfoImplBase {
@@ -51,7 +72,7 @@ public:
     if (!tls_version_.has_value()) {
       auto* crypto_stream = session_.GetCryptoStream();
       QUICHE_DCHECK(crypto_stream != nullptr);
-      tls_version_ = std::string(crypto_stream->TlsVersion());
+      tls_version_ = GetTlsVersionFromString(crypto_stream->TlsVersion());
     }
     return *tls_version_;
   }
