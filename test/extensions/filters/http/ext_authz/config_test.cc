@@ -2,11 +2,13 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
+#include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/grpc/async_client_manager_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/thread_local/thread_local_impl.h"
+#include "source/extensions/filters/http/ext_authz/auth_cache.h"
 #include "source/extensions/filters/http/ext_authz/config.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
@@ -717,6 +719,70 @@ TEST_F(ExtAuthzFilterGrpcTest, GoogleGrpc) {
   failure_mode_allow: false
   )EOF";
   testFilterFactoryAndFilterWithGrpcClient(ext_authz_config_yaml);
+}
+
+class MockAuthCacheSession : public AuthCacheSession {
+public:
+  MockAuthCacheSession() = default;
+  ~MockAuthCacheSession() override = default;
+
+  MOCK_METHOD(LookupRequest*, lookup,
+              (Http::StreamDecoderFilterCallbacks&, const RequestAttributes&, LookupCallback&&));
+  MOCK_METHOD(void, insert, (const Filters::Common::ExtAuthz::Response&));
+};
+
+class MockAuthCache : public AuthCache {
+public:
+  MockAuthCache() = default;
+  ~MockAuthCache() override = default;
+
+  MOCK_METHOD(AuthCacheSessionPtr, createSession, ());
+};
+
+class MockAuthCacheFactory : public AuthCacheFactory {
+public:
+  MockAuthCacheFactory() = default;
+  ~MockAuthCacheFactory() override = default;
+
+  // TypedFactory
+  std::string name() const override { return "envoy.filters.http.ext_authz.cache.mock"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute>();
+  }
+
+  // AuthCacheFactory
+  AuthCachePtr createAuthCache(const Protobuf::Message&,
+                               Server::Configuration::ServerFactoryContext&) override {
+    auto cache = std::make_unique<NiceMock<MockAuthCache>>();
+    ON_CALL(*cache, createSession()).WillByDefault(Invoke([]() {
+      return std::make_unique<NiceMock<MockAuthCacheSession>>();
+    }));
+    return cache;
+  }
+};
+
+static Registry::RegisterFactory<MockAuthCacheFactory, AuthCacheFactory>
+    register_mock_cache_factory_;
+
+TEST_F(ExtAuthzFilterTest, ConfigWithCache) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+  cache:
+    name: envoy.filters.http.ext_authz.cache.mock
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
+  )EOF";
+
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  Http::FilterFactoryCb cb = createFilterFactory(proto_config);
+  Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(cb);
+  EXPECT_NE(filter, nullptr);
 }
 
 } // namespace ExtAuthz

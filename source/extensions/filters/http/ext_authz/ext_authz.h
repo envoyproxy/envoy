@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -29,6 +30,7 @@
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/common/processing_effect/processing_effect.h"
+#include "source/extensions/filters/http/ext_authz/auth_cache.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -188,7 +190,8 @@ class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                Stats::Scope& scope, const std::string& stats_prefix,
-               Server::Configuration::ServerFactoryContext& factory_context);
+               Server::Configuration::ServerFactoryContext& factory_context,
+               AuthCachePtr cache = nullptr);
 
   bool allowPartialMessage() const { return allow_partial_message_; }
 
@@ -262,6 +265,8 @@ public:
   }
 
   const ExtAuthzFilterStats& stats() const { return stats_; }
+
+  AuthCache* cache() const { return cache_.get(); }
 
   void incCounter(Stats::Scope& scope, Stats::StatName name) {
     scope.counterFromStatName(name).inc();
@@ -363,6 +368,7 @@ public:
   const Stats::StatName ext_authz_error_;
   const Stats::StatName ext_authz_invalid_;
   const Stats::StatName ext_authz_failure_mode_allowed_;
+  const AuthCachePtr cache_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -454,13 +460,16 @@ class Filter : public Logger::Loggable<Logger::Id::ext_authz>,
                public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
   Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client)
-      : config_(config), client_(std::move(client)), stats_(config->stats()) {}
+      : config_(config), client_(std::move(client)),
+        cache_session_(config->cache() != nullptr ? config->cache()->createSession() : nullptr),
+        stats_(config->stats()) {}
 
   // Constructor that includes server context for per-route service support.
   Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client,
          Server::Configuration::ServerFactoryContext& server_context)
-      : config_(config), client_(std::move(client)), server_context_(&server_context),
-        stats_(config->stats()) {}
+      : config_(config), client_(std::move(client)),
+        cache_session_(config->cache() != nullptr ? config->cache()->createSession() : nullptr),
+        server_context_(&server_context), stats_(config->stats()) {}
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -526,6 +535,9 @@ private:
   std::optional<MonotonicTime> start_time_;
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers);
+  RequestAttributes collectAttributes(const Http::RequestHeaderMap& headers);
+  void callAuthzService();
+  void onCacheLookupComplete(Filters::Common::ExtAuthz::ResponsePtr&& response);
   void continueDecoding();
   // In shadow mode, writes the authorization decision and response attributes into
   // FilterState and increments the appropriate shadow stat counter. Takes the response
@@ -544,9 +556,9 @@ private:
   PerRouteFlags getPerRouteFlags(OptRef<const Router::Route> route) const;
 
   // State of this filter's communication with the external authorization service.
-  // The filter has either not started calling the external service, in the middle of calling
-  // it or has completed.
-  enum class State { NotStarted, Calling, Complete };
+  // The filter has either not started calling the external service, is performing a cache lookup,
+  // is in the middle of calling the service, or has completed.
+  enum class State { NotStarted, CacheLookup, Calling, Complete };
 
   // FilterReturn is used to capture what the return code should be to the filter chain.
   // if this filter is either in the middle of calling the service or the result is denied then
@@ -556,6 +568,8 @@ private:
   Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& response);
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
+  AuthCacheSessionPtr cache_session_;
+  AuthCacheSession::LookupRequest* active_lookup_{nullptr};
   // Per-route client that overrides the default client when specified by route configuration.
   Filters::Common::ExtAuthz::ClientPtr per_route_client_;
   // Raw pointer to the client currently serving an in-flight authorization request.
@@ -582,9 +596,18 @@ private:
 
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool initiating_call_{};
+  // Used to identify if the callback to onCacheLookupComplete() is synchronous (on the stack) or
+  // asynchronous.
+  bool initiating_cache_lookup_{};
   bool buffer_data_{};
   bool skip_check_{false};
   envoy::service::auth::v3::CheckRequest check_request_;
+  // Cached request attributes collected during initiateCall(), used as authorization context
+  // inputs for cache lookups and CheckRequest construction.
+  std::optional<RequestAttributes> request_attributes_;
+  // Cached consolidated per-route configuration merged across route specific filter configs,
+  // used to override default authorization services and provide context extensions.
+  std::optional<FilterConfigPerRoute> merged_per_route_config_;
 };
 
 } // namespace ExtAuthz

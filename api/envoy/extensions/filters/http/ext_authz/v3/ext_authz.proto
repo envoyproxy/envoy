@@ -5,6 +5,7 @@ package envoy.extensions.filters.http.ext_authz.v3;
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/config/core/v3/http_uri.proto";
 import "envoy/type/matcher/v3/metadata.proto";
@@ -30,7 +31,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 33]
+// [#next-free-field: 34]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
@@ -397,6 +398,12 @@ message ExtAuthz {
   //
   // Defaults to ``false``.
   bool shadow_mode = 32;
+
+  // Optional configuration for a cache extension. If specified, the filter will
+  // attempt to lookup and populate the cache for authorization requests.
+  // See the :ref:`caching semantics <config_http_filters_ext_authz_caching>` for more details.
+  // The extension must implement the "envoy.filters.http.ext_authz.cache" interface.
+  config.core.v3.TypedExtensionConfig cache = 33;
 }
 
 // Serialized form of the shadow-mode authorization decision written to FilterState
