@@ -16,6 +16,7 @@
 #include "test/proto/bookstore.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -41,6 +42,35 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcJsonTranscoder {
 namespace {
+
+using StatusHelpers::HasStatus;
+
+// Builds a JsonTranscoderConfig and returns the creation status (the config is discarded). Used by
+// tests that only assert on whether config creation succeeds/fails.
+absl::Status transcoderConfigStatus(
+    const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder& proto,
+    Api::Api& api) {
+  absl::Status creation_status = absl::OkStatus();
+  JsonTranscoderConfig config(proto, api, creation_status);
+  return creation_status;
+}
+
+// Builds a shared JsonTranscoderConfig, asserting successful creation.
+std::shared_ptr<JsonTranscoderConfig> makeSharedTranscoderConfig(
+    const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder& proto,
+    Api::Api& api) {
+  absl::Status creation_status = absl::OkStatus();
+  auto config = std::make_shared<JsonTranscoderConfig>(proto, api, creation_status);
+  EXPECT_TRUE(creation_status.ok());
+  return config;
+}
+
+// Constructs a stack JsonTranscoderConfig named `name`, asserting successful creation. Used because
+// JsonTranscoderConfig is non-movable (so it cannot be returned by value from a helper).
+#define MAKE_TRANSCODER_CONFIG(name, ...)                                                          \
+  absl::Status name##_status = absl::OkStatus();                                                   \
+  JsonTranscoderConfig name(__VA_ARGS__, name##_status);                                           \
+  ASSERT_TRUE(name##_status.ok())
 
 class GrpcJsonTranscoderFilterTestBase {
 protected:
@@ -124,17 +154,19 @@ protected:
 };
 
 TEST_F(GrpcJsonTranscoderConfigTest, ParseConfig) {
-  EXPECT_NO_THROW(JsonTranscoderConfig config(
-      getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
-                     "bookstore.Bookstore"),
-      *api_));
+  EXPECT_TRUE(transcoderConfigStatus(
+                  getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                                 "bookstore.Bookstore"),
+                  *api_)
+                  .ok());
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, ParseConfigSkipRecalculating) {
-  EXPECT_NO_THROW(JsonTranscoderConfig config(
-      getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
-                     "bookstore.Bookstore", true),
-      *api_));
+  EXPECT_TRUE(transcoderConfigStatus(
+                  getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                                 "bookstore.Bookstore", true),
+                  *api_)
+                  .ok());
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, ParseBinaryConfig) {
@@ -144,88 +176,94 @@ TEST_F(GrpcJsonTranscoderConfigTest, ParseBinaryConfig) {
           .fileReadToEnd(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"))
           .value());
   proto_config.add_services("bookstore.Bookstore");
-  EXPECT_NO_THROW(JsonTranscoderConfig config(proto_config, *api_));
+  EXPECT_TRUE(transcoderConfigStatus(proto_config, *api_).ok());
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, UnknownService) {
-  EXPECT_THROW_WITH_MESSAGE(
-      JsonTranscoderConfig config(
-          getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
-                         "grpc.service.UnknownService"),
-          *api_),
-      EnvoyException,
-      "transcoding_filter: Could not find 'grpc.service.UnknownService' in the proto descriptor");
+  EXPECT_THAT(transcoderConfigStatus(
+                  getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                                 "grpc.service.UnknownService"),
+                  *api_),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "transcoding_filter: Could not find 'grpc.service.UnknownService' in the "
+                        "proto descriptor"));
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, IncompleteProto) {
-  EXPECT_THROW_WITH_MESSAGE(
-      JsonTranscoderConfig config(getProtoConfig(makeProtoDescriptor([&](FileDescriptorSet& pb) {
-                                                   stripImports(pb, "test/proto/bookstore.proto");
-                                                 }),
-                                                 "bookstore.Bookstore"),
-                                  *api_),
-      EnvoyException, "transcoding_filter: Unable to build proto descriptor pool");
+  EXPECT_THAT(transcoderConfigStatus(getProtoConfig(makeProtoDescriptor([&](FileDescriptorSet& pb) {
+                                                      stripImports(pb,
+                                                                   "test/proto/bookstore.proto");
+                                                    }),
+                                                    "bookstore.Bookstore"),
+                                     *api_),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "transcoding_filter: Unable to build proto descriptor pool"));
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, NonProto) {
-  EXPECT_THROW_WITH_MESSAGE(
-      JsonTranscoderConfig config(
-          getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.proto"),
-                         "grpc.service.UnknownService"),
-          *api_),
-      EnvoyException, "transcoding_filter: Unable to parse proto descriptor");
+  EXPECT_THAT(transcoderConfigStatus(
+                  getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.proto"),
+                                 "grpc.service.UnknownService"),
+                  *api_),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "transcoding_filter: Unable to parse proto descriptor"));
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, JsonResponseBody) {
-  EXPECT_THROW_WITH_REGEX(
-      JsonTranscoderConfig config(
-          getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
-                         "bookstore.ServiceWithResponseBody"),
-          *api_),
-      EnvoyException, "Setting \"response_body\" is not supported yet for non-HttpBody fields");
+  EXPECT_THAT(transcoderConfigStatus(
+                  getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                                 "bookstore.ServiceWithResponseBody"),
+                  *api_),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        testing::ContainsRegex(
+                            "Setting \"response_body\" is not supported yet for non-HttpBody "
+                            "fields")));
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, InvalidRequestBodyPath) {
-  EXPECT_THROW_WITH_REGEX(
-      JsonTranscoderConfig config(
-          getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
-                         "bookstore.ServiceWithInvalidRequestBodyPath"),
-          *api_),
-      EnvoyException, "Could not find field");
+  EXPECT_THAT(transcoderConfigStatus(
+                  getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                                 "bookstore.ServiceWithInvalidRequestBodyPath"),
+                  *api_),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        testing::ContainsRegex("Could not find field")));
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, InvalidResponseBodyPath) {
-  EXPECT_THROW_WITH_REGEX(
-      JsonTranscoderConfig config(
-          getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
-                         "bookstore.ServiceWithInvalidResponseBodyPath"),
-          *api_),
-      EnvoyException, "Could not find field");
+  EXPECT_THAT(transcoderConfigStatus(
+                  getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                                 "bookstore.ServiceWithInvalidResponseBodyPath"),
+                  *api_),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        testing::ContainsRegex("Could not find field")));
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, NonBinaryProto) {
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config;
   proto_config.set_proto_descriptor_bin("This is invalid proto");
   proto_config.add_services("bookstore.Bookstore");
-  EXPECT_THROW_WITH_MESSAGE(JsonTranscoderConfig config(proto_config, *api_), EnvoyException,
-                            "transcoding_filter: Unable to parse proto descriptor");
+  EXPECT_THAT(transcoderConfigStatus(proto_config, *api_),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "transcoding_filter: Unable to parse proto descriptor"));
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, InvalidHttpTemplate) {
   HttpRule http_rule;
   http_rule.set_get("/book/{");
-  EXPECT_THROW_WITH_MESSAGE(
-      JsonTranscoderConfig config(getProtoConfig(makeProtoDescriptor([&](FileDescriptorSet& pb) {
-                                                   setGetBookHttpRule(pb, http_rule);
-                                                 }),
-                                                 "bookstore.Bookstore"),
-                                  *api_),
-      EnvoyException,
-      "transcoding_filter: Cannot register 'bookstore.Bookstore.GetBook' to path matcher");
+  EXPECT_THAT(
+      transcoderConfigStatus(getProtoConfig(makeProtoDescriptor([&](FileDescriptorSet& pb) {
+                                              setGetBookHttpRule(pb, http_rule);
+                                            }),
+                                            "bookstore.Bookstore"),
+                             *api_),
+      HasStatus(
+          absl::StatusCode::kInvalidArgument,
+          "transcoding_filter: Cannot register 'bookstore.Bookstore.GetBook' to path matcher"));
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoder) {
-  JsonTranscoderConfig config(
+  MAKE_TRANSCODER_CONFIG(
+      config,
       getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
                      "bookstore.Bookstore"),
       *api_);
@@ -249,7 +287,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoderAutoMap) {
       TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"), "bookstore.Bookstore");
   proto_config.set_auto_mapping(true);
 
-  JsonTranscoderConfig config(proto_config, *api_);
+  MAKE_TRANSCODER_CONFIG(config, proto_config, *api_);
 
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {":path", "/bookstore.Bookstore/DeleteShelf"}};
@@ -267,7 +305,8 @@ TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoderAutoMap) {
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, InvalidQueryParameter) {
-  JsonTranscoderConfig config(
+  MAKE_TRANSCODER_CONFIG(
+      config,
       getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
                      "bookstore.Bookstore"),
       *api_);
@@ -288,7 +327,8 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidQueryParameter) {
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, DecodedQueryParameterWithEncodedJsonName) {
-  JsonTranscoderConfig config(
+  MAKE_TRANSCODER_CONFIG(
+      config,
       getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
                      "bookstore.Bookstore"),
       *api_);
@@ -317,7 +357,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnknownQueryParameterIsIgnored) {
   auto proto_config = getProtoConfig(
       TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"), "bookstore.Bookstore");
   proto_config.set_ignore_unknown_query_parameters(true);
-  JsonTranscoderConfig config(proto_config, *api_);
+  MAKE_TRANSCODER_CONFIG(config, proto_config, *api_);
 
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/shelves?foo=bar"}};
 
@@ -337,7 +377,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnknownQueryParameterIsCaptured) {
   auto proto_config = getProtoConfig(
       TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"), "bookstore.Bookstore");
   proto_config.set_capture_unknown_query_parameters(true);
-  JsonTranscoderConfig config(proto_config, *api_);
+  MAKE_TRANSCODER_CONFIG(config, proto_config, *api_);
 
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"}, {":path", "/shelves?foo=bar+dsa&eep=baz&foo=asd&foo.bar=baz"}};
@@ -361,7 +401,8 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnknownQueryParameterIsCaptured) {
 
 TEST_F(GrpcJsonTranscoderConfigTest, IgnoredQueryParameter) {
   std::vector<std::string> ignored_query_parameters = {"key"};
-  JsonTranscoderConfig config(
+  MAKE_TRANSCODER_CONFIG(
+      config,
       getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
                      "bookstore.Bookstore", false, ignored_query_parameters),
       *api_);
@@ -383,11 +424,12 @@ TEST_F(GrpcJsonTranscoderConfigTest, IgnoredQueryParameter) {
 TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
   HttpRule http_rule;
   http_rule.set_get("/book/{b}");
-  JsonTranscoderConfig config(getProtoConfig(makeProtoDescriptor([&](FileDescriptorSet& pb) {
-                                               setGetBookHttpRule(pb, http_rule);
-                                             }),
-                                             "bookstore.Bookstore"),
-                              *api_);
+  MAKE_TRANSCODER_CONFIG(config,
+                         getProtoConfig(makeProtoDescriptor([&](FileDescriptorSet& pb) {
+                                          setGetBookHttpRule(pb, http_rule);
+                                        }),
+                                        "bookstore.Bookstore"),
+                         *api_);
 
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/book/1"}};
 
@@ -407,7 +449,8 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
 // By default, the transcoder will treat unregistered custom verb as part of path segment,
 // which can be captured in a wildcard.
 TEST_F(GrpcJsonTranscoderConfigTest, UnregisteredCustomVerb) {
-  JsonTranscoderConfig config(
+  MAKE_TRANSCODER_CONFIG(
+      config,
       getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
                      "bookstore.Bookstore", false),
       *api_);
@@ -433,7 +476,8 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnregisteredCustomVerb) {
 // By default, the transcoder will always try to match the registered custom
 // verbs.
 TEST_F(GrpcJsonTranscoderConfigTest, RegisteredCustomVerb) {
-  JsonTranscoderConfig config(
+  MAKE_TRANSCODER_CONFIG(
+      config,
       getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
                      "bookstore.Bookstore", false),
       *api_);
@@ -461,7 +505,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, MatchUnregisteredCustomVerb) {
       getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
                      "bookstore.Bookstore", false);
   proto_config.set_match_unregistered_custom_verb(true);
-  JsonTranscoderConfig config(proto_config, *api_);
+  MAKE_TRANSCODER_CONFIG(config, proto_config, *api_);
 
   // Even though the `unknown` is not registered, but as match_unregistered_custom_verb=true, the
   // transcoder will strictly try to match it.
@@ -485,8 +529,7 @@ protected:
   GrpcJsonTranscoderFilterTest(
       envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config =
           bookstoreProtoConfig())
-      : config_(std::make_shared<JsonTranscoderConfig>(proto_config, *api_)),
-        filter_(config_, stats_) {
+      : config_(makeSharedTranscoderConfig(proto_config, *api_)), filter_(config_, stats_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
 
@@ -539,7 +582,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, PerRouteDisabledConfigOverride) {
   // not setting up services list (which disables filter)
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder route_cfg;
   route_cfg.set_proto_descriptor_bin("");
-  JsonTranscoderConfig route_config(route_cfg, *api_);
+  MAKE_TRANSCODER_CONFIG(route_config, route_cfg, *api_);
 
   ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&route_config));
@@ -1365,7 +1408,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamSSE) {
   proto_config.mutable_print_options()->set_stream_newline_delimited(true);
   proto_config.mutable_print_options()->set_stream_sse_style_delimited(true);
 
-  auto config = std::make_shared<JsonTranscoderConfig>(proto_config, *api_);
+  auto config = makeSharedTranscoderConfig(proto_config, *api_);
   auto filter = JsonTranscoderFilter(config, stats_);
   filter.setDecoderFilterCallbacks(decoder_callbacks_);
   filter.setEncoderFilterCallbacks(encoder_callbacks_);
@@ -1401,7 +1444,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamSSEUnary) {
   proto_config.mutable_print_options()->set_stream_newline_delimited(true);
   proto_config.mutable_print_options()->set_stream_sse_style_delimited(true);
 
-  auto config = std::make_shared<JsonTranscoderConfig>(proto_config, *api_);
+  auto config = makeSharedTranscoderConfig(proto_config, *api_);
   auto filter = JsonTranscoderFilter(config, stats_);
   filter.setDecoderFilterCallbacks(decoder_callbacks_);
   filter.setEncoderFilterCallbacks(encoder_callbacks_);
@@ -1874,7 +1917,7 @@ protected:
   GrpcJsonTranscoderFilterPrintTest() {
     envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config;
     TestUtility::loadFromJson(TestEnvironment::substitute(GetParam().config_json_), proto_config);
-    config_ = std::make_shared<JsonTranscoderConfig>(proto_config, *api_);
+    config_ = makeSharedTranscoderConfig(proto_config, *api_);
     filter_ = std::make_unique<JsonTranscoderFilter>(config_, stats_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -1934,7 +1977,7 @@ TEST_F(GrpcJsonTranscoderDisabledFilterTest, FilterDisabled) {
 TEST_F(GrpcJsonTranscoderDisabledFilterTest, PerRouteEnabledOverride) {
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder route_cfg =
       bookstoreProtoConfig();
-  JsonTranscoderConfig route_config(route_cfg, *api_);
+  MAKE_TRANSCODER_CONFIG(route_config, route_cfg, *api_);
 
   ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&route_config));
@@ -2004,7 +2047,7 @@ protected:
   GrpcJsonTranscoderFilterUnescapeTest() {
     envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config;
     TestUtility::loadFromJson(TestEnvironment::substitute(GetParam().config_json_), proto_config);
-    config_ = std::make_shared<JsonTranscoderConfig>(proto_config, *api_);
+    config_ = makeSharedTranscoderConfig(proto_config, *api_);
     filter_ = std::make_unique<JsonTranscoderFilter>(config_, stats_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
