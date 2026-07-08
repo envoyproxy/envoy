@@ -132,13 +132,14 @@ per-endpoint capacity. Each consumer attaches independent
 ``HostLbPolicyData`` entries, so the two policies do not interfere.
 
 Utilization is derived from each host's ORCA report using the same
-extraction as CSWRR (precedence may be flipped by the
+extraction as CSWRR, which takes the first source whose value is greater
+than 0 (precedence may be flipped by the
 ``envoy.reloadable_features.orca_weight_manager_use_named_metrics_first``
 runtime feature). By default:
 
 1. Named metrics via ``metric_names_for_computing_utilization`` -- max of
-   present values, used when that max is greater than 0.
-2. ``application_utilization`` -- value in [0, 1], used when greater than 0.
+   present values.
+2. ``application_utilization``.
 3. ``cpu_utilization`` -- final fallback.
 
 .. _load_aware_locality_weight_computation:
