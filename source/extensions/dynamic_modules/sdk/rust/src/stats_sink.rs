@@ -104,23 +104,26 @@ impl<'a> MetricSnapshot<'a> {
   /// Returns `true` on success with both buffers holding exactly their bytes. Returns `false` and
   /// leaves both buffers unchanged when the index is out of range.
   pub fn text_readout(&self, index: usize, name: &mut Vec<u8>, value: &mut Vec<u8>) -> bool {
-    fill_two_buffers(name, value, |name_ptr, name_cap, name_size, value_ptr, value_cap,
-                                   value_size| unsafe {
-      abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
-        self.envoy_ptr,
-        index,
-        name_ptr,
-        name_cap,
-        name_size,
-        value_ptr,
-        value_cap,
-        value_size,
-      )
-    })
+    fill_two_buffers(
+      name,
+      value,
+      |name_ptr, name_cap, name_size, value_ptr, value_cap, value_size| unsafe {
+        abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
+          self.envoy_ptr,
+          index,
+          name_ptr,
+          name_cap,
+          name_size,
+          value_ptr,
+          value_cap,
+          value_size,
+        )
+      },
+    )
   }
 
   /// Reads the tag-extracted name of the counter at `index` into `name` (the stat name with tag
-  /// values removed). Returns `None` and leaves `name` unchanged when the index is out of range.
+  /// values removed). Returns `false` and leaves `name` unchanged when the index is out of range.
   pub fn counter_tag_extracted_name(&self, index: usize, name: &mut Vec<u8>) -> bool {
     fill_buffer(name, |ptr, capacity, size| unsafe {
       abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
@@ -155,20 +158,23 @@ impl<'a> MetricSnapshot<'a> {
     name: &mut Vec<u8>,
     value: &mut Vec<u8>,
   ) -> bool {
-    fill_two_buffers(name, value, |name_ptr, name_cap, name_size, value_ptr, value_cap,
-                                   value_size| unsafe {
-      abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
-        self.envoy_ptr,
-        index,
-        tag_index,
-        name_ptr,
-        name_cap,
-        name_size,
-        value_ptr,
-        value_cap,
-        value_size,
-      )
-    })
+    fill_two_buffers(
+      name,
+      value,
+      |name_ptr, name_cap, name_size, value_ptr, value_cap, value_size| unsafe {
+        abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+          self.envoy_ptr,
+          index,
+          tag_index,
+          name_ptr,
+          name_cap,
+          name_size,
+          value_ptr,
+          value_cap,
+          value_size,
+        )
+      },
+    )
   }
 
   /// Reads the tag-extracted name of the gauge at `index` into `name`. See
@@ -207,20 +213,23 @@ impl<'a> MetricSnapshot<'a> {
     name: &mut Vec<u8>,
     value: &mut Vec<u8>,
   ) -> bool {
-    fill_two_buffers(name, value, |name_ptr, name_cap, name_size, value_ptr, value_cap,
-                                   value_size| unsafe {
-      abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag(
-        self.envoy_ptr,
-        index,
-        tag_index,
-        name_ptr,
-        name_cap,
-        name_size,
-        value_ptr,
-        value_cap,
-        value_size,
-      )
-    })
+    fill_two_buffers(
+      name,
+      value,
+      |name_ptr, name_cap, name_size, value_ptr, value_cap, value_size| unsafe {
+        abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag(
+          self.envoy_ptr,
+          index,
+          tag_index,
+          name_ptr,
+          name_cap,
+          name_size,
+          value_ptr,
+          value_cap,
+          value_size,
+        )
+      },
+    )
   }
 
   /// Reads the tag-extracted name of the text readout at `index` into `name`. See
@@ -259,20 +268,23 @@ impl<'a> MetricSnapshot<'a> {
     name: &mut Vec<u8>,
     value: &mut Vec<u8>,
   ) -> bool {
-    fill_two_buffers(name, value, |name_ptr, name_cap, name_size, value_ptr, value_cap,
-                                   value_size| unsafe {
-      abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag(
-        self.envoy_ptr,
-        index,
-        tag_index,
-        name_ptr,
-        name_cap,
-        name_size,
-        value_ptr,
-        value_cap,
-        value_size,
-      )
-    })
+    fill_two_buffers(
+      name,
+      value,
+      |name_ptr, name_cap, name_size, value_ptr, value_cap, value_size| unsafe {
+        abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag(
+          self.envoy_ptr,
+          index,
+          tag_index,
+          name_ptr,
+          name_cap,
+          name_size,
+          value_ptr,
+          value_cap,
+          value_size,
+        )
+      },
+    )
   }
 
   /// Copies the whole snapshot into an [`OwnedMetricSnapshot`].

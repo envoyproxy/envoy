@@ -3829,8 +3829,7 @@ envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
   return false;
 }
 
-__attribute__((weak)) bool
-envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
+__attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count: "
                "not implemented in this context");

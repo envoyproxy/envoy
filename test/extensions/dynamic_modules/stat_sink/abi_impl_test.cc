@@ -262,8 +262,8 @@ TEST_F(DynamicModuleStatsSinkAbiTest, GetGaugeTagExtractedNameAndTags) {
   EXPECT_EQ("cluster.cx_active", written(name_buffer, name_size, sizeof(name_buffer)));
 
   size_t tag_count = 0;
-  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count(
-      snapshotHandle(), 0, &tag_count));
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count(snapshotHandle(),
+                                                                                   0, &tag_count));
   EXPECT_EQ(1u, tag_count);
 
   char tag_name[256];
@@ -275,6 +275,36 @@ TEST_F(DynamicModuleStatsSinkAbiTest, GetGaugeTagExtractedNameAndTags) {
       sizeof(tag_value), &tag_value_size));
   EXPECT_EQ("envoy.cluster_name", written(tag_name, tag_name_size, sizeof(tag_name)));
   EXPECT_EQ("bar", written(tag_value, tag_value_size, sizeof(tag_value)));
+}
+
+// The text-readout tag callbacks reach the third snapshot collection; a spot check confirms the
+// wiring, mirroring the gauge check above.
+TEST_F(DynamicModuleStatsSinkAbiTest, GetTextReadoutTagExtractedNameAndTags) {
+  t0_.name_ = "control_plane.foo.identifier";
+  t0_.setTagExtractedName("control_plane.identifier");
+  t0_.setTags({{"envoy.control_plane", "foo"}});
+  snapshot_.text_readouts_.push_back(t0_);
+
+  char name_buffer[256];
+  size_t name_size = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name(
+      snapshotHandle(), 0, name_buffer, sizeof(name_buffer), &name_size));
+  EXPECT_EQ("control_plane.identifier", written(name_buffer, name_size, sizeof(name_buffer)));
+
+  size_t tag_count = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count(
+      snapshotHandle(), 0, &tag_count));
+  EXPECT_EQ(1u, tag_count);
+
+  char tag_name[256];
+  char tag_value[256];
+  size_t tag_name_size = 0;
+  size_t tag_value_size = 0;
+  ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag(
+      snapshotHandle(), 0, 0, tag_name, sizeof(tag_name), &tag_name_size, tag_value,
+      sizeof(tag_value), &tag_value_size));
+  EXPECT_EQ("envoy.control_plane", written(tag_name, tag_name_size, sizeof(tag_name)));
+  EXPECT_EQ("foo", written(tag_value, tag_value_size, sizeof(tag_value)));
 }
 
 // =============================================================================

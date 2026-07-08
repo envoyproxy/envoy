@@ -101,18 +101,17 @@ bool getTag(const MetricRefs& metrics, size_t index, size_t tag_index, char* nam
   const Envoy::Stats::SymbolTable& symbol_table = metric->constSymbolTable();
   size_t current = 0;
   bool found = false;
-  metric->iterateTagStatNames(
-      [&](Envoy::Stats::StatName tag_name, Envoy::Stats::StatName tag_value) {
-        if (current == tag_index) {
-          *name_size = symbol_table.serializeToBuffer(tag_name, name_buffer, name_buffer_capacity);
-          *value_size =
-              symbol_table.serializeToBuffer(tag_value, value_buffer, value_buffer_capacity);
-          found = true;
-          return false;
-        }
-        ++current;
-        return true;
-      });
+  metric->iterateTagStatNames([&](Envoy::Stats::StatName tag_name,
+                                  Envoy::Stats::StatName tag_value) {
+    if (current == tag_index) {
+      *name_size = symbol_table.serializeToBuffer(tag_name, name_buffer, name_buffer_capacity);
+      *value_size = symbol_table.serializeToBuffer(tag_value, value_buffer, value_buffer_capacity);
+      found = true;
+      return false;
+    }
+    ++current;
+    return true;
+  });
   return found;
 }
 

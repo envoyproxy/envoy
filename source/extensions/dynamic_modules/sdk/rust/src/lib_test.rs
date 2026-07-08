@@ -6739,8 +6739,21 @@ const STUB_TEXT_READOUTS: [(&str, &str); 1] = [("text_0", "value_0")];
 // Tag-extracted names and tags, indexed to match STUB_COUNTERS. counter_0 carries two tags,
 // counter_1 carries none, exercising both the empty and multi-tag paths.
 const STUB_COUNTER_TAG_EXTRACTED_NAMES: [&str; 2] = ["cluster.rq_total", "counter_1"];
-const STUB_COUNTER_TAGS: [&[(&str, &str)]; 2] =
-  [&[("envoy.cluster_name", "foo"), ("envoy.response_code", "200")], &[]];
+const STUB_COUNTER_TAGS: [&[(&str, &str)]; 2] = [
+  &[
+    ("envoy.cluster_name", "foo"),
+    ("envoy.response_code", "200"),
+  ],
+  &[],
+];
+
+// Tag data for the single stub gauge and text readout, matching STUB_GAUGES / STUB_TEXT_READOUTS.
+// Both carry one tag so the gauge and text-readout tag wrappers are exercised distinctly from the
+// counter ones, guarding against a wrapper wired to the wrong ABI callback.
+const STUB_GAUGE_TAG_EXTRACTED_NAMES: [&str; 1] = ["cluster.cx_active"];
+const STUB_GAUGE_TAGS: [&[(&str, &str)]; 1] = [&[("envoy.cluster_name", "bar")]];
+const STUB_TEXT_READOUT_TAG_EXTRACTED_NAMES: [&str; 1] = ["control_plane.identifier"];
+const STUB_TEXT_READOUT_TAGS: [&[(&str, &str)]; 1] = [&[("envoy.control_plane", "xds")]];
 
 // Counts stub_write invocations on the calling thread so tests can assert the grow-and-retry
 // behavior (each ABI getter call writes its name once, plus a value for text readouts). It is
@@ -6866,9 +6879,8 @@ pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_t
   true
 }
 
-// Gauge and text-readout tag callbacks share the counter tag code paths, so the harness stubs
-// them as empty (no tags) purely to satisfy linkage; the counter stubs above carry the tag data
-// the tests exercise.
+// The gauge and text-readout tag callbacks share the counter tag code paths, but each stub serves
+// its own canned data so the corresponding SDK wrappers are exercised distinctly.
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name(
   _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
@@ -6877,10 +6889,17 @@ pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag
   name_buffer_capacity: usize,
   name_size: *mut usize,
 ) -> bool {
-  if index >= STUB_GAUGES.len() {
+  if index >= STUB_GAUGE_TAG_EXTRACTED_NAMES.len() {
     return false;
   }
-  unsafe { stub_write(STUB_GAUGES[index].0, name_buffer, name_buffer_capacity, name_size) };
+  unsafe {
+    stub_write(
+      STUB_GAUGE_TAG_EXTRACTED_NAMES[index],
+      name_buffer,
+      name_buffer_capacity,
+      name_size,
+    );
+  }
   true
 }
 
@@ -6890,26 +6909,34 @@ pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag
   index: usize,
   tag_count: *mut usize,
 ) -> bool {
-  if index >= STUB_GAUGES.len() {
+  if index >= STUB_GAUGE_TAGS.len() {
     return false;
   }
-  unsafe { *tag_count = 0 };
+  unsafe { *tag_count = STUB_GAUGE_TAGS[index].len() };
   true
 }
 
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag(
   _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
-  _index: usize,
-  _tag_index: usize,
-  _name_buffer: *mut std::ffi::c_char,
-  _name_buffer_capacity: usize,
-  _name_size: *mut usize,
-  _value_buffer: *mut std::ffi::c_char,
-  _value_buffer_capacity: usize,
-  _value_size: *mut usize,
+  index: usize,
+  tag_index: usize,
+  name_buffer: *mut std::ffi::c_char,
+  name_buffer_capacity: usize,
+  name_size: *mut usize,
+  value_buffer: *mut std::ffi::c_char,
+  value_buffer_capacity: usize,
+  value_size: *mut usize,
 ) -> bool {
-  false
+  if index >= STUB_GAUGE_TAGS.len() || tag_index >= STUB_GAUGE_TAGS[index].len() {
+    return false;
+  }
+  let (name, value) = STUB_GAUGE_TAGS[index][tag_index];
+  unsafe {
+    stub_write(name, name_buffer, name_buffer_capacity, name_size);
+    stub_write(value, value_buffer, value_buffer_capacity, value_size);
+  }
+  true
 }
 
 #[no_mangle]
@@ -6920,10 +6947,17 @@ pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_text_read
   name_buffer_capacity: usize,
   name_size: *mut usize,
 ) -> bool {
-  if index >= STUB_TEXT_READOUTS.len() {
+  if index >= STUB_TEXT_READOUT_TAG_EXTRACTED_NAMES.len() {
     return false;
   }
-  unsafe { stub_write(STUB_TEXT_READOUTS[index].0, name_buffer, name_buffer_capacity, name_size) };
+  unsafe {
+    stub_write(
+      STUB_TEXT_READOUT_TAG_EXTRACTED_NAMES[index],
+      name_buffer,
+      name_buffer_capacity,
+      name_size,
+    );
+  }
   true
 }
 
@@ -6933,26 +6967,34 @@ pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_text_read
   index: usize,
   tag_count: *mut usize,
 ) -> bool {
-  if index >= STUB_TEXT_READOUTS.len() {
+  if index >= STUB_TEXT_READOUT_TAGS.len() {
     return false;
   }
-  unsafe { *tag_count = 0 };
+  unsafe { *tag_count = STUB_TEXT_READOUT_TAGS[index].len() };
   true
 }
 
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag(
   _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
-  _index: usize,
-  _tag_index: usize,
-  _name_buffer: *mut std::ffi::c_char,
-  _name_buffer_capacity: usize,
-  _name_size: *mut usize,
-  _value_buffer: *mut std::ffi::c_char,
-  _value_buffer_capacity: usize,
-  _value_size: *mut usize,
+  index: usize,
+  tag_index: usize,
+  name_buffer: *mut std::ffi::c_char,
+  name_buffer_capacity: usize,
+  name_size: *mut usize,
+  value_buffer: *mut std::ffi::c_char,
+  value_buffer_capacity: usize,
+  value_size: *mut usize,
 ) -> bool {
-  false
+  if index >= STUB_TEXT_READOUT_TAGS.len() || tag_index >= STUB_TEXT_READOUT_TAGS[index].len() {
+    return false;
+  }
+  let (name, value) = STUB_TEXT_READOUT_TAGS[index][tag_index];
+  unsafe {
+    stub_write(name, name_buffer, name_buffer_capacity, name_size);
+    stub_write(value, value_buffer, value_buffer_capacity, value_size);
+  }
+  true
 }
 
 #[no_mangle]
@@ -7139,6 +7181,27 @@ fn test_metric_snapshot_reads_tags() {
   assert_eq!(snapshot.counter_tag_count(2), None);
   assert!(!snapshot.counter_tag(0, 2, &mut name, &mut value));
   assert!(!snapshot.counter_tag(2, 0, &mut name, &mut value));
+
+  // gauge_0: one tag. Exercises the gauge tag wrappers, which are distinct entry points from the
+  // counter ones.
+  assert!(snapshot.gauge_tag_extracted_name(0, &mut name));
+  assert_eq!(name.as_slice(), b"cluster.cx_active");
+  assert_eq!(snapshot.gauge_tag_count(0), Some(1));
+  assert!(snapshot.gauge_tag(0, 0, &mut name, &mut value));
+  assert_eq!(name.as_slice(), b"envoy.cluster_name");
+  assert_eq!(value.as_slice(), b"bar");
+  assert_eq!(snapshot.gauge_tag_count(1), None);
+  assert!(!snapshot.gauge_tag(0, 1, &mut name, &mut value));
+
+  // text_0: one tag. Exercises the text-readout tag wrappers.
+  assert!(snapshot.text_readout_tag_extracted_name(0, &mut name));
+  assert_eq!(name.as_slice(), b"control_plane.identifier");
+  assert_eq!(snapshot.text_readout_tag_count(0), Some(1));
+  assert!(snapshot.text_readout_tag(0, 0, &mut name, &mut value));
+  assert_eq!(name.as_slice(), b"envoy.control_plane");
+  assert_eq!(value.as_slice(), b"xds");
+  assert_eq!(snapshot.text_readout_tag_count(1), None);
+  assert!(!snapshot.text_readout_tag(0, 1, &mut name, &mut value));
 }
 
 #[test]

@@ -63,15 +63,48 @@ impl StatSink for TestStatSink {
     // pattern the API enables (for example writing each name to a socket).
     let mut name = Vec::new();
     let mut value = Vec::new();
+    let mut tag_name = Vec::new();
+    let mut tag_value = Vec::new();
+    // Exercise the counter tag callbacks against every counter in the live snapshot. Every tag
+    // index the count reports must resolve; a mismatch means the count and the per-tag reader
+    // disagree.
+    let mut counter_tags_consistent = true;
     for index in 0..snapshot.counter_count() {
       let _ = snapshot.counter(index, &mut name);
+      if !snapshot.counter_tag_extracted_name(index, &mut name) {
+        counter_tags_consistent = false;
+        continue;
+      }
+      let Some(tag_count) = snapshot.counter_tag_count(index) else {
+        counter_tags_consistent = false;
+        continue;
+      };
+      for tag_index in 0..tag_count {
+        if !snapshot.counter_tag(index, tag_index, &mut tag_name, &mut tag_value) {
+          counter_tags_consistent = false;
+        }
+      }
     }
     // Decode every gauge name and look for the always-present "server.uptime" gauge, which proves a
     // name round-trips byte-for-byte through the buffer API end to end.
     let mut found_uptime = false;
+    // Reconstruct the dimensional name of a tagged gauge from its tag-extracted name and tags, the
+    // way a Prometheus-style sink would. "cluster.cluster_0.membership_total" carries a single
+    // "envoy.cluster_name" tag whose value is the cluster name, so the tag callbacks must yield
+    // tag-extracted name "cluster.membership_total" and tag ("envoy.cluster_name", "cluster_0").
+    let mut found_tagged_gauge = false;
     for index in 0..snapshot.gauge_count() {
       if snapshot.gauge(index, &mut name).is_some() && name.as_slice() == b"server.uptime" {
         found_uptime = true;
+      }
+      if snapshot.gauge_tag_extracted_name(index, &mut name)
+        && name.as_slice() == b"cluster.membership_total"
+        && snapshot.gauge_tag_count(index) == Some(1)
+        && snapshot.gauge_tag(index, 0, &mut tag_name, &mut tag_value)
+        && tag_name.as_slice() == b"envoy.cluster_name"
+        && tag_value.as_slice() == b"cluster_0"
+      {
+        found_tagged_gauge = true;
       }
     }
     for index in 0..snapshot.text_readout_count() {
@@ -79,6 +112,11 @@ impl StatSink for TestStatSink {
     }
     if found_uptime {
       envoy_log_info!("stat sink integration test: found gauge server.uptime");
+    }
+    // A tagged gauge reconstructed from the tag callbacks, and every counter's tag count agreed
+    // with its per-tag reads: the tag ABI round-trips end to end against a live snapshot.
+    if found_tagged_gauge && counter_tags_consistent {
+      envoy_log_info!("stat sink integration test: reconstructed tagged gauge cluster.membership_total envoy.cluster_name=cluster_0");
     }
     envoy_log_info!(
       "stat sink integration test: flush called counters={} gauges={}",
