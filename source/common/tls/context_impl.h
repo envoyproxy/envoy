@@ -116,7 +116,6 @@ public:
       const CertValidator::ExtraValidationContext& validation_context,
       const std::string& host_name);
 
-  absl::Status setCompliancePolicy(enum ssl_compliance_policy_t policy);
   static void keylogCallback(const SSL* ssl, const char* line);
 
 protected:
@@ -150,6 +149,8 @@ protected:
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL* ssl);
 
   void populateServerNamesMap(Ssl::TlsContext& ctx, const int pkey_id);
+
+  absl::Status setCompliancePolicy(enum ssl_compliance_policy_t policy);
 
   // This is always non-empty, with the first context used for all new SSL
   // objects. For server contexts, once we have ClientHello, we
