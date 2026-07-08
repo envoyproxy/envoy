@@ -406,7 +406,7 @@ libevent:
   project_name: "libevent"
   project_desc: "Event notification library"
   project_url: "https://libevent.org"
-  release_date: "2026-07-01"
+  release_date: "2020-07-28"
   use_category:
   - dataplane_core
   - controlplane

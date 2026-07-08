@@ -318,8 +318,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/benchmark/archive/v{version}.tar.gz"],
     ),
     libevent = dict(
-        version = "release-2.2.2-alpha",
-        sha256 = "f0a1ead383fb4992cde92dfea88a19e43d8198b592938e454da1f5b7dbc39da9",
+        # This SHA includes the new "prepare" and "check" watchers, used for event loop performance
+        # stats (see https://github.com/libevent/libevent/pull/793) and the fix for a race condition
+        # in the watchers (see https://github.com/libevent/libevent/pull/802).
+        # This also includes the fixes for https://github.com/libevent/libevent/issues/806
+        # and https://github.com/envoyproxy/envoy-mobile/issues/215.
+        # This also includes the fixes for Phantom events with EV_ET (see
+        # https://github.com/libevent/libevent/issues/984).
+        # This also includes the wepoll backend for Windows (see
+        # https://github.com/libevent/libevent/pull/1006)
+        # TODO(adip): Update to v2.2 when it is released.
+        version = "62c152d9a7cd264b993dad730c4163c6ede2e0a3",
+        sha256 = "4c80e5fe044ce5f8055b20a2f141ee32ec2614000f3e95d2aa81611a4c8f5213",
         strip_prefix = "libevent-{version}",
         urls = ["https://github.com/libevent/libevent/archive/{version}.tar.gz"],
     ),
