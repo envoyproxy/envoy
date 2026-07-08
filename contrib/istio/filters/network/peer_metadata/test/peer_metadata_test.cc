@@ -124,7 +124,7 @@ public:
     ON_CALL(Const(write_filter_callbacks_.connection_), streamInfo())
         .WillByDefault(ReturnRef(stream_info_));
 
-    filter_ = std::make_unique<Filter>(config, local_info_);
+    filter_ = std::make_unique<Filter>(config, local_info_, nullptr);
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->initializeWriteFilterCallbacks(write_filter_callbacks_);
   }
@@ -336,7 +336,7 @@ public:
 
     host_metadata_ = std::make_shared<::envoy::config::core::v3::Metadata>();
 
-    filter_ = std::make_unique<UpstreamFilter>();
+    filter_ = std::make_unique<UpstreamFilter>(nullptr);
     filter_->initializeReadFilterCallbacks(callbacks_);
   }
 
