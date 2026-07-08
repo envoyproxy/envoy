@@ -456,8 +456,8 @@ TEST_P(HttpInspectorTest, BinaryWithEmbeddedNul) {
 }
 
 TEST_P(HttpInspectorTest, HighBitBinaryPayload) {
-  const char data[] = {static_cast<char>(0xff), static_cast<char>(0xfe),
-                       static_cast<char>(0xfd), static_cast<char>(0xfc)};
+  const char data[] = {static_cast<char>(0xff), static_cast<char>(0xfe), static_cast<char>(0xfd),
+                       static_cast<char>(0xfc)};
   const absl::string_view header(data, sizeof(data));
   testHttpInspectNotFound(header);
 }
@@ -470,6 +470,16 @@ TEST_P(HttpInspectorTest, ShortRequestLineFollowedByHeaderWithNonTokenChars) {
 TEST_P(HttpInspectorTest, LeadingCrlfStillRejectedByExistingGuard) {
   const absl::string_view header = "\r\nGET / HTTP/1.1\r\n";
   testHttpInspectNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, FastFailGuardDisabled) {
+  if (parser_impl_ != Http1ParserImpl::BalsaParser) {
+    return;
+  }
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.http_inspector_fast_fail_invalid_method_bytes", "false"}});
+  const absl::string_view header("\x4a\x52\x4d\x49\x00\x02\x4b\n", 8);
+  testHttpInspectMultipleReadsNotFound(header);
 }
 
 TEST_P(HttpInspectorTest, InvalidHttpRequestLine) {

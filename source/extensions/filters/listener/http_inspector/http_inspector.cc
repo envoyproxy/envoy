@@ -120,10 +120,13 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
 
     // Fast-fail when the request-line prefix contains a byte that is not a
     // valid HTTP method token character and not a method/path separator.
-    const absl::string_view prefix = data.substr(0, kMaxHttpMethodLength);
-    const size_t bad = prefix.find_first_not_of(kValidHttpMethodChars);
-    if (bad != absl::string_view::npos && !absl::ascii_isspace(prefix[bad])) {
-      return ParseState::Error;
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http_inspector_fast_fail_invalid_method_bytes")) {
+      const absl::string_view prefix = data.substr(0, kMaxHttpMethodLength);
+      const size_t bad = prefix.find_first_not_of(kValidHttpMethodChars);
+      if (bad != absl::string_view::npos && !absl::ascii_isspace(prefix[bad])) {
+        return ParseState::Error;
+      }
     }
 
     absl::string_view new_data = data.substr(nread_);
