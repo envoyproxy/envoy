@@ -161,9 +161,6 @@ TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetricHandshakeFail
 // configured network namespace fails at connection time (the namespace file cannot be opened),
 // the request fails gracefully with a 503 instead of crashing on a null connection.
 TEST_P(DownstreamProtocolIntegrationTest, UpstreamConnectionCreationFailure) {
-  // This test intentionally causes upstream connection failures, so bypass the upstream validation.
-  testing_upstream_intentionally_ = true;
-
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
     auto* source_address = cluster->mutable_upstream_bind_config()->mutable_source_address();
