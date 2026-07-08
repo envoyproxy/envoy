@@ -2,5 +2,5 @@ In ```OriginalDstCluster```, ```addHost()``` and ```cleanup()``` are optimized t
 of hosts into healthy/degraded sets, because the OriginalDstCluster's load balancer implementation
 selects the exact destination address from the host map without regard for health status.
 
-This behavioral change can be temporarily reverted by setting runtime guard
+This optimization can be temporarily reverted by setting runtime guard
 ``envoy.reloadable_features.skip_partition_original_dst_hosts``` to ``false``.
