@@ -47,7 +47,6 @@
 #define ENVOY_DYNAMIC_MODULES_ABI_VERSION "v0.1.0"
 
 #ifdef __cplusplus
-#include <cstdbool>
 #include <cstddef>
 #include <cstdint>
 
