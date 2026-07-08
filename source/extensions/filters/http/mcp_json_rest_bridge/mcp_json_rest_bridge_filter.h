@@ -72,6 +72,9 @@ public:
   // Returns whether local serving of tools/list is configured for the matching endpoint.
   bool toolListLocal(absl::string_view host, absl::string_view path) const;
 
+  // Returns whether there is a configured endpoint matching the host and path.
+  bool hasEndpoint(absl::string_view host, absl::string_view path) const;
+
   bool textContentStreamingEnabled(absl::string_view tool_name, absl::string_view host,
                                    absl::string_view path) const;
 
@@ -120,6 +123,9 @@ public:
 
   // Returns whether local serving of tools/list is configured for the matching endpoint.
   bool toolListLocal(absl::string_view host, absl::string_view path) const;
+
+  // Returns whether there is a configured endpoint matching the host and path.
+  bool hasEndpoint(absl::string_view host, absl::string_view path) const;
 
   bool textContentStreamingEnabled(absl::string_view tool_name, absl::string_view host,
                                    absl::string_view path) const;
@@ -198,7 +204,7 @@ private:
 
   enum class McpOperation {
     Unspecified = 0,
-    // Received the "/mcp" URL but has not parsed the request body yet.
+    // Received a configured MCP URL path but has not parsed the request body yet.
     Undecided = 1,
     // InitializeRequest in the init handshake flow.
     Initialization = 2,

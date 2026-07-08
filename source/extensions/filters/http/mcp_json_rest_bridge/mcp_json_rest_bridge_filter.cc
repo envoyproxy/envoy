@@ -177,8 +177,12 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
       max_response_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_response_body_size,
                                                               DEFAULT_MAX_RESPONSE_BODY_SIZE)) {
   const auto& tool_config = proto_config_.tool_config();
-  EndpointKey key{tool_config.default_server_info().host(),
-                  tool_config.default_server_info().path()};
+  std::string host = tool_config.default_server_info().host();
+  std::string path = tool_config.default_server_info().path();
+  if (host.empty() && path.empty()) {
+    path = "/mcp";
+  }
+  EndpointKey key{host, path};
   auto& endpoint_config = endpoint_configs_[key];
   for (const auto& tool : tool_config.tools()) {
     if (endpoint_config.tool_entries
@@ -292,27 +296,51 @@ bool McpJsonRestBridgeFilterConfig::toolListLocal(absl::string_view host,
   return false;
 }
 
+bool McpJsonRestBridgeFilterConfig::hasEndpoint(absl::string_view host,
+                                                absl::string_view path) const {
+  const EndpointKey keys[] = {{std::string(host), std::string(path)},
+                              {std::string(host), ""},
+                              {"", std::string(path)},
+                              {"", ""}};
+  for (const auto& key : keys) {
+    if (endpoint_configs_.contains(key)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 McpJsonRestBridgePerRouteConfig::McpJsonRestBridgePerRouteConfig(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
         proto_config)
     : proto_config_(proto_config) {
-  for (const auto& tool_config : proto_config_.tool_config()) {
-    EndpointKey key{tool_config.default_server_info().host(),
-                    tool_config.default_server_info().path()};
-    auto& endpoint_config = endpoint_configs_[key];
-    for (const auto& tool : tool_config.tools()) {
-      if (endpoint_config.tool_entries
-              .try_emplace(tool.name(), ToolEntry{tool.http_rule(),
-                                                  tool.text_content_streaming_enabled(), &tool})
-              .second) {
-        endpoint_config.tools.push_back(&tool);
+  if (proto_config_.tool_config().empty()) {
+    EndpointKey key{"", "/mcp"};
+    endpoint_configs_.try_emplace(key, EndpointConfig());
+  } else {
+    for (const auto& tool_config : proto_config_.tool_config()) {
+      std::string host = tool_config.default_server_info().host();
+      std::string path = tool_config.default_server_info().path();
+      if (host.empty() && path.empty()) {
+        path = "/mcp";
       }
-    }
-    if (!endpoint_config.tool_list_http_rule.has_value() && tool_config.has_tool_list_http_rule()) {
-      endpoint_config.tool_list_http_rule = tool_config.tool_list_http_rule();
-    }
-    if (tool_config.has_tool_list_local()) {
-      endpoint_config.tool_list_local = true;
+      EndpointKey key{host, path};
+      auto& endpoint_config = endpoint_configs_[key];
+      for (const auto& tool : tool_config.tools()) {
+        if (endpoint_config.tool_entries
+                .try_emplace(tool.name(), ToolEntry{tool.http_rule(),
+                                                    tool.text_content_streaming_enabled(), &tool})
+                .second) {
+          endpoint_config.tools.push_back(&tool);
+        }
+      }
+      if (!endpoint_config.tool_list_http_rule.has_value() &&
+          tool_config.has_tool_list_http_rule()) {
+        endpoint_config.tool_list_http_rule = tool_config.tool_list_http_rule();
+      }
+      if (tool_config.has_tool_list_local()) {
+        endpoint_config.tool_list_local = true;
+      }
     }
   }
   ENVOY_LOG(debug, "Received MCP JSON REST Bridge per-route config: {}",
@@ -415,6 +443,20 @@ bool McpJsonRestBridgePerRouteConfig::toolListLocal(absl::string_view host,
   return false;
 }
 
+bool McpJsonRestBridgePerRouteConfig::hasEndpoint(absl::string_view host,
+                                                  absl::string_view path) const {
+  const EndpointKey keys[] = {{std::string(host), std::string(path)},
+                              {std::string(host), ""},
+                              {"", std::string(path)},
+                              {"", ""}};
+  for (const auto& key : keys) {
+    if (endpoint_configs_.contains(key)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 Http::FilterHeadersStatus
 McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
   absl::string_view path = request_headers.getPathValue();
@@ -422,16 +464,28 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
   if (query_idx != absl::string_view::npos) {
     path = path.substr(0, query_idx);
   }
-  // TODO(guoyilin42): Make the MCP endpoint configurable.
-  if (path != "/mcp") {
-    // Only intercept /mcp requests and pass through other requests.
+
+  std::string server_name = std::string(request_headers.getHostValue());
+  // TODO(guoyilin42): Strip port number from server_name.
+
+  const auto* per_route_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(
+          decoder_callbacks_);
+  bool has_endpoint = false;
+  if (per_route_config != nullptr) {
+    has_endpoint = per_route_config->hasEndpoint(server_name, path);
+  } else {
+    has_endpoint = config_->hasEndpoint(server_name, path);
+  }
+
+  if (!has_endpoint) {
+    mcp_operation_ = McpOperation::Unspecified;
     return Http::FilterHeadersStatus::Continue;
   }
 
   path_ = std::string(path);
   mcp_operation_ = McpOperation::Undecided;
-  // TODO(guoyilin42): Strip port number from server_name_.
-  server_name_ = std::string(request_headers.getHostValue());
+  server_name_ = std::move(server_name);
 
   if (request_headers.getMethodValue() != Http::Headers::get().MethodValues.Post) {
     ENVOY_STREAM_LOG(warn, "Only POST method is supported for MCP. Received: {}",

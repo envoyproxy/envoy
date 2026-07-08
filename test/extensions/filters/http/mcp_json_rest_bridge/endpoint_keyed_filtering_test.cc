@@ -253,7 +253,7 @@ tool_config:
 
   auto filter_config = std::make_shared<McpJsonRestBridgeFilterConfig>(filter_proto);
 
-  auto tools = filter_config->toolListLocalTools("", "");
+  auto tools = filter_config->toolListLocalTools("", "/mcp");
   ASSERT_EQ(tools.size(), 1);
   EXPECT_EQ(tools[0]->name(), "duplicate_tool");
 }
@@ -276,6 +276,64 @@ tool_config:
 
   EXPECT_FALSE(per_route_config->toolListLocal("a.com", "/mcp"));
   EXPECT_FALSE(per_route_config->toolListLocal("b.com", "/other"));
+}
+
+TEST_F(EndpointKeyedFilteringTest, CustomAndDefaultEndpointPathMatching) {
+  setupRouteConfig(R"yaml(
+tool_config:
+  - tools:
+      - name: custom_tool
+        http_rule:
+          get: "/custom_response"
+    default_server_info:
+      host: "a.com"
+      path: "/custom_path"
+  - tools:
+      - name: default_tool
+        http_rule:
+          get: "/default_response"
+)yaml");
+
+  // Case 1: Match the specific path "/custom_path" with host "a.com"
+  {
+    request_headers_ = {{":method", "POST"}, {":path", "/custom_path"}, {":authority", "a.com"}};
+    recreateFilter();
+    EXPECT_EQ(filter_->decodeHeaders(request_headers_, false),
+              Http::FilterHeadersStatus::StopIteration);
+
+    EXPECT_CALL(decoder_callbacks_, requestHeaders())
+        .WillRepeatedly(Return(Http::RequestHeaderMapOptRef(request_headers_)));
+    Buffer::OwnedImpl body(
+        R"json({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"custom_tool","arguments":{}}})json");
+    filter_->decodeData(body, true);
+
+    EXPECT_EQ(request_headers_.getPathValue(), "/custom_response");
+  }
+
+  // Case 2: Match the default path "/mcp" via the global default config (which was registered as
+  // {"", "/mcp"})
+  {
+    request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "b.com"}};
+    recreateFilter();
+    EXPECT_EQ(filter_->decodeHeaders(request_headers_, false),
+              Http::FilterHeadersStatus::StopIteration);
+
+    EXPECT_CALL(decoder_callbacks_, requestHeaders())
+        .WillRepeatedly(Return(Http::RequestHeaderMapOptRef(request_headers_)));
+    Buffer::OwnedImpl body(
+        R"json({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"default_tool","arguments":{}}})json");
+    filter_->decodeData(body, true);
+
+    EXPECT_EQ(request_headers_.getPathValue(), "/default_response");
+  }
+
+  // Case 3: A request with path "/unconfigured_path" should be bypassed / passed through
+  {
+    request_headers_ = {
+        {":method", "POST"}, {":path", "/unconfigured_path"}, {":authority", "a.com"}};
+    recreateFilter();
+    EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), Http::FilterHeadersStatus::Continue);
+  }
 }
 
 } // namespace
