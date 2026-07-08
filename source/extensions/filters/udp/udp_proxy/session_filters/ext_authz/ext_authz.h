@@ -77,6 +77,9 @@ private:
   static ExtAuthzStats generateStats(Stats::Scope& scope) {
     return {ALL_UDP_SESSION_EXT_AUTHZ_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
   }
+  static Grpc::AsyncClientFactoryPtr
+  createAsyncClientFactory(const FilterConfig& config, Stats::Scope& scope,
+                           Server::Configuration::ServerFactoryContext& context);
 
   const Stats::ScopeSharedPtr stats_scope_;
   const ExtAuthzStats stats_;
@@ -85,7 +88,7 @@ private:
   const bool buffer_enabled_;
   const uint32_t max_buffered_datagrams_;
   const uint64_t max_buffered_bytes_;
-  Grpc::AsyncClientFactoryPtr async_client_factory_;
+  const Grpc::AsyncClientFactoryPtr async_client_factory_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

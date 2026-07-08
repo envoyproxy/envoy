@@ -37,11 +37,16 @@ Config::Config(const FilterConfig& config, Stats::Scope& scope,
                               ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.buffer_options(),
                                                                 max_buffered_bytes,
                                                                 DefaultMaxBufferedBytes)
-                              : DefaultMaxBufferedBytes) {
+                              : DefaultMaxBufferedBytes),
+      async_client_factory_(createAsyncClientFactory(config, scope, context)) {}
+
+Grpc::AsyncClientFactoryPtr
+Config::createAsyncClientFactory(const FilterConfig& config, Stats::Scope& scope,
+                                 Server::Configuration::ServerFactoryContext& context) {
   auto factory_or_error = context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
       config.grpc_service(), scope, true);
   THROW_IF_NOT_OK_REF(factory_or_error.status());
-  async_client_factory_ = std::move(factory_or_error.value());
+  return std::move(factory_or_error.value());
 }
 
 Filters::Common::ExtAuthz::ClientPtr Config::createClient() const {
