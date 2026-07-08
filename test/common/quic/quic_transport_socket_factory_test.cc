@@ -23,7 +23,8 @@ public:
   }
 
   void verifyQuicServerTransportSocketFactory(std::string yaml, bool expect_early_data,
-                                              bool expect_resumption = true) {
+                                              bool expect_resumption = true,
+                                              bool expect_reset_ssl = false) {
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
     TestUtility::loadFromYaml(yaml, proto_config);
     Network::DownstreamTransportSocketFactoryPtr transport_socket_factory = THROW_OR_RETURN_VALUE(
@@ -35,6 +36,9 @@ public:
     EXPECT_EQ(expect_resumption,
               static_cast<QuicServerTransportSocketFactory&>(*transport_socket_factory)
                   .resumptionEnabled());
+    EXPECT_EQ(expect_reset_ssl,
+              static_cast<QuicServerTransportSocketFactory&>(*transport_socket_factory)
+                  .resetSslEnabled());
   }
 
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
@@ -137,6 +141,44 @@ enable_resumption:
 )EOF");
 
   verifyQuicServerTransportSocketFactory(yaml, true, true);
+}
+
+TEST_F(QuicServerTransportSocketFactoryConfigTest, ResetSslExplicitlyDisabled) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+enable_reset_ssl:
+  value: false
+)EOF");
+
+  verifyQuicServerTransportSocketFactory(yaml, true, true, false);
+}
+
+TEST_F(QuicServerTransportSocketFactoryConfigTest, ResetSslExplicitlyEnabled) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+enable_reset_ssl:
+  value: true
+)EOF");
+
+  verifyQuicServerTransportSocketFactory(yaml, true, true, true);
 }
 
 TEST_F(QuicServerTransportSocketFactoryConfigTest, ResumptionDisabledEarlyDataEnabledInvalid) {

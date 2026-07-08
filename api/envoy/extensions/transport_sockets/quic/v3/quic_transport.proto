@@ -32,8 +32,9 @@ message QuicDownstreamTransport {
   // Default to true.
   google.protobuf.BoolValue enable_resumption = 3;
 
-  // If true, QUIC will allow the server to send a TLS reset packet to the
-  // client. Default to false.
+  // If true, enables memory optimization by resetting the internal SSL object
+  // after the handshake finishes.
+  // Default to false.
   google.protobuf.BoolValue enable_reset_ssl = 4;
 }
 
