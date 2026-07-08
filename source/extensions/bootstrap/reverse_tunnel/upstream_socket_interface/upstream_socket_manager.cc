@@ -100,6 +100,19 @@ UpstreamSocketManager::pickLeastLoadedSocketManager(const std::string& node_id,
   return *target_socket_manager;
 }
 
+void UpstreamSocketManager::onGoAway(int fd) {
+  auto node_it = fd_to_node_map_.find(fd);
+  RELEASE_ASSERT(node_it != fd_to_node_map_.end(),
+                 fmt::format("fd {} not found in fd_to_node_map_", fd));
+  auto cluster_it = fd_to_cluster_map_.find(fd);
+  RELEASE_ASSERT(cluster_it != fd_to_cluster_map_.end(),
+                 fmt::format("fd {} not found in fd_to_cluster_map_", fd));
+
+  if (auto extension = getUpstreamExtension()) {
+    extension->reportGoAway(node_it->second, cluster_it->second, fd);
+  }
+}
+
 void UpstreamSocketManager::handoffSocketToWorker(
     const std::string& node_id, const std::string& cluster_id, Network::ConnectionSocketPtr socket,
     const std::chrono::seconds& ping_interval, absl::string_view tenant_id,
@@ -439,6 +452,14 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
     }
   }
 
+  const bool defer_close_log = lifecycle.handed_off_to_upstream &&
+                               lifecycle.upstream_lifecycle_filter_attached &&
+                               !lifecycle.close_log_emitted && lifecycle.close_reason.empty();
+  auto* extension = getUpstreamExtension();
+  if (extension != nullptr) {
+    extension->reportDisconnection(node_id, cluster_id, fd);
+  }
+
   // Determine if this is an idle or used socket via O(1) iterator lookup.
   auto socket_it = fd_to_socket_it_map_.find(fd);
   if (socket_it != fd_to_socket_it_map_.end()) {
@@ -468,16 +489,10 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
               node_id, cluster_id, fd);
   }
 
-  const bool defer_close_log = lifecycle.handed_off_to_upstream &&
-                               lifecycle.upstream_lifecycle_filter_attached &&
-                               !lifecycle.close_log_emitted && lifecycle.close_reason.empty();
-
   // Update Envoy's stats system.
-  if (auto extension = getUpstreamExtension()) {
+  if (extension != nullptr) {
     extension->updateConnectionStats(node_id, cluster_id, false /* decrement */,
                                      tenant_isolation_enabled_);
-    // Report the disconnection to the extension for further action.
-    extension->reportDisconnection(node_id, cluster_id);
     if (!defer_close_log && !lifecycle.close_log_emitted) {
       if (lifecycle.close_reason.empty()) {
         lifecycle.close_reason = std::string(kLifecycleCloseReasonExplicitClose);

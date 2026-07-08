@@ -48,7 +48,8 @@ ReverseTunnelUpstreamCodecOptions::createClientCodec(const Context& context) con
   // Mirror the stock HTTP/2 client codec construction, but inject the drain-aware callbacks wrapper
   // so a received GOAWAY is observed.
   const Upstream::ClusterInfo& cluster = context.cluster;
-  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(context.callbacks, stats_);
+  int fd = context.connection.getSocket()->ioHandle().fdDoNotUse();
+  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(context.callbacks, fd);
   auto inner = std::make_unique<DrainAwareHttp2ClientConnection>(
       context.connection, *callbacks, cluster.http2CodecStats(), context.random,
       cluster.httpProtocolOptions().http2Options(),

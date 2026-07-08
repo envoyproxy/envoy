@@ -40,6 +40,8 @@ envoy_cc_extension(
         "//source/common/http/http2:codec_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:upstream_socket_manager_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/strings",

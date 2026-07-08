@@ -1,11 +1,20 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/connection_impl.h"
+#include "source/common/network/socket_interface.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 
 #include "test/common/tls/mock_ssl_handshaker.h"
 #include "test/mocks/common.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/ssl/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 
 #include "absl/strings/str_cat.h"
@@ -16,6 +25,7 @@
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -397,6 +407,138 @@ TEST_F(ReverseConnectionUtilityTest, DiffMsZeroDuration) {
   MonotonicTime t(std::chrono::milliseconds(42));
 
   EXPECT_EQ(ReverseConnectionUtility::diffMs(t, t), 0);
+}
+
+class GetThreadLocalSocketManagerTest : public testing::Test {
+protected:
+  GetThreadLocalSocketManagerTest() : dispatcher_("worker_0") {
+    stats_scope_ = stats_store_.createScope("test_scope.");
+    EXPECT_CALL(context_, threadLocal()).WillRepeatedly(ReturnRef(thread_local_));
+    EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*stats_scope_));
+    config_.set_stat_prefix("test_prefix");
+    EXPECT_CALL(dispatcher_, createTimer_(_))
+        .WillRepeatedly(testing::ReturnNew<NiceMock<Event::MockTimer>>());
+    EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _))
+        .WillRepeatedly(testing::ReturnNew<NiceMock<Event::MockFileEvent>>());
+  }
+
+  void SetUp() override {
+    extension_ = std::make_unique<ReverseTunnelAcceptorExtension>(acceptor_, context_, config_);
+    saved_extension_ = acceptor_.extension_;
+    acceptor_.extension_ = extension_.get();
+  }
+
+  void TearDown() override {
+    acceptor_.extension_ = saved_extension_;
+    thread_local_registry_.reset();
+    extension_.reset();
+  }
+
+  void wireTls() {
+    thread_local_registry_ =
+        std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, extension_.get());
+    socket_manager_ = thread_local_registry_->socketManager();
+    thread_local_.setDispatcher(&dispatcher_);
+    tls_slot_ = ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>::makeUnique(thread_local_);
+    tls_slot_->set([registry = thread_local_registry_](Event::Dispatcher&)
+                       -> std::shared_ptr<UpstreamSocketThreadLocal> { return registry; });
+    extension_->setTestOnlyTLSRegistry(std::move(tls_slot_));
+  }
+
+  ReverseTunnelAcceptor& resolveAcceptor() {
+    auto* socket_if =
+        Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+    RELEASE_ASSERT(socket_if, "");
+    auto* acceptor =
+        dynamic_cast<ReverseTunnelAcceptor*>(const_cast<Network::SocketInterface*>(socket_if));
+    RELEASE_ASSERT(acceptor, "");
+    return *acceptor;
+  }
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  Stats::TestUtil::TestStore stats_store_;
+  Stats::ScopeSharedPtr stats_scope_;
+  NiceMock<ThreadLocal::MockInstance> thread_local_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface config_;
+  std::unique_ptr<ReverseTunnelAcceptorExtension> extension_;
+  ReverseTunnelAcceptor& acceptor_{resolveAcceptor()};
+  ReverseTunnelAcceptorExtension* saved_extension_{nullptr};
+  std::shared_ptr<UpstreamSocketThreadLocal> thread_local_registry_;
+  std::unique_ptr<ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>> tls_slot_;
+  UpstreamSocketManager* socket_manager_{nullptr};
+};
+
+TEST_F(GetThreadLocalSocketManagerTest, ReturnsNullWithoutTls) {
+  EXPECT_EQ(nullptr, ReverseConnectionUtility::getThreadLocalSocketManager());
+}
+
+TEST_F(GetThreadLocalSocketManagerTest, ReturnsNullWithoutExtension) {
+  acceptor_.extension_ = nullptr;
+  EXPECT_EQ(nullptr, ReverseConnectionUtility::getThreadLocalSocketManager());
+}
+
+TEST_F(GetThreadLocalSocketManagerTest, ReturnsManagerWhenWired) {
+  wireTls();
+  EXPECT_EQ(socket_manager_, ReverseConnectionUtility::getThreadLocalSocketManager());
+}
+
+namespace {
+
+constexpr absl::string_view kUpstreamSocketInterfaceName =
+    "envoy.bootstrap.reverse_tunnel.upstream_socket_interface";
+
+// Bootstrap factory that is not a SocketInterface, so Network::socketInterface() returns nullptr.
+class NonSocketInterfaceFactory : public Server::Configuration::BootstrapExtensionFactory {
+public:
+  std::string name() const override { return std::string(kUpstreamSocketInterfaceName); }
+  Server::BootstrapExtensionPtr
+  createBootstrapExtension(const Protobuf::Message&,
+                           Server::Configuration::ServerFactoryContext&) override {
+    return nullptr;
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+};
+
+// SocketInterface that is not ReverseTunnelAcceptor, so the inner dynamic_cast fails.
+class NonAcceptorSocketInterface : public Network::SocketInterfaceBase {
+public:
+  std::string name() const override { return std::string(kUpstreamSocketInterfaceName); }
+  Network::IoHandlePtr socket(Network::Socket::Type, Network::Address::Type,
+                              Network::Address::IpVersion, bool,
+                              const Network::SocketCreationOptions&) const override {
+    return nullptr;
+  }
+  Network::IoHandlePtr socket(Network::Socket::Type, const Network::Address::InstanceConstSharedPtr,
+                              const Network::SocketCreationOptions&) const override {
+    return nullptr;
+  }
+  bool ipFamilySupported(int) override { return false; }
+  Server::BootstrapExtensionPtr
+  createBootstrapExtension(const Protobuf::Message&,
+                           Server::Configuration::ServerFactoryContext&) override {
+    return nullptr;
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+};
+
+} // namespace
+
+TEST(GetThreadLocalSocketManager, ReturnsNullWhenInterfaceMissing) {
+  NonSocketInterfaceFactory factory;
+  Registry::InjectFactory<Server::Configuration::BootstrapExtensionFactory> inject(factory);
+  EXPECT_EQ(nullptr, ReverseConnectionUtility::getThreadLocalSocketManager());
+}
+
+TEST(GetThreadLocalSocketManager, ReturnsNullWhenFactoryIsNotAcceptor) {
+  NonAcceptorSocketInterface factory;
+  Registry::InjectFactory<Server::Configuration::BootstrapExtensionFactory> inject(factory);
+  EXPECT_EQ(nullptr, ReverseConnectionUtility::getThreadLocalSocketManager());
 }
 
 } // namespace ReverseConnection

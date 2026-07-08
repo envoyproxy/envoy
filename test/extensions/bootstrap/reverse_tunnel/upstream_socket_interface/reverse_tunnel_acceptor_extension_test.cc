@@ -617,15 +617,16 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateConnectionReporting) {
       .WillOnce(Invoke([&node_id, &cluster_id, &tenant_id]() {
         auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
 
-        EXPECT_CALL(*reporter, reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
-                                                     testing::Eq(tenant_id), testing::_));
+        EXPECT_CALL(*reporter,
+                    reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
+                                          testing::Eq(tenant_id), testing::_, testing::Eq(200)));
 
         return reporter;
       }));
 
   extension_ =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
-  extension_->reportConnection(node_id, cluster_id, tenant_id, 0);
+  extension_->reportConnection(node_id, cluster_id, tenant_id, 0, 200);
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateDisconnectionReporting) {
@@ -646,15 +647,50 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateDisconnectionReporting) {
       .WillOnce(Invoke([&node_id, &cluster_id]() {
         auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
 
-        EXPECT_CALL(*reporter,
-                    reportDisconnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id)));
+        EXPECT_CALL(*reporter, reportDisconnectionEvent(testing::Eq(node_id),
+                                                        testing::Eq(cluster_id), testing::Eq(123)));
 
         return reporter;
       }));
 
   extension_ =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
-  extension_->reportDisconnection(node_id, cluster_id);
+  extension_->reportDisconnection(node_id, cluster_id, 123);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateGoAwayReporting) {
+  auto config = getConfigWithReporter();
+
+  std::string node_id = "node";
+  std::string cluster_id = "cluster";
+
+  NiceMock<MockReporterFactory> reporter_factory;
+
+  Registry::InjectFactory<ReverseTunnelReporterFactory> reporter_injector(reporter_factory);
+
+  EXPECT_CALL(context_, messageValidationVisitor())
+      .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  EXPECT_CALL(reporter_factory, createReporter())
+      .Times(1)
+      .WillOnce(Invoke([&node_id, &cluster_id]() {
+        auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
+
+        EXPECT_CALL(*reporter, reportGoAwayEvent(testing::Eq(node_id), testing::Eq(cluster_id),
+                                                 testing::Eq(123)));
+
+        return reporter;
+      }));
+
+  extension_ =
+      std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
+  extension_->reportGoAway(node_id, cluster_id, 123);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, ReportGoAwayWithoutReporter) {
+  extension_ =
+      std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config_);
+  extension_->reportGoAway("node", "cluster", 123);
 }
 
 // Helper function to get aggregate metric values from stats store.
