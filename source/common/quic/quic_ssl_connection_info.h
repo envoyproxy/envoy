@@ -129,9 +129,9 @@ public:
 private:
   quic::QuicSession& session_;
   bool cert_validated_{false};
-  mutable absl::optional<std::string> alpn_;
-  mutable absl::optional<std::string> sni_;
-  mutable absl::optional<std::string> tls_version_;
+  mutable std::optional<std::string> alpn_;
+  mutable std::optional<std::string> sni_;
+  mutable std::optional<std::string> tls_version_;
 };
 
 } // namespace Quic
