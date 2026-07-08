@@ -1,5 +1,6 @@
 #include <atomic>
 #include <csignal>
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -42,6 +43,12 @@ public:
   }
   static void writingSlot(int i) {
     BacktraceAction::signal_slots_[i].state.store(BacktraceAction::SlotState::Writing);
+  }
+  static void claimSlot(int i) {
+    BacktraceAction::signal_slots_[i].state.store(BacktraceAction::SlotState::Claimed);
+  }
+  static bool isClaimed(int i) {
+    return BacktraceAction::signal_slots_[i].state.load() == BacktraceAction::SlotState::Claimed;
   }
   static bool isWriting(int i) {
     return BacktraceAction::signal_slots_[i].state.load() == BacktraceAction::SlotState::Writing;
@@ -330,6 +337,65 @@ TEST_F(BacktraceActionTest, OnNonFatalSignalNoSignaledSlot) {
   for (int i = 0; i < BacktraceActionPeer::maxSlots(); ++i) {
     EXPECT_TRUE(BacktraceActionPeer::isFree(i));
   }
+}
+
+TEST_F(BacktraceActionTest, TimerNoOpOnFreeSlot) {
+  envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig config;
+  action_ = std::make_unique<BacktraceAction>(config, context_);
+
+  // A timer firing on an already-freed slot should be a no-op.
+  ASSERT_TRUE(BacktraceActionPeer::isFree(0));
+  BacktraceActionPeer::fireTimer(*action_, 0);
+
+  EXPECT_TRUE(BacktraceActionPeer::isFree(0));
+  EXPECT_EQ(0U, stats_.counter("watchdog.backtrace_action.backtraces_failed").value());
+  EXPECT_EQ(0U, stats_.counter("watchdog.backtrace_action.backtraces_logged").value());
+}
+
+TEST_F(BacktraceActionTest, TimerNoOpOnClaimedSlot) {
+  envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig config;
+  action_ = std::make_unique<BacktraceAction>(config, context_);
+
+  // A slot still being claimed by run() must be left untouched by the timer.
+  BacktraceActionPeer::claimSlot(0);
+  BacktraceActionPeer::fireTimer(*action_, 0);
+
+  EXPECT_TRUE(BacktraceActionPeer::isClaimed(0));
+  EXPECT_EQ(0U, stats_.counter("watchdog.backtrace_action.backtraces_failed").value());
+  EXPECT_EQ(0U, stats_.counter("watchdog.backtrace_action.backtraces_logged").value());
+}
+
+TEST_F(BacktraceActionTest, OnNonFatalSignalWritesTraceWithoutContext) {
+  envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig config;
+  action_ = std::make_unique<BacktraceAction>(config, context_);
+
+  BacktraceActionPeer::signalSlot(0, api_->threadFactory().currentThreadId().getId());
+  siginfo_t info{};
+  info.si_pid = getpid();
+
+  NonFatalSignalHandler::callNonFatalSignalHandlers(SIGUSR2, &info, nullptr);
+
+  // The handler should have written the trace and published it for the timer.
+  EXPECT_TRUE(BacktraceActionPeer::isReady(0));
+}
+
+TEST_F(BacktraceActionTest, RunFailsToSignalNonexistentThread) {
+  envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig config;
+  action_ = std::make_unique<BacktraceAction>(config, context_);
+
+  // A TID that does not correspond to any live thread in this process, so signal delivery fails.
+  const auto now = api_->timeSource().monotonicTime();
+  const std::vector<std::pair<Thread::ThreadId, MonotonicTime>> pairs = {
+      {Thread::ThreadId(std::numeric_limits<int32_t>::max()), now}};
+
+  EXPECT_LOG_CONTAINS(
+      "warn", "failed to signal thread",
+      action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS, pairs, now));
+
+  // The claimed slot should have been released and the failure counted.
+  EXPECT_TRUE(BacktraceActionPeer::isFree(0));
+  EXPECT_EQ(1U, stats_.counter("watchdog.backtrace_action.backtraces_failed").value());
+  EXPECT_EQ(0U, stats_.counter("watchdog.backtrace_action.backtraces_logged").value());
 }
 
 TEST_F(BacktraceActionTest, WarnWhenSignalHandlerNotRegistered) {
