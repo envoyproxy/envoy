@@ -23,6 +23,7 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/timer.h"
+#include "envoy/http/client_codec_factory.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/filter.h"
@@ -394,7 +395,8 @@ public:
   CreateConnectionData createOrcaReportingConnection(
       Event::Dispatcher& dispatcher,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-      const envoy::config::core::v3::Metadata* metadata) const override;
+      Network::UpstreamTransportSocketFactory& factory,
+      Network::Address::InstanceConstSharedPtr orca_address) const override;
 
   std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>
   gauges() const override {
@@ -488,6 +490,15 @@ protected:
       const Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
       HostDescriptionConstSharedPtr host,
       const Network::UpstreamTransportSocketFactory& socket_factory);
+  // Shared body of createOrcaReportingConnection.
+  CreateConnectionData
+  createOrcaConnection(Event::Dispatcher& dispatcher,
+                       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+                       Network::UpstreamTransportSocketFactory& factory,
+                       Network::Address::InstanceConstSharedPtr orca_address,
+                       const Network::Address::InstanceConstSharedPtr& host_address,
+                       const SharedConstAddressVector& address_list,
+                       HostDescriptionConstSharedPtr host) const;
 
 private:
   // Helper function to check multiple health flags at once.
@@ -905,6 +916,9 @@ public:
                                    Server::Configuration::ServerFactoryContext& context);
   ProtocolOptionsConfigConstSharedPtr
   extensionProtocolOptions(const std::string& name) const override;
+  OptRef<const Http::ClientCodecFactory> upstreamHttpClientCodecFactory() const override {
+    return makeOptRefFromPtr(upstream_client_codec_factory_.get());
+  }
   envoy::config::cluster::v3::Cluster::DiscoveryType type() const override { return type_; }
 
   OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>
@@ -1087,6 +1101,10 @@ private:
   const std::unique_ptr<const std::string> eds_service_name_;
   const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
       extension_protocol_options_;
+  // Per-cluster upstream (client) codec factory, recovered from extension_protocol_options_ (an
+  // options entry that also implements the factory interface). Held to pin lifetime;
+  // upstreamHttpClientCodecFactory() returns a view into it.
+  const std::shared_ptr<const Http::ClientCodecFactory> upstream_client_codec_factory_;
   const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
   const std::shared_ptr<const TcpProtocolOptionsConfigImpl> tcp_protocol_options_;
   const uint32_t max_requests_per_connection_;

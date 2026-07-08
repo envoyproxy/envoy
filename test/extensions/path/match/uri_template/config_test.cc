@@ -65,7 +65,7 @@ TEST(ConfigTest, InvalidConfigSetup) {
   EXPECT_FALSE(config_or_error.ok());
   EXPECT_EQ(config_or_error.status().message(),
             "path_match_policy.path_template /bar/{lang}/{country is invalid: Unmatched variable "
-            "bracket in \"{country\"");
+            "bracket in mixed pattern: \"{country\"");
 }
 
 // Followup on issue https://github.com/envoyproxy/envoy/issues/34507 -
@@ -75,7 +75,7 @@ TEST(ConfigTest, InvalidConfigSetupMoreInfo) {
       name: envoy.path.match.uri_template.uri_template_matcher
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
-        path_template: "/api/MyFunction('{id}')"
+        path_template: "/api/MyFunction[{id}]"
 )EOF";
 
   envoy::config::core::v3::TypedExtensionConfig config;
@@ -96,9 +96,10 @@ TEST(ConfigTest, InvalidConfigSetupMoreInfo) {
       factory->createPathMatcher(*message);
 
   EXPECT_FALSE(config_or_error.ok());
-  EXPECT_EQ(config_or_error.status().message(),
-            "path_match_policy.path_template /api/MyFunction('{id}') is invalid: Invalid literal: "
-            "\"MyFunction('{id}')\"");
+  EXPECT_EQ(
+      config_or_error.status().message(),
+      "path_match_policy.path_template /api/MyFunction[{id}] is invalid: Invalid prefix literal: "
+      "\"MyFunction[\"");
 }
 
 TEST(ConfigTest, TestConfigSetup) {

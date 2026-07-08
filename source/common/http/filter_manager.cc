@@ -1677,6 +1677,21 @@ void FilterManager::callLowWatermarkCallbacks() {
   }
 }
 
+void FilterManager::callUpstreamHighWatermarkCallbacks() {
+  ++upstream_high_watermark_count_;
+  for (auto watermark_callbacks : upstream_watermark_callbacks_) {
+    watermark_callbacks->onAboveWriteBufferHighWatermark();
+  }
+}
+
+void FilterManager::callUpstreamLowWatermarkCallbacks() {
+  ASSERT(upstream_high_watermark_count_ > 0);
+  --upstream_high_watermark_count_;
+  for (auto watermark_callbacks : upstream_watermark_callbacks_) {
+    watermark_callbacks->onBelowWriteBufferLowWatermark();
+  }
+}
+
 void FilterManager::setBufferLimit(uint64_t new_limit) {
   ENVOY_STREAM_LOG(debug, "setting buffer limit to {}", *this, new_limit);
   buffer_limit_ = new_limit;
@@ -1790,6 +1805,27 @@ void ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
   ASSERT(std::find(parent_.watermark_callbacks_.begin(), parent_.watermark_callbacks_.end(),
                    &watermark_callbacks) != parent_.watermark_callbacks_.end());
   parent_.watermark_callbacks_.remove(&watermark_callbacks);
+}
+
+void ActiveStreamDecoderFilter::addUpstreamWatermarkCallbacks(
+    UpstreamWatermarkCallbacks& watermark_callbacks) {
+  ASSERT(std::find(parent_.upstream_watermark_callbacks_.begin(),
+                   parent_.upstream_watermark_callbacks_.end(),
+                   &watermark_callbacks) == parent_.upstream_watermark_callbacks_.end());
+  parent_.upstream_watermark_callbacks_.emplace(parent_.upstream_watermark_callbacks_.end(),
+                                                &watermark_callbacks);
+  // Bring a mid-stream subscriber up to the current back-pressure state.
+  for (uint32_t i = 0; i < parent_.upstream_high_watermark_count_; ++i) {
+    watermark_callbacks.onAboveWriteBufferHighWatermark();
+  }
+}
+
+void ActiveStreamDecoderFilter::removeUpstreamWatermarkCallbacks(
+    UpstreamWatermarkCallbacks& watermark_callbacks) {
+  ASSERT(std::find(parent_.upstream_watermark_callbacks_.begin(),
+                   parent_.upstream_watermark_callbacks_.end(),
+                   &watermark_callbacks) != parent_.upstream_watermark_callbacks_.end());
+  parent_.upstream_watermark_callbacks_.remove(&watermark_callbacks);
 }
 
 bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers) {

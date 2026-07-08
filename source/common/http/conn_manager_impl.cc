@@ -2092,12 +2092,18 @@ void ConnectionManagerImpl::ActiveStream::onDecoderFilterBelowWriteBufferLowWate
     response_encoder_->getStream().readDisable(false);
   }
   connection_manager_.stats_.named_.downstream_flow_control_resumed_reading_total_.inc();
+  // Read-disabling the downstream codec only slows the original request source. Also notify any
+  // filter that produces request data of its own (e.g. replays a buffered body) so it can resume.
+  filter_manager_.callUpstreamLowWatermarkCallbacks();
 }
 
 void ConnectionManagerImpl::ActiveStream::onDecoderFilterAboveWriteBufferHighWatermark() {
   ENVOY_STREAM_LOG(debug, "Read-disabling downstream stream due to filter callbacks.", *this);
   response_encoder_->getStream().readDisable(true);
   connection_manager_.stats_.named_.downstream_flow_control_paused_reading_total_.inc();
+  // See onDecoderFilterBelowWriteBufferLowWatermark(): also fan the back-pressure out to filters
+  // that produce request data of their own and would otherwise ignore the read-disable.
+  filter_manager_.callUpstreamHighWatermarkCallbacks();
 }
 
 void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_reason,

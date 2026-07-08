@@ -469,6 +469,7 @@ envoy_cc_library(
         ":upstream_factory_context_lib",
         "//envoy/event:timer_interface",
         "//envoy/filter:config_provider_manager_interface",
+        "//envoy/http:client_codec_factory_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:dns_interface",
         "//envoy/runtime:runtime_interface",

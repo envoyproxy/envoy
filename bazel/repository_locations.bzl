@@ -108,6 +108,22 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "liburing-liburing-{version}",
         urls = ["https://github.com/axboe/liburing/archive/liburing-{version}.tar.gz"],
     ),
+    # libelf, used by libbpf for the sockmap socket interface. Built only when sockmap is enabled
+    # with --define=sockmap=enabled. Never built for releases.
+    elfutils = dict(
+        version = "0.195",
+        sha256 = "37629fdf7f1f3dc2818e138fca2b8094177d6c2d0f701d3bb650a561218dc026",
+        strip_prefix = "elfutils-{version}",
+        urls = ["https://sourceware.org/elfutils/ftp/{version}/elfutils-{version}.tar.bz2"],
+    ),
+    # eBPF loader for the sockmap socket interface. Built only when sockmap is enabled with
+    # --define=sockmap=enabled. Never built for releases.
+    libbpf = dict(
+        version = "1.7.0",
+        sha256 = "7ab5feffbf78557f626f2e3e3204788528394494715a30fc2070fcddc2051b7b",
+        strip_prefix = "libbpf-{version}",
+        urls = ["https://github.com/libbpf/libbpf/archive/refs/tags/v{version}.tar.gz"],
+    ),
     # This dependency is built only when performance tracing is enabled with the
     # option --define=perf_tracing=enabled. It's never built for releases.
     perfetto = dict(
@@ -553,8 +569,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "846ced76db5e1b6297408cc11a8bfe1fc1c0e49f",
-        sha256 = "0e11aec4ebd778fcd3c2775e3693cccbd966af4928e9fa7573c2e2975ccd9c50",
+        version = "2e79733d0b831ab194dde343845aca66d5bedde3",
+        sha256 = "eeb92fb31981b3383b17dc1ec7ac8f67a5e52b615e899c88c7ee4edb671285cc",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),
@@ -748,6 +764,15 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "b0231eb39b3c3cabdc568c619df78208a7bd95ea10c9b2236d61218bac1b367d",
         strip_prefix = "cmake-{version}",
         urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}.tar.gz"],
+    ),
+    wuffs = dict(
+        version = "0.4.0-alpha.9",
+        sha256 = "9ca4f5401a76be244362de8b39138f01f2456c444b03584703a9f1db90491ba6",
+        strip_prefix = "wuffs-mirror-release-c-{version}",
+        urls = ["https://github.com/google/wuffs-mirror-release-c/archive/refs/tags/v{version}.tar.gz"],
+        # Wuffs: memory-safe, high-performance JSON (and other format) parser.
+        # The amalgamated C file at release/c/wuffs-v0.4.c is both the header
+        # (declarations) and implementation (when WUFFS_IMPLEMENTATION is defined).
     ),
 )
 

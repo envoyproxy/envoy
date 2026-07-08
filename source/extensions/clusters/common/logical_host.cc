@@ -116,20 +116,21 @@ Upstream::Host::CreateConnectionData LogicalHost::createConnection(
 Upstream::Host::CreateConnectionData LogicalHost::createOrcaReportingConnection(
     Event::Dispatcher& dispatcher,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-    const envoy::config::core::v3::Metadata* metadata) const {
-  const Network::Address::InstanceConstSharedPtr address = orcaReportingAddress();
-  const SharedConstAddressVector address_list_or_null = addressListOrNull();
-  // Use override_transport_socket_options if set, otherwise use the passed options.
-  const auto& effective_options = override_transport_socket_options_ != nullptr
-                                      ? override_transport_socket_options_
-                                      : transport_socket_options;
-  Network::UpstreamTransportSocketFactory& factory =
-      (metadata != nullptr) ? resolveTransportSocketFactory(address, metadata, effective_options)
-                            : transportSocketFactory();
-  return HostImplBase::createConnection(
-      dispatcher, cluster(), address, address_list_or_null, factory,
-      /*options=*/nullptr, effective_options,
-      std::make_shared<RealHostDescription>(address, shared_from_this()));
+    Network::UpstreamTransportSocketFactory& factory,
+    Network::Address::InstanceConstSharedPtr orca_address) const {
+  Network::Address::InstanceConstSharedPtr host_address;
+  SharedConstAddressVector address_list_or_null;
+  {
+    absl::MutexLock lock(address_lock_);
+    host_address = address_;
+    address_list_or_null = address_list_or_null_;
+  }
+  // The caller's options pass through unchanged; as with health checks,
+  // override_transport_socket_options_ is not consulted here.
+  return createOrcaConnection(
+      dispatcher, transport_socket_options, factory, orca_address, host_address,
+      address_list_or_null,
+      std::make_shared<RealHostDescription>(orca_address, shared_from_this()));
 }
 
 } // namespace Upstream

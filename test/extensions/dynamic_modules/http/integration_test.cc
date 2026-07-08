@@ -172,6 +172,25 @@ TEST_P(DynamicModulesIntegrationTest, PassThrough) {
   EXPECT_EQ(10U, response->body().size());
 }
 
+TEST_P(DynamicModulesIntegrationTest, UpstreamConnectionId) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the upstream_connection_id filter is only in the rust test module";
+  }
+
+  initializeFilter("upstream_connection_id");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
 TEST_P(DynamicModulesIntegrationTest, HeaderCallbacks) { runHeaderCallbacksTest(false); }
 
 TEST_P(DynamicModulesIntegrationTest, HeaderCallbacksWithUpstreamFilter) {
@@ -423,6 +442,26 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestHeaders) {
   EXPECT_EQ(
       "some_value",
       response->headers().get(Http::LowerCaseString("some_header"))[0]->value().getStringView());
+}
+
+// A live, non-serializable object stored in filter state at Request lifespan is carried across
+// recreate_stream: the rebuilt filter recovers the same object and echoes its value.
+TEST_P(DynamicModulesIntegrationTest, FilterStateObjectSurvivesRecreateStream) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the filter_state_object_recreate filter is only in the rust test module";
+  }
+  initializeFilter("filter_state_object_recreate");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("0xabcd", response->headers()
+                          .get(Http::LowerCaseString("x-live-object-value"))[0]
+                          ->value()
+                          .getStringView());
 }
 
 TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestBody) {

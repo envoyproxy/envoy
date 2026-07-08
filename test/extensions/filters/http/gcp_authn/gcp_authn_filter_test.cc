@@ -319,7 +319,7 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChainIterationWithBoundAccessToken) {
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   const std::string dummy_pem = "dummy cert PEM";
-  const std::string expected_fingerprint = "mock_fingerprint_base64";
+  const std::string expected_fingerprint = "mock+fingerprint/base64=";
 
   auto socket_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
   auto client_context_config = std::make_unique<NiceMock<Ssl::MockClientContextConfig>>();
@@ -349,7 +349,7 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChainIterationWithBoundAccessToken) {
   EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
   EXPECT_EQ(message_->headers().Path()->value().getStringView(),
             "/computeMetadata/v1/instance/service-accounts/default/"
-            "token?client_certificate_sha256=mock_fingerprint_base64");
+            "token?bindCertificateFingerprint=mock%252Bfingerprint%252Fbase64%253D");
 
   Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
       {":status", "200"},

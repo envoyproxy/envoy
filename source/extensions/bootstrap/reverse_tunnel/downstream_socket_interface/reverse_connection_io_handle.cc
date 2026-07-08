@@ -1,8 +1,10 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 
+#include <algorithm>
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
+#include <optional>
 
 #include "envoy/event/timer.h"
 #include "envoy/network/address.h"
@@ -29,6 +31,22 @@ namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
+
+namespace {
+// Base interval of the deterministic exponential reconnect backoff schedule (1s, 2s, 4s, ...). The
+// cap on the schedule is configurable via ``max_reconnect_backoff`` and read from the extension.
+constexpr uint64_t kReconnectBaseBackoffMs = 1000;
+// Largest exponent applied to the base interval. Capped purely to keep the bit-shift well within
+// uint64 for pathological failure counts; the schedule is bounded by the configured max long before
+// this (e.g. base 1s reaches a 30s cap by the 5th failure), so this never affects a real backoff.
+constexpr uint32_t kMaxBackoffExponent = 32;
+// Upward jitter applied to every reconnect-related timer (the per-host backoff, a server
+// ``Retry-After`` cool-off, and the maintenance re-check) so agents that fail together
+// de-synchronize their next attempt.
+constexpr uint64_t kReconnectJitterPercent = 15;
+// Steady-state maintenance re-check interval.
+constexpr uint64_t kMaintainIntervalMs = 10000;
+} // namespace
 
 // ReverseConnectionIOHandle implementation
 ReverseConnectionIOHandle::ReverseConnectionIOHandle(os_fd_t fd,
@@ -63,6 +81,13 @@ void ReverseConnectionIOHandle::emitAccessLog(const std::string& event,
 
 void ReverseConnectionIOHandle::cleanup() {
   ENVOY_LOG_MISC(debug, "Starting cleanup of reverse connection resources.");
+
+  // Detach any still-live child tunnel IoHandles so their parent() returns nullptr instead of a
+  // dangling pointer after this object is destroyed.
+  for (auto* child : child_io_handles_) {
+    child->detachParent();
+  }
+  child_io_handles_.clear();
 
   // Reset file events before closing trigger pipe to avoid busy loop from EOF on read FD.
   ENVOY_LOG_MISC(trace,
@@ -661,8 +686,9 @@ bool ReverseConnectionIOHandle::shouldAttemptConnectionToHost(const std::string&
   return true;
 }
 
-void ReverseConnectionIOHandle::trackConnectionFailure(const std::string& host_address,
-                                                       const std::string& cluster_name) {
+void ReverseConnectionIOHandle::trackConnectionFailure(
+    const std::string& host_address, const std::string& cluster_name,
+    std::optional<std::chrono::milliseconds> retry_after) {
   auto host_it = host_to_conn_info_map_.find(host_address);
   if (host_it == host_to_conn_info_map_.end()) {
     ENVOY_LOG(debug, "Host {} not found in host_to_conn_info_map_, skipping failure tracking",
@@ -672,12 +698,25 @@ void ReverseConnectionIOHandle::trackConnectionFailure(const std::string& host_a
   auto& host_info = host_it->second;
   host_info.failure_count++;
   host_info.last_failure_time = getTimeSource().monotonicTime();
-  // Calculate exponential backoff: base_delay * 2^(failure_count - 1)
-  const uint32_t base_delay_ms = 1000; // 1 second base delay
-  const uint32_t max_delay_ms = 30000; // 30 seconds max delay
 
-  uint32_t backoff_delay_ms = base_delay_ms * (1 << (host_info.failure_count - 1));
-  backoff_delay_ms = std::min(backoff_delay_ms, max_delay_ms);
+  const uint64_t max_backoff_ms = extension_->maxReconnectBackoffMs();
+
+  uint64_t backoff_delay_ms;
+  if (retry_after.has_value()) {
+    // Honor the server's explicit cool-off hint
+    backoff_delay_ms =
+        std::min<uint64_t>(static_cast<uint64_t>(retry_after->count()), max_backoff_ms);
+  } else {
+    // Deterministic exponential backoff: base * 2^(failure_count - 1), capped at the configured
+    // max.
+    const uint32_t exponent = std::min(host_info.failure_count - 1, kMaxBackoffExponent);
+    backoff_delay_ms = std::min<uint64_t>(kReconnectBaseBackoffMs << exponent, max_backoff_ms);
+  }
+  // Apply small upward jitter to whichever delay was chosen so hosts that fail together
+  // de-synchronize their next attempt.
+  backoff_delay_ms = ReverseConnectionUtility::addJitter(backoff_delay_ms, kReconnectJitterPercent,
+                                                         extension_->randomGenerator());
+
   // Update the backoff until time. This is used in shouldAttemptConnectionToHost() to check if we
   // should attempt to connect to the host.
   host_info.backoff_until =
@@ -783,14 +822,11 @@ void ReverseConnectionIOHandle::removeConnectionState(const std::string& host_ad
             connection_key, host_address, cluster_name);
 }
 
-void ReverseConnectionIOHandle::onDownstreamConnectionClosed(const std::string& connection_key) {
-  ENVOY_LOG(debug, "reverse_tunnel: Downstream connection closed: {}", connection_key);
-
-  // Find the host for this connection key.
+std::pair<std::string, std::string>
+ReverseConnectionIOHandle::dropTunnelFromTracking(const std::string& connection_key) {
+  // Find which host owns this connection key.
   std::string host_address;
   std::string cluster_name;
-
-  // Search through host_to_conn_info_map_ to find which host this connection belongs to.
   for (const auto& [host, host_info] : host_to_conn_info_map_) {
     if (host_info.connection_keys.find(connection_key) != host_info.connection_keys.end()) {
       host_address = host;
@@ -798,25 +834,33 @@ void ReverseConnectionIOHandle::onDownstreamConnectionClosed(const std::string& 
       break;
     }
   }
-
   if (host_address.empty()) {
-    ENVOY_LOG(warn, "Could not find host for connection key: {}", connection_key);
-    return;
+    return {};
   }
 
-  ENVOY_LOG(debug, "Found connection {} belongs to host {} in cluster {}", connection_key,
-            host_address, cluster_name);
-
-  // Remove the connection key from the host's connection set.
   auto host_it = host_to_conn_info_map_.find(host_address);
   if (host_it != host_to_conn_info_map_.end()) {
     host_it->second.connection_keys.erase(connection_key);
-    ENVOY_LOG(debug, "Removed connection key {} from host {} (remaining: {})", connection_key,
-              host_address, host_it->second.connection_keys.size());
+    ENVOY_LOG(debug, "reverse_tunnel: removed connection key {} from host {} (remaining: {})",
+              connection_key, host_address, host_it->second.connection_keys.size());
   }
-
-  // Remove connection state tracking.
   removeConnectionState(host_address, cluster_name, connection_key);
+  return {host_address, cluster_name};
+}
+
+void ReverseConnectionIOHandle::onDownstreamConnectionClosed(const std::string& connection_key) {
+  ENVOY_LOG(debug, "reverse_tunnel: Downstream connection closed: {}", connection_key);
+
+  auto [host_address, cluster_name] = dropTunnelFromTracking(connection_key);
+  if (host_address.empty()) {
+    // Key already removed (typically via markTunnelDrainingAndDialReplacement when the tunnel
+    // began draining earlier). Benign no-op; logged at debug to avoid noisy warnings.
+    ENVOY_LOG(debug,
+              "reverse_tunnel: connection key {} already removed from tracking; closure cleanup "
+              "is a no-op",
+              connection_key);
+    return;
+  }
 
   emitAccessLog("connection_closed", host_address, cluster_name, connection_key, "");
 
@@ -826,6 +870,29 @@ void ReverseConnectionIOHandle::onDownstreamConnectionClosed(const std::string& 
             "reverse_tunnel: Connection closure recorded for host {} in cluster {}. "
             "Next maintenance cycle will re-initiate if needed.",
             host_address, cluster_name);
+}
+
+void ReverseConnectionIOHandle::markTunnelDrainingAndDialReplacement(
+    const std::string& connection_key) {
+  ENVOY_LOG(info,
+            "reverse_tunnel: tunnel {} draining; dropping from tracking and dialing replacement",
+            connection_key);
+
+  // Drop the key so the maintenance loop sees a deficit and dials a replacement. The underlying
+  // TCP socket is left alone: in-flight HTTP/2 streams keep running on it and it closes naturally
+  // on the next FIN; onDownstreamConnectionClosed() then no-ops.
+  const std::string host_address = dropTunnelFromTracking(connection_key).first;
+  if (host_address.empty()) {
+    // Already removed (e.g. a prior drain notice, or the host was pruned). Benign no-op.
+    ENVOY_LOG(debug, "reverse_tunnel: connection key {} not in tracking map; nothing to drain",
+              connection_key);
+    return;
+  }
+
+  // Dial the replacement on the next dispatcher pass instead of waiting for the periodic tick.
+  if (rev_conn_retry_timer_ != nullptr) {
+    rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(0));
+  }
 }
 
 void ReverseConnectionIOHandle::updateStateGauge(const std::string& host_address,
@@ -889,12 +956,12 @@ void ReverseConnectionIOHandle::maintainReverseConnections() {
   }
   ENVOY_LOG(debug, "Completed reverse TCP connection maintenance for all clusters.");
 
-  // Enable the retry timer to periodically check for missing connections (like maintainConnCount)
+  // Enable the retry timer to periodically check for missing connections (like maintainConnCount).
   if (rev_conn_retry_timer_) {
-    // TODO(basundhara-c): Make the retry timeout configurable.
-    const std::chrono::milliseconds retry_timeout(10000); // 10 seconds
-    rev_conn_retry_timer_->enableTimer(retry_timeout);
-    ENVOY_LOG(debug, "Enabled retry timer for next connection check in 10 seconds.");
+    const uint64_t retry_timeout_ms = ReverseConnectionUtility::addJitter(
+        kMaintainIntervalMs, kReconnectJitterPercent, extension_->randomGenerator());
+    rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(retry_timeout_ms));
+    ENVOY_LOG(debug, "Enabled retry timer for next connection check in {}ms.", retry_timeout_ms);
   }
 }
 
@@ -1052,8 +1119,9 @@ bool ReverseConnectionIOHandle::isTriggerPipeReady() const {
   return trigger_pipe_read_fd_ != -1 && trigger_pipe_write_fd_ != -1;
 }
 
-void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
-                                                 RCConnectionWrapper* wrapper, bool closed) {
+void ReverseConnectionIOHandle::onConnectionDone(
+    const std::string& error, RCConnectionWrapper* wrapper, bool closed,
+    std::optional<std::chrono::milliseconds> retry_after) {
   ENVOY_LOG(info,
             "reverse_tunnel: Connection wrapper done - error: '{}', closed: {}, for node_id: {}",
             error, closed, config_.src_node_id);
@@ -1132,7 +1200,7 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
       connection->close(Network::ConnectionCloseType::NoFlush);
     }
 
-    trackConnectionFailure(host_address, cluster_name);
+    trackConnectionFailure(host_address, cluster_name, retry_after);
 
     emitAccessLog("handshake_failure", host_address, cluster_name, connection_key, error);
 

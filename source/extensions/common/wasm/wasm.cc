@@ -76,8 +76,9 @@ Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeShare
       scope_(scope), api_(api), stat_name_pool_(scope_->symbolTable()),
       custom_stat_namespace_(stat_name_pool_.add(CustomStatNamespace)),
       cluster_manager_(cluster_manager), dispatcher_(dispatcher),
-      time_source_(dispatcher.timeSource()), lifecycle_stats_handler_(LifecycleStatsHandler(
-                                                 scope, config.config().vm_config().runtime())) {
+      time_source_(dispatcher.timeSource()),
+      lifecycle_stats_handler_(LifecycleStatsHandler(scope, config.config().vm_config().runtime(),
+                                                     lookupWasmVmCountGauge(api.rootScope()))) {
   lifecycle_stats_handler_.onEvent(WasmEvent::VmCreated);
   ENVOY_LOG(debug, "Base Wasm created {} now active", lifecycle_stats_handler_.getActiveVmCount());
 }

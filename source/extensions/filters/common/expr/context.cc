@@ -315,6 +315,14 @@ const ConnectionLookupValues& ConnectionLookupValues::get() {
                      .sslConnection()
                      ->peerCertificatePresented());
            }},
+          {PeerCertificateValid,
+           [](const ConnectionWrapper& wrapper) -> std::optional<CelValue> {
+             return CelValue::CreateBool(
+                 wrapper.info_.downstreamAddressProvider().sslConnection() != nullptr &&
+                 wrapper.info_.downstreamAddressProvider()
+                     .sslConnection()
+                     ->peerCertificateValidated());
+           }},
           {RequestedServerName,
            [](const ConnectionWrapper& wrapper) -> std::optional<CelValue> {
              return CelValue::CreateStringView(
