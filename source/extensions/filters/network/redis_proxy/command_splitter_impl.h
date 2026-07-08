@@ -253,7 +253,8 @@ public:
   static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool delay_command_latency,
-                                const StreamInfo::StreamInfo& stream_info);
+                                const StreamInfo::StreamInfo& stream_info,
+                                const absl::flat_hash_set<std::string>& custom_commands);
 
 private:
   TransactionRequest(SplitCallbacks& callbacks, CommandStats& command_stats,
@@ -515,6 +516,28 @@ public:
 };
 
 /**
+ * CommandHandlerFactory for transaction requests, which additionally provides the set of
+ * commands configured via custom_commands so they can be accepted within transactions.
+ */
+class TransactionCommandHandlerFactory : public CommandHandler, CommandHandlerBase {
+public:
+  TransactionCommandHandlerFactory(Router& router,
+                                   const absl::flat_hash_set<std::string>& custom_commands)
+      : CommandHandlerBase(router), custom_commands_(custom_commands) {}
+  SplitRequestPtr startRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
+                               CommandStats& command_stats, TimeSource& time_source,
+                               bool delay_command_latency,
+                               const StreamInfo::StreamInfo& stream_info) override {
+    return TransactionRequest::create(router_, std::move(request), callbacks, command_stats,
+                                      time_source, delay_command_latency, stream_info,
+                                      custom_commands_);
+  }
+
+private:
+  const absl::flat_hash_set<std::string>& custom_commands_;
+};
+
+/**
  * All splitter stats. @see stats_macros.h
  */
 #define ALL_COMMAND_SPLITTER_STATS(COUNTER)                                                        \
@@ -569,13 +592,14 @@ private:
   CommandHandlerFactory<ShardInfoRequest> shard_info_handler_;
   CommandHandlerFactory<RandomShardRequest> random_shard_handler_;
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
-  CommandHandlerFactory<TransactionRequest> transaction_handler_;
+  // Initialized before transaction_handler_, which keeps a reference to it.
+  absl::flat_hash_set<std::string> custom_commands_;
+  TransactionCommandHandlerFactory transaction_handler_;
   CommandHandlerFactory<ClusterScopeCmdRequest> cluster_scope_handler_;
   RadixTree<HandlerDataPtr> handler_lookup_table_;
   InstanceStats stats_;
   TimeSource& time_source_;
   Common::Redis::FaultManagerPtr fault_manager_;
-  absl::flat_hash_set<std::string> custom_commands_;
   // HELLO is answered locally (handleHelloCommand) and does not route through
   // handler_lookup_table_, but the ``command.hello.*`` stats its old cluster-scope registration
   // emitted must survive for operators alarming on them. Latency exists for schema parity and

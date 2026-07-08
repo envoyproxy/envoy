@@ -27,7 +27,7 @@ private:
           proto_config,
       const std::string&, Envoy::Server::Configuration::FactoryContext&) override;
 
-  Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig&
           proto_config,
       const std::string&, Envoy::Server::Configuration::ServerFactoryContext&) override;

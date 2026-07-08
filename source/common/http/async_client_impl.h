@@ -247,6 +247,8 @@ private:
   }
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
+  void addUpstreamWatermarkCallbacks(UpstreamWatermarkCallbacks&) override {}
+  void removeUpstreamWatermarkCallbacks(UpstreamWatermarkCallbacks&) override {}
   void sendGoAwayAndClose(bool graceful [[maybe_unused]] = false) override {}
 
   void setBufferLimit(uint64_t) override {

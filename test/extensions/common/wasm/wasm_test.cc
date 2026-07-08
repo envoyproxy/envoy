@@ -250,6 +250,11 @@ TEST_P(WasmCommonTest, BadSignature) {
 }
 
 TEST_P(WasmCommonTest, Segv) {
+#if defined(__has_feature)
+#if __has_feature(undefined_behavior_sanitizer)
+  GTEST_SKIP() << "This test is not expected to work with UBSAN.";
+#endif
+#endif
   if (std::get<0>(GetParam()) != "v8") {
     return;
   }
@@ -287,6 +292,11 @@ TEST_P(WasmCommonTest, Segv) {
 }
 
 TEST_P(WasmCommonTest, DivByZero) {
+#if defined(__has_feature)
+#if __has_feature(undefined_behavior_sanitizer)
+  GTEST_SKIP() << "This test is not expected to work with UBSAN.";
+#endif
+#endif
   if (std::get<0>(GetParam()) != "v8") {
     return;
   }
