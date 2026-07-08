@@ -153,6 +153,13 @@ public:
   std::string getNodeWithSocket(const std::string& key);
 
   /**
+   * Get the (tenant-scoped) cluster id this node belongs to, from the local node->cluster map.
+   * @param node_id the tenant-scoped node id to look up.
+   * @return the tenant-scoped cluster id, or empty if the node is not known to this worker.
+   */
+  std::string getClusterForNode(absl::string_view node_id) const;
+
+  /**
    * Pick the least loaded socket manager across all worker threads for a given node.
    * @param node_id the node ID to find the least loaded manager for.
    * @param cluster_id the cluster ID for logging purposes.

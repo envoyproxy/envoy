@@ -18,8 +18,8 @@ Http::FilterFactoryCb GrpcHttp1BridgeFilterConfig::createFilterFactoryFromProtoT
   };
 }
 
-Http::FilterFactoryCb
-GrpcHttp1BridgeFilterConfig::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+GrpcHttp1BridgeFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& proto_config,
     const std::string&, Server::Configuration::ServerFactoryContext& factory_context) {
   return [&factory_context, proto_config](Http::FilterChainFactoryCallbacks& callbacks) {

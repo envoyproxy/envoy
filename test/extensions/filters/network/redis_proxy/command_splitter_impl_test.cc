@@ -937,6 +937,76 @@ TEST_F(RedisSingleServerRequestTest, CustomCommand) {
   respond();
 }
 
+TEST_F(RedisSingleServerRequestTest, CustomCommandInTransaction) {
+  absl::flat_hash_set<std::string> cmds = {"example"};
+  auto splitter = getSplitter(std::move(cmds));
+
+  // Simulate a transaction that was already started by a previous command.
+  callbacks_.transaction().start();
+  callbacks_.transaction().key_ = "test";
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"example", "test"});
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(*conn_pool_, makeRequest_("test", RespVariantEq(*request), _))
+      .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
+
+  handle_ = splitter.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_NE(nullptr, handle_);
+
+  respond();
+}
+
+TEST_F(RedisSingleServerRequestTest, CustomCommandStartsTransaction) {
+  absl::flat_hash_set<std::string> cmds = {"example"};
+  auto splitter = getSplitter(std::move(cmds));
+
+  callbacks_.transaction().start();
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"example", "test"});
+
+  Common::Redis::Client::MultiRequest multi_request;
+  Common::Redis::Client::MockPoolRequest multi_pool_request;
+
+  InSequence s;
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  // A MULTI command is sent upstream before the first command of the transaction.
+  EXPECT_CALL(*conn_pool_, makeRequest_("test", RespVariantEq(multi_request), _))
+      .WillOnce(Return(&multi_pool_request));
+  EXPECT_CALL(*conn_pool_, makeRequest_("test", RespVariantEq(*request), _))
+      .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
+
+  handle_ = splitter.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_NE(nullptr, handle_);
+
+  respond();
+
+  // The mocked connection pool does not populate the transaction's clients, so
+  // reset the flag to keep the transaction destructor from closing them.
+  callbacks_.transaction().connection_established_ = false;
+}
+
+TEST_F(RedisSingleServerRequestTest, NonSimpleCommandInTransactionRejected) {
+  // "scan" is a supported command but not a simple, multi-key or transaction
+  // command, so it is rejected within a transaction.
+  callbacks_.transaction().start();
+  callbacks_.transaction().key_ = "test";
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"scan", "0"});
+
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = "'scan' command is not supported within transaction";
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+}
+
 MATCHER_P(CompositeArrayEq, rhs, "CompositeArray should be equal") {
   const ConnPool::RespVariant& obj = arg;
   const auto& lhs = absl::get<const Common::Redis::RespValue>(obj);

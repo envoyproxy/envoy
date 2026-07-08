@@ -146,9 +146,11 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceWithoutInitManagerThrows) {
 
   // The ServerFactoryContext path has no init manager, so remote sources should be rejected.
   DynamicModuleConfigFactory factory;
-  EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProtoWithServerContext(
-                              proto_config, "stats", context_.server_factory_context_),
-                          EnvoyException, "Remote module sources require an init manager");
+  EXPECT_THROW_WITH_REGEX(
+      factory
+          .createHttpFilterFactoryFromProto(proto_config, "stats", context_.server_factory_context_)
+          .value(),
+      EnvoyException, "Remote module sources require an init manager");
 }
 
 TEST_F(DynamicModuleFilterConfigTest, RemoteSourceRegistersInitTarget) {

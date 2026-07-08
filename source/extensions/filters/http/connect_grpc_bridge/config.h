@@ -22,7 +22,7 @@ private:
       const envoy::extensions::filters::http::connect_grpc_bridge::v3::FilterConfig& proto_config,
       const std::string&, Server::Configuration::FactoryContext&) override;
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::connect_grpc_bridge::v3::FilterConfig& proto_config,
       const std::string&, Server::Configuration::ServerFactoryContext&) override;
 };
