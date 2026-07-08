@@ -16,6 +16,8 @@ The gRPC access log has statistics rooted at *access_logs.grpc_access_log.* with
 
    logs_written, Counter, Total log entries sent to the logger which were not dropped. This does not imply the logs have been flushed to the gRPC endpoint yet.
    logs_dropped, Counter, Total log entries dropped due to network or application level back up.
+   grpc_entries_flushed, Counter, Total log entries in batches that were successfully submitted to the gRPC stream. Note that for the streaming gRPC ALS protocol there is no per-batch acknowledgement from the server; this counter reflects entries written to the gRPC send buffer.
+   grpc_entries_flush_failed, Counter, Total log entries in batches where the gRPC send attempt failed (stream creation failure or stream above write buffer high-watermark). An entry counted here may later be counted in ``grpc_entries_flushed`` if the batch is retried successfully on the next flush interval.
 
 
 File access log statistics

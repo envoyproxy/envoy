@@ -202,7 +202,8 @@ public:
     Decoded,
   };
 
-  static DecodeOption parseDecodeOption(absl::string_view decoding);
+  static absl::StatusOr<FormatterProviderPtr> create(absl::string_view decoding,
+                                                     std::optional<size_t> max_length);
 
   // FormatterProvider
   std::optional<std::string> format(const Context& context,

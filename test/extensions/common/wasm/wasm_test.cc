@@ -250,6 +250,11 @@ TEST_P(WasmCommonTest, BadSignature) {
 }
 
 TEST_P(WasmCommonTest, Segv) {
+#if defined(__has_feature)
+#if __has_feature(undefined_behavior_sanitizer)
+  GTEST_SKIP() << "This test is not expected to work with UBSAN.";
+#endif
+#endif
   if (std::get<0>(GetParam()) != "v8") {
     return;
   }
@@ -287,6 +292,11 @@ TEST_P(WasmCommonTest, Segv) {
 }
 
 TEST_P(WasmCommonTest, DivByZero) {
+#if defined(__has_feature)
+#if __has_feature(undefined_behavior_sanitizer)
+  GTEST_SKIP() << "This test is not expected to work with UBSAN.";
+#endif
+#endif
   if (std::get<0>(GetParam()) != "v8") {
     return;
   }
@@ -458,6 +468,42 @@ TEST_P(WasmCommonTest, Stats) {
         return root_context;
       });
   wasm->start(plugin);
+}
+
+// The wasm_vm_count gauge is process-wide, updated once per Wasm VM instance regardless of the
+// runtime or the scope/prefix the plugin config uses.
+TEST_P(WasmCommonTest, WasmVmCountGauge) {
+  auto vm_configuration = "vm_count_gauge";
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  *plugin_config.mutable_vm_config()->mutable_runtime() =
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
+  plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
+
+  std::string code;
+  if (std::get<0>(GetParam()) != "null") {
+    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+        absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
+  } else {
+    // The name of the Null VM plugin.
+    code = "CommonWasmTestCpp";
+  }
+  EXPECT_FALSE(code.empty());
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_);
+  auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
+
+  EXPECT_EQ(nullptr, TestUtility::findGauge(stats_store_, "wasm.wasm_vm_count"));
+
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
+      plugin->wasmConfig(), vm_key, scope_, *api_, cluster_manager_, *dispatcher_);
+  EXPECT_NE(wasm, nullptr);
+  auto gauge = TestUtility::findGauge(stats_store_, "wasm.wasm_vm_count");
+  ASSERT_NE(nullptr, gauge);
+  EXPECT_EQ(1, gauge->value());
+
+  wasm.reset();
+  EXPECT_EQ(0, gauge->value());
 }
 
 TEST_P(WasmCommonTest, Foreign) {

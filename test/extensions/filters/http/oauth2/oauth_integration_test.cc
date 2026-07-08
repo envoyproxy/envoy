@@ -471,6 +471,8 @@ typed_config:
 
     waitForOAuth2Response(token_secret, expect_failure);
     if (expect_failure) {
+      EXPECT_TRUE(response->waitForEndStream());
+      cleanup();
       return;
     }
 
