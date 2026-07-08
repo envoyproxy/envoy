@@ -239,6 +239,7 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
   HostVectorSharedPtr all_hosts(new HostVector(first_host_set.hosts()));
   all_hosts->emplace_back(host);
 <<<<<<< HEAD
+<<<<<<< HEAD
 
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.skip_partition_original_dst_hosts")) {
@@ -265,6 +266,21 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
                             HostSetImpl::partitionHosts(all_hosts, HostsPerLocalityImpl::empty()),
                             {}, {std::move(host)}, {}, std::nullopt, std::nullopt);
 >>>>>>> 4c8629f284bc1687b13289cd74f4730cbac76744
+=======
+
+  // updateHostsParams() called without partitioning the hosts, because health does not matter for
+  // ORIGINAL_DST clusters (hosts are used without regard for health signal).
+  auto healthy_hosts = std::make_shared<HealthyHostVector>(*all_hosts);
+  auto degraded_hosts = std::make_shared<DegradedHostVector>();
+  auto excluded_hosts = std::make_shared<ExcludedHostVector>();
+  priority_set_.updateHosts(
+      0,
+      HostSetImpl::updateHostsParams(std::move(all_hosts), HostsPerLocalityImpl::empty(),
+                                     std::move(healthy_hosts), HostsPerLocalityImpl::empty(),
+                                     std::move(degraded_hosts), HostsPerLocalityImpl::empty(),
+                                     std::move(excluded_hosts), HostsPerLocalityImpl::empty()),
+      {}, {std::move(host)}, {}, std::nullopt, std::nullopt);
+>>>>>>> 691da37626e2ec65cb804fbb8e7ddfe63d273411
 }
 
 void OriginalDstCluster::cleanup() {
