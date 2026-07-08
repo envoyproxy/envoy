@@ -71,7 +71,7 @@ private:
 class TestSerializedStringFilterState : public StreamInfo::FilterState::Object {
 public:
   TestSerializedStringFilterState(std::string str) : raw_string_(str) {}
-  absl::optional<std::string> serializeAsString() const override {
+  std::optional<std::string> serializeAsString() const override {
     return raw_string_ + " By PLAIN";
   }
   ProtobufTypes::MessagePtr serializeAsProto() const override {
@@ -140,7 +140,7 @@ TEST(SubstitutionFormatterTest, UnsupportedArrayValueTypeThrows) {
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterPlainStringTest) {
   StreamInfo::MockStreamInfo stream_info;
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
   OpenTelemetryFormatMap expected = {{"plain_string", "plain_string_value"}};
@@ -161,7 +161,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterPlainStringTest) {
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterTypesTest) {
   StreamInfo::MockStreamInfo stream_info;
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
   KeyValueList key_mapping;
@@ -222,7 +222,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterTypesTest) {
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterNestedObjectsTest) {
   StreamInfo::MockStreamInfo stream_info;
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
   KeyValueList key_mapping;
@@ -429,7 +429,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterNestedObjectsTest) {
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterSingleOperatorTest) {
   StreamInfo::MockStreamInfo stream_info;
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
   OpenTelemetryFormatMap expected = {{"protocol", "HTTP/1.1"}};
@@ -450,7 +450,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterSingleOperatorTest) {
 TEST(SubstitutionFormatterTest, EmptyOpenTelemetryFormatterTest) {
   StreamInfo::MockStreamInfo stream_info;
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
   OpenTelemetryFormatMap expected = {{"protocol", ""}};
@@ -497,7 +497,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterNonExistentHeaderTest) {
                             key_mapping);
   OpenTelemetryFormatter formatter(key_mapping, {});
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
   verifyOpenTelemetryOutput(formatter.format({&request_header, &response_header}, stream_info),
@@ -536,7 +536,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterAlternateHeaderTest) {
                             key_mapping);
   OpenTelemetryFormatter formatter(key_mapping, {});
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
   verifyOpenTelemetryOutput(formatter.format({&request_header, &response_header}, stream_info),
@@ -890,7 +890,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterMultiTokenTest) {
                               key_mapping);
     OpenTelemetryFormatter formatter(key_mapping, {});
 
-    absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+    std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
     verifyOpenTelemetryOutput(formatter.format({&request_header, &response_header}, stream_info),

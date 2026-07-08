@@ -5,6 +5,7 @@
 #include <iterator>
 #include <map>
 #include <memory>
+#include <optional>
 #include <regex>
 #include <string>
 #include <vector>
@@ -44,7 +45,6 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -218,7 +218,7 @@ public:
   const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(absl::string_view) const override {
     return nullptr;
   }
-  absl::optional<bool> filterDisabled(absl::string_view) const override { return {}; }
+  std::optional<bool> filterDisabled(absl::string_view) const override { return {}; }
   RouteSpecificFilterConfigs perFilterConfigs(absl::string_view) const override { return {}; }
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
@@ -276,8 +276,8 @@ public:
   const std::string& allowHeaders() const override { return allow_headers_; };
   const std::string& exposeHeaders() const override { return expose_headers_; };
   const std::string& maxAge() const override { return max_age_; };
-  const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
-  const absl::optional<bool>& allowPrivateNetworkAccess() const override {
+  const std::optional<bool>& allowCredentials() const override { return allow_credentials_; };
+  const std::optional<bool>& allowPrivateNetworkAccess() const override {
     return allow_private_network_access_;
   };
   bool enabled() const override {
@@ -294,7 +294,7 @@ public:
     }
     return false;
   };
-  const absl::optional<bool>& forwardNotMatchingPreflights() const override {
+  const std::optional<bool>& forwardNotMatchingPreflights() const override {
     return forward_not_matching_preflights_;
   }
 
@@ -307,9 +307,9 @@ private:
   const std::string allow_headers_;
   const std::string expose_headers_;
   const std::string max_age_;
-  absl::optional<bool> allow_credentials_;
-  absl::optional<bool> allow_private_network_access_;
-  absl::optional<bool> forward_not_matching_preflights_;
+  std::optional<bool> allow_credentials_;
+  std::optional<bool> allow_private_network_access_;
+  std::optional<bool> forward_not_matching_preflights_;
 };
 using CorsPolicyImpl = CorsPolicyImplBase<envoy::config::route::v3::CorsPolicy>;
 
@@ -346,7 +346,7 @@ public:
     }
     return HeaderParser::defaultParser();
   }
-  absl::optional<bool> filterDisabled(absl::string_view config_name) const;
+  std::optional<bool> filterDisabled(absl::string_view config_name) const;
 
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
@@ -369,12 +369,10 @@ public:
     if (hedge_policy_ != nullptr) {
       return *hedge_policy_;
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
-  absl::optional<uint64_t> requestBodyBufferLimit() const { return request_body_buffer_limit_; }
-  absl::optional<uint32_t> legacyRequestBodyBufferLimit() const {
-    return per_request_buffer_limit_;
-  }
+  std::optional<uint64_t> requestBodyBufferLimit() const { return request_body_buffer_limit_; }
+  std::optional<uint32_t> legacyRequestBodyBufferLimit() const { return per_request_buffer_limit_; }
 
   RouteSpecificFilterConfigs perFilterConfigs(absl::string_view) const override;
   const envoy::config::core::v3::Metadata& metadata() const override;
@@ -397,7 +395,7 @@ private:
 
   struct VirtualClusterBase : public VirtualCluster {
   public:
-    VirtualClusterBase(const absl::optional<std::string>& name, Stats::StatName stat_name,
+    VirtualClusterBase(const std::optional<std::string>& name, Stats::StatName stat_name,
                        Stats::ScopeSharedPtr&& scope, const VirtualClusterStatNames& stat_names)
         : name_(name), stat_name_(stat_name), scope_(std::move(scope)),
           stats_(generateStats(*scope_, stat_names)) {}
@@ -405,12 +403,12 @@ private:
     // Router::VirtualCluster
     // name_ and stat_name_ are two different representations for the same string, retained in
     // memory to avoid symbol-table locks that would be needed when converting on-the-fly.
-    const absl::optional<std::string>& name() const override { return name_; }
+    const std::optional<std::string>& name() const override { return name_; }
     Stats::StatName statName() const override { return stat_name_; }
     VirtualClusterStats& stats() const override { return stats_; }
 
   private:
-    const absl::optional<std::string> name_;
+    const std::optional<std::string> name_;
     const Stats::StatName stat_name_;
     Stats::ScopeSharedPtr scope_;
     mutable VirtualClusterStats stats_;
@@ -425,7 +423,7 @@ private:
 
   struct CatchAllVirtualCluster : public VirtualClusterBase {
     CatchAllVirtualCluster(Stats::Scope& scope, const VirtualClusterStatNames& stat_names)
-        : VirtualClusterBase(absl::nullopt, stat_names.other_,
+        : VirtualClusterBase(std::nullopt, stat_names.other_,
                              scope.scopeFromStatName(stat_names.other_), stat_names) {}
   };
 
@@ -446,8 +444,8 @@ private:
   std::unique_ptr<envoy::config::route::v3::HedgePolicy> hedge_policy_;
   std::unique_ptr<const CatchAllVirtualCluster> virtual_cluster_catch_all_;
   RouteMetadataPackPtr metadata_;
-  const absl::optional<uint32_t> per_request_buffer_limit_;
-  const absl::optional<uint64_t> request_body_buffer_limit_;
+  const std::optional<uint32_t> per_request_buffer_limit_;
+  const std::optional<uint64_t> request_body_buffer_limit_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const bool include_attempt_count_in_request_ : 1;
   const bool include_attempt_count_in_response_ : 1;
@@ -508,7 +506,7 @@ public:
   const Http::LowerCaseString& clusterHeader() const override { return cluster_header_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
   const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
-  absl::optional<bool> traceSampled() const override { return trace_sampled_; }
+  std::optional<bool> traceSampled() const override { return trace_sampled_; }
   bool disableShadowHostSuffixAppend() const override {
     return disable_shadow_host_suffix_append_ || !host_rewrite_literal_.empty();
   }
@@ -524,7 +522,7 @@ private:
   const Http::LowerCaseString cluster_header_;
   std::string runtime_key_;
   envoy::type::v3::FractionalPercent default_value_;
-  absl::optional<bool> trace_sampled_;
+  std::optional<bool> trace_sampled_;
   const bool disable_shadow_host_suffix_append_;
   const std::string host_rewrite_literal_;
   HeaderMutationsPtr request_headers_mutations_;
@@ -759,7 +757,7 @@ public:
 
   // `OptionalTimeouts` manages various `optional` values. We pack them in a
   // separate data structure for memory efficiency -- avoiding overhead of
-  // `absl::optional` per variable, and avoiding overhead of storing unset
+  // `std::optional` per variable, and avoiding overhead of storing unset
   // timeouts.
   enum class OptionalTimeoutNames {
     IdleTimeout = 0,
@@ -772,25 +770,25 @@ public:
   };
   using OptionalTimeouts = PackedStruct<std::chrono::milliseconds, 7, OptionalTimeoutNames>;
 
-  absl::optional<std::chrono::milliseconds> idleTimeout() const override {
+  std::optional<std::chrono::milliseconds> idleTimeout() const override {
     return getOptionalTimeout<OptionalTimeoutNames::IdleTimeout>();
   }
-  absl::optional<std::chrono::milliseconds> flushTimeout() const override {
+  std::optional<std::chrono::milliseconds> flushTimeout() const override {
     return getOptionalTimeout<OptionalTimeoutNames::FlushTimeout>();
   }
-  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+  std::optional<std::chrono::milliseconds> maxStreamDuration() const override {
     return getOptionalTimeout<OptionalTimeoutNames::MaxStreamDuration>();
   }
-  absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override {
+  std::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override {
     return getOptionalTimeout<OptionalTimeoutNames::GrpcTimeoutHeaderMax>();
   }
-  absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override {
+  std::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override {
     return getOptionalTimeout<OptionalTimeoutNames::GrpcTimeoutHeaderOffset>();
   }
-  absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
+  std::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
     return getOptionalTimeout<OptionalTimeoutNames::MaxGrpcTimeout>();
   }
-  absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
+  std::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
     return getOptionalTimeout<OptionalTimeoutNames::GrpcTimeoutOffset>();
   }
 
@@ -815,7 +813,7 @@ public:
     if (connect_config_ != nullptr) {
       return *connect_config_;
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
   const UpgradeMap& upgradeMap() const override { return upgrade_map_; }
   const EarlyDataPolicy& earlyDataPolicy() const override { return *early_data_policy_; }
@@ -836,7 +834,7 @@ public:
   const RouteEntry* routeEntry() const override;
   const Decorator* decorator() const override { return decorator_.get(); }
   const RouteTracing* tracingConfig() const override { return route_tracing_.get(); }
-  absl::optional<bool> filterDisabled(absl::string_view config_name) const override;
+  std::optional<bool> filterDisabled(absl::string_view config_name) const override;
   const RouteSpecificFilterConfig*
   mostSpecificPerFilterConfig(absl::string_view name) const override {
     auto* config = per_filter_configs_->get(name);
@@ -944,12 +942,12 @@ private:
 
   OptionalTimeouts buildOptionalTimeouts(const envoy::config::route::v3::RouteAction& route) const;
   template <OptionalTimeoutNames timeout_name>
-  absl::optional<std::chrono::milliseconds> getOptionalTimeout() const {
+  std::optional<std::chrono::milliseconds> getOptionalTimeout() const {
     const auto timeout = optional_timeouts_.get<timeout_name>();
     if (timeout.has_value()) {
       return *timeout;
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   absl::StatusOr<PathMatcherSharedPtr>
@@ -1008,7 +1006,7 @@ private:
   EarlyDataPolicyPtr early_data_policy_;
 
   const uint64_t request_body_buffer_limit_{std::numeric_limits<uint64_t>::max()};
-  const absl::optional<Http::Code> direct_response_code_;
+  const std::optional<Http::Code> direct_response_code_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const Http::Code cluster_not_found_response_code_;
   const Upstream::ResourcePriority priority_;
@@ -1360,7 +1358,7 @@ public:
   const RouteSpecificFilterConfig* perFilterConfig(absl::string_view name) const {
     return per_filter_configs_->get(name);
   }
-  absl::optional<bool> filterDisabled(absl::string_view config_name) const {
+  std::optional<bool> filterDisabled(absl::string_view config_name) const {
     return per_filter_configs_->disabled(config_name);
   }
 

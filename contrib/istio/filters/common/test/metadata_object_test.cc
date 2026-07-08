@@ -1,3 +1,4 @@
+// NOLINT(namespace-envoy)
 #include <optional>
 
 #include "envoy/registry/registry.h"
@@ -6,7 +7,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 namespace Istio {
 namespace Common {
 
@@ -14,18 +14,21 @@ using Envoy::Protobuf::util::MessageDifferencer;
 
 TEST(WorkloadMetadataObjectTest, AsString) {
   constexpr absl::string_view identity = "spiffe://cluster.local/ns/default/sa/default";
-  WorkloadMetadataObject deploy("pod-foo-1234", "my-cluster", "default", "foo", "foo-service",
-                                "v1alpha3", "", "", WorkloadType::Deployment, identity, "", "");
+  ::Istio::Common::WorkloadMetadataObject deploy(
+      "pod-foo-1234", "my-cluster", "default", "foo", "foo-service", "v1alpha3", "", "",
+      ::Istio::Common::WorkloadType::Deployment, identity, "", "");
 
-  WorkloadMetadataObject pod("pod-foo-1234", "my-cluster", "default", "foo", "foo-service",
-                             "v1alpha3", "", "", WorkloadType::Pod, identity, "", "");
+  ::Istio::Common::WorkloadMetadataObject pod("pod-foo-1234", "my-cluster", "default", "foo",
+                                              "foo-service", "v1alpha3", "", "",
+                                              ::Istio::Common::WorkloadType::Pod, identity, "", "");
 
-  WorkloadMetadataObject cronjob("pod-foo-1234", "my-cluster", "default", "foo", "foo-service",
-                                 "v1alpha3", "foo-app", "v1", WorkloadType::CronJob, identity, "",
-                                 "");
+  ::Istio::Common::WorkloadMetadataObject cronjob(
+      "pod-foo-1234", "my-cluster", "default", "foo", "foo-service", "v1alpha3", "foo-app", "v1",
+      ::Istio::Common::WorkloadType::CronJob, identity, "", "");
 
-  WorkloadMetadataObject job("pod-foo-1234", "my-cluster", "default", "foo", "foo-service",
-                             "v1alpha3", "", "", WorkloadType::Job, identity, "", "");
+  ::Istio::Common::WorkloadMetadataObject job("pod-foo-1234", "my-cluster", "default", "foo",
+                                              "foo-service", "v1alpha3", "", "",
+                                              ::Istio::Common::WorkloadType::Job, identity, "", "");
 
   EXPECT_EQ(deploy.serializeAsString(),
             absl::StrCat("type=deployment,workload=foo,name=pod-foo-1234,cluster=my-cluster,",
@@ -46,9 +49,9 @@ TEST(WorkloadMetadataObjectTest, AsString) {
 }
 
 void checkStructConversion(const Envoy::StreamInfo::FilterState::Object& data) {
-  const auto& obj = dynamic_cast<const WorkloadMetadataObject&>(data);
-  auto pb = convertWorkloadMetadataToStruct(obj);
-  auto obj2 = convertStructToWorkloadMetadata(pb);
+  const auto& obj = dynamic_cast<const ::Istio::Common::WorkloadMetadataObject&>(data);
+  auto pb = ::Istio::Common::convertWorkloadMetadataToStruct(obj);
+  auto obj2 = ::Istio::Common::convertStructToWorkloadMetadata(pb);
   EXPECT_EQ(obj2->serializeAsString(), obj.serializeAsString());
   MessageDifferencer::Equals(*(obj2->serializeAsProto()), *(obj.serializeAsProto()));
   EXPECT_EQ(obj2->hash(), obj.hash());
@@ -56,30 +59,31 @@ void checkStructConversion(const Envoy::StreamInfo::FilterState::Object& data) {
 
 TEST(WorkloadMetadataObjectTest, ConversionWithLabels) {
   constexpr absl::string_view identity = "spiffe://cluster.local/ns/default/sa/default";
-  WorkloadMetadataObject deploy("pod-foo-1234", "my-cluster", "default", "foo", "foo-service",
-                                "v1alpha3", "", "", WorkloadType::Deployment, identity, "", "");
+  ::Istio::Common::WorkloadMetadataObject deploy(
+      "pod-foo-1234", "my-cluster", "default", "foo", "foo-service", "v1alpha3", "", "",
+      ::Istio::Common::WorkloadType::Deployment, identity, "", "");
   deploy.setLabels({{"label1", "value1"}, {"label2", "value2"}});
-  auto pb = convertWorkloadMetadataToStruct(deploy);
-  auto obj1 = convertStructToWorkloadMetadata(pb, {"label1", "label2"});
+  auto pb = ::Istio::Common::convertWorkloadMetadataToStruct(deploy);
+  auto obj1 = ::Istio::Common::convertStructToWorkloadMetadata(pb, {"label1", "label2"});
   EXPECT_EQ(obj1->getLabels().size(), 2);
-  auto obj2 = convertStructToWorkloadMetadata(pb, {"label1"});
+  auto obj2 = ::Istio::Common::convertStructToWorkloadMetadata(pb, {"label1"});
   EXPECT_EQ(obj2->getLabels().size(), 1);
   absl::flat_hash_set<std::string> empty;
-  auto obj3 = convertStructToWorkloadMetadata(pb, empty);
+  auto obj3 = ::Istio::Common::convertStructToWorkloadMetadata(pb, empty);
   EXPECT_EQ(obj3->getLabels().size(), 0);
 }
 
 TEST(WorkloadMetadataObjectTest, Conversion) {
   {
     constexpr absl::string_view identity = "spiffe://cluster.local/ns/default/sa/default";
-    const auto r = convertBaggageToWorkloadMetadata(
+    const auto r = ::Istio::Common::convertBaggageToWorkloadMetadata(
         "k8s.deployment.name=foo,k8s.cluster.name=my-cluster,"
         "k8s.namespace.name=default,service.name=foo-service,service.version=v1alpha3,app.name=foo-"
         "app,app.version=latest",
         identity);
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("service")), "foo-service");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("revision")), "v1alpha3");
-    EXPECT_EQ(absl::get<absl::string_view>(r->getField("type")), DeploymentSuffix);
+    EXPECT_EQ(absl::get<absl::string_view>(r->getField("type")), ::Istio::Common::DeploymentSuffix);
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("workload")), "foo");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("name")), "");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("namespace")), "default");
@@ -91,12 +95,12 @@ TEST(WorkloadMetadataObjectTest, Conversion) {
   }
 
   {
-    const auto r = convertBaggageToWorkloadMetadata(
+    const auto r = ::Istio::Common::convertBaggageToWorkloadMetadata(
         "k8s.pod.name=foo-pod-435,k8s.cluster.name=my-cluster,k8s.namespace.name="
         "test,k8s.instance.name=foo-instance-435,service.name=foo-service,service.version=v1beta2");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("service")), "foo-service");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("revision")), "v1beta2");
-    EXPECT_EQ(absl::get<absl::string_view>(r->getField("type")), PodSuffix);
+    EXPECT_EQ(absl::get<absl::string_view>(r->getField("type")), ::Istio::Common::PodSuffix);
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("workload")), "foo-pod-435");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("name")), "foo-instance-435");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("namespace")), "test");
@@ -107,12 +111,12 @@ TEST(WorkloadMetadataObjectTest, Conversion) {
   }
 
   {
-    const auto r = convertBaggageToWorkloadMetadata(
+    const auto r = ::Istio::Common::convertBaggageToWorkloadMetadata(
         "k8s.job.name=foo-job-435,k8s.cluster.name=my-cluster,k8s.namespace.name="
         "test,k8s.instance.name=foo-instance-435,service.name=foo-service,service.version=v1beta4");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("service")), "foo-service");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("revision")), "v1beta4");
-    EXPECT_EQ(absl::get<absl::string_view>(r->getField("type")), JobSuffix);
+    EXPECT_EQ(absl::get<absl::string_view>(r->getField("type")), ::Istio::Common::JobSuffix);
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("workload")), "foo-job-435");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("name")), "foo-instance-435");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("namespace")), "test");
@@ -123,12 +127,12 @@ TEST(WorkloadMetadataObjectTest, Conversion) {
   }
 
   {
-    const auto r = convertBaggageToWorkloadMetadata(
+    const auto r = ::Istio::Common::convertBaggageToWorkloadMetadata(
         "k8s.cronjob.name=foo-cronjob,k8s.cluster.name=my-cluster,"
         "k8s.namespace.name=test,service.name=foo-service,service.version=v1beta4");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("service")), "foo-service");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("revision")), "v1beta4");
-    EXPECT_EQ(absl::get<absl::string_view>(r->getField("type")), CronJobSuffix);
+    EXPECT_EQ(absl::get<absl::string_view>(r->getField("type")), ::Istio::Common::CronJobSuffix);
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("workload")), "foo-cronjob");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("name")), "");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("namespace")), "test");
@@ -139,12 +143,12 @@ TEST(WorkloadMetadataObjectTest, Conversion) {
   }
 
   {
-    const auto r =
-        convertBaggageToWorkloadMetadata("k8s.deployment.name=foo,k8s.namespace.name=default,"
-                                         "service.name=foo-service,service.version=v1alpha3");
+    const auto r = ::Istio::Common::convertBaggageToWorkloadMetadata(
+        "k8s.deployment.name=foo,k8s.namespace.name=default,"
+        "service.name=foo-service,service.version=v1alpha3");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("service")), "foo-service");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("revision")), "v1alpha3");
-    EXPECT_EQ(absl::get<absl::string_view>(r->getField("type")), DeploymentSuffix);
+    EXPECT_EQ(absl::get<absl::string_view>(r->getField("type")), ::Istio::Common::DeploymentSuffix);
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("workload")), "foo");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("namespace")), "default");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("cluster")), "");
@@ -154,8 +158,8 @@ TEST(WorkloadMetadataObjectTest, Conversion) {
   }
 
   {
-    const auto r =
-        convertBaggageToWorkloadMetadata("service.name=foo-service,service.version=v1alpha3");
+    const auto r = ::Istio::Common::convertBaggageToWorkloadMetadata(
+        "service.name=foo-service,service.version=v1alpha3");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("service")), "foo-service");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("revision")), "v1alpha3");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("app")), "foo-service");
@@ -164,7 +168,8 @@ TEST(WorkloadMetadataObjectTest, Conversion) {
   }
 
   {
-    const auto r = convertBaggageToWorkloadMetadata("app.name=foo-app,app.version=latest");
+    const auto r =
+        ::Istio::Common::convertBaggageToWorkloadMetadata("app.name=foo-app,app.version=latest");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("service")), "foo-app");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("revision")), "latest");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("app")), "foo-app");
@@ -173,7 +178,7 @@ TEST(WorkloadMetadataObjectTest, Conversion) {
   }
 
   {
-    const auto r = convertBaggageToWorkloadMetadata(
+    const auto r = ::Istio::Common::convertBaggageToWorkloadMetadata(
         "service.name=foo-service,service.version=v1alpha3,app.name=foo-app,app.version=latest");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("service")), "foo-service");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("revision")), "v1alpha3");
@@ -183,25 +188,25 @@ TEST(WorkloadMetadataObjectTest, Conversion) {
   }
 
   {
-    const auto r = convertBaggageToWorkloadMetadata("k8s.namespace.name=default");
+    const auto r = ::Istio::Common::convertBaggageToWorkloadMetadata("k8s.namespace.name=default");
     EXPECT_EQ(absl::get<absl::string_view>(r->getField("namespace")), "default");
     checkStructConversion(*r);
   }
 }
 
 TEST(WorkloadMetadataObjectTest, ConvertFromEmpty) {
-  Protobuf::Struct node;
-  auto obj = convertStructToWorkloadMetadata(node);
+  Envoy::Protobuf::Struct node;
+  auto obj = ::Istio::Common::convertStructToWorkloadMetadata(node);
   EXPECT_EQ(obj->serializeAsString(), "");
   checkStructConversion(*obj);
 }
 
 TEST(WorkloadMetadataObjectTest, ConvertFromEndpointMetadata) {
-  EXPECT_EQ(std::nullopt, convertEndpointMetadata(""));
-  EXPECT_EQ(std::nullopt, convertEndpointMetadata("a;b"));
-  EXPECT_EQ(std::nullopt, convertEndpointMetadata("a;;;b"));
-  EXPECT_EQ(std::nullopt, convertEndpointMetadata("a;b;c;d"));
-  auto obj = convertEndpointMetadata("foo-pod;default;foo-service;v1;my-cluster");
+  EXPECT_EQ(std::nullopt, ::Istio::Common::convertEndpointMetadata(""));
+  EXPECT_EQ(std::nullopt, ::Istio::Common::convertEndpointMetadata("a;b"));
+  EXPECT_EQ(std::nullopt, ::Istio::Common::convertEndpointMetadata("a;;;b"));
+  EXPECT_EQ(std::nullopt, ::Istio::Common::convertEndpointMetadata("a;b;c;d"));
+  auto obj = ::Istio::Common::convertEndpointMetadata("foo-pod;default;foo-service;v1;my-cluster");
   ASSERT_TRUE(obj.has_value());
   EXPECT_EQ(obj->serializeAsString(), "workload=foo-pod,cluster=my-cluster,"
                                       "namespace=default,service=foo-service,revision=v1");
@@ -209,4 +214,3 @@ TEST(WorkloadMetadataObjectTest, ConvertFromEndpointMetadata) {
 
 } // namespace Common
 } // namespace Istio
-} // namespace Envoy

@@ -65,7 +65,7 @@ class MockFetchMetadata {
 public:
   virtual ~MockFetchMetadata() = default;
 
-  MOCK_METHOD(absl::optional<std::string>, fetch, (Http::RequestMessage&), (const));
+  MOCK_METHOD(std::optional<std::string>, fetch, (Http::RequestMessage&), (const));
 };
 
 class MockAwsClusterManager : public AwsClusterManager {
@@ -164,6 +164,10 @@ public:
     provider_->setCredentialsToAllThreads(std::move(creds));
   }
   void invalidateStats() { provider_->stats_.reset(); }
+  size_t getSubscribersCount() {
+    Thread::LockGuard lock(provider_->mu_);
+    return provider_->credentials_subscribers_.size();
+  }
 
   std::shared_ptr<MetadataCredentialsProviderBase> provider_;
 };

@@ -18,6 +18,7 @@ pub mod dns_resolver;
 #[doc(hidden)]
 pub mod ffi_helpers;
 pub mod formatter;
+pub mod health_checker;
 pub mod http;
 pub mod listener;
 pub mod load_balancer;
@@ -217,7 +218,8 @@ pub unsafe fn is_validation_mode() -> bool {
 /// # Safety
 ///
 /// The `function_ptr` must point to a valid function that remains valid for the lifetime of the
-/// process.
+/// process. A module that registers functions must be loaded with `do_not_close` set to `true` to
+/// avoid being unloaded while the registry still hands out the pointer.
 pub unsafe fn register_function(key: &str, function_ptr: *const std::ffi::c_void) -> bool {
   unsafe {
     abi::envoy_dynamic_module_callback_register_function(
@@ -265,9 +267,11 @@ pub fn get_function(key: &str) -> Option<*const std::ffi::c_void> {
 ///
 /// # Safety
 ///
-/// The `data_ptr` must point to valid data that remains valid for the lifetime of the process.
-/// Callers are responsible for agreeing on the data type out-of-band, since the registry stores
-/// opaque pointers.
+/// The `data_ptr` must point to data that remains valid while reachable through the registry. A
+/// module that registers a pointer into its own memory must either be loaded with `do_not_close`
+/// set to `true` or overwrite the pointer on each reload before any consumer reads it. Callers
+/// are responsible for agreeing on the data type out-of-band, since the registry stores opaque
+/// pointers.
 pub unsafe fn register_shared_data(key: &str, data_ptr: *const std::ffi::c_void) -> bool {
   unsafe {
     abi::envoy_dynamic_module_callback_register_shared_data(
@@ -878,6 +882,13 @@ macro_rules! declare_all_init_functions {
       "NEW_STAT_SINK_CONFIG_FUNCTION"
     );
   };
+  (@register health_checker : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_HEALTH_CHECKER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_HEALTH_CHECKER_CONFIG_FUNCTION"
+    );
+  };
 }
 
 /// The function signature for the new network filter configuration function.
@@ -1296,6 +1307,24 @@ macro_rules! declare_stat_sink_init_functions {
     }
   };
 }
+
+// =================================================================================================
+// Health Checker Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new health checker configuration.
+///
+/// The `name` is the value of `health_checker_name` from the `dynamic_modules` health-check
+/// configuration, allowing a single module to dispatch to different health checker implementations.
+/// The `config` is the raw configuration bytes. Returning `None` causes Envoy to reject the
+/// health-check configuration.
+pub type NewHealthCheckerConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn health_checker::HealthCheckerConfig>>;
+
+/// The global factory function for health checker configurations. This is set via the
+/// `health_checker:` arm of [`declare_all_init_functions!`] and is not intended to be set directly.
+pub static NEW_HEALTH_CHECKER_CONFIG_FUNCTION: OnceLock<NewHealthCheckerConfigFunction> =
+  OnceLock::new();
 
 // =================================================================================================
 // Cluster Dynamic Module

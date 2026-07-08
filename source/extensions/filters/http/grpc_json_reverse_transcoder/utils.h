@@ -30,9 +30,9 @@ std::string BuildGrpcMessage(Envoy::Buffer::Instance& body_data);
 // TODO(numanelahi): Add `~` to the list of characters that are not percent
 // encoded.
 // NOLINTNEXTLINE(readability-identifier-naming)
-absl::optional<std::string> GetNestedJsonValueAsString(const nlohmann::json& object,
-                                                       const std::string& key,
-                                                       bool has_one_path_segment);
+std::optional<std::string> GetNestedJsonValueAsString(const nlohmann::json& object,
+                                                      const std::string& key,
+                                                      bool has_one_path_segment);
 
 // Takes the json object builds a percent encoded query string out of it.
 // @param object The json object to build the query string from.

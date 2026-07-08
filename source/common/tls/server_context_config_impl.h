@@ -23,7 +23,7 @@ public:
   const std::vector<SessionTicketKey>& sessionTicketKeys() const override {
     return session_ticket_keys_;
   }
-  absl::optional<std::chrono::seconds> sessionTimeout() const override { return session_timeout_; }
+  std::optional<std::chrono::seconds> sessionTimeout() const override { return session_timeout_; }
 
   bool isReady() const override {
     const bool parent_is_ready = ContextConfigImpl::isReady();
@@ -75,7 +75,7 @@ private:
       const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::OcspStaplePolicy&
           policy);
 
-  absl::optional<std::chrono::seconds> session_timeout_;
+  std::optional<std::chrono::seconds> session_timeout_;
   const bool disable_stateless_session_resumption_;
   const bool disable_stateful_session_resumption_;
   bool full_scan_certs_on_sni_mismatch_;

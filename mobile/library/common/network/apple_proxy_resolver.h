@@ -56,7 +56,7 @@ private:
 
   std::unique_ptr<AppleSystemProxySettingsMonitor> proxy_settings_monitor_;
   std::unique_ptr<ApplePacProxyResolver> pac_proxy_resolver_;
-  absl::optional<SystemProxySettings> proxy_settings_;
+  std::optional<SystemProxySettings> proxy_settings_;
   std::unique_ptr<Thread::PosixThreadFactory> thread_factory_;
   absl::flat_hash_map<Thread::ThreadId, Thread::PosixThreadPtr> pac_resolution_threads_;
   Event::Dispatcher* dispatcher_;

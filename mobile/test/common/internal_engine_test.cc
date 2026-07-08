@@ -14,7 +14,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
-#include "absl/types/optional.h"
+#include <optional>
 #include "gtest/gtest.h"
 #include "test/cc/engine_builder_test_shim.h"
 #include "library/common/api/external.h"
@@ -344,7 +344,7 @@ TEST_F(InternalEngineTest, BasicStream) {
   Protobuf::Any typed_config;
   typed_config.set_type_url("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer");
   std::string serialized_buffer;
-  buffer.SerializeToString(&serialized_buffer);
+  std::ignore = buffer.SerializeToString(&serialized_buffer);
   typed_config.set_value(serialized_buffer);
 
   Platform::EngineBuilder builder;
@@ -528,8 +528,8 @@ TEST_F(InternalEngineTest, MultipleListenersStream) {
   EngineTestContext test_context{};
   std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
       createDefaultEngineCallbacks(test_context), /*logger=*/nullptr,
-      /*event_tracker=*/nullptr, /*thread_priority=*/absl::nullopt,
-      /*high_watermark=*/absl::nullopt, /*enable_logger=*/true,
+      /*event_tracker=*/nullptr, /*thread_priority=*/std::nullopt,
+      /*high_watermark=*/std::nullopt, /*enable_logger=*/true,
       /*use_worker_thread=*/true);
 
   Platform::EngineBuilder builder;

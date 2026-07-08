@@ -42,7 +42,7 @@ protected:
                 FirstEntry)) {}
 
   void setUpCustomBackoffRetryTimer(uint32_t retry_initial_delay_ms,
-                                    absl::optional<uint32_t> retry_max_delay_ms,
+                                    std::optional<uint32_t> retry_max_delay_ms,
                                     Random::RandomGenerator& random) {
     async_client_owner_ = std::make_unique<Grpc::MockAsyncClient>();
     async_client_ = async_client_owner_.get();

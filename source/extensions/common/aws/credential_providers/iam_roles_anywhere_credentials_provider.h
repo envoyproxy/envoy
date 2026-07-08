@@ -73,7 +73,7 @@ private:
   const std::string profile_arn_;
   const std::string trust_anchor_arn_;
   const std::string region_;
-  absl::optional<uint16_t> session_duration_;
+  std::optional<uint16_t> session_duration_;
   std::unique_ptr<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer> roles_anywhere_signer_;
 };
 

@@ -16,8 +16,8 @@ IoUringWorkerFactoryImpl::IoUringWorkerFactoryImpl(
 
 OptRef<IoUringWorker> IoUringWorkerFactoryImpl::getIoUringWorker() {
   auto ret = tls_.get();
-  if (ret == absl::nullopt) {
-    return absl::nullopt;
+  if (ret == std::nullopt) {
+    return std::nullopt;
   }
   return ret;
 }

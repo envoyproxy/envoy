@@ -40,7 +40,7 @@ public:
   std::chrono::milliseconds weight_update_period;
 
   bool enable_oob_load_report;
-  std::chrono::milliseconds oob_reporting_period;
+  Extensions::LoadBalancingPolicies::Common::OrcaOobManagerConfig oob_manager_config;
 
   // Round robin proto overrides that we want to propagate to the worker RR LB (e.g., slow start).
   RoundRobinConfig round_robin_overrides_;

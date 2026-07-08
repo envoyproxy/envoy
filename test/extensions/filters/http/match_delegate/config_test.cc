@@ -367,7 +367,7 @@ template <class InputType, class ActionType>
 Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>
 createMatchingTree(const std::string& name, const std::string& value) {
   auto tree = *Matcher::ExactMapMatcher<Envoy::Http::HttpMatchingData>::create(
-      std::make_unique<InputType>(name), absl::nullopt);
+      std::make_unique<InputType>(name), std::nullopt);
 
   tree->addChild(value, Matcher::OnMatch<Envoy::Http::HttpMatchingData>{
                             std::make_shared<ActionType>(), nullptr, false});
@@ -378,7 +378,7 @@ createMatchingTree(const std::string& name, const std::string& value) {
 Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> createRequestAndResponseMatchingTree() {
   auto tree = *Matcher::ExactMapMatcher<Envoy::Http::HttpMatchingData>::create(
       std::make_unique<Envoy::Http::Matching::HttpResponseHeadersDataInput>("match-header"),
-      absl::nullopt);
+      std::nullopt);
 
   tree->addChild(
       "match",

@@ -437,7 +437,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
                            std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&address_string);
+    std::ignore = cookie.SerializeToString(&address_string);
     const std::string encoded_address =
         Envoy::Base64::encode(address_string.data(), address_string.size());
 
@@ -479,7 +479,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
                            std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&address_string);
+    std::ignore = cookie.SerializeToString(&address_string);
     const std::string encoded_address =
         Envoy::Base64::encode(address_string.data(), address_string.size());
 
@@ -519,7 +519,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
                            std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&address_string);
+    std::ignore = cookie.SerializeToString(&address_string);
     std::string encoded_address =
         Envoy::Base64::encode(address_string.data(), address_string.size());
     codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -602,7 +602,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
                            std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&cookie_string);
+    std::ignore = cookie.SerializeToString(&cookie_string);
 
     std::string encoded_address = Envoy::Base64::encode(cookie_string.data(), cookie_string.size());
 
@@ -643,7 +643,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
                            std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&cookie_string);
+    std::ignore = cookie.SerializeToString(&cookie_string);
 
     std::string encoded_address = Envoy::Base64::encode(cookie_string.data(), cookie_string.size());
 
@@ -684,7 +684,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
                            std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&cookie_string);
+    std::ignore = cookie.SerializeToString(&cookie_string);
 
     std::string encoded_address = Envoy::Base64::encode(cookie_string.data(), cookie_string.size());
 
@@ -931,7 +931,7 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionDisabledByRoute) {
                            std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&address_string);
+    std::ignore = cookie.SerializeToString(&address_string);
     const std::string encoded_address =
         Envoy::Base64::encode(address_string.data(), address_string.size());
 
@@ -1069,7 +1069,7 @@ TEST_F(StatefulSessionIntegrationTest, CookieStatefulSessionOverriddenByRoute) {
                            std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&address_string);
+    std::ignore = cookie.SerializeToString(&address_string);
     const std::string encoded_address =
         Envoy::Base64::encode(address_string.data(), address_string.size());
 
@@ -1117,7 +1117,7 @@ TEST_F(StatefulSessionIntegrationTest, CookieStatefulSessionOverriddenByRoute) {
                            std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&address_string);
+    std::ignore = cookie.SerializeToString(&address_string);
     const std::string encoded_address =
         Envoy::Base64::encode(address_string.data(), address_string.size());
 
@@ -1246,7 +1246,7 @@ TEST_F(StatefulSessionIntegrationTest, CookieBasedStatefulSessionDisabledByReque
                            std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&address_string);
+    std::ignore = cookie.SerializeToString(&address_string);
     const std::string encoded_address =
         Envoy::Base64::encode(address_string.data(), address_string.size());
 
@@ -1429,7 +1429,7 @@ TEST_F(StatefulSessionIntegrationTest, CookieBasedStatefulSessionRejectExpiredCo
                          .count() -
                      10);
   std::string address_string;
-  cookie.SerializeToString(&address_string);
+  std::ignore = cookie.SerializeToString(&address_string);
   std::string encoded_address = Envoy::Base64::encode(address_string.data(), address_string.size());
   codec_client_ = makeHttpConnection(lookupPort("http"));
   Http::TestRequestHeaderMapImpl request_headers{

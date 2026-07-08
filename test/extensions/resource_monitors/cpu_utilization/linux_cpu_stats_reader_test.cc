@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cstdlib>
+#include <optional>
 
 #include "source/extensions/resource_monitors/cpu_utilization/linux_cpu_stats_reader.h"
 #include "source/server/resource_monitor_config_impl.h"
@@ -10,7 +11,6 @@
 #include "test/mocks/server/options.h"
 #include "test/test_common/environment.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

@@ -25,7 +25,7 @@ ContextImpl::ContextImpl(Stats::SymbolTable& symbol_table)
 
 // Gets the stat prefix and underlying storage, depending on whether request_names is empty
 Stats::ElementVec ContextImpl::statElements(Protocol protocol,
-                                            const absl::optional<RequestStatNames>& request_names,
+                                            const std::optional<RequestStatNames>& request_names,
                                             Stats::Element suffix) {
   const Stats::StatName protocolName = protocolStatName(protocol);
   if (request_names) {
@@ -35,7 +35,7 @@ Stats::ElementVec ContextImpl::statElements(Protocol protocol,
 }
 
 void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                             const absl::optional<RequestStatNames>& request_names,
+                             const std::optional<RequestStatNames>& request_names,
                              const Http::HeaderEntry* grpc_status) {
   if (!grpc_status) {
     return;
@@ -52,7 +52,7 @@ void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol prot
 }
 
 void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                             const absl::optional<RequestStatNames>& request_names, bool success) {
+                             const std::optional<RequestStatNames>& request_names, bool success) {
   Stats::ElementVec elements = statElements(protocol, request_names, successStatName(success));
   Stats::Utility::counterFromElements(cluster.statsScope(), elements).inc();
   elements.back() = total_;
@@ -60,26 +60,26 @@ void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol prot
 }
 
 void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster,
-                             const absl::optional<RequestStatNames>& request_names, bool success) {
+                             const std::optional<RequestStatNames>& request_names, bool success) {
   chargeStat(cluster, Protocol::Grpc, request_names, success);
 }
 
 void ContextImpl::chargeRequestMessageStat(const Upstream::ClusterInfo& cluster,
-                                           const absl::optional<RequestStatNames>& request_names,
+                                           const std::optional<RequestStatNames>& request_names,
                                            uint64_t amount) {
   Stats::ElementVec elements = statElements(Protocol::Grpc, request_names, request_message_count_);
   Stats::Utility::counterFromElements(cluster.statsScope(), elements).add(amount);
 }
 
 void ContextImpl::chargeResponseMessageStat(const Upstream::ClusterInfo& cluster,
-                                            const absl::optional<RequestStatNames>& request_names,
+                                            const std::optional<RequestStatNames>& request_names,
                                             uint64_t amount) {
   Stats::ElementVec elements = statElements(Protocol::Grpc, request_names, response_message_count_);
   Stats::Utility::counterFromElements(cluster.statsScope(), elements).add(amount);
 }
 
 void ContextImpl::chargeUpstreamStat(const Upstream::ClusterInfo& cluster,
-                                     const absl::optional<RequestStatNames>& request_names,
+                                     const std::optional<RequestStatNames>& request_names,
                                      std::chrono::milliseconds duration) {
   Stats::ElementVec elements = statElements(Protocol::Grpc, request_names, upstream_rq_time_);
   Stats::Utility::histogramFromElements(cluster.statsScope(), elements,
@@ -87,9 +87,9 @@ void ContextImpl::chargeUpstreamStat(const Upstream::ClusterInfo& cluster,
       .recordValue(duration.count());
 }
 
-absl::optional<ContextImpl::RequestStatNames>
+std::optional<ContextImpl::RequestStatNames>
 ContextImpl::resolveDynamicServiceAndMethod(const Http::HeaderEntry* path) {
-  absl::optional<Common::RequestNames> request_names = Common::resolveServiceAndMethod(path);
+  std::optional<Common::RequestNames> request_names = Common::resolveServiceAndMethod(path);
 
   if (!request_names) {
     return {};
@@ -103,9 +103,9 @@ ContextImpl::resolveDynamicServiceAndMethod(const Http::HeaderEntry* path) {
   return RequestStatNames{service, method};
 }
 
-absl::optional<ContextImpl::RequestStatNames>
+std::optional<ContextImpl::RequestStatNames>
 ContextImpl::resolveDynamicServiceAndMethodWithDotReplaced(const Http::HeaderEntry* path) {
-  absl::optional<Common::RequestNames> request_names = Common::resolveServiceAndMethod(path);
+  std::optional<Common::RequestNames> request_names = Common::resolveServiceAndMethod(path);
   if (!request_names) {
     return {};
   }

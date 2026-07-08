@@ -2,6 +2,7 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 #include "envoy/http/conn_pool.h"
@@ -48,7 +49,7 @@ public:
                                              Upstream::LoadBalancerContext* context) const;
 
   // Extensions::Common::DynamicForwardProxy::DfpCluster
-  std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>
+  std::pair<bool, std::optional<envoy::config::cluster::v3::Cluster>>
   createSubClusterConfig(const std::string& cluster_name, const std::string& host,
                          const int port) override;
   bool touch(const std::string& cluster_name) override;
@@ -107,7 +108,7 @@ private:
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* context, const Upstream::Host& host,
                              std::vector<uint8_t>& hash_key) override;
     OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override;
@@ -272,6 +273,10 @@ private:
   const std::chrono::milliseconds sub_cluster_ttl_;
   const envoy::config::cluster::v3::Cluster_LbPolicy sub_cluster_lb_policy_;
   const bool enable_sub_cluster_;
+
+  // Optional DNS configuration for dynamically created sub clusters. When set, sub clusters are
+  // created using the DnsCluster extension rather than the legacy STRICT_DNS discovery type.
+  const std::optional<envoy::extensions::clusters::dns::v3::DnsCluster> sub_cluster_dns_config_;
 
   friend class ClusterFactory;
   friend class ClusterTest;

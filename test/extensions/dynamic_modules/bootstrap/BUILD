@@ -70,6 +70,7 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_update_callbacks_handle_mocks",
         "//test/mocks/upstream:thread_local_cluster_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -133,6 +134,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
         "//test/integration:http_integration_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
 )

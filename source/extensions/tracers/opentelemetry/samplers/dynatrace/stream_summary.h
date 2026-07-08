@@ -3,12 +3,12 @@
 #include <algorithm>
 #include <cstdint>
 #include <list>
+#include <optional>
 
 #include "source/common/common/assert.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,7 +23,7 @@ template <typename T> using BucketIterator = typename std::list<Bucket<T>>::iter
 
 template <typename T> struct Counter {
   BucketIterator<T> bucket;
-  absl::optional<T> item{};
+  std::optional<T> item{};
   uint64_t value{};
   uint64_t error{};
 

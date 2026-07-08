@@ -238,6 +238,7 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
   const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
   HostVectorSharedPtr all_hosts(new HostVector(first_host_set.hosts()));
   all_hosts->emplace_back(host);
+<<<<<<< HEAD
 
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.skip_partition_original_dst_hosts")) {
@@ -259,6 +260,11 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
                               HostSetImpl::partitionHosts(all_hosts, HostsPerLocalityImpl::empty()),
                               {}, {std::move(host)}, {}, absl::nullopt, absl::nullopt);
   }
+=======
+  priority_set_.updateHosts(0,
+                            HostSetImpl::partitionHosts(all_hosts, HostsPerLocalityImpl::empty()),
+                            {}, {std::move(host)}, {}, std::nullopt, std::nullopt);
+>>>>>>> 4c8629f284bc1687b13289cd74f4730cbac76744
 }
 
 void OriginalDstCluster::cleanup() {

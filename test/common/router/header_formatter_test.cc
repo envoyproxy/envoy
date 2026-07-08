@@ -47,8 +47,8 @@ static envoy::config::route::v3::Route parseRouteFromV3Yaml(const std::string& y
 TEST(HeaderParserTest, TestParse) {
   struct TestCase {
     std::string input_;
-    absl::optional<std::string> expected_output_;
-    absl::optional<std::string> expected_exception_;
+    std::optional<std::string> expected_output_;
+    std::optional<std::string> expected_exception_;
   };
 
   static const TestCase test_cases[] = {
@@ -165,7 +165,7 @@ TEST(HeaderParserTest, TestParse) {
   stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
   const std::string virtual_cluster_name = "authN";
   stream_info.setVirtualClusterName(virtual_cluster_name);
-  absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
+  std::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
   ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
 
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
@@ -205,7 +205,7 @@ TEST(HeaderParserTest, TestParse) {
 
   stream_info.setResponseFlag(StreamInfo::CoreResponseFlag::LocalReset);
 
-  absl::optional<std::string> rc_details{"via_upstream"};
+  std::optional<std::string> rc_details{"via_upstream"};
   ON_CALL(stream_info, responseCodeDetails()).WillByDefault(ReturnRef(rc_details));
 
   for (const auto& test_case : test_cases) {
@@ -594,7 +594,7 @@ request_headers_to_remove: ["x-nope"]
   Http::TestRequestHeaderMapImpl header_map{
       {":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
+  std::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
   ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
 
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
