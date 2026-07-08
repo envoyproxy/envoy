@@ -1816,7 +1816,17 @@ TEST_F(RedisClusterTest, ZoneDiscoveryRefreshWhileInfoInFlightIsSkipped) {
       .Times(0);
   EXPECT_CALL(*zone_client, makeRequest_(Ref(RedisCluster::ClusterSlotsRequest::instance_), _))
       .Times(0);
+  // The session resolve timer is one-shot and stays disabled while the INFO
+  // requests are outstanding. A refresh reaches this window only because the
+  // refresh manager re-arms the timer to fire immediately (see registerCluster
+  // in the RedisCluster constructor, which calls enableTimer(0ms)). Reproduce
+  // that here: re-arm the timer, then fire it. This consumes the pending
+  // enableTimer expectation set up by setupZoneDiscoveryWithTwoNodes.
+  resolve_timer_->enableTimer(std::chrono::milliseconds(0), nullptr);
   resolve_timer_->invokeCallback();
+
+  // Completing zone discovery re-arms the resolve timer again.
+  EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
 
   // The original in-flight INFO callbacks are still valid and complete normally.
   NetworkFilters::Common::Redis::RespValuePtr info_resp_1(
