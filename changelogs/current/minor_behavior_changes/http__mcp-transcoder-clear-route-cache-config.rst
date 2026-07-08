@@ -1,1 +1,0 @@
-``McpJsonRestBridgeFilter`` includes a ``clear_route_cache`` config field; if set, the filter will recalculate the route when processing MCP requests. This field defaults to false in order to match the config for ``McpFilter``; this is a behavioral change from the previous behavior of always clearing the route cache.
