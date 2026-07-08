@@ -22,7 +22,7 @@ public:
   MatcherConstPtr createMatcher(const char* config) {
     RequirementRule rule;
     TestUtility::loadFromYaml(config, rule);
-    return Matcher::create(rule, context_);
+    return Matcher::create(rule, context_).value();
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;

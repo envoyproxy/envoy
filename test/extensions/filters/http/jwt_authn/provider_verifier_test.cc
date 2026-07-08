@@ -40,9 +40,13 @@ public:
   }
 
   void createVerifier() {
-    filter_config_ = std::make_unique<FilterConfigImpl>(proto_config_, "", mock_factory_ctx_);
+    absl::Status creation_status = absl::OkStatus();
+    filter_config_ =
+        std::make_unique<FilterConfigImpl>(proto_config_, "", mock_factory_ctx_, creation_status);
+    ASSERT_TRUE(creation_status.ok());
     verifier_ = Verifier::create(proto_config_.rules(0).requires_(), proto_config_.providers(),
-                                 *filter_config_);
+                                 *filter_config_)
+                    .value();
   }
 
   JwtAuthentication proto_config_;
@@ -250,12 +254,14 @@ TEST_F(ProviderVerifierTest, TestRequiresProviderWithAudiences) {
   verifier_->verify(Verifier::createContext(headers, parent_span_, &mock_cb_));
 }
 
-// This test verifies that requirement referencing nonexistent provider will throw exception
+// This test verifies that requirement referencing nonexistent provider will fail config creation.
 TEST_F(ProviderVerifierTest, TestRequiresNonexistentProvider) {
   TestUtility::loadFromYaml(ExampleConfig, proto_config_);
   proto_config_.mutable_rules(0)->mutable_requires_()->set_provider_name("nosuchprovider");
 
-  EXPECT_THROW(FilterConfigImpl(proto_config_, "", mock_factory_ctx_), EnvoyException);
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigImpl filter_config(proto_config_, "", mock_factory_ctx_, creation_status);
+  EXPECT_FALSE(creation_status.ok());
 }
 
 class ProviderVerifiersJwtCacheTest : public ProviderVerifierTest,
@@ -285,7 +291,7 @@ TEST_P(ProviderVerifiersJwtCacheTest, TestRequirementsWithAudiences) {
   provider_and_audiences->set_provider_name("example_provider");
   provider_and_audiences->add_audiences("other_service");
   VerifierConstPtr verifier2 =
-      Verifier::create(require2, proto_config_.providers(), *filter_config_);
+      Verifier::create(require2, proto_config_.providers(), *filter_config_).value();
 
   MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, PublicKey);
 

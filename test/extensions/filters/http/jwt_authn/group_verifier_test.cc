@@ -77,7 +77,8 @@ public:
           return std::move(mock_auths_[provider ? provider.value() : allowfailed]);
         }));
     verifier_ = Verifier::create(proto_config_.rules(0).requires_(), proto_config_.providers(),
-                                 mock_factory_);
+                                 mock_factory_)
+                    .value();
   }
   void createSyncMockAuthsAndVerifier(const StatusMap& statuses) {
     for (const auto& it : statuses) {
