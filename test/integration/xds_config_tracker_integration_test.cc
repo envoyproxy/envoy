@@ -101,11 +101,8 @@ public:
     stats_.on_config_rejected_.inc();
   }
 
-  void onResourceUnsubscribed(const absl::string_view,
-                              const std::vector<absl::string_view>& resources) override {
-    for (size_t i = 0; i < resources.size(); ++i) {
-      stats_.on_resource_unsubscribed_.inc();
-    }
+  void onResourceUnsubscribed(const absl::string_view, absl::string_view) override {
+    stats_.on_resource_unsubscribed_.inc();
   }
 
 private:

@@ -59,8 +59,7 @@ public:
                const absl::string_view error_detail),
               (override));
   MOCK_METHOD(void, onResourceUnsubscribed,
-              (const absl::string_view type_url, const std::vector<absl::string_view>& resources),
-              (override));
+              (const absl::string_view type_url, absl::string_view resource), (override));
 };
 
 class MockXdsResourcesDelegate : public XdsResourcesDelegate {

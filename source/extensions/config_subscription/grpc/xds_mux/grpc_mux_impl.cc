@@ -199,13 +199,13 @@ void GrpcMuxImpl<S, F, RQ, RS>::updateWatch(const std::string& type_url, Watch* 
 
   auto added_removed = watch_map.updateWatchInterest(watch, effective_resources);
   if (xds_config_tracker_.has_value() && !added_removed.removed_.empty()) {
-    std::vector<absl::string_view> unsubscribed(added_removed.removed_.begin(),
-                                                added_removed.removed_.end());
     ENVOY_LOG(debug,
               "GrpcMuxImpl::updateWatch calling onResourceUnsubscribed for "
               "{} resources",
-              unsubscribed.size());
-    xds_config_tracker_->onResourceUnsubscribed(type_url, unsubscribed);
+              added_removed.removed_.size());
+    for (absl::string_view resource : added_removed.removed_) {
+      xds_config_tracker_->onResourceUnsubscribed(type_url, resource);
+    }
   }
   if (options.use_namespace_matching_) {
     // This is to prevent sending out of requests that contain prefixes instead of resource names

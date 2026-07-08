@@ -1574,14 +1574,12 @@ TEST_P(GrpcMuxImplConfigTrackerTest, XdsConfigTrackerUnsubscriptionTest) {
 
   // 3. Destroy watch1 -> this should trigger unsubscription of {"y"} since no
   // other watch wants it.
-  EXPECT_CALL(xds_config_tracker_,
-              onResourceUnsubscribed(type_url_, std::vector<absl::string_view>{"y"}));
+  EXPECT_CALL(xds_config_tracker_, onResourceUnsubscribed(type_url_, "y"));
   watch1.reset();
 
   // 4. Destroy watch2 -> this should trigger unsubscription of {"x"} since no
   // other watch wants it.
-  EXPECT_CALL(xds_config_tracker_,
-              onResourceUnsubscribed(type_url_, std::vector<absl::string_view>{"x"}));
+  EXPECT_CALL(xds_config_tracker_, onResourceUnsubscribed(type_url_, "x"));
   watch2.reset();
 }
 
@@ -1606,8 +1604,7 @@ TEST_P(GrpcMuxImplConfigTrackerTest, XdsConfigTrackerExplicitGlobWildcardTest) {
   auto watch = grpc_mux_->addWatch(type_url_, {glob_resource}, callbacks_, resource_decoder_, {});
 
   // Expect unsubscription call with the glob on destruction
-  EXPECT_CALL(xds_config_tracker_,
-              onResourceUnsubscribed(type_url_, std::vector<absl::string_view>{glob_resource}));
+  EXPECT_CALL(xds_config_tracker_, onResourceUnsubscribed(type_url_, glob_resource));
 
   watch.reset();
 }
@@ -1619,8 +1616,7 @@ TEST_P(GrpcMuxImplConfigTrackerTest, XdsConfigTrackerTransitionToWildcardTest) {
   auto watch = grpc_mux_->addWatch(type_url_, {"cluster_x"}, callbacks_, resource_decoder_, {});
 
   // Expect unsubscription of "cluster_x" when updating to wildcard (empty set)
-  EXPECT_CALL(xds_config_tracker_,
-              onResourceUnsubscribed(type_url_, std::vector<absl::string_view>{"cluster_x"}));
+  EXPECT_CALL(xds_config_tracker_, onResourceUnsubscribed(type_url_, "cluster_x"));
 
   // Update to wildcard (empty set)
   watch->update({});
