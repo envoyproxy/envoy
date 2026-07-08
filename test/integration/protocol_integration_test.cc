@@ -160,7 +160,11 @@ TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetricHandshakeFail
 // Regression test: when the upstream connection cannot be created because binding to the
 // configured network namespace fails at connection time (the namespace file cannot be opened),
 // the request fails gracefully with a 503 instead of crashing on a null connection.
-TEST_P(DownstreamProtocolIntegrationTest, UpstreamConnectionCreationFailure) {
+TEST_P(ProtocolIntegrationTest, UpstreamConnectionCreationFailure) {
+  // This test intentionally fails to create the upstream connection, so bypass the check that
+  // the test used upstream connections.
+  testing_upstream_intentionally_ = true;
+
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
     auto* source_address = cluster->mutable_upstream_bind_config()->mutable_source_address();
