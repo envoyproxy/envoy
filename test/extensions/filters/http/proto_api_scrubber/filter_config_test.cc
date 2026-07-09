@@ -48,7 +48,7 @@ protected:
   }
 
   void initDefaultProtoConfig() {
-    Protobuf::TextFormat::ParseFromString(getDefaultProtoConfig(), &proto_config_);
+    std::ignore = Protobuf::TextFormat::ParseFromString(getDefaultProtoConfig(), &proto_config_);
     *proto_config_.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
         api_->fileSystem()
             .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
@@ -191,7 +191,7 @@ protected:
   )pb",
         method_name);
     ProtoApiScrubberConfig proto_config;
-    Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
+    std::ignore = Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
     *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
         api_->fileSystem()
             .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
@@ -216,7 +216,7 @@ protected:
   )pb",
         field_mask);
     ProtoApiScrubberConfig proto_config;
-    Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
+    std::ignore = Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
     *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
         api_->fileSystem()
             .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
@@ -287,7 +287,7 @@ protected:
     )pb",
                                                      input_type);
     ProtoApiScrubberConfig proto_config;
-    Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
+    std::ignore = Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
     *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
         api_->fileSystem()
             .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
@@ -382,7 +382,7 @@ protected:
       }
     )pb";
     ProtoApiScrubberConfig proto_config;
-    Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
+    std::ignore = Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
     *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
         api_->fileSystem()
             .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
@@ -440,7 +440,7 @@ protected:
       }
     )pb";
     ProtoApiScrubberConfig proto_config;
-    Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
+    std::ignore = Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
     *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
         api_->fileSystem()
             .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
@@ -491,7 +491,7 @@ protected:
       }
     )pb";
     ProtoApiScrubberConfig proto_config;
-    Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
+    std::ignore = Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
     *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
         api_->fileSystem()
             .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
@@ -512,7 +512,7 @@ protected:
         )pb",
         message_name);
     ProtoApiScrubberConfig proto_config;
-    Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
+    std::ignore = Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
     *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
         api_->fileSystem()
             .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
@@ -556,7 +556,7 @@ protected:
     descriptor_set.add_file()->CopyFrom(file_proto);
 
     std::string descriptor_bytes;
-    descriptor_set.SerializeToString(&descriptor_bytes);
+    std::ignore = descriptor_set.SerializeToString(&descriptor_bytes);
     return descriptor_bytes;
   }
 
@@ -583,7 +583,7 @@ protected:
     descriptor_set.add_file()->CopyFrom(file_proto);
 
     std::string descriptor_bytes;
-    descriptor_set.SerializeToString(&descriptor_bytes);
+    std::ignore = descriptor_set.SerializeToString(&descriptor_bytes);
     return descriptor_bytes;
   }
 
@@ -707,7 +707,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
     file_proto.add_message_type()->set_name("TestMessage");
 
     std::string invalid_binary_descriptor;
-    file_proto.SerializeToString(&invalid_binary_descriptor);
+    std::ignore = file_proto.SerializeToString(&invalid_binary_descriptor);
 
     ProtoApiScrubberConfig config;
     *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
@@ -741,7 +741,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
     descriptor_set.add_file()->CopyFrom(file2_proto);
 
     std::string invalid_binary_descriptor;
-    descriptor_set.SerializeToString(&invalid_binary_descriptor);
+    std::ignore = descriptor_set.SerializeToString(&invalid_binary_descriptor);
 
     ProtoApiScrubberConfig config;
     *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
@@ -1456,7 +1456,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, UnsupportedActionType) {
     }
   )pb";
   ProtoApiScrubberConfig proto_config;
-  Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
+  std::ignore = Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
   *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
       api_->fileSystem()
           .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
@@ -1519,7 +1519,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MatcherDeduplication) {
   // Set Predicate (CEL: true).
   auto* single_predicate = matcher_entry->mutable_predicate()->mutable_single_predicate();
   single_predicate->mutable_input()->set_name("envoy.matching.inputs.cel_data_input");
-  single_predicate->mutable_input()->mutable_typed_config()->PackFrom(
+  std::ignore = single_predicate->mutable_input()->mutable_typed_config()->PackFrom(
       xds::type::matcher::v3::HttpAttributesCelMatchInput());
 
   xds::type::matcher::v3::CelMatcher cel_matcher;
@@ -1528,12 +1528,13 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MatcherDeduplication) {
       ->mutable_expr()
       ->mutable_const_expr()
       ->set_bool_value(true);
-  single_predicate->mutable_custom_match()->mutable_typed_config()->PackFrom(cel_matcher);
+  std::ignore =
+      single_predicate->mutable_custom_match()->mutable_typed_config()->PackFrom(cel_matcher);
 
   // Set Action (RemoveField).
   auto* action = matcher_entry->mutable_on_match()->mutable_action();
   action->set_name("remove");
-  action->mutable_typed_config()->PackFrom(
+  std::ignore = action->mutable_typed_config()->PackFrom(
       envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction());
 
   // Apply the same matcher to two different fields.

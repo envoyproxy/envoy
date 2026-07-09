@@ -102,6 +102,12 @@ const std::string CONFIG_WITH_BATCHING = CONFIG + R"EOF(
             buffer_flush_timeout: 0.003s
 )EOF";
 
+// This is a configuration with custom commands.
+const std::string CONFIG_WITH_CUSTOM_COMMANDS = CONFIG + R"EOF(
+          custom_commands:
+          - json.set
+)EOF";
+
 const std::string CONFIG_WITH_ROUTES_BASE = fmt::format(R"EOF(
 admin:
   access_log:
@@ -756,7 +762,7 @@ public:
                                    std::vector<FakeRawConnectionPtr>& fake_upstream_connections,
                                    const std::vector<std::string>& auth_usernames,
                                    const std::vector<std::string>& auth_passwords,
-                                   absl::optional<uint64_t>& matched_upstream_index);
+                                   std::optional<uint64_t>& matched_upstream_index);
 
 protected:
   const int num_upstreams_;
@@ -858,6 +864,12 @@ public:
       : RedisProxyIntegrationTest(CONFIG_WITH_COMMAND_STATS, 2) {}
 };
 
+class RedisProxyWithCustomCommandsIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyWithCustomCommandsIntegrationTest()
+      : RedisProxyIntegrationTest(CONFIG_WITH_CUSTOM_COMMANDS, 2) {}
+};
+
 class RedisProxyWithFaultInjectionIntegrationTest : public RedisProxyIntegrationTest {
 public:
   RedisProxyWithFaultInjectionIntegrationTest()
@@ -948,6 +960,10 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithCustomCommandsIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
@@ -1073,7 +1089,7 @@ void RedisProxyIntegrationTest::roundtripToSomeUpstreamStep(
     const std::string& response, IntegrationTcpClientPtr& redis_client,
     std::vector<FakeRawConnectionPtr>& fake_upstream_connections,
     const std::vector<std::string>& auth_usernames, const std::vector<std::string>& auth_passwords,
-    absl::optional<uint64_t>& matched_upstream_index) {
+    std::optional<uint64_t>& matched_upstream_index) {
   redis_client->clearData();
   for (auto& fake_upstream_connection : fake_upstream_connections) {
     if (fake_upstream_connection != nullptr) {
@@ -1822,7 +1838,7 @@ TEST_P(RedisProxyWithSeparateAuthPasswordsIntegrationTest, TransparentAuthentica
   // iterate a lot to hopefully hit all upstreams.
   for (int i = 0; i < 100; ++i) {
     const std::string request = makeBulkStringArray({"get", Envoy::Random::RandomUtility::uuid()});
-    absl::optional<uint64_t> upstream_index;
+    std::optional<uint64_t> upstream_index;
     roundtripToSomeUpstreamStep(fake_upstreams_, request, response, redis_client,
                                 fake_upstream_connections, endpoint_usernames, endpoint_passwords,
                                 upstream_index);
@@ -2208,6 +2224,29 @@ TEST_P(RedisProxyWithCommandStatsIntegrationTest, PipelinedTransactionTest) {
       makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"set", "foo", "bar"}) +
       makeBulkStringArray({"get", "foo"}) + makeBulkStringArray({"exec"});
   const std::string& response = "+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n+OK\r\n$3\r\nbar\r\n";
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_TRUE(redis_client->write(transaction_commands));
+
+  expectUpstreamRequestResponse(fake_upstreams_[0], transaction_commands, response,
+                                fake_upstream_connection[0]);
+
+  redis_client->waitForData(response);
+  EXPECT_EQ(response, redis_client->data());
+
+  EXPECT_TRUE(fake_upstream_connection[0]->close());
+  redis_client->close();
+}
+
+// This test verifies that a configured custom command is treated as a simple
+// command and can be used within a transaction.
+TEST_P(RedisProxyWithCustomCommandsIntegrationTest, PipelinedTransactionWithCustomCommand) {
+  initialize();
+
+  std::array<FakeRawConnectionPtr, 1> fake_upstream_connection;
+  std::string transaction_commands = makeBulkStringArray({"MULTI"}) +
+                                     makeBulkStringArray({"json.set", "foo", "$", "1"}) +
+                                     makeBulkStringArray({"exec"});
+  const std::string& response = "+OK\r\n+QUEUED\r\n*1\r\n+OK\r\n";
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
   ASSERT_TRUE(redis_client->write(transaction_commands));
 

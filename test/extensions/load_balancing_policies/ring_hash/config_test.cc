@@ -26,7 +26,7 @@ TEST(RingHashConfigTest, Validate) {
     envoy::config::core::v3::TypedExtensionConfig config;
     config.set_name("envoy.load_balancing_policies.ring_hash");
     envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash config_msg;
-    config.mutable_typed_config()->PackFrom(config_msg);
+    std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
     auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
     EXPECT_EQ("envoy.load_balancing_policies.ring_hash", factory.name());
@@ -53,7 +53,7 @@ TEST(RingHashConfigTest, Validate) {
     config_msg.mutable_minimum_ring_size()->set_value(4);
     config_msg.mutable_maximum_ring_size()->set_value(2);
 
-    config.mutable_typed_config()->PackFrom(config_msg);
+    std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
     auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
     EXPECT_EQ("envoy.load_balancing_policies.ring_hash", factory.name());
@@ -81,7 +81,7 @@ TEST(RingHashConfigTest, Validate) {
     *hash_policy->mutable_cookie()->mutable_path() = "/test/path";
     hash_policy->mutable_cookie()->mutable_ttl()->set_seconds(1000);
 
-    config.mutable_typed_config()->PackFrom(config_msg);
+    std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
     std::string err;
     EXPECT_EQ(Validate(config_msg, &err), false);

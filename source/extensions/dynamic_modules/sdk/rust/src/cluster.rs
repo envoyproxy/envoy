@@ -119,9 +119,23 @@ pub enum HostSelectionResult {
   NoHost,
   /// The module needs to perform async work (e.g., DNS resolution) before selecting a host.
   /// The module must eventually call
-  /// [`EnvoyAsyncHostSelectionComplete::async_host_selection_complete`] to deliver the result,
+  /// [`EnvoyAsyncHostSelectionComplete::complete`] to deliver the result,
   /// unless [`AsyncHostSelectionHandle::cancel`] is called first.
   AsyncPending(Box<dyn AsyncHostSelectionHandle>),
+}
+
+/// A host's IP address and port as packed integers.
+///
+/// This is the decoded form of the packed address returned by
+/// [`EnvoyClusterLoadBalancer::get_member_update_host_packed_address`]. The address bytes are in
+/// network byte order and the port is in host byte order, letting a module key its own host map by
+/// an integer rather than a formatted string.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PackedAddress {
+  /// An IPv4 address (4 bytes, network byte order) and port (host byte order).
+  V4([u8; 4], u16),
+  /// An IPv6 address (16 bytes, network byte order) and port (host byte order).
+  V6([u8; 16], u16),
 }
 
 /// A handle for canceling an in-progress asynchronous host selection.
@@ -139,18 +153,22 @@ pub trait AsyncHostSelectionHandle: Send {
 ///
 /// This is passed to [`ClusterLb::choose_host`] and must be stored by the module when returning
 /// [`HostSelectionResult::AsyncPending`]. The module calls
-/// [`EnvoyAsyncHostSelectionComplete::async_host_selection_complete`] to deliver the async result.
+/// [`EnvoyAsyncHostSelectionComplete::complete`] to deliver the async result.
 #[automock]
 pub trait EnvoyAsyncHostSelectionComplete: Send {
-  /// Deliver the result of an asynchronous host selection.
-  ///
-  /// `host` is the selected host pointer, or `None` if host selection failed.
-  /// `details` is an optional description of the resolution outcome (e.g., error reason).
-  fn async_host_selection_complete(
-    &self,
+  /// Delivers the async host selection result and consumes the completion. `host` is the selected
+  /// host, or `None` on failure; `details` describes the outcome. Taking `self` by value means the
+  /// context borrowed via `request_context` cannot be read after the result is delivered.
+  fn complete(
+    self: Box<Self>,
     host: Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>,
     details: &str,
   );
+
+  /// The request context `choose_host` received, or `None` when there was none (e.g. health-check
+  /// selections). The view's lifetime is tied to the completion, so it cannot outlive it or
+  /// survive `complete`.
+  fn request_context<'a>(&'a self) -> Option<ClusterLbContextRef<'a>>;
 }
 
 /// The module-side load balancer instance.
@@ -161,12 +179,13 @@ pub trait ClusterLb: Send {
   /// Select a host for a request.
   ///
   /// The `context` provides access to per-request information such as downstream headers,
-  /// hash keys, override host, and retry state. It may be `None` if no context is available
-  /// (e.g., health check requests).
+  /// hash keys, override host, and retry state, and (via
+  /// [`ClusterLbContext::worker_timer_new`]) lets the module arm a per-worker timer from the
+  /// request path. It may be `None` if no context is available (e.g., health check requests).
   ///
   /// The `async_completion` callback must be used when returning
   /// [`HostSelectionResult::AsyncPending`]. The module stores it and later calls
-  /// [`EnvoyAsyncHostSelectionComplete::async_host_selection_complete`] to deliver the result.
+  /// [`EnvoyAsyncHostSelectionComplete::complete`] to deliver the result.
   /// For synchronous results, `async_completion` can be ignored.
   fn choose_host(
     &mut self,
@@ -189,6 +208,19 @@ pub trait ClusterLb: Send {
     _envoy_lb: &dyn EnvoyClusterLoadBalancer,
     _num_hosts_added: usize,
     _num_hosts_removed: usize,
+  ) {
+  }
+
+  /// Called on the worker thread when a timer created via
+  /// [`EnvoyClusterLoadBalancer::worker_timer_new`] fires.
+  ///
+  /// The `timer` is a non-owning reference to the timer that fired. The module re-arms it by
+  /// calling [`EnvoyClusterWorkerTimer::enable`] for periodic behavior, or
+  /// [`EnvoyClusterWorkerTimer::disable`] to stop it. The default implementation is a no-op.
+  fn on_worker_timer_fired(
+    &mut self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+    _timer: &dyn EnvoyClusterWorkerTimer,
   ) {
   }
 }
@@ -275,6 +307,17 @@ pub trait ClusterLbContext {
     host: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
     stat: abi::envoy_dynamic_module_type_host_stat,
   ) -> u64;
+
+  /// Creates a per-worker timer on this request's worker dispatcher.
+  ///
+  /// The worker dispatcher is captured on this load balancer for the duration of host selection,
+  /// so this is callable during [`ClusterLb::choose_host`]. The timer is not armed on creation;
+  /// call [`EnvoyClusterWorkerTimer::enable`] to arm it. When it fires,
+  /// [`ClusterLb::on_worker_timer_fired`] is invoked on this same worker thread.
+  ///
+  /// Returns `None` if no worker dispatcher is available. The returned handle owns the underlying
+  /// Envoy timer and destroys it when dropped, which must happen on this worker thread.
+  fn worker_timer_new(&self) -> Option<Box<dyn EnvoyClusterWorkerTimer>>;
 }
 
 /// Envoy-side cluster operations available to the module.
@@ -660,6 +703,49 @@ pub trait EnvoyClusterLoadBalancer: Send {
     index: usize,
     is_added: bool,
   ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>;
+
+  /// Returns the address of an added or removed host during the
+  /// [`ClusterLb::on_host_membership_update`] callback as packed integers.
+  ///
+  /// Unlike [`EnvoyClusterLoadBalancer::get_member_update_host_address`], this reads the IP address
+  /// and port directly from the host's sockaddr without formatting a string, so a module can key
+  /// its own host map by an integer. It is only valid during the `on_host_membership_update`
+  /// callback.
+  ///
+  /// Set `is_added` to `true` to get an added host address, `false` for a removed host address.
+  /// Returns `None` when the index is out of bounds, the callback is not active, or the host has a
+  /// non-IP (pipe) address.
+  fn get_member_update_host_packed_address(
+    &self,
+    index: usize,
+    is_added: bool,
+  ) -> Option<PackedAddress>;
+}
+
+/// A per-worker timer handle, created via [`EnvoyClusterLoadBalancer::worker_timer_new`].
+///
+/// The timer runs on the worker thread that created it and fires by calling
+/// [`ClusterLb::on_worker_timer_fired`]. All methods, including dropping the owning handle, must be
+/// called on that worker thread, since the underlying Envoy timer is removed from the worker
+/// dispatcher's timer list when destroyed.
+///
+/// The owning handle returned by `worker_timer_new` automatically destroys the underlying Envoy
+/// timer when dropped. The non-owning reference passed to [`ClusterLb::on_worker_timer_fired`] does
+/// not. Each timer has a unique [`id`](EnvoyClusterWorkerTimer::id) stable for its lifetime.
+#[automock]
+pub trait EnvoyClusterWorkerTimer: Send {
+  /// Returns a unique opaque identifier for this timer, stable for its lifetime. Lets a module with
+  /// multiple timers identify which one fired in [`ClusterLb::on_worker_timer_fired`].
+  fn id(&self) -> usize;
+
+  /// Enable the timer with the given delay. If already enabled, it is reset to the new delay.
+  fn enable(&self, delay: std::time::Duration);
+
+  /// Disable the timer without destroying it. It can be re-enabled later.
+  fn disable(&self);
+
+  /// Check whether the timer is currently armed.
+  fn enabled(&self) -> bool;
 }
 
 /// Envoy-side scheduler that dispatches events to the main thread.
@@ -1496,6 +1582,132 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
       Some(host)
     }
   }
+
+  fn get_member_update_host_packed_address(
+    &self,
+    index: usize,
+    is_added: bool,
+  ) -> Option<PackedAddress> {
+    let mut result = abi::envoy_dynamic_module_type_packed_address {
+      address_bytes: [0; 16],
+      port: 0,
+      family: 0,
+    };
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+        self.raw,
+        index,
+        is_added,
+        &mut result,
+      )
+    };
+    if !found {
+      return None;
+    }
+    match result.family {
+      4 => {
+        let mut v4 = [0u8; 4];
+        v4.copy_from_slice(&result.address_bytes[..4]);
+        Some(PackedAddress::V4(v4, result.port))
+      },
+      6 => Some(PackedAddress::V6(result.address_bytes, result.port)),
+      _ => None,
+    }
+  }
+}
+
+/// Owning implementation of [`EnvoyClusterWorkerTimer`]. Calls `worker_timer_delete` on drop.
+struct EnvoyClusterWorkerTimerImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_cluster_worker_timer_module_ptr,
+}
+
+// SAFETY: The raw pointer is only used on the worker thread that created the timer, matching
+// Envoy's threading model for worker timers.
+unsafe impl Send for EnvoyClusterWorkerTimerImpl {}
+
+impl Drop for EnvoyClusterWorkerTimerImpl {
+  fn drop(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_worker_timer_delete(self.raw_ptr);
+    }
+  }
+}
+
+impl EnvoyClusterWorkerTimer for EnvoyClusterWorkerTimerImpl {
+  fn id(&self) -> usize {
+    self.raw_ptr as usize
+  }
+
+  fn enable(&self, delay: std::time::Duration) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_worker_timer_enable(
+        self.raw_ptr,
+        delay.as_millis() as u64,
+      );
+    }
+  }
+
+  fn disable(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_worker_timer_disable(self.raw_ptr);
+    }
+  }
+
+  fn enabled(&self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_cluster_worker_timer_enabled(self.raw_ptr) }
+  }
+}
+
+/// Non-owning reference to a worker timer, used in the [`ClusterLb::on_worker_timer_fired`]
+/// callback. Does NOT call `worker_timer_delete` on drop.
+struct EnvoyClusterWorkerTimerRef {
+  raw_ptr: abi::envoy_dynamic_module_type_cluster_worker_timer_module_ptr,
+}
+
+// SAFETY: The raw pointer is only used on the worker thread that owns the timer.
+unsafe impl Send for EnvoyClusterWorkerTimerRef {}
+
+impl EnvoyClusterWorkerTimer for EnvoyClusterWorkerTimerRef {
+  fn id(&self) -> usize {
+    self.raw_ptr as usize
+  }
+
+  fn enable(&self, delay: std::time::Duration) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_worker_timer_enable(
+        self.raw_ptr,
+        delay.as_millis() as u64,
+      );
+    }
+  }
+
+  fn disable(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_worker_timer_disable(self.raw_ptr);
+    }
+  }
+
+  fn enabled(&self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_cluster_worker_timer_enabled(self.raw_ptr) }
+  }
+}
+
+impl EnvoyClusterWorkerTimer for Box<dyn EnvoyClusterWorkerTimer> {
+  fn id(&self) -> usize {
+    (**self).id()
+  }
+
+  fn enable(&self, delay: std::time::Duration) {
+    (**self).enable(delay);
+  }
+
+  fn disable(&self) {
+    (**self).disable();
+  }
+
+  fn enabled(&self) -> bool {
+    (**self).enabled()
+  }
 }
 
 /// Implementation of [`EnvoyClusterMetrics`] that calls into the Envoy ABI.
@@ -1816,8 +2028,8 @@ struct EnvoyAsyncHostSelectionCompleteImpl {
 unsafe impl Send for EnvoyAsyncHostSelectionCompleteImpl {}
 
 impl EnvoyAsyncHostSelectionComplete for EnvoyAsyncHostSelectionCompleteImpl {
-  fn async_host_selection_complete(
-    &self,
+  fn complete(
+    self: Box<Self>,
     host: Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>,
     details: &str,
   ) {
@@ -1831,26 +2043,40 @@ impl EnvoyAsyncHostSelectionComplete for EnvoyAsyncHostSelectionCompleteImpl {
       );
     }
   }
+
+  fn request_context(&self) -> Option<ClusterLbContextRef<'_>> {
+    // A null context pointer mirrors choose_host's `None` (e.g. health-check selections).
+    if self.raw_context.is_null() {
+      return None;
+    }
+    Some(ClusterLbContextRef::new(self.raw_context, self.raw_lb))
+  }
 }
 
-struct ClusterLbContextImpl {
+/// A view over a request's load-balancing context, valid only while the source it was obtained
+/// from is alive. Owns its handles like [`crate::EnvoyBuffer`]; the lifetime ties validity to that
+/// source rather than to any Rust-owned storage.
+#[derive(Clone, Copy)]
+pub struct ClusterLbContextRef<'a> {
   raw_context: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
   raw_lb: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _marker: std::marker::PhantomData<&'a ()>,
 }
 
-impl ClusterLbContextImpl {
-  fn new(
+impl ClusterLbContextRef<'_> {
+  pub(crate) fn new(
     raw_context: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
     raw_lb: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
   ) -> Self {
     Self {
       raw_context,
       raw_lb,
+      _marker: std::marker::PhantomData,
     }
   }
 }
 
-impl ClusterLbContext for ClusterLbContextImpl {
+impl ClusterLbContext for ClusterLbContextRef<'_> {
   fn compute_hash_key(&self) -> Option<u64> {
     let mut hash: u64 = 0;
     let ok = unsafe {
@@ -2016,6 +2242,8 @@ impl ClusterLbContext for ClusterLbContextImpl {
     }
   }
 
+  // `host` is an opaque Envoy handle passed back to Envoy, never dereferenced in Rust.
+  #[allow(clippy::not_unsafe_ptr_arg_deref)]
   fn get_host_stat(
     &self,
     host: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
@@ -2028,6 +2256,15 @@ impl ClusterLbContext for ClusterLbContextImpl {
         stat,
       )
     }
+  }
+
+  fn worker_timer_new(&self) -> Option<Box<dyn EnvoyClusterWorkerTimer>> {
+    let raw_ptr =
+      unsafe { abi::envoy_dynamic_module_callback_cluster_worker_timer_new(self.raw_lb) };
+    if raw_ptr.is_null() {
+      return None;
+    }
+    Some(Box::new(EnvoyClusterWorkerTimerImpl { raw_ptr }))
   }
 }
 
@@ -2144,7 +2381,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_destroy(
 }
 
 /// Wrapper that pairs a module-side load balancer with the Envoy-side LB pointer.
-/// The `lb_envoy_ptr` is needed by [`ClusterLbContextImpl::should_select_another_host`] to
+/// The `lb_envoy_ptr` is needed by [`ClusterLbContextRef::should_select_another_host`] to
 /// resolve host pointers from the priority set.
 struct ClusterLbWrapper {
   lb: Box<dyn ClusterLb>,
@@ -2207,7 +2444,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_choose_host(
     let context = if context_envoy_ptr.is_null() {
       None
     } else {
-      Some(ClusterLbContextImpl::new(
+      Some(ClusterLbContextRef::new(
         context_envoy_ptr,
         wrapper.lb_envoy_ptr,
       ))
@@ -2297,6 +2534,28 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_on_host_membership_u
       "envoy_dynamic_module_on_cluster_lb_on_host_membership_update",
       panic,
     );
+  });
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_worker_timer_fired(
+  lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
+  timer_ptr: abi::envoy_dynamic_module_type_cluster_worker_timer_module_ptr,
+) {
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let wrapper = &mut *(lb_module_ptr as *mut ClusterLbWrapper);
+    let envoy_lb = EnvoyClusterLoadBalancerImpl::new(lb_envoy_ptr);
+    // Non-owning reference so the module can re-arm the timer it already owns.
+    let timer_ref = EnvoyClusterWorkerTimerRef { raw_ptr: timer_ptr };
+    wrapper.lb.on_worker_timer_fired(&envoy_lb, &timer_ref);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_cluster_worker_timer_fired", panic);
   });
 }
 
@@ -2470,4 +2729,36 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_http_callout_done(
   .map_err(|panic| {
     crate::log_ffi_panic("envoy_dynamic_module_on_cluster_http_callout_done", panic);
   });
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  // The per-request accessor callbacks are satisfied by the link-time stubs in lib_test.rs.
+  #[test]
+  fn request_context_present_when_context_retained() {
+    let completion = EnvoyAsyncHostSelectionCompleteImpl {
+      raw_lb: std::ptr::null_mut(),
+      // A non-null sentinel: the per-request callback stubs ignore the pointer value.
+      raw_context: 0x1 as *mut _,
+    };
+
+    // Reads route through the per-request callbacks; the stubs report no hash / zero headers.
+    let ctx = completion
+      .request_context()
+      .expect("a retained context must be re-presented");
+    assert_eq!(ctx.compute_hash_key(), None);
+    assert_eq!(ctx.get_downstream_headers_size(), 0);
+  }
+
+  // A null context pointer yields None, matching choose_host (e.g. health-check selections).
+  #[test]
+  fn request_context_absent_when_no_context() {
+    let completion = EnvoyAsyncHostSelectionCompleteImpl {
+      raw_lb: std::ptr::null_mut(),
+      raw_context: std::ptr::null_mut(),
+    };
+    assert!(completion.request_context().is_none());
+  }
 }

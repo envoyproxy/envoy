@@ -55,6 +55,18 @@ bool getUpstreamSslAttribute(
   return true;
 }
 
+// Resolve a dynamic metadata value by filter name and dotted key path. Returns an unset value
+// when the path is absent.
+const Protobuf::Value& dynamicMetadataValue(const StreamInfo::StreamInfo& stream_info,
+                                            envoy_dynamic_module_type_module_buffer filter_name,
+                                            envoy_dynamic_module_type_module_buffer path) {
+  std::string filter_name_str(filter_name.ptr, filter_name.length);
+  std::string path_str(path.ptr, path.length);
+  std::vector<std::string> path_parts = absl::StrSplit(path_str, '.');
+  const auto& metadata = stream_info.dynamicMetadata();
+  return Envoy::Config::Metadata::metadataValue(&metadata, filter_name_str, path_parts);
+}
+
 } // namespace
 
 HeadersMapOptConstRef
@@ -274,7 +286,7 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
         stream_info,
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->dnsSansLocalCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->dnsSansLocalCertificate().front();
         },
@@ -284,7 +296,7 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
         stream_info,
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->dnsSansPeerCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->dnsSansPeerCertificate().front();
         },
@@ -294,7 +306,7 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
         stream_info,
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->uriSanLocalCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->uriSanLocalCertificate().front();
         },
@@ -304,7 +316,7 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
         stream_info,
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->uriSanPeerCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->uriSanPeerCertificate().front();
         },
@@ -342,7 +354,7 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
         stream_info,
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->dnsSansLocalCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->dnsSansLocalCertificate().front();
         },
@@ -352,7 +364,7 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
         stream_info,
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->dnsSansPeerCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->dnsSansPeerCertificate().front();
         },
@@ -362,7 +374,7 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
         stream_info,
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->uriSanLocalCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->uriSanLocalCertificate().front();
         },
@@ -372,7 +384,7 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
         stream_info,
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           if (ssl->uriSanPeerCertificate().empty()) {
-            return absl::nullopt;
+            return std::nullopt;
           }
           return ssl->uriSanPeerCertificate().front();
         },
@@ -397,6 +409,18 @@ bool ContextAccessor::getAttributeInt(const StreamInfo::StreamInfo& stream_info,
       *result = code.value();
       ok = true;
     }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_ResponseFlags: {
+    // Unlike the response code, the flags are always available as a bitmask (0 when none are set),
+    // matching the value exposed by the response.flags CEL attribute.
+    *result = stream_info.legacyResponseFlags();
+    ok = true;
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_ResponseSize: {
+    *result = stream_info.bytesSent();
+    ok = true;
     break;
   }
   case envoy_dynamic_module_type_attribute_id_ConnectionId: {
@@ -474,26 +498,37 @@ bool ContextAccessor::getDynamicMetadata(const StreamInfo::StreamInfo& stream_in
                                          envoy_dynamic_module_type_module_buffer filter_name,
                                          envoy_dynamic_module_type_module_buffer path,
                                          envoy_dynamic_module_type_envoy_buffer* result) {
-  std::string filter_name_str(filter_name.ptr, filter_name.length);
-  std::string path_str(path.ptr, path.length);
-  std::vector<std::string> path_parts = absl::StrSplit(path_str, '.');
-
-  const auto& metadata = stream_info.dynamicMetadata();
-  const auto& value =
-      Envoy::Config::Metadata::metadataValue(&metadata, filter_name_str, path_parts);
-
-  if (value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
-    return false;
-  }
-
-  // Note: Currently only string values are supported. Complex types would require serialization
-  // to a buffer, but the ABI uses zero-copy pointers to Envoy memory.
+  // String values are returned zero-copy here. Numbers and bools have dedicated typed accessors.
+  const auto& value = dynamicMetadataValue(stream_info, filter_name, path);
   if (value.kind_case() == Protobuf::Value::kStringValue) {
     const auto& str = value.string_value();
     *result = {const_cast<char*>(str.data()), str.size()};
     return true;
   }
+  return false;
+}
 
+bool ContextAccessor::getDynamicMetadataNumber(const StreamInfo::StreamInfo& stream_info,
+                                               envoy_dynamic_module_type_module_buffer filter_name,
+                                               envoy_dynamic_module_type_module_buffer path,
+                                               double* result) {
+  const auto& value = dynamicMetadataValue(stream_info, filter_name, path);
+  if (value.kind_case() == Protobuf::Value::kNumberValue) {
+    *result = value.number_value();
+    return true;
+  }
+  return false;
+}
+
+bool ContextAccessor::getDynamicMetadataBool(const StreamInfo::StreamInfo& stream_info,
+                                             envoy_dynamic_module_type_module_buffer filter_name,
+                                             envoy_dynamic_module_type_module_buffer path,
+                                             bool* result) {
+  const auto& value = dynamicMetadataValue(stream_info, filter_name, path);
+  if (value.kind_case() == Protobuf::Value::kBoolValue) {
+    *result = value.bool_value();
+    return true;
+  }
   return false;
 }
 

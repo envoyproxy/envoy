@@ -46,7 +46,7 @@ void XRateLimitHeaderUtils::populateHeaders(
     const Filters::Common::RateLimit::DescriptorStatusList& statuses,
     Http::ResponseHeaderMap& headers) {
   using LimitStatus = envoy::service::ratelimit::v3::RateLimitResponse_DescriptorStatus;
-  absl::optional<size_t> min_remaining_limit_status_index;
+  std::optional<size_t> min_remaining_limit_status_index;
   OptRef<const LimitStatus> min_remaining_limit_status;
 
   // Get the descriptor status with the minimum remaining limit.

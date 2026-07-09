@@ -304,7 +304,7 @@ ProtobufTypes::MessagePtr FilterConfigProviderManagerImplBase::dumpEcdsFilterCon
     filter_config.set_name(ecds_filter->name());
     MessageUtil::packFrom(*filter_config.mutable_typed_config(), *ecds_filter->lastConfig());
     auto& filter_config_dump = *config_dump->mutable_ecds_filters()->Add();
-    filter_config_dump.mutable_ecds_filter()->PackFrom(filter_config);
+    std::ignore = filter_config_dump.mutable_ecds_filter()->PackFrom(filter_config);
     filter_config_dump.set_version_info(ecds_filter->lastVersionInfo());
     TimestampUtil::systemClockToTimestamp(ecds_filter->lastUpdated(),
                                           *(filter_config_dump.mutable_last_updated()));

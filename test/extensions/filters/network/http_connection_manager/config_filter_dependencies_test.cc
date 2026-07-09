@@ -29,19 +29,19 @@ using envoy::extensions::filters::network::http_connection_manager::v3::HttpFilt
 void setRouterFilter(HttpFilter* filter) {
   filter->set_name("envoy.filters.http.router");
   envoy::extensions::filters::http::router::v3::Router config;
-  filter->mutable_typed_config()->PackFrom(config);
+  std::ignore = filter->mutable_typed_config()->PackFrom(config);
 }
 
 void setPantryFilter(HttpFilter* filter) {
   filter->set_name("test.pantry");
   test::http_connection_manager::PantryFilterConfig config;
-  filter->mutable_typed_config()->PackFrom(config);
+  std::ignore = filter->mutable_typed_config()->PackFrom(config);
 }
 
 void setChefFilter(HttpFilter* filter) {
   filter->set_name("test.chef");
   test::http_connection_manager::ChefFilterConfig config;
-  filter->mutable_typed_config()->PackFrom(config);
+  std::ignore = filter->mutable_typed_config()->PackFrom(config);
 }
 
 const std::string ConfigTemplate = R"EOF(

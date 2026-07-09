@@ -213,7 +213,7 @@ protected:
   Network::ClientConnectionPtr connection_;
   ClientConnectionPtr codec_;
   Event::TimerPtr idle_timer_;
-  const absl::optional<std::chrono::milliseconds> idle_timeout_;
+  const std::optional<std::chrono::milliseconds> idle_timeout_;
   const bool enable_idle_timer_only_when_connected_;
 
 private:

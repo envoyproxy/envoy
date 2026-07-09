@@ -116,6 +116,9 @@ Transactions
 Transactions (MULTI) are supported. Their use is no different from regular Redis: you start a transaction with MULTI,
 and you execute it with EXEC. Within the transaction, from the list of commands supported by Envoy (see below), only single-key
 commands (e.g. GET, SET), multi-key commands (e.g. DEL, MSET) and transaction commands (e.g. WATCH, UNWATCH, DISCARD, EXEC) are supported.
+Commands configured via :ref:`custom_commands
+<envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.custom_commands>` are also supported within
+transactions and are treated as single-key commands.
 
 
 When working in Redis Cluster mode, Envoy will relay all the commands in the transaction to the node handling the first
@@ -213,6 +216,9 @@ For details on each command's usage see the official
   GEORADIUSBYMEMBER, Geospatial
   HDEL, Hash
   HEXISTS, Hash
+  HEXPIRE, Hash
+  HEXPIREAT, Hash
+  HEXPIRETIME, Hash
   HGET, Hash
   HGETALL, Hash
   HINCRBY, Hash
@@ -221,12 +227,18 @@ For details on each command's usage see the official
   HLEN, Hash
   HMGET, Hash
   HMSET, Hash
+  HPERSIST, Hash
+  HPEXPIRE, Hash
+  HPEXPIREAT, Hash
+  HPEXPIRETIME, Hash
+  HPTTL, Hash
+  HRANDFIELD, Hash
   HSCAN, Hash
   HSET, Hash
   HSETNX, Hash
   HSTRLEN, Hash
+  HTTL, Hash
   HVALS, Hash
-  HRANDFIELD, Hash
   PFADD, HyperLogLog
   PFCOUNT, HyperLogLog
   PFMERGE, HyperLogLog

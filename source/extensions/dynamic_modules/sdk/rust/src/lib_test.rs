@@ -1527,11 +1527,14 @@ struct MockUpstreamHost {
 }
 
 static MOCK_UPSTREAM_HOST: std::sync::Mutex<Option<MockUpstreamHost>> = std::sync::Mutex::new(None);
+static MOCK_UPSTREAM_CONNECTION_ID: std::sync::atomic::AtomicU64 =
+  std::sync::atomic::AtomicU64::new(0);
 static MOCK_START_TLS_RESULT: std::sync::atomic::AtomicBool =
   std::sync::atomic::AtomicBool::new(false);
 
 fn reset_upstream_host_mock() {
   *MOCK_UPSTREAM_HOST.lock().unwrap() = None;
+  MOCK_UPSTREAM_CONNECTION_ID.store(0, std::sync::atomic::Ordering::SeqCst);
   MOCK_START_TLS_RESULT.store(false, std::sync::atomic::Ordering::SeqCst);
 }
 
@@ -1665,6 +1668,13 @@ pub extern "C" fn envoy_dynamic_module_callback_network_filter_has_upstream_host
   _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
 ) -> bool {
   MOCK_UPSTREAM_HOST.lock().unwrap().is_some()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+) -> u64 {
+  MOCK_UPSTREAM_CONNECTION_ID.load(std::sync::atomic::Ordering::SeqCst)
 }
 
 #[no_mangle]
@@ -1835,6 +1845,62 @@ fn test_has_upstream_host_false() {
   };
 
   assert!(!filter.has_upstream_host());
+}
+
+#[test]
+fn test_get_upstream_connection_id() {
+  reset_upstream_host_mock();
+  MOCK_UPSTREAM_CONNECTION_ID.store(54321, std::sync::atomic::Ordering::SeqCst);
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  assert_eq!(filter.get_upstream_connection_id(), 54321);
+}
+
+#[test]
+fn test_get_upstream_connection_id_unavailable() {
+  reset_upstream_host_mock();
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  assert_eq!(filter.get_upstream_connection_id(), 0);
+}
+
+static MOCK_HTTP_UPSTREAM_CONNECTION_ID: std::sync::atomic::AtomicU64 =
+  std::sync::atomic::AtomicU64::new(0);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_upstream_connection_id(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+) -> u64 {
+  MOCK_HTTP_UPSTREAM_CONNECTION_ID.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[test]
+fn test_http_get_upstream_connection_id() {
+  MOCK_HTTP_UPSTREAM_CONNECTION_ID.store(98765, std::sync::atomic::Ordering::SeqCst);
+
+  let filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+
+  assert_eq!(filter.get_upstream_connection_id(), 98765);
+  MOCK_HTTP_UPSTREAM_CONNECTION_ID.store(0, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[test]
+fn test_http_get_upstream_connection_id_unavailable() {
+  MOCK_HTTP_UPSTREAM_CONNECTION_ID.store(0, std::sync::atomic::Ordering::SeqCst);
+
+  let filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+
+  assert_eq!(filter.get_upstream_connection_id(), 0);
 }
 
 // =============================================================================
@@ -3905,6 +3971,70 @@ pub extern "C" fn envoy_dynamic_module_callback_http_filter_reset_stream(
   RESET_STREAM_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
 }
 
+// Single-slot store backing the filter state object FFI stubs below.
+static FILTER_STATE_OBJECT: std::sync::atomic::AtomicPtr<std::ffi::c_void> =
+  std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_set_filter_state_object(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  module_object: abi::envoy_dynamic_module_type_filter_state_object_module_ptr,
+  _destructor: abi::envoy_dynamic_module_type_filter_state_object_destructor,
+  _life_span: abi::envoy_dynamic_module_type_filter_state_life_span,
+) -> bool {
+  FILTER_STATE_OBJECT.store(module_object, std::sync::atomic::Ordering::SeqCst);
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_filter_state_object(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_filter_state_object_module_ptr {
+  FILTER_STATE_OBJECT.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[test]
+fn test_http_filter_state_object_round_trip() {
+  use std::sync::atomic::Ordering;
+  static DROPPED: AtomicUsize = AtomicUsize::new(0);
+  struct Live;
+  impl Drop for Live {
+    fn drop(&mut self) {
+      DROPPED.fetch_add(1, Ordering::SeqCst);
+    }
+  }
+  extern "C" fn destructor(object: *mut std::ffi::c_void) {
+    drop(unsafe { Box::from_raw(object as *mut Live) });
+  }
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let object = Box::into_raw(Box::new(Live)) as *mut std::ffi::c_void;
+  // SAFETY: `object` is a freshly boxed Live and `destructor` frees exactly that type without
+  // unwinding.
+  assert!(unsafe {
+    envoy_filter.set_filter_state_object(
+      b"key",
+      object,
+      destructor,
+      abi::envoy_dynamic_module_type_filter_state_life_span::Request,
+    )
+  });
+
+  // The rebuilt filter recovers the same pointer across recreate_stream.
+  let recovered = envoy_filter.get_filter_state_object(b"key");
+  assert_eq!(recovered, Some(object));
+  assert_eq!(DROPPED.load(Ordering::SeqCst), 0);
+
+  // Envoy calls the destructor once when the entry is destroyed; the boxed value is freed exactly
+  // once with no double free.
+  destructor(recovered.unwrap());
+  assert_eq!(DROPPED.load(Ordering::SeqCst), 1);
+}
+
 static NETWORK_CLOSE_CALLED: AtomicBool = AtomicBool::new(false);
 
 #[no_mangle]
@@ -4170,6 +4300,56 @@ fn test_catch_unwind_http_scheduled_after_poison_is_skipped() {
   );
 }
 
+// Regression test for CatchUnwind re-entrancy. Envoy can synchronously re-enter the same wrapper
+// while an outer callback is still on the stack (e.g. a callback that completes a response with
+// end-of-stream). Here on_scheduled re-derives `&mut CatchUnwind` from the raw wrapper pointer (as
+// every FFI entry point does) and calls a status-returning callback. The take()-based poisoning
+// misread this as a poisoned filter and panicked/failed closed; borrowing in place lets the
+// re-entrant callback run.
+#[test]
+fn test_catch_unwind_http_reentrant_status_callback_is_not_poisoned() {
+  thread_local! {
+    static WRAPPER_PTR: std::cell::Cell<*mut std::ffi::c_void> =
+      const { std::cell::Cell::new(std::ptr::null_mut()) };
+    static RESPONSE_HEADERS_RAN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+  }
+  struct ReentrantFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ReentrantFilter {
+    fn on_scheduled(&mut self, envoy_filter: &mut EHF, _event_id: u64) {
+      let ptr = WRAPPER_PTR.with(|p| p.get()) as *mut CatchUnwind<ReentrantFilter>;
+      // SAFETY: mirrors the FFI entry points re-deriving &mut from the raw filter ptr while an
+      // outer callback (this on_scheduled) is still on the stack.
+      let wrapper = unsafe { &mut *ptr };
+      HttpFilter::on_response_headers(wrapper, envoy_filter, false);
+    }
+    fn on_response_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+      RESPONSE_HEADERS_RAN.with(|c| c.set(true));
+      abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+    }
+  }
+
+  RESET_STREAM_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+  RESPONSE_HEADERS_RAN.with(|c| c.set(false));
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(ReentrantFilter);
+  WRAPPER_PTR
+    .with(|p| p.set(&mut wrapper as *mut CatchUnwind<ReentrantFilter> as *mut std::ffi::c_void));
+
+  HttpFilter::on_scheduled(&mut wrapper, &mut envoy_filter, 1);
+
+  // The re-entrant status-returning callback ran instead of being misread as poisoned.
+  assert!(RESPONSE_HEADERS_RAN.with(std::cell::Cell::get));
+  // No false fail-closed: the legitimate re-entrancy did not trip the panic guard.
+  assert!(!RESET_STREAM_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
 // =============================================================================
 // Cluster Extension FFI stubs for testing.
 // =============================================================================
@@ -4257,6 +4437,16 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_hos
   _is_added: bool,
 ) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
   std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _index: usize,
+  _is_added: bool,
+  _result: *mut abi::envoy_dynamic_module_type_packed_address,
+) -> bool {
+  false
 }
 
 #[no_mangle]
@@ -5292,6 +5482,45 @@ fn test_cluster_lb_get_member_update_host_none() {
 }
 
 #[test]
+fn test_cluster_lb_get_member_update_host_packed_address() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_member_update_host_packed_address()
+    .withf(|index, is_added| *index == 0 && *is_added)
+    .returning(|_, _| Some(cluster::PackedAddress::V4([127, 0, 0, 1], 10001)));
+  mock_lb
+    .expect_get_member_update_host_packed_address()
+    .withf(|_, is_added| !*is_added)
+    .returning(|_, _| Some(cluster::PackedAddress::V6([1; 16], 10002)));
+
+  match mock_lb.get_member_update_host_packed_address(0, true) {
+    Some(cluster::PackedAddress::V4(addr, port)) => {
+      assert_eq!(addr, [127, 0, 0, 1]);
+      assert_eq!(port, 10001);
+    },
+    other => panic!("expected V4, got {other:?}"),
+  }
+  match mock_lb.get_member_update_host_packed_address(0, false) {
+    Some(cluster::PackedAddress::V6(addr, port)) => {
+      assert_eq!(addr, [1; 16]);
+      assert_eq!(port, 10002);
+    },
+    other => panic!("expected V6, got {other:?}"),
+  }
+}
+
+#[test]
+fn test_cluster_lb_get_member_update_host_packed_address_none() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_member_update_host_packed_address()
+    .returning(|_, _| None);
+  assert!(mock_lb
+    .get_member_update_host_packed_address(0, false)
+    .is_none());
+}
+
+#[test]
 fn test_cluster_lb_get_host_locality() {
   let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
   mock_lb.expect_get_host_locality().returning(|_, _| {
@@ -5476,36 +5705,63 @@ fn test_cluster_lb_context_full_workflow() {
 fn test_async_host_selection_complete_with_host() {
   let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   mock_completion
-    .expect_async_host_selection_complete()
+    .expect_complete()
     .withf(|host, details| host.is_some() && details == "resolved")
     .times(1)
     .returning(|_, _| ());
 
-  mock_completion.async_host_selection_complete(Some(0x1234 as *mut _), "resolved");
+  Box::new(mock_completion).complete(Some(0x1234 as *mut _), "resolved");
 }
 
 #[test]
 fn test_async_host_selection_complete_no_host() {
   let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   mock_completion
-    .expect_async_host_selection_complete()
+    .expect_complete()
     .withf(|host, details| host.is_none() && details == "dns_failure")
     .times(1)
     .returning(|_, _| ());
 
-  mock_completion.async_host_selection_complete(None, "dns_failure");
+  Box::new(mock_completion).complete(None, "dns_failure");
 }
 
 #[test]
 fn test_async_host_selection_complete_empty_details() {
   let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   mock_completion
-    .expect_async_host_selection_complete()
+    .expect_complete()
     .withf(|host, details| host.is_none() && details.is_empty())
     .times(1)
     .returning(|_, _| ());
 
-  mock_completion.async_host_selection_complete(None, "");
+  Box::new(mock_completion).complete(None, "");
+}
+
+#[test]
+fn test_async_host_selection_request_context() {
+  // On resume the module reads the re-presented context. Its accessors route through the
+  // link-time stubs, which report no hash / zero headers for the sentinel pointer.
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion.expect_request_context().returning(|| {
+    Some(cluster::ClusterLbContextRef::new(
+      0x1 as *mut _,
+      std::ptr::null_mut(),
+    ))
+  });
+
+  let ctx = mock_completion
+    .request_context()
+    .expect("context present on resume");
+  assert_eq!(ctx.compute_hash_key(), None);
+  assert_eq!(ctx.get_downstream_headers_size(), 0);
+}
+
+#[test]
+fn test_async_host_selection_request_context_absent() {
+  // No context (e.g. health-check selections) is reported as None, matching choose_host.
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion.expect_request_context().returning(|| None);
+  assert!(mock_completion.request_context().is_none());
 }
 
 #[test]
@@ -5530,7 +5786,7 @@ fn test_async_host_selection_with_stored_completion() {
 
   let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   mock_completion
-    .expect_async_host_selection_complete()
+    .expect_complete()
     .withf(|host, details| host == &Some(0xBEEF as *mut _) && details == "dns_resolved")
     .times(1)
     .returning(|_, _| ());
@@ -5546,7 +5802,7 @@ fn test_async_host_selection_with_stored_completion() {
 
   // Simulate async DNS resolution completing.
   let completion = lb.pending_completion.take().unwrap();
-  completion.async_host_selection_complete(Some(0xBEEF as *mut _), "dns_resolved");
+  completion.complete(Some(0xBEEF as *mut _), "dns_resolved");
 }
 
 #[test]

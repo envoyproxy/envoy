@@ -653,7 +653,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   EXPECT_CALL(balancer1, registerHandler(_));
   EXPECT_CALL(balancer1, unregisterHandler(_));
 
-  const absl::optional<std::string> netns = "/var/run/netns";
+  const std::optional<std::string> netns = "/var/run/netns";
   Network::Address::InstanceConstSharedPtr normal_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 10001, nullptr, netns));
   EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(normal_address));

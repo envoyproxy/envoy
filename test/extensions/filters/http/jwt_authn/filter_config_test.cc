@@ -376,6 +376,59 @@ providers:
                              HasSubstr("Duration out-of-range"));
 }
 
+TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksWithRetryPolicy) {
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    remote_jwks:
+      http_uri:
+        uri: http://www.valid.com/resource
+        cluster: pubkey_cluster
+        timeout: 1s
+      retry_policy:
+        retry_back_off:
+          base_interval: 1s
+          max_interval: 10s
+        num_retries: 5
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
+  auto* jwks_data = filter_conf->getJwksCache().findByIssuer("issuer1");
+  EXPECT_NE(nullptr, jwks_data);
+  EXPECT_NE(nullptr, jwks_data->retryPolicy());
+  EXPECT_EQ(5, jwks_data->retryPolicy()->numRetries());
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksWithInvalidRetryPolicy) {
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    remote_jwks:
+      http_uri:
+        uri: http://www.valid.com/resource
+        cluster: pubkey_cluster
+        timeout: 1s
+      retry_policy:
+        retry_back_off:
+          base_interval: 10s
+          max_interval: 1s
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THAT_THROWS_MESSAGE(
+      FilterConfigImpl(proto_config, "", context), EnvoyException,
+      HasSubstr("max_interval must be greater than or equal to the base_interval"));
+}
+
 } // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters

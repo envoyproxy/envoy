@@ -47,10 +47,10 @@ void SrcAddrSocketOptionImpl::hashKey(std::vector<uint8_t>& key) const {
   }
 }
 
-absl::optional<Network::Socket::Option::Details> SrcAddrSocketOptionImpl::getOptionDetails(
+std::optional<Network::Socket::Option::Details> SrcAddrSocketOptionImpl::getOptionDetails(
     const Network::Socket&, envoy::config::core::v3::SocketOption::SocketState) const {
   // no details for this option.
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 } // namespace Network

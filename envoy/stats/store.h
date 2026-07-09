@@ -6,22 +6,15 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag_producer.h"
+#include "envoy/thread_local/thread_local.h"
 
 namespace Envoy {
-namespace Event {
-
-class Dispatcher;
-}
-
-namespace ThreadLocal {
-class Instance;
-}
-
 namespace Stats {
 
 class Sink;
@@ -177,10 +170,17 @@ public:
   /**
    * @return a scope of the given name.
    */
-  ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
+  ScopeSharedPtr createScope(absl::string_view name, bool evictable = false,
                              const ScopeStatsLimitSettings& limits = {},
                              StatsMatcherSharedPtr matcher = nullptr) {
     return rootScope()->createScope(name, evictable, limits, std::move(matcher));
+  }
+  ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name, TagStringViewSpan name_tags,
+                                           absl::string_view tagged_name, bool evictable = false,
+                                           const ScopeStatsLimitSettings& limits = {},
+                                           StatsMatcherSharedPtr matcher = nullptr) {
+    return rootScope()->createScopeWithTaggedName(base_name, name_tags, tagged_name, evictable,
+                                                  limits, std::move(matcher));
   }
 
   /**

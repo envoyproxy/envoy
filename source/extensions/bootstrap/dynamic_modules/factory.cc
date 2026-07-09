@@ -7,6 +7,7 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 namespace Envoy {
@@ -35,6 +36,8 @@ Server::BootstrapExtensionPtr DynamicModuleBootstrapExtensionFactory::createBoot
   if (proto_config.has_extension_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.extension_config());
     if (!config_or_error.ok()) {
+      Extensions::DynamicModules::incrementLoadFailure(
+          context, proto_config.extension_name(), Extensions::DynamicModules::ConfigInitErrorStat);
       throwEnvoyExceptionOrPanic("Failed to parse extension config: " +
                                  std::string(config_or_error.status().message()));
     }
@@ -52,6 +55,8 @@ Server::BootstrapExtensionPtr DynamicModuleBootstrapExtensionFactory::createBoot
       context.serverScope().store());
 
   if (!extension_config.ok()) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        context, proto_config.extension_name(), Extensions::DynamicModules::ConfigInitErrorStat);
     throwEnvoyExceptionOrPanic("Failed to create extension config: " +
                                std::string(extension_config.status().message()));
   }

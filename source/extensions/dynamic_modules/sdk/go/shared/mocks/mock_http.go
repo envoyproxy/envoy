@@ -194,6 +194,54 @@ func (mr *MockHeaderMapMockRecorder) Set(key, value any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Set", reflect.TypeOf((*MockHeaderMap)(nil).Set), key, value)
 }
 
+// MockDownstreamWatermarkCallbacks is a mock of DownstreamWatermarkCallbacks interface.
+type MockDownstreamWatermarkCallbacks struct {
+	ctrl     *gomock.Controller
+	recorder *MockDownstreamWatermarkCallbacksMockRecorder
+	isgomock struct{}
+}
+
+// MockDownstreamWatermarkCallbacksMockRecorder is the mock recorder for MockDownstreamWatermarkCallbacks.
+type MockDownstreamWatermarkCallbacksMockRecorder struct {
+	mock *MockDownstreamWatermarkCallbacks
+}
+
+// NewMockDownstreamWatermarkCallbacks creates a new mock instance.
+func NewMockDownstreamWatermarkCallbacks(ctrl *gomock.Controller) *MockDownstreamWatermarkCallbacks {
+	mock := &MockDownstreamWatermarkCallbacks{ctrl: ctrl}
+	mock.recorder = &MockDownstreamWatermarkCallbacksMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockDownstreamWatermarkCallbacks) EXPECT() *MockDownstreamWatermarkCallbacksMockRecorder {
+	return m.recorder
+}
+
+// OnAboveWriteBufferHighWatermark mocks base method.
+func (m *MockDownstreamWatermarkCallbacks) OnAboveWriteBufferHighWatermark() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "OnAboveWriteBufferHighWatermark")
+}
+
+// OnAboveWriteBufferHighWatermark indicates an expected call of OnAboveWriteBufferHighWatermark.
+func (mr *MockDownstreamWatermarkCallbacksMockRecorder) OnAboveWriteBufferHighWatermark() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnAboveWriteBufferHighWatermark", reflect.TypeOf((*MockDownstreamWatermarkCallbacks)(nil).OnAboveWriteBufferHighWatermark))
+}
+
+// OnBelowWriteBufferLowWatermark mocks base method.
+func (m *MockDownstreamWatermarkCallbacks) OnBelowWriteBufferLowWatermark() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "OnBelowWriteBufferLowWatermark")
+}
+
+// OnBelowWriteBufferLowWatermark indicates an expected call of OnBelowWriteBufferLowWatermark.
+func (mr *MockDownstreamWatermarkCallbacksMockRecorder) OnBelowWriteBufferLowWatermark() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnBelowWriteBufferLowWatermark", reflect.TypeOf((*MockDownstreamWatermarkCallbacks)(nil).OnBelowWriteBufferLowWatermark))
+}
+
 // MockSpan is a mock of Span interface.
 type MockSpan struct {
 	ctrl     *gomock.Controller
@@ -373,6 +421,51 @@ func (mr *MockChildSpanMockRecorder) Finish() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Finish", reflect.TypeOf((*MockChildSpan)(nil).Finish))
 }
 
+// GetBaggage mocks base method.
+func (m *MockChildSpan) GetBaggage(key string) (shared.UnsafeEnvoyBuffer, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBaggage", key)
+	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetBaggage indicates an expected call of GetBaggage.
+func (mr *MockChildSpanMockRecorder) GetBaggage(key any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBaggage", reflect.TypeOf((*MockChildSpan)(nil).GetBaggage), key)
+}
+
+// GetSpanID mocks base method.
+func (m *MockChildSpan) GetSpanID() (shared.UnsafeEnvoyBuffer, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSpanID")
+	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetSpanID indicates an expected call of GetSpanID.
+func (mr *MockChildSpanMockRecorder) GetSpanID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSpanID", reflect.TypeOf((*MockChildSpan)(nil).GetSpanID))
+}
+
+// GetTraceID mocks base method.
+func (m *MockChildSpan) GetTraceID() (shared.UnsafeEnvoyBuffer, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTraceID")
+	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetTraceID indicates an expected call of GetTraceID.
+func (mr *MockChildSpanMockRecorder) GetTraceID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTraceID", reflect.TypeOf((*MockChildSpan)(nil).GetTraceID))
+}
+
 // Log mocks base method.
 func (m *MockChildSpan) Log(event string) {
 	m.ctrl.T.Helper()
@@ -445,54 +538,6 @@ func (m *MockChildSpan) SpawnChild(operationName string) shared.ChildSpan {
 func (mr *MockChildSpanMockRecorder) SpawnChild(operationName any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SpawnChild", reflect.TypeOf((*MockChildSpan)(nil).SpawnChild), operationName)
-}
-
-// MockDownstreamWatermarkCallbacks is a mock of DownstreamWatermarkCallbacks interface.
-type MockDownstreamWatermarkCallbacks struct {
-	ctrl     *gomock.Controller
-	recorder *MockDownstreamWatermarkCallbacksMockRecorder
-	isgomock struct{}
-}
-
-// MockDownstreamWatermarkCallbacksMockRecorder is the mock recorder for MockDownstreamWatermarkCallbacks.
-type MockDownstreamWatermarkCallbacksMockRecorder struct {
-	mock *MockDownstreamWatermarkCallbacks
-}
-
-// NewMockDownstreamWatermarkCallbacks creates a new mock instance.
-func NewMockDownstreamWatermarkCallbacks(ctrl *gomock.Controller) *MockDownstreamWatermarkCallbacks {
-	mock := &MockDownstreamWatermarkCallbacks{ctrl: ctrl}
-	mock.recorder = &MockDownstreamWatermarkCallbacksMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockDownstreamWatermarkCallbacks) EXPECT() *MockDownstreamWatermarkCallbacksMockRecorder {
-	return m.recorder
-}
-
-// OnAboveWriteBufferHighWatermark mocks base method.
-func (m *MockDownstreamWatermarkCallbacks) OnAboveWriteBufferHighWatermark() {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "OnAboveWriteBufferHighWatermark")
-}
-
-// OnAboveWriteBufferHighWatermark indicates an expected call of OnAboveWriteBufferHighWatermark.
-func (mr *MockDownstreamWatermarkCallbacksMockRecorder) OnAboveWriteBufferHighWatermark() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnAboveWriteBufferHighWatermark", reflect.TypeOf((*MockDownstreamWatermarkCallbacks)(nil).OnAboveWriteBufferHighWatermark))
-}
-
-// OnBelowWriteBufferLowWatermark mocks base method.
-func (m *MockDownstreamWatermarkCallbacks) OnBelowWriteBufferLowWatermark() {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "OnBelowWriteBufferLowWatermark")
-}
-
-// OnBelowWriteBufferLowWatermark indicates an expected call of OnBelowWriteBufferLowWatermark.
-func (mr *MockDownstreamWatermarkCallbacksMockRecorder) OnBelowWriteBufferLowWatermark() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnBelowWriteBufferLowWatermark", reflect.TypeOf((*MockDownstreamWatermarkCallbacks)(nil).OnBelowWriteBufferLowWatermark))
 }
 
 // MockHttpFilterHandle is a mock of HttpFilterHandle interface.
@@ -698,10 +743,10 @@ func (mr *MockHttpFilterHandleMockRecorder) GetAttributeBool(attributeID any) *g
 }
 
 // GetAttributeNumber mocks base method.
-func (m *MockHttpFilterHandle) GetAttributeNumber(attributeID shared.AttributeID) (uint64, bool) {
+func (m *MockHttpFilterHandle) GetAttributeNumber(attributeID shared.AttributeID) (float64, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAttributeNumber", attributeID)
-	ret0, _ := ret[0].(uint64)
+	ret0, _ := ret[0].(float64)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
@@ -1533,6 +1578,25 @@ func (m *MockHttpFilterConfigHandle) EXPECT() *MockHttpFilterConfigHandleMockRec
 	return m.recorder
 }
 
+// DecrementGaugeValue mocks base method.
+func (m *MockHttpFilterConfigHandle) DecrementGaugeValue(id shared.MetricID, value uint64, tagsValues ...string) shared.MetricsResult {
+	m.ctrl.T.Helper()
+	varargs := []any{id, value}
+	for _, a := range tagsValues {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DecrementGaugeValue", varargs...)
+	ret0, _ := ret[0].(shared.MetricsResult)
+	return ret0
+}
+
+// DecrementGaugeValue indicates an expected call of DecrementGaugeValue.
+func (mr *MockHttpFilterConfigHandleMockRecorder) DecrementGaugeValue(id, value any, tagsValues ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{id, value}, tagsValues...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DecrementGaugeValue", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).DecrementGaugeValue), varargs...)
+}
+
 // DefineCounter mocks base method.
 func (m *MockHttpFilterConfigHandle) DefineCounter(name string, tagKeys ...string) (shared.MetricID, shared.MetricsResult) {
 	m.ctrl.T.Helper()
@@ -1622,6 +1686,44 @@ func (mr *MockHttpFilterConfigHandleMockRecorder) HttpCallout(cluster, headers, 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HttpCallout", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).HttpCallout), cluster, headers, body, timeoutMs, cb)
 }
 
+// IncrementCounterValue mocks base method.
+func (m *MockHttpFilterConfigHandle) IncrementCounterValue(id shared.MetricID, value uint64, tagsValues ...string) shared.MetricsResult {
+	m.ctrl.T.Helper()
+	varargs := []any{id, value}
+	for _, a := range tagsValues {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "IncrementCounterValue", varargs...)
+	ret0, _ := ret[0].(shared.MetricsResult)
+	return ret0
+}
+
+// IncrementCounterValue indicates an expected call of IncrementCounterValue.
+func (mr *MockHttpFilterConfigHandleMockRecorder) IncrementCounterValue(id, value any, tagsValues ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{id, value}, tagsValues...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncrementCounterValue", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).IncrementCounterValue), varargs...)
+}
+
+// IncrementGaugeValue mocks base method.
+func (m *MockHttpFilterConfigHandle) IncrementGaugeValue(id shared.MetricID, value uint64, tagsValues ...string) shared.MetricsResult {
+	m.ctrl.T.Helper()
+	varargs := []any{id, value}
+	for _, a := range tagsValues {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "IncrementGaugeValue", varargs...)
+	ret0, _ := ret[0].(shared.MetricsResult)
+	return ret0
+}
+
+// IncrementGaugeValue indicates an expected call of IncrementGaugeValue.
+func (mr *MockHttpFilterConfigHandleMockRecorder) IncrementGaugeValue(id, value any, tagsValues ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{id, value}, tagsValues...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncrementGaugeValue", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).IncrementGaugeValue), varargs...)
+}
+
 // Log mocks base method.
 func (m *MockHttpFilterConfigHandle) Log(level shared.LogLevel, format string, args ...any) {
 	m.ctrl.T.Helper()
@@ -1637,6 +1739,25 @@ func (mr *MockHttpFilterConfigHandleMockRecorder) Log(level, format any, args ..
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{level, format}, args...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Log", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).Log), varargs...)
+}
+
+// RecordHistogramValue mocks base method.
+func (m *MockHttpFilterConfigHandle) RecordHistogramValue(id shared.MetricID, value uint64, tagsValues ...string) shared.MetricsResult {
+	m.ctrl.T.Helper()
+	varargs := []any{id, value}
+	for _, a := range tagsValues {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "RecordHistogramValue", varargs...)
+	ret0, _ := ret[0].(shared.MetricsResult)
+	return ret0
+}
+
+// RecordHistogramValue indicates an expected call of RecordHistogramValue.
+func (mr *MockHttpFilterConfigHandleMockRecorder) RecordHistogramValue(id, value any, tagsValues ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{id, value}, tagsValues...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordHistogramValue", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).RecordHistogramValue), varargs...)
 }
 
 // ResetHttpStream mocks base method.
@@ -1677,6 +1798,25 @@ func (m *MockHttpFilterConfigHandle) SendHttpStreamTrailers(streamID uint64, tra
 func (mr *MockHttpFilterConfigHandleMockRecorder) SendHttpStreamTrailers(streamID, trailers any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendHttpStreamTrailers", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).SendHttpStreamTrailers), streamID, trailers)
+}
+
+// SetGaugeValue mocks base method.
+func (m *MockHttpFilterConfigHandle) SetGaugeValue(id shared.MetricID, value uint64, tagsValues ...string) shared.MetricsResult {
+	m.ctrl.T.Helper()
+	varargs := []any{id, value}
+	for _, a := range tagsValues {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "SetGaugeValue", varargs...)
+	ret0, _ := ret[0].(shared.MetricsResult)
+	return ret0
+}
+
+// SetGaugeValue indicates an expected call of SetGaugeValue.
+func (mr *MockHttpFilterConfigHandleMockRecorder) SetGaugeValue(id, value any, tagsValues ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{id, value}, tagsValues...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetGaugeValue", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).SetGaugeValue), varargs...)
 }
 
 // StartHttpStream mocks base method.

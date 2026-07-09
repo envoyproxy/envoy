@@ -96,7 +96,7 @@ absl::StatusOr<Http::FilterFactoryCb> CompositeFilterFactory::createFilterFactor
         .is_downstream_ = true,
         .stat_prefix_ = stats_prefix,
         .factory_context_ = context,
-        .upstream_factory_context_ = absl::nullopt,
+        .upstream_factory_context_ = std::nullopt,
         .server_factory_context_ = context.serverFactoryContext()};
     auto match_tree_or_error = createMatcherTree(proto_config.matcher(), action_context);
     RETURN_IF_NOT_OK(match_tree_or_error.status());
@@ -127,7 +127,7 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> CompositeFilterFactory::createFilte
     Envoy::Http::Matching::HttpFilterActionContext action_context{
         .is_downstream_ = false,
         .stat_prefix_ = stats_prefix,
-        .factory_context_ = absl::nullopt,
+        .factory_context_ = std::nullopt,
         .upstream_factory_context_ = context,
         .server_factory_context_ = context.serverFactoryContext()};
 
@@ -159,8 +159,8 @@ CompositeFilterFactory::createRouteSpecificFilterConfigTyped(
       .is_downstream_ = true,
       .stat_prefix_ =
           fmt::format("http.{}.", context.scope().symbolTable().toString(context.scope().prefix())),
-      .factory_context_ = absl::nullopt,
-      .upstream_factory_context_ = absl::nullopt,
+      .factory_context_ = std::nullopt,
+      .upstream_factory_context_ = std::nullopt,
       .server_factory_context_ = context};
 
   auto match_tree_or_error = createMatcherTree(config.matcher(), action_context);

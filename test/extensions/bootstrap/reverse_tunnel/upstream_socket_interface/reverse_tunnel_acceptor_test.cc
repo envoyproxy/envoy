@@ -109,7 +109,7 @@ protected:
       const sockaddr* sockAddr() const override { return nullptr; }
       socklen_t sockAddrLen() const override { return 0; }
       absl::string_view addressType() const override { return "test"; }
-      absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+      std::optional<std::string> networkNamespace() const override { return std::nullopt; }
       Network::Address::InstanceConstSharedPtr
       withNetworkNamespace(absl::string_view) const override {
         return nullptr;

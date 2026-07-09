@@ -168,7 +168,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
 
 void AsyncStreamImpl::sendLocalReply(Code code, absl::string_view body,
                                      std::function<void(ResponseHeaderMap& headers)> modify_headers,
-                                     const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                                     const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                                      absl::string_view details) {
   stream_info_.setResponseCodeDetails(details);
   if (encoded_response_headers_) {
