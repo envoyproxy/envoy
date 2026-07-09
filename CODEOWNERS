@@ -1,7 +1,6 @@
 # TODO(zuercher): determine how we want to deal with auto-assignment
 # By default, @envoyproxy/maintainers own everything.
 #*       @envoyproxy/maintainers
-
 # ci
 /.github/ @agrawroh @phlax @jwendell
 /ci/ @agrawroh @phlax @jwendell
@@ -443,6 +442,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/health_checkers/dynamic_modules @basundhara-c @agrawroh @mathetake @wbpcode
 # Linux network namespace override
 /*/extensions/local_address_selectors/filter_state_override @tonya11en @kyessenov
+# AI Protocol Manager filter
+/*/extensions/filters/http/ai_protocol_manager @penguingao @botengyao @tyxia
 
 # HTTP credential injector
 /*/extensions/filters/http/credential_injector @zhaohuabing @kyessenov

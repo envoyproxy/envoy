@@ -717,6 +717,8 @@ WEAK_STUB(NetworkFilterGetUpstreamHostCluster,
           envoy_dynamic_module_callback_network_filter_get_upstream_host_cluster(nullptr, nullptr))
 WEAK_STUB(NetworkFilterHasUpstreamHost,
           envoy_dynamic_module_callback_network_filter_has_upstream_host(nullptr))
+WEAK_STUB(NetworkFilterGetUpstreamConnectionId,
+          envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(nullptr))
 WEAK_STUB(NetworkFilterStartUpstreamSecureTransport,
           envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(nullptr))
 WEAK_STUB(NetworkFilterReadEnabled,
@@ -1545,6 +1547,24 @@ WEAK_STUB(HttpFilterGetAttributeInt,
 WEAK_STUB(HttpFilterGetAttributeBool,
           envoy_dynamic_module_callback_http_filter_get_attribute_bool(
               nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(NetworkFilterGetAttributeString,
+          envoy_dynamic_module_callback_network_filter_get_attribute_string(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(NetworkFilterGetAttributeInt,
+          envoy_dynamic_module_callback_network_filter_get_attribute_int(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(NetworkFilterGetAttributeBool,
+          envoy_dynamic_module_callback_network_filter_get_attribute_bool(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(ListenerFilterGetAttributeString,
+          envoy_dynamic_module_callback_listener_filter_get_attribute_string(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(ListenerFilterGetAttributeInt,
+          envoy_dynamic_module_callback_listener_filter_get_attribute_int(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(ListenerFilterGetAttributeBool,
+          envoy_dynamic_module_callback_listener_filter_get_attribute_bool(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
 WEAK_STUB(HttpFilterHttpCallout,
           envoy_dynamic_module_callback_http_filter_http_callout(nullptr, nullptr, {nullptr, 0},
                                                                  nullptr, 0, {nullptr, 0}, 0))
@@ -1625,6 +1645,8 @@ WEAK_STUB(HttpGetClusterHostCount,
 WEAK_STUB(HttpSetUpstreamOverrideHost,
           envoy_dynamic_module_callback_http_set_upstream_override_host(nullptr, {nullptr, 0},
                                                                         false))
+WEAK_STUB(HttpGetUpstreamConnectionId,
+          envoy_dynamic_module_callback_http_get_upstream_connection_id(nullptr))
 WEAK_STUB(HttpFilterResetStream,
           envoy_dynamic_module_callback_http_filter_reset_stream(
               nullptr, envoy_dynamic_module_type_http_filter_stream_reset_reason_LocalReset,
