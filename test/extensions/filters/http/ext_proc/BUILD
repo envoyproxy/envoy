@@ -24,6 +24,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/ext_proc:config",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
