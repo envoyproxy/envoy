@@ -171,6 +171,8 @@ def envoy_dependencies(skip_targets = []):
 
     _aws_c_auth_testdata()
     _liburing()
+    _elfutils()
+    _libbpf()
     _com_github_bazel_buildtools()
     _c_ares()
     _com_github_openhistogram_libcircllhist()
@@ -242,6 +244,7 @@ def envoy_dependencies(skip_targets = []):
 
     _libmaxminddb()
     _thrift()
+    _wuffs()
 
     external_http_archive("rules_license")
     external_http_archive("rules_pkg")
@@ -360,6 +363,18 @@ def _liburing():
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:liburing.patch"],
+    )
+
+def _elfutils():
+    external_http_archive(
+        name = "elfutils",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
+def _libbpf():
+    external_http_archive(
+        name = "libbpf",
+        build_file_content = BUILD_ALL_CONTENT,
     )
 
 def _com_github_bazel_buildtools():
@@ -1071,4 +1086,22 @@ def _libmaxminddb():
     external_http_archive(
         name = "libmaxminddb",
         build_file_content = LIBMAXMINDDB_BUILD_CONTENT,
+    )
+
+def _wuffs():
+    external_http_archive(
+        name = "wuffs",
+        build_file_content = """
+cc_library(
+    name = "wuffs",
+    # Wuffs uses an amalgamated single-file distribution: wuffs-v0.4.c acts as
+    # a header (declarations only) when included without WUFFS_IMPLEMENTATION,
+    # and as a full implementation when WUFFS_IMPLEMENTATION is defined (done
+    # in exactly one TU: wuffs_impl.c).  Listed as hdrs so dependent targets
+    # may include it.
+    textual_hdrs = ["release/c/wuffs-v0.4.c"],
+    visibility = ["//visibility:public"],
+    copts = ["-Wno-unused-function"],
+)
+""",
     )

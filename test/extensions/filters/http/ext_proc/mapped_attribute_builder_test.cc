@@ -33,8 +33,10 @@ protected:
 
   void initialize(const std::string& yaml) {
     TestUtility::loadFromYaml(yaml, proto_config_);
-    builder_ =
-        std::make_unique<MappedAttributeBuilder>(proto_config_, expr_builder_, factory_context_);
+    absl::Status creation_status = absl::OkStatus();
+    builder_ = std::make_unique<MappedAttributeBuilder>(proto_config_, expr_builder_,
+                                                        factory_context_, creation_status);
+    EXPECT_TRUE(creation_status.ok());
     EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
     EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
   }

@@ -198,9 +198,9 @@ DynamicModuleHttpFilter::sendHttpCallout(uint64_t* callout_id_out, absl::string_
 
   // Prepare the callback and the ID.
   const uint64_t callout_id = getNextCalloutId();
-  auto http_callout_callabck =
+  auto http_callout_callback =
       std::make_unique<DynamicModuleHttpFilter::HttpCalloutCallback>(*this, callout_id);
-  DynamicModuleHttpFilter::HttpCalloutCallback& callback = *http_callout_callabck;
+  DynamicModuleHttpFilter::HttpCalloutCallback& callback = *http_callout_callback;
 
   auto request = cluster->httpAsyncClient().send(std::move(message), callback, options);
   if (!request) {
@@ -209,7 +209,7 @@ DynamicModuleHttpFilter::sendHttpCallout(uint64_t* callout_id_out, absl::string_
 
   // Register the callout.
   callback.request_ = request;
-  http_callouts_.emplace(callout_id, std::move(http_callout_callabck));
+  http_callouts_.emplace(callout_id, std::move(http_callout_callback));
   *callout_id_out = callout_id;
 
   return envoy_dynamic_module_type_http_callout_init_result_Success;

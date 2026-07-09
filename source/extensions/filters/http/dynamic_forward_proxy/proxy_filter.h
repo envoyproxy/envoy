@@ -90,7 +90,7 @@ private:
 
     void onClusterAddOrUpdate(absl::string_view cluster_name,
                               Upstream::ThreadLocalClusterCommand& command) override;
-    void onClusterRemoval(const std::string& name) override;
+    void onClusterRemoval(absl::string_view name) override;
 
     absl::flat_hash_map<std::string, std::list<LoadClusterEntryHandleImpl*>> pending_clusters_;
     Upstream::ClusterUpdateCallbacksHandlePtr handle_;

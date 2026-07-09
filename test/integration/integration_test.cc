@@ -198,6 +198,29 @@ TEST_P(IntegrationTest, WorkerCpuAffinity) {
   codec_client_->close();
 }
 
+// Verify that a listener configured with the CPU locality connection balancer and worker CPU
+// affinity starts and serves traffic. On kernels that support reuse port BPF steering this
+// exercises the BPF fast path, otherwise the kernel distributes connections with its default
+// reuse port hashing.
+TEST_P(IntegrationTest, CpuLocalityConnectionBalancer) {
+  concurrency_ = 2;
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.set_enable_worker_cpu_affinity(true);
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->mutable_connection_balance_config()->mutable_cpu_locality_balance();
+  });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  codec_client_->close();
+}
+
 class TestConnectionBalanceFactory : public Network::ConnectionBalanceFactory {
 public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

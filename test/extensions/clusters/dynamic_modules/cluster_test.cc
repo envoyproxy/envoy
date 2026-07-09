@@ -1247,6 +1247,30 @@ TEST_F(DynamicModuleClusterTest, OnScheduledCallback) {
   result = absl::InternalError("cleanup");
 }
 
+// Worker timer creation returns null before any chooseHost has captured a worker dispatcher.
+TEST_F(DynamicModuleClusterTest, WorkerTimerNewReturnsNullWithoutDispatcher) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  NiceMock<Upstream::MockPrioritySet> worker_ps;
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+  auto lb = std::make_unique<DynamicModuleLoadBalancer>(handle, worker_ps);
+
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_worker_timer_new(lb.get()));
+}
+
+// Deleting a worker timer off a worker thread (here, the test thread) trips an Envoy bug and skips
+// the deletion, since the underlying timer may only be destroyed on its worker dispatcher thread.
+TEST_F(DynamicModuleClusterTest, WorkerTimerDeleteOffWorkerThreadIsEnvoyBug) {
+  auto* timer = new DynamicModuleClusterWorkerTimer();
+  EXPECT_ENVOY_BUG(envoy_dynamic_module_callback_cluster_worker_timer_delete(timer),
+                   "must be called on a worker thread");
+  // The callback skipped deletion on the test thread, so free it directly.
+  delete timer;
+}
+
 // Test that onScheduled handles the case when cluster is already destroyed.
 TEST_F(DynamicModuleClusterTest, OnScheduledAfterClusterDestroyed) {
   Event::PostCb captured_cb;

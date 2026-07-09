@@ -18,6 +18,7 @@ pub mod dns_resolver;
 #[doc(hidden)]
 pub mod ffi_helpers;
 pub mod formatter;
+pub mod health_checker;
 pub mod http;
 pub mod listener;
 pub mod load_balancer;
@@ -405,6 +406,20 @@ macro_rules! envoy_log {
       }
     }
   };
+}
+
+/// Get the current effective log level of the dynamic modules logging stream. This can be used to
+/// align in-module verbosity with the level configured on the Envoy side, including changes applied
+/// at runtime via the admin API.
+pub fn get_log_level() -> abi::envoy_dynamic_module_type_log_level {
+  unsafe { abi::envoy_dynamic_module_callback_get_log_level() }
+}
+
+/// Check whether the given log level is enabled for the dynamic modules logging stream. This can be
+/// used to skip expensive work that is only needed when a message at the given level would actually
+/// be logged.
+pub fn is_log_enabled(level: abi::envoy_dynamic_module_type_log_level) -> bool {
+  unsafe { abi::envoy_dynamic_module_callback_log_enabled(level) }
 }
 
 /// Guard macro that ensures each factory `OnceLock` is registered by exactly one module.
@@ -881,6 +896,13 @@ macro_rules! declare_all_init_functions {
       "NEW_STAT_SINK_CONFIG_FUNCTION"
     );
   };
+  (@register health_checker : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_HEALTH_CHECKER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_HEALTH_CHECKER_CONFIG_FUNCTION"
+    );
+  };
 }
 
 /// The function signature for the new network filter configuration function.
@@ -1299,6 +1321,24 @@ macro_rules! declare_stat_sink_init_functions {
     }
   };
 }
+
+// =================================================================================================
+// Health Checker Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new health checker configuration.
+///
+/// The `name` is the value of `health_checker_name` from the `dynamic_modules` health-check
+/// configuration, allowing a single module to dispatch to different health checker implementations.
+/// The `config` is the raw configuration bytes. Returning `None` causes Envoy to reject the
+/// health-check configuration.
+pub type NewHealthCheckerConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn health_checker::HealthCheckerConfig>>;
+
+/// The global factory function for health checker configurations. This is set via the
+/// `health_checker:` arm of [`declare_all_init_functions!`] and is not intended to be set directly.
+pub static NEW_HEALTH_CHECKER_CONFIG_FUNCTION: OnceLock<NewHealthCheckerConfigFunction> =
+  OnceLock::new();
 
 // =================================================================================================
 // Cluster Dynamic Module

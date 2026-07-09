@@ -257,7 +257,8 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
                            const uint32_t max_message_timeout_ms, Stats::Scope& scope,
                            const std::string& stats_prefix, bool is_upstream,
                            Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
-                           Server::Configuration::CommonFactoryContext& context)
+                           Server::Configuration::CommonFactoryContext& context,
+                           absl::Status& creation_status)
     : stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       untyped_forwarding_namespaces_(
           config.metadata_options().forwarding_namespaces().untyped().begin(),
@@ -281,7 +282,7 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       mutation_checker_(config.mutation_rules(), context.regexEngine()),
       filter_metadata_(config.filter_metadata()),
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
-                          config.response_attributes()),
+                          config.response_attributes(), creation_status),
       processing_request_modifier_factory_cb_(
           createProcessingRequestModifierCb(config, builder, context)),
       on_processing_response_factory_cb_(

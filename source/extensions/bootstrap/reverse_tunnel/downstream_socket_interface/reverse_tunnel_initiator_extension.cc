@@ -23,6 +23,11 @@ namespace ReverseConnection {
 // Static warning flag for reverse tunnel detailed stats activation.
 static bool reverse_tunnel_detailed_stats_warning_logged = false;
 
+namespace {
+// Default cap on the per-host reconnect backoff when ``max_reconnect_backoff`` is unset.
+constexpr uint64_t kDefaultMaxReconnectBackoffMs = 30000;
+} // namespace
+
 ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
     Server::Configuration::ServerFactoryContext& context,
     const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
@@ -31,6 +36,8 @@ ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
   stat_prefix_ = PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "reverse_tunnel_initiator");
   // Configure detailed stats flag (defaults to false).
   enable_detailed_stats_ = config.enable_detailed_stats();
+  max_reconnect_backoff_ms_ =
+      PROTOBUF_GET_MS_OR_DEFAULT(config, max_reconnect_backoff, kDefaultMaxReconnectBackoffMs);
   if (config.has_http_handshake() && !config.http_handshake().request_path().empty()) {
     handshake_request_path_ = config.http_handshake().request_path();
   } else {

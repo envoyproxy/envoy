@@ -146,13 +146,11 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
   };
 }
 
-Envoy::Http::FilterFactoryCb
-DynamicModuleConfigFactory::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Envoy::Http::FilterFactoryCb>
+DynamicModuleConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const FilterConfig& proto_config, const std::string& stat_prefix,
     Server::Configuration::ServerFactoryContext& context) {
-  auto cb_or_error = createFilterFactory(proto_config, stat_prefix, context, context.scope());
-  THROW_IF_NOT_OK_REF(cb_or_error.status());
-  return cb_or_error.value();
+  return createFilterFactory(proto_config, stat_prefix, context, context.scope());
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

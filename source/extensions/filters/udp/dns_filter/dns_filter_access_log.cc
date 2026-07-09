@@ -89,7 +89,7 @@ public:
     const auto& provider_table = providerFuncTable();
     const auto func_it = provider_table.find(std::string(command));
     if (func_it == provider_table.end()) {
-      return nullptr;
+      return absl::InvalidArgumentError(absl::StrCat("Invalid format substitution: ", command));
     }
     return func_it->second(command_arg, max_length);
   }

@@ -18,6 +18,7 @@ flushdb
 itr
 STREQ
 htonl
+htons
 ABI
 ACK
 ACL
@@ -85,6 +86,7 @@ Reserializer
 SION
 TRA
 Websockets
+reentrancy
 webtransport
 WEBTRANSPORT
 signalling
@@ -593,6 +595,7 @@ WS
 WSA
 WSABUF
 WSS
+WUFFS
 Welford's
 Wi
 XDS
@@ -628,6 +631,7 @@ alls
 alphanumerics
 amongst
 anno
+Anthropic
 anonymization
 anonymizing
 anys
@@ -783,6 +787,7 @@ datacenter
 datadog
 datagram
 datagrams
+datapath
 de
 deallocate
 deallocated
@@ -849,6 +854,7 @@ dup
 durations
 dynamodb
 eg
+el
 emplace
 emplaced
 emscripten
@@ -966,6 +972,7 @@ healths
 healthz
 hermeticity
 highp
+hl
 hit
 hoc
 hostname
@@ -1013,6 +1020,7 @@ iov
 iovcnt
 iovec
 iovecs
+iop
 ips
 iptables
 ish
@@ -1045,6 +1053,7 @@ ldd
 len
 lenenc
 lexically
+libbpf
 libc
 libevent
 libprotobuf
@@ -1181,6 +1190,7 @@ oob
 opcode
 openid
 openssl
+OpenAI
 opentracing
 optimizations
 optname
@@ -1321,6 +1331,7 @@ redispatch
 redistributions
 reentrant
 reentrants
+reentrantly
 refactor
 refactored
 refcount
@@ -1437,7 +1448,9 @@ snapshotted
 sockaddr
 socketpair
 sockfd
+sockhash
 socklen
+sockmap
 sockopt
 sockopts
 somestring
@@ -1551,6 +1564,7 @@ tmpfs
 token
 tokenize
 tokenized
+tokenizer
 tokenizes
 tokenizing
 tokio
@@ -1622,6 +1636,8 @@ variadic
 varint
 vec
 vectorize
+VBC
+VBD
 ver
 verifier
 verifiers
@@ -1743,3 +1759,23 @@ datasets
 smartptr
 JA3
 JA4
+AiProtocolManager
+modelling
+delegator
+MSS
+SERVFAIL
+WR
+exceptionless
+freeaddrinfo
+fstat
+getrlimit
+linkat
+mkstemp
+muxes
+pread
+pwrite
+setns
+setrlimit
+preprocessor
+RDWR
+stringification

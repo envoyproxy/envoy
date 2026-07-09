@@ -404,7 +404,7 @@ TEST_P(AggregateIntegrationTest, CircuitBreakerTestMaxConnections) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "55", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
                                                              {cluster1_}, {cluster1_}, {}, "56");
-  test_server_->waitForGauge("cluster_manager.active_clusters", Eq(3));
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(2));
 
   // initial circuit breaker states:
   // the aggregate cluster circuit breaker is closed
@@ -524,7 +524,7 @@ TEST_P(AggregateIntegrationTest, CircuitBreakerTestMaxRequests) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "55", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
                                                              {cluster1_}, {cluster1_}, {}, "56");
-  test_server_->waitForGauge("cluster_manager.active_clusters", Eq(3));
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(2));
 
   // initial circuit breaker states:
   // the aggregate cluster circuit breaker is closed
@@ -648,7 +648,7 @@ TEST_P(AggregateIntegrationTest, CircuitBreakerTestMaxPendingRequests) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "55", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
                                                              {cluster1_}, {cluster1_}, {}, "56");
-  test_server_->waitForGauge("cluster_manager.active_clusters", Eq(3));
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(2));
 
   // initial circuit breaker states:
   // the aggregate cluster circuit breaker is closed
@@ -802,7 +802,7 @@ TEST_P(AggregateIntegrationTest, CircuitBreakerMaxRetriesTest) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "55", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
                                                              {cluster1_}, {cluster1_}, {}, "56");
-  test_server_->waitForGauge("cluster_manager.active_clusters", Eq(3));
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(2));
 
   // initial circuit breaker states:
   // the aggregate cluster circuit breaker is closed

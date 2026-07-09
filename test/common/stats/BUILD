@@ -178,7 +178,10 @@ envoy_cc_test(
     name = "refcount_ptr_test",
     srcs = ["refcount_ptr_test.cc"],
     rbe_pool = "6gig",
-    deps = ["//envoy/stats:refcount_ptr_interface"],
+    deps = [
+        "//envoy/stats:refcount_ptr_interface",
+        "//test/test_common:thread_factory_for_test_lib",
+    ],
 )
 
 envoy_cc_test(
@@ -430,6 +433,24 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "thread_local_store_speed_test_benchmark_test",
     benchmark_binary = "thread_local_store_speed_test",
+)
+
+envoy_cc_benchmark_binary(
+    name = "dec_ref_count_speed_test",
+    srcs = ["dec_ref_count_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/stats:allocator_lib",
+        "//source/common/stats:symbol_table_lib",
+        "@abseil-cpp//absl/strings",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "dec_ref_count_speed_test_benchmark_test",
+    benchmark_binary = "dec_ref_count_speed_test",
 )
 
 envoy_cc_test(
