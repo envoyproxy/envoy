@@ -86,6 +86,7 @@ Reserializer
 SION
 TRA
 Websockets
+reentrancy
 webtransport
 WEBTRANSPORT
 signalling
@@ -1330,6 +1331,7 @@ redispatch
 redistributions
 reentrant
 reentrants
+reentrantly
 refactor
 refactored
 refcount
@@ -1757,3 +1759,6 @@ datasets
 smartptr
 JA3
 JA4
+AiProtocolManager
+modelling
+delegator

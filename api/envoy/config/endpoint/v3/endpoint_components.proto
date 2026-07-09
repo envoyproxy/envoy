@@ -154,7 +154,7 @@ message LbEndpoint {
 // LbEndpoint list collection. Entries are `LbEndpoint` resources or references.
 // [#not-implemented-hide:]
 message LbEndpointCollection {
-  xds.core.v3.CollectionEntry entries = 1;
+  repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
 // A configuration for an LEDS collection.
