@@ -183,9 +183,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
           // A single protobuf message cannot exceed 2GB.
           if (content_length > std::numeric_limits<uint32_t>::max()) {
             decoder_callbacks_->sendLocalReply(
-                Http::Code::OK,
-                "envoy reverse bridge: upstream response too large for gRPC frame", nullptr,
-                Grpc::Status::WellKnownGrpcStatus::Internal,
+                Http::Code::OK, "envoy reverse bridge: upstream response too large for gRPC frame",
+                nullptr, Grpc::Status::WellKnownGrpcStatus::Internal,
                 RcDetails::get().GrpcBridgeFailedWrongContentLength);
             return Http::FilterHeadersStatus::StopIteration;
           }
