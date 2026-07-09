@@ -92,35 +92,10 @@ public:
   // RefcountInterface
   void incRefCount() override { ref_count_.fetch_add(1, std::memory_order_relaxed); }
   bool decRefCount() override {
-    ASSERT(ref_count_ >= 1);
-    // Takes a snapshot of the current ref_count_
-    uint32_t ref_count_snapshot = ref_count_.load(std::memory_order_relaxed);
-
-    // Checks if ref_count_snapshot is 1. If it is 1, then a decrement would free memory, and we
-    // would need to acquire the allocator mutex.
-    //
-    // If ref_count_snapshot is > 1, then there are some important cases where thread
-    // interruptions might change what happens:
-    //
-    // First case: ref_count_ is unchanged (ref_count_ == ref_count_snapshot)
-    // Zero or more threads touch ref_count_ before compare_exchange_weak is called.
-    // compare_exchange_weak returns true, and decRefCount returns false.
-    //
-    // Second case: ref_count_ is changed (ref_count_ != ref_count_snapshot && ref_count_ > 1)
-    // One or more threads touch ref_count_ before compare_exchange_weak is called.
-    // compare_exchange_weak returns false, ref_count_snapshot is set to be ref_count_. Loop
-    // restarts.
-    //
-    // Third case: ref_count_ is changed (ref_count_ != ref_count_snapshot && ref_count <= 1)
-    // One or more threads touch ref_count_ before compare_exchange_weak is called.
-    // compare_exchange_weak returns false. ref_count_snapshot is set to be ref_count_. Loop
-    // restarts, but exits out of the while loop because conditional is false (a decrement would
-    // free memory; check start of comment).
-    while (ref_count_snapshot > 1) {
-      if (ref_count_.compare_exchange_weak(ref_count_snapshot, ref_count_snapshot - 1,
-                                           std::memory_order_acq_rel)) {
-        return false;
-      }
+    // See tryDecRefCountFastPath() in refcount_ptr.h for the interleaving
+    // analysis of the lock-free fast path.
+    if (tryDecRefCountFastPath(ref_count_)) {
+      return false;
     }
     // Another thread may call incRefCount at this point. The lock path still does the right thing
     // because the stat is not freed if ref_count_ is not 0.

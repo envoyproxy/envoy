@@ -176,5 +176,43 @@ struct RefcountHelper {
   std::atomic<uint32_t> ref_count_{0};
 };
 
+// Lock-free release fast path shared by stat implementations whose final
+// reference-count decrement must happen under a lock so that the transition
+// to zero is atomic with removal from a by-name map (see
+// StatsSharedImpl::decRefCount in allocator.cc and
+// ParentHistogramImpl::decRefCount in thread_local_store.cc, and the
+// discussion introduced in #45821).
+//
+// Takes a snapshot of the current ref_count. If the snapshot is 1, a
+// decrement could free memory, so we return false and the caller must
+// decrement under its lock. If the snapshot is > 1, thread interleavings
+// resolve as follows:
+//
+// First case: ref_count is unchanged (ref_count == snapshot).
+// compare_exchange_weak succeeds having dropped a non-final reference, and
+// we return true.
+//
+// Second case: ref_count changed and is still > 1. compare_exchange_weak
+// fails and reloads the snapshot; the loop restarts.
+//
+// Third case: ref_count changed and is now <= 1. compare_exchange_weak fails
+// and reloads the snapshot; the loop exits and we return false (a decrement
+// could free memory; see above).
+//
+// @return true if a non-final reference was dropped (the caller is done), or
+// false if the caller may hold the last reference and must perform the
+// decrement under its lock.
+inline bool tryDecRefCountFastPath(std::atomic<uint32_t>& ref_count) {
+  ASSERT(ref_count >= 1);
+  uint32_t ref_count_snapshot = ref_count.load(std::memory_order_relaxed);
+  while (ref_count_snapshot > 1) {
+    if (ref_count.compare_exchange_weak(ref_count_snapshot, ref_count_snapshot - 1,
+                                        std::memory_order_acq_rel)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 } // namespace Stats
 } // namespace Envoy
