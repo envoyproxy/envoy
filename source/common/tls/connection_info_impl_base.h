@@ -68,10 +68,10 @@ public:
   // Subclasses that store the validated chain should override this.
   virtual X509* validatedPeerIssuer() const { return nullptr; }
 
-  // Returns the validated peer certificate chain (leaf first) if the subclass stores one, or
-  // absl::nullopt if unavailable. Subclasses that store the validated chain should override this.
+  // Returns the validated peer certificate chain (leaf first) if the subclass stores one.
+  // Subclasses that store the validated chain should override this.
   virtual OptRef<const std::vector<bssl::UniquePtr<X509>>> validatedPeerCertChain() const {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
 private:
