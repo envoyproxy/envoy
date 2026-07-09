@@ -92,6 +92,15 @@ TEST(EnvoyBugStackTrace, TestStackTrace) {
   EXPECT_LOG_CONTAINS("error", "#0 ", st.logStackTrace());
 }
 
+TEST(EnvoyBugStackTrace, TestStackTraceSingleEntry) {
+  const bool saved = Assert::EnvoyBugStackTrace::singleLine();
+  Assert::EnvoyBugStackTrace::setSingleLine(true);
+  Assert::EnvoyBugStackTrace st;
+  st.capture();
+  EXPECT_LOG_CONTAINS("error", "stacktrace for envoy bug", st.logStackTrace());
+  Assert::EnvoyBugStackTrace::setSingleLine(saved);
+}
+
 TEST(EnvoyBugDeathTest, VariousLogs) {
   // Use 2 envoy bug action registrations to verify that action chaining is working correctly.
   int envoy_bug_fail_count = 0;
