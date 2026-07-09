@@ -2944,6 +2944,65 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ConfigStatsOperate) {
                 config, invalid_id, 1));
 }
 
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAttributeInt) {
+  const uint64_t response_flags = (1ULL << 1) | (1ULL << 26);
+  EXPECT_CALL(callbacks_.stream_info_, legacyResponseFlags())
+      .WillRepeatedly(testing::Return(response_flags));
+  uint64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_attribute_int(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_ResponseFlags, &result));
+  EXPECT_EQ(response_flags, result);
+
+  // A request attribute that is not backed by stream info returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_attribute_int(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_RequestPath, &result));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAttributeBool) {
+  EXPECT_CALL(callbacks_.stream_info_, healthCheck()).WillRepeatedly(testing::Return(true));
+  bool result = false;
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_attribute_bool(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_HealthCheck, &result));
+  EXPECT_TRUE(result);
+
+  // An unsupported bool attribute returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_attribute_bool(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_RequestPath, &result));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAttributeString) {
+  const std::optional<std::string> details = "via_upstream";
+  EXPECT_CALL(callbacks_.stream_info_, responseCodeDetails())
+      .WillRepeatedly(testing::ReturnRef(details));
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_attribute_string(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_ResponseCodeDetails, &result));
+  EXPECT_EQ("via_upstream", std::string(result.ptr, result.length));
+
+  // An int attribute requested as string returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_attribute_string(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_ResponseFlags, &result));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAttributeNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
+
+  envoy_dynamic_module_type_envoy_buffer str_result = {nullptr, 0};
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_attribute_string(
+      static_cast<void*>(filter.get()), envoy_dynamic_module_type_attribute_id_ResponseCodeDetails,
+      &str_result));
+  uint64_t int_result = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_attribute_int(
+      static_cast<void*>(filter.get()), envoy_dynamic_module_type_attribute_id_ResponseFlags,
+      &int_result));
+  bool bool_result = false;
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_attribute_bool(
+      static_cast<void*>(filter.get()), envoy_dynamic_module_type_attribute_id_HealthCheck,
+      &bool_result));
+}
+
 } // namespace ListenerFilters
 } // namespace DynamicModules
 } // namespace Extensions

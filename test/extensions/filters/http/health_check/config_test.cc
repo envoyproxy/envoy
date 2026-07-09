@@ -297,7 +297,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterWithServerContext) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   HealthCheckFilterConfig factory;
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

@@ -378,6 +378,24 @@ Once a connection is established to a specific downstream node, it is cached and
 requests to that node. Each data request is multiplexed as a new HTTP/2 stream on the existing connection,
 avoiding the overhead of establishing new connections.
 
+Observing reachable nodes
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Because the cluster materializes an Envoy host for a downstream node only when the first data request for
+that node arrives, the :ref:`/clusters <operations_admin_interface_clusters>` admin endpoint would
+otherwise not list nodes that are connected but have not yet received traffic. To make the live inventory
+discoverable, the cluster additionally reports every currently-reachable node on ``/clusters`` as a
+read-only entry, so a client can see what is reachable over reverse tunnels before sending any request.
+
+Each reported node appears as a host whose hostname encodes its ``tenant``, ``cluster`` and ``node``
+identifiers as ``tenant:cluster:node`` (the tenant segment is omitted when tenant isolation is
+disabled), together with an ``rt_connection_count`` gauge giving the number of established tunnels to
+that node. The same hostname is used once the node materializes as a real load-balanced host. These
+entries are informational only: they are not load-balanced hosts and do not affect
+routing. The list is eventually consistent and is derived from the upstream socket interface's per-node
+connection gauges, so it requires ``enable_detailed_stats`` to be set on the upstream socket interface
+bootstrap extension. A node drops off the list once its connection count reaches zero.
+
 .. _config_reverse_connection_egress_listener:
 
 Egress listener for data traffic

@@ -24,8 +24,8 @@ Http::FilterFactoryCb GrpcJsonTranscoderFilterConfig::createFilterFactoryFromPro
   };
 }
 
-Http::FilterFactoryCb
-GrpcJsonTranscoderFilterConfig::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+GrpcJsonTranscoderFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
         proto_config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
