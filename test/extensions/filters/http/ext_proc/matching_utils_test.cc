@@ -82,7 +82,8 @@ TEST(ExpressionManagerTest, CelUnavailableTest) {
   request_matchers.Add("true");
 
   // When CEL is not available, this should log a warning but not throw
-  ExpressionManager manager(builder, context.local_info_, request_matchers, {});
+  absl::Status creation_status = absl::OkStatus();
+  ExpressionManager manager(builder, context.local_info_, request_matchers, {}, creation_status);
   EXPECT_FALSE(manager.hasRequestExpr());
 }
 

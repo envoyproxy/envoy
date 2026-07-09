@@ -21,12 +21,12 @@ MappedAttributeBuilderFactory::createProcessingRequestModifier(
           mapped_attribute_builder::v3::MappedAttributeBuilder&>(
       config, context.messageValidationVisitor());
   absl::Status creation_status = absl::OkStatus();
-  auto buidler =
+  auto builder_instance =
       std::make_unique<MappedAttributeBuilder>(proto_config, builder, context, creation_status);
 
   // TODO(wbpcode): Consider returning absl::StatusOr<> instead of throwing an exception here.
   THROW_IF_NOT_OK_REF(creation_status);
-  return buidler;
+  return builder_instance;
 }
 
 REGISTER_FACTORY(
