@@ -100,7 +100,7 @@ public:
     }
 
   private:
-    // Repoints `to_move`'s handler back at this wrapper, adopts its link, and empties the source.
+    // Re-points `to_move`'s handler back at this wrapper, adopts its link, and empties the source.
     // Shared by the move constructor and move assignment; assumes any link previously held on this
     // side is already gone (the constructor starts empty, the assignment calls reset() first).
     void moveFrom(CallbacksWrapper& to_move) noexcept {
@@ -165,7 +165,7 @@ public:
   }
 
 private:
-  // Repoints `to_move`'s wrapper back at this handler, adopts its link, and empties the source.
+  // Re-points `to_move`'s wrapper back at this handler, adopts its link, and empties the source.
   // Shared by the move constructor and move assignment; assumes any link previously held on this
   // side is already gone (the constructor starts empty, the assignment calls reset() first).
   void moveFrom(CallbacksHandler& to_move) noexcept {
