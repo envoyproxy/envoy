@@ -58,6 +58,8 @@ public:
               (const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
                const absl::string_view error_detail),
               (override));
+  MOCK_METHOD(void, onResourceUnsubscribed,
+              (const absl::string_view type_url, absl::string_view resource), (override));
 };
 
 class MockXdsResourcesDelegate : public XdsResourcesDelegate {

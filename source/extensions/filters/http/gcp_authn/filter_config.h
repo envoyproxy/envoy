@@ -12,13 +12,13 @@ namespace HttpFilters {
 namespace GcpAuthn {
 
 class GcpAuthnFilterFactory
-    : public Common::FactoryBase<
+    : public Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>,
       public Logger::Loggable<Logger::Id::filter> {
 public:
-  GcpAuthnFilterFactory() : FactoryBase(std::string(FilterName)) {}
+  GcpAuthnFilterFactory() : ExceptionFreeFactoryBase(std::string(FilterName)) {}
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };

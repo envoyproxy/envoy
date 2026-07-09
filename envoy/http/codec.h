@@ -473,7 +473,7 @@ public:
   virtual absl::string_view responseDetails() { return ""; }
 
   /**
-   * @return const Network::ConnectionInfoProvider& the adderess provider  of the connection
+   * @return const Network::ConnectionInfoProvider& the address provider of the connection
    * associated with the stream.
    */
   virtual const Network::ConnectionInfoProvider& connectionInfoProvider() PURE;
@@ -611,7 +611,7 @@ struct Http1Settings {
   // and https:// URLs should be rejected over unencrypted connections.
   bool validate_scheme_{false};
 
-  // If true, Envoy will send a fully qualified URL in the firstline of the request.
+  // If true, Envoy will send a fully qualified URL in the first line of the request.
   bool send_fully_qualified_url_{false};
 
   // If true, any non-empty method composed of valid characters is accepted.

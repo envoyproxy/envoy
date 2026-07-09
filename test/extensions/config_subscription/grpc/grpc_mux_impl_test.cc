@@ -1892,6 +1892,27 @@ TEST_P(GrpcMuxImplTest, XdsResourcesDelegateOnResourceLoadFailed) {
   grpc_mux_->shutdown();
 }
 
+TEST_P(GrpcMuxImplTest, ShutdownPreventsSending) {
+  setup();
+  InSequence s;
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage("foo", {"x", "y"}, "", true);
+  grpc_mux_->start();
+
+  grpc_mux_->shutdown();
+
+  // We do not expect any messages to be sent here as the mux has been shutdown.
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _)).Times(0);
+  auto bar_sub = grpc_mux_->addWatch("bar", {"z"}, callbacks_, resource_decoder_, {});
+}
+
+TEST_P(GrpcMuxImplTest, RequestOnDemandUpdateDoesNothing) {
+  setup();
+  // Should not throw or crash.
+  grpc_mux_->requestOnDemandUpdate("foo", {"z"});
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy

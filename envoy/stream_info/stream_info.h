@@ -763,7 +763,7 @@ public:
   setConnectionTerminationDetails(absl::string_view connection_termination_details) PURE;
 
   /*
-   * @param short string type flag to indicate the noteworthy event of this stream. Mutliple flags
+   * @param short string type flag to indicate the noteworthy event of this stream. Multiple flags
    * could be added and will be concatenated with comma. It should not contain any empty or space
    * characters (' ', '\t', '\f', '\v', '\n', '\r').
    *
