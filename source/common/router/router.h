@@ -312,6 +312,9 @@ public:
   static StreamInfo::CoreResponseFlag
   streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
 
+  static std::optional<Upstream::Outlier::Result>
+  streamResetReasonToOutlierResult(Http::StreamResetReason reset_reason);
+
   // Http::StreamFilterBase
   void onDestroy() override;
 

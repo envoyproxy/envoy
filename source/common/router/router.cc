@@ -1665,13 +1665,15 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   // Therefore removing an upstream in the case of an overloaded cluster
   // would make the situation even worse.
   // https://github.com/envoyproxy/envoy/issues/25487
-  if (!dropped) {
-    // TODO: The reset may also come from upstream over the wire. In this case it should be
-    // treated as external origin error and distinguished from local origin error.
-    // This matters only when running OutlierDetection with split_external_local_origin_errors
-    // config param set to true.
-    updateOutlierDetection(Upstream::Outlier::Result::LocalOriginConnectFailed, upstream_request,
-                           std::nullopt);
+  const auto outlier_result = streamResetReasonToOutlierResult(reset_reason);
+  if (outlier_result.has_value()) {
+    // Preserve the legacy 503 mapping in non-split mode when a peer-generated reset is reported as
+    // an external-origin failure.
+    const std::optional<uint64_t> response_code =
+        outlier_result.value() == Upstream::Outlier::Result::ExtOriginRequestFailed
+            ? std::optional<uint64_t>(enumToInt(Http::Code::ServiceUnavailable))
+            : std::nullopt;
+    updateOutlierDetection(outlier_result.value(), upstream_request, response_code);
   }
 
   if (maybeRetryReset(reset_reason, upstream_request, TimeoutRetry::No)) {
@@ -1767,6 +1769,31 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
     return StreamInfo::CoreResponseFlag::UpstreamRemoteReset;
   case Http::StreamResetReason::OverloadManager:
     return StreamInfo::CoreResponseFlag::OverloadManager;
+  }
+
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
+std::optional<Upstream::Outlier::Result>
+Filter::streamResetReasonToOutlierResult(Http::StreamResetReason reset_reason) {
+  switch (reset_reason) {
+  case Http::StreamResetReason::RemoteReset:
+  case Http::StreamResetReason::RemoteRefusedStreamReset:
+  case Http::StreamResetReason::ProtocolError:
+    return Upstream::Outlier::Result::ExtOriginRequestFailed;
+  case Http::StreamResetReason::Overflow:
+  case Http::StreamResetReason::RemoteResetNoError:
+    return std::nullopt;
+  case Http::StreamResetReason::LocalReset:
+  case Http::StreamResetReason::LocalRefusedStreamReset:
+  case Http::StreamResetReason::LocalConnectionFailure:
+  case Http::StreamResetReason::RemoteConnectionFailure:
+  case Http::StreamResetReason::ConnectionTimeout:
+  case Http::StreamResetReason::ConnectionTermination:
+  case Http::StreamResetReason::ConnectError:
+  case Http::StreamResetReason::OverloadManager:
+  case Http::StreamResetReason::Http1PrematureUpstreamHalfClose:
+    return Upstream::Outlier::Result::LocalOriginConnectFailed;
   }
 
   PANIC_DUE_TO_CORRUPT_ENUM;
