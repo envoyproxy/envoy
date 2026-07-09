@@ -1094,6 +1094,27 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "quic_upstream_client_cert_integration_test",
+    size = "large",
+    srcs = select({
+        "//bazel:disable_http3": [],
+        "//conditions:default": ["quic_upstream_client_cert_integration_test.cc"],
+    }),
+    data = ["//test/config/integration/certs"],
+    rbe_pool = "6gig",
+    tags = [
+        "cpu:3",
+    ],
+    deps = envoy_select_enable_http3([
+        ":http_protocol_integration_lib",
+        "//source/common/quic:envoy_quic_proof_source_lib",
+        "//source/common/tls:connection_info_impl_base_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    ]),
+)
+
+envoy_cc_test(
     name = "multiplexed_upstream_integration_test",
     size = "large",
     srcs = [
