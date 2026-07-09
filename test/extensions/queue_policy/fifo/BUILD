@@ -12,12 +12,12 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "fifo_queue_strategy_test",
-    srcs = ["fifo_queue_strategy_test.cc"],
-    extension_names = ["envoy.queue_strategy.fifo"],
+    name = "fifo_queue_policy_test",
+    srcs = ["fifo_queue_policy_test.cc"],
+    extension_names = ["envoy.queue_policy.fifo"],
     deps = [
         "//source/common/protobuf:message_validator_lib",
-        "//source/extensions/queue_strategy/fifo:fifo_queue_strategy_impl",
+        "//source/extensions/queue_policy/fifo:fifo_queue_policy_impl",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
     ],

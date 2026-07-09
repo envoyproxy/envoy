@@ -53,6 +53,6 @@ Extensions
   wasm/wasm
   watchdog/watchdog
   load_balancing_policies/load_balancing_policies
-  queue_strategy/queue_strategy
+  queue_policy/queue_policy
   cluster_specifier/cluster_specifier
   local_address_selectors/local_address_selectors

@@ -1,4 +1,4 @@
-#include "source/extensions/queue_strategy/fifo/fifo_queue_strategy.h"
+#include "source/extensions/queue_policy/fifo/fifo_queue_policy.h"
 
 #include "envoy/registry/registry.h"
 
@@ -6,14 +6,13 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace QueueStrategy {
+namespace QueuePolicy {
 namespace {
 using PendingStreamFifoQueueFactory = FifoQueueFactory<ConnectionPool::PendingStream>;
 }
 
-REGISTER_FACTORY(PendingStreamFifoQueueFactory,
-                 QueueStrategyFactory<ConnectionPool::PendingStream>);
+REGISTER_FACTORY(PendingStreamFifoQueueFactory, QueuePolicyFactory<ConnectionPool::PendingStream>);
 
-} // namespace QueueStrategy
+} // namespace QueuePolicy
 } // namespace Extensions
 } // namespace Envoy

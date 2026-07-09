@@ -1304,9 +1304,9 @@ message Cluster {
   // connection pool for every downstream connection
   bool connection_pool_per_downstream_connection = 51;
 
-  // Queueing config for cluster pending requests. If unset, Envoy uses the FIFO queue strategy.
-  // [#extension-category: envoy.queue_strategy]
-  core.v3.TypedExtensionConfig queue_strategy_config = 61;
+  // Queueing config for cluster pending requests. If unset, Envoy uses the FIFO queue policy.
+  // [#extension-category: envoy.queue_policy]
+  core.v3.TypedExtensionConfig queue_policy_config = 61;
 }
 
 // Extensible load balancing policy configuration.

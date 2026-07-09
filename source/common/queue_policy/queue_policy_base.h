@@ -16,7 +16,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace QueueStrategy {
+namespace QueuePolicy {
 
 // Base class that handles queuing for objects.
 template <class ItemType> class QueueBase {
@@ -101,30 +101,30 @@ protected:
   std::list<ItemPtrType> items_;
 };
 
-template <class ItemType> using QueueStrategyUniquePtr = std::unique_ptr<QueueBase<ItemType>>;
+template <class ItemType> using QueuePolicyUniquePtr = std::unique_ptr<QueueBase<ItemType>>;
 
 /**
- * Implemented by each queue strategy and registered via Registry::registerFactory() or the
+ * Implemented by each queue policy and registered via Registry::registerFactory() or the
  * convenience class RegisterFactory.
  */
-template <class ItemType> class QueueStrategyFactory : public Config::TypedFactory {
+template <class ItemType> class QueuePolicyFactory : public Config::TypedFactory {
 public:
-  ~QueueStrategyFactory() override = default;
+  ~QueuePolicyFactory() override = default;
 
   /**
-   * Create a particular queue strategy implementation.
-   * @param config supplies the configuration for the queue strategy.
+   * Create a particular queue policy implementation.
+   * @param config supplies the configuration for the queue policy.
    * @param stat_prefix prefix for stat logging
-   * @param context supplies the context for queue strategy.
+   * @param context supplies the context for queue policy.
    * @return FilterFactoryCb the factory creation function.
    */
-  virtual absl::StatusOr<QueueStrategyUniquePtr<ItemType>>
-  createQueueStrategy(const Protobuf::Message& config, const std::string& stat_prefix,
-                      ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+  virtual absl::StatusOr<QueuePolicyUniquePtr<ItemType>>
+  createQueuePolicy(const Protobuf::Message& config, const std::string& stat_prefix,
+                    ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
-  std::string category() const override { return "envoy.queue_strategy"; }
+  std::string category() const override { return "envoy.queue_policy"; }
 };
 
-} // namespace QueueStrategy
+} // namespace QueuePolicy
 } // namespace Extensions
 } // namespace Envoy

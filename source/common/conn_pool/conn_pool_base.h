@@ -11,7 +11,7 @@
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/conn_pool/pending_stream.h"
-#include "source/common/queue_strategy/queue_strategy_base.h"
+#include "source/common/queue_policy/queue_policy_base.h"
 
 #include "absl/strings/string_view.h"
 #include "fmt/ostream.h"
@@ -19,8 +19,7 @@
 namespace Envoy {
 namespace ConnectionPool {
 
-using PendingStreamQueuePtr =
-    Envoy::Extensions::QueueStrategy::QueueStrategyUniquePtr<PendingStream>;
+using PendingStreamQueuePtr = Envoy::Extensions::QueuePolicy::QueuePolicyUniquePtr<PendingStream>;
 
 class ConnPoolImplBase;
 

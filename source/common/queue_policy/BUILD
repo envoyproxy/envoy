@@ -9,10 +9,10 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "queue_strategy_base_lib",
+    name = "queue_policy_base_lib",
     hdrs = [
-        "fifo_queue_strategy.h",
-        "queue_strategy_base.h",
+        "fifo_queue_policy.h",
+        "queue_policy_base.h",
     ],
     deps = [
         "//envoy/common:conn_pool_interface",

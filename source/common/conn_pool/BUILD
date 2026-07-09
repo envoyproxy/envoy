@@ -24,7 +24,7 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:message_validator_lib",
-        "//source/common/queue_strategy:queue_strategy_base_lib",
+        "//source/common/queue_policy:queue_policy_base_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/upstream:upstream_lib",
     ],

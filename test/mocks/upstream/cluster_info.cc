@@ -148,11 +148,11 @@ MockClusterInfo::MockClusterInfo()
         }
         return *typed_metadata_;
       }));
-  ON_CALL(*this, queueStrategyConfig())
+  ON_CALL(*this, queuePolicyConfig())
       .WillByDefault(
           Invoke([this]() -> OptRef<const envoy::config::core::v3::TypedExtensionConfig> {
             return makeOptRefFromPtr<const envoy::config::core::v3::TypedExtensionConfig>(
-                queue_strategy_config_.get());
+                queue_policy_config_.get());
           }));
   ON_CALL(*this, clusterType())
       .WillByDefault(

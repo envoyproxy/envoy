@@ -3,11 +3,11 @@
 #include <memory>
 #include <utility>
 
-#include "source/common/queue_strategy/queue_strategy_base.h"
+#include "source/common/queue_policy/queue_policy_base.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace QueueStrategy {
+namespace QueuePolicy {
 
 template <class ItemType> class FifoQueue : public QueueBase<ItemType> {
   using ItemPtrType = std::unique_ptr<ItemType>;
@@ -39,6 +39,6 @@ public:
   }
 };
 
-} // namespace QueueStrategy
+} // namespace QueuePolicy
 } // namespace Extensions
 } // namespace Envoy

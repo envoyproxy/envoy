@@ -427,7 +427,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "//source/common/queue_strategy:queue_strategy_base_lib",
+        "//source/common/queue_policy:queue_policy_base_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:stats_matcher_lib",
         "//source/server:transport_socket_config_lib",

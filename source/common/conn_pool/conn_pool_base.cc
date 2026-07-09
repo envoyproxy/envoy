@@ -7,7 +7,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
-#include "source/common/queue_strategy/fifo_queue_strategy.h"
+#include "source/common/queue_policy/fifo_queue_policy.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -24,22 +24,22 @@ int64_t currentUnusedCapacity(const std::list<ActiveClientPtr>& connecting_clien
 }
 
 PendingStreamQueuePtr createPendingStreamQueue(
-    const OptRef<const envoy::config::core::v3::TypedExtensionConfig> queue_strategy_config) {
-  if (!queue_strategy_config.has_value()) {
-    return std::make_unique<Extensions::QueueStrategy::FifoQueue<PendingStream>>();
+    const OptRef<const envoy::config::core::v3::TypedExtensionConfig> queue_policy_config) {
+  if (!queue_policy_config.has_value()) {
+    return std::make_unique<Extensions::QueuePolicy::FifoQueue<PendingStream>>();
   }
 
-  using PendingStreamQueueFactory = Extensions::QueueStrategy::QueueStrategyFactory<PendingStream>;
+  using PendingStreamQueueFactory = Extensions::QueuePolicy::QueuePolicyFactory<PendingStream>;
   ProtobufMessage::ValidationVisitor& validation_visitor =
       ProtobufMessage::getStrictValidationVisitor();
   PendingStreamQueueFactory& factory =
       Config::Utility::getAndCheckFactory<PendingStreamQueueFactory>(
-          queue_strategy_config.value().get());
+          queue_policy_config.value().get());
   ProtobufTypes::MessagePtr factory_config = Config::Utility::translateToFactoryConfig(
-      queue_strategy_config.value().get(), validation_visitor, factory);
+      queue_policy_config.value().get(), validation_visitor, factory);
 
   auto queue =
-      factory.createQueueStrategy(*factory_config, "cluster." + factory.name(), validation_visitor);
+      factory.createQueuePolicy(*factory_config, "cluster." + factory.name(), validation_visitor);
   RELEASE_ASSERT(queue.ok(), queue.status().ToString());
   return std::move(*queue);
 }
@@ -81,7 +81,7 @@ ConnPoolImplBase::ConnPoolImplBase(
     Upstream::ClusterConnectivityState& state, Server::OverloadManager& overload_manager)
     : host_(host), priority_(priority), dispatcher_(dispatcher), socket_options_(options),
       transport_socket_options_(transport_socket_options), cluster_connectivity_state_(state),
-      pending_streams_(createPendingStreamQueue(host_->cluster().queueStrategyConfig())),
+      pending_streams_(createPendingStreamQueue(host_->cluster().queuePolicyConfig())),
       upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })),
       create_new_connection_load_shed_(overload_manager.getLoadShedPoint(
           Server::LoadShedPointName::get().ConnectionPoolNewConnection)),
@@ -762,7 +762,7 @@ void ConnPoolImplBase::purgePendingStreams(
   cluster_connectivity_state_.decrPendingStreams(pending_streams_->size());
   clearQueueOverloadedGauge();
   pending_streams_to_purge_ = pending_streams_->takeItems();
-  pending_streams_ = createPendingStreamQueue(host_->cluster().queueStrategyConfig());
+  pending_streams_ = createPendingStreamQueue(host_->cluster().queuePolicyConfig());
   while (!pending_streams_to_purge_.empty()) {
     PendingStreamPtr stream =
         pending_streams_to_purge_.front()->removeFromList(pending_streams_to_purge_);

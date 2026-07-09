@@ -1,11 +1,11 @@
 #include "source/common/protobuf/message_validator_impl.h"
-#include "source/extensions/queue_strategy/fifo/fifo_queue_strategy.h"
+#include "source/extensions/queue_policy/fifo/fifo_queue_policy.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace QueueStrategy {
+namespace QueuePolicy {
 
 namespace {
 class FifoQueueItemType : public ConnectionPool::Cancellable,
@@ -22,8 +22,7 @@ private:
 };
 } // namespace
 
-using FifoQueueStrategyConfig =
-    envoy::extensions::queue_strategy::fifo::v3::FifoQueueStrategyConfig;
+using FifoQueuePolicyConfig = envoy::extensions::queue_policy::fifo::v3::FifoQueuePolicyConfig;
 
 TEST(FifoQueueTest, TestQueueFunctions) {
   FifoQueue<FifoQueueItemType> queue;
@@ -51,14 +50,14 @@ TEST_F(FifoQueueFactoryTest, CanConstructFactory) {
   EXPECT_NO_THROW(FifoQueueFactory<FifoQueueItemType> f);
 }
 
-TEST_F(FifoQueueFactoryTest, CreateQueueStrategyReturnsValidPtr) {
-  FifoQueueStrategyConfig config;
-  auto result = factory_.createQueueStrategy(config, "test_prefix",
-                                             ProtobufMessage::getStrictValidationVisitor());
+TEST_F(FifoQueueFactoryTest, CreateQueuePolicyReturnsValidPtr) {
+  FifoQueuePolicyConfig config;
+  auto result = factory_.createQueuePolicy(config, "test_prefix",
+                                           ProtobufMessage::getStrictValidationVisitor());
   EXPECT_TRUE(result.ok());
   EXPECT_NE(result.value(), nullptr);
 }
 
-} // namespace QueueStrategy
+} // namespace QueuePolicy
 } // namespace Extensions
 } // namespace Envoy

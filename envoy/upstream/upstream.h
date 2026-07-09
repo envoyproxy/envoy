@@ -1276,11 +1276,11 @@ public:
 
   /**
    * @return OptRef<const envoy::config::core::v3::TypedExtensionConfig>
-   * an optional value of the configuration for the pending requests queue strategy for this
+   * an optional value of the configuration for the pending requests queue policy for this
    * cluster.
    */
   virtual OptRef<const envoy::config::core::v3::TypedExtensionConfig>
-  queueStrategyConfig() const PURE;
+  queuePolicyConfig() const PURE;
 
   /**
    * @return whether to skip waiting for health checking before draining connections
