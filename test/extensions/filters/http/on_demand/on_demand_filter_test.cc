@@ -13,6 +13,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -108,6 +109,21 @@ TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteIsNotAvailable) {
   EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(OptRef<const Router::Route>{}));
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+}
+
+// tests onRouteConfigUpdateCompletion() invoked synchronously while decodeHeaders() is still
+// active: the callback must not continue decoding (decode_headers_active_ == true).
+TEST_F(OnDemandFilterTest, TestDecodeHeadersRouteConfigUpdateCompletesSynchronously) {
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(OptRef<const Router::Route>{}));
+  // Invoke the route config update callback synchronously, before requestRouteConfigUpdate()
+  // returns, i.e. while decode_headers_active_ is still true.
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_))
+      .WillOnce(Invoke(
+          [](Http::RouteConfigUpdatedCallbackSharedPtr callback) -> void { (*callback)(true); }));
+  // continueDecoding() must not be called from within decodeHeaders().
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  filter_->decodeHeaders(headers, true);
 }
 
 TEST_F(OnDemandFilterTest, TestDecodeTrailers) {
@@ -223,6 +239,34 @@ TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStream) {
   filter_->decodeHeaders(headers, true);
   EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
   filter_->onRouteConfigUpdateCompletion(true);
+}
+
+// Tests onRouteConfigUpdateCompletion() with the on_demand_track_end_stream flag disabled
+// (old behavior: stream recreation is gated on the absence of a decoding buffer).
+TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStreamOldBehavior) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.on_demand_track_end_stream", "false"}});
+  Http::TestRequestHeaderMapImpl headers;
+  filter_->decodeHeaders(headers, true);
+  // No decoding buffer, so the stream can be recreated.
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
+  filter_->onRouteConfigUpdateCompletion(true);
+}
+
+// Tests onClusterDiscoveryCompletion() with the on_demand_track_end_stream flag disabled
+// (old behavior: stream recreation is gated on the absence of a decoding buffer).
+TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundOldBehavior) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "false"},
+       {"envoy.reloadable_features.on_demand_track_end_stream", "false"}});
+  Http::TestRequestHeaderMapImpl headers;
+  filter_->decodeHeaders(headers, true);
+  // No decoding buffer, so the stream can be recreated.
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
+  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
 }
 
 // tests onClusterDiscoveryCompletion when a cluster is missing
@@ -344,6 +388,12 @@ TEST(OnDemandConfigTest, Basic) {
   OnDemandFilterConfig config3(config, cm, visitor, status3);
   EXPECT_THAT(status3, HasStatus(absl::StatusCode::kInvalidArgument,
                                  "foo does not have a xdstp:, http: or file: scheme"));
+
+  // A valid xdstp resources_locator is decoded and an OdCds API is allocated with it.
+  config.mutable_odcds()->set_resources_locator("xdstp://foo/envoy.config.cluster.v3.Cluster/bar");
+  absl::Status status4 = absl::OkStatus();
+  OnDemandFilterConfig config4(config, cm, visitor, status4);
+  EXPECT_TRUE(status4.ok());
 }
 
 } // namespace OnDemand

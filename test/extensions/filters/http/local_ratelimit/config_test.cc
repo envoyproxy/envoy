@@ -106,11 +106,10 @@ stat_prefix: test
   TestUtility::loadFromYaml(config_yaml, *proto_config);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_FALSE(factory
-                   .createRouteSpecificFilterConfig(*proto_config, context,
-                                                    ProtobufMessage::getNullValidationVisitor())
-                   .status()
-                   .ok());
+  EXPECT_THAT(factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                      ProtobufMessage::getNullValidationVisitor()),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "local rate limit token bucket must be set for per filter configs"));
 }
 
 TEST(Factory, FillTimerTooLow) {
