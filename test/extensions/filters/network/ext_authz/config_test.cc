@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_authz is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.validate.h"
