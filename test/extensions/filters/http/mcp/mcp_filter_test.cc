@@ -17,7 +17,13 @@ namespace {
 using McpFilterStateObject = Filters::Common::Mcp::FilterStateObject;
 
 using testing::_;
+using testing::AllOf;
+using testing::Contains;
+using testing::Key;
 using testing::NiceMock;
+using testing::Not;
+using testing::Pair;
+using testing::Property;
 using testing::Return;
 
 class McpFilterTest : public testing::Test {
@@ -139,10 +145,47 @@ TEST_F(McpFilterTest, RejectNoMcpMode) {
 
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"accept", "text/html"}};
 
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::BadRequest, "Only MCP traffic is allowed", _, _, _));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Http::Code::BadRequest, "Only MCP traffic is allowed", _, _, "REJECT_NO_MCP"));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            AllOf(
+                Contains(Pair("status", Property(&Protobuf::Value::string_value, "REJECT_NO_MCP"))),
+                Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, false)))));
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+// Test REJECT_NO_MCP mode - reject non-MCP traffic and populate FilterState
+TEST_F(McpFilterTest, RejectNoMcpModePopulatesFilterState) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.set_request_storage_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"accept", "text/html"}};
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Http::Code::BadRequest, "Only MCP traffic is allowed", _, _, "REJECT_NO_MCP"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  const auto* filter_state_obj =
+      decoder_callbacks_.stream_info_.filterState()->getDataReadOnly<McpFilterStateObject>(
+          std::string(McpFilterStateObject::FilterStateKey));
+  ASSERT_NE(filter_state_obj, nullptr);
+  EXPECT_FALSE(filter_state_obj->isMcpRequest());
+  EXPECT_FALSE(filter_state_obj->isExceedingLimit());
+  EXPECT_EQ(filter_state_obj->status(), Filters::Common::Mcp::Status::NoMcp);
+  EXPECT_EQ(filter_state_obj->method(), std::nullopt);
 }
 
 // Test REJECT_NO_MCP mode - allow valid SSE
@@ -170,7 +213,15 @@ TEST_F(McpFilterTest, RejectModeRejectsNonJsonRpc) {
 
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
-                             "request must be a valid JSON-RPC 2.0 message for MCP", _, _, _));
+                             "request must be a valid JSON-RPC 2.0 message for MCP", _, _,
+                             "NOT_JSONRPC"));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            AllOf(Contains(Pair("status", Property(&Protobuf::Value::string_value, "NOT_JSONRPC"))),
+                  Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, false)))));
+      });
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
@@ -207,24 +258,18 @@ TEST_F(McpFilterTest, DynamicMetadataSet) {
   Buffer::OwnedImpl buffer(json);
 
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
-      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
-        const auto& fields = metadata.fields();
-
-        auto jsonrpc_it = fields.find("jsonrpc");
-        ASSERT_NE(jsonrpc_it, fields.end());
-        EXPECT_EQ(jsonrpc_it->second.string_value(), "2.0");
-
-        auto method_it = fields.find("method");
-        ASSERT_NE(method_it, fields.end());
-        EXPECT_EQ(method_it->second.string_value(), "tools/call");
-
-        auto params_it = fields.find("params");
-        ASSERT_NE(params_it, fields.end());
-        const auto& params = params_it->second.struct_value().fields();
-
-        auto name_it = params.find("name");
-        ASSERT_NE(name_it, params.end());
-        EXPECT_EQ(name_it->second.string_value(), "test");
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            AllOf(
+                Contains(Pair("jsonrpc", Property(&Protobuf::Value::string_value, "2.0"))),
+                Contains(Pair("method", Property(&Protobuf::Value::string_value, "tools/call"))),
+                Contains(Pair(
+                    "params",
+                    Property(&Protobuf::Value::struct_value,
+                             Property(&Protobuf::Struct::fields,
+                                      Contains(Pair("name", Property(&Protobuf::Value::string_value,
+                                                                     "test")))))))));
       });
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -243,12 +288,10 @@ TEST_F(McpFilterTest, DynamicMetadataContainsIsMcpRequest) {
   Buffer::OwnedImpl buffer(json);
 
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
-      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
-        const auto& fields = metadata.fields();
-
-        auto it = fields.find(std::string(Filters::Common::Mcp::McpConstants::IS_MCP_REQUEST));
-        ASSERT_NE(it, fields.end());
-        EXPECT_TRUE(it->second.bool_value());
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(metadata.fields(),
+                    Contains(Pair(std::string(Filters::Common::Mcp::McpConstants::IS_MCP_REQUEST),
+                                  Property(&Protobuf::Value::bool_value, true))));
       });
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -265,7 +308,45 @@ TEST_F(McpFilterTest, PartialNoJsonData) {
 
   Buffer::OwnedImpl buffer("partial data");
 
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest, "not a valid JSON", _, _, "NOT_JSONRPC"));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            AllOf(Contains(Pair("status", Property(&Protobuf::Value::string_value, "NOT_JSONRPC"))),
+                  Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, false)))));
+      });
+
   // Malformed JSON — always rejected even in PASS_THROUGH mode.
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+}
+
+// Test that incomplete JSON (which is valid so far but incomplete at end_stream)
+// triggers a parse error.
+TEST_F(McpFilterTest, IncompleteJsonParseError) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  // Send incomplete JSON body
+  Buffer::OwnedImpl buffer("{\"jsonrpc\": \"2.0\"");
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "reached end_stream or configured body size, don't get enough data.",
+                             _, _, "PARSE_ERROR"));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            AllOf(Contains(Pair("status", Property(&Protobuf::Value::string_value, "PARSE_ERROR"))),
+                  Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, false)))));
+      });
+
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
 
@@ -402,11 +483,13 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitContinues) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
-// Test request body exceeding limit when there is not enough data.
+// Test request body exceeding limit when there is not enough data
 TEST_F(McpFilterTest, RequestBodyExceedingLimitRejectWhenNotEnoughData) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.mutable_max_request_body_size()->set_value(20); // Very small limit
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.set_request_storage_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE);
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -426,9 +509,58 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitRejectWhenNotEnoughData) {
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
                              "reached end_stream or configured body size, don't get enough data.",
-                             _, _, _));
+                             _, _, "BODY_TOO_LARGE"));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            AllOf(Contains(
+                      Pair("status", Property(&Protobuf::Value::string_value, "BODY_TOO_LARGE"))),
+                  Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, false))),
+                  Contains(
+                      Pair("is_exceeding_limit", Property(&Protobuf::Value::bool_value, true)))));
+      });
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+
+  // Verify FilterState
+  const auto* filter_state_obj =
+      decoder_callbacks_.stream_info_.filterState()->getDataReadOnly<McpFilterStateObject>(
+          std::string(McpFilterStateObject::FilterStateKey));
+  ASSERT_NE(filter_state_obj, nullptr);
+  EXPECT_FALSE(filter_state_obj->isMcpRequest());
+  EXPECT_TRUE(filter_state_obj->isExceedingLimit());
+  EXPECT_EQ(filter_state_obj->status(), Filters::Common::Mcp::Status::BodyTooLarge);
+}
+
+// Test that REJECT_NO_MCP mode populates FilterState even for non-MCP requests
+TEST_F(McpFilterTest, RejectModeNonJsonRpcPopulatesFilterState) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.set_request_storage_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({"foo": "bar"})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+
+  const auto* filter_state_obj =
+      decoder_callbacks_.stream_info_.filterState()->getDataReadOnly<McpFilterStateObject>(
+          std::string(McpFilterStateObject::FilterStateKey));
+  ASSERT_NE(filter_state_obj, nullptr);
+  EXPECT_FALSE(filter_state_obj->isMcpRequest());
+  EXPECT_EQ(filter_state_obj->status(), Filters::Common::Mcp::Status::NotJsonRpc);
 }
 
 // Test that truncated JSON with end_stream is rejected even in PASS_THROUGH mode.
@@ -533,24 +665,24 @@ TEST_F(McpFilterTest, BodyLimitPassThroughWithoutMetadata) {
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 
-  // Verify that dynamic metadata still contains is_exceeding_limit and is_mcp_request
-  const auto& fields = captured_metadata.fields();
+  // Verify that dynamic metadata still contains is_exceeding_limit, is_mcp_request, and status
+  EXPECT_THAT(
+      captured_metadata.fields(),
+      AllOf(Contains(Pair(std::string(IS_EXCEEDING_LIMIT),
+                          Property(&Protobuf::Value::bool_value, true))),
+            Contains(
+                Pair(std::string(IS_MCP_REQUEST), Property(&Protobuf::Value::bool_value, false))),
+            Contains(Pair(std::string(STATUS), Property(&Protobuf::Value::string_value, "OK")))));
 
-  auto limit_it = fields.find(std::string(IS_EXCEEDING_LIMIT));
-  ASSERT_NE(limit_it, fields.end());
-  EXPECT_TRUE(limit_it->second.bool_value());
-
-  auto mcp_it = fields.find(std::string(IS_MCP_REQUEST));
-  ASSERT_NE(mcp_it, fields.end());
-  EXPECT_FALSE(mcp_it->second.bool_value());
-
-  // Verify that FilterStateObject still exists and is populated with the exceeding limit state
+  // Verify that FilterStateObject still exists and is populated with the exceeding limit state and
+  // status
   const auto* filter_state_obj =
       decoder_callbacks_.stream_info_.filterState()->getDataReadOnly<McpFilterStateObject>(
           std::string(McpFilterStateObject::FilterStateKey));
   ASSERT_NE(filter_state_obj, nullptr);
   EXPECT_FALSE(filter_state_obj->isMcpRequest());
   EXPECT_TRUE(filter_state_obj->isExceedingLimit());
+  EXPECT_EQ(filter_state_obj->status(), Filters::Common::Mcp::Status::Ok);
 }
 
 // Test that if reject_duplicate_keys is explicitly set to true in the config,
@@ -576,7 +708,16 @@ TEST_F(McpFilterTest, DuplicateKeyRejectionEnabledConfig) {
 
   // Expect request to be rejected with BadRequest due to duplicate keys
   EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::BadRequest, "duplicate JSON keys detected", _, _, _));
+              sendLocalReply(Http::Code::BadRequest, "duplicate JSON keys detected", _, _,
+                             "DUPLICATE_KEYS"));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            AllOf(Contains(
+                      Pair("status", Property(&Protobuf::Value::string_value, "DUPLICATE_KEYS"))),
+                  Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, false)))));
+      });
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
   EXPECT_EQ(1u, config_->stats().duplicate_keys_rejected_.value());
@@ -692,18 +833,17 @@ TEST_F(McpFilterTest, PartialParsingSucceedsWithOptionalFieldConfig) {
 
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
-      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
-        const auto& fields = metadata.fields();
-        auto params_it = fields.find("params");
-        ASSERT_NE(params_it, fields.end());
-        const auto& params = params_it->second.struct_value().fields();
-
-        auto name_it = params.find("name");
-        ASSERT_NE(name_it, params.end());
-        EXPECT_EQ(name_it->second.string_value(), "tool");
-
-        // _meta is not present in the JSON, so it should not be in the metadata
-        EXPECT_EQ(params.find("_meta"), params.end());
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            Contains(Pair(
+                "params",
+                Property(
+                    &Protobuf::Value::struct_value,
+                    Property(&Protobuf::Struct::fields,
+                             AllOf(Contains(Pair("name",
+                                                 Property(&Protobuf::Value::string_value, "tool"))),
+                                   Not(Contains(Key("_meta")))))))));
       });
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -744,25 +884,25 @@ TEST_F(McpFilterTest, OptionalMetaFieldExtractedWithPartialParsing) {
 
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
-      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
-        const auto& fields = metadata.fields();
-        auto params_it = fields.find("params");
-        ASSERT_NE(params_it, fields.end());
-        const auto& params = params_it->second.struct_value().fields();
-
-        // Required field should be extracted
-        auto name_it = params.find("name");
-        ASSERT_NE(name_it, params.end());
-        EXPECT_EQ(name_it->second.string_value(), "mytool");
-
-        // _meta should be extracted since it appears before the size limit
-        auto meta_it = params.find("_meta");
-        ASSERT_NE(meta_it, params.end());
-        ASSERT_TRUE(meta_it->second.has_struct_value());
-        const auto& meta_fields = meta_it->second.struct_value().fields();
-        auto trace_it = meta_fields.find("trace_id");
-        ASSERT_NE(trace_it, meta_fields.end());
-        EXPECT_EQ(trace_it->second.string_value(), "abc123");
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            Contains(Pair(
+                "params",
+                Property(
+                    &Protobuf::Value::struct_value,
+                    Property(
+                        &Protobuf::Struct::fields,
+                        AllOf(Contains(
+                                  Pair("name", Property(&Protobuf::Value::string_value, "mytool"))),
+                              Contains(Pair(
+                                  "_meta",
+                                  Property(&Protobuf::Value::struct_value,
+                                           Property(&Protobuf::Struct::fields,
+                                                    Contains(Pair(
+                                                        "trace_id",
+                                                        Property(&Protobuf::Value::string_value,
+                                                                 "abc123")))))))))))));
       });
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -805,25 +945,25 @@ TEST_F(McpFilterTest, ChunkByChunkParsingWithOptionalFields) {
 
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
-      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
-        const auto& fields = metadata.fields();
-        auto params_it = fields.find("params");
-        ASSERT_NE(params_it, fields.end());
-        const auto& params = params_it->second.struct_value().fields();
-
-        // Required field should be extracted
-        auto name_it = params.find("name");
-        ASSERT_NE(name_it, params.end());
-        EXPECT_EQ(name_it->second.string_value(), "mytool");
-
-        // _meta should be extracted from the second chunk
-        auto meta_it = params.find("_meta");
-        ASSERT_NE(meta_it, params.end());
-        ASSERT_TRUE(meta_it->second.has_struct_value());
-        const auto& meta_fields = meta_it->second.struct_value().fields();
-        auto trace_it = meta_fields.find("trace_id");
-        ASSERT_NE(trace_it, meta_fields.end());
-        EXPECT_EQ(trace_it->second.string_value(), "abc123");
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            Contains(Pair(
+                "params",
+                Property(
+                    &Protobuf::Value::struct_value,
+                    Property(
+                        &Protobuf::Struct::fields,
+                        AllOf(Contains(
+                                  Pair("name", Property(&Protobuf::Value::string_value, "mytool"))),
+                              Contains(Pair(
+                                  "_meta",
+                                  Property(&Protobuf::Value::struct_value,
+                                           Property(&Protobuf::Struct::fields,
+                                                    Contains(Pair(
+                                                        "trace_id",
+                                                        Property(&Protobuf::Value::string_value,
+                                                                 "abc123")))))))))))));
       });
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer2, true));
@@ -959,22 +1099,13 @@ TEST_F(McpFilterTest, BodySizeLimitInPassThroughMode) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 
   // Verify dynamic metadata contents.
-  const auto& fields = captured_metadata.fields();
-
-  // is_exceeding_limit must be true — body exceeded configured max.
-  auto limit_it = fields.find(std::string(IS_EXCEEDING_LIMIT));
-  ASSERT_NE(limit_it, fields.end());
-  EXPECT_TRUE(limit_it->second.bool_value());
-
-  // is_mcp_request should be true — jsonrpc + method were within the limit.
-  auto mcp_it = fields.find(std::string(IS_MCP_REQUEST));
-  ASSERT_NE(mcp_it, fields.end());
-  EXPECT_TRUE(mcp_it->second.bool_value());
-
-  // method should be extracted (within the 80-byte limit).
-  auto method_it = fields.find("method");
-  ASSERT_NE(method_it, fields.end());
-  EXPECT_EQ(method_it->second.string_value(), "tools/call");
+  EXPECT_THAT(
+      captured_metadata.fields(),
+      AllOf(
+          Contains(
+              Pair(std::string(IS_EXCEEDING_LIMIT), Property(&Protobuf::Value::bool_value, true))),
+          Contains(Pair(std::string(IS_MCP_REQUEST), Property(&Protobuf::Value::bool_value, true))),
+          Contains(Pair("method", Property(&Protobuf::Value::string_value, "tools/call")))));
 }
 
 // Test body size check in PASS_THROUGH mode in a multi-chunk request.
@@ -1023,17 +1154,11 @@ TEST_F(McpFilterTest, BodySizeLimitInPassThroughModeMultiChunk) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer2, true));
 
   // Verify dynamic metadata contents.
-  const auto& fields = captured_metadata.fields();
-
-  // is_exceeding_limit must be true — body exceeded configured max.
-  auto limit_it = fields.find(std::string(IS_EXCEEDING_LIMIT));
-  ASSERT_NE(limit_it, fields.end());
-  EXPECT_TRUE(limit_it->second.bool_value());
-
-  // is_mcp_request should be true — jsonrpc + method were successfully parsed within the limit.
-  auto mcp_it = fields.find(std::string(IS_MCP_REQUEST));
-  ASSERT_NE(mcp_it, fields.end());
-  EXPECT_TRUE(mcp_it->second.bool_value());
+  EXPECT_THAT(captured_metadata.fields(),
+              AllOf(Contains(Pair(std::string(IS_EXCEEDING_LIMIT),
+                                  Property(&Protobuf::Value::bool_value, true))),
+                    Contains(Pair(std::string(IS_MCP_REQUEST),
+                                  Property(&Protobuf::Value::bool_value, true)))));
 }
 
 // Test route cache is NOT cleared by default when metadata is set
@@ -1151,19 +1276,17 @@ TEST_F(McpFilterTest, FilterWithCustomParserConfig) {
 
   // Expect dynamic metadata to be set with the custom field
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
-      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
-        const auto& fields = metadata.fields();
-        auto it = fields.find("params");
-        ASSERT_NE(it, fields.end());
-        const auto& params = it->second.struct_value().fields();
-
-        // Custom field should be extracted
-        auto custom_it = params.find("custom_field");
-        ASSERT_NE(custom_it, params.end());
-        EXPECT_EQ(custom_it->second.string_value(), "extracted_value");
-
-        // Other field should not be extracted
-        EXPECT_EQ(params.find("other_field"), params.end());
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            Contains(
+                Pair("params",
+                     Property(&Protobuf::Value::struct_value,
+                              Property(&Protobuf::Struct::fields,
+                                       AllOf(Contains(Pair("custom_field",
+                                                           Property(&Protobuf::Value::string_value,
+                                                                    "extracted_value"))),
+                                             Not(Contains(Key("other_field")))))))));
       });
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -1365,18 +1488,12 @@ TEST_F(McpFilterTest, MethodGroupAddedToMetadata) {
   Buffer::OwnedImpl buffer(json);
 
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
-      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
-        const auto& fields = metadata.fields();
-
-        // Check method_group is set to "tool" (built-in group for tools/call)
-        auto group_it = fields.find("method_group");
-        ASSERT_NE(group_it, fields.end());
-        EXPECT_EQ(group_it->second.string_value(), "tool");
-
-        // Check method is also set
-        auto method_it = fields.find("method");
-        ASSERT_NE(method_it, fields.end());
-        EXPECT_EQ(method_it->second.string_value(), "tools/call");
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            AllOf(
+                Contains(Pair("method_group", Property(&Protobuf::Value::string_value, "tool"))),
+                Contains(Pair("method", Property(&Protobuf::Value::string_value, "tools/call")))));
       });
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -1407,11 +1524,10 @@ TEST_F(McpFilterTest, MethodGroupWithCustomOverride) {
   Buffer::OwnedImpl buffer(json);
 
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
-      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
-        const auto& fields = metadata.fields();
-        auto group_it = fields.find("group");
-        ASSERT_NE(group_it, fields.end());
-        EXPECT_EQ(group_it->second.string_value(), "custom_tools");
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            Contains(Pair("group", Property(&Protobuf::Value::string_value, "custom_tools"))));
       });
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -1433,6 +1549,7 @@ TEST(McpFilterStateObjectTest, Construction) {
   EXPECT_TRUE(obj->json()->hasObject("jsonrpc"));
   EXPECT_TRUE(obj->json()->hasObject("id"));
   EXPECT_TRUE(obj->json()->hasObject("params"));
+  EXPECT_EQ(obj->status(), Filters::Common::Mcp::Status::Ok);
 }
 
 TEST(McpFilterStateObjectTest, MethodOnly) {

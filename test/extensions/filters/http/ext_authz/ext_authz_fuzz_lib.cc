@@ -55,13 +55,13 @@ absl::StatusOr<std::unique_ptr<Filter>> ReusableFuzzerUtil::setup(
   const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config = input.config();
   FilterConfigSharedPtr config;
 
-  try {
-    config = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(),
-                                            "ext_authz_prefix", factory_context_);
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException during filter config validation: {}", e.what());
+  absl::Status creation_status = absl::OkStatus();
+  config = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(),
+                                          "ext_authz_prefix", factory_context_, creation_status);
+  if (!creation_status.ok()) {
+    ENVOY_LOG_MISC(debug, "Invalid filter config: {}", creation_status.message());
     return absl::InvalidArgumentError(
-        absl::StrCat("EnvoyException during filter config validation: {}", e.what()));
+        absl::StrCat("Invalid filter config: ", creation_status.message()));
   }
 
   return filter_factory_.newFilter(std::move(config), std::move(client), input.filter_metadata());

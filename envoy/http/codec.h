@@ -696,6 +696,39 @@ public:
 };
 
 /**
+ * Callbacks for upstream request watermark limits, as observed on the request (decode) path.
+ *
+ * These are the mirror image of DownstreamWatermarkCallbacks: where the downstream callbacks fire
+ * when the downstream connection/stream backs up (a slow client reading the response), these fire
+ * when the upstream backs up while accepting the request body. The connection manager already
+ * receives this signal via
+ * StreamDecoderFilterCallbacks::onDecoderFilterAboveWriteBufferHighWatermark (raised by the
+ * router's UpstreamRequest) and read-disables the downstream codec to slow the original source;
+ * subscribing here additionally lets a filter that produces request data on its own (e.g. by
+ * replaying a buffered body via injectDecodedDataToFilterChain) pause and resume in step with the
+ * upstream.
+ */
+class UpstreamWatermarkCallbacks {
+public:
+  virtual ~UpstreamWatermarkCallbacks() = default;
+
+  /**
+   * Called when the upstream request path goes over its high watermark. As with
+   * DownstreamWatermarkCallbacks, this may be called more than once (e.g. for the stream and the
+   * connection independently), and the implementation is responsible for unwinding multiple high
+   * and low watermark calls.
+   */
+  virtual void onAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when the upstream request path goes from over its high watermark to under its low
+   * watermark. The implementation must not resume the flow of data until a matching number of low
+   * watermark callbacks have been received for the outstanding high watermark callbacks.
+   */
+  virtual void onBelowWriteBufferLowWatermark() PURE;
+};
+
+/**
  * Callbacks for server connections.
  */
 class ServerConnectionCallbacks : public virtual ConnectionCallbacks {

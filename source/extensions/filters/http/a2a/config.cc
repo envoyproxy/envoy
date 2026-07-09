@@ -9,7 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace A2a {
 
-Http::FilterFactoryCb A2aFilterConfigFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> A2aFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::a2a::v3::A2a& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 

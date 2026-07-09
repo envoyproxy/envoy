@@ -128,6 +128,7 @@ proto_library(
         "//envoy/extensions/filters/http/a2a/v3:pkg",
         "//envoy/extensions/filters/http/adaptive_concurrency/v3:pkg",
         "//envoy/extensions/filters/http/admission_control/v3:pkg",
+        "//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg",
         "//envoy/extensions/filters/http/alternate_protocols_cache/v3:pkg",
         "//envoy/extensions/filters/http/api_key_auth/v3:pkg",
         "//envoy/extensions/filters/http/aws_lambda/v3:pkg",
