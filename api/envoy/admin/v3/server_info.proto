@@ -197,6 +197,9 @@ message CommandLineOptions {
   // See :option:`--enable-fine-grain-logging` for details.
   bool enable_fine_grain_logging = 34;
 
+  // See :option:`--log-stacktrace-single-entry` for details.
+  bool log_stacktrace_single_entry = 43;
+
   // See :option:`--socket-path` for details.
   string socket_path = 35;
 

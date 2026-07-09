@@ -17,6 +17,19 @@ TEST(Backward, Basic) {
   BackwardsTrace::setLogToStderr(save_log_to_stderr);
 }
 
+TEST(Backward, SingleLine) {
+  const bool save_log_to_stderr = BackwardsTrace::logToStderr();
+  const bool save_single_line = BackwardsTrace::singleLine();
+  BackwardsTrace::setLogToStderr(false);
+  BackwardsTrace::setSingleLine(true);
+  BackwardsTrace tracer;
+  tracer.capture();
+  EXPECT_LOG_CONTAINS(
+      "critical", "Backtrace (use tools/stack_decode.py to get line numbers):", tracer.logTrace());
+  BackwardsTrace::setSingleLine(save_single_line);
+  BackwardsTrace::setLogToStderr(save_log_to_stderr);
+}
+
 TEST(Backward, InvalidUsageTest) {
   // Ensure we do not crash if logging is attempted when there was no trace captured
   BackwardsTrace tracer;
