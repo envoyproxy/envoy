@@ -1720,3 +1720,5 @@ datasets
 smartptr
 JA3
 JA4
+CNSA
+KEM

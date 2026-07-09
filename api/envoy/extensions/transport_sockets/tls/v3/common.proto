@@ -69,7 +69,7 @@ message TlsParameters {
     //     with SHA-384.
     //
     // Note: this setting aids with compliance with CNSA requirements but does not
-    // guarantee it. Careful reading of draft-becker-cnsa2-tls-profile is
+    // guarantee it. Careful reading of ``draft-becker-cnsa2-tls-profile`` is
     // recommended.
     //
     // .. attention::
