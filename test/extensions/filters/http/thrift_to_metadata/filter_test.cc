@@ -115,7 +115,7 @@ response_rules:
     TestUtility::loadFromYaml(yaml, config);
     absl::Status creation_status = absl::OkStatus();
     config_ = std::make_shared<FilterConfig>(config, *scope_.rootScope(), creation_status);
-    ASSERT_TRUE(creation_status.ok());
+    ASSERT_TRUE(creation_status.ok()) << creation_status.ToString();
     filter_ = std::make_shared<Filter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);

@@ -151,7 +151,7 @@ TEST(Factory, NoRule) {
                         "either request or response rules"));
 }
 
-TEST(Factory, NoTwitterProtocol) {
+TEST(Factory, DEPRECATED_FEATURE_TEST(NoTwitterProtocol)) {
   const std::string yaml = R"(
 request_rules:
 - field: PROTOCOL

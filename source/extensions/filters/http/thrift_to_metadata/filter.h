@@ -150,10 +150,14 @@ private:
                       absl::Status& creation_status) const {
     Rules rules;
     for (const auto& proto_rule : proto_rules) {
-      rules.emplace_back(proto_rule, rules.size(), trie_root, creation_status);
       if (!creation_status.ok()) {
         return rules;
       }
+      auto rule = Rule(proto_rule, rules.size(), trie_root, creation_status);
+      if (!creation_status.ok()) {
+        return rules;
+      }
+      rules.emplace_back(std::move(rule));
     }
     return rules;
   }
