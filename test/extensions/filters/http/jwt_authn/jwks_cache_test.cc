@@ -42,7 +42,9 @@ protected:
 
   void setupCache(const std::string& config_str) {
     TestUtility::loadFromYaml(config_str, config_);
-    cache_ = JwksCache::create(config_, context_, mock_fetcher_.AsStdFunction(), stats_).value();
+    auto cache_or = JwksCache::create(config_, context_, mock_fetcher_.AsStdFunction(), stats_);
+    ASSERT_TRUE(cache_or.ok()) << cache_or.status();
+    cache_ = std::move(cache_or).value();
   }
 
   JwtAuthentication config_;
