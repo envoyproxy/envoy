@@ -16,7 +16,7 @@ namespace GcpAuthn {
 
 using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
 
-Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
     const GcpAuthnFilterConfig& config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
   std::shared_ptr<TokenCache> token_cache;
@@ -26,7 +26,7 @@ Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
   // config.retry_policy has an invalid case that could not be validated by the
   // proto validation annotation. It has to be validated by the code.
   if (config.has_retry_policy()) {
-    THROW_IF_NOT_OK(Http::Utility::validateCoreRetryPolicy(config.retry_policy()));
+    RETURN_IF_NOT_OK(Http::Utility::validateCoreRetryPolicy(config.retry_policy()));
   }
 
   FilterConfigSharedPtr filter_config =
