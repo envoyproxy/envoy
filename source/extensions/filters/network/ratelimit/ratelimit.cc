@@ -9,9 +9,14 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/fmt.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/formatter/substitution_formatter.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/network/well_known_names.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -62,9 +67,12 @@ Config::applySubstitutionFormatter(StreamInfo::StreamInfo& stream_info) {
 }
 
 InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope) {
-  std::string final_prefix = fmt::format("ratelimit.{}.", name);
-  return {ALL_TCP_RATE_LIMIT_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                                   POOL_GAUGE_PREFIX(scope, final_prefix))};
+  // ratelimit.(<stat_prefix>.)*
+  Stats::TaggedStatName stat_prefix(scope.symbolTable(), "ratelimit",
+                                    {{Envoy::Config::TagNames::get().RATELIMIT_PREFIX, name}},
+                                    absl::StrCat("ratelimit.", name));
+  return {ALL_TCP_RATE_LIMIT_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix),
+                                   POOL_GAUGE_TAGGED(scope, stat_prefix))};
 }
 
 Network::FilterStatus Filter::onData(Buffer::Instance&, bool) {

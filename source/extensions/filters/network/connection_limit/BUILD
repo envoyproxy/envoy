@@ -20,9 +20,12 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/network:filter_interface",
         "//envoy/runtime:runtime_interface",
+        "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
+        "//source/common/config:well_known_names",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/common/stats:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/connection_limit/v3:pkg_cc_proto",
     ],
 )

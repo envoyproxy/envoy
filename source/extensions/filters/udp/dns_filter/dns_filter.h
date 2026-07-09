@@ -10,6 +10,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/radix_tree.h"
 #include "source/common/config/config_provider_impl.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
@@ -108,9 +109,13 @@ public:
 
 private:
   static DnsFilterStats generateStats(const std::string& stat_prefix, Stats::Scope& scope) {
-    const auto final_prefix = absl::StrCat("dns_filter.", stat_prefix);
-    return {ALL_DNS_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                                 POOL_HISTOGRAM_PREFIX(scope, final_prefix))};
+    // dns_filter.(<stat_prefix>.).**
+    Stats::TaggedStatName stat_name_prefix(
+        scope.symbolTable(), "dns_filter",
+        {{Envoy::Config::TagNames::get().DNS_FILTER_PREFIX, stat_prefix}},
+        absl::StrCat("dns_filter.", stat_prefix));
+    return {ALL_DNS_FILTER_STATS(POOL_COUNTER_TAGGED(scope, stat_name_prefix),
+                                 POOL_HISTOGRAM_TAGGED(scope, stat_name_prefix))};
   }
 
   bool loadServerConfig(

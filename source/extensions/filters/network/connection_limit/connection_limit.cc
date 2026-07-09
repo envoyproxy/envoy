@@ -2,7 +2,12 @@
 
 #include "envoy/extensions/filters/network/connection_limit/v3/connection_limit.pb.h"
 
+#include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/utility.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,9 +23,13 @@ Config::Config(
       connections_(0), delay_(PROTOBUF_GET_OPTIONAL_MS(proto_config, delay)) {}
 
 ConnectionLimitStats Config::generateStats(const std::string& prefix, Stats::Scope& scope) {
-  const std::string final_prefix = "connection_limit." + prefix;
-  return {ALL_CONNECTION_LIMIT_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                                     POOL_GAUGE_PREFIX(scope, final_prefix))};
+  // connection_limit.(<stat_prefix>.)*
+  Stats::TaggedStatName stat_prefix(
+      scope.symbolTable(), "connection_limit",
+      {{Envoy::Config::TagNames::get().CONNECTION_LIMIT_PREFIX, prefix}},
+      absl::StrCat("connection_limit.", prefix, "."));
+  return {ALL_CONNECTION_LIMIT_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix),
+                                     POOL_GAUGE_TAGGED(scope, stat_prefix))};
 }
 
 bool Config::incrementConnectionWithinLimit() {

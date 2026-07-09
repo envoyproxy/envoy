@@ -3,7 +3,11 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
 
+#include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/stats/utility.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -90,8 +94,12 @@ Config::~Config() {
 }
 
 LocalRateLimitStats Config::generateStats(const std::string& prefix, Stats::Scope& scope) {
-  const std::string final_prefix = "local_rate_limit." + prefix;
-  return {ALL_LOCAL_RATE_LIMIT_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  // local_rate_limit.(<stat_prefix>.)*
+  Stats::TaggedStatName stat_prefix(
+      scope.symbolTable(), "local_rate_limit",
+      {{Envoy::Config::TagNames::get().LOCAL_NETWORK_RATELIMIT_PREFIX, prefix}},
+      absl::StrCat("local_rate_limit.", prefix, "."));
+  return {ALL_LOCAL_RATE_LIMIT_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
 }
 
 bool Config::canCreateConnection() { return rate_limiter_->requestAllowed({}).allowed; }
