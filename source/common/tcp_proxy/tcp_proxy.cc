@@ -113,14 +113,18 @@ OnDemandConfig::OnDemandConfig(
                 envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds) {
           return THROW_OR_RETURN_VALUE(
               context.serverFactoryContext().clusterManager().allocateOdCdsApi(
-                  &Upstream::XdstpOdCdsApiImpl::create, on_demand_message.odcds_config(),
-                  OptRef<xds::core::v3::ResourceLocator>(), context.messageValidationVisitor()),
+                  Upstream::withClusterInactivityTimeout(&Upstream::XdstpOdCdsApiImpl::create,
+                                                         std::chrono::milliseconds(0)),
+                  on_demand_message.odcds_config(), OptRef<xds::core::v3::ResourceLocator>(),
+                  context.messageValidationVisitor()),
               Upstream::OdCdsApiHandlePtr);
         }
         return THROW_OR_RETURN_VALUE(
             context.serverFactoryContext().clusterManager().allocateOdCdsApi(
-                &Upstream::OdCdsApiImpl::create, on_demand_message.odcds_config(),
-                OptRef<xds::core::v3::ResourceLocator>(), context.messageValidationVisitor()),
+                Upstream::withClusterInactivityTimeout(&Upstream::OdCdsApiImpl::create,
+                                                       std::chrono::milliseconds(0)),
+                on_demand_message.odcds_config(), OptRef<xds::core::v3::ResourceLocator>(),
+                context.messageValidationVisitor()),
             Upstream::OdCdsApiHandlePtr);
       }()),
       lookup_timeout_(

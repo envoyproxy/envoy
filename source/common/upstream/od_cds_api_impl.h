@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "envoy/common/time.h"
@@ -22,6 +23,16 @@
 
 namespace Envoy {
 namespace Upstream {
+
+// Binds a trailing cluster inactivity timeout onto an ODCDS create() so the result matches
+// ClusterManager::OdCdsCreationFunction, whose signature omits the timeout.
+template <typename CreateFn>
+auto withClusterInactivityTimeout(CreateFn create_fn,
+                                  std::chrono::milliseconds cluster_inactivity_timeout) {
+  return [create_fn, cluster_inactivity_timeout](auto&&... args) {
+    return create_fn(std::forward<decltype(args)>(args)..., cluster_inactivity_timeout);
+  };
+}
 
 enum class StartStatus {
   // No initial fetch started.
