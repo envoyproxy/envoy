@@ -495,6 +495,15 @@ void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level
  */
 bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level level);
 
+/**
+ * envoy_dynamic_module_callback_get_log_level is called by the module to get the current effective
+ * log level for the dynamic modules Id. This allows the module to align its own verbosity with the
+ * level configured on the Envoy side, including changes applied at runtime via the admin API.
+ *
+ * @return the current effective log level as envoy_dynamic_module_type_log_level.
+ */
+envoy_dynamic_module_type_log_level envoy_dynamic_module_callback_get_log_level();
+
 // --------------------------------- Threading -----------------------------------
 
 /**
