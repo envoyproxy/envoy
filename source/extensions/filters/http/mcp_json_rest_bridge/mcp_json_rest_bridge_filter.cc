@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/mcp_json_rest_bridge/mcp_json_rest_bridge_filter.h"
 
+#include <array>
+
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
@@ -164,6 +166,15 @@ void setTraceContextHeaders(Http::RequestHeaderMap& request_headers,
   }
 }
 
+std::array<EndpointKey, 4> getEndpointLookupKeys(absl::string_view host, absl::string_view path) {
+  return {{
+      {std::string(host), std::string(path)},
+      {std::string(host), ""},
+      {"", std::string(path)},
+      {"", ""},
+  }};
+}
+
 } // namespace
 
 McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
@@ -203,11 +214,7 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
 absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
 McpJsonRestBridgeFilterConfig::getHttpRule(absl::string_view tool_name, absl::string_view host,
                                            absl::string_view path) const {
-  const EndpointKey keys[] = {{std::string(host), std::string(path)},
-                              {std::string(host), ""},
-                              {"", std::string(path)},
-                              {"", ""}};
-  for (const auto& key : keys) {
+  for (const auto& key : getEndpointLookupKeys(host, path)) {
     auto it = endpoint_configs_.find(key);
     if (it != endpoint_configs_.end()) {
       auto tool_it = it->second.tool_entries.find(tool_name);
@@ -223,11 +230,7 @@ McpJsonRestBridgeFilterConfig::getHttpRule(absl::string_view tool_name, absl::st
 bool McpJsonRestBridgeFilterConfig::textContentStreamingEnabled(absl::string_view tool_name,
                                                                 absl::string_view host,
                                                                 absl::string_view path) const {
-  const EndpointKey keys[] = {{std::string(host), std::string(path)},
-                              {std::string(host), ""},
-                              {"", std::string(path)},
-                              {"", ""}};
-  for (const auto& key : keys) {
+  for (const auto& key : getEndpointLookupKeys(host, path)) {
     auto it = endpoint_configs_.find(key);
     if (it != endpoint_configs_.end()) {
       auto tool_it = it->second.tool_entries.find(tool_name);
@@ -242,11 +245,7 @@ bool McpJsonRestBridgeFilterConfig::textContentStreamingEnabled(absl::string_vie
 absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
 McpJsonRestBridgeFilterConfig::getToolsListHttpRule(absl::string_view host,
                                                     absl::string_view path) const {
-  const EndpointKey keys[] = {{std::string(host), std::string(path)},
-                              {std::string(host), ""},
-                              {"", std::string(path)},
-                              {"", ""}};
-  for (const auto& key : keys) {
+  for (const auto& key : getEndpointLookupKeys(host, path)) {
     auto it = endpoint_configs_.find(key);
     if (it != endpoint_configs_.end()) {
       if (it->second.tool_list_http_rule.has_value()) {
@@ -261,12 +260,8 @@ std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::To
 McpJsonRestBridgeFilterConfig::toolListLocalTools(absl::string_view host,
                                                   absl::string_view path) const {
   std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*> tools;
-  const EndpointKey keys[] = {{std::string(host), std::string(path)},
-                              {std::string(host), ""},
-                              {"", std::string(path)},
-                              {"", ""}};
   absl::flat_hash_set<absl::string_view> added_tools;
-  for (const auto& key : keys) {
+  for (const auto& key : getEndpointLookupKeys(host, path)) {
     auto it = endpoint_configs_.find(key);
     if (it != endpoint_configs_.end() && it->second.tool_list_local) {
       for (const auto* tool : it->second.tools) {
@@ -281,11 +276,7 @@ McpJsonRestBridgeFilterConfig::toolListLocalTools(absl::string_view host,
 
 bool McpJsonRestBridgeFilterConfig::toolListLocal(absl::string_view host,
                                                   absl::string_view path) const {
-  const EndpointKey keys[] = {{std::string(host), std::string(path)},
-                              {std::string(host), ""},
-                              {"", std::string(path)},
-                              {"", ""}};
-  for (const auto& key : keys) {
+  for (const auto& key : getEndpointLookupKeys(host, path)) {
     auto it = endpoint_configs_.find(key);
     if (it != endpoint_configs_.end()) {
       if (it->second.tool_list_local) {
@@ -298,11 +289,7 @@ bool McpJsonRestBridgeFilterConfig::toolListLocal(absl::string_view host,
 
 bool McpJsonRestBridgeFilterConfig::hasEndpoint(absl::string_view host,
                                                 absl::string_view path) const {
-  const EndpointKey keys[] = {{std::string(host), std::string(path)},
-                              {std::string(host), ""},
-                              {"", std::string(path)},
-                              {"", ""}};
-  for (const auto& key : keys) {
+  for (const auto& key : getEndpointLookupKeys(host, path)) {
     if (endpoint_configs_.contains(key)) {
       return true;
     }
@@ -350,11 +337,7 @@ McpJsonRestBridgePerRouteConfig::McpJsonRestBridgePerRouteConfig(
 absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
 McpJsonRestBridgePerRouteConfig::getHttpRule(absl::string_view tool_name, absl::string_view host,
                                              absl::string_view path) const {
-  const EndpointKey keys[] = {{std::string(host), std::string(path)},
-                              {std::string(host), ""},
-                              {"", std::string(path)},
-                              {"", ""}};
-  for (const auto& key : keys) {
+  for (const auto& key : getEndpointLookupKeys(host, path)) {
     auto it = endpoint_configs_.find(key);
     if (it != endpoint_configs_.end()) {
       auto tool_it = it->second.tool_entries.find(tool_name);
@@ -370,11 +353,7 @@ McpJsonRestBridgePerRouteConfig::getHttpRule(absl::string_view tool_name, absl::
 bool McpJsonRestBridgePerRouteConfig::textContentStreamingEnabled(absl::string_view tool_name,
                                                                   absl::string_view host,
                                                                   absl::string_view path) const {
-  const EndpointKey keys[] = {{std::string(host), std::string(path)},
-                              {std::string(host), ""},
-                              {"", std::string(path)},
-                              {"", ""}};
-  for (const auto& key : keys) {
+  for (const auto& key : getEndpointLookupKeys(host, path)) {
     auto it = endpoint_configs_.find(key);
     if (it != endpoint_configs_.end()) {
       auto tool_it = it->second.tool_entries.find(tool_name);
@@ -389,11 +368,7 @@ bool McpJsonRestBridgePerRouteConfig::textContentStreamingEnabled(absl::string_v
 absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
 McpJsonRestBridgePerRouteConfig::getToolsListHttpRule(absl::string_view host,
                                                       absl::string_view path) const {
-  const EndpointKey keys[] = {{std::string(host), std::string(path)},
-                              {std::string(host), ""},
-                              {"", std::string(path)},
-                              {"", ""}};
-  for (const auto& key : keys) {
+  for (const auto& key : getEndpointLookupKeys(host, path)) {
     auto it = endpoint_configs_.find(key);
     if (it != endpoint_configs_.end()) {
       if (it->second.tool_list_http_rule.has_value()) {
@@ -408,12 +383,8 @@ std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::To
 McpJsonRestBridgePerRouteConfig::toolListLocalTools(absl::string_view host,
                                                     absl::string_view path) const {
   std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*> tools;
-  const EndpointKey keys[] = {{std::string(host), std::string(path)},
-                              {std::string(host), ""},
-                              {"", std::string(path)},
-                              {"", ""}};
   absl::flat_hash_set<absl::string_view> added_tools;
-  for (const auto& key : keys) {
+  for (const auto& key : getEndpointLookupKeys(host, path)) {
     auto it = endpoint_configs_.find(key);
     if (it != endpoint_configs_.end() && it->second.tool_list_local) {
       for (const auto* tool : it->second.tools) {
@@ -428,11 +399,7 @@ McpJsonRestBridgePerRouteConfig::toolListLocalTools(absl::string_view host,
 
 bool McpJsonRestBridgePerRouteConfig::toolListLocal(absl::string_view host,
                                                     absl::string_view path) const {
-  const EndpointKey keys[] = {{std::string(host), std::string(path)},
-                              {std::string(host), ""},
-                              {"", std::string(path)},
-                              {"", ""}};
-  for (const auto& key : keys) {
+  for (const auto& key : getEndpointLookupKeys(host, path)) {
     auto it = endpoint_configs_.find(key);
     if (it != endpoint_configs_.end()) {
       if (it->second.tool_list_local) {
@@ -445,11 +412,7 @@ bool McpJsonRestBridgePerRouteConfig::toolListLocal(absl::string_view host,
 
 bool McpJsonRestBridgePerRouteConfig::hasEndpoint(absl::string_view host,
                                                   absl::string_view path) const {
-  const EndpointKey keys[] = {{std::string(host), std::string(path)},
-                              {std::string(host), ""},
-                              {"", std::string(path)},
-                              {"", ""}};
-  for (const auto& key : keys) {
+  for (const auto& key : getEndpointLookupKeys(host, path)) {
     if (endpoint_configs_.contains(key)) {
       return true;
     }
@@ -465,8 +428,8 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
     path = path.substr(0, query_idx);
   }
 
-  std::string server_name = std::string(request_headers.getHostValue());
-  // TODO(guoyilin42): Strip port number from server_name.
+  std::string server_name =
+      std::string(Http::Utility::parseAuthority(request_headers.getHostValue()).host_);
 
   const auto* per_route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(

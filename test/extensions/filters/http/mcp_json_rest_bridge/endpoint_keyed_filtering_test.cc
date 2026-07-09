@@ -294,9 +294,11 @@ tool_config:
           get: "/default_response"
 )yaml");
 
-  // Case 1: Match the specific path "/custom_path" with host "a.com"
+  // Case 1: Match the specific path "/custom_path" with host "a.com" (verifying port stripping
+  // works)
   {
-    request_headers_ = {{":method", "POST"}, {":path", "/custom_path"}, {":authority", "a.com"}};
+    request_headers_ = {
+        {":method", "POST"}, {":path", "/custom_path"}, {":authority", "a.com:8080"}};
     recreateFilter();
     EXPECT_EQ(filter_->decodeHeaders(request_headers_, false),
               Http::FilterHeadersStatus::StopIteration);
