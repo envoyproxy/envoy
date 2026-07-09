@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <optional>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 
@@ -8,7 +9,6 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -32,13 +32,13 @@ protected:
     }
   }
 
-  absl::optional<std::string> findTag(const TagVector& tags, const std::string& name) {
+  std::optional<std::string> findTag(const TagVector& tags, const std::string& name) {
     for (const auto& tag : tags) {
       if (tag.name_ == name) {
         return tag.value_;
       }
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   envoy::config::metrics::v3::StatsConfig stats_config_;
