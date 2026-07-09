@@ -228,8 +228,8 @@ TEST_F(PostgresMessageParserTest, HasCompleteMessageWithOffsetIncompleteBoundary
 
   Buffer::OwnedImpl buffer;
   buffer.add("prefix", offset);
-  buffer.move(startup);
-  buffer.drain(1);
+  // Add all but the last byte so the length header is intact but the message is truncated.
+  buffer.add(startup.linearize(startup.length()), startup.length() - 1);
 
   uint32_t message_length = 0;
   EXPECT_FALSE(PostgresMessageParser::hasCompleteMessage(buffer, offset, message_length));
