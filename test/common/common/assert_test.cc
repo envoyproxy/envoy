@@ -97,7 +97,15 @@ TEST(EnvoyBugStackTrace, TestStackTraceSingleEntry) {
   Assert::EnvoyBugStackTrace::setSingleLine(true);
   Assert::EnvoyBugStackTrace st;
   st.capture();
-  EXPECT_LOG_CONTAINS("error", "stacktrace for envoy bug", st.logStackTrace());
+  {
+    LogLevelSetter save_levels(spdlog::level::trace);
+    StartStopRecording recording(GetLogSink());
+    st.logStackTrace();
+    auto messages = recording.messages();
+    ASSERT_EQ(1, messages.size());
+    EXPECT_THAT(messages[0], testing::HasSubstr("stacktrace for envoy bug"));
+    EXPECT_THAT(messages[0], testing::HasSubstr("#0"));
+  }
   Assert::EnvoyBugStackTrace::setSingleLine(saved);
 }
 

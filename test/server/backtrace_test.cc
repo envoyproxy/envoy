@@ -2,6 +2,7 @@
 
 #include "test/test_common/logging.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -17,15 +18,22 @@ TEST(Backward, Basic) {
   BackwardsTrace::setLogToStderr(save_log_to_stderr);
 }
 
-TEST(Backward, SingleLine) {
+TEST(Backward, SingleEntry) {
   const bool save_log_to_stderr = BackwardsTrace::logToStderr();
   const bool save_single_line = BackwardsTrace::singleLine();
   BackwardsTrace::setLogToStderr(false);
   BackwardsTrace::setSingleLine(true);
   BackwardsTrace tracer;
   tracer.capture();
-  EXPECT_LOG_CONTAINS(
-      "critical", "Backtrace (use tools/stack_decode.py to get line numbers):", tracer.logTrace());
+  {
+    LogLevelSetter save_levels(spdlog::level::trace);
+    StartStopRecording recording(GetLogSink());
+    tracer.logTrace();
+    auto messages = recording.messages();
+    ASSERT_EQ(1, messages.size());
+    EXPECT_THAT(messages[0], testing::HasSubstr("Backtrace"));
+    EXPECT_THAT(messages[0], testing::HasSubstr("#0:"));
+  }
   BackwardsTrace::setSingleLine(save_single_line);
   BackwardsTrace::setLogToStderr(save_log_to_stderr);
 }
