@@ -52,7 +52,7 @@ public:
       "envoy.load_shed_points.http3_server_go_away_and_close_on_dispatch";
 
   // Envoy will send a GOAWAY while processing HTTP3 requests at the codec level
-  // which will eventually drain the HPPT/3 connection.
+  // which will eventually drain the HTTP/3 connection.
   const std::string H3ServerGoAwayOnDispatch =
       "envoy.load_shed_points.http3_server_go_away_on_dispatch";
 };
