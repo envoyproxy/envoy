@@ -337,14 +337,14 @@ TEST_F(QuicClientTransportSocketFactoryTest, GetCryptoConfig) {
   EXPECT_TRUE(factory_->supportedAlpnProtocols().empty());
   EXPECT_EQ(nullptr, factory_->getCryptoConfig());
 
-  Ssl::ClientContextSharedPtr ssl_context1{new Ssl::MockClientContext()};
+  Ssl::ClientContextSharedPtr ssl_context1{new NiceMock<Ssl::MockClientContext>()};
   EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(ssl_context1));
   update_callback_();
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config1 = factory_->getCryptoConfig();
   EXPECT_NE(nullptr, crypto_config1);
 
-  Ssl::ClientContextSharedPtr ssl_context2{new Ssl::MockClientContext()};
+  Ssl::ClientContextSharedPtr ssl_context2{new NiceMock<Ssl::MockClientContext>()};
   EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(ssl_context2));
   update_callback_();

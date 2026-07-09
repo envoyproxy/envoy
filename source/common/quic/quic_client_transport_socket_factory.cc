@@ -7,8 +7,8 @@
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/context_impl.h"
 
 #include "quiche/quic/core/crypto/quic_client_session_cache.h"
 
@@ -152,19 +152,11 @@ std::shared_ptr<quic::QuicCryptoClientConfig> QuicClientTransportSocketFactory::
 
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.quic_upstream_client_certificates")) {
-      // The cert selector is rejected at config load time for QUIC, so a production context is
-      // always a plain ClientContextImpl with at most one TLS certificate. The downcast can only
-      // fail for mock contexts in tests.
-      auto* client_context_impl =
-          dynamic_cast<Extensions::TransportSockets::Tls::ClientContextImpl*>(
-              tls_config.client_context_.get());
-      if (client_context_impl != nullptr && !client_context_impl->getTlsContexts().empty()) {
-        absl::Status status = configureQuicClientCertChain(
-            tls_config.crypto_config_->ssl_ctx(), client_context_impl->getTlsContexts()[0]);
-        if (!status.ok()) {
-          ENVOY_LOG(warn, "Not sending client certificates on QUIC connections: {}",
-                    status.message());
-        }
+      absl::Status status = configureQuicClientCertChain(
+          tls_config.crypto_config_->ssl_ctx(), tls_config.client_context_->getTlsContext());
+      if (!status.ok()) {
+        ENVOY_LOG(warn, "Not sending client certificates on QUIC connections: {}",
+                  status.message());
       }
     }
   }

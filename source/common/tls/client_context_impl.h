@@ -52,6 +52,9 @@ public:
   // Ssl::TlsCertificateSelectorContext
   const std::vector<Ssl::TlsContext>& getTlsContexts() const override { return tls_contexts_; };
 
+  // Ssl::ClientContext
+  const Ssl::TlsContext& getTlsContext() const override { return tls_contexts_[0]; }
+
   int selectTlsContext(SSL*);
 
 protected:
