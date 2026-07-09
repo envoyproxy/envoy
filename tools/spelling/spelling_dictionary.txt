@@ -1779,3 +1779,8 @@ setrlimit
 preprocessor
 RDWR
 stringification
+RMW
+acq
+interleavings
+millis
+msgs
