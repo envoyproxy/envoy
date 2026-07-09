@@ -8,6 +8,8 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/stats/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -34,7 +36,7 @@ private:
 
   Stats::Scope& scope_;
   Stats::StatNameSetPtr stat_name_set_;
-  const Stats::StatName stats_prefix_;
+  const Stats::TaggedStatName stats_prefix_;
   const Stats::StatName unknown_hit_;
   bool use_xff_;
   const uint32_t xff_num_trusted_hops_;

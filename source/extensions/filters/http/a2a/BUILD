@@ -37,6 +37,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:prefix_utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:string_view",

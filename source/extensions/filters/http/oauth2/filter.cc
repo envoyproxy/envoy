@@ -23,6 +23,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/retry_policy_impl.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/http/oauth2/client_assertion.h"
 
 #include "absl/strings/escaping.h"
@@ -778,8 +779,11 @@ FilterConfig::FilterConfig(
 FilterStats FilterConfig::generateStats(const std::string& prefix,
                                         const std::string& filter_stats_prefix,
                                         Stats::Scope& scope) {
-  const std::string final_prefix = absl::StrCat(prefix, filter_stats_prefix);
-  return {ALL_OAUTH_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  // No oauth2 tag exists in well_known_names.cc, so filter_stats_prefix stays an untagged literal;
+  // only the parent "http.<hcm>." prefix is tagged (by the helper).
+  Stats::TaggedStatName stat_prefix =
+      Stats::mergeStatPrefix(scope.symbolTable(), prefix, filter_stats_prefix);
+  return {ALL_OAUTH_FILTER_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
 }
 
 bool FilterConfig::shouldUseRefreshToken(

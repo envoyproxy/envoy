@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//envoy/server:filter_config_interface",
         "//source/common/http:header_map_lib",
+        "//source/common/stats:prefix_utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/http/injected_credentials/common:credential_interface",
     ],

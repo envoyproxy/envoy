@@ -138,6 +138,7 @@ envoy_cc_library(
         "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_macros",
         "//envoy/thread_local:thread_local_interface",
+        "//source/common/stats:prefix_utility_lib",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )

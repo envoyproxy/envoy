@@ -4,6 +4,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/http/composite/filter.h"
 
 namespace Envoy {
@@ -103,9 +104,10 @@ absl::StatusOr<Http::FilterFactoryCb> CompositeFilterFactory::createFilterFactor
     match_tree = std::move(match_tree_or_error.value());
   }
 
-  const auto& prefix = stats_prefix + "composite.";
+  Stats::TaggedStatName stat_prefix =
+      Stats::mergeStatPrefix(context.scope().symbolTable(), stats_prefix, "composite.");
   auto stats = std::make_shared<FilterStats>(
-      FilterStats{ALL_COMPOSITE_FILTER_STATS(POOL_COUNTER_PREFIX(context.scope(), prefix))});
+      FilterStats{ALL_COMPOSITE_FILTER_STATS(POOL_COUNTER_TAGGED(context.scope(), stat_prefix))});
 
   return [stats, named_chains, match_tree](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(*stats, callbacks.dispatcher(), false /* is_upstream */,
@@ -138,9 +140,10 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> CompositeFilterFactory::createFilte
 
   // This method is called for upstream filters.
   // Named filter chains are not supported for upstream filters.
-  const auto& prefix = stats_prefix + "composite.";
+  Stats::TaggedStatName stat_prefix =
+      Stats::mergeStatPrefix(context.scope().symbolTable(), stats_prefix, "composite.");
   auto stats = std::make_shared<FilterStats>(
-      FilterStats{ALL_COMPOSITE_FILTER_STATS(POOL_COUNTER_PREFIX(context.scope(), prefix))});
+      FilterStats{ALL_COMPOSITE_FILTER_STATS(POOL_COUNTER_TAGGED(context.scope(), stat_prefix))});
 
   return [stats, match_tree](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(*stats, callbacks.dispatcher(), true /* is_upstream */,

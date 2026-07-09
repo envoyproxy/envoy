@@ -10,6 +10,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/http/filter_chain_helper.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
@@ -87,8 +88,9 @@ public:
 
 private:
   static FilterChainStats createStats(const std::string& stats_prefix, Stats::Scope& scope) {
-    const std::string final_prefix = fmt::format("{}filter_chain.", stats_prefix);
-    return {COMMON_FILTER_CHAIN_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+    Stats::TaggedStatName stat_prefix =
+        Stats::mergeStatPrefix(scope.symbolTable(), stats_prefix, "filter_chain.");
+    return {COMMON_FILTER_CHAIN_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
   }
 
   FilterChainConstSharedPtr default_filter_chain_;

@@ -217,7 +217,8 @@ using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConf
 class GradientController : public ConcurrencyController {
 public:
   GradientController(GradientControllerConfig config, Event::Dispatcher& dispatcher,
-                     Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope,
+                     Runtime::Loader& runtime, const std::string& parent_stats_prefix,
+                     const std::string& filter_stats_prefix, Stats::Scope& scope,
                      Random::RandomGenerator& random, TimeSource& time_source);
 
   // Used in unit tests to validate worker thread interactions.
@@ -239,7 +240,8 @@ public:
 
 private:
   static GradientControllerStats generateStats(Stats::Scope& scope,
-                                               const std::string& stats_prefix);
+                                               const std::string& parent_stats_prefix,
+                                               const std::string& filter_stats_prefix);
   void updateMinRTT() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   std::chrono::microseconds processLatencySamplesAndClear()
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);

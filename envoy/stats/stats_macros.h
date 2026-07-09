@@ -99,6 +99,38 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
 #define POOL_HISTOGRAM(POOL) POOL_HISTOGRAM_PREFIX(POOL, "")
 #define POOL_TEXT_READOUT(POOL) POOL_TEXT_READOUT_PREFIX(POOL, "")
 
+// Tagged variants of the POOL_*_PREFIX macros: create each stat directly on POOL with pre-encoded
+// tags. BASE_PREFIX and PREFIX are Stats::StatNames (the tag-extracted and flat prefixes,
+// pre-encoded once by the caller) and TAGS is a Stats::StatNameTagSpan. Callers must include
+// "source/common/stats/utility.h". See Stats::Utility::counterFromTaggedPrefix.
+#define POOL_COUNTER_TAGGED_PREFIX(POOL, BASE_PREFIX, TAGS, PREFIX)                                \
+  Envoy::Stats::Utility::counterFromTaggedPrefix((POOL), (BASE_PREFIX), (TAGS), (PREFIX),          \
+                                                 (FINISH_STAT_DECL_
+#define POOL_GAUGE_TAGGED_PREFIX(POOL, BASE_PREFIX, TAGS, PREFIX)                                  \
+  Envoy::Stats::Utility::gaugeFromTaggedPrefix((POOL), (BASE_PREFIX), (TAGS), (PREFIX),            \
+                                               (FINISH_STAT_DECL_MODE_
+#define POOL_HISTOGRAM_TAGGED_PREFIX(POOL, BASE_PREFIX, TAGS, PREFIX)                              \
+  Envoy::Stats::Utility::histogramFromTaggedPrefix((POOL), (BASE_PREFIX), (TAGS), (PREFIX),        \
+                                                   (FINISH_STAT_DECL_UNIT_
+#define POOL_TEXT_READOUT_TAGGED_PREFIX(POOL, BASE_PREFIX, TAGS, PREFIX)                           \
+  Envoy::Stats::Utility::textReadoutFromTaggedPrefix((POOL), (BASE_PREFIX), (TAGS), (PREFIX),      \
+                                                     (FINISH_STAT_DECL_
+
+// Convenience wrappers taking a Stats::TaggedStatName (see utility.h), which pre-encodes the
+// tag-extracted prefix, the flat prefix and the tags.
+#define POOL_COUNTER_TAGGED(POOL, TAGGED_NAME)                                                     \
+  POOL_COUNTER_TAGGED_PREFIX(POOL, (TAGGED_NAME).baseName(), (TAGGED_NAME).tags(),                 \
+                             (TAGGED_NAME).name())
+#define POOL_GAUGE_TAGGED(POOL, TAGGED_NAME)                                                       \
+  POOL_GAUGE_TAGGED_PREFIX(POOL, (TAGGED_NAME).baseName(), (TAGGED_NAME).tags(),                   \
+                           (TAGGED_NAME).name())
+#define POOL_HISTOGRAM_TAGGED(POOL, TAGGED_NAME)                                                   \
+  POOL_HISTOGRAM_TAGGED_PREFIX(POOL, (TAGGED_NAME).baseName(), (TAGGED_NAME).tags(),               \
+                               (TAGGED_NAME).name())
+#define POOL_TEXT_READOUT_TAGGED(POOL, TAGGED_NAME)                                                \
+  POOL_TEXT_READOUT_TAGGED_PREFIX(POOL, (TAGGED_NAME).baseName(), (TAGGED_NAME).tags(),            \
+                                  (TAGGED_NAME).name())
+
 #define NULL_STAT_DECL_(X) std::string(#X)),
 #define NULL_STAT_DECL_IGNORE_MODE_(X, MODE) std::string(#X)),
 

@@ -5,6 +5,7 @@
 
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 
 namespace Envoy {
@@ -33,10 +34,14 @@ StatefulSessionConfig::StatefulSessionConfig(const ProtoConfig& config,
               : Http::Code::ServiceUnavailable) {
   // Only construct stats if stat_prefix is explicitly set.
   if (!config.stat_prefix().empty()) {
-    const std::string final_prefix =
-        absl::StrCat(stats_prefix, "stateful_session.", config.stat_prefix(), ".");
+    // The parent (HCM/cluster) prefix in `stats_prefix` is tag-extracted automatically; the
+    // filter's own `stateful_session.<stat_prefix>` segment has no defined tag, so it stays a
+    // literal. The emitted flat name is byte-identical to the legacy POOL_COUNTER_PREFIX output.
+    Stats::TaggedStatName stat_prefix =
+        Stats::mergeStatPrefix(scope.symbolTable(), stats_prefix,
+                               absl::StrCat("stateful_session.", config.stat_prefix(), "."));
     stats_ = std::make_shared<StatefulSessionFilterStats>(StatefulSessionFilterStats{
-        ALL_STATEFUL_SESSION_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))});
+        ALL_STATEFUL_SESSION_FILTER_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))});
   }
 
   if (!config.has_session_state()) {

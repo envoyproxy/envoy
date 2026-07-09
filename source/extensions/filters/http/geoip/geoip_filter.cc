@@ -4,6 +4,7 @@
 
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
+#include "source/common/stats/prefix_utility.h"
 
 #include "absl/memory/memory.h"
 
@@ -16,7 +17,8 @@ GeoipFilterConfig::GeoipFilterConfig(
     const envoy::extensions::filters::http::geoip::v3::Geoip& config,
     const std::string& stat_prefix, Stats::Scope& scope)
     : scope_(scope), stat_name_set_(scope.symbolTable().makeSet("Geoip")),
-      stats_prefix_(stat_name_set_->add(stat_prefix + "geoip")), use_xff_(config.has_xff_config()),
+      stats_prefix_(Stats::mergeStatPrefix(scope.symbolTable(), stat_prefix, "geoip.")),
+      use_xff_(config.has_xff_config()),
       xff_num_trusted_hops_(config.has_xff_config() ? config.xff_config().xff_num_trusted_hops()
                                                     : 0),
       ip_address_header_(config.has_custom_header_config()
@@ -27,8 +29,9 @@ GeoipFilterConfig::GeoipFilterConfig(
 }
 
 void GeoipFilterConfig::incCounter(Stats::StatName name) {
-  Stats::SymbolTable::StoragePtr storage = scope_.symbolTable().join({stats_prefix_, name});
-  scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+  Stats::Utility::counterFromTaggedPrefix(scope_, stats_prefix_.baseName(), stats_prefix_.tags(),
+                                          stats_prefix_.name(), name)
+      .inc();
 }
 
 GeoipFilter::GeoipFilter(GeoipFilterConfigSharedPtr config, Geolocation::DriverSharedPtr driver)

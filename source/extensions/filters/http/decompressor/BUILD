@@ -24,6 +24,7 @@ envoy_cc_library(
         "//source/common/common:macros",
         "//source/common/http:headers_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/common/stats:prefix_utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/decompressor/v3:pkg_cc_proto",
     ],

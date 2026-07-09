@@ -4,6 +4,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -56,7 +57,9 @@ public:
 
 private:
   static BasicAuthStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    return BasicAuthStats{ALL_BASIC_AUTH_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+    Stats::TaggedStatName stat_prefix =
+        Stats::mergeStatPrefix(scope.symbolTable(), prefix, "basic_auth.");
+    return BasicAuthStats{ALL_BASIC_AUTH_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
   }
 
   const UserMap users_;

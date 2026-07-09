@@ -3,6 +3,7 @@
 #include <utility>
 #include <vector>
 
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/common/mcp/filter_state.h"
 
 #include "absl/strings/str_cat.h"
@@ -52,8 +53,9 @@ parseSessionIdentity(const envoy::extensions::filters::http::mcp_router::v3::Mcp
 }
 
 McpRouterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-  const std::string final_prefix = absl::StrCat(prefix, "mcp_router.");
-  return McpRouterStats{MCP_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  Stats::TaggedStatName stat_prefix =
+      Stats::mergeStatPrefix(scope.symbolTable(), prefix, "mcp_router.");
+  return McpRouterStats{MCP_ROUTER_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
 }
 
 template <typename Config> std::vector<McpBackendConfig> parseBackends(const Config& config) {

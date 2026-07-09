@@ -19,10 +19,12 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/grpc/typed_async_client.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/runtime/runtime_protos.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
@@ -299,8 +301,17 @@ private:
 
   ExtAuthzFilterStats generateStats(const std::string& prefix,
                                     const std::string& filter_stats_prefix, Stats::Scope& scope) {
-    const std::string final_prefix = absl::StrCat(prefix, "ext_authz.", filter_stats_prefix);
-    return {ALL_EXT_AUTHZ_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+    // The parent "http.<hcm>."/"cluster.<name>." prefix is tagged by the helper; the optional
+    // filter_stats_prefix is this filter's own EXT_AUTHZ_PREFIX tag (well_known_names.cc:
+    // http.*.ext_authz.$.**).
+    Stats::TaggedStatName stat_prefix =
+        filter_stats_prefix.empty()
+            ? Stats::mergeStatPrefix(scope.symbolTable(), prefix, "ext_authz.")
+            : Stats::mergeStatPrefix(
+                  scope.symbolTable(), prefix, "ext_authz.",
+                  {{Envoy::Config::TagNames::get().EXT_AUTHZ_PREFIX, filter_stats_prefix}},
+                  absl::StrCat("ext_authz.", filter_stats_prefix, "."));
+    return {ALL_EXT_AUTHZ_FILTER_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
   }
 
   // This generates ext_authz.<optional filter_stats_prefix>.name, for example: ext_authz.waf.ok

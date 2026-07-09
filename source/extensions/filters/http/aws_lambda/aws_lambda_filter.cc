@@ -18,6 +18,7 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/const_singleton.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/http/aws_lambda/request_response.pb.validate.h"
 
 #include "absl/strings/numbers.h"
@@ -439,9 +440,10 @@ std::optional<Arn> parseArn(absl::string_view arn) {
 }
 
 FilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-  const std::string final_prefix = prefix + "aws_lambda.";
-  return {ALL_AWS_LAMBDA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                                      POOL_HISTOGRAM_PREFIX(scope, final_prefix))};
+  Stats::TaggedStatName stat_prefix =
+      Stats::mergeStatPrefix(scope.symbolTable(), prefix, "aws_lambda.");
+  return {ALL_AWS_LAMBDA_FILTER_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix),
+                                      POOL_HISTOGRAM_TAGGED(scope, stat_prefix))};
 }
 
 } // namespace AwsLambdaFilter

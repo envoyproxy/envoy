@@ -12,6 +12,7 @@
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_mutation.h"
 #include "source/common/http/utility.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "absl/strings/string_view.h"
@@ -154,8 +155,13 @@ public:
 
 private:
   TransformFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    const std::string final_prefix = prefix + ".http_transform";
-    return {ALL_STATEFUL_SESSION_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+    // The parent (HCM/cluster) prefix is tag-extracted automatically; "http_transform" is the
+    // filter's own untagged literal. Using the helper also collapses the stray double dot the
+    // legacy `prefix + ".http_transform"` produced when `prefix` was the dot-terminated
+    // `http.<hcm>.`.
+    Stats::TaggedStatName stat_prefix =
+        Stats::mergeStatPrefix(scope.symbolTable(), prefix, "http_transform.");
+    return {ALL_STATEFUL_SESSION_FILTER_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
   }
   TransformFilterStats stats_;
 };

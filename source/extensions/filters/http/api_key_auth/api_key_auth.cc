@@ -108,8 +108,7 @@ Forwarding::Forwarding(const ForwardingProto& proto_config) {
 
 FilterConfig::FilterConfig(const ApiKeyAuthProto& proto_config, Stats::Scope& scope,
                            const std::string& stats_prefix, absl::Status& creation_status)
-    : default_config_(proto_config, creation_status),
-      stats_(generateStats(scope, stats_prefix + "api_key_auth.")) {}
+    : default_config_(proto_config, creation_status), stats_(generateStats(scope, stats_prefix)) {}
 
 ApiKeyAuthFilter::ApiKeyAuthFilter(FilterConfigSharedPtr config) : config_(std::move(config)) {}
 

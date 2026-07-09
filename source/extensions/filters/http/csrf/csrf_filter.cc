@@ -7,6 +7,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/stats/prefix_utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -76,8 +77,8 @@ std::string targetOriginValue(const Http::RequestHeaderMap& headers) {
 }
 
 static CsrfStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-  const std::string final_prefix = prefix + "csrf.";
-  return CsrfStats{ALL_CSRF_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  Stats::TaggedStatName stat_prefix = Stats::mergeStatPrefix(scope.symbolTable(), prefix, "csrf.");
+  return CsrfStats{ALL_CSRF_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
 }
 
 static CsrfPolicyPtr

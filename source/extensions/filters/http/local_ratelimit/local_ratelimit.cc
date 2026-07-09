@@ -10,9 +10,13 @@
 #include "envoy/extensions/filters/http/local_ratelimit/v3/local_rate_limit.pb.h"
 #include "envoy/http/codes.h"
 
+#include "source/common/config/well_known_names.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/http/common/ratelimit_headers.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -123,8 +127,15 @@ FilterConfig::requestAllowed(absl::Span<const RateLimit::Descriptor> request_des
 }
 
 LocalRateLimitStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
-  const std::string final_prefix = prefix + ".http_local_rate_limit";
-  return {ALL_LOCAL_RATE_LIMIT_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  // Value-first prefix: the config stat_prefix leads and is this filter's own
+  // LOCAL_HTTP_RATELIMIT_PREFIX tag ("$.http_local_rate_limit.**"); there is no HCM/cluster parent
+  // in the prefix (it's carried by the scope), so this is built directly rather than via the
+  // parent-oriented mergeStatPrefix helper.
+  Stats::TaggedStatName stat_prefix(
+      scope.symbolTable(), "http_local_rate_limit.",
+      {{Envoy::Config::TagNames::get().LOCAL_HTTP_RATELIMIT_PREFIX, prefix}},
+      absl::StrCat(prefix, ".http_local_rate_limit."));
+  return {ALL_LOCAL_RATE_LIMIT_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
 }
 
 bool FilterConfig::enabled() const {

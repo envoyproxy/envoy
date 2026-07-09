@@ -20,6 +20,7 @@
 #include "source/common/grpc/status.h"
 #include "source/common/http/codes.h"
 #include "source/common/runtime/runtime_protos.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/http/admission_control/evaluators/response_evaluator.h"
 #include "source/extensions/filters/http/admission_control/thread_local_controller.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
@@ -102,7 +103,11 @@ public:
 
 private:
   static AdmissionControlStats generateStats(Stats::Scope& scope, const std::string& prefix) {
-    return {ALL_ADMISSION_CONTROL_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+    // The parent "http.<hcm>."/"cluster.<name>." prefix is tagged; "admission_control" is the
+    // filter's own (untagged) segment.
+    Stats::TaggedStatName stat_prefix =
+        Stats::mergeStatPrefix(scope.symbolTable(), prefix, "admission_control.");
+    return {ALL_ADMISSION_CONTROL_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
   }
 
   bool shouldRejectRequest() const;

@@ -19,6 +19,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/common/ext_proc/client_base.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/common/processing_effect/processing_effect.h"
@@ -355,8 +356,14 @@ private:
 
   ExtProcFilterStats generateStats(const std::string& prefix,
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
-    const std::string final_prefix = absl::StrCat(prefix, "ext_proc.", filter_stats_prefix);
-    return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+    // No ext_proc tag exists in well_known_names.cc, so filter_stats_prefix stays an untagged
+    // literal; only the parent "http.<hcm>." prefix is tagged (by the helper).
+    Stats::TaggedStatName stat_prefix =
+        filter_stats_prefix.empty()
+            ? Stats::mergeStatPrefix(scope.symbolTable(), prefix, "ext_proc.")
+            : Stats::mergeStatPrefix(scope.symbolTable(), prefix,
+                                     absl::StrCat("ext_proc.", filter_stats_prefix, "."));
+    return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_TAGGED(scope, stat_prefix))};
   }
   static std::function<std::unique_ptr<OnProcessingResponse>()> createOnProcessingResponseCb(
       const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,

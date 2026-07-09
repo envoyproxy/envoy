@@ -30,6 +30,7 @@ envoy_cc_library(
         "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
+        "//source/common/stats:prefix_utility_lib",
         "//source/extensions/filters/common/mcp:filter_state_lib",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:variant",

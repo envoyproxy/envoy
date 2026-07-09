@@ -72,6 +72,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/router:retry_policy_lib",
         "//source/common/secret:secret_provider_impl_lib",
+        "//source/common/stats:prefix_utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/oauth2/v3:pkg_cc_proto",

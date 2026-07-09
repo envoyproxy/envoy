@@ -29,7 +29,8 @@ absl::StatusOr<Http::FilterFactoryCb> AdaptiveConcurrencyFilterFactory::createFi
   RETURN_IF_NOT_OK_REF(creation_status);
   controller = std::make_shared<Controller::GradientController>(
       std::move(gradient_controller_config), server_context.mainThreadDispatcher(),
-      server_context.runtime(), acc_stats_prefix + "gradient_controller.", scope,
+      server_context.runtime(), /*parent_stats_prefix=*/stats_prefix,
+      /*filter_stats_prefix=*/"adaptive_concurrency.gradient_controller.", scope,
       server_context.api().randomGenerator(), server_context.timeSource());
 
   AdaptiveConcurrencyFilterConfigSharedPtr filter_config(new AdaptiveConcurrencyFilterConfig(
