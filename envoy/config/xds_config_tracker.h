@@ -18,7 +18,7 @@ namespace Envoy {
 namespace Config {
 
 /**
- * An interface for hooking into xDS update events to provide the ablility to use some external
+ * An interface for hooking into xDS update events to provide the ability to use some external
  * processor in xDS update. This tracker provides the process point when the discovery response
  * is received, when the resources are successfully processed and applied, and when there is any
  * failure.
