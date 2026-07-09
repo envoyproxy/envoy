@@ -392,5 +392,74 @@ TEST_F(QuicClientTransportSocketFactoryTest, ClientCertificateRuntimeDisabled) {
   EXPECT_EQ(nullptr, SSL_CTX_get0_privatekey(crypto_config->ssl_ctx()));
 }
 
+// A client certificate with a private key provider is rejected at config load time because
+// QUICHE's client handshaker requires direct access to the private key.
+TEST_F(QuicClientTransportSocketFactoryTest, PrivateKeyProviderRejectedAtConfigLoad) {
+  // This test does not pass the fixture's context_config_ to a factory; take ownership so the
+  // mock is deleted.
+  std::unique_ptr<Ssl::MockClientContextConfig> unused_config{context_config_};
+  auto config = std::make_unique<NiceMock<Ssl::MockClientContextConfig>>();
+  NiceMock<Ssl::MockTlsCertificateConfig> cert_config;
+  auto provider = std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
+  ON_CALL(cert_config, privateKeyMethod()).WillByDefault(Return(provider));
+  std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> certs{cert_config};
+  ON_CALL(*config, tlsCertificates()).WillByDefault(Return(certs));
+
+  auto factory_or_error =
+      Quic::QuicClientTransportSocketFactory::create(std::move(config), context_);
+  EXPECT_FALSE(factory_or_error.ok());
+  EXPECT_EQ(factory_or_error.status().code(), absl::StatusCode::kUnimplemented);
+}
+
+// With the runtime guard disabled, a private key provider does not fail config load (pre-existing
+// behavior: the certificate is simply not sent over QUIC).
+TEST_F(QuicClientTransportSocketFactoryTest, PrivateKeyProviderAllowedWhenRuntimeDisabled) {
+  // This test does not pass the fixture's context_config_ to a factory; take ownership so the
+  // mock is deleted.
+  std::unique_ptr<Ssl::MockClientContextConfig> unused_config{context_config_};
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.quic_upstream_client_certificates", "false"}});
+
+  auto config = std::make_unique<NiceMock<Ssl::MockClientContextConfig>>();
+  NiceMock<Ssl::MockTlsCertificateConfig> cert_config;
+  auto provider = std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
+  ON_CALL(cert_config, privateKeyMethod()).WillByDefault(Return(provider));
+  std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> certs{cert_config};
+  ON_CALL(*config, tlsCertificates()).WillByDefault(Return(certs));
+  EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+      .WillOnce(Return(nullptr));
+
+  auto factory_or_error =
+      Quic::QuicClientTransportSocketFactory::create(std::move(config), context_);
+  EXPECT_TRUE(factory_or_error.ok());
+}
+
+// If a certificate which cannot be installed on the QUICHE SSL context arrives at runtime (via
+// SDS), the factory fails closed: no crypto config is returned, so no connections are created
+// without the configured client certificate.
+TEST_F(QuicClientTransportSocketFactoryTest, FailClosedWhenCertificateCannotBeInstalled) {
+  initialize();
+
+  // A TlsContext with a certificate chain but no directly accessible private key, as is the case
+  // when the certificate uses a private key provider.
+  Ssl::TlsContext tls_context;
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(test_cert_chain_.data(), test_cert_chain_.size()));
+  tls_context.cert_chain_.reset(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+  ASSERT_NE(nullptr, tls_context.cert_chain_);
+  tls_context.ssl_ctx_.reset(SSL_CTX_new(TLS_method()));
+
+  auto* mock_context = new NiceMock<Ssl::MockClientContext>();
+  Ssl::ClientContextSharedPtr ssl_context{mock_context};
+  ON_CALL(*mock_context, getTlsContext()).WillByDefault(ReturnRef(tls_context));
+  EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+      .WillOnce(Return(ssl_context));
+  update_callback_();
+
+  EXPECT_EQ(nullptr, factory_->getCryptoConfig());
+  // The failure is not cached; subsequent calls fail the same way.
+  EXPECT_EQ(nullptr, factory_->getCryptoConfig());
+}
+
 } // namespace Quic
 } // namespace Envoy

@@ -30,6 +30,8 @@ absl::Status configureQuicClientCertChain(SSL_CTX* quic_ssl_ctx,
   EVP_PKEY* private_key = SSL_CTX_get0_privatekey(tls_context.ssl_ctx_.get());
   if (private_key == nullptr) {
     // The private key is not directly accessible when a private key provider is configured.
+    // Static configurations with a provider are rejected at config load time; this is the
+    // backstop for certificates delivered via SDS.
     return absl::UnimplementedError(
         "client certificates with a private key provider are not supported on QUIC");
   }
@@ -63,7 +65,7 @@ absl::Status configureQuicClientCertChain(SSL_CTX* quic_ssl_ctx,
   }
   if (SSL_CTX_set_chain_and_key(quic_ssl_ctx, raw_chain.data(), raw_chain.size(), private_key,
                                 nullptr) != 1) {
-    return absl::InvalidArgumentError("failed to install client certificate chain for QUIC");
+    return absl::InternalError("failed to install client certificate chain for QUIC");
   }
   return absl::OkStatus();
 }
@@ -76,6 +78,17 @@ QuicClientTransportSocketFactory::create(
     Server::Configuration::TransportSocketFactoryContext& context) {
   if (config->tlsCertificateSelectorFactory()) {
     return absl::UnimplementedError("Client certificate selector not supported on QUIC");
+  }
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_upstream_client_certificates")) {
+    // QUICHE's client handshaker requires direct access to the private key, so private key
+    // providers cannot be supported; reject them at config load time.
+    for (const auto& tls_certificate : config->tlsCertificates()) {
+      if (tls_certificate.get().privateKeyMethod() != nullptr) {
+        return absl::UnimplementedError(
+            "client certificates with a private key provider are not supported on QUIC");
+      }
+    }
   }
   absl::Status creation_status = absl::OkStatus();
   auto factory = std::unique_ptr<QuicClientTransportSocketFactory>(
@@ -155,8 +168,14 @@ std::shared_ptr<quic::QuicCryptoClientConfig> QuicClientTransportSocketFactory::
       absl::Status status = configureQuicClientCertChain(
           tls_config.crypto_config_->ssl_ctx(), tls_config.client_context_->getTlsContext());
       if (!status.ok()) {
-        ENVOY_LOG(warn, "Not sending client certificates on QUIC connections: {}",
-                  status.message());
+        // Configurations which can hit this are rejected at config load time, so this is only
+        // reachable when a certificate delivered later via SDS cannot be installed (e.g. it uses
+        // a private key provider). Fail closed rather than sending connections without the
+        // configured client certificate.
+        ENVOY_LOG(error, "Not creating QUIC connections: {}", status.message());
+        tls_config.client_context_ = nullptr;
+        tls_config.crypto_config_ = nullptr;
+        return nullptr;
       }
     }
   }

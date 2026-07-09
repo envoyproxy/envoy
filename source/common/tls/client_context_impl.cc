@@ -76,12 +76,14 @@ ClientContextImpl::ClientContextImpl(
     return;
   }
 
-  // This should be guaranteed during configuration ingestion for client contexts.
+  // This should be guaranteed during configuration ingestion for client contexts. If this
+  // invariant ever changes, getTlsContext() must be updated to handle multiple TLS contexts.
   if (tls_contexts_.size() != 1) {
     creation_status =
         absl::InvalidArgumentError("Client TLS context supports only a single certificate");
     return;
   }
+  ASSERT(tls_contexts_.size() == 1);
 
   if (!parsed_alpn_protocols_.empty()) {
     for (auto& ctx : tls_contexts_) {
