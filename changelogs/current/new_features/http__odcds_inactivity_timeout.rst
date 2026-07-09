@@ -1,0 +1,2 @@
+Added :ref:`OnDemandCds.cluster_inactivity_timeout <envoy_v3_api_field_extensions.filters.http.on_demand.v3.OnDemandCds.cluster_inactivity_timeout>`
+to enable cleaning up clusters added by ODCDS that have no more traffic.
