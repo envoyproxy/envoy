@@ -193,7 +193,6 @@ private:
 
   // params.clientInfo level
   std::string client_info_name_;
-  bool seen_client_info_name_{false};
 
   // params._meta level
   std::string meta_traceparent_;

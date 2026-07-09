@@ -15,3 +15,11 @@ envoy_cc_test(
         "//source/common/json/wuffs_json:wuffs_json_cursor_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "ai_request_handlers_test",
+    srcs = ["ai_request_handlers_test.cc"],
+    deps = [
+        "//source/common/json/wuffs_json:ai_request_handlers_lib",
+    ],
+)

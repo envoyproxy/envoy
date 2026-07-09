@@ -28,7 +28,6 @@ envoy_cc_library(
         ":wuffs_json_cursor_lib",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/strings:numbers",
     ],
 )
 
