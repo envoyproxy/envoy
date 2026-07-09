@@ -1527,11 +1527,14 @@ struct MockUpstreamHost {
 }
 
 static MOCK_UPSTREAM_HOST: std::sync::Mutex<Option<MockUpstreamHost>> = std::sync::Mutex::new(None);
+static MOCK_UPSTREAM_CONNECTION_ID: std::sync::atomic::AtomicU64 =
+  std::sync::atomic::AtomicU64::new(0);
 static MOCK_START_TLS_RESULT: std::sync::atomic::AtomicBool =
   std::sync::atomic::AtomicBool::new(false);
 
 fn reset_upstream_host_mock() {
   *MOCK_UPSTREAM_HOST.lock().unwrap() = None;
+  MOCK_UPSTREAM_CONNECTION_ID.store(0, std::sync::atomic::Ordering::SeqCst);
   MOCK_START_TLS_RESULT.store(false, std::sync::atomic::Ordering::SeqCst);
 }
 
@@ -1665,6 +1668,13 @@ pub extern "C" fn envoy_dynamic_module_callback_network_filter_has_upstream_host
   _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
 ) -> bool {
   MOCK_UPSTREAM_HOST.lock().unwrap().is_some()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+) -> u64 {
+  MOCK_UPSTREAM_CONNECTION_ID.load(std::sync::atomic::Ordering::SeqCst)
 }
 
 #[no_mangle]
@@ -1835,6 +1845,62 @@ fn test_has_upstream_host_false() {
   };
 
   assert!(!filter.has_upstream_host());
+}
+
+#[test]
+fn test_get_upstream_connection_id() {
+  reset_upstream_host_mock();
+  MOCK_UPSTREAM_CONNECTION_ID.store(54321, std::sync::atomic::Ordering::SeqCst);
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  assert_eq!(filter.get_upstream_connection_id(), 54321);
+}
+
+#[test]
+fn test_get_upstream_connection_id_unavailable() {
+  reset_upstream_host_mock();
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  assert_eq!(filter.get_upstream_connection_id(), 0);
+}
+
+static MOCK_HTTP_UPSTREAM_CONNECTION_ID: std::sync::atomic::AtomicU64 =
+  std::sync::atomic::AtomicU64::new(0);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_upstream_connection_id(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+) -> u64 {
+  MOCK_HTTP_UPSTREAM_CONNECTION_ID.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[test]
+fn test_http_get_upstream_connection_id() {
+  MOCK_HTTP_UPSTREAM_CONNECTION_ID.store(98765, std::sync::atomic::Ordering::SeqCst);
+
+  let filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+
+  assert_eq!(filter.get_upstream_connection_id(), 98765);
+  MOCK_HTTP_UPSTREAM_CONNECTION_ID.store(0, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[test]
+fn test_http_get_upstream_connection_id_unavailable() {
+  MOCK_HTTP_UPSTREAM_CONNECTION_ID.store(0, std::sync::atomic::Ordering::SeqCst);
+
+  let filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+
+  assert_eq!(filter.get_upstream_connection_id(), 0);
 }
 
 // =============================================================================

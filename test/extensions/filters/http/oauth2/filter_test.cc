@@ -1123,9 +1123,12 @@ TEST_F(OAuth2Test, RequestSignout) {
 }
 
 /**
- * Scenario: The OAuth filter receives a sign out request when end session endpoint is configured.
+ * Scenario: The OAuth filter receives a sign-out request when end session endpoint is configured.
+ * The post_logout_redirect_uri is not defined and is not disabled.
  *
- * Expected behavior: the filter should redirect to the end session endpoint.
+ * Expected behavior: the filter should redirect to the end session endpoint and use the
+ * request-derived default
+ * ``post_logout_redirect_uri`` query parameter (<scheme>://<host>/).
  */
 TEST_F(OAuth2Test, RequestSignoutWhenEndSessionEndpointIsConfigured) {
   // Create a filter config with end session endpoint and openid scope.
@@ -1180,6 +1183,234 @@ TEST_F(OAuth2Test, RequestSignoutWhenEndSessionEndpointIsConfigured) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: The OAuth filter receives a sign out request, ``end_session_endpoint`` is configured,
+ * and ``post_logout_redirect_uri`` is overridden in the filter configuration.
+ *
+ * Expected behavior: the filter should redirect to the end session endpoint and use the configured
+ * URI as the ``post_logout_redirect_uri`` query parameter, instead of the request-derived default.
+ */
+TEST_F(OAuth2Test, RequestSignoutWithCustomPostLogoutRedirectUri) {
+  // Create a filter config with end session endpoint, post logout redirect uri and openid scope.
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  auto credentials = p.mutable_credentials();
+  credentials->set_client_id(TEST_CLIENT_ID);
+  credentials->mutable_token_secret()->set_name("secret");
+  credentials->mutable_hmac_secret()->set_name("hmac");
+  p.set_end_session_endpoint("https://auth.example.com/oauth/logout");
+  p.mutable_post_logout_redirect_uri()->set_uri("https://traffic.example.com/loggedout");
+  p.add_auth_scopes("openid");
+
+  // Create the OAuth config.
+  auto secret_reader = std::make_shared<MockSecretReader>();
+  FilterConfigSharedPtr test_config_;
+  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
+                                                secret_reader, scope_, "test.");
+  init(test_config_);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Cookie.get(), "IdToken=xyztoken"},
+  };
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().Location.get(),
+       "https://auth.example.com/oauth/"
+       "logout?id_token_hint=xyztoken&client_id=1&post_logout_"
+       "redirect_uri=https%3A%2F%2Ftraffic.example.com%2Floggedout"},
+  };
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: The OAuth filter receives a sign out request, ``end_session_endpoint`` is configured,
+ * and ``post_logout_redirect_uri`` uses a header-formatter substitution token.
+ *
+ * Expected behavior: the filter should substitute the token against the inbound request before
+ * percent-encoding the value and emitting it as the ``post_logout_redirect_uri`` query parameter.
+ */
+TEST_F(OAuth2Test, RequestSignoutWithFormattedPostLogoutRedirectUri) {
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  auto credentials = p.mutable_credentials();
+  credentials->set_client_id(TEST_CLIENT_ID);
+  credentials->mutable_token_secret()->set_name("secret");
+  credentials->mutable_hmac_secret()->set_name("hmac");
+  p.set_end_session_endpoint("https://auth.example.com/oauth/logout");
+  p.mutable_post_logout_redirect_uri()->set_uri("%REQ(:scheme)%://app.example.com/loggedout");
+  p.add_auth_scopes("openid");
+
+  auto secret_reader = std::make_shared<MockSecretReader>();
+  FilterConfigSharedPtr test_config_;
+  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
+                                                secret_reader, scope_, "test.");
+  init(test_config_);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Cookie.get(), "IdToken=xyztoken"},
+  };
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().Location.get(),
+       "https://auth.example.com/oauth/"
+       "logout?id_token_hint=xyztoken&client_id=1&post_logout_"
+       "redirect_uri=https%3A%2F%2Fapp.example.com%2Floggedout"},
+  };
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: The OAuth filter receives a sign out request, ``end_session_endpoint`` is configured,
+ * and ``post_logout_redirect_uri.disabled`` is true.
+ *
+ * Expected behavior: the filter should redirect to the end session endpoint without including the
+ * ``post_logout_redirect_uri`` query parameter at all.
+ */
+TEST_F(OAuth2Test, RequestSignoutWithDisabledPostLogoutRedirectUri) {
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  auto credentials = p.mutable_credentials();
+  credentials->set_client_id(TEST_CLIENT_ID);
+  credentials->mutable_token_secret()->set_name("secret");
+  credentials->mutable_hmac_secret()->set_name("hmac");
+  p.set_end_session_endpoint("https://auth.example.com/oauth/logout");
+  p.mutable_post_logout_redirect_uri()->set_disabled(true);
+  p.add_auth_scopes("openid");
+
+  // Create the OAuth config.
+  auto secret_reader = std::make_shared<MockSecretReader>();
+  FilterConfigSharedPtr test_config_;
+  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
+                                                secret_reader, scope_, "test.");
+  init(test_config_);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Cookie.get(), "IdToken=xyztoken"},
+  };
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().Location.get(), "https://auth.example.com/oauth/"
+                                            "logout?id_token_hint=xyztoken&client_id=1"},
+  };
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: ``post_logout_redirect_uri.uri`` contains an invalid header-formatter string.
+ *
+ * Expected behavior: because the URI formatter is only compiled when it will actually be used
+ * (``end_session_endpoint`` is set and a ``uri`` is configured), an invalid format string does not
+ * fail config load when ``end_session_endpoint`` is unset. Conversely, the same invalid format
+ * string fails config load once ``end_session_endpoint`` is set, proving validation still happens
+ * when the value is actually used.
+ */
+TEST_F(OAuth2Test, InvalidPostLogoutRedirectUriValidatedOnlyWhenUsed) {
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  auto credentials = p.mutable_credentials();
+  credentials->set_client_id(TEST_CLIENT_ID);
+  credentials->mutable_token_secret()->set_name("secret");
+  credentials->mutable_hmac_secret()->set_name("hmac");
+  // Invalid header-formatter command (PATH does not accept argument 'A').
+  p.mutable_post_logout_redirect_uri()->set_uri("%PATH(A)%");
+  p.add_auth_scopes("openid");
+
+  auto secret_reader = std::make_shared<MockSecretReader>();
+
+  // End_session_endpoint is not defined: the invalid formatter is never compiled,
+  // so the config loads without throwing.
+  EXPECT_NO_THROW(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
+                                                 secret_reader, scope_, "test."));
+
+  // End_session_endpoint is set: the invalid formatter is compiled and the config fails to load.
+  p.set_end_session_endpoint("https://auth.example.com/oauth/logout");
+  EXPECT_THROW(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
+                                              secret_reader, scope_, "test."),
+               EnvoyException);
 }
 
 /**

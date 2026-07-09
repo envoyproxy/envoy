@@ -3,6 +3,7 @@
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -11,6 +12,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace FileSystemBuffer {
+
+using StatusHelpers::HasStatus;
 
 using ::testing::HasSubstr;
 
@@ -81,15 +84,17 @@ TEST_F(FileSystemBufferFilterConfigTest, ThrowsExceptionOnUnsetBufferBehavior) {
                           "invalid BufferBehavior");
 }
 
-TEST_F(FileSystemBufferFilterConfigTest, ThrowsExceptionWithConfiguredInvalidPath) {
+TEST_F(FileSystemBufferFilterConfigTest, FailsWithConfiguredInvalidPath) {
   auto proto_config = configFromYaml(R"(
     storage_buffer_path: "/hat/banana/this/is/not/a/valid/path"
     manager_config:
       thread_pool:
         thread_count: 1
   )");
-  EXPECT_THROW_WITH_REGEX(captureConfigFromProto(proto_config), EnvoyException,
-                          "is not a directory");
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto status_or = factory()->createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_THAT(status_or,
+              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("is not a directory")));
 }
 
 TEST_F(FileSystemBufferFilterConfigTest, ThrowsExceptionWithConfigured0BytesMemoryBufferLimit) {

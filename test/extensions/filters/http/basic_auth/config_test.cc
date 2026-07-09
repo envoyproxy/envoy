@@ -50,9 +50,10 @@ TEST(Factory, InvalidConfigNoColon) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW(
-      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException);
+  auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_FALSE(status_or.ok());
+  EXPECT_EQ(status_or.status().message(),
+            "basic auth: invalid htpasswd format, username:password is expected");
 }
 
 TEST(Factory, InvalidConfigDuplicateUsers) {
@@ -69,9 +70,9 @@ TEST(Factory, InvalidConfigDuplicateUsers) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, "basic auth: duplicate users");
+  auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_FALSE(status_or.ok());
+  EXPECT_EQ(status_or.status().message(), "basic auth: duplicate users");
 }
 
 TEST(Factory, InvalidConfigNoUser) {
@@ -88,9 +89,9 @@ TEST(Factory, InvalidConfigNoUser) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, "basic auth: empty user name or password");
+  auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_FALSE(status_or.ok());
+  EXPECT_EQ(status_or.status().message(), "basic auth: empty user name or password");
 }
 
 TEST(Factory, InvalidConfigNoPassword) {
@@ -107,9 +108,9 @@ TEST(Factory, InvalidConfigNoPassword) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, "basic auth: empty user name or password");
+  auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_FALSE(status_or.ok());
+  EXPECT_EQ(status_or.status().message(), "basic auth: empty user name or password");
 }
 
 TEST(Factory, InvalidConfigNoHash) {
@@ -126,9 +127,10 @@ TEST(Factory, InvalidConfigNoHash) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, "basic auth: invalid htpasswd format, invalid SHA hash length");
+  auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_FALSE(status_or.ok());
+  EXPECT_EQ(status_or.status().message(),
+            "basic auth: invalid htpasswd format, invalid SHA hash length");
 }
 
 TEST(Factory, InvalidConfigNotSHA) {
@@ -145,9 +147,10 @@ TEST(Factory, InvalidConfigNotSHA) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, "basic auth: unsupported htpasswd format: please use {SHA}");
+  auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_FALSE(status_or.ok());
+  EXPECT_EQ(status_or.status().message(),
+            "basic auth: unsupported htpasswd format: please use {SHA}");
 }
 
 TEST(Factory, ValidConfigWithServerContext) {

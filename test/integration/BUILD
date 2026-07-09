@@ -1923,6 +1923,27 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "listener_crl_share_integration_test",
+    size = "large",
+    srcs = ["listener_crl_share_integration_test.cc"],
+    data = [
+        "//test/common/tls/test_data:certs",
+    ],
+    rbe_pool = "6gig",
+    deps = [
+        ":http_integration_lib",
+        "//source/common/tls:client_ssl_socket_lib",
+        "//source/common/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:config",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "listener_extension_discovery_integration_test",
     size = "large",
     srcs = envoy_select_enable_http3(["listener_extension_discovery_integration_test.cc"]),

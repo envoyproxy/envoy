@@ -615,3 +615,54 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
     abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
   );
 }
+
+#[test]
+fn test_response_flags_callbacks_filter() {
+  let mut f = ResponseFlagsCallbacksFilter {};
+  let mut envoy_filter = MockEnvoyHttpFilter::default();
+
+  // Craft a bitmask with NoHealthyUpstream (bit 1), UpstreamOverflow (bit 7) and
+  // DnsResolutionFailed (bit 26) set. The unset bits must not produce any header.
+  envoy_filter
+    .expect_get_attribute_int()
+    .withf(|id| *id == abi::envoy_dynamic_module_type_attribute_id::ResponseFlags)
+    .return_const(Some((1i64 << 1) | (1i64 << 7) | (1i64 << 26)))
+    .once();
+
+  // Only the three set flags should be surfaced as response headers.
+  envoy_filter
+    .expect_set_response_header()
+    .withf(|key, value| key == "x-response-flag-no-healthy-upstream" && value == b"true")
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_set_response_header()
+    .withf(|key, value| key == "x-response-flag-upstream-overflow" && value == b"true")
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_set_response_header()
+    .withf(|key, value| key == "x-response-flag-dns-resolution-failed" && value == b"true")
+    .return_const(true)
+    .once();
+
+  assert_eq!(
+    f.on_response_headers(&mut envoy_filter, false),
+    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  );
+}
+
+#[test]
+fn test_map_response_flags_none_when_unavailable() {
+  let mut envoy_filter = MockEnvoyHttpFilter::default();
+
+  // When the attribute is unavailable the getter returns None, which must map to all-false flags.
+  envoy_filter
+    .expect_get_attribute_int()
+    .withf(|id| *id == abi::envoy_dynamic_module_type_attribute_id::ResponseFlags)
+    .returning(|_| None)
+    .once();
+
+  let flags = map_response_flags(&envoy_filter);
+  assert!(flags.as_headers().iter().all(|(_, is_set)| !is_set));
+}

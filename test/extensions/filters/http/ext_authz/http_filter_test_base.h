@@ -47,6 +47,16 @@ using ::testing::Return;
 
 constexpr char FilterConfigName[] = "ext_authz_filter";
 
+// Builds a per-route config from proto, asserting construction succeeds. For tests that only use
+// valid per-route configurations.
+inline FilterConfigPerRoute
+makePerRoute(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& config) {
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigPerRoute per_route(config, creation_status);
+  EXPECT_TRUE(creation_status.ok());
+  return per_route;
+}
+
 template <class T> class HttpFilterTestBase : public T {
 public:
   HttpFilterTestBase() = default;
@@ -60,8 +70,10 @@ public:
   }
 
   void initialize(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config) {
+    absl::Status creation_status = absl::OkStatus();
     config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(),
-                                             "ext_authz_prefix", factory_context_);
+                                             "ext_authz_prefix", factory_context_, creation_status);
+    ASSERT_TRUE(creation_status.ok());
     client_ = new NiceMock<Filters::Common::ExtAuthz::MockClient>();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_},
                                        factory_context_);

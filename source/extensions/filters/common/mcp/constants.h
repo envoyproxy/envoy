@@ -52,6 +52,16 @@ constexpr absl::string_view DEFAULT_SERVER_VERSION = "1.0.0";
 
 constexpr absl::string_view IS_MCP_REQUEST = "is_mcp_request";
 constexpr absl::string_view IS_EXCEEDING_LIMIT = "is_exceeding_limit";
+constexpr absl::string_view STATUS = "status";
+
+namespace StatusValues {
+constexpr absl::string_view OK = "OK";
+constexpr absl::string_view PARSE_ERROR = "PARSE_ERROR";
+constexpr absl::string_view NO_MCP = "REJECT_NO_MCP";
+constexpr absl::string_view NOT_JSONRPC = "NOT_JSONRPC";
+constexpr absl::string_view DUPLICATE_KEYS = "DUPLICATE_KEYS";
+constexpr absl::string_view BODY_TOO_LARGE = "BODY_TOO_LARGE";
+} // namespace StatusValues
 
 // HTTP header names
 constexpr absl::string_view MCP_SESSION_ID_HEADER = "mcp-session-id";

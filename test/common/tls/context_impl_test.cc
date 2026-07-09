@@ -12,6 +12,7 @@
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/ssl.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/common/tls/cert_validator/default_validator.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
@@ -171,6 +172,117 @@ TEST_F(SslContextImplTest, TestCipherSuitesDeduplication) {
 
   EXPECT_TRUE(manager_.createSslClientContext(*store_.rootScope(), *cfg1).ok());
   EXPECT_TRUE(manager_.createSslClientContext(*store_.rootScope(), *cfg2).ok());
+}
+
+// Validates that TLS contexts referencing identical CRL content share a single
+// parsed CRL, rather than each holding its own multi-megabyte parsed copy.
+TEST_F(SslContextImplTest, TestCrlSharedAcrossContexts) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context1;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context1);
+  auto cfg1 = *ClientContextConfigImpl::create(tls_context1, factory_context_);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context2;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context2);
+  auto cfg2 = *ClientContextConfigImpl::create(tls_context2, factory_context_);
+
+  auto ctx1 = *manager_.createSslClientContext(*store_.rootScope(), *cfg1);
+  auto cleanup1 = cleanUpHelper(ctx1);
+  auto ctx2 = *manager_.createSslClientContext(*store_.rootScope(), *cfg2);
+  auto cleanup2 = cleanUpHelper(ctx2);
+  ASSERT_NE(ctx1, nullptr);
+  ASSERT_NE(ctx2, nullptr);
+
+  // Both contexts reference the same CRL content, so it is parsed and held once.
+  auto crl_cache = getCrlCache(server_factory_context_.singletonManager());
+  EXPECT_EQ(crl_cache->size(), 1);
+
+  // A context with a different CRL adds a second cache entry.
+  const std::string other_yaml = R"EOF(
+  common_tls_context:
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.crl"
+  )EOF";
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context3;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(other_yaml), tls_context3);
+  auto cfg3 = *ClientContextConfigImpl::create(tls_context3, factory_context_);
+  auto ctx3 = *manager_.createSslClientContext(*store_.rootScope(), *cfg3);
+  auto cleanup3 = cleanUpHelper(ctx3);
+  ASSERT_NE(ctx3, nullptr);
+  EXPECT_EQ(crl_cache->size(), 2);
+}
+
+// Validates the lifetime of a CRL shared between two TLS contexts: deleting one
+// context leaves the CRL valid and still enforced for the other, and tearing
+// down both contexts is safe. Primarily intended to run under ASAN/TSAN to catch
+// lifetime regressions in the shared-CRL handling.
+TEST_F(SslContextImplTest, TestCrlSharedContextLifetime) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"
+  require_client_certificate: true
+  )EOF";
+
+  auto make_factory = [&]() {
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+    auto cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+    return *ServerSslSocketFactory::create(std::move(cfg), manager_, *store_.rootScope());
+  };
+
+  auto factory_a = make_factory();
+  auto factory_b = make_factory();
+
+  // Both contexts reference the same CRL content, so it is parsed and held once.
+  auto crl_cache = getCrlCache(server_factory_context_.singletonManager());
+  EXPECT_EQ(crl_cache->size(), 1);
+
+  // A client certificate that ca_cert.crl revokes.
+  bssl::UniquePtr<X509> revoked_cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+
+  // Confirms the given context still enforces revocation through the shared CRL.
+  auto expect_revocation_enforced = [&](ServerSslSocketFactory& factory) {
+    Network::TransportSocketPtr socket = factory.createDownstreamTransportSocket();
+    SSL_CTX* ssl_ctx = extractSslCtx(socket.get());
+    bssl::UniquePtr<X509_STORE_CTX> store_ctx(X509_STORE_CTX_new());
+    ASSERT_TRUE(X509_STORE_CTX_init(store_ctx.get(), SSL_CTX_get_cert_store(ssl_ctx),
+                                    revoked_cert.get(), nullptr));
+    EXPECT_EQ(X509_verify_cert(store_ctx.get()), 0);
+    EXPECT_EQ(X509_STORE_CTX_get_error(store_ctx.get()), X509_V_ERR_CERT_REVOKED);
+  };
+
+  expect_revocation_enforced(*factory_b);
+
+  // Delete one context; destroying the factory removes its context. The shared
+  // CRL must remain valid and enforced for the surviving context.
+  factory_a.reset();
+  EXPECT_EQ(crl_cache->size(), 1);
+  expect_revocation_enforced(*factory_b);
+
+  // Delete the second context; the cache entry is released with no crash.
+  factory_b.reset();
+  EXPECT_EQ(crl_cache->size(), 0);
 }
 
 // Envoy's default cipher preference is server's.
