@@ -247,6 +247,16 @@ TEST_F(GrpcJsonTranscoderConfigTest, NonBinaryProto) {
                         "transcoding_filter: Unable to parse proto descriptor"));
 }
 
+TEST_F(GrpcJsonTranscoderConfigTest, DescriptorNotSet) {
+  // Services are configured (so the filter is enabled) but neither proto_descriptor nor
+  // proto_descriptor_bin is set.
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config;
+  proto_config.add_services("bookstore.Bookstore");
+  EXPECT_THAT(
+      transcoderConfigStatus(proto_config, *api_),
+      HasStatus(absl::StatusCode::kInvalidArgument, "transcoding_filter: descriptor not set"));
+}
+
 TEST_F(GrpcJsonTranscoderConfigTest, InvalidHttpTemplate) {
   HttpRule http_rule;
   http_rule.set_get("/book/{");
@@ -1231,6 +1241,45 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithHttpBody) {
   EXPECT_THAT(request, ProtoEq(expected_request));
 }
 
+// A unary HTTP body request whose stream is terminated by trailers (rather than an end_stream
+// flag on the last data frame) must still flush the buffered body as a single gRPC frame.
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithHttpBodyEndsWithTrailers) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/postBody?arg=hi"}, {"content-type", "text/plain"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl buffer;
+  buffer.add("hello world!");
+  // No end_stream: the body is buffered waiting for the end of the stream.
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(buffer, false));
+  EXPECT_EQ(buffer.length(), 0);
+
+  // Trailers signal end-of-stream, causing the buffered HTTP body to be flushed.
+  Buffer::OwnedImpl decoded_data;
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
+      .WillOnce(Invoke([&decoded_data](Buffer::Instance& data, bool) { decoded_data.move(data); }));
+
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
+
+  std::vector<Grpc::Frame> frames;
+  Grpc::Decoder decoder;
+  std::ignore = decoder.decode(decoded_data, frames);
+  ASSERT_EQ(frames.size(), 1);
+
+  bookstore::EchoBodyRequest expected_request;
+  expected_request.set_arg("hi");
+  expected_request.mutable_nested()->mutable_content()->set_content_type("text/plain");
+  expected_request.mutable_nested()->mutable_content()->set_data("hello world!");
+
+  bookstore::EchoBodyRequest request;
+  std::ignore = request.ParseFromString(frames[0].data_->toString());
+  EXPECT_THAT(request, ProtoEq(expected_request));
+}
+
 // Unary requests with HTTP bodies require the filter to buffer the entire body.
 // This results in the filter internally buffering more data than the configured limits.
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithHttpBodyExceedsBufferLimit) {
@@ -1338,6 +1387,33 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBody) {
     std::ignore = request.ParseFromString(frames[0].data_->toString());
     EXPECT_THAT(request, ProtoEq(expected_request));
   }
+}
+
+// A client-streaming HTTP body request whose data frames are all delivered before the stream is
+// terminated by trailers. Because every frame was already sent during decodeData, the trailing
+// call to send the HTTP body message should be a no-op (nothing left buffered).
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBodyEndsWithTrailers) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/streamBody?arg=hi"}, {"content-type", "text/plain"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+  // Client streaming packages each data frame into a gRPC frame as it arrives (end_stream=false).
+  Buffer::OwnedImpl buffer;
+  buffer.add("data");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(buffer, false));
+
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+  std::ignore = decoder.decode(buffer, frames);
+  EXPECT_EQ(frames.size(), 1);
+
+  // All body data was already flushed, so terminating via trailers must not add any more data.
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _)).Times(0);
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
 }
 
 class GrpcJsonTranscoderFilterTestWithLargerBuffer : public GrpcJsonTranscoderFilterTest {
@@ -1460,6 +1536,27 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamSSEUnary) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter.encodeHeaders(response_headers, false));
   EXPECT_EQ("application/json", response_headers.get_("content-type"));
+}
+
+// A server-streaming (non-HttpBody) response whose final data frame carries end_stream. This
+// drives the end_stream path of encodeData that finishes the response input stream.
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingServerStreamingEncodeDataEndStream) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/shelves/1/books"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("/bookstore.Bookstore/ListBooks", request_headers.get_(":path"));
+
+  Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
+                                                   {":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+
+  bookstore::Book book;
+  book.set_title("Book1");
+  auto response_data = Grpc::Common::serializeToGrpcFrame(book);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(*response_data, true));
+  EXPECT_THAT(response_data->toString(), testing::HasSubstr(R"("title":"Book1")"));
 }
 
 // Streaming requests with HTTP bodies do not internally buffer any data.
@@ -1903,6 +2000,54 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, SkipTranscodingStatusIfBod
 
   Http::TestResponseTrailerMapImpl response_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
+}
+
+TEST_F(GrpcJsonTranscoderFilterEchoStructTest, TranscodingErrorWithTooDeepProtoMessage) {
+  // A proto message nested deeper than the transcoder's recursion limit fails to transcode,
+  // which rejects the response with a 502 (Bad Gateway).
+  auto response_message = createDeepStruct(100);
+  auto response_data = Grpc::Common::serializeToGrpcFrame(response_message);
+
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::BadGateway, _, _, _, _));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
+            filter_.encodeData(*response_data, false));
+}
+
+// With convert_grpc_status enabled, a response that carries a body must not have its body replaced
+// by a serialized status, even when a non-OK grpc-status is present in the trailers.
+TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, SkipStatusConversionWhenBodyPresent) {
+  Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
+                                                   {":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.encodeHeaders(response_headers, false));
+
+  // A response body sets has_body_, which suppresses status conversion.
+  bookstore::Shelf response;
+  response.set_id(20);
+  response.set_theme("Children");
+  auto response_data = Grpc::Common::serializeToGrpcFrame(response);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
+            filter_.encodeData(*response_data, false));
+
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(testing::Invoke([](Buffer::Instance& data, bool) {
+        EXPECT_EQ(R"({"id":"20","theme":"Children"})", data.toString());
+      }));
+
+  Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "5"},
+                                                     {"grpc-message", "not found"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
+}
+
+// With convert_grpc_status enabled, an OK grpc-status is not converted into a serialized status
+// body.
+TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, SkipStatusConversionForOkStatus) {
+  Http::TestResponseHeaderMapImpl response_headers{
+      {"content-type", "application/grpc"}, {":status", "200"}, {"grpc-status", "0"}};
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, true));
+  EXPECT_EQ("200", response_headers.get_(":status"));
 }
 
 struct GrpcJsonTranscoderFilterPrintTestParam {
