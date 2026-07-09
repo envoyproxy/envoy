@@ -248,7 +248,7 @@ public:
                const uint32_t max_message_timeout_ms, Stats::Scope& scope,
                const std::string& stats_prefix, bool is_upstream,
                Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
-               Server::Configuration::CommonFactoryContext& context);
+               Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status);
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 

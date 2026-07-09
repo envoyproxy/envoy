@@ -67,6 +67,12 @@ void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level
   }
 }
 
+envoy_dynamic_module_type_log_level envoy_dynamic_module_callback_get_log_level() {
+  // The ABI log level enum mirrors spdlog::level::level_enum, so the cast is a direct mapping.
+  return static_cast<envoy_dynamic_module_type_log_level>(
+      Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules).level());
+}
+
 uint32_t envoy_dynamic_module_callback_get_concurrency() {
   using namespace Envoy;
   // The previous `ASSERT_IS_MAIN_OR_TEST_THREAD` is compiled out under NDEBUG and the
