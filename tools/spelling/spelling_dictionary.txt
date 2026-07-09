@@ -15,6 +15,7 @@ addrlen
 defragmentation
 evictable
 flushdb
+interleavings
 itr
 STREQ
 htonl

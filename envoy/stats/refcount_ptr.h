@@ -161,9 +161,9 @@ struct RefcountHelper {
   // thread's accesses to the object happen-before the object's destruction,
   // so each decrement releases, and the final decrement (the one that takes
   // the count to zero and triggers destruction) also acquires. We use an
-  // acq_rel read-modify-write rather than the fence-based formulation from
-  // the Boost example because TSAN models RMW orderings precisely, while
-  // standalone fences are not as well supported. On x86 the difference from
+  // `acq_rel` read-modify-write rather than the fence-based formulation from
+  // the Boost example because TSAN models read-modify-write orderings precisely,
+  // while standalone fences are not as well supported. On x86 the difference from
   // the previous sequentially-consistent operations is minimal, but the
   // savings are real on weakly-ordered platforms such as ARM.
   void incRefCount() { ref_count_.fetch_add(1, std::memory_order_relaxed); }
