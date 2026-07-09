@@ -65,10 +65,10 @@ TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithCorrectProto) {
 
   RateLimitQuotaFilterFactory factory;
   std::string stats_prefix = "test";
-  Http::FilterFactoryCb cb = factory
-                                 .createFilterFactoryFromProtoTyped(filter_config, stats_prefix,
-                                                                    mock_stream_client->context_)
-                                 .value();
+  auto cb_or = factory.createFilterFactoryFromProtoTyped(filter_config, stats_prefix,
+                                                         mock_stream_client->context_);
+  ASSERT_TRUE(cb_or.ok()) << cb_or.status();
+  Http::FilterFactoryCb cb = std::move(cb_or).value();
   cb(filter_callback);
 
   GlobalTlsStores::clear();

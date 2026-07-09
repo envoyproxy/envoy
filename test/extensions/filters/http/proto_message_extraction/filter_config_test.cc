@@ -48,8 +48,11 @@ protected:
   // filter_config_ on success.
   absl::Status makeConfig() {
     absl::Status creation_status = absl::OkStatus();
-    filter_config_ = std::make_unique<FilterConfig>(
+    auto filter_config = std::make_unique<FilterConfig>(
         proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_, creation_status);
+    if (creation_status.ok()) {
+      filter_config_ = std::move(filter_config);
+    }
     return creation_status;
   }
 
