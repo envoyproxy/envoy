@@ -2284,6 +2284,104 @@ TEST_F(ReverseConnectionClusterTest, CleanupRemovesHostsFromPrioritySet) {
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 }
 
+// The reverse-connection cluster surfaces currently-reachable tunnels as admin endpoints without
+// creating load-balanced hosts.
+TEST_F(ReverseConnectionClusterTest, AdminEndpointsExposeReachableTunnels) {
+  config_.set_enable_detailed_stats(true);
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-remote-node-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+
+  // The cluster is its own admin endpoint provider.
+  EXPECT_EQ(static_cast<const Upstream::AdminEndpointProvider*>(cluster_.get()),
+            cluster_->adminEndpointProvider());
+
+  // No tunnels yet: nothing reported, and no load-balanced hosts created.
+  EXPECT_TRUE(cluster_->adminEndpoints().empty());
+
+  // Two connections to the same node surface as one endpoint with a count of 2.
+  extension_->updateConnectionStats("node-a", "cluster-a", true, false);
+  extension_->updateConnectionStats("node-a", "cluster-a", true, false);
+
+  auto endpoints = cluster_->adminEndpoints();
+  ASSERT_EQ(1, endpoints.size());
+  const auto& ep = endpoints[0];
+
+  // Mirrors a real reverse-tunnel host: placeholder 127.0.0.1:0 address, node id in logicalName,
+  // and "cluster:node" in the hostname, weight 1, healthy.
+  EXPECT_EQ("node-a", ep.address->logicalName());
+  EXPECT_EQ("127.0.0.1:0", ep.address->asString());
+  EXPECT_EQ("cluster-a:node-a", ep.hostname);
+  EXPECT_EQ(1u, ep.weight);
+  EXPECT_EQ(envoy::config::core::v3::HEALTHY, ep.health);
+
+  ASSERT_EQ(1, ep.gauges.size());
+  EXPECT_EQ("rt_connection_count", ep.gauges[0].first);
+  EXPECT_EQ(2, ep.gauges[0].second);
+
+  // Surfacing admin endpoints does not add load-balanced hosts to the priority set.
+  for (const auto& host_set : cluster_->prioritySet().hostSetsPerPriority()) {
+    EXPECT_TRUE(host_set->hosts().empty());
+  }
+}
+
+// A node that already has a real (lazily-created) load-balanced host is not also surfaced as a
+// synthetic admin endpoint, so it is never listed twice.
+TEST_F(ReverseConnectionClusterTest, AdminEndpointsSkipNodesWithRealHost) {
+  config_.set_enable_detailed_stats(true);
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-remote-node-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+  addTestSocket("node-a", "cluster-a");
+
+  // The reachable-tunnel inventory knows about node-a.
+  extension_->updateConnectionStats("node-a", "cluster-a", true, false);
+  EXPECT_EQ(1, cluster_->adminEndpoints().size());
+
+  // Route a request to node-a so a real load-balanced host is created for it.
+  RevConCluster::LoadBalancer lb(cluster_);
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+  lb_context.downstream_headers_ =
+      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "node-a"}}};
+  auto result = lb.chooseHost(&lb_context);
+  ASSERT_NE(result.host, nullptr);
+
+  // The real host carries the same "cluster:node" hostname as the synthetic endpoint did.
+  EXPECT_EQ("cluster-a:node-a", result.host->hostname());
+
+  // Now that node-a has a real host, it is no longer reported as a synthetic endpoint.
+  EXPECT_TRUE(cluster_->adminEndpoints().empty());
+}
+
 } // namespace ReverseConnection
 } // namespace Extensions
 } // namespace Envoy

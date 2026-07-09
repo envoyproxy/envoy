@@ -21,7 +21,7 @@ Http::FilterFactoryCb McpFilterConfigFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
-Http::FilterFactoryCb McpFilterConfigFactory::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb> McpFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
 

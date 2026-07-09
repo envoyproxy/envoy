@@ -616,6 +616,8 @@ public:
     }
     void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) override {}
     void removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) override {}
+    void addUpstreamWatermarkCallbacks(Http::UpstreamWatermarkCallbacks&) override {}
+    void removeUpstreamWatermarkCallbacks(Http::UpstreamWatermarkCallbacks&) override {}
     void setBufferLimit(uint64_t) override {}
     uint64_t bufferLimit() override { return 0; }
     bool recreateStream(const Http::ResponseHeaderMap*) override { return false; }

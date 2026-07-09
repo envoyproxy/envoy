@@ -11,6 +11,7 @@ Other features
   reverse_tunnel
   io_uring
   vcl
+  sockmap
   wasm
   wasm_service
   qatzip

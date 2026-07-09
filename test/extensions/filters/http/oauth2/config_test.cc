@@ -275,6 +275,129 @@ config:
       });
 }
 
+TEST(ConfigTest, CreateFilterPrivateKeyJwt) {
+  const std::string yaml = R"EOF(
+config:
+  token_endpoint:
+    cluster: foo
+    uri: oauth.com/token
+    timeout: 3s
+  credentials:
+    client_id: "secret"
+    token_secret:
+      name: private_key
+    hmac_secret:
+      name: hmac
+  authorization_endpoint: https://oauth.com/oauth/authorize/
+  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
+  redirect_path_matcher:
+    path:
+      exact: /callback
+  signout_path:
+    path:
+      exact: /signout
+  auth_type: "PRIVATE_KEY_JWT"
+  private_key_jwt_config:
+    signing_algorithm: RS256
+    assertion_lifetime: 120s
+    )EOF";
+
+  OAuth2Config factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
+
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
+  ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
+      .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
+          envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
+
+  EXPECT_CALL(context, messageValidationVisitor());
+  EXPECT_CALL(context.server_factory_context_, clusterManager()).Times(2);
+  EXPECT_CALL(context, scope());
+  EXPECT_CALL(context.server_factory_context_, timeSource());
+  EXPECT_CALL(context, initManager());
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
+
+TEST(ConfigTest, PrivateKeyJwtInvalidAssertionLifetime) {
+  // A non-positive assertion_lifetime is rejected by the PGV duration rule at config ingestion.
+  const std::string yaml = R"EOF(
+config:
+  token_endpoint:
+    cluster: foo
+    uri: oauth.com/token
+    timeout: 3s
+  credentials:
+    client_id: "secret"
+    token_secret:
+      name: private_key
+    hmac_secret:
+      name: hmac
+  authorization_endpoint: https://oauth.com/oauth/authorize/
+  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
+  redirect_path_matcher:
+    path:
+      exact: /callback
+  signout_path:
+    path:
+      exact: /signout
+  auth_type: "PRIVATE_KEY_JWT"
+  private_key_jwt_config:
+    signing_algorithm: ES256
+    assertion_lifetime: 0s
+    )EOF";
+
+  OAuth2Config factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  EXPECT_THROW_WITH_REGEX(
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
+      EnvoyException, "value must be greater than");
+}
+
+TEST(ConfigTest, PrivateKeyJwtMissingTokenSecret) {
+  const std::string yaml = R"EOF(
+config:
+  token_endpoint:
+    cluster: foo
+    uri: oauth.com/token
+    timeout: 3s
+  credentials:
+    client_id: "secret"
+    hmac_secret:
+      name: hmac
+  authorization_endpoint: https://oauth.com/oauth/authorize/
+  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
+  redirect_path_matcher:
+    path:
+      exact: /callback
+  signout_path:
+    path:
+      exact: /signout
+  auth_type: "PRIVATE_KEY_JWT"
+    )EOF";
+
+  OAuth2Config factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().message(),
+            "token_secret is required when auth_type is not TLS_CLIENT_AUTH");
+}
+
 TEST(ConfigTest, MissingTokenSecretNonTlsClientAuth) {
   const std::string yaml = R"EOF(
 config:

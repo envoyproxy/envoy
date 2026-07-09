@@ -1,0 +1,1 @@
+OpenTelemetry tracer now sets the ``http.method`` attribute to ``_OTHER`` if the HTTP method is not one of the known methods (CONNECT, DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT, QUERY, TRACE), adhering to OpenTelemetry semantic conventions.

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
