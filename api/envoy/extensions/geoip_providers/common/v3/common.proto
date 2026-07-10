@@ -98,7 +98,7 @@ message CommonGeoipProviderConfig {
   // - The :ref:`Network GeoIP filter <config_network_filters_geoip>` stores results in the
   //   connection's filter state under the well-known key ``envoy.geoip``.
   //
-  // [#next-free-field: 13]
+  // [#next-free-field: 24]
   message GeolocationFieldKeys {
     // If set, the key will be used to populate the country ISO code associated with the IP address.
     string country = 1;
@@ -147,6 +147,51 @@ message CommonGeoipProviderConfig {
     // and the result will be stored with this key. Value will be set to either ``true`` or ``false``
     // depending on the check result.
     string apple_private_relay = 11;
+
+    // If set, the key will be used to populate the `GeoNames <https://www.geonames.org/>`_ ID of the
+    // city associated with the IP address.
+    string city_geoname_id = 13;
+
+    // If set, the key will be used to populate the approximate WGS84 latitude of the location
+    // associated with the IP address.
+    string latitude = 14;
+
+    // If set, the key will be used to populate the approximate WGS84 longitude of the location
+    // associated with the IP address.
+    string longitude = 15;
+
+    // If set, the key will be used to populate the time zone associated with the IP address as
+    // found in the `IANA Time Zone Database <https://www.iana.org/time-zones>`_ (e.g. ``Europe/London``).
+    string time_zone = 16;
+
+    // If set, the key will be used to populate the postal code associated with the IP address.
+    string postal_code = 17;
+
+    // If set, the key will be used to populate the English name of the region associated with the
+    // IP address. The least specific subdivision will be selected as the region value.
+    string region_name = 18;
+
+    // If set, the key will be used to populate the `GeoNames <https://www.geonames.org/>`_ ID of the
+    // region associated with the IP address. The least specific subdivision will be selected as the
+    // region value.
+    string region_geoname_id = 19;
+
+    // If set, the key will be used to populate the `GeoNames <https://www.geonames.org/>`_ ID of the
+    // subregion associated with the IP address. The second least specific subdivision will be
+    // selected as the subregion value.
+    string subregion_geoname_id = 20;
+
+    // If set, the key will be used to populate the `GeoNames <https://www.geonames.org/>`_ ID of the
+    // country associated with the IP address.
+    string country_geoname_id = 21;
+
+    // If set, the key will be used to populate the `GeoNames <https://www.geonames.org/>`_ ID of the
+    // continent associated with the IP address.
+    string continent_geoname_id = 22;
+
+    // If set, the key will be used to populate the metro code (DMA code in the US) associated with
+    // the IP address.
+    string metro_code = 23;
   }
 
   // Configuration for geolocation headers to add to HTTP requests.
