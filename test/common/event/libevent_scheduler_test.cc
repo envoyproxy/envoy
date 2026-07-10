@@ -28,8 +28,9 @@ protected:
 
 class MockEvwatchObserver : public Evwatch::Observer {
 public:
-  MOCK_METHOD(void, onPrepare, (uint64_t prepare_time_us, bool timeout_set, uint64_t timeout_us));
-  MOCK_METHOD(void, onCheck, (uint64_t check_time_us));
+  MOCK_METHOD(void, onPrepare,
+              (MonotonicTime prepare_time, bool timeout_set, std::chrono::microseconds timeout));
+  MOCK_METHOD(void, onCheck, (MonotonicTime check_time));
 };
 
 TEST_F(LibeventSchedulerTest, RegisterMultipleObserversAndLazyPruning) {

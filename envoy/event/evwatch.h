@@ -1,9 +1,11 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 
 namespace Envoy {
 namespace Event {
@@ -19,17 +21,18 @@ public:
 
   /**
    * Called during epoll/event loop prepare phase (before sleeping/polling for events).
-   * @param prepare_time_us monotonic time in microseconds at prepare.
+   * @param prepare_time monotonic time at prepare.
    * @param timeout_set whether a timeout was set on the epoll wait.
-   * @param timeout_us the duration of the timeout in microseconds if timeout_set is true.
+   * @param timeout the duration of the timeout if timeout_set is true.
    */
-  virtual void onPrepare(uint64_t prepare_time_us, bool timeout_set, uint64_t timeout_us) = 0;
+  virtual void onPrepare(MonotonicTime prepare_time, bool timeout_set,
+                         std::chrono::microseconds timeout) = 0;
 
   /**
    * Called during epoll/event loop check phase (after waking up from polling for events).
-   * @param check_time_us monotonic time in microseconds at check.
+   * @param check_time monotonic time at check.
    */
-  virtual void onCheck(uint64_t check_time_us) = 0;
+  virtual void onCheck(MonotonicTime check_time) = 0;
 };
 
 using ObserverPtr = std::unique_ptr<Observer>;

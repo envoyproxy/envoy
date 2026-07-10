@@ -31,8 +31,9 @@ public:
 
 class MockEvwatchObserver : public Evwatch::Observer {
 public:
-  MOCK_METHOD(void, onPrepare, (uint64_t prepare_time_us, bool timeout_set, uint64_t timeout_us));
-  MOCK_METHOD(void, onCheck, (uint64_t check_time_us));
+  MOCK_METHOD(void, onPrepare,
+              (MonotonicTime prepare_time, bool timeout_set, std::chrono::microseconds timeout));
+  MOCK_METHOD(void, onCheck, (MonotonicTime check_time));
 };
 
 TEST(EvwatchObserverDispatcherTest, MockDispatcherRegistration) {
@@ -133,20 +134,22 @@ TEST_F(EvwatchObserverRealDispatcherTest, TimeoutReportingAndMetricsCalculation)
   auto observer = std::make_unique<NiceMock<MockEvwatchObserver>>();
   auto* observer_ptr = observer.get();
 
-  std::atomic<uint64_t> last_check_time_us{0};
-  std::atomic<uint64_t> recorded_loop_duration_us{0};
-  std::atomic<bool> observed_timer_timeout{false};
+  MonotonicTime last_check_time{};
+  std::chrono::microseconds recorded_loop_duration{0};
+  bool observed_timer_timeout{false};
 
   ON_CALL(*observer_ptr, onCheck(_))
       .WillByDefault(
-          Invoke([&last_check_time_us](uint64_t check_time) { last_check_time_us = check_time; }));
+          Invoke([&last_check_time](MonotonicTime check_time) { last_check_time = check_time; }));
 
   ON_CALL(*observer_ptr, onPrepare(_, _, _))
-      .WillByDefault(Invoke([&](uint64_t prepare_time, bool timeout_set, uint64_t timeout_us) {
-        if (last_check_time_us.load() != 0 && prepare_time >= last_check_time_us.load()) {
-          recorded_loop_duration_us = prepare_time - last_check_time_us.load();
+      .WillByDefault(Invoke([&](MonotonicTime prepare_time, bool timeout_set,
+                                std::chrono::microseconds timeout) {
+        if (last_check_time.time_since_epoch().count() != 0 && prepare_time >= last_check_time) {
+          recorded_loop_duration =
+              std::chrono::duration_cast<std::chrono::microseconds>(prepare_time - last_check_time);
         }
-        if (timeout_set && timeout_us <= 50000) {
+        if (timeout_set && timeout <= std::chrono::microseconds(50000)) {
           observed_timer_timeout = true;
         }
       }));
@@ -162,8 +165,8 @@ TEST_F(EvwatchObserverRealDispatcherTest, TimeoutReportingAndMetricsCalculation)
   // Cycle again to verify duration calculation across iterations.
   cycleEventLoop();
 
-  EXPECT_TRUE(observed_timer_timeout.load());
-  EXPECT_GT(recorded_loop_duration_us.load(), 0);
+  EXPECT_TRUE(observed_timer_timeout);
+  EXPECT_GT(recorded_loop_duration.count(), 0);
 
   handle.reset();
 }

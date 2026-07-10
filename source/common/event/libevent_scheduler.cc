@@ -164,18 +164,17 @@ void LibeventScheduler::onPrepareForObserver(evwatch*, const evwatch_prepare_cb_
   }
   timeval timeout;
   const bool timeout_set = evwatch_prepare_get_timeout(info, &timeout);
-  const uint64_t timeout_us =
-      timeout_set ? static_cast<uint64_t>(timeout.tv_sec) * 1000000 + timeout.tv_usec : 0;
+  const std::chrono::microseconds timeout_us =
+      timeout_set ? std::chrono::microseconds(static_cast<uint64_t>(timeout.tv_sec) * 1000000 +
+                                              timeout.tv_usec)
+                  : std::chrono::microseconds(0);
 
-  const uint64_t prepare_time_us =
-      std::chrono::duration_cast<std::chrono::microseconds>(
-          std::chrono::steady_clock::now().time_since_epoch()) // NO_CHECK_FORMAT(real_time)
-          .count();
+  const MonotonicTime prepare_time = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
 
-  auto observers = self->evwatch_observers_;
-  for (const auto& entry : observers) {
-    if (auto observer = entry.lock()) {
-      observer->onPrepare(prepare_time_us, timeout_set, timeout_us);
+  const size_t size = self->evwatch_observers_.size();
+  for (size_t i = 0; i < size; ++i) {
+    if (auto observer = self->evwatch_observers_[i].lock()) {
+      observer->onPrepare(prepare_time, timeout_set, timeout_us);
     }
   }
   self->evwatch_observers_.erase(std::remove_if(self->evwatch_observers_.begin(),
@@ -189,15 +188,12 @@ void LibeventScheduler::onCheckForObserver(evwatch*, const evwatch_check_cb_info
   if (self->evwatch_observers_.empty()) {
     return;
   }
-  const uint64_t check_time_us =
-      std::chrono::duration_cast<std::chrono::microseconds>(
-          std::chrono::steady_clock::now().time_since_epoch()) // NO_CHECK_FORMAT(real_time)
-          .count();
+  const MonotonicTime check_time = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
 
-  auto observers = self->evwatch_observers_;
-  for (const auto& entry : observers) {
-    if (auto observer = entry.lock()) {
-      observer->onCheck(check_time_us);
+  const size_t size = self->evwatch_observers_.size();
+  for (size_t i = 0; i < size; ++i) {
+    if (auto observer = self->evwatch_observers_[i].lock()) {
+      observer->onCheck(check_time);
     }
   }
   self->evwatch_observers_.erase(std::remove_if(self->evwatch_observers_.begin(),
