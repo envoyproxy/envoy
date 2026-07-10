@@ -519,8 +519,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bytecodealliance/wasm-micro-runtime/archive/{version}.tar.gz"],
     ),
     wasmtime = dict(
-        version = "42.0.2",
-        sha256 = "96b94e150a3877d98cdc2e27bcd65ba89155ad67fa16c48fad6216664cb60d29",
+        version = "45.0.2",
+        sha256 = "a95cf57008b87dbe1cdaba220ea58b75bb0b53369e166fe21e729011bd25e9e8",
         strip_prefix = "wasmtime-{version}",
         urls = ["https://github.com/bytecodealliance/wasmtime/archive/v{version}.tar.gz"],
     ),
@@ -623,8 +623,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/{version}.tar.gz"],
     ),
     proxy_wasm_cpp_host = dict(
-        version = "09e5f8d6658fdb77f3d5859b27141e79514e371c",
-        sha256 = "366e7598d4931a96fd1c5b0482f87076d863810049aa3a8ce921616592ed3e8c",
+        version = "f2db56af443571e92a31c0b877106d9ea96e19ef",
+        sha256 = "34dac5bcebf0b156e435bf8dd9bdac5be60b95f967c420c680578d73af28c604",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
     ),

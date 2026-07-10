@@ -573,7 +573,7 @@ wasmtime:
   project_name: "wasmtime"
   project_desc: "A standalone runtime for WebAssembly"
   project_url: "https://github.com/bytecodealliance/wasmtime"
-  release_date: "2026-04-09"
+  release_date: "2026-06-15"
   use_category:
   - dataplane_ext
   extensions:
@@ -1233,7 +1233,7 @@ proxy_wasm_cpp_host:
   project_name: "WebAssembly for Proxies (C++ host implementation)"
   project_desc: "WebAssembly for Proxies (C++ host implementation)"
   project_url: "https://github.com/proxy-wasm/proxy-wasm-cpp-host"
-  release_date: "2026-06-22"
+  release_date: "2026-06-23"
   use_category:
   - dataplane_ext
   extensions:
