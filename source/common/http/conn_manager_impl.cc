@@ -939,7 +939,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       connection_manager_.read_callbacks_->connection().streamInfo().startTimeMonotonic());
 
   // Copy the connection-level downstream TLS handshake time points onto the request-level stream
-  // info so they are available to COMMON_DURATION (DX_HS_BEG/DX_HS_END) access logging.
+  // info so they are available to COMMON_DURATION (DS_HS_BEG/DS_HS_END) access logging.
   const auto& connection_downstream_timing =
       connection_manager_.read_callbacks_->connection().streamInfo().downstreamTiming();
   if (connection_downstream_timing.downstreamHandshakeStart().has_value()) {

@@ -364,9 +364,9 @@ Current supported substitution commands include:
     * ``DS_CX_END``: The time point at which the downstream connection was closed, i.e. the
       connection close time. Note this is unlike ``US_CX_END``, which marks the end of the upstream
       connection *establishment* rather than the connection close.
-    * ``DX_HS_BEG``: The time point of the downstream TLS handshake begin, i.e. when the
+    * ``DS_HS_BEG``: The time point of the downstream TLS handshake begin, i.e. when the
       ClientHello was received.
-    * ``DX_HS_END``: The time point of the downstream TLS handshake end.
+    * ``DS_HS_END``: The time point of the downstream TLS handshake end.
     * ``DS_RX_BEG``: The time point of the downstream request receiving begin.
     * ``DS_RX_END``: The time point of the downstream request receiving end.
     * ``US_CX_BEG``: The time point of the upstream TCP connect begin.
@@ -416,9 +416,9 @@ Current supported substitution commands include:
     * ``DS_CX_END``: The time point at which the downstream connection was closed, i.e. the
       connection close time. Note this is unlike ``US_CX_END``, which marks the end of the upstream
       connection *establishment* rather than the connection close.
-    * ``DX_HS_BEG``: The time point of the downstream TLS handshake begin, i.e. when the
+    * ``DS_HS_BEG``: The time point of the downstream TLS handshake begin, i.e. when the
       ClientHello was received.
-    * ``DX_HS_END``: The time point of the downstream TLS handshake end.
+    * ``DS_HS_END``: The time point of the downstream TLS handshake end.
     * ``US_CX_BEG``: The time point of the upstream TCP connect begin.
     * ``US_CX_END``: The time point of the upstream TCP connect end.
 

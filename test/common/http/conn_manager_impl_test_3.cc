@@ -2733,7 +2733,7 @@ TEST_F(HttpConnectionManagerImplTest, CommonDurationDownstreamConnectionTimePoin
   EXPECT_EQ(MonotonicTime(std::chrono::milliseconds(30)), logged_connection_end.value());
 }
 
-// The COMMON_DURATION downstream TLS handshake time points (DX_HS_BEG/DX_HS_END) are recorded at
+// The COMMON_DURATION downstream TLS handshake time points (DS_HS_BEG/DS_HS_END) are recorded at
 // connection level and copied onto each request-level stream info for access logging.
 TEST_F(HttpConnectionManagerImplTest, CommonDurationDownstreamHandshakeTimePoints) {
   std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
