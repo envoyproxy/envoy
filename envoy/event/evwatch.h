@@ -50,7 +50,7 @@ public:
 
   /**
    * Returns a weak reference to the underlying observer. This allows ad-hoc tracking lists
-   * (such as periodic metric pollers) to safely reference the observer without interfering
+   * (such as periodic metric readers) to safely reference the observer without interfering
    * with RAII handle ownership and lifecycle unregistration.
    */
   virtual ObserverWeakPtr observer() const = 0;
