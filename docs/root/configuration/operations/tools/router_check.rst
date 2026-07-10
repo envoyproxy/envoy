@@ -16,7 +16,7 @@ virtual host name, manual path rewrite, manual host rewrite, path redirect, and
 header field matches. Extensions for other test cases can be added. Details about installing the tool
 and sample tool input/output can be found at :ref:`installation <install_tools_route_table_check_tool>`.
 
-The route table check tool config is composed of an array of json test objects. Each test object is composed of
+The route table check tool config is composed of an array of JSON test objects. Each test object is composed of
 three parts.
 
 Test name
@@ -163,10 +163,10 @@ input
     simulate the route being disabled.
 
   ssl
-    *(optional, boolean)* A flag that determines whether to set x-forwarded-proto to https or http.
+    *(optional, boolean)* A flag that determines whether to set x-forwarded-proto to https or HTTP.
     By setting x-forwarded-proto to a given protocol, the tool is able to simulate the behavior of
     a client issuing a request via HTTP or HTTPS. By default ssl is false which corresponds to
-    x-forwarded-proto set to http.
+    x-forwarded-proto set to HTTP.
 
   runtime
     *(optional, string)* A string representing the runtime setting to enable for the test. The runtime
