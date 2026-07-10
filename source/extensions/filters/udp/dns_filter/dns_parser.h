@@ -49,7 +49,10 @@ public:
       : BaseDnsRecord(rec_name, rec_type, rec_class) {}
   bool serialize(Buffer::OwnedImpl& output) override;
 
-  // Name used for matching configured domains; may be normalized while name_ keeps original case.
+  // Name used for matching; falls back to original-case name_ when not normalized.
+  const std::string& lookupName() const { return lookup_name_.empty() ? name_ : lookup_name_; }
+
+  // Lowercased copy of name_, populated only for case-insensitive matching; empty otherwise.
   std::string lookup_name_;
   std::unique_ptr<Stats::HistogramCompletableTimespanImpl> query_time_ms_;
 };

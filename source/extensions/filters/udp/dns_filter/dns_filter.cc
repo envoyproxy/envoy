@@ -295,7 +295,7 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
     incrementExternalQueryTypeCount(query->type_);
     for (const auto& ip : iplist) {
       incrementExternalQueryTypeAnswerCount(query->type_);
-      const std::chrono::seconds ttl = getDomainTTL(query->lookup_name_);
+      const std::chrono::seconds ttl = getDomainTTL(query->lookupName());
       message_parser_.storeDnsAnswerRecord(context, *query, ttl, ip);
     }
     sendDnsResponse(std::move(context));
@@ -367,13 +367,13 @@ DnsLookupResponseCode DnsFilter::getResponseForQuery(DnsQueryContextPtr& context
    * contains QDCOUNT (usually 1) entries.
    */
   for (const auto& query : context->queries_) {
-    // Normalize the query name once; all matching below and in the resolver callback reuses it.
-    query->lookup_name_ = maybeNormalizeName(query->name_);
+    // Normalize once; matching below and the resolver callback reuse lookupName().
+    maybeNormalizeQuery(*query);
 
     // Try to resolve the query locally. If forwarding the query externally is disabled we will
     // always attempt to resolve with the configured domains
     const bool forward_queries = config_->forwardQueries();
-    if (isKnownDomain(query->lookup_name_) || !forward_queries) {
+    if (isKnownDomain(query->lookupName()) || !forward_queries) {
       // Determine whether the name is a cluster. Move on to the next query if successful
       if (resolveViaClusters(context, *query)) {
         continue;
@@ -490,7 +490,7 @@ bool DnsFilter::resolveClusterService(DnsQueryContextPtr& context, const DnsQuer
   size_t cluster_endpoints = 0;
 
   // Get the service_list config for the domain
-  const auto* service_config = getServiceConfigForDomain(query.lookup_name_);
+  const auto* service_config = getServiceConfigForDomain(query.lookupName());
   if (service_config != nullptr) {
     // We can redirect to more than one cluster, but only one is supported
     const auto& cluster_target = service_config->targets_.begin();
@@ -550,7 +550,7 @@ bool DnsFilter::resolveClusterService(DnsQueryContextPtr& context, const DnsQuer
 
 bool DnsFilter::resolveClusterHost(DnsQueryContextPtr& context, const DnsQueryRecord& query) {
   // Determine if the domain name is being redirected to a cluster
-  const auto cluster_name = getClusterNameForDomain(query.lookup_name_);
+  const auto cluster_name = getClusterNameForDomain(query.lookupName());
   absl::string_view lookup_name;
   if (!cluster_name.empty()) {
     lookup_name = cluster_name;
@@ -595,7 +595,7 @@ bool DnsFilter::resolveViaClusters(DnsQueryContextPtr& context, const DnsQueryRe
 }
 
 bool DnsFilter::resolveConfiguredDomain(DnsQueryContextPtr& context, const DnsQueryRecord& query) {
-  const auto* configured_address_list = getAddressListForDomain(query.lookup_name_);
+  const auto* configured_address_list = getAddressListForDomain(query.lookupName());
   uint64_t hosts_found = 0;
   if (configured_address_list != nullptr) {
     // Build an answer record from each configured IP address
@@ -604,7 +604,7 @@ bool DnsFilter::resolveConfiguredDomain(DnsQueryContextPtr& context, const DnsQu
       ENVOY_LOG(trace, "using local address {} for domain [{}]",
                 configured_address->ip()->addressAsString(), query.name_);
       ++hosts_found;
-      const std::chrono::seconds ttl = getDomainTTL(query.lookup_name_);
+      const std::chrono::seconds ttl = getDomainTTL(query.lookupName());
       if (message_parser_.storeDnsAnswerRecord(context, query, ttl, configured_address)) {
         incrementLocalQueryTypeAnswerCount(query.type_);
       }
@@ -614,7 +614,7 @@ bool DnsFilter::resolveConfiguredDomain(DnsQueryContextPtr& context, const DnsQu
 }
 
 bool DnsFilter::resolveConfiguredService(DnsQueryContextPtr& context, const DnsQueryRecord& query) {
-  const auto* service_config = getServiceConfigForDomain(query.lookup_name_);
+  const auto* service_config = getServiceConfigForDomain(query.lookupName());
 
   size_t targets_discovered = 0;
   if (service_config != nullptr) {

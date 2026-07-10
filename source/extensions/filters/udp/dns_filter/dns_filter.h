@@ -360,9 +360,16 @@ private:
     }
   }
 
-  // Returns an owning string so callers can safely take string_views into the result.
-  std::string maybeNormalizeName(const absl::string_view name) const {
-    return config_->caseInsensitive() ? absl::AsciiStrToLower(name) : std::string(name);
+  // Populates lookup_name_ with a lowercased copy for case-insensitive matching; a no-op (no
+  // allocation) on the default case-sensitive path.
+  void maybeNormalizeQuery(DnsQueryRecord& query) const {
+    if (!config_->caseInsensitive()) {
+      return;
+    }
+    std::string lower = absl::AsciiStrToLower(query.name_);
+    if (lower != query.name_) {
+      query.lookup_name_ = std::move(lower);
+    }
   }
 
   /**
