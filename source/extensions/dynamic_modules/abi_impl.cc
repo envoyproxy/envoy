@@ -67,6 +67,12 @@ void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level
   }
 }
 
+envoy_dynamic_module_type_log_level envoy_dynamic_module_callback_get_log_level() {
+  // The ABI log level enum mirrors spdlog::level::level_enum, so the cast is a direct mapping.
+  return static_cast<envoy_dynamic_module_type_log_level>(
+      Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules).level());
+}
+
 uint32_t envoy_dynamic_module_callback_get_concurrency() {
   using namespace Envoy;
   // The previous `ASSERT_IS_MAIN_OR_TEST_THREAD` is compiled out under NDEBUG and the
@@ -1745,6 +1751,14 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_network_filter_has_upst
   IS_ENVOY_BUG("envoy_dynamic_module_callback_network_filter_has_upstream_host: "
                "not implemented in this context");
   return false;
+}
+
+__attribute__((weak)) uint64_t
+envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(
+    envoy_dynamic_module_type_network_filter_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_network_filter_get_upstream_connection_id: "
+               "not implemented in this context");
+  return 0;
 }
 
 __attribute__((weak)) bool
@@ -4316,6 +4330,54 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_http_filter_get_attribu
   return false;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_network_filter_get_attribute_string(
+    envoy_dynamic_module_type_network_filter_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_network_filter_get_attribute_string: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_network_filter_get_attribute_int(
+    envoy_dynamic_module_type_network_filter_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    uint64_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_network_filter_get_attribute_int: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_network_filter_get_attribute_bool(
+    envoy_dynamic_module_type_network_filter_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    bool*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_network_filter_get_attribute_bool: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_listener_filter_get_attribute_string(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_listener_filter_get_attribute_string: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_listener_filter_get_attribute_int(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    uint64_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_listener_filter_get_attribute_int: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_listener_filter_get_attribute_bool(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    bool*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_listener_filter_get_attribute_bool: "
+               "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) envoy_dynamic_module_type_http_callout_init_result
 envoy_dynamic_module_callback_http_filter_http_callout(
     envoy_dynamic_module_type_http_filter_envoy_ptr, uint64_t*,
@@ -4589,6 +4651,13 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_http_set_upstream_overr
   IS_ENVOY_BUG("envoy_dynamic_module_callback_http_set_upstream_override_host: not implemented in "
                "this context");
   return false;
+}
+
+__attribute__((weak)) uint64_t envoy_dynamic_module_callback_http_get_upstream_connection_id(
+    envoy_dynamic_module_type_http_filter_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_http_get_upstream_connection_id: not "
+               "implemented in this context");
+  return 0;
 }
 
 __attribute__((weak)) void envoy_dynamic_module_callback_http_filter_reset_stream(

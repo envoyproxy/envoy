@@ -10,13 +10,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CacheV2 {
 
-class CacheFilterFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::cache_v2::v3::CacheV2Config> {
+class CacheFilterFactory : public Common::ExceptionFreeFactoryBase<
+                               envoy::extensions::filters::http::cache_v2::v3::CacheV2Config> {
 public:
-  CacheFilterFactory() : FactoryBase("envoy.filters.http.cache_v2") {}
+  CacheFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.cache_v2") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config& config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };

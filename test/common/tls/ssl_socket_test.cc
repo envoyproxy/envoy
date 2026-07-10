@@ -362,6 +362,16 @@ public:
 
   const std::string& expectedPeerCertChain() const { return expected_peer_cert_chain_; }
 
+  TestUtilOptions&
+  setExpectedValidatedPeerCertChain(const std::string& expected_validated_peer_cert_chain) {
+    expected_validated_peer_cert_chain_ = expected_validated_peer_cert_chain;
+    return *this;
+  }
+
+  const std::string& expectedValidatedPeerCertChain() const {
+    return expected_validated_peer_cert_chain_;
+  }
+
   TestUtilOptions& setExpectedValidFromTimePeerCert(const std::string& expected_valid_from) {
     expected_valid_from_peer_cert_ = expected_valid_from;
     return *this;
@@ -469,6 +479,7 @@ private:
   std::vector<std::string> expected_local_oids_;
   std::string expected_peer_cert_;
   std::string expected_peer_cert_chain_;
+  std::string expected_validated_peer_cert_chain_;
   std::string expected_valid_from_peer_cert_;
   std::string expected_expiration_peer_cert_;
   std::string expected_ocsp_response_;
@@ -766,6 +777,14 @@ void testUtil(const TestUtilOptions& options) {
         concatenated_chain = absl::StrJoin(pem_chain, "");
         EXPECT_EQ(options.expectedPeerCertChain(), concatenated_chain);
       }
+      if (!options.expectedValidatedPeerCertChain().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        absl::Span<const std::string> validated_chain =
+            server_connection->ssl()->pemEncodedValidatedPeerCertificateChain();
+        EXPECT_EQ(options.expectedValidatedPeerCertChain(), absl::StrJoin(validated_chain, ""));
+        validated_chain = server_connection->ssl()->pemEncodedValidatedPeerCertificateChain();
+        EXPECT_EQ(options.expectedValidatedPeerCertChain(), absl::StrJoin(validated_chain, ""));
+      }
       if (!options.expectedValidFromTimePeerCert().empty()) {
         const std::string formatted = TestUtility::formatTime(
             server_connection->ssl()->validFromPeerCertificate().value(), "%b %e %H:%M:%S %Y GMT");
@@ -797,6 +816,7 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(EMPTY_STRING,
                   server_connection->ssl()->urlEncodedPemEncodedPeerCertificateChain());
         EXPECT_TRUE(server_connection->ssl()->pemEncodedPeerCertificateChain().empty());
+        EXPECT_TRUE(server_connection->ssl()->pemEncodedValidatedPeerCertificateChain().empty());
       }
       if (!options.expectedSni().empty()) {
         EXPECT_EQ(options.expectedSni(), server_connection->ssl()->sni());
@@ -2797,6 +2817,49 @@ TEST_P(SslSocketTest, GetPeerCertChain) {
                                   "}}/test/common/tls/test_data/no_san_chain.pem"));
   testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
                .setExpectedPeerCertChain(expected_peer_cert_chain));
+}
+
+// Verify that pemEncodedValidatedPeerCertificateChain() returns the chain Envoy built
+// and validated even when the peer presents a chain in the wrong order with a decoy CA.
+// The client sends leaf (san_dns3) + Root CA (decoy) + Intermediate CA; BoringSSL re-orders and
+// completes the path, so the validated chain is leaf + Intermediate CA + Root CA - both a
+// different order and a different set from what the peer sent.
+TEST_P(SslSocketTest, GetValidatedPeerCertChainWithIntermediate) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_with_decoy_chain.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  // The validated chain is leaf + Intermediate CA + Root CA, in that order.
+  const std::string expected_validated_chain =
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir }}/test/common/tls/test_data/san_dns3_cert.pem")) +
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.pem")) +
+      TestEnvironment::readFileToStringForTest(
+          TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+  testUtil(test_options.setExpectedSerialNumber(TEST_SAN_DNS3_CERT_SERIAL)
+               .setExpectedValidatedPeerCertChain(expected_validated_chain)
+               .setExpectedSha256PeerCertificateIssuerDigest(TEST_INTERMEDIATE_CA_CERT_256_HASH)
+               .setExpectedSerialNumberPeerCertificateIssuer(TEST_INTERMEDIATE_CA_CERT_SERIAL));
 }
 
 TEST_P(SslSocketTest, GetIssueExpireTimesPeerCert) {
@@ -6138,6 +6201,44 @@ TEST_P(SslSocketTest, CipherSuitesWithPolicy) {
   // Client connects with an unsupported client cipher suite for a server policy, connection fails.
   server_params->add_compliance_policies(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::FIPS_202205);
+  updateFilterChain(tls_context, *filter_chain);
+  TestUtilOptionsV2 error_test_options(listener, client, false, version_);
+  error_test_options.setExpectedServerStats("ssl.connection_error");
+  testUtilV2(error_test_options);
+}
+
+TEST_P(SslSocketTest, CipherSuitesWithCNSA2Policy) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"));
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
+      client.mutable_common_tls_context()->mutable_tls_params();
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
+      tls_context.mutable_common_tls_context()->mutable_tls_params();
+
+  // Connection using a common cipher (client & server) succeeds.
+  client_params->clear_cipher_suites();
+  client_params->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
+  server_params->clear_cipher_suites();
+  server_params->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
+  server_params->add_cipher_suites("AES256-GCM-SHA384");
+  updateFilterChain(tls_context, *filter_chain);
+  TestUtilOptionsV2 test_options(listener, client, true, version_);
+  testUtilV2(test_options);
+
+  // Client connects with an unsupported client cipher suite for a server policy, connection fails.
+  server_params->add_compliance_policies(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::CNSA2_202603);
   updateFilterChain(tls_context, *filter_chain);
   TestUtilOptionsV2 error_test_options(listener, client, false, version_);
   error_test_options.setExpectedServerStats("ssl.connection_error");

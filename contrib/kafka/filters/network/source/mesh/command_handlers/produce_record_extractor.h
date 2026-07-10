@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "contrib/kafka/filters/network/source/external/requests.h"
 #include "contrib/kafka/filters/network/source/mesh/outbound_record.h"
 

@@ -2424,8 +2424,14 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
     if (active_health_check_flag_changed) {
       hosts_with_active_health_check_flag_changed.emplace(existing_host->first);
     }
-    const bool skip_inplace_host_update =
-        health_check_address_changed || locality_changed || active_health_check_flag_changed;
+    const bool endpoint_hostname_changed =
+        (existing_host_found && host->hostname() != existing_host->second->hostname());
+    const bool health_check_hostname_changed =
+        (existing_host_found && health_checker_ != nullptr &&
+         host->hostnameForHealthChecks() != existing_host->second->hostnameForHealthChecks());
+    const bool hostname_changed = endpoint_hostname_changed || health_check_hostname_changed;
+    const bool skip_inplace_host_update = health_check_address_changed || locality_changed ||
+                                          active_health_check_flag_changed || hostname_changed;
 
     // When there is a match and we decided to do in-place update, we potentially update the
     // host's health check flag and metadata. Afterwards, the host is pushed back into the
