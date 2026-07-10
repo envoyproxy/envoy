@@ -24,6 +24,7 @@ envoy_cc_library(
     deps = [
         ":deferred_deletable",
         ":dispatcher_thread_deletable",
+        ":event_loop_interface",
         ":file_event_interface",
         ":scaled_timer",
         ":schedulable_cb_interface",
@@ -44,6 +45,12 @@ envoy_cc_library(
         "@abseil-cpp//absl/functional:any_invocable",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_library(
+    name = "event_loop_interface",
+    hdrs = ["event_loop.h"],
+    deps = ["//envoy/common:pure_lib"],
 )
 
 envoy_cc_library(

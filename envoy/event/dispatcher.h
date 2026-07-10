@@ -11,6 +11,7 @@
 #include "envoy/config/core/v3/resolver.pb.h"
 #include "envoy/config/core/v3/udp_socket_config.pb.h"
 #include "envoy/event/dispatcher_thread_deletable.h"
+#include "envoy/event/event_loop.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/scaled_timer.h"
 #include "envoy/event/schedulable_cb.h"
@@ -165,6 +166,15 @@ public:
    */
   virtual void registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
                                 std::chrono::milliseconds min_touch_interval) PURE;
+
+  /**
+   * Register an Evwatch::Observer to receive prepare and check callbacks on this dispatcher's
+   * event loop. Must be called on the dispatcher's thread or via post().
+   * @param observer the observer to register.
+   * @return Evwatch::ObserverHandlePtr handle that unregisters the observer when destructed.
+   */
+  virtual Evwatch::ObserverHandlePtr
+  registerEvwatchObserver(Evwatch::ObserverSharedPtr observer) = 0;
 
   /**
    * Returns a time-source to use with this dispatcher.

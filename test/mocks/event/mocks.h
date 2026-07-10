@@ -9,6 +9,7 @@
 #include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/event_loop.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/event/signal.h"
@@ -117,6 +118,7 @@ public:
   // Event::Dispatcher
   MOCK_METHOD(void, registerWatchdog,
               (const Server::WatchDogSharedPtr&, std::chrono::milliseconds));
+  MOCK_METHOD(Evwatch::ObserverHandlePtr, registerEvwatchObserver, (Evwatch::ObserverSharedPtr));
   MOCK_METHOD(void, initializeStats, (Stats::Scope&, const absl::optional<std::string>&));
   MOCK_METHOD(void, clearDeferredDeleteList, ());
   MOCK_METHOD(Network::ServerConnection*, createServerConnection_, (StreamInfo::StreamInfo & info));

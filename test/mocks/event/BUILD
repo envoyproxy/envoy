@@ -16,6 +16,7 @@ envoy_cc_mock(
     deps = [
         "//envoy/event:deferred_deletable",
         "//envoy/event:dispatcher_interface",
+        "//envoy/event:event_loop_interface",
         "//envoy/event:file_event_interface",
         "//envoy/event:scaled_range_timer_manager_interface",
         "//envoy/event:signal_interface",
@@ -35,5 +36,6 @@ envoy_cc_test_library(
     hdrs = ["wrapped_dispatcher.h"],
     deps = [
         "//envoy/event:dispatcher_interface",
+        "//envoy/event:event_loop_interface",
     ],
 )

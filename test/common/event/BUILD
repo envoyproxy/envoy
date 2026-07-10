@@ -19,10 +19,33 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
         "//source/common/stats:isolated_store_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/server:watch_dog_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "event_loop_test",
+    srcs = ["event_loop_test.cc"],
+    deps = [
+        "//envoy/api:api_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:event_loop_interface",
+        "//test/mocks/event:event_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "libevent_scheduler_test",
+    srcs = ["libevent_scheduler_test.cc"],
+    deps = [
+        "//source/common/event:libevent_scheduler_lib",
+        "//test/mocks/event:event_mocks",
         "//test/test_common:utility_lib",
     ],
 )

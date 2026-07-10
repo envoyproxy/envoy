@@ -1,5 +1,7 @@
 #include "source/common/event/libevent_scheduler.h"
 
+#include <algorithm>
+
 #include "source/common/common/assert.h"
 #include "source/common/event/schedulable_cb_impl.h"
 #include "source/common/event/timer_impl.h"
@@ -13,6 +15,15 @@ namespace {
 void recordTimeval(Stats::Histogram& histogram, const timeval& tv) {
   histogram.recordValue(tv.tv_sec * 1000000 + tv.tv_usec);
 }
+
+class ObserverHandleImpl : public Evwatch::ObserverHandle {
+public:
+  explicit ObserverHandleImpl(Evwatch::ObserverSharedPtr observer)
+      : observer_(std::move(observer)) {}
+
+private:
+  Evwatch::ObserverSharedPtr observer_;
+};
 } // namespace
 
 LibeventScheduler::LibeventScheduler() {
@@ -140,6 +151,64 @@ void LibeventScheduler::onCheckForStats(evwatch*, const evwatch_check_cb_info*, 
       recordTimeval(self->stats_->poll_delay_us_, delay);
     }
   }
+}
+
+void LibeventScheduler::onPrepareForObserver(evwatch*, const evwatch_prepare_cb_info* info,
+                                             void* arg) {
+  auto self = static_cast<LibeventScheduler*>(arg);
+  if (self->evwatch_observers_.empty()) {
+    return;
+  }
+  timeval timeout;
+  const bool timeout_set = evwatch_prepare_get_timeout(info, &timeout);
+  const uint64_t timeout_us =
+      timeout_set ? static_cast<uint64_t>(timeout.tv_sec) * 1000000 + timeout.tv_usec : 0;
+
+  timeval now;
+  evutil_gettimeofday(&now, nullptr);
+  const uint64_t prepare_time_us = static_cast<uint64_t>(now.tv_sec) * 1000000 + now.tv_usec;
+
+  for (auto it = self->evwatch_observers_.begin(); it != self->evwatch_observers_.end();) {
+    if (auto observer = it->lock()) {
+      observer->onPrepare(prepare_time_us, timeout_set, timeout_us);
+      ++it;
+    } else {
+      it = self->evwatch_observers_.erase(it);
+    }
+  }
+}
+
+void LibeventScheduler::onCheckForObserver(evwatch*, const evwatch_check_cb_info*, void* arg) {
+  auto self = static_cast<LibeventScheduler*>(arg);
+  if (self->evwatch_observers_.empty()) {
+    return;
+  }
+  timeval now;
+  evutil_gettimeofday(&now, nullptr);
+  const uint64_t check_time_us = static_cast<uint64_t>(now.tv_sec) * 1000000 + now.tv_usec;
+
+  for (auto it = self->evwatch_observers_.begin(); it != self->evwatch_observers_.end();) {
+    if (auto observer = it->lock()) {
+      observer->onCheck(check_time_us);
+      ++it;
+    } else {
+      it = self->evwatch_observers_.erase(it);
+    }
+  }
+}
+
+Evwatch::ObserverHandlePtr
+LibeventScheduler::registerEvwatchObserver(Evwatch::ObserverSharedPtr observer) {
+  if (observer == nullptr) {
+    return nullptr;
+  }
+  if (!evwatch_observers_registered_) {
+    evwatch_observers_registered_ = true;
+    evwatch_prepare_new(libevent_.get(), &onPrepareForObserver, this);
+    evwatch_check_new(libevent_.get(), &onCheckForObserver, this);
+  }
+  evwatch_observers_.push_back(observer);
+  return std::make_unique<ObserverHandleImpl>(std::move(observer));
 }
 
 } // namespace Event

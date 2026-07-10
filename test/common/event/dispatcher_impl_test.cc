@@ -32,6 +32,7 @@ using testing::InSequence;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Event {
@@ -1523,6 +1524,46 @@ TEST_F(DispatcherConnectionTest, CreateEnvoyInternalConnectionWhenFactoryNotExis
           Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(),
           nullptr, nullptr),
       "");
+}
+
+class DispatcherImplEvwatchTest : public testing::Test {
+protected:
+  DispatcherImplEvwatchTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
+
+  void cycleEventLoop() {
+    dispatcher_->post([]() {});
+    dispatcher_->run(Dispatcher::RunType::Block);
+  }
+
+  Api::ApiPtr api_;
+  DispatcherPtr dispatcher_;
+};
+
+class MockEvwatchObserver : public Evwatch::Observer {
+public:
+  MOCK_METHOD(void, onPrepare, (uint64_t prepare_time_us, bool timeout_set, uint64_t timeout_us));
+  MOCK_METHOD(void, onCheck, (uint64_t check_time_us));
+};
+
+TEST_F(DispatcherImplEvwatchTest, RegisterAndUnregisterObserver) {
+  auto observer = std::make_shared<StrictMock<MockEvwatchObserver>>();
+  auto* observer_ptr = observer.get();
+  EXPECT_CALL(*observer_ptr, onPrepare(_, _, _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(*observer_ptr, onCheck(_)).Times(testing::AtLeast(1));
+
+  auto handle = dispatcher_->registerEvwatchObserver(std::move(observer));
+  EXPECT_NE(nullptr, handle);
+  cycleEventLoop();
+
+  handle.reset();
+  cycleEventLoop();
+}
+
+TEST_F(DispatcherImplEvwatchTest, RegisterNullObserver) {
+  auto handle = dispatcher_->registerEvwatchObserver(nullptr);
+  EXPECT_EQ(nullptr, handle);
+  cycleEventLoop();
 }
 
 } // namespace
