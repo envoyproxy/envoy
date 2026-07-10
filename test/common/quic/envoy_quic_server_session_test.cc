@@ -938,7 +938,9 @@ TEST_F(EnvoyQuicServerSessionTest, ShutdownNotice) {
   testing::NiceMock<quic::test::MockHttp3DebugVisitor> debug_visitor;
   envoy_quic_session_.set_debug_visitor(&debug_visitor);
   EXPECT_CALL(debug_visitor, OnGoAwayFrameSent(_));
+  EXPECT_EQ(0U, stats_.goaway_sent_.value());
   http_connection_->shutdownNotice();
+  EXPECT_EQ(0U, stats_.goaway_sent_.value());
 }
 
 TEST_F(EnvoyQuicServerSessionTest, GoAway) {
@@ -946,7 +948,9 @@ TEST_F(EnvoyQuicServerSessionTest, GoAway) {
   testing::NiceMock<quic::test::MockHttp3DebugVisitor> debug_visitor;
   envoy_quic_session_.set_debug_visitor(&debug_visitor);
   EXPECT_CALL(debug_visitor, OnGoAwayFrameSent(_));
+  EXPECT_EQ(0U, stats_.goaway_sent_.value());
   http_connection_->goAway();
+  EXPECT_EQ(1U, stats_.goaway_sent_.value());
 }
 
 TEST_F(EnvoyQuicServerSessionTest, ConnectedAfterHandshake) {
