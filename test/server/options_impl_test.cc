@@ -554,6 +554,17 @@ TEST_F(OptionsImplTest, SkipHotRestartDefaults) {
   EXPECT_FALSE(options->skipHotRestartParentStats());
 }
 
+TEST_F(OptionsImplTest, LogStacktraceSingleEntryDefault) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl({"envoy", "-c", "hello"});
+  EXPECT_FALSE(options->logStacktraceSingleEntry());
+}
+
+TEST_F(OptionsImplTest, LogStacktraceSingleEntryEnabled) {
+  std::unique_ptr<OptionsImpl> options =
+      createOptionsImpl({"envoy", "-c", "hello", "--log-stacktrace-single-entry"});
+  EXPECT_TRUE(options->logStacktraceSingleEntry());
+}
+
 TEST_F(OptionsImplTest, LogFormatOverride) {
   std::unique_ptr<OptionsImpl> options =
       createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v"});

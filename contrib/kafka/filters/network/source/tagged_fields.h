@@ -50,6 +50,9 @@ struct TaggedField {
  */
 class TaggedFieldDeserializer : public Deserializer<TaggedField> {
 public:
+  // protects against memory exhaustion via attacker controlled field data length.
+  static constexpr uint32_t MAX_TAGGED_FIELD_DATA_SIZE = 64 * 1024; // 64 kb
+
   TaggedFieldDeserializer() = default;
 
   uint32_t feed(absl::string_view& data) override {
@@ -63,14 +66,17 @@ public:
 
     if (!length_consumed_) {
       required_ = length_deserializer_.get();
-      data_buffer_ = std::vector<unsigned char>(required_);
+      if (required_ > MAX_TAGGED_FIELD_DATA_SIZE) {
+        throw EnvoyException(fmt::format("Tagged field data length {} exceeds maximum allowed {}",
+                                         required_, MAX_TAGGED_FIELD_DATA_SIZE));
+      }
+      data_buffer_.reserve(required_);
       length_consumed_ = true;
     }
 
     const uint32_t data_consumed = std::min<uint32_t>(required_, data.size());
-    const uint32_t written = data_buffer_.size() - required_;
     if (data_consumed > 0) {
-      memcpy(data_buffer_.data() + written, data.data(), data_consumed); // NOLINT(safe-memcpy)
+      data_buffer_.insert(data_buffer_.end(), data.data(), data.data() + data_consumed);
       required_ -= data_consumed;
       data = {data.data() + data_consumed, data.size() - data_consumed};
     }
@@ -128,6 +134,9 @@ struct TaggedFields {
  */
 class TaggedFieldsDeserializer : public Deserializer<TaggedFields> {
 public:
+  // protects against memory exhaustion via attacker controlled tagged field count.
+  static constexpr uint32_t MAX_TAGGED_FIELD_COUNT = 64;
+
   uint32_t feed(absl::string_view& data) override {
 
     const uint32_t count_consumed = count_deserializer_.feed(data);
@@ -137,6 +146,10 @@ public:
 
     if (!children_setup_) {
       const uint32_t field_count = count_deserializer_.get();
+      if (field_count > MAX_TAGGED_FIELD_COUNT) {
+        throw EnvoyException(fmt::format("Tagged field count {} exceeds maximum allowed {}",
+                                         field_count, MAX_TAGGED_FIELD_COUNT));
+      }
       children_ = std::vector<TaggedFieldDeserializer>(field_count);
       children_setup_ = true;
     }

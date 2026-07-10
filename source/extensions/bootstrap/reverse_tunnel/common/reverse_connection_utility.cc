@@ -89,6 +89,34 @@ std::string ReverseConnectionUtility::buildTenantScopedIdentifier(absl::string_v
   return std::string(absl::StrCat(tenant, TENANT_SCOPE_DELIMITER, identifier));
 }
 
+std::string ReverseConnectionUtility::buildClusterScopedIdentifier(absl::string_view node_id,
+                                                                   absl::string_view cluster_id) {
+  // cluster_id carries the tenant prefix; prefixing the base node yields "[tenant:]cluster:node".
+  const TenantScopedIdentifierView node = splitTenantScopedIdentifier(node_id);
+  // Without a cluster, keep the node's own tenant so isolation is preserved.
+  if (cluster_id.empty()) {
+    return buildTenantScopedIdentifier(node.tenant, node.identifier);
+  }
+  return buildTenantScopedIdentifier(cluster_id, node.identifier);
+}
+
+std::pair<std::string, std::string>
+ReverseConnectionUtility::splitClusterScopedIdentifier(absl::string_view value) {
+  const TenantScopedIdentifierView first = splitTenantScopedIdentifier(value);
+  if (first.tenant.empty()) {
+    // "node" — cluster absent, so attribute the whole value to the node.
+    return {std::string(value), std::string()};
+  }
+  const TenantScopedIdentifierView second = splitTenantScopedIdentifier(first.identifier);
+  if (second.tenant.empty()) {
+    // "cluster:node" — no tenant prefix.
+    return {std::string(second.identifier), std::string(first.tenant)};
+  }
+  // "tenant:cluster:node".
+  return {buildTenantScopedIdentifier(first.tenant, second.identifier),
+          buildTenantScopedIdentifier(first.tenant, second.tenant)};
+}
+
 std::shared_ptr<PingMessageHandler> ReverseConnectionMessageHandlerFactory::createPingHandler() {
   return std::make_shared<PingMessageHandler>();
 }

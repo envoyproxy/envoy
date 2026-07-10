@@ -379,15 +379,15 @@ ContextImpl::ContextImpl(
       if (!fips_mode) {
         ENVOY_LOG(warn, "FIPS conformance policy applied on a non-FIPS build");
       }
-      for (auto& tls_context : tls_contexts_) {
-        int rc = SSL_CTX_set_compliance_policy(tls_context.ssl_ctx_.get(),
-                                               ssl_compliance_policy_fips_202205);
-        if (rc != 1) {
-          creation_status = absl::InvalidArgumentError(
-              absl::StrCat("Failed to apply FIPS_202205 compliance policy: ",
-                           Utility::getLastCryptoError().value_or("")));
-          return;
-        }
+      creation_status = setCompliancePolicy(ssl_compliance_policy_fips_202205);
+      if (!creation_status.ok()) {
+        return;
+      }
+      break;
+    case ProtoPolicy::CNSA2_202603:
+      creation_status = setCompliancePolicy(ssl_compliance_policy_cnsa2_202603);
+      if (!creation_status.ok()) {
+        return;
       }
       break;
     default:
@@ -397,6 +397,18 @@ ContextImpl::ContextImpl(
   }
 }
 
+absl::Status ContextImpl::setCompliancePolicy(enum ssl_compliance_policy_t policy) {
+  for (auto& tls_context : tls_contexts_) {
+    int rc = SSL_CTX_set_compliance_policy(tls_context.ssl_ctx_.get(), policy);
+    if (rc != 1) {
+      return absl::InvalidArgumentError(absl::StrCat("Failed to apply compliance policy: ",
+                                                     Utility::getLastCryptoError().value_or("")));
+    }
+  }
+
+  return absl::OkStatus();
+}
+
 void ContextImpl::keylogCallback(const SSL* ssl, const char* line) {
   ASSERT(ssl != nullptr);
   auto callbacks =
@@ -404,14 +416,20 @@ void ContextImpl::keylogCallback(const SSL* ssl, const char* line) {
   auto ctx = static_cast<ContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
   ASSERT(callbacks != nullptr);
   ASSERT(ctx != nullptr);
+  ctx->maybeWriteKeyLog(line, callbacks->connection().connectionInfoProvider().localAddress().get(),
+                        callbacks->connection().connectionInfoProvider().remoteAddress().get());
+}
 
-  if ((ctx->tls_keylog_local_.getIpListSize() == 0 ||
-       ctx->tls_keylog_local_.contains(
-           *(callbacks->connection().connectionInfoProvider().localAddress()))) &&
-      (ctx->tls_keylog_remote_.getIpListSize() == 0 ||
-       ctx->tls_keylog_remote_.contains(
-           *(callbacks->connection().connectionInfoProvider().remoteAddress())))) {
-    ctx->tls_keylog_file_->write(absl::StrCat(line, "\n"));
+void ContextImpl::maybeWriteKeyLog(const char* line, const Network::Address::Instance* local_addr,
+                                   const Network::Address::Instance* remote_addr) const {
+  if (tls_keylog_file_ == nullptr) {
+    return;
+  }
+  if ((tls_keylog_local_.getIpListSize() == 0 ||
+       (local_addr != nullptr && tls_keylog_local_.contains(*local_addr))) &&
+      (tls_keylog_remote_.getIpListSize() == 0 ||
+       (remote_addr != nullptr && tls_keylog_remote_.contains(*remote_addr)))) {
+    tls_keylog_file_->write(absl::StrCat(line, "\n"));
   }
 }
 

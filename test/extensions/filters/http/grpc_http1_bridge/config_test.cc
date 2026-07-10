@@ -28,7 +28,7 @@ TEST(GrpcHttp1BridgeFilterConfigTest, GrpcHttp1BridgeFilterWithServerContext) {
   GrpcHttp1BridgeFilterConfig factory;
   envoy::extensions::filters::http::grpc_http1_bridge::v3::Config config;
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

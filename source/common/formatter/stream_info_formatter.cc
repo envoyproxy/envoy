@@ -2623,7 +2623,7 @@ public:
         (*it).second.first, command, sub_command, max_length));
 
     StreamInfoFormatterResult result = (*it).second.second(sub_command, max_length);
-    THROW_IF_NOT_OK_REF(result.status());
+    RETURN_IF_NOT_OK_REF(result.status());
 
     return (std::move(result)).value();
   }
