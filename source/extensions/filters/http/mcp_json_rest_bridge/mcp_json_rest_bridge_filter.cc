@@ -1188,7 +1188,7 @@ void McpJsonRestBridgeFilter::setParsingMetadata(absl::string_view method,
   mcp_method_ = std::string(method);
   has_params_ = false;
   mcp_params_.Clear();
-  if (params.is_object()) {
+  if (params.is_object() && !params.empty()) {
     absl::Status status = MessageUtil::loadFromJsonNoThrow(params.dump(), mcp_params_);
     if (status.ok()) {
       has_params_ = !mcp_params_.fields().empty();
