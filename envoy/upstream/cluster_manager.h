@@ -78,7 +78,7 @@ public:
    * onClusterRemoval is called when a cluster is removed; the argument is the cluster name.
    * @param cluster_name is the name of the removed cluster.
    */
-  virtual void onClusterRemoval(const std::string& cluster_name) PURE;
+  virtual void onClusterRemoval(absl::string_view cluster_name) PURE;
 };
 
 /**
@@ -287,7 +287,7 @@ public:
    */
   virtual absl::StatusOr<bool>
   addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                     const std::string& version_info, const bool avoid_cds_removal = false) PURE;
+                     absl::string_view version_info, const bool avoid_cds_removal = false) PURE;
 
   /**
    * Set a callback that will be invoked when all primary clusters have been initialized.
@@ -356,7 +356,7 @@ public:
    *
    * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
    */
-  virtual OptRef<const Cluster> getActiveCluster(const std::string& cluster_name) const PURE;
+  virtual OptRef<const Cluster> getActiveCluster(absl::string_view cluster_name) const PURE;
 
   /**
    * Receives a cluster name and returns an active or warming cluster (if found).
@@ -366,7 +366,7 @@ public:
    * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
    */
   virtual OptRef<const Cluster>
-  getActiveOrWarmingCluster(const std::string& cluster_name) const PURE;
+  getActiveOrWarmingCluster(absl::string_view cluster_name) const PURE;
 
   /**
    * Returns true iff the given cluster name is known in the cluster-manager
@@ -376,7 +376,7 @@ public:
    *
    * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
    */
-  virtual bool hasCluster(const std::string& cluster_name) const PURE;
+  virtual bool hasCluster(absl::string_view cluster_name) const PURE;
 
   /**
    * Returns true iff there's an active cluster in the cluster-manager.
@@ -419,7 +419,7 @@ public:
    * can be removed by setting `remove_ignored` to true while removeCluster().
    * @return true if the action results in the removal of a cluster.
    */
-  virtual bool removeCluster(const std::string& cluster, const bool remove_ignored = false) PURE;
+  virtual bool removeCluster(absl::string_view cluster, const bool remove_ignored = false) PURE;
 
   /**
    * Shutdown the cluster manager prior to destroying connection pools and other thread local data.
@@ -515,7 +515,7 @@ public:
    * @param predicate supplies the optional drain connections host predicate. If not supplied, all
    *                  hosts are drained.
    */
-  virtual void drainConnections(const std::string& cluster,
+  virtual void drainConnections(absl::string_view cluster,
                                 DrainConnectionsHostPredicate predicate) PURE;
 
   /**
@@ -538,7 +538,7 @@ public:
    * Check if the cluster is active and statically configured, and if not, return an error
    * @param cluster, the cluster to check.
    */
-  virtual absl::Status checkActiveStaticCluster(const std::string& cluster) PURE;
+  virtual absl::Status checkActiveStaticCluster(absl::string_view cluster) PURE;
 
   /**
    * Allocates an on-demand CDS API provider from configuration proto or locator.

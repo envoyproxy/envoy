@@ -29,9 +29,16 @@ struct LuaFilterStats {
   ALL_LUA_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+/**
+ * One PerLuaCodeSetup owns one ThreadLocalState, i.e. one Lua VM (lua_State) per worker thread
+ * plus the main thread, so it accounts for exactly `concurrency + 1` VMs in the shared
+ * `lua.lua_vm_count` gauge. The gauge is updated once here, not per-thread/per-VM.
+ */
 class PerLuaCodeSetup : Logger::Loggable<Logger::Id::lua> {
 public:
-  PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls);
+  PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
+                  Stats::Gauge& vm_count_gauge, uint32_t concurrency);
+  ~PerLuaCodeSetup();
 
   Extensions::Filters::Common::Lua::CoroutinePtr createCoroutine() {
     return lua_state_.createCoroutine();
@@ -48,6 +55,8 @@ private:
   uint64_t response_function_slot_{};
 
   Filters::Common::Lua::ThreadLocalState lua_state_;
+  Stats::Gauge& vm_count_gauge_;
+  uint32_t vm_count_delta_{};
 };
 
 using PerLuaCodeSetupPtr = std::unique_ptr<PerLuaCodeSetup>;
@@ -455,7 +464,8 @@ class FilterConfig : Logger::Loggable<Logger::Id::lua> {
 public:
   FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
-               Api::Api& api, Stats::Scope& scope, const std::string& stat_prefix);
+               Api::Api& api, Stats::Scope& scope, const std::string& stat_prefix,
+               uint32_t concurrency);
 
   PerLuaCodeSetup* perLuaCodeSetup(std::optional<absl::string_view> name = std::nullopt) const {
     if (!name.has_value()) {

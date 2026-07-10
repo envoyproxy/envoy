@@ -32,7 +32,7 @@ TEST(AlternateProtocolsCacheFilterConfigTest, AlternateProtocolsCacheFilterWithS
   AlternateProtocolsCacheFilterFactory factory;
   envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(filter_callback, dispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
