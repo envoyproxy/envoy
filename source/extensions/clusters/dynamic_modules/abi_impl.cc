@@ -5,6 +5,8 @@
 #include <chrono>
 #include <cstring>
 
+#include "envoy/registry/registry.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/common/thread.h"
@@ -910,6 +912,62 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
   last_serialized_filter_state = std::move(serialized.value());
   result->ptr = const_cast<char*>(last_serialized_filter_state.data());
   result->length = last_serialized_filter_state.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
+  if (context_envoy_ptr == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  absl::string_view value_view(value.ptr, value.length);
+  stream_info->filterState()->setData(
+      key_view, std::make_unique<Envoy::Router::StringAccessorImpl>(value_view),
+      Envoy::StreamInfo::FilterState::LifeSpan::FilterChain);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
+  if (context_envoy_ptr == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+
+  absl::string_view key_view(key.ptr, key.length);
+  absl::string_view value_view(value.ptr, value.length);
+
+  auto* factory = Envoy::Registry::FactoryRegistry<
+      Envoy::StreamInfo::FilterState::ObjectFactory>::getFactory(key_view);
+  if (factory == nullptr) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "no ObjectFactory registered for filter state key '{}'", key_view);
+    return false;
+  }
+
+  auto object = factory->createFromBytes(value_view);
+  if (object == nullptr) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "ObjectFactory failed to create object for filter state key '{}'", key_view);
+    return false;
+  }
+
+  stream_info->filterState()->setData(key_view, std::move(object),
+                                      Envoy::StreamInfo::FilterState::LifeSpan::FilterChain);
   return true;
 }
 
