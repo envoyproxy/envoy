@@ -46,7 +46,7 @@ TEST(PassthroughStateImplReverse, RoundTripsSingleMarkedObject) {
   EXPECT_EQ(got->value(), 42);
 }
 
-TEST(PassthroughStateImplReverse, MergeReverseDoesNotOverwriteExistingName) {
+TEST(PassthroughStateImplReverse, MergeReverseOverwritesExistingName) {
   PassthroughStateImpl state;
   StreamInfo::FilterStateImpl inner(StreamInfo::FilterState::LifeSpan::Connection);
   auto inner_value = std::make_shared<ReverseSimpleType>(1);
@@ -62,7 +62,7 @@ TEST(PassthroughStateImplReverse, MergeReverseDoesNotOverwriteExistingName) {
 
   const auto* got = outer.getDataReadOnly<ReverseSimpleType>("reverse.test.key");
   ASSERT_NE(got, nullptr);
-  EXPECT_EQ(got->value(), 99); // existing value preserved
+  EXPECT_EQ(got->value(), 1); // last-writer-wins: propagated value overwrites the existing one
 }
 
 TEST(PassthroughStateImplReverse, CaptureWithNoMarkedObjectsIsNoOp) {

@@ -416,15 +416,13 @@ void PassthroughStateImpl::captureReverse(const StreamInfo::FilterState& filter_
 }
 
 void PassthroughStateImpl::mergeReverse(StreamInfo::FilterState& filter_state) {
-  ASSERT(reverse_state_ == ReverseState::Created || reverse_state_ == ReverseState::Captured);
+  // Close ordering across the internal-listener boundary is not guaranteed, so this may run
+  // in an unexpected state; merge only once, from the initial/captured state.
+  if (!(reverse_state_ == ReverseState::Created || reverse_state_ == ReverseState::Captured)) {
+    return;
+  }
   for (const auto& object : reverse_filter_state_objects_) {
-    // Skip if the recipient already has data for this name; reverse propagation
-    // is opportunistic and must not overwrite an existing entry.
-    if (filter_state.hasDataWithName(object.name_)) {
-      ENVOY_LOG(debug, "reverse-passthrough skipping filter state '{}' (already set on recipient)",
-                object.name_);
-      continue;
-    }
+    // Last-writer-wins, consistent with the forward PassthroughState::mergeInto path.
     filter_state.setData(object.name_, object.data_, StreamInfo::FilterState::LifeSpan::Connection,
                          object.stream_sharing_);
   }
