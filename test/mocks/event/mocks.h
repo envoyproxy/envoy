@@ -9,7 +9,7 @@
 #include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/event_loop.h"
+#include "envoy/event/evwatch.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/event/signal.h"

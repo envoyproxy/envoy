@@ -8,7 +8,7 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher_thread_deletable.h"
-#include "envoy/event/event_loop.h"
+#include "envoy/event/evwatch.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/scaled_timer.h"
 #include "envoy/event/schedulable_cb.h"

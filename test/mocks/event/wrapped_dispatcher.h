@@ -6,7 +6,7 @@
 #include <list>
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/event_loop.h"
+#include "envoy/event/evwatch.h"
 
 namespace Envoy {
 namespace Event {

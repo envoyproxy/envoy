@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/event_loop.h"
+#include "envoy/event/evwatch.h"
 #include "envoy/event/schedulable_cb.h"
 #include "envoy/event/timer.h"
 

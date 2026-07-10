@@ -5,7 +5,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/event_loop.h"
+#include "envoy/event/evwatch.h"
 #include "envoy/event/timer.h"
 
 #include "test/mocks/event/mocks.h"

@@ -29,12 +29,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "event_loop_test",
-    srcs = ["event_loop_test.cc"],
+    name = "evwatch_test",
+    srcs = ["evwatch_test.cc"],
     deps = [
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",
-        "//envoy/event:event_loop_interface",
+        "//envoy/event:evwatch_interface",
         "//test/mocks/event:event_mocks",
         "//test/test_common:utility_lib",
     ],
