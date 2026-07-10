@@ -52,7 +52,7 @@ public:
   // Name used for matching; falls back to original-case name_ when not normalized.
   const std::string& lookupName() const { return lookup_name_.empty() ? name_ : lookup_name_; }
 
-  // Lowercased copy of name_, populated only for case-insensitive matching; empty otherwise.
+  // Lowercase copy of name_, populated only for case-insensitive matching; empty otherwise.
   std::string lookup_name_;
   std::unique_ptr<Stats::HistogramCompletableTimespanImpl> query_time_ms_;
 };

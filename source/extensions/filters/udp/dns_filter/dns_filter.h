@@ -360,7 +360,7 @@ private:
     }
   }
 
-  // Populates lookup_name_ with a lowercased copy for case-insensitive matching; a no-op (no
+  // Populates lookup_name_ with a lowercase copy for case-insensitive matching; a no-op (no
   // allocation) on the default case-sensitive path.
   void maybeNormalizeQuery(DnsQueryRecord& query) const {
     if (!config_->caseInsensitive()) {
