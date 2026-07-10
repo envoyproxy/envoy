@@ -101,7 +101,7 @@ TEST_F(OptionsImplTest, ConcurrencyZeroIsOne) {
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
 }
 
-TEST_F(OptionsImplTest, All) {
+TEST_F(OptionsImplTest, AllOptions) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl(
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 0 "
       "--local-address-ip-version v6 -l info --component-log-level upstream:debug,connection:trace "
