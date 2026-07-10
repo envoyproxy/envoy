@@ -26,6 +26,7 @@ QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(
 }
 
 void QuicHttpClientConnectionImpl::goAway() {
+  stats_.goaway_sent_.inc();
   quic_client_session_.SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "client goaway");
 }
 
