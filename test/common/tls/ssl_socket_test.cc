@@ -6207,7 +6207,7 @@ TEST_P(SslSocketTest, CipherSuitesWithPolicy) {
   testUtilV2(error_test_options);
 }
 
-TEST_P(SslSocketTest, CipherSuitesWithCNSA2Policy) {
+BORINGSSL_TEST_P(SslSocketTest, CipherSuitesWithCNSA2Policy) {
   envoy::config::listener::v3::Listener listener;
   envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
