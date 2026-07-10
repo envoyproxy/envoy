@@ -119,7 +119,7 @@ public:
   MOCK_METHOD(void, registerWatchdog,
               (const Server::WatchDogSharedPtr&, std::chrono::milliseconds));
   MOCK_METHOD(Evwatch::ObserverHandlePtr, registerEvwatchObserver, (Evwatch::ObserverSharedPtr));
-  MOCK_METHOD(void, initializeStats, (Stats::Scope&, const absl::optional<std::string>&));
+  MOCK_METHOD(void, initializeStats, (Stats::Scope&, const std::optional<std::string>&));
   MOCK_METHOD(void, clearDeferredDeleteList, ());
   MOCK_METHOD(Network::ServerConnection*, createServerConnection_, (StreamInfo::StreamInfo & info));
   MOCK_METHOD(Network::ClientConnection*, createClientConnection_,

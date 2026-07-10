@@ -41,7 +41,8 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
     absl::string_view cluster_name = EMPTY_STRING;
     TRY_ASSERT_MAIN_THREAD {
       const envoy::config::cluster::v3::Cluster& cluster =
-          dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource.get().resource());
+          Envoy::Protobuf::DynamicCastMessage<envoy::config::cluster::v3::Cluster>(
+              resource.get().resource());
       cluster_name = cluster.name();
       if (!cluster_names.insert(cluster.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully applied.

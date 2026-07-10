@@ -42,7 +42,7 @@ TEST_F(RpingInterceptorTest, FullRpingConsumedAndCallbackInvoked) {
   ASSERT_EQ(write(fds[1], rping.data(), rping.size()), static_cast<ssize_t>(rping.size()));
 
   Buffer::OwnedImpl buffer;
-  const auto result = interceptor->read(buffer, absl::nullopt);
+  const auto result = interceptor->read(buffer, std::nullopt);
 
   EXPECT_EQ(result.err_, nullptr);
   EXPECT_EQ(result.return_value_, rping.size());
@@ -65,14 +65,14 @@ TEST_F(RpingInterceptorTest, ChoppedRpingCompletesAndDrainsInSingleBuffer) {
   Buffer::OwnedImpl buffer;
 
   ASSERT_EQ(write(fds[1], prefix.data(), prefix.size()), static_cast<ssize_t>(prefix.size()));
-  const auto first = interceptor->read(buffer, absl::nullopt);
+  const auto first = interceptor->read(buffer, std::nullopt);
   EXPECT_EQ(first.err_, nullptr);
   EXPECT_EQ(first.return_value_, prefix.size());
   EXPECT_EQ(buffer.toString(), prefix);
   EXPECT_EQ(interceptor->pingMessages(), 0);
 
   ASSERT_EQ(write(fds[1], suffix.data(), suffix.size()), static_cast<ssize_t>(suffix.size()));
-  const auto second = interceptor->read(buffer, absl::nullopt);
+  const auto second = interceptor->read(buffer, std::nullopt);
   EXPECT_EQ(second.err_, nullptr);
   EXPECT_EQ(second.return_value_, rping.size());
   EXPECT_EQ(buffer.length(), 0);
@@ -92,7 +92,7 @@ TEST_F(RpingInterceptorTest, PingPlusDataConsumesPingAndReturnsPayload) {
   ASSERT_EQ(write(fds[1], combined.data(), combined.size()), static_cast<ssize_t>(combined.size()));
 
   Buffer::OwnedImpl buffer;
-  const auto result = interceptor->read(buffer, absl::nullopt);
+  const auto result = interceptor->read(buffer, std::nullopt);
 
   EXPECT_EQ(result.err_, nullptr);
   EXPECT_EQ(result.return_value_, payload.size());
@@ -112,7 +112,7 @@ TEST_F(RpingInterceptorTest, DataAfterPingIsPassedThrough) {
 
   ASSERT_EQ(write(fds[1], rping.data(), rping.size()), static_cast<ssize_t>(rping.size()));
   Buffer::OwnedImpl first_read_buffer;
-  const auto first = interceptor->read(first_read_buffer, absl::nullopt);
+  const auto first = interceptor->read(first_read_buffer, std::nullopt);
   EXPECT_EQ(first.err_, nullptr);
   EXPECT_EQ(first.return_value_, rping.size());
   EXPECT_EQ(first_read_buffer.length(), 0);
@@ -120,7 +120,7 @@ TEST_F(RpingInterceptorTest, DataAfterPingIsPassedThrough) {
 
   ASSERT_EQ(write(fds[1], data.data(), data.size()), static_cast<ssize_t>(data.size()));
   Buffer::OwnedImpl second_read_buffer;
-  const auto second = interceptor->read(second_read_buffer, absl::nullopt);
+  const auto second = interceptor->read(second_read_buffer, std::nullopt);
   EXPECT_EQ(second.err_, nullptr);
   EXPECT_EQ(second.return_value_, data.size());
   EXPECT_EQ(second_read_buffer.toString(), data);
@@ -140,7 +140,7 @@ TEST_F(RpingInterceptorTest, NonRpingFirstDisablesPingModeThenRpingPassesThrough
   ASSERT_EQ(write(fds[1], first_data.data(), first_data.size()),
             static_cast<ssize_t>(first_data.size()));
   Buffer::OwnedImpl first_read_buffer;
-  const auto first = interceptor->read(first_read_buffer, absl::nullopt);
+  const auto first = interceptor->read(first_read_buffer, std::nullopt);
   EXPECT_EQ(first.err_, nullptr);
   EXPECT_EQ(first.return_value_, first_data.size());
   EXPECT_EQ(first_read_buffer.toString(), first_data);
@@ -148,7 +148,7 @@ TEST_F(RpingInterceptorTest, NonRpingFirstDisablesPingModeThenRpingPassesThrough
 
   ASSERT_EQ(write(fds[1], rping.data(), rping.size()), static_cast<ssize_t>(rping.size()));
   Buffer::OwnedImpl second_read_buffer;
-  const auto second = interceptor->read(second_read_buffer, absl::nullopt);
+  const auto second = interceptor->read(second_read_buffer, std::nullopt);
   EXPECT_EQ(second.err_, nullptr);
   EXPECT_EQ(second.return_value_, rping.size());
   EXPECT_EQ(second_read_buffer.toString(), rping);

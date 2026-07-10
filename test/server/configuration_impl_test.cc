@@ -74,7 +74,7 @@ protected:
   void addStatsdFakeClusterConfig(envoy::config::metrics::v3::StatsSink& sink) {
     envoy::config::metrics::v3::StatsdSink statsd_sink;
     statsd_sink.set_tcp_cluster_name("fake_cluster");
-    sink.mutable_typed_config()->PackFrom(statsd_sink);
+    std::ignore = sink.mutable_typed_config()->PackFrom(statsd_sink);
   }
 
   Api::ApiPtr api_;
@@ -623,7 +623,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
   xds::type::v3::TypedStruct typed_struct;
   auto untyped_struct = typed_struct.mutable_value();
   (*untyped_struct->mutable_fields())["foo"].set_string_value("bar");
-  sink.mutable_typed_config()->PackFrom(typed_struct);
+  std::ignore = sink.mutable_typed_config()->PackFrom(typed_struct);
 
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(
@@ -724,11 +724,11 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
   ASSERT_EQ(config.admin().socketOptions()->size(), 2);
   auto detail = config.admin().socketOptions()->at(0)->getOptionDetails(
       socket_mock, envoy::config::core::v3::SocketOption::STATE_PREBIND);
-  ASSERT_NE(detail, absl::nullopt);
+  ASSERT_NE(detail, std::nullopt);
   EXPECT_EQ(detail->name_, Envoy::Network::SocketOptionName(1, 2, "1/2"));
   detail = config.admin().socketOptions()->at(1)->getOptionDetails(
       socket_mock, envoy::config::core::v3::SocketOption::STATE_BOUND);
-  ASSERT_NE(detail, absl::nullopt);
+  ASSERT_NE(detail, std::nullopt);
   EXPECT_EQ(detail->name_, Envoy::Network::SocketOptionName(4, 5, "4/5"));
 }
 

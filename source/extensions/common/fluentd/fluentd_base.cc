@@ -7,7 +7,7 @@ namespace Fluentd {
 
 FluentdBase::FluentdBase(Upstream::ThreadLocalCluster& cluster, Tcp::AsyncTcpClientPtr client,
                          Event::Dispatcher& dispatcher, const std::string& tag,
-                         absl::optional<uint32_t> max_connect_attempts, Stats::Scope& parent_scope,
+                         std::optional<uint32_t> max_connect_attempts, Stats::Scope& parent_scope,
                          const std::string& stat_prefix, BackOffStrategyPtr backoff_strategy,
                          uint64_t buffer_flush_interval, uint64_t max_buffer_size)
     : tag_(tag), id_(dispatcher.name()), max_connect_attempts_(max_connect_attempts),

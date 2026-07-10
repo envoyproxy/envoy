@@ -32,6 +32,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "endpoint_keyed_filtering_test",
+    srcs = ["endpoint_keyed_filtering_test.cc"],
+    deps = [
+        "//source/extensions/filters/http/mcp_json_rest_bridge:mcp_json_rest_bridge_filter_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/mcp_json_rest_bridge/v3:pkg_cc_proto",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_test(
     name = "http_request_builder_test",
     srcs = ["http_request_builder_test.cc"],
     deps = [

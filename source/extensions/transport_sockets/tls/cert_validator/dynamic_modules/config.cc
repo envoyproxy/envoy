@@ -9,6 +9,7 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 
 #include "openssl/ssl.h"
 
@@ -173,7 +174,7 @@ ValidationResults DynamicModuleCertValidator::doVerifyCertChain(
     const char* error = "verify cert failed: empty cert chain";
     ENVOY_LOG(debug, error);
     return {ValidationResults::ValidationStatus::Failed,
-            Envoy::Ssl::ClientValidationStatus::NoClientCertificate, absl::nullopt, error};
+            Envoy::Ssl::ClientValidationStatus::NoClientCertificate, std::nullopt, error};
   }
 
   // Encode certificates to DER.
@@ -188,7 +189,7 @@ ValidationResults DynamicModuleCertValidator::doVerifyCertChain(
       const char* error = "verify cert failed: DER encoding error";
       ENVOY_LOG(debug, error);
       return {ValidationResults::ValidationStatus::Failed,
-              Envoy::Ssl::ClientValidationStatus::Failed, absl::nullopt, error};
+              Envoy::Ssl::ClientValidationStatus::Failed, std::nullopt, error};
     }
     der_certs[i].assign(der, der + der_len);
     OPENSSL_free(der);
@@ -236,7 +237,7 @@ ValidationResults DynamicModuleCertValidator::doVerifyCertChain(
     break;
   }
 
-  absl::optional<uint8_t> tls_alert;
+  std::optional<uint8_t> tls_alert;
   if (result.has_tls_alert) {
     tls_alert = result.tls_alert;
   }
@@ -277,8 +278,8 @@ void DynamicModuleCertValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX
   (void)hash_length;
 }
 
-absl::optional<uint32_t> DynamicModuleCertValidator::daysUntilFirstCertExpires() const {
-  return absl::nullopt;
+std::optional<uint32_t> DynamicModuleCertValidator::daysUntilFirstCertExpires() const {
+  return std::nullopt;
 }
 
 std::string DynamicModuleCertValidator::getCaFileName() const { return ""; }
@@ -314,13 +315,21 @@ absl::StatusOr<CertValidatorPtr> DynamicModuleCertValidatorFactory::createCertVa
   std::string validator_config_str;
   if (proto_config.has_validator_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.validator_config());
-    RETURN_IF_NOT_OK_REF(config_or_error.status());
+    if (!config_or_error.ok()) {
+      Envoy::Extensions::DynamicModules::incrementLoadFailure(
+          context, proto_config.validator_name(),
+          Envoy::Extensions::DynamicModules::ConfigInitErrorStat);
+      return config_or_error.status();
+    }
     validator_config_str = std::move(config_or_error.value());
   }
 
   auto factory_config_or_error = newDynamicModuleCertValidatorConfig(
       proto_config.validator_name(), validator_config_str, std::move(dynamic_module));
   if (!factory_config_or_error.ok()) {
+    Envoy::Extensions::DynamicModules::incrementLoadFailure(
+        context, proto_config.validator_name(),
+        Envoy::Extensions::DynamicModules::ConfigInitErrorStat);
     return factory_config_or_error.status();
   }
 

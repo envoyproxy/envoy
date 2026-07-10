@@ -49,6 +49,40 @@ fn new_cluster_config(
         metrics: envoy_cluster_metrics,
       }))
     },
+    "worker_local_rebuild" => {
+      let counter_id = envoy_cluster_metrics
+        .define_counter("membership_hosts_total")
+        .ok();
+      Some(Box::new(WorkerLocalRebuildClusterConfig {
+        upstream_address: config_str.to_string(),
+        counter_id,
+        metrics: envoy_cluster_metrics,
+      }))
+    },
+    "member_update_packed_address" => {
+      let counter_id = envoy_cluster_metrics
+        .define_counter("packed_address_verified_total")
+        .ok();
+      Some(Box::new(MemberUpdatePackedAddressClusterConfig {
+        upstream_address: config_str.to_string(),
+        counter_id,
+        metrics: envoy_cluster_metrics,
+      }))
+    },
+    "worker_timer" => {
+      let armed_id = envoy_cluster_metrics
+        .define_counter("timer_armed_total")
+        .ok();
+      let fired_id = envoy_cluster_metrics
+        .define_counter("timer_fired_total")
+        .ok();
+      Some(Box::new(WorkerTimerClusterConfig {
+        upstream_address: config_str.to_string(),
+        armed_id,
+        fired_id,
+        metrics: envoy_cluster_metrics,
+      }))
+    },
     _ => None,
   }
 }
@@ -176,9 +210,7 @@ unsafe impl Send for AsyncCompletionTask {}
 
 impl AsyncCompletionTask {
   fn run(self) {
-    self
-      .completion
-      .async_host_selection_complete(Some(self.host), "async_resolved");
+    self.completion.complete(Some(self.host), "async_resolved");
   }
 }
 
@@ -466,5 +498,358 @@ impl ClusterLb for RunOnAllWorkersLb {
       return HostSelectionResult::NoHost;
     }
     HostSelectionResult::Selected(hosts.0[0])
+  }
+}
+
+// =============================================================================
+// Worker local priority set rebuild via membership updates.
+// =============================================================================
+//
+// on_init defers the host add through the scheduler so it lands after workers are registered and
+// their load balancers have subscribed to membership updates. on_host_membership_update learns the
+// added hosts directly from get_member_update_host and routes through those pointers, then confirms
+// the worker local priority set agrees on the host count before incrementing a counter so the test
+// can wait for every worker to converge.
+
+const WORKER_LOCAL_REBUILD_ADD_EVENT_ID: u64 = 200;
+
+struct WorkerLocalRebuildClusterConfig {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterConfig for WorkerLocalRebuildClusterConfig {
+  fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+    Box::new(WorkerLocalRebuildCluster {
+      upstream_address: self.upstream_address.clone(),
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+}
+
+struct WorkerLocalRebuildCluster {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl Cluster for WorkerLocalRebuildCluster {
+  fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+    envoy_cluster.pre_init_complete();
+    let scheduler = envoy_cluster.new_scheduler();
+    scheduler.commit(WORKER_LOCAL_REBUILD_ADD_EVENT_ID);
+  }
+
+  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
+    Box::new(WorkerLocalRebuildLb {
+      hosts: Vec::new(),
+      index: 0,
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+
+  fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
+    if event_id == WORKER_LOCAL_REBUILD_ADD_EVENT_ID {
+      envoy_cluster.add_hosts(&[self.upstream_address.clone()], &[1u32]);
+    }
+  }
+}
+
+struct WorkerLocalRebuildLb {
+  hosts: Vec<usize>,
+  index: usize,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterLb for WorkerLocalRebuildLb {
+  fn choose_host(
+    &mut self,
+    _context: Option<&dyn ClusterLbContext>,
+    _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+  ) -> HostSelectionResult {
+    if self.hosts.is_empty() {
+      return HostSelectionResult::NoHost;
+    }
+    let idx = self.index % self.hosts.len();
+    self.index += 1;
+    HostSelectionResult::Selected(
+      self.hosts[idx] as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+    )
+  }
+
+  fn on_host_membership_update(
+    &mut self,
+    envoy_lb: &dyn EnvoyClusterLoadBalancer,
+    num_hosts_added: usize,
+    num_hosts_removed: usize,
+  ) {
+    // Drop removed hosts resolved directly from the member update.
+    for i in 0..num_hosts_removed {
+      if let Some(host) = envoy_lb.get_member_update_host(i, false) {
+        let addr = host as usize;
+        self.hosts.retain(|&existing| existing != addr);
+      }
+    }
+    // Learn added hosts directly from the member update so routing uses the pointer it returns.
+    for i in 0..num_hosts_added {
+      if let Some(host) = envoy_lb.get_member_update_host(i, true) {
+        self.hosts.push(host as usize);
+      }
+    }
+    // Increment a counter once the out-of-range lookup returns no host and the present host count
+    // agrees with the worker local set, so the test can wait for every worker to converge.
+    let converged = envoy_lb
+      .get_member_update_host(num_hosts_added, true)
+      .is_none()
+      && !self.hosts.is_empty()
+      && envoy_lb.get_hosts_count(0) == self.hosts.len();
+    if converged {
+      if let Some(counter_id) = self.counter_id {
+        let _ = self.metrics.increment_counter(counter_id, 1);
+      }
+    }
+  }
+}
+
+// =============================================================================
+// Packed member-update address.
+// =============================================================================
+//
+// Mirrors the worker-local-rebuild flow, but on_host_membership_update reads each added host's
+// address both as a formatted string (get_member_update_host_address) and as packed integers
+// (get_member_update_host_packed_address), then confirms the packed bytes parse back to the same
+// IP and port before incrementing a counter. This exercises the packed getter end to end through
+// the real module for whichever IP family the integration test runs under.
+
+const PACKED_ADDRESS_ADD_EVENT_ID: u64 = 300;
+
+struct MemberUpdatePackedAddressClusterConfig {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterConfig for MemberUpdatePackedAddressClusterConfig {
+  fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+    Box::new(MemberUpdatePackedAddressCluster {
+      upstream_address: self.upstream_address.clone(),
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+}
+
+struct MemberUpdatePackedAddressCluster {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl Cluster for MemberUpdatePackedAddressCluster {
+  fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+    envoy_cluster.pre_init_complete();
+    let scheduler = envoy_cluster.new_scheduler();
+    scheduler.commit(PACKED_ADDRESS_ADD_EVENT_ID);
+  }
+
+  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
+    Box::new(MemberUpdatePackedAddressLb {
+      hosts: Vec::new(),
+      index: 0,
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+
+  fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
+    if event_id == PACKED_ADDRESS_ADD_EVENT_ID {
+      envoy_cluster.add_hosts(&[self.upstream_address.clone()], &[1u32]);
+    }
+  }
+}
+
+struct MemberUpdatePackedAddressLb {
+  hosts: Vec<usize>,
+  index: usize,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+// Confirms the packed address parses back to the same IP and port as the formatted string Envoy
+// returns for the host. Ipv4Addr/Ipv6Addr::octets() are in network byte order, matching the packed
+// bytes.
+fn packed_matches_string(packed: &PackedAddress, formatted: &str) -> bool {
+  let parsed = match formatted.parse::<std::net::SocketAddr>() {
+    Ok(addr) => addr,
+    Err(_) => return false,
+  };
+  match (packed, parsed) {
+    (PackedAddress::V4(bytes, port), std::net::SocketAddr::V4(v4)) => {
+      *bytes == v4.ip().octets() && *port == v4.port()
+    },
+    (PackedAddress::V6(bytes, port), std::net::SocketAddr::V6(v6)) => {
+      *bytes == v6.ip().octets() && *port == v6.port()
+    },
+    _ => false,
+  }
+}
+
+impl ClusterLb for MemberUpdatePackedAddressLb {
+  fn choose_host(
+    &mut self,
+    _context: Option<&dyn ClusterLbContext>,
+    _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+  ) -> HostSelectionResult {
+    if self.hosts.is_empty() {
+      return HostSelectionResult::NoHost;
+    }
+    let idx = self.index % self.hosts.len();
+    self.index += 1;
+    HostSelectionResult::Selected(
+      self.hosts[idx] as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+    )
+  }
+
+  fn on_host_membership_update(
+    &mut self,
+    envoy_lb: &dyn EnvoyClusterLoadBalancer,
+    num_hosts_added: usize,
+    _num_hosts_removed: usize,
+  ) {
+    for i in 0..num_hosts_added {
+      // The packed bytes must agree with the formatted address for the same host.
+      let verified = match (
+        envoy_lb.get_member_update_host_packed_address(i, true),
+        envoy_lb.get_member_update_host_address(i, true),
+      ) {
+        (Some(packed), Some(formatted)) => packed_matches_string(&packed, &formatted),
+        _ => false,
+      };
+      if let Some(host) = envoy_lb.get_member_update_host(i, true) {
+        self.hosts.push(host as usize);
+      }
+      if verified {
+        if let Some(counter_id) = self.counter_id {
+          let _ = self.metrics.increment_counter(counter_id, 1);
+        }
+      }
+    }
+  }
+}
+
+// =============================================================================
+// Per-worker timer.
+// =============================================================================
+//
+// On the first choose_host (after the worker dispatcher has been captured) the load balancer
+// arms a 50ms repeating worker timer. Arming exercises enable/enabled/disable in one round-trip
+// and increments timer_armed_total only when the enabled/disabled observations agree. Each fire
+// runs on_worker_timer_fired on the worker thread, increments timer_fired_total, and re-arms the
+// timer, so it keeps firing without further requests. The timer is deleted when the load balancer
+// is destroyed on the worker thread at shutdown.
+
+const WORKER_TIMER_INTERVAL_MS: u64 = 50;
+
+struct WorkerTimerClusterConfig {
+  upstream_address: String,
+  armed_id: Option<EnvoyCounterId>,
+  fired_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterConfig for WorkerTimerClusterConfig {
+  fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+    Box::new(WorkerTimerCluster {
+      upstream_address: self.upstream_address.clone(),
+      hosts: Arc::new(Mutex::new(HostList(Vec::new()))),
+      armed_id: self.armed_id,
+      fired_id: self.fired_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+}
+
+struct WorkerTimerCluster {
+  upstream_address: String,
+  hosts: SharedHostList,
+  armed_id: Option<EnvoyCounterId>,
+  fired_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl Cluster for WorkerTimerCluster {
+  fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+    let addresses = vec![self.upstream_address.clone()];
+    let weights = vec![1u32];
+    if let Some(host_ptrs) = envoy_cluster.add_hosts(&addresses, &weights) {
+      self.hosts.lock().unwrap().0 = host_ptrs;
+    }
+    envoy_cluster.pre_init_complete();
+  }
+
+  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
+    Box::new(WorkerTimerLb {
+      hosts: self.hosts.clone(),
+      timer: None,
+      armed_id: self.armed_id,
+      fired_id: self.fired_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+}
+
+struct WorkerTimerLb {
+  hosts: SharedHostList,
+  timer: Option<Box<dyn EnvoyClusterWorkerTimer>>,
+  armed_id: Option<EnvoyCounterId>,
+  fired_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterLb for WorkerTimerLb {
+  fn choose_host(
+    &mut self,
+    context: Option<&dyn ClusterLbContext>,
+    _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+  ) -> HostSelectionResult {
+    if self.timer.is_none() {
+      if let Some(timer) = context.and_then(|ctx| ctx.worker_timer_new()) {
+        let interval = std::time::Duration::from_millis(WORKER_TIMER_INTERVAL_MS);
+        timer.enable(interval);
+        let enabled_after_enable = timer.enabled();
+        timer.disable();
+        let disabled_after_disable = !timer.enabled();
+        // Re-arm so the timer actually starts firing.
+        timer.enable(interval);
+        if enabled_after_enable && disabled_after_disable {
+          if let Some(armed_id) = self.armed_id {
+            let _ = self.metrics.increment_counter(armed_id, 1);
+          }
+        }
+        self.timer = Some(timer);
+      }
+    }
+
+    let hosts = self.hosts.lock().unwrap();
+    if hosts.0.is_empty() {
+      return HostSelectionResult::NoHost;
+    }
+    HostSelectionResult::Selected(hosts.0[0])
+  }
+
+  fn on_worker_timer_fired(
+    &mut self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+    timer: &dyn EnvoyClusterWorkerTimer,
+  ) {
+    if let Some(fired_id) = self.fired_id {
+      let _ = self.metrics.increment_counter(fired_id, 1);
+    }
+    // Re-arm for periodic firing.
+    timer.enable(std::time::Duration::from_millis(WORKER_TIMER_INTERVAL_MS));
   }
 }

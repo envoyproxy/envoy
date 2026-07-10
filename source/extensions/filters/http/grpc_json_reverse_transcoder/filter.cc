@@ -93,7 +93,7 @@ void appendHttpBodyEnvelope(Buffer::Instance& output, std::string content_type,
     StringOutputStream string_stream(&proto_envelope);
     CodedOutputStream coded_stream(&string_stream);
 
-    body.SerializeToCodedStream(&coded_stream);
+    std::ignore = body.SerializeToCodedStream(&coded_stream);
     coded_stream.WriteTag(http_body_tag);
     coded_stream.WriteVarint64(content_length);
   }
@@ -231,7 +231,7 @@ GrpcJsonReverseTranscoderFilter::GrpcStatusFromHeaders(ResponseHeaderMap& header
 
 bool GrpcJsonReverseTranscoderFilter::BuildRequestFromHttpBody(Buffer::Instance& data) {
   std::vector<Grpc::Frame> frames;
-  static_cast<void>(decoder_.decode(data, frames));
+  std::ignore = decoder_.decode(data, frames);
   if (frames.empty()) {
     return false;
   }

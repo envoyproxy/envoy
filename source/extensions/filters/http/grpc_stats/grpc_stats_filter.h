@@ -24,7 +24,7 @@ struct GrpcStatsObject : public StreamInfo::FilterState::Object {
     return msg;
   }
 
-  absl::optional<std::string> serializeAsString() const override {
+  std::optional<std::string> serializeAsString() const override {
     return absl::StrCat(request_message_count, ",", response_message_count);
   }
 };

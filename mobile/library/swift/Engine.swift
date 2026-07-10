@@ -12,6 +12,9 @@ public protocol Engine: AnyObject {
 
   func dumpStats() -> String
 
+  /// Drains connections matching the given socket tag.
+  func drainConnectionsBySocketTag(_ tag: UInt32)
+
   /// Terminates the running engine.
   func terminate()
 

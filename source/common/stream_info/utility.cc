@@ -118,12 +118,12 @@ const ResponseFlagUtils::ResponseFlagsMapType& ResponseFlagUtils::responseFlagsM
   return mutableResponseFlagsMap();
 }
 
-absl::optional<ResponseFlag> ResponseFlagUtils::toResponseFlag(absl::string_view flag) {
+std::optional<ResponseFlag> ResponseFlagUtils::toResponseFlag(absl::string_view flag) {
   const auto iter = responseFlagsMap().find(flag);
   if (iter != responseFlagsMap().end()) {
     return iter->second.flag_;
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 CustomResponseFlag::CustomResponseFlag(absl::string_view flag, absl::string_view flag_long)
@@ -137,113 +137,113 @@ OptRef<const UpstreamTiming> getUpstreamTiming(const StreamInfo& stream_info) {
   return info.value().get().upstreamTiming();
 }
 
-absl::optional<std::chrono::nanoseconds> duration(const absl::optional<MonotonicTime>& time,
-                                                  const StreamInfo& stream_info) {
+std::optional<std::chrono::nanoseconds> duration(const std::optional<MonotonicTime>& time,
+                                                 const StreamInfo& stream_info) {
   if (!time.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return std::chrono::duration_cast<std::chrono::nanoseconds>(time.value() -
                                                               stream_info.startTimeMonotonic());
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::firstUpstreamTxByteSent() {
+std::optional<std::chrono::nanoseconds> TimingUtility::firstUpstreamTxByteSent() {
   OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
   if (!timing) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return duration(timing.value().get().first_upstream_tx_byte_sent_, stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::lastUpstreamTxByteSent() {
+std::optional<std::chrono::nanoseconds> TimingUtility::lastUpstreamTxByteSent() {
   OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
   if (!timing) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return duration(timing.value().get().last_upstream_tx_byte_sent_, stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::firstUpstreamRxByteReceived() {
+std::optional<std::chrono::nanoseconds> TimingUtility::firstUpstreamRxByteReceived() {
   OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
   if (!timing) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return duration(timing.value().get().first_upstream_rx_byte_received_, stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::lastUpstreamRxByteReceived() {
+std::optional<std::chrono::nanoseconds> TimingUtility::lastUpstreamRxByteReceived() {
   OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
   if (!timing) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return duration(timing.value().get().last_upstream_rx_byte_received_, stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::firstUpstreamRxBodyByteReceived() {
+std::optional<std::chrono::nanoseconds> TimingUtility::firstUpstreamRxBodyByteReceived() {
   OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
   if (!timing) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return duration(timing.value().get().first_upstream_rx_body_byte_received_, stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::upstreamHandshakeComplete() {
+std::optional<std::chrono::nanoseconds> TimingUtility::upstreamHandshakeComplete() {
   OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
   if (!timing) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return duration(timing.value().get().upstreamHandshakeComplete(), stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::firstDownstreamTxByteSent() {
+std::optional<std::chrono::nanoseconds> TimingUtility::firstDownstreamTxByteSent() {
   OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
   if (!timing) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return duration(timing.value().get().firstDownstreamTxByteSent(), stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamTxByteSent() {
+std::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamTxByteSent() {
   OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
   if (!timing) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return duration(timing.value().get().lastDownstreamTxByteSent(), stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamHeaderRxByteReceived() {
+std::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamHeaderRxByteReceived() {
   OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
   if (!timing) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return duration(timing.value().get().lastDownstreamHeaderRxByteReceived(), stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamRxByteReceived() {
+std::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamRxByteReceived() {
   OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
   if (!timing) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return duration(timing.value().get().lastDownstreamRxByteReceived(), stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::downstreamHandshakeComplete() {
+std::optional<std::chrono::nanoseconds> TimingUtility::downstreamHandshakeComplete() {
   OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
   if (!timing) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return duration(timing.value().get().downstreamHandshakeComplete(), stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamAckReceived() {
+std::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamAckReceived() {
   OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
   if (!timing) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return duration(timing.value().get().lastDownstreamAckReceived(), stream_info_);
 }
 
 const std::string Utility::formatDownstreamAddressNoPort(const Network::Address::Instance& address,
-                                                         absl::optional<int> mask_prefix_len) {
+                                                         std::optional<int> mask_prefix_len) {
   // No masking - return address without port
   if (!mask_prefix_len.has_value()) {
     if (address.type() == Network::Address::Type::Ip) {
@@ -266,8 +266,7 @@ const std::string Utility::formatDownstreamAddressNoPort(const Network::Address:
   Network::Address::InstanceConstSharedPtr address_ptr(&address,
                                                        [](const Network::Address::Instance*) {});
 
-  auto cidr_range_or_error =
-      Network::Address::CidrRange::create(address_ptr, length, absl::nullopt);
+  auto cidr_range_or_error = Network::Address::CidrRange::create(address_ptr, length, std::nullopt);
 
   if (cidr_range_or_error.ok()) {
     masked_address = cidr_range_or_error.value().asString();
@@ -284,7 +283,7 @@ Utility::formatDownstreamAddressJustPort(const Network::Address::Instance& addre
   return port;
 }
 
-absl::optional<uint32_t>
+std::optional<uint32_t>
 Utility::extractDownstreamAddressJustPort(const Network::Address::Instance& address) {
   if (address.type() == Network::Address::Type::Ip) {
     return address.ip()->port();
@@ -301,7 +300,7 @@ Utility::formatDownstreamAddressJustEndpointId(const Network::Address::Instance&
   return endpoint_id;
 }
 
-const absl::optional<Http::Code>
+const std::optional<Http::Code>
 ProxyStatusUtils::recommendedHttpStatusCode(const ProxyStatusError proxy_status) {
   // This switch statement was derived from the mapping from proxy error type to
   // recommended HTTP status code in
@@ -347,7 +346,7 @@ ProxyStatusUtils::recommendedHttpStatusCode(const ProxyStatusError proxy_status)
   case ProxyStatusError::ProxyInternalResponse:
   case ProxyStatusError::HttpRequestError:
   default:
-    return absl::nullopt;
+    return std::nullopt;
   }
 }
 
@@ -475,7 +474,7 @@ ProxyStatusUtils::proxyStatusErrorToString(const ProxyStatusError proxy_status) 
   }
 }
 
-const absl::optional<ProxyStatusError>
+const std::optional<ProxyStatusError>
 ProxyStatusUtils::fromStreamInfo(const StreamInfo& stream_info) {
   // NB: This mapping from Envoy-specific CoreResponseFlag enum to Proxy-Status
   // error enum is lossy, since CoreResponseFlag is really a bitset of many
@@ -539,7 +538,7 @@ ProxyStatusUtils::fromStreamInfo(const StreamInfo& stream_info) {
   } else if (stream_info.hasResponseFlag(CoreResponseFlag::DnsResolutionFailed)) {
     return ProxyStatusError::DnsError;
   } else {
-    return absl::nullopt;
+    return std::nullopt;
   }
 }
 

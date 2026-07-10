@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -57,7 +58,6 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/match.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -378,8 +378,8 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config,
   // If trace sampling is not explicitly configured in shadow_policy, we pass null optional to
   // inherit the parent's sampling decision. This prevents oversampling when runtime sampling is
   // disabled.
-  trace_sampled_ = config.has_trace_sampled() ? absl::optional<bool>(config.trace_sampled().value())
-                                              : absl::nullopt;
+  trace_sampled_ = config.has_trace_sampled() ? std::optional<bool>(config.trace_sampled().value())
+                                              : std::nullopt;
 
   // Create HeaderMutations directly from HeaderMutation rules
   if (!config.request_headers_mutations().empty()) {
@@ -1357,8 +1357,8 @@ absl::Status RouteEntryImplBase::validateClusters(const Upstream::ClusterManager
   return absl::OkStatus();
 }
 
-absl::optional<bool> RouteEntryImplBase::filterDisabled(absl::string_view config_name) const {
-  absl::optional<bool> result = per_filter_configs_->disabled(config_name);
+std::optional<bool> RouteEntryImplBase::filterDisabled(absl::string_view config_name) const {
+  std::optional<bool> result = per_filter_configs_->disabled(config_name);
   if (result.has_value()) {
     return result.value();
   }
@@ -1709,8 +1709,8 @@ CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
 
 const CommonConfig& CommonVirtualHostImpl::routeConfig() const { return *global_route_config_; }
 
-absl::optional<bool> CommonVirtualHostImpl::filterDisabled(absl::string_view config_name) const {
-  absl::optional<bool> result = per_filter_configs_->disabled(config_name);
+std::optional<bool> CommonVirtualHostImpl::filterDisabled(absl::string_view config_name) const {
+  std::optional<bool> result = per_filter_configs_->disabled(config_name);
   if (result.has_value()) {
     return result.value();
   }

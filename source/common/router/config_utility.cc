@@ -16,7 +16,7 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-absl::optional<Matchers::StringMatcherImpl>
+std::optional<Matchers::StringMatcherImpl>
 maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& config,
                          Server::Configuration::CommonFactoryContext& context) {
   switch (config.query_parameter_match_specifier_case()) {
@@ -25,13 +25,13 @@ maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& 
     return Matchers::StringMatcherImpl(config.string_match(), context);
   case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
       kPresentMatch:
-    return absl::nullopt;
+    return std::nullopt;
   case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
       QUERY_PARAMETER_MATCH_SPECIFIER_NOT_SET:
-    return absl::nullopt;
+    return std::nullopt;
   }
 
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 } // namespace
@@ -40,8 +40,8 @@ ConfigUtility::QueryParameterMatcher::QueryParameterMatcher(
     const envoy::config::route::v3::QueryParameterMatcher& config,
     Server::Configuration::CommonFactoryContext& context)
     : name_(config.name()),
-      present_match_(config.has_present_match() ? absl::make_optional(config.present_match())
-                                                : absl::nullopt),
+      present_match_(config.has_present_match() ? std::make_optional(config.present_match())
+                                                : std::nullopt),
       matcher_(maybeCreateStringMatcher(config, context)) {}
 
 bool ConfigUtility::QueryParameterMatcher::matches(
@@ -77,7 +77,7 @@ ConfigUtility::CookieMatcher::CookieMatcher(const envoy::config::route::v3::Cook
       string_match_(config.string_match(), context) {}
 
 bool ConfigUtility::CookieMatcher::matches(
-    const absl::optional<absl::string_view>& cookie_value) const {
+    const std::optional<absl::string_view>& cookie_value) const {
   bool matched = false;
   if (cookie_value.has_value()) {
     matched = string_match_.match(cookie_value.value());
@@ -112,7 +112,7 @@ bool ConfigUtility::matchQueryParams(
 bool ConfigUtility::matchCookies(const absl::flat_hash_map<std::string, std::string>& cookies,
                                  const std::vector<CookieMatcherPtr>& matchers) {
   for (const auto& matcher : matchers) {
-    absl::optional<absl::string_view> cookie_value;
+    std::optional<absl::string_view> cookie_value;
     const auto it = cookies.find(matcher->name());
     if (it != cookies.end()) {
       cookie_value = it->second;
@@ -143,7 +143,7 @@ Http::Code ConfigUtility::parseRedirectResponseCode(
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-absl::optional<Http::Code>
+std::optional<Http::Code>
 ConfigUtility::parseDirectResponseCode(const envoy::config::route::v3::Route& route) {
   if (route.has_redirect()) {
     return parseRedirectResponseCode(route.redirect().response_code());

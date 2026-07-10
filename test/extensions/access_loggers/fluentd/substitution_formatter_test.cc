@@ -22,7 +22,7 @@ TEST(FluentdFormatterImplTest, FormatMsgpack) {
   (*log_struct.mutable_fields())["LogType"].set_string_value("%ACCESS_LOG_TYPE%");
 
   auto json_formatter =
-      Formatter::SubstitutionFormatStringUtils::createJsonFormatter(log_struct, false);
+      Formatter::SubstitutionFormatStringUtils::createJsonFormatter(log_struct, false).value();
 
   auto fluentd_formatter = FluentdFormatterImpl(std::move(json_formatter));
   auto expected_json = "{\"Message\":\"SomeValue\",\"LogType\":\"NotSet\"}";

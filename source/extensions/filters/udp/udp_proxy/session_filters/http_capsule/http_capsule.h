@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/extensions/filters/udp/udp_proxy/session/http_capsule/v3/http_capsule.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
 

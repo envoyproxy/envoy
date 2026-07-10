@@ -230,6 +230,21 @@ absl::Span<const std::string> ConnectionInfoImplBase::pemEncodedPeerCertificateC
       });
 }
 
+absl::Span<const std::string>
+ConnectionInfoImplBase::pemEncodedValidatedPeerCertificateChain() const {
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::PemEncodedValidatedPeerCertificateChain, [this](SSL*) {
+        std::vector<std::string> result;
+        OptRef<const std::vector<bssl::UniquePtr<X509>>> chain = validatedPeerCertChain();
+        if (chain.has_value()) {
+          for (const auto& cert : *chain) {
+            result.emplace_back(certToPem(*cert));
+          }
+        }
+        return result;
+      });
+}
+
 bool ConnectionInfoImplBase::peerCertificateSanMatches(const Ssl::SanMatcher& matcher) const {
   const bssl::UniquePtr<GENERAL_NAMES>& sans =
       getCachedValueOrCreate<bssl::UniquePtr<GENERAL_NAMES>>(
@@ -470,7 +485,7 @@ Ssl::ParsedX509NameOptConstRef ConnectionInfoImplBase::parsedSubjectPeerCertific
   if (parsedName) {
     return {*parsedName};
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 const std::string& ConnectionInfoImplBase::subjectLocalCertificate() const {
@@ -483,18 +498,18 @@ const std::string& ConnectionInfoImplBase::subjectLocalCertificate() const {
   });
 }
 
-absl::optional<SystemTime> ConnectionInfoImplBase::validFromPeerCertificate() const {
+std::optional<SystemTime> ConnectionInfoImplBase::validFromPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
   if (!cert) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return Utility::getValidFrom(*cert);
 }
 
-absl::optional<SystemTime> ConnectionInfoImplBase::expirationPeerCertificate() const {
+std::optional<SystemTime> ConnectionInfoImplBase::expirationPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
   if (!cert) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return Utility::getExpirationTime(*cert);
 }

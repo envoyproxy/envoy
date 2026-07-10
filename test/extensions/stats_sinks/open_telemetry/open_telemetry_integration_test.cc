@@ -52,10 +52,7 @@ public:
 
   OpenTelemetryIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {
-    // TODO(ohadvano): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat 'grpc.otlp_collector.streams_closed_x' and
-    // stat_prefix 'otlp_collector'.
-    skip_tag_extraction_rule_check_ = true;
+    skip_tag_extraction_rule_check_ = false;
     driver_ = (std::get<2>(GetParam()) == ExporterType::GRPC) ? makeGrpcDriver(clientType())
                                                               : makeHttpDriver();
   }
@@ -90,7 +87,7 @@ public:
       envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
       driver_.configureExporter(sink_config, fake_upstreams_.back()->localAddress());
       sink_config.set_prefix(stat_prefix_);
-      metrics_sink->mutable_typed_config()->PackFrom(sink_config);
+      std::ignore = metrics_sink->mutable_typed_config()->PackFrom(sink_config);
 
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(500));
@@ -333,7 +330,7 @@ public:
                      fake_upstreams_.back()->localAddress());
 
       // Add custom conversion rules.
-      Protobuf::TextFormat::ParseFromString(
+      std::ignore = Protobuf::TextFormat::ParseFromString(
           R"pb(matcher_list {
                      matchers {
                        predicate {
@@ -422,7 +419,7 @@ public:
                    })pb",
           sink_config.mutable_custom_metric_conversions());
 
-      metrics_sink->mutable_typed_config()->PackFrom(sink_config);
+      std::ignore = metrics_sink->mutable_typed_config()->PackFrom(sink_config);
 
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(500));
@@ -502,7 +499,7 @@ class OpenTelemetryFormatterHeaderTest : public testing::TestWithParam<Network::
                                          public HttpIntegrationTest {
 public:
   OpenTelemetryFormatterHeaderTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
-    skip_tag_extraction_rule_check_ = true;
+    skip_tag_extraction_rule_check_ = false;
   }
 
   void initialize() override {
@@ -529,7 +526,7 @@ public:
       header->mutable_header()->set_key("x-custom-formatter");
       header->mutable_header()->set_value("%HOSTNAME%");
 
-      sink->mutable_typed_config()->PackFrom(config);
+      std::ignore = sink->mutable_typed_config()->PackFrom(config);
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(100));
     });

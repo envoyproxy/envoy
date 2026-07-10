@@ -49,7 +49,7 @@ public:
       setGrpcService(*config.mutable_grpc_service(), "metrics_service",
                      fake_upstreams_.back()->localAddress());
       config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-      metrics_sink->mutable_typed_config()->PackFrom(config);
+      std::ignore = metrics_sink->mutable_typed_config()->PackFrom(config);
       // Shrink reporting period down to 1s to make test not take forever.
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(100));

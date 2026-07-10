@@ -85,30 +85,30 @@ Http::FilterHeadersStatus FileServerFilter::decodeHeaders(RequestHeaderMap& head
     // If the request didn't match a mapping, skip this filter.
     return Http::FilterHeadersStatus::Continue;
   }
-  absl::optional<std::filesystem::path> file_path = config->applyPathMapping(path, *mapping);
+  std::optional<std::filesystem::path> file_path = config->applyPathMapping(path, *mapping);
   if (!file_path) {
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
                                        CodeUtility::toString(Http::Code::BadRequest), nullptr,
-                                       absl::nullopt, "file_server_rejected_non_normalized_path");
+                                       std::nullopt, "file_server_rejected_non_normalized_path");
     return Http::FilterHeadersStatus::StopIteration;
   }
   if (!headers.Method()) {
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
                                        CodeUtility::toString(Http::Code::BadRequest), nullptr,
-                                       absl::nullopt, "file_server_rejected_missing_method");
+                                       std::nullopt, "file_server_rejected_missing_method");
     return Http::FilterHeadersStatus::StopIteration;
   }
   if (headers.Method()->value() != Http::Headers::get().MethodValues.Head &&
       headers.Method()->value() != Http::Headers::get().MethodValues.Get) {
     decoder_callbacks_->sendLocalReply(Http::Code::MethodNotAllowed,
                                        CodeUtility::toString(Http::Code::MethodNotAllowed), nullptr,
-                                       absl::nullopt, "file_server_rejected_method");
+                                       std::nullopt, "file_server_rejected_method");
     return Http::FilterHeadersStatus::StopIteration;
   }
   if (!end_stream) {
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
                                        CodeUtility::toString(Http::Code::BadRequest), nullptr,
-                                       absl::nullopt, "file_server_rejected_not_end_stream");
+                                       std::nullopt, "file_server_rejected_not_end_stream");
     return Http::FilterHeadersStatus::StopIteration;
   }
   // Parse range header, if present, into start and end (otherwise or on error, 0,0)
@@ -132,7 +132,7 @@ void FileServerFilter::bodyChunkFromFile(Buffer::InstancePtr buffer, bool end_st
 
 void FileServerFilter::errorFromFile(Http::Code code, absl::string_view log_message) {
   if (!headers_sent_) {
-    decoder_callbacks_->sendLocalReply(code, CodeUtility::toString(code), nullptr, absl::nullopt,
+    decoder_callbacks_->sendLocalReply(code, CodeUtility::toString(code), nullptr, std::nullopt,
                                        log_message);
   } else {
     decoder_callbacks_->streamInfo().setResponseCodeDetails(log_message);

@@ -1,9 +1,11 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/optref.h"
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
@@ -14,9 +16,9 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/hash/hash.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "nlohmann/json.hpp" // IWYU pragma: keep
 
 namespace Envoy {
@@ -25,6 +27,19 @@ namespace HttpFilters {
 namespace McpJsonRestBridge {
 
 inline constexpr char FilterName[] = "envoy.filters.http.mcp_json_rest_bridge";
+
+struct EndpointKey {
+  std::string host;
+  std::string path;
+
+  bool operator==(const EndpointKey& other) const {
+    return host == other.host && path == other.path;
+  }
+
+  template <typename H> friend H AbslHashValue(H h, const EndpointKey& k) {
+    return H::combine(std::move(h), k.host, k.path);
+  }
+};
 
 /**
  * Configuration for the MCP JSON REST Bridge filter.
@@ -36,9 +51,9 @@ public:
           proto_config);
 
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-  getHttpRule(absl::string_view tool_name) const;
+  getHttpRule(absl::string_view tool_name, absl::string_view host, absl::string_view path) const;
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-  getToolsListHttpRule() const;
+  getToolsListHttpRule(absl::string_view host, absl::string_view path) const;
 
   const std::string& fallbackProtocolVersion() const { return fallback_protocol_version_; }
 
@@ -50,7 +65,18 @@ public:
     return proto_config_.request_storage_mode();
   }
 
-  bool textContentStreamingEnabled(absl::string_view tool_name) const;
+  // Returns tools to serve a local tools/list response, filtered by host and path.
+  std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
+  toolListLocalTools(absl::string_view host, absl::string_view path) const;
+
+  // Returns whether local serving of tools/list is configured for the matching endpoint.
+  bool toolListLocal(absl::string_view host, absl::string_view path) const;
+
+  // Returns whether there is a configured endpoint matching the host and path.
+  bool hasEndpoint(absl::string_view host, absl::string_view path) const;
+
+  bool textContentStreamingEnabled(absl::string_view tool_name, absl::string_view host,
+                                   absl::string_view path) const;
 
   bool traceContextExtraction() const { return proto_config_.has_trace_context_extraction(); }
 
@@ -62,8 +88,17 @@ private:
   struct ToolEntry {
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
     bool text_content_streaming_enabled;
+    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig* tool_proto;
   };
-  absl::flat_hash_map<std::string, ToolEntry> tool_entries_;
+  struct EndpointConfig {
+    absl::flat_hash_map<std::string, ToolEntry> tool_entries;
+    std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
+        tools;
+    std::optional<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+        tool_list_http_rule;
+    bool tool_list_local = false;
+  };
+  absl::flat_hash_map<EndpointKey, EndpointConfig> endpoint_configs_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config_;
   std::string fallback_protocol_version_;
   uint32_t max_request_body_size_;
@@ -78,18 +113,38 @@ public:
           proto_config);
 
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-  getHttpRule(absl::string_view tool_name) const;
+  getHttpRule(absl::string_view tool_name, absl::string_view host, absl::string_view path) const;
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-  getToolsListHttpRule() const;
+  getToolsListHttpRule(absl::string_view host, absl::string_view path) const;
 
-  bool textContentStreamingEnabled(absl::string_view tool_name) const;
+  // Returns tools to serve a local tools/list response, filtered by host and path.
+  std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
+  toolListLocalTools(absl::string_view host, absl::string_view path) const;
+
+  // Returns whether local serving of tools/list is configured for the matching endpoint.
+  bool toolListLocal(absl::string_view host, absl::string_view path) const;
+
+  // Returns whether there is a configured endpoint matching the host and path.
+  bool hasEndpoint(absl::string_view host, absl::string_view path) const;
+
+  bool textContentStreamingEnabled(absl::string_view tool_name, absl::string_view host,
+                                   absl::string_view path) const;
 
 private:
   struct ToolEntry {
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
     bool text_content_streaming_enabled;
+    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig* tool_proto;
   };
-  absl::flat_hash_map<std::string, ToolEntry> tool_entries_;
+  struct EndpointConfig {
+    absl::flat_hash_map<std::string, ToolEntry> tool_entries;
+    std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
+        tools;
+    std::optional<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+        tool_list_http_rule;
+    bool tool_list_local = false;
+  };
+  absl::flat_hash_map<EndpointKey, EndpointConfig> endpoint_configs_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
       proto_config_;
 };
@@ -119,6 +174,12 @@ private:
   void handleMcpMethod(const nlohmann::json& json_rpc, Http::RequestHeaderMapOptRef request_headers,
                        const McpJsonRestBridgePerRouteConfig* per_route_config);
 
+  // Serves a local tools/list response using tools' ToolsListSpecificConfig.
+  void serveToolsListLocal(
+      const nlohmann::json& json_rpc,
+      const std::vector<
+          const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>& tools);
+
   // Modifies the response from upstream into JSON-RPC response.
   void encodeJsonRpcData(Http::ResponseHeaderMapOptRef response_headers);
 
@@ -143,7 +204,7 @@ private:
 
   enum class McpOperation {
     Unspecified = 0,
-    // Received the "/mcp" URL but has not parsed the request body yet.
+    // Received a configured MCP URL path but has not parsed the request body yet.
     Undecided = 1,
     // InitializeRequest in the init handshake flow.
     Initialization = 2,
@@ -151,14 +212,17 @@ private:
     InitializationAck = 3,
     // Clients send a tools/list request to discover available tools.
     ToolsList = 4,
+    // Clients send a tools/list request that is handled locally.
+    ToolsListLocal = 5,
     // Clients send a tools/call request to invoke a tool.
-    ToolsCall = 5,
+    ToolsCall = 6,
     // MCP operation failed.
-    OperationFailed = 6,
+    OperationFailed = 7,
   };
   McpOperation mcp_operation_ = McpOperation::Unspecified;
-  absl::optional<nlohmann::json> session_id_;
+  std::optional<nlohmann::json> session_id_;
   std::string server_name_;
+  std::string path_;
   Buffer::OwnedImpl request_body_;
   std::string request_body_str_;
   Buffer::OwnedImpl response_body_;
