@@ -1762,6 +1762,8 @@ JA4
 AiProtocolManager
 modelling
 delegator
+CNSA
+KEM
 MSS
 SERVFAIL
 WR

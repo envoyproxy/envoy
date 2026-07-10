@@ -379,15 +379,15 @@ ContextImpl::ContextImpl(
       if (!fips_mode) {
         ENVOY_LOG(warn, "FIPS conformance policy applied on a non-FIPS build");
       }
-      for (auto& tls_context : tls_contexts_) {
-        int rc = SSL_CTX_set_compliance_policy(tls_context.ssl_ctx_.get(),
-                                               ssl_compliance_policy_fips_202205);
-        if (rc != 1) {
-          creation_status = absl::InvalidArgumentError(
-              absl::StrCat("Failed to apply FIPS_202205 compliance policy: ",
-                           Utility::getLastCryptoError().value_or("")));
-          return;
-        }
+      creation_status = setCompliancePolicy(ssl_compliance_policy_fips_202205);
+      if (!creation_status.ok()) {
+        return;
+      }
+      break;
+    case ProtoPolicy::CNSA2_202603:
+      creation_status = setCompliancePolicy(ssl_compliance_policy_cnsa2_202603);
+      if (!creation_status.ok()) {
+        return;
       }
       break;
     default:
@@ -395,6 +395,18 @@ ContextImpl::ContextImpl(
       return;
     }
   }
+}
+
+absl::Status ContextImpl::setCompliancePolicy(enum ssl_compliance_policy_t policy) {
+  for (auto& tls_context : tls_contexts_) {
+    int rc = SSL_CTX_set_compliance_policy(tls_context.ssl_ctx_.get(), policy);
+    if (rc != 1) {
+      return absl::InvalidArgumentError(absl::StrCat("Failed to apply compliance policy: ",
+                                                     Utility::getLastCryptoError().value_or("")));
+    }
+  }
+
+  return absl::OkStatus();
 }
 
 void ContextImpl::keylogCallback(const SSL* ssl, const char* line) {
