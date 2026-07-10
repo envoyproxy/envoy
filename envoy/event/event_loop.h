@@ -34,6 +34,7 @@ public:
 
 using ObserverPtr = std::unique_ptr<Observer>;
 using ObserverSharedPtr = std::shared_ptr<Observer>;
+using ObserverWeakPtr = std::weak_ptr<Observer>;
 
 /**
  * Handle returned when registering an Evwatch::Observer with a Dispatcher.
@@ -43,6 +44,13 @@ using ObserverSharedPtr = std::shared_ptr<Observer>;
 class ObserverHandle {
 public:
   virtual ~ObserverHandle() = default;
+
+  /**
+   * Returns a weak reference to the underlying observer. This allows ad-hoc tracking lists
+   * (such as periodic metric pollers) to safely reference the observer without interfering
+   * with RAII handle ownership and lifecycle unregistration.
+   */
+  virtual ObserverWeakPtr observer() const = 0;
 };
 
 using ObserverHandlePtr = std::unique_ptr<ObserverHandle>;

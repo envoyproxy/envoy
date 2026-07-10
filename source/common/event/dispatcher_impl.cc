@@ -430,8 +430,8 @@ void DispatcherImpl::popTrackedObject(const ScopeTrackedObject* expected_object)
          "Popped the top of the tracked object stack, but it wasn't the expected object!");
 }
 
-Evwatch::ObserverHandlePtr
-DispatcherImpl::registerEvwatchObserver(Evwatch::ObserverSharedPtr observer) {
+Evwatch::ObserverHandlePtr DispatcherImpl::registerEvwatchObserver(Evwatch::ObserverPtr observer) {
+  ASSERT(isThreadSafe());
   return base_scheduler_.registerEvwatchObserver(std::move(observer));
 }
 

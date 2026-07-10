@@ -1547,7 +1547,7 @@ public:
 };
 
 TEST_F(DispatcherImplEvwatchTest, RegisterAndUnregisterObserver) {
-  auto observer = std::make_shared<StrictMock<MockEvwatchObserver>>();
+  auto observer = std::make_unique<StrictMock<MockEvwatchObserver>>();
   auto* observer_ptr = observer.get();
   EXPECT_CALL(*observer_ptr, onPrepare(_, _, _)).Times(testing::AtLeast(1));
   EXPECT_CALL(*observer_ptr, onCheck(_)).Times(testing::AtLeast(1));

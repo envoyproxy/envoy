@@ -1,6 +1,7 @@
 #include "source/common/event/libevent_scheduler.h"
 
 #include <algorithm>
+#include <chrono>
 
 #include "source/common/common/assert.h"
 #include "source/common/event/schedulable_cb_impl.h"
@@ -20,6 +21,8 @@ class ObserverHandleImpl : public Evwatch::ObserverHandle {
 public:
   explicit ObserverHandleImpl(Evwatch::ObserverSharedPtr observer)
       : observer_(std::move(observer)) {}
+
+  Evwatch::ObserverWeakPtr observer() const override { return observer_; }
 
 private:
   Evwatch::ObserverSharedPtr observer_;
@@ -164,18 +167,21 @@ void LibeventScheduler::onPrepareForObserver(evwatch*, const evwatch_prepare_cb_
   const uint64_t timeout_us =
       timeout_set ? static_cast<uint64_t>(timeout.tv_sec) * 1000000 + timeout.tv_usec : 0;
 
-  timeval now;
-  evutil_gettimeofday(&now, nullptr);
-  const uint64_t prepare_time_us = static_cast<uint64_t>(now.tv_sec) * 1000000 + now.tv_usec;
+  const uint64_t prepare_time_us =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::steady_clock::now().time_since_epoch()) // NO_CHECK_FORMAT(real_time)
+          .count();
 
-  for (auto it = self->evwatch_observers_.begin(); it != self->evwatch_observers_.end();) {
-    if (auto observer = it->lock()) {
+  auto observers = self->evwatch_observers_;
+  for (const auto& entry : observers) {
+    if (auto observer = entry.lock()) {
       observer->onPrepare(prepare_time_us, timeout_set, timeout_us);
-      ++it;
-    } else {
-      it = self->evwatch_observers_.erase(it);
     }
   }
+  self->evwatch_observers_.erase(std::remove_if(self->evwatch_observers_.begin(),
+                                                self->evwatch_observers_.end(),
+                                                [](const auto& entry) { return entry.expired(); }),
+                                 self->evwatch_observers_.end());
 }
 
 void LibeventScheduler::onCheckForObserver(evwatch*, const evwatch_check_cb_info*, void* arg) {
@@ -183,22 +189,25 @@ void LibeventScheduler::onCheckForObserver(evwatch*, const evwatch_check_cb_info
   if (self->evwatch_observers_.empty()) {
     return;
   }
-  timeval now;
-  evutil_gettimeofday(&now, nullptr);
-  const uint64_t check_time_us = static_cast<uint64_t>(now.tv_sec) * 1000000 + now.tv_usec;
+  const uint64_t check_time_us =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::steady_clock::now().time_since_epoch()) // NO_CHECK_FORMAT(real_time)
+          .count();
 
-  for (auto it = self->evwatch_observers_.begin(); it != self->evwatch_observers_.end();) {
-    if (auto observer = it->lock()) {
+  auto observers = self->evwatch_observers_;
+  for (const auto& entry : observers) {
+    if (auto observer = entry.lock()) {
       observer->onCheck(check_time_us);
-      ++it;
-    } else {
-      it = self->evwatch_observers_.erase(it);
     }
   }
+  self->evwatch_observers_.erase(std::remove_if(self->evwatch_observers_.begin(),
+                                                self->evwatch_observers_.end(),
+                                                [](const auto& entry) { return entry.expired(); }),
+                                 self->evwatch_observers_.end());
 }
 
 Evwatch::ObserverHandlePtr
-LibeventScheduler::registerEvwatchObserver(Evwatch::ObserverSharedPtr observer) {
+LibeventScheduler::registerEvwatchObserver(Evwatch::ObserverPtr observer) {
   if (observer == nullptr) {
     return nullptr;
   }
@@ -207,8 +216,9 @@ LibeventScheduler::registerEvwatchObserver(Evwatch::ObserverSharedPtr observer) 
     evwatch_prepare_new(libevent_.get(), &onPrepareForObserver, this);
     evwatch_check_new(libevent_.get(), &onCheckForObserver, this);
   }
-  evwatch_observers_.push_back(observer);
-  return std::make_unique<ObserverHandleImpl>(std::move(observer));
+  auto shared_obs = Evwatch::ObserverSharedPtr(std::move(observer));
+  evwatch_observers_.push_back(shared_obs);
+  return std::make_unique<ObserverHandleImpl>(std::move(shared_obs));
 }
 
 } // namespace Event

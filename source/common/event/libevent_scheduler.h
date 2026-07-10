@@ -63,7 +63,7 @@ public:
 
   LibeventScheduler();
 
-  Evwatch::ObserverHandlePtr registerEvwatchObserver(Evwatch::ObserverSharedPtr observer);
+  Evwatch::ObserverHandlePtr registerEvwatchObserver(Evwatch::ObserverPtr observer);
 
   // Scheduler
   TimerPtr createTimer(const TimerCb& cb, Dispatcher& dispatcher) override;

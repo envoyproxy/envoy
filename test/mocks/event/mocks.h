@@ -118,7 +118,7 @@ public:
   // Event::Dispatcher
   MOCK_METHOD(void, registerWatchdog,
               (const Server::WatchDogSharedPtr&, std::chrono::milliseconds));
-  MOCK_METHOD(Evwatch::ObserverHandlePtr, registerEvwatchObserver, (Evwatch::ObserverSharedPtr));
+  MOCK_METHOD(Evwatch::ObserverHandlePtr, registerEvwatchObserver, (Evwatch::ObserverPtr));
   MOCK_METHOD(void, initializeStats, (Stats::Scope&, const std::optional<std::string>&));
   MOCK_METHOD(void, clearDeferredDeleteList, ());
   MOCK_METHOD(Network::ServerConnection*, createServerConnection_, (StreamInfo::StreamInfo & info));

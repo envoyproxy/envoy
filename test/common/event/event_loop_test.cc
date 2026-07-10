@@ -24,7 +24,10 @@ namespace Envoy {
 namespace Event {
 namespace {
 
-class MockObserverHandle : public Evwatch::ObserverHandle {};
+class MockObserverHandle : public Evwatch::ObserverHandle {
+public:
+  MOCK_METHOD(Evwatch::ObserverWeakPtr, observer, (), (const, override));
+};
 
 class MockEvwatchObserver : public Evwatch::Observer {
 public:
@@ -33,18 +36,18 @@ public:
 };
 
 TEST(EvwatchObserverDispatcherTest, MockDispatcherRegistration) {
-  auto observer = std::make_shared<StrictMock<MockEvwatchObserver>>();
+  auto observer = std::make_unique<StrictMock<MockEvwatchObserver>>();
   MockEvwatchObserver* observer_ptr = observer.get();
 
   StrictMock<MockDispatcher> dispatcher("worker_0");
 
   EXPECT_CALL(dispatcher, registerEvwatchObserver(_))
-      .WillOnce(Invoke([observer_ptr](Evwatch::ObserverSharedPtr t) {
+      .WillOnce(Invoke([observer_ptr](Evwatch::ObserverPtr t) {
         EXPECT_EQ(observer_ptr, t.get());
         return std::make_unique<MockObserverHandle>();
       }));
 
-  auto handle = dispatcher.registerEvwatchObserver(observer);
+  auto handle = dispatcher.registerEvwatchObserver(std::move(observer));
   EXPECT_NE(nullptr, handle);
 }
 
@@ -63,7 +66,7 @@ public:
 };
 
 TEST_F(EvwatchObserverRealDispatcherTest, RealLibeventWatcherCallbacksAndRAIIHandle) {
-  auto observer = std::make_shared<StrictMock<MockEvwatchObserver>>();
+  auto observer = std::make_unique<StrictMock<MockEvwatchObserver>>();
   auto* observer_ptr = observer.get();
 
   EXPECT_CALL(*observer_ptr, onPrepare(_, _, _)).Times(testing::AtLeast(1));
@@ -85,13 +88,15 @@ TEST_F(EvwatchObserverRealDispatcherTest, NullObserverRegistrationIsNoop) {
 }
 
 TEST_F(EvwatchObserverRealDispatcherTest, MultipleObserversSimultaneous) {
-  auto observer1 = std::make_shared<StrictMock<MockEvwatchObserver>>();
-  auto observer2 = std::make_shared<StrictMock<MockEvwatchObserver>>();
+  auto observer1 = std::make_unique<StrictMock<MockEvwatchObserver>>();
+  auto observer2 = std::make_unique<StrictMock<MockEvwatchObserver>>();
+  auto* observer1_ptr = observer1.get();
+  auto* observer2_ptr = observer2.get();
 
-  EXPECT_CALL(*observer1, onPrepare(_, _, _)).Times(testing::AtLeast(1));
-  EXPECT_CALL(*observer1, onCheck(_)).Times(testing::AtLeast(1));
-  EXPECT_CALL(*observer2, onPrepare(_, _, _)).Times(testing::AtLeast(1));
-  EXPECT_CALL(*observer2, onCheck(_)).Times(testing::AtLeast(1));
+  EXPECT_CALL(*observer1_ptr, onPrepare(_, _, _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(*observer1_ptr, onCheck(_)).Times(testing::AtLeast(1));
+  EXPECT_CALL(*observer2_ptr, onPrepare(_, _, _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(*observer2_ptr, onCheck(_)).Times(testing::AtLeast(1));
 
   auto handle1 = dispatcher_->registerEvwatchObserver(std::move(observer1));
   auto handle2 = dispatcher_->registerEvwatchObserver(std::move(observer2));
@@ -103,8 +108,8 @@ TEST_F(EvwatchObserverRealDispatcherTest, MultipleObserversSimultaneous) {
 }
 
 TEST_F(EvwatchObserverRealDispatcherTest, PartialHandleDestruction) {
-  auto observer1 = std::make_shared<StrictMock<MockEvwatchObserver>>();
-  auto observer2 = std::make_shared<StrictMock<MockEvwatchObserver>>();
+  auto observer1 = std::make_unique<StrictMock<MockEvwatchObserver>>();
+  auto observer2 = std::make_unique<StrictMock<MockEvwatchObserver>>();
   auto* observer1_ptr = observer1.get();
   auto* observer2_ptr = observer2.get();
 
@@ -125,17 +130,18 @@ TEST_F(EvwatchObserverRealDispatcherTest, PartialHandleDestruction) {
 }
 
 TEST_F(EvwatchObserverRealDispatcherTest, TimeoutReportingAndMetricsCalculation) {
-  auto observer = std::make_shared<NiceMock<MockEvwatchObserver>>();
+  auto observer = std::make_unique<NiceMock<MockEvwatchObserver>>();
+  auto* observer_ptr = observer.get();
 
   std::atomic<uint64_t> last_check_time_us{0};
   std::atomic<uint64_t> recorded_loop_duration_us{0};
   std::atomic<bool> observed_timer_timeout{false};
 
-  ON_CALL(*observer, onCheck(_)).WillByDefault(Invoke([&last_check_time_us](uint64_t check_time) {
-    last_check_time_us = check_time;
-  }));
+  ON_CALL(*observer_ptr, onCheck(_))
+      .WillByDefault(
+          Invoke([&last_check_time_us](uint64_t check_time) { last_check_time_us = check_time; }));
 
-  ON_CALL(*observer, onPrepare(_, _, _))
+  ON_CALL(*observer_ptr, onPrepare(_, _, _))
       .WillByDefault(Invoke([&](uint64_t prepare_time, bool timeout_set, uint64_t timeout_us) {
         if (last_check_time_us.load() != 0 && prepare_time >= last_check_time_us.load()) {
           recorded_loop_duration_us = prepare_time - last_check_time_us.load();
@@ -145,7 +151,7 @@ TEST_F(EvwatchObserverRealDispatcherTest, TimeoutReportingAndMetricsCalculation)
         }
       }));
 
-  auto handle = dispatcher_->registerEvwatchObserver(observer);
+  auto handle = dispatcher_->registerEvwatchObserver(std::move(observer));
 
   // Schedule a timer with a 10ms deadline to ensure libevent sets a poll timeout.
   TimerPtr timer = dispatcher_->createTimer([this]() { dispatcher_->exit(); });

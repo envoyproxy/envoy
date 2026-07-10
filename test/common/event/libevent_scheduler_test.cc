@@ -33,8 +33,8 @@ public:
 };
 
 TEST_F(LibeventSchedulerTest, RegisterMultipleObserversAndLazyPruning) {
-  auto observer1 = std::make_shared<StrictMock<MockEvwatchObserver>>();
-  auto observer2 = std::make_shared<StrictMock<MockEvwatchObserver>>();
+  auto observer1 = std::make_unique<StrictMock<MockEvwatchObserver>>();
+  auto observer2 = std::make_unique<StrictMock<MockEvwatchObserver>>();
   auto* observer1_ptr = observer1.get();
   auto* observer2_ptr = observer2.get();
 
@@ -74,8 +74,8 @@ TEST_F(LibeventSchedulerTest, RegisterNullObserver) {
 }
 
 TEST_F(LibeventSchedulerTest, DestructionDuringPrepareCallback) {
-  auto observer1 = std::make_shared<StrictMock<MockEvwatchObserver>>();
-  auto observer2 = std::make_shared<StrictMock<MockEvwatchObserver>>();
+  auto observer1 = std::make_unique<StrictMock<MockEvwatchObserver>>();
+  auto observer2 = std::make_unique<StrictMock<MockEvwatchObserver>>();
   auto* observer1_ptr = observer1.get();
   auto* observer2_ptr = observer2.get();
 

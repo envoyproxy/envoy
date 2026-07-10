@@ -26,7 +26,7 @@ public:
     impl_.registerWatchdog(watchdog, min_touch_interval);
   }
 
-  Evwatch::ObserverHandlePtr registerEvwatchObserver(Evwatch::ObserverSharedPtr observer) override {
+  Evwatch::ObserverHandlePtr registerEvwatchObserver(Evwatch::ObserverPtr observer) override {
     return impl_.registerEvwatchObserver(std::move(observer));
   }
 

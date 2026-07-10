@@ -164,8 +164,7 @@ public:
    * @param observer the observer to register.
    * @return Evwatch::ObserverHandlePtr handle that unregisters the observer when destructed.
    */
-  virtual Evwatch::ObserverHandlePtr
-  registerEvwatchObserver(Evwatch::ObserverSharedPtr observer) = 0;
+  virtual Evwatch::ObserverHandlePtr registerEvwatchObserver(Evwatch::ObserverPtr observer) = 0;
 
   /**
    * Returns a time-source to use with this dispatcher.
