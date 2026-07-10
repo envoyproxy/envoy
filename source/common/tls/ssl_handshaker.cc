@@ -139,18 +139,34 @@ bool SslHandshakerImpl::peerCertificateValidated() const {
          Envoy::Ssl::ClientValidationStatus::Validated;
 }
 
+namespace {
+bool sawBytesFromDownstream(SSL* ssl) {
+  if (ssl == nullptr) {
+    return false;
+  }
+  if (!SSL_is_server(ssl)) {
+    return false;
+  }
+  auto* rbio = SSL_get_rbio(ssl);
+  if (rbio == nullptr) {
+    return false;
+  }
+  return BIO_number_read(rbio) > 0;
+}
+} // namespace
+
 Network::PostIoAction SslHandshakerImpl::doHandshake() {
   ASSERT(state_ != Ssl::SocketState::HandshakeComplete && state_ != Ssl::SocketState::ShutdownSent);
 
-  // On the server side the handshake is only driven once downstream data (the ClientHello) has
-  // arrived, so the first time we step the handshake corresponds to the ClientHello being
-  // received. Record this as the downstream handshake start.
-  if (SSL_is_server(ssl())) {
+  int rc = SSL_do_handshake(ssl());
+
+  // On the server side, record the downstream handshake start the first time we actually consume
+  // bytes from the wire, i.e. when the ClientHello has been received.
+  if (sawBytesFromDownstream(ssl())) {
     handshake_callbacks_->connection().streamInfo().downstreamTiming().onDownstreamHandshakeStart(
         handshake_callbacks_->connection().dispatcher().timeSource());
   }
 
-  int rc = SSL_do_handshake(ssl());
   if (rc == 1) {
     state_ = Ssl::SocketState::HandshakeComplete;
     handshake_callbacks_->onSuccess(ssl());
