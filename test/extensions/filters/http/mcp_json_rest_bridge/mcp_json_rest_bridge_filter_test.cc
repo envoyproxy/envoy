@@ -1762,6 +1762,7 @@ tool_config:
   Protobuf::Struct expected_response_metadata;
   MessageUtil::loadFromJson(R"json({
       "status": "mcp_json_rest_bridge_response_too_large",
+      "backend_response_code": 200,
       "method": "tools/call",
       "params": {
         "name": "create_api_key",
@@ -1782,6 +1783,7 @@ tool_config:
   EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
 
+  response_headers_ = {{":status", "200"}};
   EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
   EXPECT_CALL(

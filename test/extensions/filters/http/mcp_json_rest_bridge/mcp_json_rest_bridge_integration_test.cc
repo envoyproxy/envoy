@@ -422,6 +422,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallResponseBodyExceedsLimit) {
           Protobuf::Struct expected_metadata;
           MessageUtil::loadFromJson(R"json({
             "status": "mcp_json_rest_bridge_response_too_large",
+            "backend_response_code": 200,
             "method": "tools/call",
             "params": {
               "name": "create_api_key",

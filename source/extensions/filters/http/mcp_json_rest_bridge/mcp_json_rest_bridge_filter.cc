@@ -659,7 +659,8 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
         // If the ID is missing in the request, the ID in the response should be null.
         {McpConstants::ID_FIELD, session_id_.has_value() ? *session_id_ : json(nullptr)},
         {McpConstants::ERROR_FIELD, generateErrorJsonResponse(-32000, "Response body too large")}};
-    setResponseMetadata(BridgeStatus::ResponseTooLarge, backend_response_code_);
+    setResponseMetadata(BridgeStatus::ResponseTooLarge,
+                        getResponseCode(encoder_callbacks_->responseHeaders()));
     sendLocalReplyInternal(
         Http::Code::InternalServerError, BridgeStatus::ResponseTooLarge, error_json.dump(),
         [](Http::ResponseHeaderMap& headers) {
