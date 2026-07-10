@@ -195,7 +195,7 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   is_redis_cluster_ = cluster_type.has_value() && cluster_type->name() == "envoy.clusters.redis";
 }
 
-void InstanceImpl::ThreadLocalPool::onClusterRemoval(const std::string& cluster_name) {
+void InstanceImpl::ThreadLocalPool::onClusterRemoval(absl::string_view cluster_name) {
   if (cluster_name != cluster_name_) {
     return;
   }

@@ -80,7 +80,9 @@ private:
   void reserveResources(const envoy::config::metrics::v3::StatsConfig& config);
 
   /**
-   * Adds all default extractors from well_known_names.cc into the collection.
+   * Adds all default extractors from well_known_names.cc into the collection. Default extractors
+   * whose tag name is overridden by a custom extractor (see allow_default_tag_overrides) are
+   * skipped.
    *
    * @param config const envoy::config::metrics::v2::StatsConfig& the config.
    * @return a status indicating if the default extractors were successfully added.

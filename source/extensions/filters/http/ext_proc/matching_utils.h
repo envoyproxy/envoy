@@ -21,10 +21,11 @@ public:
   ExpressionManager(Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
                     const LocalInfo::LocalInfo& local_info,
                     const Protobuf::RepeatedPtrField<std::string>& request_matchers,
-                    const Protobuf::RepeatedPtrField<std::string>& response_matchers)
+                    const Protobuf::RepeatedPtrField<std::string>& response_matchers,
+                    absl::Status& creation_status)
       : builder_(builder), local_info_(local_info),
-        request_expr_(initExpressions(request_matchers)),
-        response_expr_(initExpressions(response_matchers)) {};
+        request_expr_(initExpressions(request_matchers, creation_status)),
+        response_expr_(initExpressions(response_matchers, creation_status)) {};
 
   bool hasRequestExpr() const { return !request_expr_.empty(); };
 
@@ -48,7 +49,8 @@ public:
 
 private:
   absl::flat_hash_map<std::string, CelExpression>
-  initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers);
+  initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers,
+                  absl::Status& creation_status);
 
   const Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder_;
   const LocalInfo::LocalInfo& local_info_;

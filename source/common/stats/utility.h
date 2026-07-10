@@ -60,6 +60,41 @@ using Element = absl::variant<StatName, DynamicName, DynamicSavedName>;
 using ElementVec = absl::InlinedVector<Element, 8>;
 
 /**
+ * Bundles the pre-encoded names and tags used with the POOL_*_TAGGED macros. Encoding the
+ * names and tags once (typically per config) lets an owner create many tagged stats directly on
+ * a shared scope, without allocating a per-owner sub-scope just to carry the tags.
+ *
+ * Neither name should have a trailing dot: the leaf stat name is appended with a '.' separator,
+ * matching statPrefixJoin() used by the untagged POOL_*_PREFIX macros.
+ */
+class TaggedStatName {
+public:
+  /**
+   * @param symbol_table The symbol table used to encode the names and tags.
+   * @param base_name The tag-extracted name, which is used to create the tag-extracted stat
+   * name.
+   * @param tags The tags associated with the tagged name.
+   * @param name The tagged name, which is used to create the tagged stat name. If tags is empty,
+   * this is ignored and base_name is used for both forms.
+   *
+   * Note: the names and tags are copied into a private pool, so the caller does not need to
+   * maintain their lifetime after this constructor returns.
+   */
+  TaggedStatName(SymbolTable& symbol_table, absl::string_view base_name, TagStringViewSpan tags,
+                 absl::string_view name);
+
+  StatName name() const { return name_; }
+  StatName baseName() const { return base_name_; }
+  StatNameTagSpan tags() const { return tags_; }
+
+private:
+  StatNamePool tag_pool_;
+  StatName name_;
+  StatName base_name_;
+  StatNameTagVec tags_;
+};
+
+/**
  * Common stats utility routines.
  */
 namespace Utility {
@@ -71,6 +106,17 @@ namespace Utility {
  * @return the sanitized stat name.
  */
 std::string sanitizeStatsName(absl::string_view name);
+
+/**
+ * Sanitizes a stat name and writes it to the provided buffer. The buffer is
+ * used to hold the sanitized name, and the returned string_view points to the
+ * buffer. The buffer is not modified if the name does not need sanitization.
+ * @param name the stat name to sanitize.
+ * @param buffer the buffer to write the sanitized name to.
+ * @return a string_view pointing to the sanitized name in the buffer, or the
+ * original name if no sanitization was needed.
+ */
+absl::string_view sanitizeStatsName(absl::string_view name, std::string& buffer);
 
 /**
  * Finds a metric tag with the specified name.
@@ -231,6 +277,40 @@ TextReadout& textReadoutFromElements(Scope& scope, const ElementVec& elements,
  */
 TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
                                       StatNameTagVectorOptConstRef tags = std::nullopt);
+
+/**
+ * The `*FromTaggedPrefix` helpers create stats from a pre-encoded prefix and tags, which are
+ * typically created once per config and then used to create many stats. The helpers are used by the
+ * `POOL_*_TAGGED` macros in stats_macros.h.
+ *
+ * @param scope The scope in which to create the stat (the scope's own prefix/tags still apply).
+ * @param base_prefix Pre-encoded prefix with tag values removed (the tag-extracted name).
+ * @param prefix_tags Pre-encoded tags to attach to the stat.
+ * @param prefix Pre-encoded prefix with tag values interleaved (the flat name). If prefix_tags is
+ * empty, this is ignored and base_prefix is used for both forms.
+ * @param name The stat's leaf name.
+ */
+Counter& counterFromTaggedPrefix(Scope& scope, StatName base_prefix, StatNameTagSpan prefix_tags,
+                                 StatName prefix, absl::string_view name);
+Gauge& gaugeFromTaggedPrefix(Scope& scope, StatName base_prefix, StatNameTagSpan prefix_tags,
+                             StatName prefix, absl::string_view name,
+                             Gauge::ImportMode import_mode);
+Histogram& histogramFromTaggedPrefix(Scope& scope, StatName base_prefix,
+                                     StatNameTagSpan prefix_tags, StatName prefix,
+                                     absl::string_view name, Histogram::Unit unit);
+TextReadout& textReadoutFromTaggedPrefix(Scope& scope, StatName base_prefix,
+                                         StatNameTagSpan prefix_tags, StatName prefix,
+                                         absl::string_view name);
+Counter& counterFromTaggedPrefix(Scope& scope, StatName base_prefix, StatNameTagSpan prefix_tags,
+                                 StatName prefix, StatName name);
+Gauge& gaugeFromTaggedPrefix(Scope& scope, StatName base_prefix, StatNameTagSpan prefix_tags,
+                             StatName prefix, StatName name, Gauge::ImportMode import_mode);
+Histogram& histogramFromTaggedPrefix(Scope& scope, StatName base_prefix,
+                                     StatNameTagSpan prefix_tags, StatName prefix, StatName name,
+                                     Histogram::Unit unit);
+TextReadout& textReadoutFromTaggedPrefix(Scope& scope, StatName base_prefix,
+                                         StatNameTagSpan prefix_tags, StatName prefix,
+                                         StatName name);
 
 } // namespace Utility
 

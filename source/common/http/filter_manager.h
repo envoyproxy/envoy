@@ -299,6 +299,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
   void
   removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
+  void addUpstreamWatermarkCallbacks(UpstreamWatermarkCallbacks& watermark_callbacks) override;
+  void removeUpstreamWatermarkCallbacks(UpstreamWatermarkCallbacks& watermark_callbacks) override;
   bool recreateStream(const Http::ResponseHeaderMap* original_response_headers) override;
 
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override;
@@ -840,6 +842,13 @@ public:
   void callHighWatermarkCallbacks();
   void callLowWatermarkCallbacks();
 
+  // Pass on upstream-request watermark callbacks to subscribers. These are driven by the aggregate
+  // back-pressure raised toward the request source via onDecoderFilterAboveWriteBufferHighWatermark
+  // (notably by the router's UpstreamRequest), and let a filter that produces request data of its
+  // own pause/resume in step with the upstream.
+  void callUpstreamHighWatermarkCallbacks();
+  void callUpstreamLowWatermarkCallbacks();
+
   void requestHeadersInitialized() {
     if (Http::Headers::get().MethodValues.Head ==
         filter_manager_callbacks_.requestHeaders()->getMethodValue()) {
@@ -1157,6 +1166,10 @@ private:
   uint64_t buffer_limit_{0};
   uint32_t high_watermark_count_{0};
   std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
+  // Upstream-request watermark subscribers and the count of outstanding high watermarks, so a
+  // filter subscribing mid-stream is brought up to the current back-pressure state.
+  uint32_t upstream_high_watermark_count_{0};
+  std::list<UpstreamWatermarkCallbacks*> upstream_watermark_callbacks_;
   Network::Socket::OptionsSharedPtr upstream_options_ =
       std::make_shared<Network::Socket::Options>();
   Upstream::LoadBalancerContext::OverrideHost upstream_override_host_;

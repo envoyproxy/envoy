@@ -830,6 +830,109 @@ TEST_F(EdsTest, UseHostnameForHealthChecks) {
   EXPECT_EQ(hosts[0]->hostnameForHealthChecks(), "foo");
 }
 
+// Validate that a subsequent onConfigUpdate() that only changes the hostname for an endpoint with
+// an unchanged address recreates the host so the new hostname takes effect. The hostname is
+// immutable on a host, so it cannot be updated in place.
+TEST_F(EdsTest, HostnameUpdate) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+  auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(1234);
+  endpoint->set_hostname("foo");
+  cluster_load_assignment.set_cluster_name("fare");
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  const HostConstSharedPtr original_host =
+      cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  EXPECT_EQ(original_host->hostname(), "foo");
+
+  endpoint->set_hostname("bar");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts.size(), 1);
+  EXPECT_EQ(hosts[0]->hostname(), "bar");
+  // The host must have been recreated, not updated in place.
+  EXPECT_NE(original_host.get(), hosts[0].get());
+}
+
+// Validate that a change to the health check hostname override is applied on a subsequent
+// onConfigUpdate() by recreating the host. The cluster has an active health checker, so the health
+// check hostname is meaningful and a change to it must take effect.
+TEST_F(EdsTest, HealthCheckConfigHostnameUpdate) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+  auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(1234);
+  endpoint->mutable_health_check_config()->set_hostname("foo");
+  cluster_load_assignment.set_cluster_name("fare");
+  initialize();
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  const HostConstSharedPtr original_host =
+      cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  EXPECT_EQ(original_host->hostnameForHealthChecks(), "foo");
+
+  endpoint->mutable_health_check_config()->set_hostname("bar");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts.size(), 1);
+  EXPECT_EQ(hosts[0]->hostnameForHealthChecks(), "bar");
+  EXPECT_NE(original_host.get(), hosts[0].get());
+}
+
+// Validate that re-pushing an identical assignment (unchanged hostname) reuses the existing host in
+// place, i.e. the hostname comparison does not over-trigger host recreation.
+TEST_F(EdsTest, HostnameUnchangedReusesHost) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+  auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(1234);
+  endpoint->set_hostname("foo");
+  cluster_load_assignment.set_cluster_name("fare");
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  const HostConstSharedPtr original_host =
+      cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+
+  // Re-push the same assignment; the host should be reused, not recreated.
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts.size(), 1);
+  EXPECT_EQ(original_host.get(), hosts[0].get());
+}
+
+// Validate that when the cluster has no active health checker, a change to the health check
+// hostname override does NOT recreate the host.
+TEST_F(EdsTest, HealthCheckConfigHostnameUpdateWithoutHealthCheckerReusesHost) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+  auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(1234);
+  endpoint->mutable_health_check_config()->set_hostname("foo");
+  cluster_load_assignment.set_cluster_name("fare");
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  const HostConstSharedPtr original_host =
+      cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  EXPECT_EQ(original_host->hostnameForHealthChecks(), "foo");
+
+  endpoint->mutable_health_check_config()->set_hostname("bar");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts.size(), 1);
+  // No health checker is configured, so the host should be reused, not recreated.
+  EXPECT_EQ(original_host.get(), hosts[0].get());
+}
+
 TEST_F(EdsTest, UseAddressForHealthChecks) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints()->mutable_endpoint();

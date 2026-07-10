@@ -810,7 +810,7 @@ if __name__ == "__main__":
 
     if not paths:
         paths = [
-            target_root / "api", target_root / "include", target_root / "source",
+            target_root / "api", target_root / "envoy", target_root / "source",
             target_root / "test", target_root / "tools"
         ]
 

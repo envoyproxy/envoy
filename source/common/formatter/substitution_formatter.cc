@@ -408,19 +408,26 @@ void stringValueToLogLine(const JsonFormatterImpl::Formatters& formatters, const
   log_line.push_back('"'); // End the JSON string.
 }
 
-JsonFormatterImpl::JsonFormatterImpl(const Protobuf::Struct& struct_format, bool omit_empty_values,
-                                     const CommandParsers& commands)
-    : omit_empty_values_(omit_empty_values) {
+absl::StatusOr<std::unique_ptr<JsonFormatterImpl>>
+JsonFormatterImpl::create(const Protobuf::Struct& struct_format, bool omit_empty_values,
+                          const CommandParsers& commands) {
+  std::vector<ParsedFormatElement> parsed_elements;
   for (JsonFormatBuilder::FormatElement& element : JsonFormatBuilder().fromStruct(struct_format)) {
     if (element.is_template_) {
-      parsed_elements_.emplace_back(
-          THROW_OR_RETURN_VALUE(SubstitutionFormatParser::parse(element.value_, commands),
-                                std::vector<FormatterProviderPtr>));
+      absl::StatusOr<std::vector<FormatterProviderPtr>> providers_or =
+          SubstitutionFormatParser::parse(element.value_, commands);
+      RETURN_IF_NOT_OK_REF(providers_or.status());
+      parsed_elements.emplace_back(std::move(providers_or).value());
     } else {
-      parsed_elements_.emplace_back(std::move(element.value_));
+      parsed_elements.emplace_back(std::move(element.value_));
     }
   }
+  return std::make_unique<JsonFormatterImpl>(omit_empty_values, std::move(parsed_elements));
 }
+
+JsonFormatterImpl::JsonFormatterImpl(bool omit_empty_values,
+                                     std::vector<ParsedFormatElement>&& parsed_elements)
+    : omit_empty_values_(omit_empty_values), parsed_elements_(std::move(parsed_elements)) {}
 
 std::string JsonFormatterImpl::format(const Context& context,
                                       const StreamInfo::StreamInfo& info) const {
