@@ -951,8 +951,9 @@ bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(
   absl::string_view key_view(key.ptr, key.length);
   absl::string_view value_view(value.ptr, value.length);
 
-  auto* factory = Envoy::Registry::FactoryRegistry<
-      Envoy::StreamInfo::FilterState::ObjectFactory>::getFactory(key_view);
+  auto* factory =
+      Envoy::Registry::FactoryRegistry<Envoy::StreamInfo::FilterState::ObjectFactory>::getFactory(
+          key_view);
   if (factory == nullptr) {
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
                         "no ObjectFactory registered for filter state key '{}'", key_view);
@@ -962,7 +963,8 @@ bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(
   auto object = factory->createFromBytes(value_view);
   if (object == nullptr) {
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        "ObjectFactory failed to create object for filter state key '{}'", key_view);
+                        "ObjectFactory failed to create object for filter state key '{}'",
+                        key_view);
     return false;
   }
 
