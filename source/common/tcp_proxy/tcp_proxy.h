@@ -26,6 +26,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/common/flow_control_pause_tracker.h"
 #include "source/common/common/logger.h"
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/http/header_map_impl.h"
@@ -64,6 +65,7 @@ constexpr absl::string_view ReceiveBeforeConnectKey = "envoy.tcp_proxy.receive_b
   COUNTER(downstream_cx_rx_bytes_total)                                                            \
   COUNTER(downstream_cx_total)                                                                     \
   COUNTER(downstream_cx_tx_bytes_total)                                                            \
+  COUNTER(downstream_flow_control_combined_reading_delay_micros)                                   \
   COUNTER(downstream_flow_control_paused_reading_total)                                            \
   COUNTER(downstream_flow_control_resumed_reading_total)                                           \
   COUNTER(early_data_received_count_total)                                                         \
@@ -741,6 +743,8 @@ protected:
   // This will be non-null from when an upstream connection is attempted until
   // it either succeeds or fails.
   std::unique_ptr<GenericConnPool> generic_conn_pool_;
+  FlowControlPauseTracker downstream_read_pause_tracker_;
+  FlowControlPauseTracker upstream_read_pause_tracker_;
   // Time the filter first attempted to connect to the upstream after the
   // cluster is discovered. Capture the first time as the filter may try multiple times to connect
   // to the upstream.

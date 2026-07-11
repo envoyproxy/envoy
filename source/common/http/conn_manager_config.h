@@ -51,6 +51,7 @@ namespace Http {
   COUNTER(downstream_cx_total)                                                                     \
   COUNTER(downstream_cx_tx_bytes_total)                                                            \
   COUNTER(downstream_cx_upgrades_total)                                                            \
+  COUNTER(downstream_flow_control_combined_reading_delay_micros)                                   \
   COUNTER(downstream_flow_control_paused_reading_total)                                            \
   COUNTER(downstream_flow_control_resumed_reading_total)                                           \
   COUNTER(downstream_rq_1xx)                                                                       \

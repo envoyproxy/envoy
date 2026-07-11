@@ -11,6 +11,7 @@
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/filter.h"
 
+#include "source/common/common/flow_control_pause_tracker.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/router/upstream_to_downstream_impl_base.h"
@@ -42,7 +43,10 @@ public:
   void onUpstreamConnectionEstablished() override;
 
   // Http::StreamFilterBase
-  void onDestroy() override { callbacks_->removeDownstreamWatermarkCallbacks(*this); }
+  void onDestroy() override;
+
+  void recordUpstreamReadPaused();
+  void recordUpstreamReadResumed();
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -94,6 +98,7 @@ public:
   };
   Http::StreamDecoderFilterCallbacks* callbacks_;
   CodecBridge bridge_;
+  FlowControlPauseTracker upstream_read_pause_tracker_;
   OptRef<Http::RequestHeaderMap> latched_headers_;
   absl::Status deferred_reset_status_;
   std::optional<bool> latched_end_stream_;

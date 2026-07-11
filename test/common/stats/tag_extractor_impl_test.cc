@@ -379,6 +379,8 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
 
   regex_tester.testRegex("tcp.tcp_prefix.downstream_flow_control_resumed_reading_total",
                          "tcp.downstream_flow_control_resumed_reading_total", {tcp_prefix});
+  regex_tester.testRegex("tcp.tcp_prefix.downstream_flow_control_combined_reading_delay_micros",
+                         "tcp.downstream_flow_control_combined_reading_delay_micros", {tcp_prefix});
 
   // UDP Prefix
   Tag udp_prefix;

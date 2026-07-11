@@ -138,6 +138,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "flow_control_pause_tracker",
+    srcs = ["flow_control_pause_tracker.cc"],
+    hdrs = ["flow_control_pause_tracker.h"],
+    deps = [
+        "//envoy/common:time_interface",
+        "//envoy/stats:stats_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "safe_memcpy_lib",
     hdrs = ["safe_memcpy.h"],
 )

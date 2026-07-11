@@ -47,6 +47,7 @@ namespace Stats {
   COUNTER(upstream_cx_tx_bytes_total)                                                              \
   COUNTER(upstream_flow_control_backed_up_total)                                                   \
   COUNTER(upstream_flow_control_drained_total)                                                     \
+  COUNTER(upstream_flow_control_combined_reading_delay_micros)                                     \
   COUNTER(upstream_flow_control_paused_reading_total)                                              \
   COUNTER(upstream_flow_control_resumed_reading_total)                                             \
   COUNTER(upstream_internal_redirect_failed_total)                                                 \

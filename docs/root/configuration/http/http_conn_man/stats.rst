@@ -41,6 +41,7 @@ statistics:
    ``downstream_cx_max_requests_reached``, Counter, Total connections closed due to max requests per connection
    ``downstream_cx_overload_disable_keepalive``, Counter, Total connections for which HTTP 1.x keepalive has been disabled due to Envoy overload
    ``downstream_flow_control_paused_reading_total``, Counter, Total number of times reads were disabled due to flow control
+   ``downstream_flow_control_combined_reading_delay_micros``, Counter, Total time in microseconds accumulated across downstream streams while one or more flow-control read pauses were active
    ``downstream_flow_control_resumed_reading_total``, Counter, Total number of times reads were enabled on the connection due to flow control
    ``downstream_rq_total``, Counter, Total requests
    ``downstream_rq_http1_total``, Counter, Total HTTP/1.1 requests

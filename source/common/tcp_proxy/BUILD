@@ -70,6 +70,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
+        "//source/common/common:flow_control_pause_tracker",
         "//source/common/common:macros",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:well_known_names",

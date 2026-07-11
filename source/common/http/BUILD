@@ -413,6 +413,7 @@ envoy_cc_library(
         "//source/common/common:dump_state_utils",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
+        "//source/common/common:flow_control_pause_tracker",
         "//source/common/common:linked_object",
         "//source/common/common:perf_tracing_lib",
         "//source/common/common:regex_lib",

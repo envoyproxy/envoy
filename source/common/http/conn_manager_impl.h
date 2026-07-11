@@ -38,6 +38,7 @@
 
 #include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/dump_state_utils.h"
+#include "source/common/common/flow_control_pause_tracker.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/grpc/common.h"
 #include "source/common/http/conn_manager_config.h"
@@ -154,6 +155,7 @@ private:
                               public RouteCache {
     ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit,
                  Buffer::BufferMemoryAccountSharedPtr account);
+    ~ActiveStream() override;
 
     // Event::DeferredDeletable
     void deleteIsPending() override {
@@ -478,6 +480,7 @@ private:
     // Note: The FM must outlive the above headers, as they are possibly accessed during filter
     // destruction.
     DownstreamFilterManager filter_manager_;
+    FlowControlPauseTracker downstream_read_pause_tracker_;
 
     Tracing::SpanPtr active_span_;
     ResponseEncoder* response_encoder_{};

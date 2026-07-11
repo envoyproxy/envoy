@@ -17,6 +17,7 @@
 
 #include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/cleanup.h"
+#include "source/common/common/flow_control_pause_tracker.h"
 #include "source/common/common/hash.h"
 #include "source/common/common/hex.h"
 #include "source/common/common/linked_object.h"
@@ -197,6 +198,8 @@ private:
   void onPerTryIdleTimeout();
   void upstreamLog(AccessLog::AccessLogType access_log_type);
   void resetUpstreamLogFlushTimer();
+  void recordUpstreamReadPaused();
+  void recordUpstreamReadResumed();
 
   RouterFilterInterface& parent_;
   std::unique_ptr<GenericConnPool> conn_pool_;
@@ -219,6 +222,7 @@ private:
   Http::ResponseTrailerMapPtr upstream_trailers_;
   OptRef<UpstreamToDownstream> upstream_interface_;
   std::list<Http::UpstreamCallbacks*> upstream_callbacks_;
+  FlowControlPauseTracker upstream_read_pause_tracker_;
 
   Event::TimerPtr max_stream_duration_timer_;
 

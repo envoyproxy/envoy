@@ -200,6 +200,10 @@ TEST_F(WatermarkTest, UpstreamWatermarks) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_flow_control_paused_reading_total")
                     .value());
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_combined_reading_delay_micros")
+                    .value());
+  test_time_.advanceTimeWait(std::chrono::microseconds(321));
 
   EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
   EXPECT_CALL(stream_, readDisable(_));
@@ -207,6 +211,9 @@ TEST_F(WatermarkTest, UpstreamWatermarks) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_flow_control_resumed_reading_total")
                     .value());
+  EXPECT_EQ(321U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                      .counter("upstream_flow_control_combined_reading_delay_micros")
+                      .value());
 
   Buffer::OwnedImpl data;
   EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
@@ -240,8 +247,12 @@ TEST_F(WatermarkTest, DelayUpstreamReadDisableBeforeResponse1) {
                     .counter("upstream_flow_control_paused_reading_total")
                     .value());
   EXPECT_EQ(0u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_combined_reading_delay_micros")
+                    .value());
+  EXPECT_EQ(0u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_flow_control_resumed_reading_total")
                     .value());
+  test_time_.advanceTimeWait(std::chrono::microseconds(111));
 
   // Following watermark callbacks shouldn't delay readDisable.
   EXPECT_CALL(stream_, readDisable(false));
@@ -249,12 +260,16 @@ TEST_F(WatermarkTest, DelayUpstreamReadDisableBeforeResponse1) {
   EXPECT_EQ(1u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_flow_control_resumed_reading_total")
                     .value());
+  EXPECT_EQ(0u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_combined_reading_delay_micros")
+                    .value());
 
   EXPECT_CALL(stream_, readDisable(true));
   watermark_callbacks->onAboveWriteBufferHighWatermark();
   EXPECT_EQ(3u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_flow_control_paused_reading_total")
                     .value());
+  test_time_.advanceTimeWait(std::chrono::microseconds(222));
 
   EXPECT_CALL(stream_, readDisable(false)).Times(2u);
   watermark_callbacks->onBelowWriteBufferLowWatermark();
@@ -262,6 +277,9 @@ TEST_F(WatermarkTest, DelayUpstreamReadDisableBeforeResponse1) {
   EXPECT_EQ(3u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_flow_control_resumed_reading_total")
                     .value());
+  EXPECT_EQ(333u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                      .counter("upstream_flow_control_combined_reading_delay_micros")
+                      .value());
 
   Buffer::OwnedImpl data;
   EXPECT_CALL(callbacks_, encodeData(_, true));
