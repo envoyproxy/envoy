@@ -10519,8 +10519,7 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
  * @param context_envoy_ptr is the per-request load balancer context.
  * @param key is the key of the filter state.
  * @param value is the bytes value of the filter state to be set.
- * @return true if the operation is successful, false if the request has no stream info or the key
- * already exists and is marked as read-only.
+ * @return true if the operation is successful, false if the request has no stream info.
  */
 bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes(
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
@@ -10537,8 +10536,7 @@ bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes(
  * @param key is the key of the filter state. This must match a registered ObjectFactory name.
  * @param value is the serialized bytes value used to construct the typed object.
  * @return true if the operation is successful, false if the request has no stream info, no
- * ObjectFactory is registered for the key, the factory fails to create the object, or the key
- * already exists and is marked as read-only.
+ * ObjectFactory is registered for the key, or the factory fails to create the object.
  */
 bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,

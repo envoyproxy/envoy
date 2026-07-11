@@ -305,8 +305,7 @@ pub trait ClusterLbContext {
   /// same request. The value is stored with FilterChain life span. If the key does not exist it is
   /// created.
   ///
-  /// Returns true on success, false if the request has no stream info or the key already exists
-  /// and is marked read-only.
+  /// Returns true on success, false if the request has no stream info.
   fn set_filter_state_bytes(&self, key: &[u8], value: &[u8]) -> bool;
 
   /// Stores a typed filter state on the request under `key` via the key's registered
@@ -314,8 +313,7 @@ pub trait ClusterLbContext {
   /// it. The value is stored with FilterChain life span.
   ///
   /// Returns true on success, false if the request has no stream info, no `ObjectFactory` is
-  /// registered for the key, the factory fails to create the object, or the key already exists and
-  /// is marked read-only.
+  /// registered for the key, or the factory fails to create the object.
   fn set_filter_state_typed(&self, key: &[u8], value: &[u8]) -> bool;
 
   /// Returns the value of a per-host stat for the given host pointer. The module must ensure
