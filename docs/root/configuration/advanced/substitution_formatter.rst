@@ -1565,6 +1565,9 @@ Current supported substitution commands include:
 ``%FILTER_CHAIN_NAME%``
   The :ref:`network filter chain name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` of the downstream connection.
 
+``%LISTENER_NAME%``
+  The :ref:`name <envoy_v3_api_field_config.listener.v3.Listener.name>` of the listener that accepted the downstream connection.
+
 .. _config_access_log_format_access_log_type:
 
 ``%ACCESS_LOG_TYPE%``

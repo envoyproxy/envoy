@@ -1883,6 +1883,36 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
 
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+    auto listener_info = std::make_shared<NiceMock<Network::MockListenerInfo>>();
+    ON_CALL(*listener_info, name()).WillByDefault(Return("mock_listener_name"));
+    stream_info.downstream_connection_info_provider_->setListenerInfo(listener_info);
+
+    StreamInfoFormatter upstream_format("LISTENER_NAME");
+
+    EXPECT_EQ("mock_listener_name", upstream_format.format({}, stream_info));
+  }
+
+  {
+    // No listener info set: the operator yields std::nullopt.
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setListenerInfo(nullptr);
+    StreamInfoFormatter upstream_format("LISTENER_NAME");
+    EXPECT_EQ(std::nullopt, upstream_format.format({}, stream_info));
+  }
+
+  {
+    // Empty listener name: the operator yields std::nullopt.
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    auto listener_info = std::make_shared<NiceMock<Network::MockListenerInfo>>();
+    ON_CALL(*listener_info, name()).WillByDefault(Return(""));
+    stream_info.downstream_connection_info_provider_->setListenerInfo(listener_info);
+    StreamInfoFormatter upstream_format("LISTENER_NAME");
+    EXPECT_EQ(std::nullopt, upstream_format.format({}, stream_info));
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("VIRTUAL_CLUSTER_NAME");
     std::string virtual_cluster_name = "authN";
     stream_info.setVirtualClusterName(virtual_cluster_name);
