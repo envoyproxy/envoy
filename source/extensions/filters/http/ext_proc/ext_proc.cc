@@ -1494,15 +1494,13 @@ void Filter::logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info)
     logging_info_->setHttpResponseCodeDetails(stream_info->responseCodeDetails());
   }
 
-  if (logging_info_->clusterInfo() == nullptr) {
-    std::string destination = "";
-    if (config_with_hash_key_.config().has_envoy_grpc()) {
-      destination = config_with_hash_key_.config().envoy_grpc().cluster_name();
-    } else if (config_with_hash_key_.config().has_google_grpc()) {
-      destination = config_with_hash_key_.config().google_grpc().target_uri();
-    }
-    logging_info_->setDestination(destination);
+  absl::string_view destination = "";
+  if (config_with_hash_key_.config().has_envoy_grpc()) {
+    destination = config_with_hash_key_.config().envoy_grpc().cluster_name();
+  } else if (config_with_hash_key_.config().has_google_grpc()) {
+    destination = config_with_hash_key_.config().google_grpc().target_uri();
   }
+  logging_info_->setDestination(destination);
 }
 
 void Filter::logStreamInfo() {
