@@ -70,7 +70,7 @@ private:
 // ScopedExecutionContext is a stack-only RAII object to call ExecutionContext::activate on
 // construction and ExecutionContext::deactivate on destruction.
 //
-// ScopedExecutionContext is intened to be used in a simple c++ scope:
+// ScopedExecutionContext is intended to be used in a simple c++ scope:
 //   {
 //     ExecutionContext context;
 //     // context.activate() called here.

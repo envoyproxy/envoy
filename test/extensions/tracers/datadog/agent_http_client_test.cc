@@ -1,4 +1,5 @@
 #include <chrono>
+#include <optional>
 
 #include "envoy/http/header_map.h"
 
@@ -13,7 +14,6 @@
 #include "test/test_common/enum_test_utils.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "datadog/dict_writer.h"
 #include "datadog/error.h"
 #include "datadog/expected.h"

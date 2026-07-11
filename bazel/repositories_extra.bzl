@@ -1,5 +1,5 @@
 load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies")
-load("@com_google_protobuf//bazel/private:proto_bazel_features.bzl", "proto_bazel_features")
+load("@com_google_protobuf//bazel/private/oss:proto_bazel_features.bzl", "proto_bazel_features")
 load("@emsdk//:deps.bzl", emsdk_deps = "deps")
 load("@envoy_toolshed//compile:libcxx_libs.bzl", "setup_libcxx_libs")
 load("@envoy_toolshed//sysroot:sysroot.bzl", "setup_sysroots")

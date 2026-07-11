@@ -122,7 +122,7 @@ void HttpGrpcAccessLog::emitLog(const Formatter::Context& context,
 
   if (request_headers.Method() != nullptr) {
     envoy::config::core::v3::RequestMethod method = envoy::config::core::v3::METHOD_UNSPECIFIED;
-    envoy::config::core::v3::RequestMethod_Parse(
+    std::ignore = envoy::config::core::v3::RequestMethod_Parse(
         MessageUtil::sanitizeUtf8String(request_headers.getMethodValue()), &method);
     request_properties->set_request_method(method);
   }

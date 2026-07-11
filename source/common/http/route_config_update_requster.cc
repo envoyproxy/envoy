@@ -6,7 +6,7 @@ namespace Http {
 // TODO(chaoqin-li1123): Make on demand vhds and on demand srds works at the same time.
 void RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
     RouteCache& route_cache, Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb,
-    absl::optional<Router::ConfigConstSharedPtr> route_config, Event::Dispatcher& dispatcher,
+    std::optional<Router::ConfigConstSharedPtr> route_config, Event::Dispatcher& dispatcher,
     RequestHeaderMap& request_headers) {
   if (route_config.has_value() && route_config.value()->usesVhds()) {
     ASSERT(!request_headers.Host()->value().empty());

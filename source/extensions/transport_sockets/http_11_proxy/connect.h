@@ -36,7 +36,7 @@ public:
       Network::TransportSocketPtr&& transport_socket,
       Network::TransportSocketOptionsConstSharedPtr options,
       std::shared_ptr<const Upstream::HostDescription> host,
-      absl::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info = absl::nullopt);
+      std::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info = std::nullopt);
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
@@ -60,7 +60,7 @@ class UpstreamHttp11ConnectSocketFactory : public PassthroughFactory {
 public:
   UpstreamHttp11ConnectSocketFactory(
       Network::UpstreamTransportSocketFactoryPtr transport_socket_factory,
-      absl::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info = absl::nullopt);
+      std::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info = std::nullopt);
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
@@ -78,7 +78,7 @@ public:
   }
 
 private:
-  const absl::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info_;
+  const std::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info_;
 };
 
 // This is a utility class for isValidConnectResponse. It is only exposed for

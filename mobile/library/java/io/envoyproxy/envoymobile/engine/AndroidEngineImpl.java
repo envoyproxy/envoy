@@ -68,6 +68,11 @@ public class AndroidEngineImpl implements EnvoyEngine {
   }
 
   @Override
+  public void drainConnectionsBySocketTag(int tag) {
+    envoyEngine.drainConnectionsBySocketTag(tag);
+  }
+
+  @Override
   public long getEngineHandle() {
     return envoyEngine.getEngineHandle();
   }

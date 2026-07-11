@@ -19,6 +19,8 @@
 #include "test/integration/utility.h"
 #include "test/mocks/common.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/file_system_for_test.h"
+#include "test/test_common/thread_factory_for_test.h"
 
 #include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
@@ -69,7 +71,7 @@ createTestOptionsImpl(const std::string& config_path, const std::string& config_
 IntegrationTestServerPtr IntegrationTestServer::create(
     const std::string& config_path, const Network::Address::IpVersion version,
     std::function<void(IntegrationTestServer&)> server_ready_function,
-    std::function<void()> on_server_init_function, absl::optional<uint64_t> deterministic_value,
+    std::function<void()> on_server_init_function, std::optional<uint64_t> deterministic_value,
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization,
     ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
     uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
@@ -129,7 +131,7 @@ void IntegrationTestServer::setAdsConfigSource(
 
 void IntegrationTestServer::start(
     const Network::Address::IpVersion version, std::function<void()> on_server_init_function,
-    absl::optional<uint64_t> deterministic_value, bool defer_listener_finalization,
+    std::optional<uint64_t> deterministic_value, bool defer_listener_finalization,
     ProcessObjectOptRef process_object, Server::FieldValidationConfig validator_config,
     uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
     Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_bootstrap_node_metadata,
@@ -216,7 +218,7 @@ void IntegrationTestServer::serverReady() {
 }
 
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
-                                          absl::optional<uint64_t> deterministic_value,
+                                          std::optional<uint64_t> deterministic_value,
                                           ProcessObjectOptRef process_object,
                                           Server::FieldValidationConfig validation_config,
                                           uint32_t concurrency, std::chrono::seconds drain_time,

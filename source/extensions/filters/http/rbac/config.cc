@@ -24,8 +24,8 @@ Http::FilterFactoryCb RoleBasedAccessControlFilterConfigFactory::createFilterFac
   };
 }
 
-Http::FilterFactoryCb
-RoleBasedAccessControlFilterConfigFactory::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+RoleBasedAccessControlFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
 

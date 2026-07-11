@@ -26,14 +26,14 @@ public:
     return createFilterFactory(proto_config, stat_prefix, context, dual_info.scope,
                                dual_info.init_manager);
   }
-  Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const FilterConfig& proto_config, const std::string& stat_prefix,
       Server::Configuration::ServerFactoryContext& context) override;
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactory(const FilterConfig& proto_config, const std::string& stat_prefix,
                       Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
-                      OptRef<Init::Manager> init_manager = absl::nullopt);
+                      OptRef<Init::Manager> init_manager = std::nullopt);
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(const RouteConfigProto&,

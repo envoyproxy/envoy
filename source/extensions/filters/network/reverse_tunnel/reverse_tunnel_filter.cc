@@ -22,6 +22,8 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 #include "source/server/generic_factory_context.h"
 
+#include "absl/strings/numbers.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -317,7 +319,7 @@ void ReverseTunnelFilter::RequestDecoderImpl::decodeMetadata(Http::MetadataMapPt
 void ReverseTunnelFilter::RequestDecoderImpl::sendLocalReply(
     Http::Code code, absl::string_view body,
     const std::function<void(Http::ResponseHeaderMap& headers)>& modify_headers,
-    const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+    const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
   auto headers = Http::ResponseHeaderMapImpl::create();
   headers->setStatus(static_cast<uint64_t>(code));
   headers->setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
@@ -358,7 +360,7 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
             method, path);
   if (!absl::EqualsIgnoreCase(method, parent_.config_->requestMethod()) ||
       path != parent_.config_->requestPath()) {
-    sendLocalReply(Http::Code::NotFound, "Not a reverse tunnel request", nullptr, absl::nullopt,
+    sendLocalReply(Http::Code::NotFound, "Not a reverse tunnel request", nullptr, std::nullopt,
                    "reverse_tunnel_not_found");
     // Close the connection after sending the response.
     parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
@@ -384,7 +386,7 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
                               Bootstrap::ReverseConnection::ReverseConnectionUtility::
                                   REVERSE_TUNNEL_UPGRADE_PROTOCOL);
           },
-          absl::nullopt, "reverse_tunnel_upgrade_required");
+          std::nullopt, "reverse_tunnel_upgrade_required");
       parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
       return;
     }
@@ -403,7 +405,7 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
     ENVOY_CONN_LOG(debug, "reverse_tunnel: missing required headers (node/cluster/tenant)",
                    parent_.read_callbacks_->connection());
     sendLocalReply(Http::Code::BadRequest, "Missing required reverse tunnel headers", nullptr,
-                   absl::nullopt, "reverse_tunnel_missing_headers");
+                   std::nullopt, "reverse_tunnel_missing_headers");
     // Close the connection after sending the response.
     parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
     return;
@@ -436,7 +438,7 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
           fmt::format("Reverse tunnel identifiers must not contain '{}' when tenant isolation is "
                       "enabled",
                       delimiter),
-          nullptr, absl::nullopt, "reverse_tunnel_invalid_identifier");
+          nullptr, std::nullopt, "reverse_tunnel_invalid_identifier");
       parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
       return;
     }
@@ -453,7 +455,7 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
           debug, "reverse_tunnel: missing upstream cluster name header when enforcement is enabled",
           parent_.read_callbacks_->connection());
       sendLocalReply(Http::Code::BadRequest, "Missing upstream cluster name header", nullptr,
-                     absl::nullopt, "reverse_tunnel_missing_cluster_name_header");
+                     std::nullopt, "reverse_tunnel_missing_cluster_name_header");
       parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
       return;
     }
@@ -466,7 +468,7 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
                      "reverse_tunnel: upstream cluster name mismatch. Expected: '{}', Actual: '{}'",
                      parent_.read_callbacks_->connection(), parent_.config_->requiredClusterName(),
                      upstream_cluster_name);
-      sendLocalReply(Http::Code::BadRequest, "Cluster name mismatch", nullptr, absl::nullopt,
+      sendLocalReply(Http::Code::BadRequest, "Cluster name mismatch", nullptr, std::nullopt,
                      "reverse_tunnel_cluster_mismatch");
       parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
       return;
@@ -487,7 +489,7 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
     ENVOY_CONN_LOG(debug,
                    "reverse_tunnel: validation failed for node '{}', cluster '{}', tenant '{}'",
                    parent_.read_callbacks_->connection(), node_id, cluster_id, tenant_id);
-    sendLocalReply(Http::Code::Forbidden, "Validation failed", nullptr, absl::nullopt,
+    sendLocalReply(Http::Code::Forbidden, "Validation failed", nullptr, std::nullopt,
                    "reverse_tunnel_validation_failed");
     parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
     return;
@@ -509,7 +511,20 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
   }
   encoder_.encodeHeaders(*resp_headers, true);
 
-  parent_.processAcceptedConnection(node_id, cluster_id, tenant_id);
+  // Extract DP-side tunnel initiation timestamp if present. Defaults to 0 (absent).
+  int64_t initiation_time_ms = 0;
+  const auto initiation_time_vals =
+      headers_->get(Bootstrap::ReverseConnection::reverseTunnelInitiationTimeHeader());
+  if (!initiation_time_vals.empty()) {
+    if (!absl::SimpleAtoi(initiation_time_vals[0]->value().getStringView(), &initiation_time_ms)) {
+      ENVOY_CONN_LOG(warn, "reverse_tunnel: failed to parse initiation-time header value '{}'",
+                     parent_.read_callbacks_->connection(),
+                     initiation_time_vals[0]->value().getStringView());
+      initiation_time_ms = 0;
+    }
+  }
+
+  parent_.processAcceptedConnection(node_id, cluster_id, tenant_id, initiation_time_ms);
   parent_.stats_.accepted_.inc();
 
   // Close the listener-side connection so tunnel bytes go to the duped fd, not back into
@@ -523,7 +538,8 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
 
 void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
                                                     absl::string_view cluster_id,
-                                                    absl::string_view tenant_id) {
+                                                    absl::string_view tenant_id,
+                                                    int64_t initiation_time_ms) {
   ENVOY_CONN_LOG(debug,
                  "reverse_tunnel: connection accepted for node '{}' in cluster '{}' (tenant: '{}')",
                  read_callbacks_->connection(), node_id, cluster_id, tenant_id);
@@ -593,7 +609,7 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
 
   // Report the connection to the extension -> reporter.
   if (auto extension = socket_manager->getUpstreamExtension()) {
-    extension->reportConnection(socket_node_id, socket_cluster_id, tenant_id);
+    extension->reportConnection(socket_node_id, socket_cluster_id, tenant_id, initiation_time_ms);
   }
 }
 

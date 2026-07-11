@@ -154,11 +154,18 @@ bool addSimpleHosts(DynamicModuleCluster& cluster, const std::vector<std::string
 }
 
 // Test that creating a cluster with a valid no-op module succeeds.
+// Pull the shared dynamic-modules test helper into scope.
+using ::Envoy::Extensions::DynamicModules::failureCounter;
+
 TEST_F(DynamicModuleClusterTest, BasicCreation) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
   ASSERT_TRUE(result.ok()) << result.status().message();
   EXPECT_NE(nullptr, result->first);
   EXPECT_NE(nullptr, result->second);
+
+  // The happy path emits no load-failure counters.
+  EXPECT_EQ(0U, failureCounter(server_context_.serverScope(), "module_load_error", "test"));
+  EXPECT_EQ(0U, failureCounter(server_context_.serverScope(), "config_init_error", "test"));
 }
 
 // Test that creating a cluster by loading the module via ``module.local.filename`` succeeds.
@@ -219,6 +226,8 @@ TEST_F(DynamicModuleClusterTest, MissingModule) {
   auto result = createCluster(makeYamlConfig("nonexistent_module"));
   ASSERT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module"));
+
+  EXPECT_EQ(1U, failureCounter(server_context_.serverScope(), "module_load_error", "test"));
 }
 
 // Test that on_cluster_config_new returning nullptr fails.
@@ -227,6 +236,10 @@ TEST_F(DynamicModuleClusterTest, ConfigNewFail) {
   ASSERT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("Failed to create in-module cluster configuration"));
+
+  // The module loads fine but its config creation fails, counted as config_init_error.
+  EXPECT_EQ(1U, failureCounter(server_context_.serverScope(), "config_init_error", "test"));
+  EXPECT_EQ(0U, failureCounter(server_context_.serverScope(), "module_load_error", "test"));
 }
 
 // Test that on_cluster_new returning nullptr fails.
@@ -235,6 +248,27 @@ TEST_F(DynamicModuleClusterTest, ClusterNewFail) {
   ASSERT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("Failed to create in-module cluster instance"));
+}
+
+// The cluster_config Any cannot be unpacked. This is parsed before the module is loaded, so it is
+// counted as config_init_error and module_load_error stays zero. A malformed Any must be built
+// programmatically because a cluster_config parsed from YAML is always valid.
+TEST_F(DynamicModuleClusterTest, MalformedClusterConfig) {
+  auto cluster = Upstream::parseClusterFromV3Yaml(makeYamlConfig("cluster_no_op"));
+  envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig cluster_config;
+  ASSERT_TRUE(cluster.cluster_type().typed_config().UnpackTo(&cluster_config));
+  auto* any = cluster_config.mutable_cluster_config();
+  any->set_type_url("type.googleapis.com/google.protobuf.StringValue");
+  any->set_value("invalid_binary_data_that_cannot_be_unpacked_as_string_value");
+  std::ignore = cluster.mutable_cluster_type()->mutable_typed_config()->PackFrom(cluster_config);
+
+  Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr, false);
+  DynamicModuleClusterFactory factory;
+  auto result = factory.create(cluster, factory_context);
+  ASSERT_FALSE(result.ok());
+
+  EXPECT_EQ(1U, failureCounter(server_context_.serverScope(), "config_init_error", "test"));
+  EXPECT_EQ(0U, failureCounter(server_context_.serverScope(), "module_load_error", "test"));
 }
 
 // Test batch host addition and removal via the public API.
@@ -845,7 +879,7 @@ TEST_F(DynamicModuleClusterTest, LbHostInformationWithMetadataAndLocality) {
   // Update the cluster's priority set directly with locality data.
   cluster->prioritySet().updateHosts(
       0, Upstream::HostSetImpl::partitionHosts(all_hosts, hosts_per_locality), locality_weights,
-      {host_a1, host_a2, host_b1}, {}, absl::nullopt, absl::nullopt);
+      {host_a1, host_a2, host_b1}, {}, std::nullopt, std::nullopt);
 
   // Create the LB.
   auto& talb = result->second;
@@ -996,7 +1030,7 @@ TEST_F(DynamicModuleClusterTest, LbHostInformationWithMetadataAndLocality) {
       Upstream::HostVector{degraded_host, unhealthy_host});
   cluster->prioritySet().updateHosts(
       1, Upstream::HostSetImpl::partitionHosts(p1_hosts, p1_hosts_per_locality), nullptr,
-      {degraded_host, unhealthy_host}, {}, absl::nullopt, absl::nullopt);
+      {degraded_host, unhealthy_host}, {}, std::nullopt, std::nullopt);
 
   EXPECT_EQ(envoy_dynamic_module_type_host_health_Degraded,
             envoy_dynamic_module_callback_cluster_lb_get_host_health(dm_lb, 1, 0));
@@ -1211,6 +1245,30 @@ TEST_F(DynamicModuleClusterTest, OnScheduledCallback) {
   envoy_dynamic_module_callback_cluster_scheduler_delete(scheduler_ptr);
   cluster.reset();
   result = absl::InternalError("cleanup");
+}
+
+// Worker timer creation returns null before any chooseHost has captured a worker dispatcher.
+TEST_F(DynamicModuleClusterTest, WorkerTimerNewReturnsNullWithoutDispatcher) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  NiceMock<Upstream::MockPrioritySet> worker_ps;
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+  auto lb = std::make_unique<DynamicModuleLoadBalancer>(handle, worker_ps);
+
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_worker_timer_new(lb.get()));
+}
+
+// Deleting a worker timer off a worker thread (here, the test thread) trips an Envoy bug and skips
+// the deletion, since the underlying timer may only be destroyed on its worker dispatcher thread.
+TEST_F(DynamicModuleClusterTest, WorkerTimerDeleteOffWorkerThreadIsEnvoyBug) {
+  auto* timer = new DynamicModuleClusterWorkerTimer();
+  EXPECT_ENVOY_BUG(envoy_dynamic_module_callback_cluster_worker_timer_delete(timer),
+                   "must be called on a worker thread");
+  // The callback skipped deletion on the test thread, so free it directly.
+  delete timer;
 }
 
 // Test that onScheduled handles the case when cluster is already destroyed.
@@ -1916,7 +1974,7 @@ TEST_F(DynamicModuleClusterTest, MetricsVecNotFoundWithLabels) {
 // Test compute_hash_key with a valid hash.
 TEST_F(DynamicModuleClusterTest, LbContextComputeHashKey) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
-  ON_CALL(context, computeHashKey()).WillByDefault(Return(absl::optional<uint64_t>(12345)));
+  ON_CALL(context, computeHashKey()).WillByDefault(Return(std::optional<uint64_t>(12345)));
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   uint64_t hash = 0;
@@ -1928,7 +1986,7 @@ TEST_F(DynamicModuleClusterTest, LbContextComputeHashKey) {
 // Test compute_hash_key when no hash is available.
 TEST_F(DynamicModuleClusterTest, LbContextComputeHashKeyNoHash) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
-  ON_CALL(context, computeHashKey()).WillByDefault(Return(absl::nullopt));
+  ON_CALL(context, computeHashKey()).WillByDefault(Return(std::nullopt));
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   uint64_t hash = 0;
@@ -3820,13 +3878,13 @@ TEST_F(DynamicModuleClusterTest, LbRepeatedConstructTeardownWithUpdates) {
     worker_priority_set.updateHosts(
         0,
         Upstream::HostSetImpl::partitionHosts(all_hosts, Upstream::HostsPerLocalityImpl::empty()),
-        {}, {hosts[0]}, {}, absl::nullopt, absl::nullopt);
+        {}, {hosts[0]}, {}, std::nullopt, std::nullopt);
 
     all_hosts = std::make_shared<Upstream::HostVector>(Upstream::HostVector{hosts[0], hosts[1]});
     worker_priority_set.updateHosts(
         0,
         Upstream::HostSetImpl::partitionHosts(all_hosts, Upstream::HostsPerLocalityImpl::empty()),
-        {}, {hosts[1]}, {}, absl::nullopt, absl::nullopt);
+        {}, {hosts[1]}, {}, std::nullopt, std::nullopt);
   }
 }
 

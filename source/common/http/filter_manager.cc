@@ -67,7 +67,7 @@ void ActiveStreamFilterBase::commonContinue() {
 
   // Set ScopeTrackerScopeState if there's no existing crash context.
   ScopeTrackedObjectStack encapsulated_object;
-  absl::optional<ScopeTrackerScopeState> state;
+  std::optional<ScopeTrackerScopeState> state;
   if (parent_.dispatcher_.trackedObjectStackIsEmpty()) {
     restoreContextOnContinue(encapsulated_object);
     state.emplace(&encapsulated_object, parent_.dispatcher_);
@@ -376,7 +376,7 @@ uint64_t ActiveStreamFilterBase::bufferLimit() { return parent_.buffer_limit_; }
 void ActiveStreamFilterBase::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+    const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   if (!streamInfo().filterState()->hasData<LocalReplyOwnerObject>(LocalReplyFilterStateKey)) {
     streamInfo().filterState()->setData(
         LocalReplyFilterStateKey,
@@ -489,6 +489,10 @@ void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance&
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
 
+OptRef<WebTransportSession> ActiveStreamDecoderFilter::webTransportSession() {
+  return parent_.webTransportSession();
+}
+
 void ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
 const Buffer::Instance* ActiveStreamDecoderFilter::decodingBuffer() {
   return parent_.buffered_request_data_.get();
@@ -505,7 +509,7 @@ void ActiveStreamDecoderFilter::modifyDecodingBuffer(
 void ActiveStreamDecoderFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+    const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   ActiveStreamFilterBase::sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
@@ -569,7 +573,7 @@ void ActiveStreamDecoderFilter::requestDataTooLarge() {
   } else {
     parent_.filter_manager_callbacks_.onRequestDataTooLarge();
     sendLocalReply(Code::PayloadTooLarge, CodeUtility::toString(Code::PayloadTooLarge), nullptr,
-                   absl::nullopt, StreamInfo::ResponseCodeDetails::get().RequestPayloadTooLarge);
+                   std::nullopt, StreamInfo::ResponseCodeDetails::get().RequestPayloadTooLarge);
   }
 }
 
@@ -842,7 +846,7 @@ void FilterManager::addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::In
     decodeData(&filter, data, false, FilterIterationStartState::AlwaysStartFromNext);
   } else {
     IS_ENVOY_BUG("Invalid request data");
-    sendLocalReply(Http::Code::BadGateway, "Filter error", nullptr, absl::nullopt,
+    sendLocalReply(Http::Code::BadGateway, "Filter error", nullptr, std::nullopt,
                    StreamInfo::ResponseCodeDetails::get().FilterAddedInvalidRequestData);
   }
 }
@@ -1022,7 +1026,7 @@ void DownstreamFilterManager::onLocalReply(StreamFilterBase::LocalReplyData& dat
 void DownstreamFilterManager::sendLocalReply(
     Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+    const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   ASSERT(!state_.under_on_local_reply_);
   const bool is_head_request = state_.is_head_request_;
   const bool is_grpc_request = state_.is_grpc_request_;
@@ -1101,7 +1105,7 @@ void DownstreamFilterManager::sendLocalReply(
 void DownstreamFilterManager::prepareLocalReplyViaFilterChain(
     bool is_grpc_request, Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+    const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   ENVOY_STREAM_LOG(debug, "Preparing local reply with details {}", *this, details);
   ASSERT(!filter_manager_callbacks_.responseHeaders().has_value());
   // For early error handling, do a best-effort attempt to create a filter chain
@@ -1153,7 +1157,7 @@ FilterManager::CreateChainResult DownstreamFilterManager::createDownstreamFilter
 void DownstreamFilterManager::sendLocalReplyViaFilterChain(
     bool is_grpc_request, Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+    const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   ENVOY_STREAM_LOG(debug, "Sending local reply with details {}", *this, details);
   ASSERT(!filter_manager_callbacks_.responseHeaders().has_value());
   // For early error handling, do a best-effort attempt to create a filter chain
@@ -1189,7 +1193,7 @@ void DownstreamFilterManager::sendLocalReplyViaFilterChain(
 void DownstreamFilterManager::sendDirectLocalReply(
     Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap&)>& modify_headers, bool is_head_request,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
+    const std::optional<Grpc::Status::GrpcStatus> grpc_status) {
   // Make sure we won't end up with nested watermark calls from the body buffer.
   state_.encoder_filters_streaming_ = true;
   Http::Utility::sendLocalReply(
@@ -1353,7 +1357,7 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
   if (!status.ok()) {
     // If the check failed, then we reply with BadGateway, and stop the further processing.
     sendLocalReply(
-        Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
+        Http::Code::BadGateway, status.message(), nullptr, std::nullopt,
         absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredResponseHeaders,
                      "{", StringUtil::replaceAllEmptySpace(status.message()), "}"));
     return;
@@ -1452,7 +1456,7 @@ void FilterManager::addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::In
     encodeData(&filter, data, false, FilterIterationStartState::AlwaysStartFromNext);
   } else {
     IS_ENVOY_BUG("Invalid response data");
-    sendLocalReply(Http::Code::BadGateway, "Filter error", nullptr, absl::nullopt,
+    sendLocalReply(Http::Code::BadGateway, "Filter error", nullptr, std::nullopt,
                    StreamInfo::ResponseCodeDetails::get().FilterAddedInvalidResponseData);
   }
 }
@@ -1673,6 +1677,21 @@ void FilterManager::callLowWatermarkCallbacks() {
   }
 }
 
+void FilterManager::callUpstreamHighWatermarkCallbacks() {
+  ++upstream_high_watermark_count_;
+  for (auto watermark_callbacks : upstream_watermark_callbacks_) {
+    watermark_callbacks->onAboveWriteBufferHighWatermark();
+  }
+}
+
+void FilterManager::callUpstreamLowWatermarkCallbacks() {
+  ASSERT(upstream_high_watermark_count_ > 0);
+  --upstream_high_watermark_count_;
+  for (auto watermark_callbacks : upstream_watermark_callbacks_) {
+    watermark_callbacks->onBelowWriteBufferLowWatermark();
+  }
+}
+
 void FilterManager::setBufferLimit(uint64_t new_limit) {
   ENVOY_STREAM_LOG(debug, "setting buffer limit to {}", *this, new_limit);
   buffer_limit_ = new_limit;
@@ -1786,6 +1805,27 @@ void ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
   ASSERT(std::find(parent_.watermark_callbacks_.begin(), parent_.watermark_callbacks_.end(),
                    &watermark_callbacks) != parent_.watermark_callbacks_.end());
   parent_.watermark_callbacks_.remove(&watermark_callbacks);
+}
+
+void ActiveStreamDecoderFilter::addUpstreamWatermarkCallbacks(
+    UpstreamWatermarkCallbacks& watermark_callbacks) {
+  ASSERT(std::find(parent_.upstream_watermark_callbacks_.begin(),
+                   parent_.upstream_watermark_callbacks_.end(),
+                   &watermark_callbacks) == parent_.upstream_watermark_callbacks_.end());
+  parent_.upstream_watermark_callbacks_.emplace(parent_.upstream_watermark_callbacks_.end(),
+                                                &watermark_callbacks);
+  // Bring a mid-stream subscriber up to the current back-pressure state.
+  for (uint32_t i = 0; i < parent_.upstream_high_watermark_count_; ++i) {
+    watermark_callbacks.onAboveWriteBufferHighWatermark();
+  }
+}
+
+void ActiveStreamDecoderFilter::removeUpstreamWatermarkCallbacks(
+    UpstreamWatermarkCallbacks& watermark_callbacks) {
+  ASSERT(std::find(parent_.upstream_watermark_callbacks_.begin(),
+                   parent_.upstream_watermark_callbacks_.end(),
+                   &watermark_callbacks) != parent_.upstream_watermark_callbacks_.end());
+  parent_.upstream_watermark_callbacks_.remove(&watermark_callbacks);
 }
 
 bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers) {
@@ -1943,7 +1983,7 @@ void ActiveStreamEncoderFilter::modifyEncodingBuffer(
 void ActiveStreamEncoderFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+    const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
 
   ActiveStreamFilterBase::sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
@@ -1959,7 +1999,7 @@ void ActiveStreamEncoderFilter::responseDataTooLarge() {
     // reset the stream.
     parent_.sendLocalReply(
         Http::Code::InternalServerError, CodeUtility::toString(Http::Code::InternalServerError),
-        nullptr, absl::nullopt, StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
+        nullptr, std::nullopt, StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
   }
 }
 

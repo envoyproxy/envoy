@@ -29,7 +29,7 @@ private:
   Server::Configuration::FactoryContext& factory_context_;
 };
 
-Http::FilterFactoryCb TapFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> TapFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   auto& server_context = context.serverFactoryContext();

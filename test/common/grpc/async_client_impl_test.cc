@@ -641,6 +641,40 @@ TEST_F(EnvoyAsyncClientImplTest, AsyncRequestDetach) {
   http_callbacks->onReset();
 }
 
+TEST_F(EnvoyAsyncClientImplTest, MultipleFramesWithResetInBetween) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
+            http_callbacks = &callbacks;
+            return &http_stream;
+          }));
+
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  ASSERT_NE(grpc_stream, nullptr);
+
+  // Buffer with two frames.
+  Buffer::OwnedImpl data;
+  uint8_t flags = 0;
+  uint32_t len = 0;
+  data.add(&flags, 1);
+  data.add(&len, 4);
+  data.add(&flags, 1);
+  data.add(&len, 4);
+
+  EXPECT_CALL(grpc_callbacks, onReceiveMessage_(_))
+      .WillOnce(Invoke([&](const helloworld::HelloReply&) { grpc_stream->resetStream(); }));
+
+  http_callbacks->onData(data, false);
+}
+
 } // namespace
 } // namespace Grpc
 } // namespace Envoy

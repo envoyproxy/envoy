@@ -14,6 +14,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/exe/platform_impl.h"
+#include "source/server/backtrace.h"
 #include "source/server/config_validation/server.h"
 #include "source/server/drain_manager_impl.h"
 #include "source/server/hot_restart_nop_impl.h"
@@ -70,6 +71,8 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
   logging_context_ = std::make_unique<Logger::Context>(
       options_.logLevel(), options_.logFormat(), restarter_->logLock(), options_.logFormatEscaped(),
       options_.mode() == Server::Mode::Validate ? false : options_.enableFineGrainLogging());
+  BackwardsTrace::setSingleLine(options_.logStacktraceSingleEntry());
+  Assert::EnvoyBugStackTrace::setSingleLine(options_.logStacktraceSingleEntry());
   init(time_system, listener_hooks, std::move(random_generator), std::move(process_context),
        createFunction());
 }
@@ -91,7 +94,7 @@ bool MainCommonBase::run() {
     ret = Server::validateConfig(
         options_, Network::Utility::getLocalAddress(options_.localAddressIpVersion()),
         component_factory_, platform_impl_->threadFactory(), platform_impl_->fileSystem(),
-        process_context_ ? ProcessContextOptRef(std::ref(*process_context_)) : absl::nullopt);
+        process_context_ ? ProcessContextOptRef(std::ref(*process_context_)) : std::nullopt);
     break;
   case Server::Mode::InitOnly:
     PERF_DUMP();

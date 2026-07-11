@@ -1,12 +1,11 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/rds/route_config_provider.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Rds {
@@ -34,11 +33,11 @@ public:
   virtual uint64_t configHash() const PURE;
 
   /**
-   * @return absl::optional<RouteConfigProvider::ConfigInfo> containing an instance of
+   * @return std::optional<RouteConfigProvider::ConfigInfo> containing an instance of
    * RouteConfigProvider::ConfigInfo if RouteConfiguration has been updated at least once. Otherwise
-   * returns an empty absl::optional<RouteConfigProvider::ConfigInfo>.
+   * returns an empty std::optional<RouteConfigProvider::ConfigInfo>.
    */
-  virtual const absl::optional<RouteConfigProvider::ConfigInfo>& configInfo() const PURE;
+  virtual const std::optional<RouteConfigProvider::ConfigInfo>& configInfo() const PURE;
 
   /**
    * @return Protobuf::Message& current RouteConfiguration.

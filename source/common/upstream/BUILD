@@ -469,6 +469,7 @@ envoy_cc_library(
         ":upstream_factory_context_lib",
         "//envoy/event:timer_interface",
         "//envoy/filter:config_provider_manager_interface",
+        "//envoy/http:client_codec_factory_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:dns_interface",
         "//envoy/runtime:runtime_interface",
@@ -594,7 +595,6 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/upstream:upstream_interface",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -613,7 +613,6 @@ envoy_cc_library(
         "//envoy/registry",
         "//envoy/upstream:upstream_interface",
         "//source/common/network:resolver_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/upstream/local_address_selector/v3:pkg_cc_proto",
     ],
     # Ensure this factory in the source is always linked in.

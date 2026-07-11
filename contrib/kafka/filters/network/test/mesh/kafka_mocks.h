@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "contrib/kafka/filters/network/source/mesh/librdkafka_utils.h"
 #include "gmock/gmock.h"
 #include "librdkafka/rdkafkacpp.h"

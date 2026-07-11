@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/formatter/substitution_formatter_base.h"
+#include "envoy/formatter/substitution_formatter.h"
 
 #include "source/common/common/statusor.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
@@ -88,8 +88,8 @@ public:
   ~DynamicModuleFormatterProvider() override;
 
   // Formatter::FormatterProvider
-  absl::optional<std::string> format(const ::Envoy::Formatter::Context& context,
-                                     const StreamInfo::StreamInfo& stream_info) const override;
+  std::optional<std::string> format(const ::Envoy::Formatter::Context& context,
+                                    const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const ::Envoy::Formatter::Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
 
@@ -107,9 +107,9 @@ public:
   explicit DynamicModuleCommandParser(DynamicModuleFormatterConfigSharedPtr config);
 
   // Formatter::CommandParser
-  ::Envoy::Formatter::FormatterProviderPtr parse(absl::string_view command,
-                                                 absl::string_view command_arg,
-                                                 absl::optional<size_t> max_length) const override;
+  absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
+  parse(absl::string_view command, absl::string_view command_arg,
+        std::optional<size_t> max_length) const override;
 
 private:
   const DynamicModuleFormatterConfigSharedPtr config_;

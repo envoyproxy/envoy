@@ -40,16 +40,15 @@ void checkSerializedData(Envoy::Buffer::Instance& data,
 apikeys::CreateApiKeyRequest parseFromStreamMessage(StreamMessage& msg) {
   apikeys::CreateApiKeyRequest parsed_request;
   auto* c = dynamic_cast<Protobuf::field_extraction::CordMessageData*>(msg.message());
-  parsed_request.ParseFromCord(c->Cord());
+  std::ignore = parsed_request.ParseFromCord(c->Cord());
   return parsed_request;
 }
 
 // Serialize the request message into a pre-existing StreamMessage.
 // Serialization overwrites pre-existing date in the buffer.
 void serializeToStreamMessage(StreamMessage& msg, apikeys::CreateApiKeyRequest& request) {
-  apikeys::CreateApiKeyRequest parsed_request;
   auto* c = dynamic_cast<Protobuf::field_extraction::CordMessageData*>(msg.message());
-  request.SerializeToCord(&(c->Cord()));
+  std::ignore = request.SerializeToCord(&(c->Cord()));
 }
 } // namespace GrpcFieldExtraction
 } // namespace HttpFilters

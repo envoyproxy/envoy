@@ -1,5 +1,7 @@
 #include "contrib/golang/filters/http/source/processor_state.h"
 
+#include <optional>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/protobuf/utility.h"
 
@@ -289,7 +291,7 @@ void DecodingProcessorState::addBufferData(Buffer::Instance& data) {
             ENVOY_LOG(debug, "golang filter decode data buffer is full, reply with 413");
             decoder_callbacks_->sendLocalReply(
                 Http::Code::PayloadTooLarge,
-                Http::CodeUtility::toString(Http::Code::PayloadTooLarge), nullptr, absl::nullopt,
+                Http::CodeUtility::toString(Http::Code::PayloadTooLarge), nullptr, std::nullopt,
                 StreamInfo::ResponseCodeDetails::get().RequestPayloadTooLarge);
             return;
           }
@@ -323,8 +325,8 @@ void EncodingProcessorState::addBufferData(Buffer::Instance& data) {
             // reset the stream.
             encoder_callbacks_->sendLocalReply(
                 Http::Code::InternalServerError,
-                Http::CodeUtility::toString(Http::Code::InternalServerError), nullptr,
-                absl::nullopt, StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
+                Http::CodeUtility::toString(Http::Code::InternalServerError), nullptr, std::nullopt,
+                StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
             return;
           }
           if (!watermark_requested_) {

@@ -39,7 +39,7 @@ TEST(OverrideHostLbConfigTest, NoFallbackLb) {
   config.set_name("envoy.load_balancers.override_host");
   OverrideHost config_msg;
   config_msg.add_override_host_sources()->set_header("x-foo");
-  config.mutable_typed_config()->PackFrom(config_msg);
+  std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
   EXPECT_EQ("envoy.load_balancing_policies.override_host", factory.name());
@@ -56,7 +56,7 @@ TEST(OverrideHostLbConfigTest, NoFallbackPolicies) {
   OverrideHost config_msg;
   config_msg.add_override_host_sources()->set_header("x-foo");
   config_msg.mutable_fallback_policy();
-  config.mutable_typed_config()->PackFrom(config_msg);
+  std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
 
@@ -76,15 +76,15 @@ TEST(OverrideHostLbConfigTest, NoPrimaryOverideSources) {
   Protobuf::Struct invalid_policy;
   auto* typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-  typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
+  std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
   typed_extension_config->set_name("existent_policy");
   Config fallback_picker_config;
   typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-  typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
+  std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
   typed_extension_config->set_name("envoy.load_balancers.override_host.test");
 
-  config.mutable_typed_config()->PackFrom(config_msg);
+  std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
 
@@ -103,15 +103,15 @@ TEST(OverrideHostLbConfigTest, FirstValidFallbackPolicyIsUsed) {
   Protobuf::Struct invalid_policy;
   auto* typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-  typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
+  std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
   typed_extension_config->set_name("existent_policy");
   Config fallback_picker_config;
   typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-  typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
+  std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
   typed_extension_config->set_name("envoy.load_balancers.override_host.test");
 
-  config.mutable_typed_config()->PackFrom(config_msg);
+  std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
 
@@ -131,15 +131,15 @@ TEST(OverrideHostLbConfigTest, EmptyPrimaryOverrideSource) {
   Protobuf::Struct invalid_policy;
   auto* typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-  typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
+  std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
   typed_extension_config->set_name("existent_policy");
   Config fallback_picker_config;
   typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-  typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
+  std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
   typed_extension_config->set_name("envoy.load_balancers.override_host.test");
 
-  config.mutable_typed_config()->PackFrom(config_msg);
+  std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
 
@@ -164,15 +164,15 @@ TEST(OverrideHostLbConfigTest, HeaderAndMetadataInTheSameOverrideSource) {
   Protobuf::Struct invalid_policy;
   auto* typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-  typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
+  std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
   typed_extension_config->set_name("existent_policy");
   Config fallback_picker_config;
   typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-  typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
+  std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
   typed_extension_config->set_name("envoy.load_balancers.override_host.test");
 
-  config.mutable_typed_config()->PackFrom(config_msg);
+  std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
 
@@ -195,9 +195,9 @@ TEST(OverrideHostLbConfigTest, FallbackLbCalledToChooseHost) {
   Config fallback_picker_config;
   auto* typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-  typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
+  std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
   typed_extension_config->set_name("envoy.load_balancers.override_host.test");
-  config.mutable_typed_config()->PackFrom(config_msg);
+  std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
 
@@ -238,10 +238,10 @@ TEST(OverrideHostLbConfigTest, ValidSelectedHostKey) {
   Config fallback_picker_config;
   auto* typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-  typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
+  std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
   typed_extension_config->set_name("envoy.load_balancers.override_host.test");
 
-  config.mutable_typed_config()->PackFrom(config_msg);
+  std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
   auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
   auto result = factory.loadConfig(context, config_msg);
   EXPECT_TRUE(result.ok());

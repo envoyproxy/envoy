@@ -1,15 +1,19 @@
 /// Opt-in panic guard that wraps a filter and catches panics at the trait boundary.
 ///
 /// When a wrapped filter method panics, `CatchUnwind`:
-/// 1. Drops the inner filter (preventing access to potentially inconsistent state).
+/// 1. Marks the wrapper poisoned so no later callback re-enters the (possibly inconsistent) filter.
 /// 2. Logs the panic payload.
 /// 3. Fails closed — sends a 500 response and/or returns `StopIteration` for HTTP filters, closes
 ///    the connection for network filters, etc.
 ///
-/// Subsequent callbacks on a poisoned wrapper behave differently depending on type:
-/// - Status-returning callbacks panic immediately. This indicates the fail-closed mechanism did not
-///   terminate the stream as expected.
+/// Subsequent callbacks on a poisoned wrapper are not forwarded to the filter:
+/// - Status-returning callbacks fail closed (apply the same fail-closed action as a panic).
 /// - Late async, event, and cleanup callbacks are silently skipped.
+///
+/// The filter is borrowed in place for each callback rather than moved out, so synchronous
+/// re-entrancy (Envoy calling back into the same wrapper while a callback is still on the stack,
+/// e.g. `on_stream_complete` fired inline while completing a response from `on_scheduled`) sees a
+/// live filter instead of being misread as poisoned.
 ///
 /// # Usage
 ///
@@ -29,7 +33,8 @@
 /// }
 /// ```
 pub struct CatchUnwind<F> {
-  filter: Option<F>,
+  filter: F,
+  poisoned: bool,
 }
 
 enum CatchError {
@@ -40,40 +45,47 @@ enum CatchError {
 impl<F> CatchUnwind<F> {
   pub fn new(filter: F) -> Self {
     Self {
-      filter: Some(filter),
+      filter,
+      poisoned: false,
     }
   }
 
   /// Run `f` on the inner filter, catching any panic.
   ///
-  /// If the filter was already poisoned by a prior panic, panics immediately — a
-  /// status-returning callback on a poisoned filter means the fail-closed mechanism
-  /// didn't terminate the stream as expected.
+  /// If the filter was already poisoned by a prior panic, fails closed immediately (returns
+  /// `Err(())`) rather than calling into the inconsistent filter.
+  ///
+  /// The filter is borrowed in place rather than moved out for the duration of the call. This keeps
+  /// the inner filter reachable if Envoy synchronously re-enters this same wrapper while `f` is
+  /// still on the stack (e.g. completing a response with end-of-stream from a scheduled callback
+  /// drives `on_stream_complete` inline). A move-out approach would make that legitimate re-entrancy
+  /// look like a poisoned filter.
+  ///
+  /// SAFETY: re-entrancy means two `&mut self.filter` can be live across stack frames (the outer
+  /// call plus the re-entrant one, each deriving `&mut CatchUnwind` from the same raw FFI pointer).
+  /// This mirrors the aliasing that already exists for the wrapper itself at every FFI entry point;
+  /// borrowing the filter in place does not widen it.
   fn catch<R>(&mut self, name: &str, f: impl FnOnce(&mut F) -> R) -> Result<R, ()> {
-    let mut filter = self
-      .filter
-      .take()
-      .expect("status-returning callback invoked on a poisoned filter");
-    // AssertUnwindSafe is sound here: if a panic occurs, `filter` is not put back into
-    // `self.filter` — it is dropped at the end of this scope, so no code ever observes
-    // the potentially inconsistent state.
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&mut filter))) {
-      Ok(val) => {
-        self.filter = Some(filter);
-        Ok(val)
-      },
+    if self.poisoned {
+      return Err(());
+    }
+    // AssertUnwindSafe is sound here: if `f` panics, `poisoned` is set so no later callback ever
+    // observes the potentially inconsistent filter. The filter is dropped only when the wrapper is.
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&mut self.filter))) {
+      Ok(val) => Ok(val),
       Err(panic) => {
         crate::envoy_log_error!(
           "{}: caught panic: {}",
           name,
           crate::panic_payload_to_string(panic)
         );
+        self.poisoned = true;
         Err(())
       },
     }
   }
 
-  /// Like [`catch`](Self::catch), but skips if the filter is already poisoned.
+  /// Like [`catch`](Self::catch), but reports skip vs panic separately.
   ///
   /// This is intended for async, event, and cleanup callbacks that Envoy may still
   /// invoke after a prior fail-closed.
@@ -85,21 +97,19 @@ impl<F> CatchUnwind<F> {
   /// - `Err(CatchError::Poisoned)` if the wrapper was already poisoned and the callback was
   ///   skipped.
   fn catch_or_skip<R>(&mut self, name: &str, f: impl FnOnce(&mut F) -> R) -> Result<R, CatchError> {
-    let Some(mut filter) = self.filter.take() else {
+    if self.poisoned {
       return Err(CatchError::Poisoned);
-    };
-    // See `catch` for AssertUnwindSafe justification.
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&mut filter))) {
-      Ok(val) => {
-        self.filter = Some(filter);
-        Ok(val)
-      },
+    }
+    // See `catch` for the AssertUnwindSafe and borrow-in-place justifications.
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&mut self.filter))) {
+      Ok(val) => Ok(val),
       Err(panic) => {
         crate::envoy_log_error!(
           "{}: caught panic: {}",
           name,
           crate::panic_payload_to_string(panic)
         );
+        self.poisoned = true;
         Err(CatchError::Panicked)
       },
     }

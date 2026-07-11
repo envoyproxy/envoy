@@ -18,7 +18,7 @@
 namespace Envoy {
 
 // Implementation of CgroupDetector interface
-absl::optional<uint32_t> CgroupDetectorImpl::getCpuLimit(Filesystem::Instance& fs) {
+std::optional<uint32_t> CgroupDetectorImpl::getCpuLimit(Filesystem::Instance& fs) {
   return CgroupCpuUtil::getCpuLimit(fs);
 }
 
@@ -28,37 +28,37 @@ absl::optional<uint32_t> CgroupDetectorImpl::getCpuLimit(Filesystem::Instance& f
 //
 // Return values:
 //   Valid uint32_t: Actual CPU limit (number of CPUs, rounded up)
-//   absl::nullopt: No limit detected (unlimited CPU usage allowed)
-absl::optional<uint32_t> CgroupCpuUtil::getCpuLimit(Filesystem::Instance& fs) {
+//   std::nullopt: No limit detected (unlimited CPU usage allowed)
+std::optional<uint32_t> CgroupCpuUtil::getCpuLimit(Filesystem::Instance& fs) {
   // Step 1: Mount Discovery - call once and reuse
-  absl::optional<std::string> mount_opt = discoverCgroupMount(fs);
+  std::optional<std::string> mount_opt = discoverCgroupMount(fs);
   if (!mount_opt.has_value()) {
     // No `cgroup` filesystem found
-    return absl::nullopt;
+    return std::nullopt;
   }
   const std::string& mount_point = mount_opt.value();
 
   // Steps 2-3: Process Assignment + Path Construction
-  absl::optional<CgroupInfo> cgroup_info_opt = constructCgroupPath(mount_point, fs);
+  std::optional<CgroupInfo> cgroup_info_opt = constructCgroupPath(mount_point, fs);
   if (!cgroup_info_opt.has_value()) {
     // No valid `cgroup` path found
-    return absl::nullopt;
+    return std::nullopt;
   }
   const CgroupInfo& cgroup_info = cgroup_info_opt.value();
 
   // Step 4: File Access - append version-specific filenames and validate access
-  absl::optional<CpuFiles> cpu_files_opt = accessCgroupFiles(cgroup_info, fs);
+  std::optional<CpuFiles> cpu_files_opt = accessCgroupFiles(cgroup_info, fs);
   if (!cpu_files_opt.has_value()) {
     // File access failed - fallback to "no `cgroup`"
-    return absl::nullopt;
+    return std::nullopt;
   }
   const CpuFiles& cpu_files = cpu_files_opt.value();
 
   // Step 5: Read Actual Limits using cached file paths
-  absl::optional<double> cpu_ratio = readActualLimits(cpu_files, fs);
+  std::optional<double> cpu_ratio = readActualLimits(cpu_files, fs);
   if (!cpu_ratio.has_value()) {
     // No valid limit found or unlimited
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   // Convert float64 ratio to uint32_t CPU count (rounded down, minimum 1)
@@ -72,13 +72,13 @@ absl::optional<uint32_t> CgroupCpuUtil::getCpuLimit(Filesystem::Instance& fs) {
 // Validation requirements:
 // - Newline requirement: Content must end with '\n'
 //
-// Returns string_view without trailing newline on success, absl::nullopt on validation failure.
-absl::optional<absl::string_view>
+// Returns string_view without trailing newline on success, std::nullopt on validation failure.
+std::optional<absl::string_view>
 CgroupCpuUtil::validateCgroupFileContent(const std::string& content, const std::string& file_path) {
   // Newline Validation: Require trailing newline
   if (content.empty() || content.back() != '\n') {
     ENVOY_LOG_MISC(warn, "Malformed `cgroup` file {}: missing trailing newline", file_path);
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   // Return content without trailing newline
@@ -96,15 +96,15 @@ CgroupCpuUtil::validateCgroupFileContent(const std::string& content, const std::
 //   - If v1 hierarchy + containsCPU(): Return immediately (v1 wins)
 //   - Result: Single relative path + version with highest priority
 //
-// Returns CgroupPathInfo with relative path and version, or absl::nullopt if no suitable `cgroup`
+// Returns CgroupPathInfo with relative path and version, or std::nullopt if no suitable `cgroup`
 // found.
-absl::optional<CgroupPathInfo> CgroupCpuUtil::getCurrentCgroupPath(Filesystem::Instance& fs) {
+std::optional<CgroupPathInfo> CgroupCpuUtil::getCurrentCgroupPath(Filesystem::Instance& fs) {
   const auto result = fs.fileReadToEnd(std::string(PROC_CGROUP_PATH));
   if (!result.ok()) {
     // `/proc/self/cgroup` doesn't exist - not in a `cgroup`
     ENVOY_LOG_MISC(warn,
                    "Cannot read `/proc/self/cgroup`: not in a `cgroup` or file doesn't exist");
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   absl::string_view content = result.value();
@@ -154,20 +154,20 @@ absl::optional<CgroupPathInfo> CgroupCpuUtil::getCurrentCgroupPath(Filesystem::I
   // Result: Single relative path with highest priority
   // Return v2 path if we found v2 hierarchy, or nullopt if no valid cgroup found
   if (!found_v2) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return CgroupPathInfo{v2_path, "v2"};
 }
 
 // Constructs complete cgroup path by combining mount point and process assignment.
-absl::optional<CgroupInfo> CgroupCpuUtil::constructCgroupPath(const std::string& mount_point,
-                                                              Filesystem::Instance& fs) {
+std::optional<CgroupInfo> CgroupCpuUtil::constructCgroupPath(const std::string& mount_point,
+                                                             Filesystem::Instance& fs) {
 
   // Process Assignment - get relative path and determine version
-  absl::optional<CgroupPathInfo> path_info_opt = getCurrentCgroupPath(fs);
+  std::optional<CgroupPathInfo> path_info_opt = getCurrentCgroupPath(fs);
   if (!path_info_opt.has_value()) {
     // No cgroup path found for this process
-    return absl::nullopt;
+    return std::nullopt;
   }
   const CgroupPathInfo& path_info = path_info_opt.value();
   const std::string& relative_path = path_info.relative_path;
@@ -194,8 +194,8 @@ absl::optional<CgroupInfo> CgroupCpuUtil::constructCgroupPath(const std::string&
 }
 
 // Accesses cgroup v1 CPU files (quota and period).
-absl::optional<CpuFiles> CgroupCpuUtil::accessCgroupV1Files(const CgroupInfo& cgroup_info,
-                                                            Filesystem::Instance& fs) {
+std::optional<CpuFiles> CgroupCpuUtil::accessCgroupV1Files(const CgroupInfo& cgroup_info,
+                                                           Filesystem::Instance& fs) {
   // Read v1 files directly - no trial and error needed
   std::string v1_quota_path = absl::StrCat(cgroup_info.full_path, CGROUP_V1_QUOTA_FILE);
   std::string v1_period_path = absl::StrCat(cgroup_info.full_path, CGROUP_V1_PERIOD_FILE);
@@ -213,13 +213,13 @@ absl::optional<CpuFiles> CgroupCpuUtil::accessCgroupV1Files(const CgroupInfo& cg
   } else {
     // Expected v1 files don't exist - this is an error
     ENVOY_LOG_MISC(warn, "Expected cgroup v1 files not accessible at {}", cgroup_info.full_path);
-    return absl::nullopt;
+    return std::nullopt;
   }
 }
 
 // Accesses cgroup v2 CPU file (cpu.max).
-absl::optional<CpuFiles> CgroupCpuUtil::accessCgroupV2Files(const CgroupInfo& cgroup_info,
-                                                            Filesystem::Instance& fs) {
+std::optional<CpuFiles> CgroupCpuUtil::accessCgroupV2Files(const CgroupInfo& cgroup_info,
+                                                           Filesystem::Instance& fs) {
   // Read v2 file directly - no trial and error needed
   std::string v2_cpu_max_path = absl::StrCat(cgroup_info.full_path, CGROUP_V2_CPU_MAX_FILE);
   const auto result = fs.fileReadToEnd(v2_cpu_max_path);
@@ -234,7 +234,7 @@ absl::optional<CpuFiles> CgroupCpuUtil::accessCgroupV2Files(const CgroupInfo& cg
   } else {
     // Expected v2 file doesn't exist - this is an error
     ENVOY_LOG_MISC(warn, "Expected cgroup v2 file not accessible at {}", cgroup_info.full_path);
-    return absl::nullopt;
+    return std::nullopt;
   }
 }
 
@@ -244,10 +244,10 @@ absl::optional<CpuFiles> CgroupCpuUtil::accessCgroupV2Files(const CgroupInfo& cg
 //   1. Get combined path from Step 3
 //   2. Append version-specific filenames
 //   3. Validate file access via filesystem interface
-//   4. Error handling: File not found → return absl::nullopt
+//   4. Error handling: File not found → return std::nullopt
 //   5. Result: CPU struct with cached file content for reading
-absl::optional<CpuFiles> CgroupCpuUtil::accessCgroupFiles(const CgroupInfo& cgroup_info,
-                                                          Filesystem::Instance& fs) {
+std::optional<CpuFiles> CgroupCpuUtil::accessCgroupFiles(const CgroupInfo& cgroup_info,
+                                                         Filesystem::Instance& fs) {
   // Version is already determined by getCurrentCgroupPath() from /proc/self/cgroup parsing.
   // No need for fallback logic - we know exactly which files to read based on the version.
 
@@ -259,12 +259,12 @@ absl::optional<CpuFiles> CgroupCpuUtil::accessCgroupFiles(const CgroupInfo& cgro
     // Unknown version - this shouldn't happen
     ENVOY_LOG_MISC(warn, "Unknown cgroup version '{}' at {}", cgroup_info.version,
                    cgroup_info.full_path);
-    return absl::nullopt;
+    return std::nullopt;
   }
 }
 
 // Reads actual CPU limits from cgroup v1 files with quota/period parsing.
-absl::optional<double> CgroupCpuUtil::readActualLimitsV1(const CpuFiles& cpu_files) {
+std::optional<double> CgroupCpuUtil::readActualLimitsV1(const CpuFiles& cpu_files) {
   // v1: Use cached quota and period content (no re-reading)
   const std::string quota_str = std::string(absl::StripAsciiWhitespace(cpu_files.quota_content));
   const std::string period_str = std::string(absl::StripAsciiWhitespace(cpu_files.period_content));
@@ -273,19 +273,19 @@ absl::optional<double> CgroupCpuUtil::readActualLimitsV1(const CpuFiles& cpu_fil
   if (!absl::SimpleAtoi(quota_str, &quota) || !absl::SimpleAtoi(period_str, &period)) {
     ENVOY_LOG_MISC(warn, "Failed to parse cgroup v1 values: quota='{}' period='{}'", quota_str,
                    period_str);
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   // Handle special case: v1 quota = -1 means no limit
   if (quota == -1) {
     ENVOY_LOG_MISC(debug, "cgroup v1 unlimited CPU (quota = -1)");
-    return absl::nullopt; // Unlimited - return nullopt
+    return std::nullopt; // Unlimited - return nullopt
   }
 
   // Validate values
   if (period <= 0 || quota <= 0) {
     ENVOY_LOG_MISC(warn, "Invalid cgroup v1 values: quota={} period={}", quota, period);
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   // Calculate CPU ratio as float64
@@ -297,7 +297,7 @@ absl::optional<double> CgroupCpuUtil::readActualLimitsV1(const CpuFiles& cpu_fil
 }
 
 // Reads actual CPU limits from cgroup v2 files with "quota period" parsing.
-absl::optional<double> CgroupCpuUtil::readActualLimitsV2(const CpuFiles& cpu_files) {
+std::optional<double> CgroupCpuUtil::readActualLimitsV2(const CpuFiles& cpu_files) {
   // v2: Use cached cpu.max content (no re-reading)
   absl::string_view content = absl::StripAsciiWhitespace(cpu_files.quota_content);
 
@@ -306,13 +306,13 @@ absl::optional<double> CgroupCpuUtil::readActualLimitsV2(const CpuFiles& cpu_fil
 
   if (parts.size() != 2) {
     ENVOY_LOG_MISC(warn, "Malformed cgroup v2 cpu.max: expected 'quota period', got '{}'", content);
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   // Handle special case: v2 quota = "max" means no limit
   if (parts[0] == "max") {
     ENVOY_LOG_MISC(debug, "cgroup v2 unlimited CPU (quota = max)");
-    return absl::nullopt; // Unlimited - return nullopt
+    return std::nullopt; // Unlimited - return nullopt
   }
 
   // Parse quota and period values
@@ -320,13 +320,13 @@ absl::optional<double> CgroupCpuUtil::readActualLimitsV2(const CpuFiles& cpu_fil
   if (!absl::SimpleAtoi(parts[0], &quota) || !absl::SimpleAtoi(parts[1], &period)) {
     ENVOY_LOG_MISC(warn, "Failed to parse cgroup v2 values: quota='{}' period='{}'", parts[0],
                    parts[1]);
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   // Validate values
   if (period == 0) {
     ENVOY_LOG_MISC(warn, "Invalid cgroup v2 period: cannot be zero");
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   // Calculate CPU ratio as float64
@@ -349,15 +349,15 @@ absl::optional<double> CgroupCpuUtil::readActualLimitsV2(const CpuFiles& cpu_fil
 //      - v1: quota = -1 means no limit
 //      - v2: quota = "max" means no limit
 //   5. Result: CPU limit as float64 ratio
-absl::optional<double> CgroupCpuUtil::readActualLimits(const CpuFiles& cpu_files,
-                                                       Filesystem::Instance& /* fs */) {
+std::optional<double> CgroupCpuUtil::readActualLimits(const CpuFiles& cpu_files,
+                                                      Filesystem::Instance& /* fs */) {
   if (cpu_files.version == "v1") {
     return readActualLimitsV1(cpu_files);
   } else if (cpu_files.version == "v2") {
     return readActualLimitsV2(cpu_files);
   } else {
     ENVOY_LOG_MISC(warn, "Unknown cgroup version: {}", cpu_files.version);
-    return absl::nullopt;
+    return std::nullopt;
   }
 }
 
@@ -373,12 +373,12 @@ absl::optional<double> CgroupCpuUtil::readActualLimits(const CpuFiles& cpu_files
 // - If cgroup v2: save mount point, continue searching
 // - Result: single mount point with highest priority
 //
-absl::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Instance& fs) {
+std::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Instance& fs) {
   const auto result = fs.fileReadToEnd(std::string(PROC_MOUNTINFO_PATH));
   if (!result.ok()) {
     // /proc/self/mountinfo doesn't exist - not in a cgroup
     ENVOY_LOG_MISC(warn, "Cannot read /proc/self/mountinfo: not in a cgroup or file doesn't exist");
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   absl::string_view content = result.value();
@@ -498,7 +498,7 @@ absl::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Insta
 
   // No cgroup filesystem found
   ENVOY_LOG_MISC(debug, "No cgroup filesystem mounts found");
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 // Unescapes octal escape sequences in paths from /proc/self/mountinfo.
@@ -581,7 +581,7 @@ std::string CgroupCpuUtil::unescapePath(absl::string_view path) {
 //
 // NOTE: Mount points may contain escaped characters (\040 for space, \134 for backslash, etc.)
 // and must be unescaped before use.
-absl::optional<std::string> CgroupCpuUtil::parseMountInfoLine(absl::string_view line) {
+std::optional<std::string> CgroupCpuUtil::parseMountInfoLine(absl::string_view line) {
   const std::vector<absl::string_view> fields = absl::StrSplit(line, ' ');
 
   // Find the separator "-" to locate filesystem type field
@@ -596,7 +596,7 @@ absl::optional<std::string> CgroupCpuUtil::parseMountInfoLine(absl::string_view 
   if (separator_pos == 0 || separator_pos + 1 >= fields.size()) {
     // Malformed line or separator not found
     ENVOY_LOG_MISC(warn, "Malformed mountinfo line: separator '-' not found or invalid position");
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   // Extract mount point (field 5, 0-indexed = 4) and filesystem type (separator + 1)
@@ -606,7 +606,7 @@ absl::optional<std::string> CgroupCpuUtil::parseMountInfoLine(absl::string_view 
                    "Malformed mountinfo line: expected at least 5 fields and filesystem type after "
                    "separator, got {} fields",
                    fields.size());
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   absl::string_view mount_point_escaped = fields[4];
@@ -614,7 +614,7 @@ absl::optional<std::string> CgroupCpuUtil::parseMountInfoLine(absl::string_view 
 
   // Check if this is a cgroup filesystem
   if (fs_type != "cgroup" && fs_type != "cgroup2") {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   // Unescape mount point - Linux's show_path escapes special characters

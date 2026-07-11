@@ -1630,8 +1630,9 @@ class TestHeaderFilterFactory : public ExtensionFilterFactory {
 public:
   ~TestHeaderFilterFactory() override = default;
 
-  FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                         Server::Configuration::GenericFactoryContext& context) override {
+  absl::StatusOr<FilterPtr>
+  createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
+               Server::Configuration::GenericFactoryContext& context) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
         config, context.messageValidationVisitor(), *this);
     const auto& header_config =
@@ -1725,12 +1726,14 @@ class SampleExtensionFilterFactory : public ExtensionFilterFactory {
 public:
   ~SampleExtensionFilterFactory() override = default;
 
-  FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                         Server::Configuration::GenericFactoryContext& context) override {
+  absl::StatusOr<FilterPtr>
+  createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
+               Server::Configuration::GenericFactoryContext& context) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
         config, context.messageValidationVisitor(), *this);
 
-    Protobuf::Struct struct_config = *dynamic_cast<const Protobuf::Struct*>(factory_config.get());
+    Protobuf::Struct struct_config =
+        *Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(factory_config.get());
     return std::make_unique<SampleExtensionFilter>(
         static_cast<uint32_t>(struct_config.fields().at("rate").number_value()));
   }
