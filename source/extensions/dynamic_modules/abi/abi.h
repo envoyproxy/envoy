@@ -47,7 +47,6 @@
 #define ENVOY_DYNAMIC_MODULES_ABI_VERSION "v0.1.0"
 
 #ifdef __cplusplus
-#include <cstdbool>
 #include <cstddef>
 #include <cstdint>
 
@@ -495,6 +494,15 @@ void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level
  * @return true if the log level is enabled, false otherwise.
  */
 bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level level);
+
+/**
+ * envoy_dynamic_module_callback_get_log_level is called by the module to get the current effective
+ * log level for the dynamic modules Id. This allows the module to align its own verbosity with the
+ * level configured on the Envoy side, including changes applied at runtime via the admin API.
+ *
+ * @return the current effective log level as envoy_dynamic_module_type_log_level.
+ */
+envoy_dynamic_module_type_log_level envoy_dynamic_module_callback_get_log_level();
 
 // --------------------------------- Threading -----------------------------------
 
@@ -2420,6 +2428,73 @@ bool envoy_dynamic_module_callback_http_get_filter_state_typed(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
 
+// Lifespan of a filter state entry. Mirrors StreamInfo::FilterState::LifeSpan. Entries at Request
+// or Connection lifespan are carried into the new stream on recreate_stream; FilterChain entries
+// are not.
+typedef enum envoy_dynamic_module_type_filter_state_life_span {
+  envoy_dynamic_module_type_filter_state_life_span_FilterChain = 0,
+  envoy_dynamic_module_type_filter_state_life_span_Request = 1,
+  envoy_dynamic_module_type_filter_state_life_span_Connection = 2,
+} envoy_dynamic_module_type_filter_state_life_span;
+
+// OWNERSHIP: module-owned opaque object stored in filter state. Envoy never dereferences it; it
+// calls the supplied destructor exactly once when the entry is destroyed. THREADING: created and
+// accessed on the worker thread owning the stream.
+typedef void* envoy_dynamic_module_type_filter_state_object_module_ptr;
+
+// Destructor for a filter state object. Envoy calls it exactly once, on the worker thread, when the
+// entry is destroyed (stream/connection end per life_span, or overwrite of the same key). It runs
+// on the teardown path outside any module callback guard, so it must not unwind: a panic crossing
+// this boundary is undefined behavior. The Rust SDK enforces this by requiring an
+// ``extern "C"`` destructor, which aborts on unwind.
+typedef void (*envoy_dynamic_module_type_filter_state_object_destructor)(
+    envoy_dynamic_module_type_filter_state_object_module_ptr module_object);
+
+/**
+ * envoy_dynamic_module_callback_http_set_filter_state_object is called by the module to store an
+ * opaque, module-owned object in the filter state under the given key. Envoy never interprets the
+ * object; it wraps it in a non-serializable FilterState::Object and calls destructor(module_object)
+ * exactly once when that wrapper is destroyed. Objects stored at Request or Connection lifespan
+ * survive recreate_stream (carried into the new stream's parent filter state); FilterChain-lifespan
+ * objects do not.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state.
+ * @param module_object is the opaque object to store. Ownership transfers to Envoy.
+ * @param destructor is called exactly once with module_object when the entry is destroyed, or
+ * before returning false so a failed store never leaks the object. It must not unwind; see the
+ * destructor typedef.
+ * @param life_span is the lifespan of the entry. A Connection-lifespan entry may outlive the
+ * stream, so its object and destructor must remain valid until the connection ends.
+ * @return true if stored. Returns false, after running the destructor, if the stream info or filter
+ * state is not available, or if the key already holds an entry at a different life_span.
+ */
+bool envoy_dynamic_module_callback_http_set_filter_state_object(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_filter_state_object_module_ptr module_object,
+    envoy_dynamic_module_type_filter_state_object_destructor destructor,
+    envoy_dynamic_module_type_filter_state_life_span life_span);
+
+/**
+ * envoy_dynamic_module_callback_http_get_filter_state_object is called by the module to borrow the
+ * opaque object previously stored under the given key. Ownership stays with Envoy; the module must
+ * not free the returned pointer. After a recreate_stream, the rebuilt filter calls this with the
+ * same key to recover the carried-over object.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state.
+ * @return the stored object, or NULL if the stream info is not available, the key does not exist,
+ * or the entry was not stored via set_filter_state_object. Valid until the entry is destroyed or
+ * overwritten.
+ */
+envoy_dynamic_module_type_filter_state_object_module_ptr
+envoy_dynamic_module_callback_http_get_filter_state_object(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key);
+
 // ---------------------- Other HTTP filter callbacks ----------------------------
 
 /**
@@ -3200,6 +3275,15 @@ bool envoy_dynamic_module_callback_http_get_cluster_host_count(
 bool envoy_dynamic_module_callback_http_set_upstream_override_host(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer host, bool strict);
+
+/**
+ * Get the upstream connection ID.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @return the upstream connection ID, or 0 if not available.
+ */
+uint64_t envoy_dynamic_module_callback_http_get_upstream_connection_id(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
 // ------------------- Stream Control Callbacks -------------------------
 
@@ -4577,6 +4661,15 @@ bool envoy_dynamic_module_callback_network_filter_get_upstream_host_cluster(
 bool envoy_dynamic_module_callback_network_filter_has_upstream_host(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
 
+/**
+ * Get the upstream connection ID.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return the upstream connection ID, or 0 if not available.
+ */
+uint64_t envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
 // ---------------------- StartTLS Support Callbacks ---------------------------
 
 /**
@@ -4813,6 +4906,61 @@ void envoy_dynamic_module_callback_network_filter_config_scheduler_commit(
  */
 uint32_t envoy_dynamic_module_callback_network_filter_get_worker_index(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_attribute_string is called by the module to get
+ * the string attribute value. If the attribute is not accessible or the
+ * value is not a string, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the pointer variable where the pointer to the buffer
+ * of the string value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_attribute_string(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_attribute_int is called by the module to get
+ * an integer attribute value. If the attribute is not accessible or the
+ * value is not an integer, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the integer value of the attribute will be
+ * stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_attribute_int(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_attribute_bool is called by the module to get
+ * a boolean attribute value. If the attribute is not accessible or the
+ * value is not a boolean, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the bool value of the attribute will be
+ * stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_attribute_bool(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
 
 // =============================================================================
 // ============================= Listener Filter ===============================
@@ -6053,6 +6201,61 @@ void envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(
  */
 uint32_t envoy_dynamic_module_callback_listener_filter_get_worker_index(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_attribute_string is called by the module to get
+ * the string attribute value. If the attribute is not accessible or the
+ * value is not a string, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the pointer variable where the pointer to the buffer
+ * of the string value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_attribute_string(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_attribute_int is called by the module to get
+ * an integer attribute value. If the attribute is not accessible or the
+ * value is not an integer, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the integer value of the attribute will be
+ * stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_attribute_int(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_attribute_bool is called by the module to get
+ * a boolean attribute value. If the attribute is not accessible or the
+ * value is not a boolean, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the bool value of the attribute will be
+ * stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_attribute_bool(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
 
 // =============================================================================
 // ========================== UDP Listener Filter ==============================

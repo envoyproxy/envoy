@@ -57,8 +57,8 @@ constexpr const char* CookieDeleteFormatString =
 constexpr const char* CookieTailHttpOnlyFormatString = ";path={};Max-Age={};secure;HttpOnly{}";
 constexpr const char* CookieDomainFormatString = ";domain={}";
 
-constexpr const char* OIDCLogoutUrlFormatString =
-    "{0}?id_token_hint={1}&client_id={2}&post_logout_redirect_uri={3}";
+constexpr const char* OIDCLogoutUrlBaseFormatString = "{0}?id_token_hint={1}&client_id={2}";
+constexpr const char* OIDCLogoutUrlPostLogoutRedirectFormatString = "&post_logout_redirect_uri={0}";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 constexpr absl::string_view ServiceUnavailableBodyMessage = "Service Unavailable";
@@ -654,6 +654,14 @@ FilterConfig::FilterConfig(
     : oauth_token_endpoint_(proto_config.token_endpoint()),
       authorization_endpoint_(proto_config.authorization_endpoint()),
       end_session_endpoint_(proto_config.end_session_endpoint()),
+      post_logout_redirect_uri_formatter_(
+          (proto_config.post_logout_redirect_uri().uri().empty() ||
+           proto_config.end_session_endpoint().empty())
+              ? nullptr
+              : THROW_OR_RETURN_VALUE(
+                    Formatter::FormatterImpl::create(proto_config.post_logout_redirect_uri().uri()),
+                    Formatter::FormatterPtr)),
+      disable_post_logout_redirect_uri_(proto_config.post_logout_redirect_uri().disabled()),
       authorization_query_params_(buildAutorizationQueryParams(proto_config)),
       client_id_(proto_config.credentials().client_id()),
       redirect_uri_(proto_config.redirect_uri()),
@@ -1388,19 +1396,32 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
                      maybe_secure_attr));
   }
 
-  const std::string post_logout_redirect_url =
+  const std::string default_post_logout_redirect_url =
       absl::StrCat(headers.getSchemeValue(), "://", host_, "/");
   // If the end session endpoint is set, redirect to it to log out the user from the OpenID
   // provider.
   if (!config_->endSessionEndpoint().empty()) {
     const std::string id_token =
         Http::Utility::parseCookieValue(headers, config_->cookieNames().id_token_);
-    const std::string oidc_logout_url = fmt::format(
-        OIDCLogoutUrlFormatString, config_->endSessionEndpoint(), id_token, config_->clientId(),
-        Http::Utility::PercentEncoding::encode(post_logout_redirect_url, ":/=&?"));
+    std::string oidc_logout_url =
+        fmt::format(OIDCLogoutUrlBaseFormatString, config_->endSessionEndpoint(), id_token,
+                    config_->clientId());
+
+    if (!config_->disablePostLogoutRedirectUri()) {
+      std::string redirect_uri;
+      if (config_->postLogoutRedirectUriFormatter() == nullptr) {
+        redirect_uri = default_post_logout_redirect_url;
+      } else {
+        redirect_uri = config_->postLogoutRedirectUriFormatter()->format(
+            {&headers}, decoder_callbacks_->streamInfo());
+      }
+      absl::StrAppend(&oidc_logout_url,
+                      fmt::format(OIDCLogoutUrlPostLogoutRedirectFormatString,
+                                  Http::Utility::PercentEncoding::urlEncode(redirect_uri)));
+    }
     response_headers->setLocation(oidc_logout_url);
   } else {
-    response_headers->setLocation(post_logout_redirect_url);
+    response_headers->setLocation(default_post_logout_redirect_url);
   }
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);

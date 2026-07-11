@@ -20,22 +20,22 @@ namespace {
 
 TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(GrpcJsonReverseTranscoderFactory()
+  EXPECT_FALSE(GrpcJsonReverseTranscoderFactory()
                    .createFilterFactoryFromProto(
                        envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
                            GrpcJsonReverseTranscoder(),
                        "stats", context)
-                   .value(),
-               ProtoValidationException);
+                   .ok());
 }
 
 TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFailWithServerContext) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_THROW(GrpcJsonReverseTranscoderFactory().createFilterFactoryFromProtoWithServerContext(
-                   envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
-                       GrpcJsonReverseTranscoder(),
-                   "stats", context),
-               ProtoValidationException);
+  EXPECT_FALSE(GrpcJsonReverseTranscoderFactory()
+                   .createHttpFilterFactoryFromProto(
+                       envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
+                           GrpcJsonReverseTranscoder(),
+                       "stats", context)
+                   .ok());
 }
 
 class GrpcJsonReverseTranscoderFilterFactoryTest : public testing::Test {
@@ -71,7 +71,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterFactoryTest, CreateFilterFactoryFromProtoW
   GrpcJsonReverseTranscoderFactory factory;
 
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(config_, "stats", context);
+      factory.createHttpFilterFactoryFromProto(config_, "stats", context).value();
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

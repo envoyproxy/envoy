@@ -7,6 +7,7 @@
 #include "source/common/quic/envoy_quic_proof_source.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_tls_server_handshaker.h"
 #include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/default_tls_certificate_selector.h"
@@ -376,26 +377,24 @@ TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailAlgorithmMismatch) {
       std::make_unique<TestSignatureCallback>(false, filter_chain_, signature));
 }
 
-// Smoke test: verify OnNewSslCtx installs the ticket key callback when the
-// runtime guard is enabled. We cannot directly inspect the callback, but we
-// verify the call completes without error.
-TEST_F(EnvoyQuicProofSourceTest, OnNewSslCtxWithSessionTicketSupport) {
+// BoringSSL has no getter for the ticket key callback, so the ticket install
+// can only be observed via behavior; the key log callback has one.
+TEST_F(EnvoyQuicProofSourceTest, OnNewSslCtxInstallsKeylogCallback) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_session_ticket_support", "true"}});
-
+  scoped_runtime.mergeValues({{"envoy.restart_features.quic_keylog_support", "true"}});
   bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
   ASSERT_NE(ssl_ctx, nullptr);
   proof_source_.OnNewSslCtx(ssl_ctx.get());
+  EXPECT_EQ(EnvoyTlsServerHandshaker::keylogCallback, SSL_CTX_get_keylog_callback(ssl_ctx.get()));
 }
 
-// Smoke test: verify OnNewSslCtx is a no-op when the runtime guard is disabled.
-TEST_F(EnvoyQuicProofSourceTest, OnNewSslCtxWithSessionTicketSupportDisabled) {
+TEST_F(EnvoyQuicProofSourceTest, OnNewSslCtxDoesNotInstallKeylogCallbackWhenFlagOff) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_session_ticket_support", "false"}});
-
+  scoped_runtime.mergeValues({{"envoy.restart_features.quic_keylog_support", "false"}});
   bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
   ASSERT_NE(ssl_ctx, nullptr);
   proof_source_.OnNewSslCtx(ssl_ctx.get());
+  EXPECT_EQ(nullptr, SSL_CTX_get_keylog_callback(ssl_ctx.get()));
 }
 
 } // namespace Quic

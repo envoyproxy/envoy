@@ -160,6 +160,12 @@ public:
   virtual bool skipDeprecatedLogs() const PURE;
 
   /**
+   * @return bool whether to emit the entire stack trace in a single log entry
+   *         instead of one log call per frame. Useful for log aggregation systems.
+   */
+  virtual bool logStacktraceSingleEntry() const PURE;
+
+  /**
    * @return const std::string& the admin address output file.
    */
   virtual const std::string& adminAddressPath() const PURE;
