@@ -36,26 +36,10 @@ namespace {
 
 using ::testing::_;
 using ::testing::AtLeast;
+using ::testing::DoAll;
 using ::testing::NiceMock;
 using ::testing::Return;
-
-// Minimal HostLbPolicyData that records delivered reports; proves the OOB manager delivers to any
-// HostLbPolicyData (not just OrcaHostLbPolicyData) via the standard onOrcaLoadReport entry point.
-class RecordingLbPolicyData : public Upstream::HostLbPolicyData {
-public:
-  explicit RecordingLbPolicyData(absl::Status status = absl::OkStatus())
-      : status_(std::move(status)) {}
-  bool receivesOrcaLoadReport() const override { return true; }
-  absl::Status onOrcaLoadReport(const Upstream::OrcaLoadReport& report,
-                                OptRef<const StreamInfo::StreamInfo>) override {
-    ++calls_;
-    last_util_ = report.application_utilization();
-    return status_;
-  }
-  int calls_ = 0;
-  double last_util_ = -1.0;
-  absl::Status status_;
-};
+using ::testing::SaveArg;
 
 // MOCK_METHOD returns a raw Http::CodecClient*; createCodecClient wraps in unique_ptr to
 // transfer ownership to OobSession.
@@ -559,8 +543,10 @@ TEST_F(OrcaOobManagerWireTest, ReportDeliveredToArbitraryLbPolicyData) {
 
   auto* attempt_timer = installAttemptTimer();
   auto host = makeWiredHost();
-  auto data = std::make_unique<RecordingLbPolicyData>();
-  auto* data_ptr = data.get();
+  auto data = std::make_unique<Upstream::MockHostLbPolicyData>();
+  xds::data::orca::v3::OrcaLoadReport delivered;
+  EXPECT_CALL(*data, onOrcaLoadReport(_, _))
+      .WillOnce(DoAll(SaveArg<0>(&delivered), Return(absl::OkStatus())));
   host->addLbPolicyData(std::move(data));
   priority_set_.runUpdateCallbacks(0, {host}, {});
 
@@ -574,8 +560,7 @@ TEST_F(OrcaOobManagerWireTest, ReportDeliveredToArbitraryLbPolicyData) {
   report.set_application_utilization(0.75);
   respondReport(*attempt, report);
 
-  EXPECT_EQ(data_ptr->calls_, 1);
-  EXPECT_DOUBLE_EQ(data_ptr->last_util_, 0.75);
+  EXPECT_DOUBLE_EQ(delivered.application_utilization(), 0.75);
   EXPECT_EQ(oobCounter("reports_received"), 1);
   EXPECT_EQ(oobCounter("report_errors"), 0);
 
@@ -591,8 +576,44 @@ TEST_F(OrcaOobManagerWireTest, LbPolicyDataErrorIncrementsReportErrors) {
 
   auto* attempt_timer = installAttemptTimer();
   auto host = makeWiredHost();
-  host->addLbPolicyData(
-      std::make_unique<RecordingLbPolicyData>(absl::InternalError("sink rejected report")));
+  auto data = std::make_unique<Upstream::MockHostLbPolicyData>();
+  EXPECT_CALL(*data, onOrcaLoadReport(_, _))
+      .WillOnce(Return(absl::InternalError("sink rejected report")));
+  host->addLbPolicyData(std::move(data));
+  priority_set_.runUpdateCallbacks(0, {host}, {});
+
+  auto attempt = makeAttempt();
+  wireConnectionFor(host, *attempt);
+  expectCreateCodecClient(*manager, *attempt);
+  attempt_timer->invokeCallback();
+
+  respondHeadersOk(*attempt);
+  xds::data::orca::v3::OrcaLoadReport report;
+  report.set_application_utilization(0.5);
+  respondReport(*attempt, report);
+
+  EXPECT_EQ(oobCounter("reports_received"), 1);
+  EXPECT_EQ(oobCounter("report_errors"), 1);
+
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  manager.reset();
+}
+
+TEST_F(OrcaOobManagerWireTest, FanOutContinuesPastFailingRecipient) {
+  // A failing recipient must not short-circuit delivery to the remaining recipients, and a
+  // mixed OK/failure result increments report_errors exactly once.
+  auto manager = makeManager();
+  ASSERT_OK(manager->initialize());
+
+  auto* attempt_timer = installAttemptTimer();
+  auto host = makeWiredHost();
+  auto failing = std::make_unique<Upstream::MockHostLbPolicyData>();
+  auto ok = std::make_unique<Upstream::MockHostLbPolicyData>();
+  EXPECT_CALL(*failing, onOrcaLoadReport(_, _))
+      .WillOnce(Return(absl::InternalError("sink rejected report")));
+  EXPECT_CALL(*ok, onOrcaLoadReport(_, _)).WillOnce(Return(absl::OkStatus()));
+  host->addLbPolicyData(std::move(failing));
+  host->addLbPolicyData(std::move(ok));
   priority_set_.runUpdateCallbacks(0, {host}, {});
 
   auto attempt = makeAttempt();

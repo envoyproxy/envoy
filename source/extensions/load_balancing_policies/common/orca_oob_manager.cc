@@ -391,8 +391,12 @@ void OrcaOobManager::OobSession::onReport(const xds::data::orca::v3::OrcaLoadRep
   Upstream::HostUtility::forEachOrcaLoadReportRecipient(
       *host_, [&](Upstream::HostLbPolicyData& data) {
         had_recipient = true;
-        if (!data.onOrcaLoadReport(report, std::nullopt).ok()) {
+        const absl::Status status = data.onOrcaLoadReport(report, std::nullopt);
+        if (!status.ok()) {
           apply_failed = true;
+          ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                             "OOB onOrcaLoadReport failed: {} for host {}", status.message(),
+                             host_->address()->asString());
         }
       });
   if (!had_recipient || apply_failed) {

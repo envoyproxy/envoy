@@ -8444,13 +8444,6 @@ TEST_F(RouterTest, OrcaLoadReport_NoConfiguredMetricNames) {
   ASSERT_EQ(load_metric_stats_map, nullptr);
 }
 
-class TestOrcaLoadReportLbData : public Upstream::HostLbPolicyData {
-public:
-  bool receivesOrcaLoadReport() const override { return true; }
-  MOCK_METHOD(absl::Status, onOrcaLoadReport,
-              (const Upstream::OrcaLoadReport&, OptRef<const StreamInfo::StreamInfo>), (override));
-};
-
 TEST_F(RouterTest, OrcaLoadReportCallbacks) {
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
@@ -8465,7 +8458,7 @@ TEST_F(RouterTest, OrcaLoadReportCallbacks) {
   router_->decodeHeaders(headers, true);
 
   // Configure the HostLbData to receive the report.
-  auto host_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
+  auto host_lb_policy_data = std::make_unique<Upstream::MockHostLbPolicyData>();
   auto host_lb_policy_data_raw_ptr = host_lb_policy_data.get();
   cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(host_lb_policy_data));
 
@@ -8519,7 +8512,7 @@ TEST_F(RouterTest, OrcaLoadReportCallbackReturnsError) {
   router_->decodeHeaders(headers, true);
 
   // Configure the HostLbData to receive the report.
-  auto host_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
+  auto host_lb_policy_data = std::make_unique<Upstream::MockHostLbPolicyData>();
   auto host_lb_policy_data_raw_ptr = host_lb_policy_data.get();
   cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(host_lb_policy_data));
 
@@ -8560,7 +8553,7 @@ TEST_F(RouterTest, OrcaLoadReportInvalidHeaderValue) {
 
   // Configure the HostLbData to receive the report, but don't expect it to be
   // called for invalid orca header.
-  auto host_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
+  auto host_lb_policy_data = std::make_unique<Upstream::MockHostLbPolicyData>();
   auto host_lb_policy_data_raw_ptr = host_lb_policy_data.get();
   cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(host_lb_policy_data));
   EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _)).Times(0);
@@ -8587,9 +8580,9 @@ TEST_F(RouterTest, OrcaLoadReportCallbacksFanOutToMultipleHostDataEntries) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, true);
 
-  auto first_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
+  auto first_lb_policy_data = std::make_unique<Upstream::MockHostLbPolicyData>();
   auto* first_lb_policy_data_raw_ptr = first_lb_policy_data.get();
-  auto second_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
+  auto second_lb_policy_data = std::make_unique<Upstream::MockHostLbPolicyData>();
   auto* second_lb_policy_data_raw_ptr = second_lb_policy_data.get();
   cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(first_lb_policy_data));
   cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(second_lb_policy_data));
@@ -8624,17 +8617,10 @@ TEST_F(RouterTest, OrcaLoadReportSkipsEntriesNotInterestedInOrca) {
   router_->decodeHeaders(headers, true);
 
   // First entry opts out of ORCA reports.
-  class NonOrcaLbData : public Upstream::HostLbPolicyData {
-  public:
-    bool receivesOrcaLoadReport() const override { return false; }
-    MOCK_METHOD(absl::Status, onOrcaLoadReport,
-                (const Upstream::OrcaLoadReport&, OptRef<const StreamInfo::StreamInfo>),
-                (override));
-  };
-
-  auto non_orca_data = std::make_unique<NonOrcaLbData>();
+  auto non_orca_data =
+      std::make_unique<Upstream::MockHostLbPolicyData>(/*receives_orca_load_report=*/false);
   auto* non_orca_data_raw_ptr = non_orca_data.get();
-  auto orca_data = std::make_unique<TestOrcaLoadReportLbData>();
+  auto orca_data = std::make_unique<Upstream::MockHostLbPolicyData>();
   auto* orca_data_raw_ptr = orca_data.get();
   cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(non_orca_data));
   cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(orca_data));

@@ -150,9 +150,6 @@ public:
   // Core weight update (blackout, expiration, median default). Returns true if any weight changed.
   bool updateWeightsOnHosts(const Upstream::HostVector& hosts);
 
-  // Accessor for the report handler (used by tests and for creating host data).
-  OrcaLoadReportHandlerSharedPtr reportHandler() { return report_handler_; }
-
   // Get weight based on host LB policy data if valid, otherwise return nullopt.
   static std::optional<uint32_t> getWeightIfValidFromHost(const Upstream::Host& host,
                                                           MonotonicTime max_non_empty_since,
