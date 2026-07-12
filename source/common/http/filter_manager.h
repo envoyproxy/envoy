@@ -136,6 +136,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual bool canContinue() PURE;
   virtual Buffer::InstancePtr createBuffer() PURE;
   virtual Buffer::InstancePtr& bufferedData() PURE;
+  virtual void clearSkipBodyOnNextContinue() {}
   virtual bool observedEndStream() PURE;
   virtual bool has1xxHeaders() PURE;
   virtual void do1xxHeaders() PURE;
@@ -280,6 +281,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   RequestTrailerMap& addDecodedTrailers() override;
   MetadataMapVector& addDecodedMetadata() override;
   void continueDecoding() override;
+  void setSkipBodyOnNextContinue() override;
+  void clearSkipBodyOnNextContinue() override { skip_body_on_next_continue_ = false; }
   const Buffer::Instance* decodingBuffer() override;
 
   void modifyDecodingBuffer(std::function<void(Buffer::Instance&)> callback) override;
@@ -330,6 +333,9 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   StreamDecoderFilterSharedPtr handle_;
   StreamDecoderFilters::Iterator entry_;
   bool is_grpc_request_{};
+  // When true, bufferedData() returns null_buffer_ptr_
+  bool skip_body_on_next_continue_{};
+  Buffer::InstancePtr null_buffer_ptr_{};
 };
 
 /**

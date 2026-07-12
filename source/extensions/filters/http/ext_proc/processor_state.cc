@@ -595,6 +595,10 @@ void ProcessorState::continueIfNecessary() {
   if (paused_) {
     ENVOY_STREAM_LOG(debug, "Continuing processing", *filterCallbacks());
     paused_ = false;
+    if (body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED) {
+      // body was already forwarded, skip doData().
+      skipBodyOnNextContinue();
+    }
     continueProcessing();
   }
 }

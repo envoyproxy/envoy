@@ -197,6 +197,7 @@ private:
     return makeOptRef<const Tracing::Config>(tracing_config_);
   }
   void continueDecoding() override {}
+  void setSkipBodyOnNextContinue() override {}
   RequestTrailerMap& addDecodedTrailers() override { PANIC("not implemented"); }
   void addDecodedData(Buffer::Instance& data, bool) override {
     if (!new_async_client_retry_logic_) {
