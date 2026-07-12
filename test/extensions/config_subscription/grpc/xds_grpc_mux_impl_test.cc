@@ -1522,6 +1522,106 @@ TEST(UnifiedDeltaGrpcMuxFactoryTest, InvalidRateLimit) {
                EnvoyException);
 }
 
+class GrpcMuxImplConfigTrackerTest : public GrpcMuxImplTest {
+public:
+  GrpcMuxImplConfigTrackerTest() : GrpcMuxImplTest() {
+    xds_config_tracker_ptr_ = &xds_config_tracker_;
+
+    // Re-setup the mux with the tracker
+    GrpcMuxContext grpc_mux_context{
+        /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+        /*failover_async_client_=*/nullptr,
+        /*dispatcher_=*/dispatcher_,
+        /*service_method_=*/
+        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+            "envoy.service.discovery.v3.AggregatedDiscoveryService."
+            "StreamAggregatedResources"),
+        /*local_info_=*/local_info_,
+        /*rate_limit_settings_=*/rate_limit_settings_,
+        /*scope_=*/*stats_.rootScope(),
+        /*config_validators_=*/std::move(config_validators_),
+        /*xds_resources_delegate_=*/XdsResourcesDelegateOptRef(),
+        /*xds_config_tracker_=*/
+        makeOptRefFromPtr<XdsConfigTracker>(xds_config_tracker_ptr_),
+        /*backoff_strategy_=*/
+        std::make_unique<JitteredExponentialBackOffStrategy>(
+            SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
+            random_),
+        /*target_xds_authority_=*/"",
+        /*eds_resources_cache_=*/
+        std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+        /*skip_subsequent_node_=*/true};
+
+    grpc_mux_ = std::make_unique<XdsMux::GrpcMuxSotw>(grpc_mux_context);
+  }
+
+  const std::string type_url_ =
+      "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment";
+
+  NiceMock<MockXdsConfigTracker> xds_config_tracker_;
+  MockXdsConfigTracker* xds_config_tracker_ptr_;
+};
+
+INSTANTIATE_TEST_SUITE_P(GrpcMuxImpl, GrpcMuxImplConfigTrackerTest, ::testing::Bool());
+
+TEST_P(GrpcMuxImplConfigTrackerTest, XdsConfigTrackerUnsubscriptionTest) {
+  // 1. Add watch1 for {"x", "y"}
+  auto watch1 = grpc_mux_->addWatch(type_url_, {"x", "y"}, callbacks_, resource_decoder_, {});
+
+  // 2. Add watch2 for {"x"}
+  NiceMock<MockSubscriptionCallbacks> callbacks2;
+  auto watch2 = grpc_mux_->addWatch(type_url_, {"x"}, callbacks2, resource_decoder_, {});
+
+  // 3. Destroy watch1 -> this should trigger unsubscription of {"y"} since no
+  // other watch wants it.
+  EXPECT_CALL(xds_config_tracker_, onResourceUnsubscribed(type_url_, "y"));
+  watch1.reset();
+
+  // 4. Destroy watch2 -> this should trigger unsubscription of {"x"} since no
+  // other watch wants it.
+  EXPECT_CALL(xds_config_tracker_, onResourceUnsubscribed(type_url_, "x"));
+  watch2.reset();
+}
+
+// Demonstrates that the implicit wildcard subscription results in no calls to
+// onResourceUnsubscribed; individual resources are not tracked in this case.
+TEST_P(GrpcMuxImplConfigTrackerTest, XdsConfigTrackerImplicitWildcardTest) {
+  // Add watch with empty set (implicit wildcard)
+  auto watch = grpc_mux_->addWatch(type_url_, {}, callbacks_, resource_decoder_, {});
+
+  // Expect NO unsubscription calls on destruction because no explicit names were watched
+  EXPECT_CALL(xds_config_tracker_, onResourceUnsubscribed(_, _)).Times(0);
+
+  watch.reset();
+}
+
+// Demonstrates that a subscription with a glob wildcard results in the config tracker receiving an
+// unsubscription notice for the glob, not individual resources.
+TEST_P(GrpcMuxImplConfigTrackerTest, XdsConfigTrackerExplicitGlobWildcardTest) {
+  const std::string glob_resource = "xdstp://test/envoy.config.cluster.v3.Cluster/foo/*";
+
+  // Add watch with glob
+  auto watch = grpc_mux_->addWatch(type_url_, {glob_resource}, callbacks_, resource_decoder_, {});
+
+  // Expect unsubscription call with the glob on destruction
+  EXPECT_CALL(xds_config_tracker_, onResourceUnsubscribed(type_url_, glob_resource));
+
+  watch.reset();
+}
+
+// Demonstrates that in the transition from explicit subscriptions to an implicit wildcard, the
+// explicit resources are conveyed through onResourceUnsubscribe.
+TEST_P(GrpcMuxImplConfigTrackerTest, XdsConfigTrackerTransitionToWildcardTest) {
+  // Add watch with specific resource
+  auto watch = grpc_mux_->addWatch(type_url_, {"cluster_x"}, callbacks_, resource_decoder_, {});
+
+  // Expect unsubscription of "cluster_x" when updating to wildcard (empty set)
+  EXPECT_CALL(xds_config_tracker_, onResourceUnsubscribed(type_url_, "cluster_x"));
+
+  // Update to wildcard (empty set)
+  watch->update({});
+}
+
 } // namespace
 } // namespace XdsMux
 } // namespace Config

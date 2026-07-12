@@ -83,8 +83,10 @@ Pictorially this looks like:
 
 `ParentHistogram`s are held weakly a set in ThreadLocalStore. Like other stats,
 they keep an embedded reference count and are removed from the set and destroyed
-when the last strong reference disappears. Consequently, we must hold a lock for
-the set when decrementing histogram reference counts. A similar process occurs for
+when the last strong reference disappears. Consequently, a decrement that may
+drop the last reference must hold a lock for the set, so that removal from the
+set is atomic with the final decrement; non-final decrements take a lock-free
+fast path. A similar process occurs for
 other types of stats, but in those cases it is taken care of in `AllocatorImpl`.
 There are strong references to `ParentHistograms` in TlsCacheEntry::parent_histograms_.
 
