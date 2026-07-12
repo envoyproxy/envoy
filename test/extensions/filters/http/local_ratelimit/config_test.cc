@@ -14,6 +14,7 @@ namespace HttpFilters {
 namespace LocalRateLimitFilter {
 
 using StatusHelpers::HasStatus;
+using StatusHelpers::IsOk;
 
 TEST(Factory, GlobalEmptyConfig) {
   const std::string yaml = R"(
@@ -265,11 +266,9 @@ response_headers_to_add:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  EXPECT_FALSE(factory
-                   .createRouteSpecificFilterConfig(*proto_config, context,
-                                                    ProtobufMessage::getNullValidationVisitor())
-                   .status()
-                   .ok());
+  EXPECT_THAT(factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                      ProtobufMessage::getNullValidationVisitor()),
+              Not(IsOk()));
 }
 
 TEST(Factory, LocalClusterRateLimitAndLocalRateLimitPerDownstreamConnection) {

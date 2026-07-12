@@ -23,6 +23,7 @@ namespace HttpFilters {
 namespace OnDemand {
 
 using StatusHelpers::HasStatus;
+using StatusHelpers::IsOk;
 
 class OnDemandFilterTest : public testing::Test {
 public:
@@ -376,12 +377,12 @@ TEST(OnDemandConfigTest, Basic) {
 
   absl::Status status1 = absl::OkStatus();
   OnDemandFilterConfig config1(config, cm, visitor, status1);
-  EXPECT_TRUE(status1.ok());
+  EXPECT_THAT(status1, IsOk());
 
   config.mutable_odcds();
   absl::Status status2 = absl::OkStatus();
   OnDemandFilterConfig config2(config, cm, visitor, status2);
-  EXPECT_TRUE(status2.ok());
+  EXPECT_THAT(status2, IsOk());
 
   config.mutable_odcds()->set_resources_locator("foo");
   absl::Status status3 = absl::OkStatus();
@@ -393,7 +394,7 @@ TEST(OnDemandConfigTest, Basic) {
   config.mutable_odcds()->set_resources_locator("xdstp://foo/envoy.config.cluster.v3.Cluster/bar");
   absl::Status status4 = absl::OkStatus();
   OnDemandFilterConfig config4(config, cm, visitor, status4);
-  EXPECT_TRUE(status4.ok());
+  EXPECT_THAT(status4, IsOk());
 }
 
 } // namespace OnDemand

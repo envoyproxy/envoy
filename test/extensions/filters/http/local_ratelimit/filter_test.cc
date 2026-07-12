@@ -104,7 +104,7 @@ public:
     absl::Status creation_status = absl::OkStatus();
     config_ = std::make_shared<FilterConfig>(config, factory_context_, *stats_.rootScope(),
                                              creation_status, per_route);
-    ASSERT_TRUE(creation_status.ok());
+    ASSERT_TRUE(creation_status.ok()) << creation_status.message();
     filter_ = std::make_shared<Filter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
