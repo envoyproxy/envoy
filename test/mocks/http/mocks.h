@@ -318,6 +318,7 @@ public:
   }
 
   MOCK_METHOD(void, continueDecoding, ());
+  MOCK_METHOD(void, setSkipBodyOnNextContinue, ());
   MOCK_METHOD(void, addDecodedData, (Buffer::Instance & data, bool streaming));
   MOCK_METHOD(void, injectDecodedDataToFilterChain, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(RequestTrailerMap&, addDecodedTrailers, ());
