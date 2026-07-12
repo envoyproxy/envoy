@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.udp.udp_proxy.session.ext_authz.v3;
+
+import "envoy/config/core/v3/grpc_service.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.udp.udp_proxy.session.ext_authz.v3";
+option java_outer_classname = "ExtAuthzProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/udp/udp_proxy/session/ext_authz/v3;ext_authzv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: UDP session external authorization]
+// UDP proxy session external authorization
+// :ref:`configuration overview <config_udp_session_filters_ext_authz>`.
+// [#extension: envoy.filters.udp.session.ext_authz]
+
+// External authorization for UDP proxy sessions over the gRPC
+// :ref:`CheckRequest <envoy_v3_api_msg_service.auth.v3.CheckRequest>` API.
+message FilterConfig {
+  // Configuration for UDP datagrams buffering while the authorization call is in flight.
+  message BufferOptions {
+    // If set, the filter will only buffer datagrams up to the requested limit, and will drop
+    // new UDP datagrams if the buffer contains the max_buffered_datagrams value at the time
+    // of a new datagram arrival. If not set, the default value is 1024 datagrams.
+    google.protobuf.UInt32Value max_buffered_datagrams = 1;
+
+    // If set, the filter will only buffer datagrams up to the requested total buffered bytes limit,
+    // and will drop new UDP datagrams if the buffer contains the max_buffered_bytes value
+    // at the time of a new datagram arrival. If not set, the default value is 16,384 (16KB).
+    google.protobuf.UInt64Value max_buffered_bytes = 2;
+  }
+
+  // The prefix to use when emitting :ref:`statistics
+  // <config_udp_session_filters_ext_authz_stats>`.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The external authorization gRPC service configuration (default timeout: 200ms).
+  config.core.v3.GrpcService grpc_service = 2 [(validate.rules).message = {required: true}];
+
+  // The filter's behaviour in case the external authorization service does not respond back, or
+  // when it returns an error. When set to true, the new session is established and traffic is
+  // forwarded to the upstream. When set to false, the session is dropped. Defaults to false.
+  bool failure_mode_allow = 3;
+
+  // If configured, the filter will buffer datagrams while it is waiting for the authorization
+  // response. If this field is not configured, there will be no buffering and downstream datagrams
+  // that arrive while the authorization call is in progress will be dropped. In case this field is
+  // set but the options are not configured, the default values will be applied as described in the
+  // ``BufferOptions``.
+  BufferOptions buffer_options = 4;
+}
