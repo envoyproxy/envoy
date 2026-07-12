@@ -256,6 +256,7 @@ public:
   virtual Http::HeaderMap* addTrailers() PURE;
 
   virtual void continueProcessing() const PURE;
+  virtual void skipBodyOnNextContinue() {}
   void continueIfNecessary();
   void clearAsyncState(Grpc::Status::GrpcStatus call_status = Grpc::Status::Aborted);
 
@@ -573,6 +574,9 @@ public:
   }
 
   void continueProcessing() const override;
+  void skipBodyOnNextContinue() override {
+    decoder_callbacks_->setSkipBodyOnNextContinue();
+  }
 
   envoy::service::ext_proc::v3::HttpHeaders*
   mutableHeaders(envoy::service::ext_proc::v3::ProcessingRequest& request) const override {

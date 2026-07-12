@@ -131,6 +131,8 @@ void ActiveStreamFilterBase::commonContinue() {
   if (bufferedData()) {
     doData(observedEndStream() && !had_trailers_before_data);
   }
+  
+  clearSkipBodyOnNextContinue();
 
   if (!canContinue()) {
     ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
@@ -413,6 +415,9 @@ Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
 }
 
 Buffer::InstancePtr& ActiveStreamDecoderFilter::bufferedData() {
+  if (skip_body_on_next_continue_) {
+    return null_buffer_ptr_;
+  }
   return parent_.buffered_request_data_;
 }
 
@@ -491,6 +496,10 @@ void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance&
 
 OptRef<WebTransportSession> ActiveStreamDecoderFilter::webTransportSession() {
   return parent_.webTransportSession();
+}
+
+void ActiveStreamDecoderFilter::setSkipBodyOnNextContinue() {
+  skip_body_on_next_continue_ = true;
 }
 
 void ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
