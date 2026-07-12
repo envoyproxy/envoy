@@ -149,7 +149,7 @@ public:
   processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction) const;
   const Envoy::Protobuf::Struct& filterMetadata() const { return filter_metadata_; }
   const std::string& httpResponseCodeDetails() const { return http_response_code_details_; }
-  void setDestination(absl::string_view destination) { destination_ = std::string(destination); }
+  void setDestination(absl::string_view destination) { destination_ = destination; }
   const std::string& destination() const {
     return cluster_info_ != nullptr ? cluster_info_->name() : destination_;
   }
