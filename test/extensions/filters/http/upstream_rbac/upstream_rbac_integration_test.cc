@@ -133,28 +133,5 @@ TEST_P(UpstreamRbacIntegrationTest, ClusterContextStatsNotDoublePrefixed) {
   cleanupUpstreamAndDownstream();
 }
 
-// With the correct-stats-prefix flag disabled (legacy behavior), upstream RBAC filter stats land
-// at the double-prefixed location because the cluster scope prefix string was re-passed as
-// stats_prefix on top of a scope that already carried the cluster prefix.
-TEST_P(UpstreamRbacIntegrationTest, ClusterContextLegacyStatsAreDoublePrefixed) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix", "false");
-  addUpstreamRbacFilter(loopbackCidr(), loopbackPrefixLen());
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("403", response->headers().getStatusValue());
-
-  // With the legacy behavior the counter is double-prefixed.
-  test_server_->waitForCounter("cluster.cluster_0.cluster.cluster_0.rbac.denied", testing::Eq(1));
-  // The correctly-prefixed counter must not exist.
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.rbac.denied"));
-
-  cleanupUpstreamAndDownstream();
-}
-
 } // namespace
 } // namespace Envoy

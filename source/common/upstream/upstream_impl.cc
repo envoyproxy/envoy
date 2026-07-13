@@ -1253,7 +1253,7 @@ ClusterInfoImpl::ClusterInfoImpl(
               server_context)),
       network_filter_config_provider_manager_(
           createSingletonUpstreamNetworkFilterConfigProviderManager(server_context)),
-      upstream_context_(server_context, init_manager, *stats_scope_),
+      upstream_context_(server_context, init_manager, server_context.serverScope()),
       happy_eyeballs_config_(
           config.upstream_connection_options().has_happy_eyeballs_config()
               ? std::make_unique<
@@ -1451,24 +1451,15 @@ ClusterInfoImpl::ClusterInfoImpl(
         return;
       }
 
-      // With the flag enabled (default): use the server root scope (empty prefix) and pass
-      // "cluster.<name>." as stats_prefix, mirroring the router case. This avoids the legacy
-      // double-prefix bug where the scope's own prefix string was re-passed as stats_prefix,
-      // producing names like "cluster.X.cluster.X.rbac.denied".
-      const bool correct_prefix = Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix");
-      const std::string stats_prefix =
-          correct_prefix ? absl::StrCat("cluster.", name_, ".")
-                         : stats_scope_->symbolTable().toString(stats_scope_->prefix());
-      UpstreamFactoryContextImpl root_scope_ctx(
-          upstream_context_.serverFactoryContext(), upstream_context_.initManager(),
-          upstream_context_.serverFactoryContext().serverScope());
-      Server::Configuration::UpstreamFactoryContext& filter_ctx =
-          correct_prefix ? root_scope_ctx : upstream_context_;
+      // upstream_context_ uses the server root scope (empty prefix). Pass "cluster.<name>."
+      // explicitly as stats_prefix so upstream HTTP filters emit stats under "cluster.<name>.*",
+      // mirroring the router case where the HCM stat prefix is passed as stats_prefix.
+      const std::string stats_prefix = absl::StrCat("cluster.", name_, ".");
       Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                               Server::Configuration::UpstreamHttpFilterConfigFactory>
           helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
-                 factory_context.serverFactoryContext().clusterManager(), filter_ctx, stats_prefix);
+                 factory_context.serverFactoryContext().clusterManager(), upstream_context_,
+                 stats_prefix);
       SET_AND_RETURN_IF_NOT_OK(helper.processFilters(http_protocol_options_->http_filters_,
                                                      "upstream http", "upstream http",
                                                      http_filter_factories_),
