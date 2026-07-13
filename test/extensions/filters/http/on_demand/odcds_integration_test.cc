@@ -161,15 +161,15 @@ public:
 
   static OnDemandCdsConfig
   createOnDemandCdsConfig(std::optional<envoy::config::core::v3::ConfigSource> config_source,
-                          int timeout_millis, int cluster_inactivity_timeout_millis = 0) {
+                          int timeout_millis, int cluster_idle_timeout_millis = 0) {
     OnDemandCdsConfig config;
     if (config_source.has_value()) {
       *config.mutable_source() = std::move(config_source.value());
     }
     *config.mutable_timeout() = ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout_millis);
-    if (cluster_inactivity_timeout_millis > 0) {
-      *config.mutable_cluster_inactivity_timeout() =
-          ProtobufUtil::TimeUtil::MillisecondsToDuration(cluster_inactivity_timeout_millis);
+    if (cluster_idle_timeout_millis > 0) {
+      *config.mutable_cluster_idle_timeout() =
+          ProtobufUtil::TimeUtil::MillisecondsToDuration(cluster_idle_timeout_millis);
     }
     return config;
   }
@@ -177,25 +177,25 @@ public:
   template <typename OnDemandConfigType>
   static OnDemandConfigType
   createConfig(std::optional<envoy::config::core::v3::ConfigSource> config_source,
-               int timeout_millis, int cluster_inactivity_timeout_millis = 0) {
+               int timeout_millis, int cluster_idle_timeout_millis = 0) {
     OnDemandConfigType on_demand;
     *on_demand.mutable_odcds() = createOnDemandCdsConfig(std::move(config_source), timeout_millis,
-                                                         cluster_inactivity_timeout_millis);
+                                                         cluster_idle_timeout_millis);
     return on_demand;
   }
 
   static OnDemandConfig
   createOnDemandConfig(std::optional<envoy::config::core::v3::ConfigSource> config_source,
-                       int timeout_millis, int cluster_inactivity_timeout_millis = 0) {
+                       int timeout_millis, int cluster_idle_timeout_millis = 0) {
     return createConfig<OnDemandConfig>(std::move(config_source), timeout_millis,
-                                        cluster_inactivity_timeout_millis);
+                                        cluster_idle_timeout_millis);
   }
 
   static PerRouteConfig
   createPerRouteConfig(std::optional<envoy::config::core::v3::ConfigSource> config_source,
-                       int timeout_millis, int cluster_inactivity_timeout_millis = 0) {
+                       int timeout_millis, int cluster_idle_timeout_millis = 0) {
     return createConfig<PerRouteConfig>(std::move(config_source), timeout_millis,
-                                        cluster_inactivity_timeout_millis);
+                                        cluster_idle_timeout_millis);
   }
 
   static OptRef<Protobuf::Map<std::string, Protobuf::Any>>
@@ -402,12 +402,12 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) {
   cleanupUpstreamAndDownstream();
 }
 
-// A cluster discovered via ODCDS and then reclaimed for inactivity is rediscovered when a later
+// A cluster discovered via ODCDS and then reclaimed for idle is rediscovered when a later
 // request needs it again.
-TEST_P(OdCdsIntegrationTest, OnDemandClusterRediscoveredAfterInactivityTimeout) {
+TEST_P(OdCdsIntegrationTest, OnDemandClusterRediscoveredAfterIdleTimeout) {
   addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
                         OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500,
-                        /*cluster_inactivity_timeout_millis=*/1000),
+                        /*cluster_idle_timeout_millis=*/1000),
                     "integration", {});
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -434,7 +434,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterRediscoveredAfterInactivityTimeout) 
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "200", {}, {});
 
-  // new_cluster goes idle and is reclaimed by the inactivity timeout. Reclamation both removes the
+  // new_cluster goes idle and is reclaimed by the idle timeout. Reclamation both removes the
   // cluster (tearing down its upstream connection) and unsubscribes the resource from ODCDS.
   test_server_->waitForCounter("cluster_manager.cluster_removed", testing::Ge(1));
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {}, {"new_cluster"},
@@ -459,13 +459,13 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterRediscoveredAfterInactivityTimeout) 
   cleanupUpstreamAndDownstream();
 }
 
-// The inactivity timeout must survive a listener filter-chain update that removes the on_demand
+// The idle timeout must survive a listener filter-chain update that removes the on_demand
 // filter: the ODCDS subscription (and its reaper) is owned by the ClusterManager, not the filter,
 // so a cluster discovered before the update is still reclaimed afterwards.
 TEST_P(OdCdsIntegrationTest, OnDemandClusterReclaimedAfterListenerFilterChainUpdate) {
   addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
                         OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500,
-                        /*cluster_inactivity_timeout_millis=*/1000),
+                        /*cluster_idle_timeout_millis=*/1000),
                     "integration", {});
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));

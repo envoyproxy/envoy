@@ -19,18 +19,17 @@
 #include "source/common/config/resource_type_helper.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/upstream/cds_api_helper.h"
-#include "source/common/upstream/od_cds_cluster_inactivity_timeout.h"
+#include "source/common/upstream/od_cds_cluster_idle_timeout.h"
 
 namespace Envoy {
 namespace Upstream {
 
-// Binds a trailing cluster inactivity timeout onto an ODCDS create() so the result matches
+// Binds a trailing cluster idle timeout onto an ODCDS create() so the result matches
 // ClusterManager::OdCdsCreationFunction, whose signature omits the timeout.
 template <typename CreateFn>
-auto withClusterInactivityTimeout(CreateFn create_fn,
-                                  std::chrono::milliseconds cluster_inactivity_timeout) {
-  return [create_fn, cluster_inactivity_timeout](auto&&... args) {
-    return create_fn(std::forward<decltype(args)>(args)..., cluster_inactivity_timeout);
+auto withClusterIdleTimeout(CreateFn create_fn, std::chrono::milliseconds cluster_idle_timeout) {
+  return [create_fn, cluster_idle_timeout](auto&&... args) {
+    return create_fn(std::forward<decltype(args)>(args)..., cluster_idle_timeout);
   };
 }
 
@@ -56,7 +55,7 @@ public:
          Config::XdsManager& xds_manager, ClusterManager& cm, MissingClusterNotifier& notifier,
          Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
          Server::Configuration::ServerFactoryContext& server_factory_context,
-         std::chrono::milliseconds cluster_inactivity_timeout);
+         std::chrono::milliseconds cluster_idle_timeout);
 
   // Upstream::OdCdsApi
   void updateOnDemand(std::string cluster_name) override;
@@ -77,7 +76,7 @@ private:
                MissingClusterNotifier& notifier, Stats::Scope& scope,
                ProtobufMessage::ValidationVisitor& validation_visitor,
                Event::Dispatcher& main_thread_dispatcher, TimeSource& time_source,
-               std::chrono::milliseconds cluster_inactivity_timeout, absl::Status& creation_status);
+               std::chrono::milliseconds cluster_idle_timeout, absl::Status& creation_status);
   void sendAwaiting();
 
   CdsApiHelper helper_;
@@ -88,9 +87,9 @@ private:
   absl::flat_hash_set<std::string> subscribed_clusters_;
   const Config::ResourceTypeHelper<envoy::config::cluster::v3::Cluster> resource_type_helper_;
   // Idle timeout applied to clusters this API discovers, from
-  // OnDemandCds.cluster_inactivity_timeout.
-  const std::chrono::milliseconds cluster_inactivity_timeout_;
-  OdCdsClusterInactivityTimeout cluster_inactivity_reaper_;
+  // OnDemandCds.cluster_idle_timeout.
+  const std::chrono::milliseconds cluster_idle_timeout_;
+  OdCdsClusterIdleTimeout cluster_idle_reaper_;
   Config::SubscriptionPtr subscription_;
 };
 
@@ -105,7 +104,7 @@ public:
          Config::XdsManager& xds_manager, ClusterManager& cm, MissingClusterNotifier& notifier,
          Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
          Server::Configuration::ServerFactoryContext& server_factory_context,
-         std::chrono::milliseconds cluster_inactivity_timeout);
+         std::chrono::milliseconds cluster_idle_timeout);
 
   // Upstream::OdCdsApi
   void updateOnDemand(std::string cluster_name) override;
@@ -118,8 +117,7 @@ private:
                     MissingClusterNotifier& notifier, Stats::Scope& scope,
                     Server::Configuration::ServerFactoryContext& server_context, bool old_ads,
                     ProtobufMessage::ValidationVisitor& validation_visitor,
-                    std::chrono::milliseconds cluster_inactivity_timeout,
-                    absl::Status& creation_status);
+                    std::chrono::milliseconds cluster_idle_timeout, absl::Status& creation_status);
 
   // Fetches, and potentially creates, the singleton subscriptions manager.
   // The arguments will be passed to the subscriptions manager's constructor, if
@@ -133,7 +131,7 @@ private:
   // A singleton through which all subscriptions will be processed.
   XdstpOdcdsSubscriptionsManagerSharedPtr subscriptions_manager_;
   // Idle timeout applied to clusters this filter discovers.
-  const std::chrono::milliseconds cluster_inactivity_timeout_;
+  const std::chrono::milliseconds cluster_idle_timeout_;
   const bool old_ads_;
 };
 

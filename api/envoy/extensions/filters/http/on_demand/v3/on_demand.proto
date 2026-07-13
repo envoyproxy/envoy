@@ -37,11 +37,11 @@ message OnDemandCds {
   // The timeout for on demand cluster lookup. If not set, defaults to 5 seconds.
   google.protobuf.Duration timeout = 3;
 
-  // Inactivity period allowed for clusters discovered through this filter.
+  // Idle period allowed for clusters discovered through this filter.
   // A cluster that has been idle for this long will be subject to automatic removal.
   // An idle cluster is one that has no streams to any of its endpoints.
-  // Inactivity detection is disabled if this value is zero or unset.
-  google.protobuf.Duration cluster_inactivity_timeout = 4 [(validate.rules).duration = {gte {}}];
+  // Idle detection is disabled if this value is zero or unset.
+  google.protobuf.Duration cluster_idle_timeout = 4 [(validate.rules).duration = {gte {}}];
 }
 
 // On Demand Discovery filter config.

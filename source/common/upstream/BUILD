@@ -51,7 +51,7 @@ envoy_cc_library(
     hdrs = ["od_cds_api_impl.h"],
     deps = [
         ":cds_api_helper_lib",
-        ":od_cds_cluster_inactivity_timeout_lib",
+        ":od_cds_cluster_idle_timeout_lib",
         "//envoy/common:time_interface",
         "//envoy/config:subscription_interface",
         "//envoy/event:dispatcher_interface",
@@ -69,9 +69,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "od_cds_cluster_inactivity_timeout_lib",
-    srcs = ["od_cds_cluster_inactivity_timeout.cc"],
-    hdrs = ["od_cds_cluster_inactivity_timeout.h"],
+    name = "od_cds_cluster_idle_timeout_lib",
+    srcs = ["od_cds_cluster_idle_timeout.cc"],
+    hdrs = ["od_cds_cluster_idle_timeout.h"],
     deps = [
         "//envoy/common:time_interface",
         "//envoy/event:dispatcher_interface",
