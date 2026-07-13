@@ -68,6 +68,9 @@ public:
   // Returns whether worker-thread rebalancing should be skipped for accepted connections.
   bool skipRebalancing() const { return skip_rebalancing_; }
 
+  // Returns the upgrade token used during the HTTP/1.1 Upgrade handshake.
+  const std::string& upgradeType() const { return upgrade_type_; }
+
 private:
   ReverseTunnelFilterConfig(
       const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
@@ -90,10 +93,13 @@ private:
   // Required cluster name for validation (empty means no validation).
   const std::string required_cluster_name_;
 
-  // When true, expect `Connection: Upgrade` + `Upgrade: reverse-tunnel` and respond `101`.
+  // When true, expect `Connection: Upgrade` + `Upgrade: <upgrade_type_>` and respond `101`.
   const bool use_http_upgrade_{false};
 
   const bool skip_rebalancing_{false};
+
+  // Upgrade token advertised when `use_http_upgrade_` is true. Defaults to "reverse-tunnel".
+  const std::string upgrade_type_;
 };
 
 using ReverseTunnelFilterConfigSharedPtr = std::shared_ptr<ReverseTunnelFilterConfig>;

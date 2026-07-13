@@ -92,6 +92,8 @@ struct ReverseConnectionSocketConfig {
       additional_headers;       // Additional headers for the handshake request.
   bool use_http_upgrade{false}; // Negotiate handshake as HTTP/1.1 Upgrade -> 101.
   std::shared_ptr<const std::vector<HandshakeHeader>> handshake_headers;
+  std::string upgrade_type{std::string(
+      ReverseConnectionUtility::REVERSE_TUNNEL_UPGRADE_PROTOCOL)}; // Upgrade token sent.
   // TODO(basundhara-c): Add support for multiple remote clusters using the same
   // ReverseConnectionIOHandle. Currently, each ReverseConnectionIOHandle handles
   // reverse connections for a single upstream cluster since a different ReverseConnectionAddress
@@ -369,6 +371,11 @@ public:
   const std::shared_ptr<const std::vector<HandshakeHeader>>& handshakeHeaders() const {
     return config_.handshake_headers;
   }
+
+  /**
+   * @return the upgrade token used during the HTTP/1.1 Upgrade handshake.
+   */
+  const std::string& upgradeType() const { return config_.upgrade_type; }
 
 private:
   /**

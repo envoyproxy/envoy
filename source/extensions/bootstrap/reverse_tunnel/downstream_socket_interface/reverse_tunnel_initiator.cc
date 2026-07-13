@@ -130,6 +130,7 @@ ReverseTunnelInitiator::socket(Envoy::Network::Socket::Type socket_type,
       socket_config.additional_headers = extension_->handshakeAdditionalHeaders();
       socket_config.use_http_upgrade = extension_->handshakeUsesHttpUpgrade();
       socket_config.handshake_headers = extension_->handshakeHeaders();
+      socket_config.upgrade_type = extension_->handshakeUpgradeType();
     }
 
     // Pass config directly to helper method.

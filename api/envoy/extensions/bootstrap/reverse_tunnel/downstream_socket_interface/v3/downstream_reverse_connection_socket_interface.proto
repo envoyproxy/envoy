@@ -26,6 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#next-free-field: 6]
 message DownstreamReverseConnectionSocketInterface {
   // HTTP handshake settings for initiator envoy initiated reverse tunnels.
+  // [#next-free-field: 6]
   message HttpHandshakeConfig {
     // Request path used when issuing the HTTP reverse-connection handshake. Defaults to
     // "/reverse_connections/request".
@@ -34,7 +35,7 @@ message DownstreamReverseConnectionSocketInterface {
     // Additional headers to include in the HTTP handshake request.
     repeated config.core.v3.HeaderValueOption additional_headers = 2;
 
-    // Perform the handshake as an HTTP/1.1 ``Upgrade`` exchange (``Upgrade: reverse-tunnel``,
+    // Perform the handshake as an HTTP/1.1 ``Upgrade`` exchange (``Upgrade: <upgrade_type>``,
     // success on ``101``) so HTTP proxies can route the handshake and splice the tunnel
     // afterward. The responder must set this flag to the same value.
     // Defaults to ``false``.
@@ -45,6 +46,11 @@ message DownstreamReverseConnectionSocketInterface {
     // as substitution format strings; when empty, the values are sent literally.
     // [#extension-category: envoy.formatter]
     repeated config.core.v3.TypedExtensionConfig formatters = 4;
+
+    // Upgrade token sent in the ``Upgrade`` header when ``use_http_upgrade`` is ``true``.
+    // The responder must be configured with the same value.
+    // If empty, defaults to ``reverse-tunnel``.
+    string upgrade_type = 5 [(validate.rules).string = {max_len: 255 ignore_empty: true}];
   }
 
   // Stat prefix to be used for downstream reverse connection socket interface stats.
