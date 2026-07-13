@@ -19,8 +19,7 @@ void recordTimeval(Stats::Histogram& histogram, const timeval& tv) {
 
 class ObserverHandleImpl : public Evwatch::ObserverHandle {
 public:
-  explicit ObserverHandleImpl(Evwatch::ObserverSharedPtr observer)
-      : observer_(std::move(observer)) {}
+  explicit ObserverHandleImpl(Evwatch::ObserverPtr observer) : observer_(std::move(observer)) {}
 
   Evwatch::ObserverWeakPtr observer() const override { return observer_; }
 
@@ -212,9 +211,9 @@ LibeventScheduler::registerEvwatchObserver(Evwatch::ObserverPtr observer) {
     evwatch_prepare_new(libevent_.get(), &onPrepareForObserver, this);
     evwatch_check_new(libevent_.get(), &onCheckForObserver, this);
   }
-  auto shared_obs = Evwatch::ObserverSharedPtr(std::move(observer));
-  evwatch_observers_.push_back(shared_obs);
-  return std::make_unique<ObserverHandleImpl>(std::move(shared_obs));
+  auto handle = std::make_unique<ObserverHandleImpl>(std::move(observer));
+  evwatch_observers_.push_back(handle->observer());
+  return handle;
 }
 
 } // namespace Event
