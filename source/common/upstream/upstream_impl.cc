@@ -1460,20 +1460,15 @@ ClusterInfoImpl::ClusterInfoImpl(
       const std::string stats_prefix =
           correct_prefix ? absl::StrCat("cluster.", name_, ".")
                          : stats_scope_->symbolTable().toString(stats_scope_->prefix());
-      std::optional<UpstreamFactoryContextImpl> new_ctx;
-      if (correct_prefix) {
-        new_ctx.emplace(upstream_context_.serverFactoryContext(), upstream_context_.initManager(),
-                        upstream_context_.serverFactoryContext().serverScope());
-      }
-      Server::Configuration::UpstreamFactoryContext* filter_ctx = &upstream_context_;
-      if (new_ctx.has_value()) {
-        filter_ctx = &new_ctx.value();
-      }
+      UpstreamFactoryContextImpl root_scope_ctx(
+          upstream_context_.serverFactoryContext(), upstream_context_.initManager(),
+          upstream_context_.serverFactoryContext().serverScope());
+      Server::Configuration::UpstreamFactoryContext& filter_ctx =
+          correct_prefix ? root_scope_ctx : upstream_context_;
       Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                               Server::Configuration::UpstreamHttpFilterConfigFactory>
           helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
-                 factory_context.serverFactoryContext().clusterManager(), *filter_ctx,
-                 stats_prefix);
+                 factory_context.serverFactoryContext().clusterManager(), filter_ctx, stats_prefix);
       SET_AND_RETURN_IF_NOT_OK(helper.processFilters(http_protocol_options_->http_filters_,
                                                      "upstream http", "upstream http",
                                                      http_filter_factories_),
