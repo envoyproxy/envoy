@@ -2,12 +2,14 @@
 
 // This file provides host-side implementations for the cluster dynamic module ABI callbacks.
 
+#include <chrono>
 #include <cstring>
 
 #include "source/common/common/assert.h"
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/common/thread.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
@@ -923,6 +925,47 @@ uint64_t envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
   return readHostStat(host->stats(), stat);
 }
 
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value) {
+  if (context_envoy_ptr == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  Envoy::Protobuf::Struct metadata_value;
+  (*metadata_value.mutable_fields())[key_view].set_number_value(value);
+  stream_info->setDynamicMetadata(std::string(ns.ptr, ns.length), metadata_value);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value) {
+  if (context_envoy_ptr == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  absl::string_view value_view(value.ptr, value.length);
+  Envoy::Protobuf::Struct metadata_value;
+  (*metadata_value.mutable_fields())[key_view].set_string_value(value_view);
+  stream_info->setDynamicMetadata(std::string(ns.ptr, ns.length), metadata_value);
+  return true;
+}
+
 envoy_dynamic_module_type_cluster_scheduler_module_ptr
 envoy_dynamic_module_callback_cluster_scheduler_new(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr) {
@@ -980,6 +1023,84 @@ void envoy_dynamic_module_callback_cluster_get_name(
   const auto& name = getCluster(cluster_envoy_ptr)->clusterName();
   result->ptr = name.data();
   result->length = name.size();
+}
+
+// =============================================================================
+// Cluster Worker Timer Callbacks
+// =============================================================================
+
+envoy_dynamic_module_type_cluster_worker_timer_module_ptr
+envoy_dynamic_module_callback_cluster_worker_timer_new(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr) {
+  using Envoy::Extensions::Clusters::DynamicModules::DynamicModuleClusterWorkerTimer;
+  using Envoy::Extensions::Clusters::DynamicModules::DynamicModuleLoadBalancer;
+  auto* lb = getLb(lb_envoy_ptr);
+  if (lb == nullptr) {
+    return nullptr;
+  }
+  Envoy::Event::Dispatcher* dispatcher = lb->workerDispatcher();
+  if (dispatcher == nullptr) {
+    // No choose_host has captured a worker dispatcher on this worker yet.
+    return nullptr;
+  }
+  // Allocate the timer wrapper first so we can capture a stable heap pointer in the callback.
+  auto* timer_wrapper = new DynamicModuleClusterWorkerTimer();
+  // Timer create, fire, and delete all run on this worker thread. The empty lambda validates that
+  // the load balancer is still registered (defends against a module that leaks the timer past
+  // on_cluster_lb_destroy) while holding the registry lock only for that check; the module hook
+  // runs outside the lock. A load balancer observed live here cannot be freed during the call,
+  // since its destruction would run on this same worker thread.
+  timer_wrapper->setTimer(dispatcher->createTimer([lb, timer_wrapper]() {
+    if (!DynamicModuleLoadBalancer::withActiveInstance(lb,
+                                                       [](const DynamicModuleLoadBalancer&) {})) {
+      return;
+    }
+    const auto& config = lb->config();
+    if (config->on_cluster_worker_timer_fired_ != nullptr) {
+      config->on_cluster_worker_timer_fired_(lb, lb->inModuleLb(),
+                                             static_cast<void*>(timer_wrapper));
+    }
+  }));
+  return static_cast<void*>(timer_wrapper);
+}
+
+void envoy_dynamic_module_callback_cluster_worker_timer_enable(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr timer_ptr,
+    uint64_t delay_milliseconds) {
+  auto* timer =
+      static_cast<Envoy::Extensions::Clusters::DynamicModules::DynamicModuleClusterWorkerTimer*>(
+          timer_ptr);
+  timer->timer().enableTimer(std::chrono::milliseconds(delay_milliseconds));
+}
+
+void envoy_dynamic_module_callback_cluster_worker_timer_disable(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr timer_ptr) {
+  auto* timer =
+      static_cast<Envoy::Extensions::Clusters::DynamicModules::DynamicModuleClusterWorkerTimer*>(
+          timer_ptr);
+  timer->timer().disableTimer();
+}
+
+bool envoy_dynamic_module_callback_cluster_worker_timer_enabled(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr timer_ptr) {
+  auto* timer =
+      static_cast<Envoy::Extensions::Clusters::DynamicModules::DynamicModuleClusterWorkerTimer*>(
+          timer_ptr);
+  return timer->timer().enabled();
+}
+
+void envoy_dynamic_module_callback_cluster_worker_timer_delete(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr timer_ptr) {
+  // The underlying `Event::Timer` is removed from the worker dispatcher's timer list in its
+  // destructor, which is only safe on that worker thread. Guard explicitly since the
+  // ASSERT-based thread check is compiled out under NDEBUG.
+  if (Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_worker_timer_delete must be called "
+                 "on a worker thread");
+    return;
+  }
+  delete static_cast<Envoy::Extensions::Clusters::DynamicModules::DynamicModuleClusterWorkerTimer*>(
+      timer_ptr);
 }
 
 // =============================================================================

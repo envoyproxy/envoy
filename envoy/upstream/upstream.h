@@ -220,17 +220,19 @@ public:
   /**
    * Create a dedicated connection for ORCA out-of-band load reporting per gRFC A51
    * (xds.service.orca.v3.OpenRcaService), separate from request and health-check pools.
-   * Dials the address returned by orcaReportingAddress().
    * @param dispatcher supplies the owning dispatcher.
    * @param transport_socket_options supplies the transport options that will be set on the new
    * connection.
-   * @param metadata when non-null drives transport socket factory resolution.
+   * @param factory the transport socket factory for the connection, resolved by the caller.
+   * @param orca_address the resolved address to dial; the caller applies any port override.
+   * Implementations should use the host's address list only when this equals the host address.
    * @return the connection data.
    */
   virtual CreateConnectionData createOrcaReportingConnection(
       Event::Dispatcher& dispatcher,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-      const envoy::config::core::v3::Metadata* metadata) const PURE;
+      Network::UpstreamTransportSocketFactory& factory,
+      Network::Address::InstanceConstSharedPtr orca_address) const PURE;
 
   /**
    * @return host specific gauges.
@@ -1360,6 +1362,7 @@ protected:
 
 using ClusterInfoConstSharedPtr = std::shared_ptr<const ClusterInfo>;
 
+class AdminEndpointProvider;
 class HealthChecker;
 
 /**
@@ -1435,6 +1438,12 @@ public:
    * Set up the drop_category value for the thread local cluster.
    */
   virtual void setDropCategory(absl::string_view drop_category) PURE;
+
+  /**
+   * @return the cluster's admin endpoint provider, used to render synthetic, display-only entries
+   *         on the admin /clusters page, or nullptr if the cluster has none. Defaults to nullptr.
+   */
+  virtual const AdminEndpointProvider* adminEndpointProvider() const { return nullptr; }
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;
@@ -1458,3 +1467,22 @@ template <> struct formatter<Envoy::Upstream::Host> : formatter<absl::string_vie
 };
 
 } // namespace fmt
+
+namespace std {
+
+// fmt formatter class for Host
+template <> struct formatter<Envoy::Upstream::Host, char> {
+  template <class ParseContext> constexpr ParseContext::iterator parse(ParseContext& ctx) {
+    return ctx.begin();
+  }
+
+  template <typename FormatContext>
+  auto format(const Envoy::Upstream::Host& host, FormatContext& ctx) const -> decltype(ctx.out()) {
+    absl::string_view out = !host.hostname().empty() ? host.hostname()
+                            : host.address()         ? host.address()->asStringView()
+                                                     : "<empty>";
+    return std::formatter<absl::string_view>().format(out, ctx);
+  }
+};
+
+} // namespace std

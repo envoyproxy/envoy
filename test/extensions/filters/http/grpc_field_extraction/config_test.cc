@@ -47,7 +47,7 @@ TEST_F(GrpcFieldExtractionFilterFactoryTest, CreateFilterFactoryFromProtoWithSer
   FilterFactoryCreator factory;
 
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(config_, "stats", context);
+      factory.createHttpFilterFactoryFromProto(config_, "stats", context).value();
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);

@@ -1,0 +1,12 @@
+syntax = "proto2";
+
+package test;
+
+message SubMessage {
+  optional string stringval = 1;
+}
+
+message TestMessage {
+  optional string name = 1;
+  optional SubMessage sub = 2;
+}

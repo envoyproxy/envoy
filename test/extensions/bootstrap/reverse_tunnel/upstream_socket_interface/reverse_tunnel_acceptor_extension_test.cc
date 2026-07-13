@@ -824,6 +824,74 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ExtensionTenantIsolationPropagatedToS
   EXPECT_TRUE(socket_manager->tenantIsolationEnabled());
 }
 
+// reachableTunnels() reconstructs the (tenant, cluster, node, count) tuples from the composite
+// gauges, aggregated across workers.
+TEST_F(ReverseTunnelAcceptorExtensionTest, ReachableTunnels) {
+  setupThreadLocalSlot();
+
+  extension_->updateConnectionStats("node1", "cluster1", true, false);
+  extension_->updateConnectionStats("node1", "cluster1", true, false);
+  extension_->updateConnectionStats("node2", "cluster2", true, false);
+
+  auto tunnels = extension_->reachableTunnels();
+  ASSERT_EQ(2, tunnels.size());
+
+  absl::flat_hash_map<std::string, ReverseTunnelAcceptorExtension::ReachableTunnel> by_node;
+  for (const auto& tunnel : tunnels) {
+    by_node[tunnel.node_id] = tunnel;
+  }
+
+  ASSERT_TRUE(by_node.contains("node1"));
+  EXPECT_EQ("cluster1", by_node["node1"].cluster_id);
+  EXPECT_EQ(2, by_node["node1"].connection_count);
+
+  ASSERT_TRUE(by_node.contains("node2"));
+  EXPECT_EQ("cluster2", by_node["node2"].cluster_id);
+  EXPECT_EQ(1, by_node["node2"].connection_count);
+}
+
+// A tunnel whose connection count drops to zero is no longer reported.
+TEST_F(ReverseTunnelAcceptorExtensionTest, ReachableTunnelsRemovedAtZero) {
+  setupThreadLocalSlot();
+
+  extension_->updateConnectionStats("node1", "cluster1", true, false);
+  EXPECT_EQ(1, extension_->reachableTunnels().size());
+
+  extension_->updateConnectionStats("node1", "cluster1", false, false);
+  EXPECT_TRUE(extension_->reachableTunnels().empty());
+}
+
+// With tenant isolation, the reported node id is the tenant-scoped identifier (the host key).
+TEST_F(ReverseTunnelAcceptorExtensionTest, ReachableTunnelsTenantScoped) {
+  setupThreadLocalSlot();
+
+  const std::string node_id =
+      ReverseConnection::ReverseConnectionUtility::buildTenantScopedIdentifier("tenant-a", "node1");
+  const std::string cluster_id =
+      ReverseConnection::ReverseConnectionUtility::buildTenantScopedIdentifier("tenant-a",
+                                                                               "cluster1");
+  extension_->updateConnectionStats(node_id, cluster_id, true, true);
+
+  auto tunnels = extension_->reachableTunnels();
+  ASSERT_EQ(1, tunnels.size());
+  EXPECT_EQ("tenant-a:node1", tunnels[0].node_id);
+  EXPECT_EQ("tenant-a:cluster1", tunnels[0].cluster_id);
+  EXPECT_EQ(1, tunnels[0].connection_count);
+}
+
+// reachableTunnels() returns nothing when detailed stats are disabled (no composite gauges exist).
+TEST_F(ReverseTunnelAcceptorExtensionTest, ReachableTunnelsEmptyWithoutDetailedStats) {
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface no_stats_config;
+  no_stats_config.set_stat_prefix("reverse_connections");
+  no_stats_config.set_enable_detailed_stats(false);
+  auto no_stats_extension = std::make_unique<ReverseTunnelAcceptorExtension>(
+      *socket_interface_, context_, no_stats_config);
+
+  no_stats_extension->updateConnectionStats("node1", "cluster1", true, false);
+  EXPECT_TRUE(no_stats_extension->reachableTunnels().empty());
+}
+
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions

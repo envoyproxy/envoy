@@ -273,6 +273,43 @@ TEST_F(ReverseConnectionUtilityTest, BuildTenantScopedIdentifierWithoutTenant) {
   EXPECT_EQ(composite, "node-1");
 }
 
+TEST_F(ReverseConnectionUtilityTest, ClusterScopedIdentifierRoundTripWithTenant) {
+  const std::string node_id = ReverseConnectionUtility::buildTenantScopedIdentifier("t", "node-1");
+  const std::string cluster_id =
+      ReverseConnectionUtility::buildTenantScopedIdentifier("t", "cluster-1");
+
+  const std::string composite =
+      ReverseConnectionUtility::buildClusterScopedIdentifier(node_id, cluster_id);
+  EXPECT_EQ(composite, "t:cluster-1:node-1");
+
+  const auto [recovered_node, recovered_cluster] =
+      ReverseConnectionUtility::splitClusterScopedIdentifier(composite);
+  EXPECT_EQ(recovered_node, node_id);
+  EXPECT_EQ(recovered_cluster, cluster_id);
+}
+
+TEST_F(ReverseConnectionUtilityTest, ClusterScopedIdentifierRoundTripWithoutTenant) {
+  const std::string composite =
+      ReverseConnectionUtility::buildClusterScopedIdentifier("node-1", "cluster-1");
+  EXPECT_EQ(composite, "cluster-1:node-1");
+
+  const auto [recovered_node, recovered_cluster] =
+      ReverseConnectionUtility::splitClusterScopedIdentifier(composite);
+  EXPECT_EQ(recovered_node, "node-1");
+  EXPECT_EQ(recovered_cluster, "cluster-1");
+}
+
+TEST_F(ReverseConnectionUtilityTest, ClusterScopedIdentifierEmptyCluster) {
+  const std::string composite =
+      ReverseConnectionUtility::buildClusterScopedIdentifier("node-1", "");
+  EXPECT_EQ(composite, "node-1");
+
+  const auto [recovered_node, recovered_cluster] =
+      ReverseConnectionUtility::splitClusterScopedIdentifier(composite);
+  EXPECT_EQ(recovered_node, "node-1");
+  EXPECT_EQ(recovered_cluster, "");
+}
+
 TEST_F(ReverseConnectionUtilityTest, ApplySslQuietCloseWithoutSsl) {
   NiceMock<Network::MockConnection> connection;
   EXPECT_CALL(connection, ssl()).WillOnce(Return(nullptr));

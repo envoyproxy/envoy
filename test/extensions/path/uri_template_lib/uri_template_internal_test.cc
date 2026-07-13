@@ -30,10 +30,6 @@ namespace {
 using ::Envoy::StatusHelpers::StatusIs;
 
 TEST(InternalParsing, ParsedPathDebugString) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.uri_template_match_on_asterisk", "true"}});
-
   ParsedPathPattern patt1 = {
       {
           "abc",
@@ -125,6 +121,21 @@ TEST(InternalParsing, ParseLiteralWorks) {
   EXPECT_EQ(result->unparsed_pattern_, "/123");
 }
 
+TEST(InternalParsing, ParseLiteralFullPattern) {
+  absl::StatusOr<ParsedResult<Literal>> result = parseLiteral("abc");
+  ASSERT_OK(result);
+  EXPECT_EQ(result->parsed_value_, "abc");
+  EXPECT_TRUE(result->unparsed_pattern_.empty());
+}
+
+TEST(InternalParsing, ParseLiteralEmptyFails) {
+  EXPECT_THAT(parseLiteral(""), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST(InternalParsing, ParseLiteralStartingWithSlashFails) {
+  EXPECT_THAT(parseLiteral("/abc"), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
 TEST(InternalParsing, ParseTextGlob) {
   std::string pattern = "***abc/123";
 
@@ -211,22 +222,65 @@ TEST_P(ParsePathPatternSyntaxSuccess, ParsePathPatternSyntaxSuccessTest) {
 
 class ParsePathPatternSyntaxFailure : public testing::TestWithParam<std::string> {};
 
-INSTANTIATE_TEST_SUITE_P(
-    ParsePathPatternSyntaxFailureTestSuite, ParsePathPatternSyntaxFailure,
-    testing::Values("/api/v{versionNum=*}/1234", "/api/{version=*beta}/1234",
-                    "/media/eff456/ll-sd-out.{ext}", "/media/eff456/ll-sd-out.{ext=*}",
-                    "/media/{country=**}/{lang=*}/**", "/media/**/*/**", "/media/{id=/*}/*",
-                    "/media/{contentId=/**}", "/api/{version}/{version}",
-                    "/api/{version.major}/{version.minor}", "/media/*{*}*", "/media/{*}/",
-                    "/media/*/index?a=2", "media", "/\001\002\003\004\005\006\007", "/*(/**",
-                    "/**/{var}", "/{var1}/{var2}/{var3}/{var4}/{var5}/{var6}", "/{=*}",
-                    "/{var12345678901234=*}"));
+// Patterns that should always fail regardless of mixed variable support
+INSTANTIATE_TEST_SUITE_P(ParsePathPatternSyntaxFailureTestSuite, ParsePathPatternSyntaxFailure,
+                         testing::Values("/api/{version=*beta}/1234",
+                                         "/media/{country=**}/{lang=*}/**", "/media/**/*/**",
+                                         "/media/{id=/*}/*", "/media/{contentId=/**}",
+                                         "/api/{version}/{version}",
+                                         "/api/{version.major}/{version.minor}", "/media/*{*}*",
+                                         "/media/{*}/", "/media/*/index?a=2", "media",
+                                         "/\001\002\003\004\005\006\007", "/*(/**", "/**/{var}",
+                                         "/{var1}/{var2}/{var3}/{var4}/{var5}/{var6}", "/{=*}",
+                                         "/{var12345678901234=*}"));
 
 TEST_P(ParsePathPatternSyntaxFailure, ParsePathPatternSyntaxFailureTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
   EXPECT_THAT(parsePathPatternSyntax(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+class ParsePathPatternSyntaxFailureWithMixedVariablesDisabled
+    : public testing::TestWithParam<std::string> {};
+
+// Patterns that should fail only when mixed variable support is disabled
+INSTANTIATE_TEST_SUITE_P(ParsePathPatternSyntaxFailureWithMixedVariablesDisabledTestSuite,
+                         ParsePathPatternSyntaxFailureWithMixedVariablesDisabled,
+                         testing::Values("/api/v{versionNum=*}/1234",
+                                         "/media/eff456/ll-sd-out.{ext}",
+                                         "/media/eff456/ll-sd-out.{ext=*}"));
+
+TEST_P(ParsePathPatternSyntaxFailureWithMixedVariablesDisabled,
+       ParsePathPatternSyntaxFailureWithMixedVariablesDisabledTest) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.uri_template_mixed_variable_literals", "false"}});
+
+  std::string pattern = GetParam();
+  SCOPED_TRACE(pattern);
+
+  EXPECT_THAT(parsePathPatternSyntax(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+class ParsePathPatternSyntaxSuccessWithMixedVariablesEnabled
+    : public testing::TestWithParam<std::string> {};
+
+// Patterns that should succeed when mixed variable support is enabled
+INSTANTIATE_TEST_SUITE_P(ParsePathPatternSyntaxSuccessWithMixedVariablesEnabledTestSuite,
+                         ParsePathPatternSyntaxSuccessWithMixedVariablesEnabled,
+                         testing::Values("/api/v{versionNum=*}/1234",
+                                         "/media/eff456/ll-sd-out.{ext}",
+                                         "/media/eff456/ll-sd-out.{ext=*}"));
+
+TEST_P(ParsePathPatternSyntaxSuccessWithMixedVariablesEnabled,
+       ParsePathPatternSyntaxSuccessWithMixedVariablesEnabledTest) {
+  std::string pattern = GetParam();
+  SCOPED_TRACE(pattern);
+
+  absl::StatusOr<ParsedPathPattern> parsed_patt = parsePathPatternSyntax(pattern);
+  ASSERT_OK(parsed_patt);
+  EXPECT_EQ(parsed_patt->debugString(), pattern);
 }
 
 TEST(InternalRegexGen, LiteralEscapes) {
@@ -283,7 +337,7 @@ TEST(InternalRegexGen, RegexLikePatternIsMatchedLiterally) {
   EXPECT_FALSE(RE2::FullMatch("aa", toRegexPattern("a+")));
 }
 
-TEST(InternalRegexGen, DollarSignMatchesIfself) {
+TEST(InternalRegexGen, DollarSignMatchesItself) {
   EXPECT_TRUE(RE2::FullMatch("abc$", toRegexPattern("abc$")));
   EXPECT_FALSE(RE2::FullMatch("abc", toRegexPattern("abc$")));
 }
@@ -341,6 +395,7 @@ TEST(InternalRegexGen, VariableRegexDefaultNotMatch) {
   ASSERT_OK(var);
 
   EXPECT_FALSE(RE2::FullMatch("abc/def", toRegexPattern(var->parsed_value_)));
+  EXPECT_FALSE(RE2::FullMatch("", toRegexPattern(var->parsed_value_)));
 }
 
 TEST(InternalRegexGen, VariableRegexSegmentsMatch) {
@@ -448,7 +503,11 @@ INSTANTIATE_TEST_SUITE_P(
         GenPatternTestCase("/api/v1/foo/bar/baz/", "/api/{version=*}/{url=**}",
                            {{"version", "v1"}, {"url", "foo/bar/baz/"}}),
         GenPatternTestCase("/api/v1/v2/v3", "/api/{VERSION}/{version}/{verSION}",
-                           {{"VERSION", "v1"}, {"version", "v2"}, {"verSION", "v3"}})));
+                           {{"VERSION", "v1"}, {"version", "v2"}, {"verSION", "v3"}}),
+        GenPatternTestCase("/api/v1/users/123.json", "/api/v{version}/users/{id}.json",
+                           {{"version", "1"}, {"id", "123"}}),
+        GenPatternTestCase("/media/eff456/ll-sd-out.m3u8", "/media/{contentId}/ll-sd-out.{ext}",
+                           {{"contentId", "eff456"}, {"ext", "m3u8"}})));
 
 TEST_P(GenPatternRegexWithMatch, WithCapture) {
   absl::StatusOr<ParsedPathPattern> pattern = parsePathPatternSyntax(pathPattern());
@@ -497,6 +556,124 @@ TEST_P(GenPatternRegexWithoutMatch, WithCapture) {
 
   EXPECT_FALSE(regex.Match(requestPath(), /*startpos=*/0,
                            /*endpos=*/requestPath().size(), RE2::ANCHOR_BOTH, nullptr, 0));
+}
+
+// Tests for mixed variable/literal functionality
+class ParseMixedVariableLiteralSuccess
+    : public testing::TestWithParam<
+          std::tuple<std::string, std::string, std::string, std::string>> {};
+
+INSTANTIATE_TEST_SUITE_P(
+    ParseMixedVariableLiteralSuccessTestSuite, ParseMixedVariableLiteralSuccess,
+    testing::Values(std::make_tuple("v{id}", "v", "id", ""),
+                    std::make_tuple("api{version}.json", "api", "version", ".json"),
+                    std::make_tuple("MyFunction('{param}')", "MyFunction('", "param", "')"),
+                    std::make_tuple("{var}suffix", "", "var", "suffix"),
+                    std::make_tuple("prefix{var}", "prefix", "var", ""),
+                    std::make_tuple("v{id=*}", "v", "id", ""),
+                    std::make_tuple("api{version=*}.json", "api", "version", ".json")));
+
+TEST_P(ParseMixedVariableLiteralSuccess, ParseMixedVariableLiteralSuccessTest) {
+  std::string pattern = std::get<0>(GetParam());
+  std::string expected_prefix = std::get<1>(GetParam());
+  std::string expected_var_name = std::get<2>(GetParam());
+  std::string expected_suffix = std::get<3>(GetParam());
+
+  SCOPED_TRACE(pattern);
+
+  absl::StatusOr<ParsedResult<Variable>> result = parseMixedVariableLiteral(pattern);
+
+  ASSERT_OK(result);
+  EXPECT_EQ(result->parsed_value_.prefix_, expected_prefix);
+  EXPECT_EQ(result->parsed_value_.name_, expected_var_name);
+  EXPECT_EQ(result->parsed_value_.suffix_, expected_suffix);
+  EXPECT_TRUE(result->unparsed_pattern_.empty());
+}
+
+class ParseMixedVariableLiteralFailure : public testing::TestWithParam<std::string> {};
+
+INSTANTIATE_TEST_SUITE_P(ParseMixedVariableLiteralFailureTestSuite,
+                         ParseMixedVariableLiteralFailure,
+                         testing::Values("no_variable_here", "prefix{", "}suffix",
+                                         "prefix{invalid_var_name-123}suffix",
+                                         "prefix{1invalid}suffix", "prefix{var=invalid?}suffix"));
+
+TEST_P(ParseMixedVariableLiteralFailure, ParseMixedVariableLiteralFailureTest) {
+  std::string pattern = GetParam();
+  SCOPED_TRACE(pattern);
+
+  EXPECT_THAT(parseMixedVariableLiteral(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST(InternalMixedVariableLiteralParsing, MixedVariableDebugString) {
+  Variable var = Variable("version", {}, "api", ".json");
+  EXPECT_EQ(var.debugString(), "api{version}.json");
+
+  Variable var_with_match = Variable("id", {Operator::PathGlob}, "v", "");
+  EXPECT_EQ(var_with_match.debugString(), "v{id=*}");
+}
+
+TEST(InternalMixedVariableLiteralParsing, MixedVariableRegexPattern) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.uri_template_match_on_asterisk", "true"}});
+
+  Variable var = Variable("version", {}, "api", ".json");
+  std::string regex = toRegexPattern(var);
+  EXPECT_EQ(regex, "api(?P<version>[a-zA-Z0-9-._~%!$&'()+,;:@=*]+)\\.json");
+
+  // Test that the regex matches correctly
+  std::string capture;
+  EXPECT_TRUE(RE2::FullMatch("apiv1.json", regex, &capture));
+  EXPECT_EQ(capture, "v1");
+
+  EXPECT_TRUE(RE2::FullMatch("api2.0.json", regex, &capture));
+  EXPECT_EQ(capture, "2.0");
+}
+
+TEST(InternalMixedVariableLiteralParsing, PathPatternWithMixedVariables) {
+  absl::StatusOr<ParsedPathPattern> pattern =
+      parsePathPatternSyntax("/api/v{version}/users/{id}.json");
+  ASSERT_OK(pattern);
+
+  // Check the debug string representation
+  EXPECT_EQ(pattern->debugString(), "/api/v{version}/users/{id}.json");
+
+  // Check that it captures the right variables
+  EXPECT_EQ(pattern->captured_variables_.size(), 2);
+  EXPECT_TRUE(pattern->captured_variables_.contains("version"));
+  EXPECT_TRUE(pattern->captured_variables_.contains("id"));
+
+  // Test regex generation and matching
+  std::string regex = toRegexPattern(pattern.value());
+  std::string version_capture, id_capture;
+  EXPECT_TRUE(RE2::FullMatch("/api/v1/users/123.json", regex, &version_capture, &id_capture));
+  EXPECT_EQ(version_capture, "1");
+  EXPECT_EQ(id_capture, "123");
+}
+
+TEST(InternalMixedVariableLiteralParsing, PathPatternWithMixedVariablesDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.uri_template_match_on_asterisk", "true"},
+       {"envoy.reloadable_features.uri_template_mixed_variable_literals", "false"}});
+
+  // When the feature flag is disabled, mixed variables should not be supported and parsing should
+  // fail
+  absl::StatusOr<ParsedPathPattern> pattern = parsePathPatternSyntax("/api/v{version}/users");
+  EXPECT_THAT(pattern, StatusIs(absl::StatusCode::kInvalidArgument));
+}
+TEST(InternalMixedVariableLiteralParsing, VarWithSuffixInNonTerminalSegment) {
+  absl::StatusOr<ParsedPathPattern> pattern = parsePathPatternSyntax("/{id}.json/v1");
+  ASSERT_OK(pattern);
+  EXPECT_EQ(pattern->debugString(), "/{id}.json/v1");
+
+  std::string regex_str = toRegexPattern(pattern.value());
+  std::string id_capture;
+  EXPECT_TRUE(RE2::FullMatch("/123.json/v1", regex_str, &id_capture));
+  EXPECT_EQ(id_capture, "123");
+  EXPECT_FALSE(RE2::FullMatch("/123.json/v2", regex_str, nullptr));
+  EXPECT_FALSE(RE2::FullMatch("/123/v1", regex_str, nullptr));
 }
 
 } // namespace
