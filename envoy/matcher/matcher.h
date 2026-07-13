@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <format>
 #include <memory>
 #include <optional>
 #include <string>
@@ -262,7 +263,7 @@ public:
   /**
    * A set of data input types supported by InputMatcher.
    * String is default supported data input type because almost all the derived objects support
-   * string only. The name of core types (e.g., std::string, int) is defined string constrant which
+   * string only. The name of core types (e.g., std::string, int) is defined string constant which
    * produces human-readable form (e.g., "string", "int").
    *
    * Override this function to provide matcher specific supported data input types.
@@ -416,7 +417,7 @@ public:
   /**
    * Input type of DataInput.
    * String is default data input type since nearly all the DataInput's derived objects' input type
-   * is string. The name of core types (e.g., std::string, int) is defined string constrant which
+   * is string. The name of core types (e.g., std::string, int) is defined string constant which
    * produces human-readable form (e.g., "string", "int").
    *
    * Override this function to provide matcher specific data input type.
@@ -505,3 +506,20 @@ namespace fmt {
 // Allow fmtlib to use operator << defined in DataInputGetResult
 template <> struct formatter<::Envoy::Matcher::DataInputGetResult> : ostream_formatter {};
 } // namespace fmt
+
+namespace std {
+template <> struct formatter<::Envoy::Matcher::DataInputGetResult, char> {
+  template <class ParseContext> constexpr ParseContext::iterator parse(ParseContext& ctx) {
+    return ctx.begin();
+  }
+
+  template <class FmtContext>
+  FmtContext::iterator format(const ::Envoy::Matcher::DataInputGetResult& s,
+                              FmtContext& ctx) const {
+    std::ostringstream out;
+    out << s;
+    return std::ranges::copy(std::move(out).str(), ctx.out()).out;
+  }
+};
+
+} // namespace std

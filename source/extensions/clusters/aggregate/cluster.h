@@ -79,7 +79,7 @@ public:
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view cluster_name,
                             Upstream::ThreadLocalClusterCommand& get_cluster) override;
-  void onClusterRemoval(const std::string& cluster_name) override;
+  void onClusterRemoval(absl::string_view cluster_name) override;
 
   // Upstream::LoadBalancer
   Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
@@ -128,8 +128,8 @@ private:
   using LoadBalancerImplPtr = std::unique_ptr<LoadBalancerImpl>;
 
   void addMemberUpdateCallbackForCluster(Upstream::ThreadLocalCluster& thread_local_cluster);
-  PriorityContextPtr linearizePrioritySet(OptRef<const std::string> excluded_cluster);
-  void refresh(OptRef<const std::string> excluded_cluster = OptRef<const std::string>());
+  PriorityContextPtr linearizePrioritySet(std::optional<absl::string_view> excluded_cluster);
+  void refresh(std::optional<absl::string_view> excluded_cluster = std::nullopt);
 
   LoadBalancerImplPtr load_balancer_;
   Upstream::ClusterInfoConstSharedPtr parent_info_;

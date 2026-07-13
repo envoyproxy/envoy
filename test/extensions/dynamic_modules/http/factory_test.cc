@@ -261,8 +261,9 @@ filter_config:
       .WillByDefault(testing::Return(1));
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
-  auto factory_cb = factory.createFilterFactoryFromProtoWithServerContext(
-      proto_config, "", context.server_factory_context_);
+  auto factory_cb =
+      factory.createHttpFilterFactoryFromProto(proto_config, "", context.server_factory_context_)
+          .value();
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
 
   NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};

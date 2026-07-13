@@ -137,6 +137,87 @@ TEST_F(AllocatorTest, RefCountDecAllocRaceSynchronized) {
   EXPECT_FALSE(alloc_.isMutexLockedForTest());
 }
 
+// Hammers non-final ref-count releases, which drop their reference without
+// taking the allocator's lock: half the threads copy and drop a reference
+// that the main thread holds throughout (so all of their releases are
+// non-final), while the other half re-acquire the same name'd counter through
+// the allocator, which takes the lock. Verifies the ref-count, the stat's
+// value, and that the final release still destroys the stat. The case where
+// the final release itself races the fast-path releases across threads is
+// covered by RefCountCrossThreadFinalRelease below.
+TEST_F(AllocatorTest, RefCountNonFinalReleaseChurn) {
+  StatName counter_name = makeStat("counter.name");
+  Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
+
+  CounterSharedPtr counter = alloc_.makeCounter(counter_name, StatName(), {});
+
+  const uint32_t num_threads = 12;
+  const uint32_t iters = 10000;
+  std::vector<Thread::ThreadPtr> threads;
+  absl::Notification go;
+  for (uint32_t i = 0; i < num_threads; ++i) {
+    threads.push_back(thread_factory.createThread([&, i]() {
+      go.WaitForNotification();
+      for (uint32_t iter = 0; iter < iters; ++iter) {
+        if (i % 2 == 0) {
+          CounterSharedPtr copy(counter);
+          copy->inc();
+        } else {
+          alloc_.makeCounter(counter_name, StatName(), {})->inc();
+        }
+      }
+    }));
+  }
+  go.Notify();
+  for (uint32_t i = 0; i < num_threads; ++i) {
+    threads[i]->join();
+  }
+
+  EXPECT_EQ(1, counter->use_count());
+  EXPECT_EQ(num_threads * iters, counter->value());
+
+  // Dropping the last reference destroys the stat; allocating the same name
+  // again must yield a fresh counter.
+  counter.reset();
+  CounterSharedPtr fresh = alloc_.makeCounter(counter_name, StatName(), {});
+  EXPECT_EQ(1, fresh->use_count());
+  EXPECT_EQ(0, fresh->value());
+}
+
+// The final release races the fast-path releases across worker threads: the
+// main thread drops its reference before releasing the workers, so whichever
+// worker drops last performs the locked final release and destroys the stat
+// while the other workers are releasing through the lock-free fast path.
+// Under TSAN this validates that every worker's accesses to the stat
+// happen-before its destruction.
+TEST_F(AllocatorTest, RefCountCrossThreadFinalRelease) {
+  StatName counter_name = makeStat("counter.name");
+  Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
+
+  const uint32_t num_threads = 12;
+  const uint32_t iters = 200;
+  for (uint32_t iter = 0; iter < iters; ++iter) {
+    CounterSharedPtr counter = alloc_.makeCounter(counter_name, StatName(), {});
+    absl::Notification go;
+    std::vector<Thread::ThreadPtr> threads;
+    for (uint32_t i = 0; i < num_threads; ++i) {
+      threads.push_back(thread_factory.createThread([copy = counter, &go]() mutable {
+        go.WaitForNotification();
+        copy->inc();
+        copy.reset(); // One of these releases is the final one.
+      }));
+    }
+    counter.reset(); // The main thread no longer holds a reference.
+    go.Notify();
+    for (uint32_t i = 0; i < num_threads; ++i) {
+      threads[i]->join();
+    }
+    // The stat was destroyed by whichever worker released last; the same name
+    // must now yield a fresh counter.
+    EXPECT_EQ(0, alloc_.makeCounter(counter_name, StatName(), {})->value());
+  }
+}
+
 TEST_F(AllocatorTest, HiddenGauge) {
   GaugeSharedPtr uninitialized_gauge =
       alloc_.makeGauge(makeStat("uninitialized"), StatName(), {}, Gauge::ImportMode::Uninitialized);

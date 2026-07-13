@@ -279,6 +279,7 @@ envoy_cc_test(
     srcs =
         ["xds_failover_integration_test.cc"],
     rbe_pool = "6gig",
+    shard_count = 2,
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",

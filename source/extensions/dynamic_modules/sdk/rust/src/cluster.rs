@@ -324,6 +324,20 @@ pub trait ClusterLbContext {
     stat: abi::envoy_dynamic_module_type_host_stat,
   ) -> u64;
 
+  /// Sets a number value on the request's dynamic metadata under `namespace` and `key`,
+  /// overwriting any existing value. The value is observable in the access log via
+  /// `%DYNAMIC_METADATA(namespace:key)%`.
+  ///
+  /// Returns `true` if the value was set, `false` if the request has no stream info.
+  fn set_dynamic_metadata_number(&self, namespace: &str, key: &str, value: f64) -> bool;
+
+  /// Sets a string value on the request's dynamic metadata under `namespace` and `key`,
+  /// overwriting any existing value. The value is observable in the access log via
+  /// `%DYNAMIC_METADATA(namespace:key)%`.
+  ///
+  /// Returns `true` if the value was set, `false` if the request has no stream info.
+  fn set_dynamic_metadata_string(&self, namespace: &str, key: &str, value: &str) -> bool;
+
   /// Creates a per-worker timer on this request's worker dispatcher.
   ///
   /// The worker dispatcher is captured on this load balancer for the duration of host selection,
@@ -2290,6 +2304,28 @@ impl ClusterLbContext for ClusterLbContextRef<'_> {
         self.raw_context,
         host,
         stat,
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_number(&self, namespace: &str, key: &str, value: f64) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
+        self.raw_context,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_string(&self, namespace: &str, key: &str, value: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
+        self.raw_context,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
       )
     }
   }

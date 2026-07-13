@@ -304,6 +304,11 @@ std::string UpstreamSocketManager::getNodeWithSocket(const std::string& key) {
   return key;
 }
 
+std::string UpstreamSocketManager::getClusterForNode(absl::string_view node_id) const {
+  const auto it = node_to_cluster_map_.find(node_id);
+  return it != node_to_cluster_map_.end() ? it->second : std::string();
+}
+
 const ReverseTunnelLifecycleInfo* UpstreamSocketManager::getLifecycleInfo(int fd) const {
   auto it = fd_to_lifecycle_info_.find(fd);
   return it != fd_to_lifecycle_info_.end() ? &it->second : nullptr;

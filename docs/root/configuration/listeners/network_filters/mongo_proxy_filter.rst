@@ -6,6 +6,7 @@ Mongo proxy
 * MongoDB :ref:`architecture overview <arch_overview_mongo>`
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.mongo_proxy.v3.MongoProxy``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.mongo_proxy.v3.MongoProxy>`
+* The maximum BSON decoding depth can be configured via the :ref:`max_bson_depth <envoy_v3_api_field_extensions.filters.network.mongo_proxy.v3.MongoProxy.max_bson_depth>` field.
 
 .. _config_network_filters_mongo_proxy_fault_injection:
 
