@@ -1253,7 +1253,7 @@ ClusterInfoImpl::ClusterInfoImpl(
               server_context)),
       network_filter_config_provider_manager_(
           createSingletonUpstreamNetworkFilterConfigProviderManager(server_context)),
-      upstream_context_(server_context, init_manager, server_context.serverScope()),
+      upstream_context_(server_context, init_manager, *stats_scope_),
       happy_eyeballs_config_(
           config.upstream_connection_options().has_happy_eyeballs_config()
               ? std::make_unique<
@@ -1451,14 +1451,13 @@ ClusterInfoImpl::ClusterInfoImpl(
         return;
       }
 
-      // upstream_context_ uses the server root scope (empty prefix), so pass "cluster.<name>."
-      // explicitly as stats_prefix to scope upstream HTTP filter stats under "cluster.<name>.*".
-      const std::string stats_prefix = absl::StrCat("cluster.", name_, ".");
+      // upstream_context_ uses stats_scope_ which already carries "cluster.<name>." as prefix,
+      // so pass EMPTY_STRING as stats_prefix; HTTP filter stats land under "cluster.<name>.*".
       Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                               Server::Configuration::UpstreamHttpFilterConfigFactory>
           helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
                  factory_context.serverFactoryContext().clusterManager(), upstream_context_,
-                 stats_prefix);
+                 EMPTY_STRING);
       SET_AND_RETURN_IF_NOT_OK(helper.processFilters(http_protocol_options_->http_filters_,
                                                      "upstream http", "upstream http",
                                                      http_filter_factories_),
