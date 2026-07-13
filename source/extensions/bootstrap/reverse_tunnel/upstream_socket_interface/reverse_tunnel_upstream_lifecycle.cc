@@ -152,7 +152,7 @@ void ReverseTunnelUpstreamLifecycleFilter::onEvent(Network::ConnectionEvent even
 }
 
 Network::FilterFactoryCb ReverseTunnelUpstreamLifecycleConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message&, Server::Configuration::UpstreamFactoryContext&) {
+    const Protobuf::Message&, const std::string&, Server::Configuration::UpstreamFactoryContext&) {
   return [](Network::FilterManager& filter_manager) {
     filter_manager.addReadFilter(std::make_shared<ReverseTunnelUpstreamLifecycleFilter>());
   };

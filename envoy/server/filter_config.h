@@ -220,8 +220,16 @@ public:
    * the case of general error. The returned callback should always be initialized.
    */
   virtual Network::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& config,
+  createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stats_prefix,
                                UpstreamFactoryContext& context) PURE;
+
+  // Convenience overload for callers that have not yet been updated to pass an explicit
+  // stats_prefix (e.g. ECDS dynamic filter instantiation). Delegates to the 3-arg form
+  // with an empty prefix; the factory falls back to context.scope() for stat scoping.
+  Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                        UpstreamFactoryContext& context) {
+    return createFilterFactoryFromProto(config, "", context);
+  }
 
   std::string category() const override { return "envoy.filters.upstream_network"; }
 

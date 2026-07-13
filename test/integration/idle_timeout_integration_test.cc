@@ -653,11 +653,11 @@ class UpstreamIdleTimeoutVerifierFilterFactory
     : public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
 public:
   Network::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&,
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string& stats_prefix,
                                Server::Configuration::UpstreamFactoryContext& context) override {
-    Stats::Scope& scope = context.scope();
-    return [&scope](Network::FilterManager& filter_manager) {
-      auto filter = std::make_shared<UpstreamIdleTimeoutVerifierFilter>(scope);
+    Stats::ScopeSharedPtr scope = context.scope().createScope(stats_prefix);
+    return [scope](Network::FilterManager& filter_manager) {
+      auto filter = std::make_shared<UpstreamIdleTimeoutVerifierFilter>(*scope);
       filter_manager.addReadFilter(filter);
       filter_manager.addAccessLogHandler(filter);
     };

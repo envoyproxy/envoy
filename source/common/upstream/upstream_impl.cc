@@ -1253,7 +1253,7 @@ ClusterInfoImpl::ClusterInfoImpl(
               server_context)),
       network_filter_config_provider_manager_(
           createSingletonUpstreamNetworkFilterConfigProviderManager(server_context)),
-      upstream_context_(server_context, init_manager, *stats_scope_),
+      upstream_context_(server_context, init_manager, server_context.serverScope()),
       happy_eyeballs_config_(
           config.upstream_connection_options().has_happy_eyeballs_config()
               ? std::make_unique<
@@ -1436,8 +1436,8 @@ ClusterInfoImpl::ClusterInfoImpl(
         Config::Utility::translateOpaqueConfig(
             proto_config.typed_config(), factory_context.messageValidationVisitor(), *message),
         creation_status);
-    Network::FilterFactoryCb callback =
-        factory.createFilterFactoryFromProto(*message, upstream_context_);
+    Network::FilterFactoryCb callback = factory.createFilterFactoryFromProto(
+        *message, absl::StrCat("cluster.", name_, "."), upstream_context_);
     filter_factories_.push_back(
         network_filter_config_provider_manager_->createStaticFilterConfigProvider(
             callback, proto_config.name()));
@@ -1451,13 +1451,14 @@ ClusterInfoImpl::ClusterInfoImpl(
         return;
       }
 
-      // upstream_context_ uses stats_scope_ which already carries "cluster.<name>." as prefix,
-      // so pass EMPTY_STRING as stats_prefix; HTTP filter stats land under "cluster.<name>.*".
+      // upstream_context_ uses the server root scope (empty prefix). Pass "cluster.<name>."
+      // explicitly as stats_prefix so HTTP filter stats land under "cluster.<name>.*",
+      // mirroring the router case where the HCM stat prefix is passed as stats_prefix.
       Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                               Server::Configuration::UpstreamHttpFilterConfigFactory>
           helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
                  factory_context.serverFactoryContext().clusterManager(), upstream_context_,
-                 EMPTY_STRING);
+                 absl::StrCat("cluster.", name_, "."));
       SET_AND_RETURN_IF_NOT_OK(helper.processFilters(http_protocol_options_->http_filters_,
                                                      "upstream http", "upstream http",
                                                      http_filter_factories_),

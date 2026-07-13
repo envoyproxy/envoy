@@ -289,6 +289,16 @@ public:
                        const std::string&) const override {
     // Upstream network filters don't use the concept of terminal filters.
   }
+
+private:
+  absl::StatusOr<Network::FilterFactoryCb>
+  instantiateFilterFactory(const Protobuf::Message& message) const override {
+    auto* factory = Registry::FactoryRegistry<NeutralNetworkFilterConfigFactory>::getFactoryByType(
+        message.GetTypeName());
+    // TODO: thread the cluster stats_prefix through the ECDS manager infrastructure so dynamic
+    // upstream network filters receive "cluster.<name>." rather than "" here.
+    return factory->createFilterFactoryFromProto(message, "", this->factory_context_);
+  }
 };
 
 // Implementation of a listener dynamic filter config provider.
