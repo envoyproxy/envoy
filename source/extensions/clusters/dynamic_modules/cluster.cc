@@ -135,6 +135,12 @@ absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleCluster
   config->on_cluster_lb_on_host_membership_update_ =
       on_lb_membership_update.ok() ? on_lb_membership_update.value() : nullptr;
 
+  auto on_worker_timer_fired =
+      config->dynamic_module_->getFunctionPointer<OnClusterWorkerTimerFiredType>(
+          "envoy_dynamic_module_on_cluster_worker_timer_fired");
+  config->on_cluster_worker_timer_fired_ =
+      on_worker_timer_fired.ok() ? on_worker_timer_fired.value() : nullptr;
+
   // Call on_cluster_config_new to get the in-module configuration.
   envoy_dynamic_module_type_envoy_buffer name_buffer = {config->cluster_name_.data(),
                                                         config->cluster_name_.size()};
@@ -787,6 +793,11 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   // a happens-before relationship via the thread::spawn synchronization in the module.
   const auto* connection = context != nullptr ? context->downstreamConnection() : nullptr;
   active_async_dispatcher_ = connection != nullptr ? &connection->dispatcher() : nullptr;
+  // Capture the worker dispatcher for worker timer creation. Sticky: keep any previously captured
+  // dispatcher when this call has no connection, since the worker dispatcher is stable.
+  if (active_async_dispatcher_ != nullptr) {
+    worker_dispatcher_ = active_async_dispatcher_;
+  }
   active_async_cancelled_ = std::make_shared<std::atomic<bool>>(false);
 
   envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;

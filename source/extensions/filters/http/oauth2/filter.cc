@@ -23,6 +23,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/retry_policy_impl.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/filters/http/oauth2/client_assertion.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
@@ -56,8 +57,8 @@ constexpr const char* CookieDeleteFormatString =
 constexpr const char* CookieTailHttpOnlyFormatString = ";path={};Max-Age={};secure;HttpOnly{}";
 constexpr const char* CookieDomainFormatString = ";domain={}";
 
-constexpr const char* OIDCLogoutUrlFormatString =
-    "{0}?id_token_hint={1}&client_id={2}&post_logout_redirect_uri={3}";
+constexpr const char* OIDCLogoutUrlBaseFormatString = "{0}?id_token_hint={1}&client_id={2}";
+constexpr const char* OIDCLogoutUrlPostLogoutRedirectFormatString = "&post_logout_redirect_uri={0}";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 constexpr absl::string_view ServiceUnavailableBodyMessage = "Service Unavailable";
@@ -186,6 +187,9 @@ getAuthType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType 
   case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
       OAuth2Config_AuthType_TLS_CLIENT_AUTH:
     return AuthType::TlsClientAuth;
+  case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+      OAuth2Config_AuthType_PRIVATE_KEY_JWT:
+    return AuthType::PrivateKeyJwt;
   case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
       OAuth2Config_AuthType_URL_ENCODED_BODY:
   default:
@@ -650,6 +654,14 @@ FilterConfig::FilterConfig(
     : oauth_token_endpoint_(proto_config.token_endpoint()),
       authorization_endpoint_(proto_config.authorization_endpoint()),
       end_session_endpoint_(proto_config.end_session_endpoint()),
+      post_logout_redirect_uri_formatter_(
+          (proto_config.post_logout_redirect_uri().uri().empty() ||
+           proto_config.end_session_endpoint().empty())
+              ? nullptr
+              : THROW_OR_RETURN_VALUE(
+                    Formatter::FormatterImpl::create(proto_config.post_logout_redirect_uri().uri()),
+                    Formatter::FormatterPtr)),
+      disable_post_logout_redirect_uri_(proto_config.post_logout_redirect_uri().disabled()),
       authorization_query_params_(buildAutorizationQueryParams(proto_config)),
       client_id_(proto_config.credentials().client_id()),
       redirect_uri_(proto_config.redirect_uri()),
@@ -673,6 +685,11 @@ FilterConfig::FilterConfig(
                                                              DEFAULT_CSRF_TOKEN_EXPIRES_IN)),
       code_verifier_token_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(
           proto_config, code_verifier_token_expires_in, DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN)),
+      jwt_signing_algorithm_(
+          envoy::extensions::filters::http::oauth2::v3::PrivateKeyJwtConfig::SigningAlgorithm_Name(
+              proto_config.private_key_jwt_config().signing_algorithm())),
+      jwt_assertion_lifetime_(std::chrono::seconds(PROTOBUF_GET_SECONDS_OR_DEFAULT(
+          proto_config.private_key_jwt_config(), assertion_lifetime, 60))),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       preserve_authorization_header_(proto_config.preserve_authorization_header()),
       use_refresh_token_(FilterConfig::shouldUseRefreshToken(proto_config)),
@@ -992,8 +1009,14 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
                        *decoder_callbacks_);
 
       // try to update access token by refresh token
+      auto client_credential = getClientCredential();
+      if (!client_credential.ok()) {
+        sendUnauthorizedResponse(fmt::format("Failed to obtain client credential: {}",
+                                             client_credential.status().message()));
+        return Http::FilterHeadersStatus::StopIteration;
+      }
       oauth_client_->asyncRefreshAccessToken(validator_->refreshToken(), config_->clientId(),
-                                             config_->clientSecret(), config_->authType());
+                                             client_credential.value(), config_->authType());
       const auto state = oauth_client_->getState();
       if (state == OAuth2Client::OAuthState::FailureContinue) {
         return Http::FilterHeadersStatus::Continue;
@@ -1055,7 +1078,13 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   }
   std::string code_verifier = decrypt_result.plaintext;
 
-  oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
+  auto client_credential = getClientCredential();
+  if (!client_credential.ok()) {
+    sendUnauthorizedResponse(fmt::format("Failed to obtain client credential: {}",
+                                         client_credential.status().message()));
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+  oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), client_credential.value(),
                                      redirect_uri, code_verifier, config_->authType());
   const auto state = oauth_client_->getState();
   if (state == OAuth2Client::OAuthState::FailureContinue) {
@@ -1066,6 +1095,20 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   // pause while we await the next step from the OAuth server
   return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+}
+
+absl::StatusOr<std::string> OAuth2Filter::getClientCredential() {
+  if (config_->authType() != AuthType::PrivateKeyJwt) {
+    return config_->clientSecret();
+  }
+
+  auto assertion_result = ClientAssertion::create(
+      config_->clientId(), config_->tokenEndpointUrl(), config_->clientSecret(),
+      config_->jwtSigningAlgorithm(), config_->jwtAssertionLifetime(), time_source_, random_);
+  if (!assertion_result.ok()) {
+    return assertion_result.status();
+  }
+  return std::move(assertion_result.value());
 }
 
 Http::FilterHeadersStatus OAuth2Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
@@ -1353,19 +1396,32 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
                      maybe_secure_attr));
   }
 
-  const std::string post_logout_redirect_url =
+  const std::string default_post_logout_redirect_url =
       absl::StrCat(headers.getSchemeValue(), "://", host_, "/");
   // If the end session endpoint is set, redirect to it to log out the user from the OpenID
   // provider.
   if (!config_->endSessionEndpoint().empty()) {
     const std::string id_token =
         Http::Utility::parseCookieValue(headers, config_->cookieNames().id_token_);
-    const std::string oidc_logout_url = fmt::format(
-        OIDCLogoutUrlFormatString, config_->endSessionEndpoint(), id_token, config_->clientId(),
-        Http::Utility::PercentEncoding::encode(post_logout_redirect_url, ":/=&?"));
+    std::string oidc_logout_url =
+        fmt::format(OIDCLogoutUrlBaseFormatString, config_->endSessionEndpoint(), id_token,
+                    config_->clientId());
+
+    if (!config_->disablePostLogoutRedirectUri()) {
+      std::string redirect_uri;
+      if (config_->postLogoutRedirectUriFormatter() == nullptr) {
+        redirect_uri = default_post_logout_redirect_url;
+      } else {
+        redirect_uri = config_->postLogoutRedirectUriFormatter()->format(
+            {&headers}, decoder_callbacks_->streamInfo());
+      }
+      absl::StrAppend(&oidc_logout_url,
+                      fmt::format(OIDCLogoutUrlPostLogoutRedirectFormatString,
+                                  Http::Utility::PercentEncoding::urlEncode(redirect_uri)));
+    }
     response_headers->setLocation(oidc_logout_url);
   } else {
-    response_headers->setLocation(post_logout_redirect_url);
+    response_headers->setLocation(default_post_logout_redirect_url);
   }
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "envoy/config/eds_resources_cache.h"
 
 #include "gmock/gmock.h"

@@ -1,6 +1,8 @@
 #include <string>
+#include <vector>
 
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stats/tag.h"
 
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stats/null_counter.h"
@@ -186,6 +188,116 @@ TEST_P(StatsUtilityTest, Counters) {
   Counter& ctags =
       Utility::counterFromElements(*scope, {DynamicName("x"), token, DynamicName("y")}, tags_);
   EXPECT_EQ("scope.x.token.y.tag1.value1.tag2.value2", ctags.name());
+}
+
+// Verifies the `*FromTaggedPrefix` helpers with a string_view leaf name. Unlike counterFromElements
+// (which appends tags to the flat name), the tagged prefix keeps the tag value at its original
+// position in the flat name (join of `tagged_prefix` and the leaf). The tag-extracted `base_prefix`
+// only surfaces through a store configured with tag extractors, so it is exercised at the store
+// level in thread_local_store_test / isolated_store_impl_test; here we pin the flat name the
+// utility helper builds.
+TEST_P(StatsUtilityTest, TaggedStatNames) {
+  ScopeSharedPtr scope = store_->createScope("scope.");
+  const StatName tag_extracted_prefix = pool_.add("prefix");
+  const StatName tagged_prefix = pool_.add("prefix.value");
+
+  Counter& c = Utility::counterFromTaggedPrefix(*scope, tag_extracted_prefix, tags_, tagged_prefix,
+                                                "requests");
+  EXPECT_EQ("scope.prefix.value.requests", c.name());
+
+  Gauge& g = Utility::gaugeFromTaggedPrefix(*scope, tag_extracted_prefix, tags_, tagged_prefix,
+                                            "active", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("scope.prefix.value.active", g.name());
+  EXPECT_EQ(Gauge::ImportMode::Accumulate, g.importMode());
+
+  Histogram& h = Utility::histogramFromTaggedPrefix(
+      *scope, tag_extracted_prefix, tags_, tagged_prefix, "latency", Histogram::Unit::Unspecified);
+  EXPECT_EQ("scope.prefix.value.latency", h.name());
+  EXPECT_EQ(Histogram::Unit::Unspecified, h.unit());
+
+  TextReadout& t = Utility::textReadoutFromTaggedPrefix(*scope, tag_extracted_prefix, tags_,
+                                                        tagged_prefix, "info");
+  EXPECT_EQ("scope.prefix.value.info", t.name());
+}
+
+// Verifies the `*FromTaggedPrefix` overloads that take a symbolic StatName leaf (rather than a
+// string_view), which are used when the leaf name is already interned.
+TEST_P(StatsUtilityTest, TaggedStatNamesWithStatNameLeaf) {
+  ScopeSharedPtr scope = store_->createScope("scope.");
+  const StatName tag_extracted_prefix = pool_.add("prefix");
+  const StatName tagged_prefix = pool_.add("prefix.value");
+  const StatName requests = pool_.add("requests");
+  const StatName active = pool_.add("active");
+  const StatName latency = pool_.add("latency");
+  const StatName info = pool_.add("info");
+
+  Counter& c = Utility::counterFromTaggedPrefix(*scope, tag_extracted_prefix, tags_, tagged_prefix,
+                                                requests);
+  EXPECT_EQ("scope.prefix.value.requests", c.name());
+
+  Gauge& g = Utility::gaugeFromTaggedPrefix(*scope, tag_extracted_prefix, tags_, tagged_prefix,
+                                            active, Gauge::ImportMode::NeverImport);
+  EXPECT_EQ("scope.prefix.value.active", g.name());
+  EXPECT_EQ(Gauge::ImportMode::NeverImport, g.importMode());
+
+  Histogram& h = Utility::histogramFromTaggedPrefix(*scope, tag_extracted_prefix, tags_,
+                                                    tagged_prefix, latency, Histogram::Unit::Bytes);
+  EXPECT_EQ("scope.prefix.value.latency", h.name());
+  EXPECT_EQ(Histogram::Unit::Bytes, h.unit());
+
+  TextReadout& t = Utility::textReadoutFromTaggedPrefix(*scope, tag_extracted_prefix, tags_,
+                                                        tagged_prefix, info);
+  EXPECT_EQ("scope.prefix.value.info", t.name());
+}
+
+// A tagged prefix with no tags: base and tagged forms coincide, so the flat name is just the prefix
+// joined with the leaf.
+TEST_P(StatsUtilityTest, TaggedStatNamesNoTags) {
+  ScopeSharedPtr scope = store_->createScope("scope.");
+  const StatName prefix = pool_.add("prefix");
+  Counter& c = Utility::counterFromTaggedPrefix(*scope, prefix, {}, prefix, "requests");
+  EXPECT_EQ("scope.prefix.requests", c.name());
+
+  Counter& c2 = Utility::counterFromTaggedPrefix(*scope, prefix, {}, StatName(), "requests");
+  EXPECT_EQ("scope.prefix.requests", c2.name());
+
+  Gauge& g = Utility::gaugeFromTaggedPrefix(*scope, prefix, {}, StatName(), "gauge",
+                                            Gauge::ImportMode::NeverImport);
+  EXPECT_EQ("scope.prefix.gauge", g.name());
+
+  Histogram& h = Utility::histogramFromTaggedPrefix(*scope, prefix, {}, StatName(), "histogram",
+                                                    Histogram::Unit::Milliseconds);
+  EXPECT_EQ("scope.prefix.histogram", h.name());
+
+  TextReadout& t = Utility::textReadoutFromTaggedPrefix(*scope, prefix, {}, StatName(), "text");
+  EXPECT_EQ("scope.prefix.text", t.name());
+}
+
+// Exercises TaggedStatName directly: it pre-encodes the base name, tagged name, and tags
+// into its own pool, copying the string_view inputs so callers need not keep them alive.
+TEST_P(StatsUtilityTest, TaggedStatNameAccessors) {
+  const std::vector<TagStringView> tag_views{{"tagA", "valA"}, {"tagB", "valB"}};
+  TaggedStatName tagged(*symbol_table_, "base.name", tag_views, "base.valA.name");
+  EXPECT_EQ("base.name", symbol_table_->toString(tagged.baseName()));
+  EXPECT_EQ("base.valA.name", symbol_table_->toString(tagged.name()));
+  const StatNameTagSpan name_tags = tagged.tags();
+  ASSERT_EQ(2, name_tags.size());
+  EXPECT_EQ("tagA", symbol_table_->toString(name_tags[0].first));
+  EXPECT_EQ("valA", symbol_table_->toString(name_tags[0].second));
+  EXPECT_EQ("tagB", symbol_table_->toString(name_tags[1].first));
+  EXPECT_EQ("valB", symbol_table_->toString(name_tags[1].second));
+
+  // Empty tags: base and tagged forms coincide and there are no tags.
+  TaggedStatName empty(*symbol_table_, "base", {}, "base");
+  EXPECT_EQ("base", symbol_table_->toString(empty.baseName()));
+  EXPECT_EQ("base", symbol_table_->toString(empty.name()));
+  EXPECT_TRUE(empty.tags().empty());
+
+  // Empty tags with an empty tagged name: the name falls back to the base name.
+  TaggedStatName fallback(*symbol_table_, "base", {}, "");
+  EXPECT_EQ("base", symbol_table_->toString(fallback.baseName()));
+  EXPECT_EQ("base", symbol_table_->toString(fallback.name()));
+  EXPECT_TRUE(fallback.tags().empty());
 }
 
 TEST_P(StatsUtilityTest, Gauges) {

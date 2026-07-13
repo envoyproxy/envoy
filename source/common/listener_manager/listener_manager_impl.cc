@@ -18,6 +18,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/cpu_affinity.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/thread.h"
 #include "source/common/config/utility.h"
 #include "source/common/network/filter_matcher.h"
 #include "source/common/network/io_socket_handle_impl.h"
@@ -29,6 +30,7 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/synchronization/blocking_counter.h"
+#include "absl/types/span.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
 #include "source/common/quic/quic_server_transport_socket_factory.h"
@@ -1035,24 +1037,29 @@ bool ListenerManagerImpl::removeListenerInternal(const std::string& name,
   return true;
 }
 
-std::vector<uint32_t> ListenerManagerImpl::assignWorkerCpus() {
+absl::Span<const uint32_t> ListenerManagerImpl::workerCpus() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   // Pin each worker thread to a CPU when worker CPU affinity is enabled so each worker keeps its
-  // cache and `NUMA` locality.
-  if (!server_.bootstrap().enable_worker_cpu_affinity()) {
-    return {};
+  // cache and `NUMA` locality. The assignment depends only on the worker count and the process
+  // affinity mask, both fixed at startup, so it is computed once and cached for reuse when building
+  // listeners and when starting workers.
+  if (!worker_cpus_.has_value()) {
+    worker_cpus_ = server_.bootstrap().enable_worker_cpu_affinity()
+                       ? Thread::workerCpuAssignment(workers_.size())
+                       : std::vector<uint32_t>{};
   }
-  const std::vector<uint32_t> worker_cpus = Thread::workerCpuAssignment(workers_.size());
-  // The gauge counts workers assigned a CPU. Each assigned CPU is in the process mask so the
-  // per-worker pin normally succeeds, and a rare set failure is logged by `setThreadAffinity()`.
-  stats_.workers_pinned_.set(worker_cpus.size());
-  if (worker_cpus.empty()) {
-    ENVOY_LOG(warn, "worker CPU affinity is enabled but no worker could be pinned for {} workers",
-              workers_.size());
-  } else {
-    ENVOY_LOG(info, "worker CPU affinity is enabled, pinning {} workers to CPUs {}",
-              worker_cpus.size(), absl::StrJoin(worker_cpus, ","));
+  return *worker_cpus_;
+}
+
+bool ListenerManagerImpl::reusePortBpfCpuSteeringSupported() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // Steering needs every worker pinned to a CPU and a kernel that supports the program. Both inputs
+  // are fixed at startup, so the result is computed once and cached.
+  if (!reuse_port_bpf_cpu_steering_supported_.has_value()) {
+    reuse_port_bpf_cpu_steering_supported_ =
+        !workerCpus().empty() && Api::OsSysCallsSingleton::get().supportsReusePortBpfCpuSteering();
   }
-  return worker_cpus;
+  return *reuse_port_bpf_cpu_steering_supported_;
 }
 
 absl::Status ListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog,
@@ -1096,7 +1103,20 @@ absl::Status ListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog,
                           });
     }
   }
-  const std::vector<uint32_t> worker_cpus = assignWorkerCpus();
+  const absl::Span<const uint32_t> worker_cpus = workerCpus();
+  if (server_.bootstrap().enable_worker_cpu_affinity()) {
+    // The gauge counts workers assigned a CPU. Each assigned CPU is in the process mask so the
+    // per-worker pin normally succeeds, and a rare failure to set affinity is logged by
+    // `setThreadAffinity()`.
+    stats_.workers_pinned_.set(worker_cpus.size());
+    if (worker_cpus.empty()) {
+      ENVOY_LOG(warn, "worker CPU affinity is enabled but no worker could be pinned for {} workers",
+                workers_.size());
+    } else {
+      ENVOY_LOG(info, "worker CPU affinity is enabled, pinning {} workers to CPUs {}",
+                worker_cpus.size(), absl::StrJoin(worker_cpus, ","));
+    }
+  }
   for (const auto& worker : workers_) {
     ENVOY_LOG(debug, "starting worker {}", i);
     std::optional<uint32_t> cpu_id;

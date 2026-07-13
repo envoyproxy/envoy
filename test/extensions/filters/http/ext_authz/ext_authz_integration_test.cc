@@ -1045,7 +1045,10 @@ TEST_P(ExtAuthzGrpcIntegrationTest, PerRouteGrpcServiceConfigurationParsing) {
       "special";
 
   // Test configuration parsing and validation
-  Envoy::Extensions::HttpFilters::ExtAuthz::FilterConfigPerRoute config_per_route(per_route_config);
+  absl::Status creation_status = absl::OkStatus();
+  Envoy::Extensions::HttpFilters::ExtAuthz::FilterConfigPerRoute config_per_route(per_route_config,
+                                                                                  creation_status);
+  ASSERT_TRUE(creation_status.ok());
 
   // Verify the configuration was parsed correctly
   ASSERT_TRUE(config_per_route.grpcService().has_value());

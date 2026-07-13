@@ -388,6 +388,18 @@ TEST_F(TestUpstreamSocketManager, HandoffAndCloseLogsUseLifecycleMetadata) {
   socket_manager_->markSocketDead(fd);
 }
 
+TEST_F(TestUpstreamSocketManager, GetClusterForNode) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket),
+                                       std::chrono::seconds(30));
+
+  EXPECT_EQ(socket_manager_->getClusterForNode(node_id), cluster_id);
+  EXPECT_EQ(socket_manager_->getClusterForNode("unknown-node"), "");
+}
+
 TEST_F(TestUpstreamSocketManager, AddAndGetMultipleSocketsSameNode) {
   auto socket1 = createMockSocket(123);
   auto socket2 = createMockSocket(456);

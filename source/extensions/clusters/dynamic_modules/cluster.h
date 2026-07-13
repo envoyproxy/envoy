@@ -8,6 +8,7 @@
 #include "envoy/common/callback.h"
 #include "envoy/common/optref.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/event/timer.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.validate.h"
 #include "envoy/http/async_client.h"
@@ -60,6 +61,7 @@ using OnClusterShutdownType = decltype(&envoy_dynamic_module_on_cluster_shutdown
 using OnClusterHttpCalloutDoneType = decltype(&envoy_dynamic_module_on_cluster_http_callout_done);
 using OnClusterLbOnHostMembershipUpdateType =
     decltype(&envoy_dynamic_module_on_cluster_lb_on_host_membership_update);
+using OnClusterWorkerTimerFiredType = decltype(&envoy_dynamic_module_on_cluster_worker_timer_fired);
 
 /**
  * Configuration for a dynamic module cluster. This holds the loaded dynamic module, resolved
@@ -100,6 +102,7 @@ public:
   OnClusterShutdownType on_cluster_shutdown_ = nullptr;
   OnClusterHttpCalloutDoneType on_cluster_http_callout_done_ = nullptr;
   OnClusterLbOnHostMembershipUpdateType on_cluster_lb_on_host_membership_update_ = nullptr;
+  OnClusterWorkerTimerFiredType on_cluster_worker_timer_fired_ = nullptr;
 
   // The in-module configuration pointer.
   envoy_dynamic_module_type_cluster_config_module_ptr in_module_config_ = nullptr;
@@ -522,6 +525,24 @@ private:
 };
 
 /**
+ * Wraps an Envoy timer owned by a DynamicModuleLoadBalancer (per-worker). It is created via
+ * envoy_dynamic_module_callback_cluster_worker_timer_new and deleted via
+ * envoy_dynamic_module_callback_cluster_worker_timer_delete.
+ *
+ * The timer, its fired callback, and its deletion are all confined to the worker thread that
+ * created it, so no cross-thread synchronization is needed.
+ */
+class DynamicModuleClusterWorkerTimer {
+public:
+  // Separated from construction so the timer callback can capture a stable pointer to this object.
+  void setTimer(Event::TimerPtr timer) { timer_ = std::move(timer); }
+  Event::Timer& timer() { return *timer_; }
+
+private:
+  Event::TimerPtr timer_;
+};
+
+/**
  * Async host selection handle that bridges the dynamic module's async host selection to Envoy's
  * LoadBalancerContext::onAsyncHostSelection. This is created when the module returns an async
  * pending result from choose_host, and destroyed after the module delivers the result or the
@@ -595,6 +616,19 @@ public:
    */
   Event::Dispatcher* activeAsyncDispatcher() const { return active_async_dispatcher_; }
 
+  /**
+   * Returns the worker thread's dispatcher captured during chooseHost, or nullptr if no chooseHost
+   * has run on this worker yet. Used by the worker timer ABI callbacks to create timers on the
+   * correct worker dispatcher. The captured dispatcher is stable for the worker's lifetime.
+   */
+  Event::Dispatcher* workerDispatcher() const { return worker_dispatcher_; }
+
+  // The cluster config holding the resolved module function pointers.
+  const DynamicModuleClusterConfigSharedPtr& config() const { return handle_->cluster()->config(); }
+
+  // The in-module load balancer pointer passed to module hooks.
+  envoy_dynamic_module_type_cluster_lb_module_ptr inModuleLb() const { return in_module_lb_; }
+
   // Per-host custom data storage.
   bool setHostData(uint32_t priority, size_t index, uintptr_t data);
   bool getHostData(uint32_t priority, size_t index, uintptr_t* data) const;
@@ -628,6 +662,10 @@ private:
 
   // Worker thread dispatcher captured during chooseHost for async completion posting.
   Event::Dispatcher* active_async_dispatcher_{nullptr};
+
+  // Worker thread dispatcher captured during chooseHost, used to create worker timers. Sticky:
+  // once captured it is never cleared, since the worker dispatcher is stable for the worker's life.
+  Event::Dispatcher* worker_dispatcher_{nullptr};
 
   // Per-host data storage keyed by (priority, index). This is per-LB-instance (per-worker).
   absl::flat_hash_map<std::pair<uint32_t, size_t>, uintptr_t> per_host_data_;

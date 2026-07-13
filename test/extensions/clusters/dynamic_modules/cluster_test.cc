@@ -1247,6 +1247,30 @@ TEST_F(DynamicModuleClusterTest, OnScheduledCallback) {
   result = absl::InternalError("cleanup");
 }
 
+// Worker timer creation returns null before any chooseHost has captured a worker dispatcher.
+TEST_F(DynamicModuleClusterTest, WorkerTimerNewReturnsNullWithoutDispatcher) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  NiceMock<Upstream::MockPrioritySet> worker_ps;
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+  auto lb = std::make_unique<DynamicModuleLoadBalancer>(handle, worker_ps);
+
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_worker_timer_new(lb.get()));
+}
+
+// Deleting a worker timer off a worker thread (here, the test thread) trips an Envoy bug and skips
+// the deletion, since the underlying timer may only be destroyed on its worker dispatcher thread.
+TEST_F(DynamicModuleClusterTest, WorkerTimerDeleteOffWorkerThreadIsEnvoyBug) {
+  auto* timer = new DynamicModuleClusterWorkerTimer();
+  EXPECT_ENVOY_BUG(envoy_dynamic_module_callback_cluster_worker_timer_delete(timer),
+                   "must be called on a worker thread");
+  // The callback skipped deletion on the test thread, so free it directly.
+  delete timer;
+}
+
 // Test that onScheduled handles the case when cluster is already destroyed.
 TEST_F(DynamicModuleClusterTest, OnScheduledAfterClusterDestroyed) {
   Event::PostCb captured_cb;
@@ -2593,6 +2617,98 @@ TEST_F(DynamicModuleClusterTest, LbGetHostStatReadsValues) {
                    lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_CxActive));
   EXPECT_EQ(8, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
                    lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_RqActive));
+}
+
+// Test set_dynamic_metadata_number with nullptr context returns false.
+TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataNumberNullContext) {
+  std::string ns = "n";
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns.data(), ns.size()};
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
+      nullptr, ns_buf, key_buf, 1.0));
+}
+
+// Test set_dynamic_metadata_number when the request has no stream info.
+TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataNumberNoStreamInfo) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(nullptr));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string ns = "n";
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns.data(), ns.size()};
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
+      context_ptr, ns_buf, key_buf, 1.0));
+}
+
+// Test set_dynamic_metadata_number happy path: the number lands on the request's stream info.
+TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataNumber) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(stream_info, setDynamicMetadata(_, _))
+      .WillByDefault(testing::Invoke([&](const std::string& name, const Protobuf::Struct& value) {
+        (*stream_info.metadata_.mutable_filter_metadata())[name].MergeFrom(value);
+      }));
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string ns = "dynamic_modules.test";
+  std::string key = "number_key";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns.data(), ns.size()};
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
+      context_ptr, ns_buf, key_buf, 42.0));
+  const auto& fields = stream_info.metadata_.filter_metadata().at(ns).fields();
+  EXPECT_EQ(42.0, fields.at(key).number_value());
+}
+
+// Test set_dynamic_metadata_string with nullptr context returns false.
+TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataStringNullContext) {
+  std::string ns = "n";
+  std::string key = "k";
+  std::string value = "v";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns.data(), ns.size()};
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_module_buffer value_buf = {value.data(), value.size()};
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
+      nullptr, ns_buf, key_buf, value_buf));
+}
+
+// Test set_dynamic_metadata_string when the request has no stream info.
+TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataStringNoStreamInfo) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(nullptr));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string ns = "n";
+  std::string key = "k";
+  std::string value = "v";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns.data(), ns.size()};
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_module_buffer value_buf = {value.data(), value.size()};
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
+      context_ptr, ns_buf, key_buf, value_buf));
+}
+
+// Test set_dynamic_metadata_string happy path: the string lands on the request's stream info.
+TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataString) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(stream_info, setDynamicMetadata(_, _))
+      .WillByDefault(testing::Invoke([&](const std::string& name, const Protobuf::Struct& value) {
+        (*stream_info.metadata_.mutable_filter_metadata())[name].MergeFrom(value);
+      }));
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string ns = "dynamic_modules.test";
+  std::string key = "string_key";
+  std::string value = "test_value";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns.data(), ns.size()};
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_module_buffer value_buf = {value.data(), value.size()};
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
+      context_ptr, ns_buf, key_buf, value_buf));
+  const auto& fields = stream_info.metadata_.filter_metadata().at(ns).fields();
+  EXPECT_EQ("test_value", fields.at(key).string_value());
 }
 
 // =================================================================================================

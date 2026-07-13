@@ -130,6 +130,7 @@ public:
   MOCK_METHOD(envoy::config::cluster::v3::Cluster::DiscoveryType, type, (), (const));
   MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>, clusterType, (),
               (const));
+  MOCK_METHOD(OptRef<const Http::ClientCodecFactory>, upstreamHttpClientCodecFactory, (), (const));
   MOCK_METHOD(OptRef<const envoy::config::core::v3::TypedExtensionConfig>, upstreamConfig, (),
               (const));
   MOCK_METHOD(bool, maintenanceMode, (), (const));

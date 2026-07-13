@@ -1,5 +1,6 @@
 #include "source/common/upstream/upstream_impl.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <limits>
@@ -139,6 +140,29 @@ parseExtensionProtocolOptions(
   }
 
   return options;
+}
+
+// Recovers the per-cluster upstream (client) codec factory from the parsed protocol options. Any
+// options object may expose one via ProtocolOptionsConfig::upstreamHttpClientCodecFactory(); at
+// most one is allowed across all configured options.
+absl::StatusOr<std::shared_ptr<const Http::ClientCodecFactory>> findUpstreamHttpClientCodecFactory(
+    const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>& options) {
+  std::shared_ptr<const Http::ClientCodecFactory> found;
+  for (const auto& [name, option] : options) {
+    OptRef<const Http::ClientCodecFactory> factory = option->upstreamHttpClientCodecFactory();
+    if (!factory.has_value()) {
+      continue;
+    }
+    if (found != nullptr) {
+      return absl::InvalidArgumentError(
+          "multiple upstream HTTP client codec factories configured on a single cluster via "
+          "typed_extension_protocol_options; at most one is allowed");
+    }
+    // Aliasing shared_ptr: shares ownership with the options object (the factory and the options
+    // object are the same instance) while exposing it as a ClientCodecFactory.
+    found = std::shared_ptr<const Http::ClientCodecFactory>(option, &factory.ref());
+  }
+  return found;
 }
 
 // Updates the EDS health flags for an existing host to match the new host.
@@ -607,14 +631,26 @@ Host::CreateConnectionData HostImplBase::createHealthCheckConnection(
 Host::CreateConnectionData HostImplBase::createOrcaReportingConnection(
     Event::Dispatcher& dispatcher,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-    const envoy::config::core::v3::Metadata* metadata) const {
-  const auto orca_address = orcaReportingAddress();
-  Network::UpstreamTransportSocketFactory& factory =
-      (metadata != nullptr)
-          ? resolveTransportSocketFactory(orca_address, metadata, transport_socket_options)
-          : transportSocketFactory();
-  return createConnection(dispatcher, cluster(), orca_address, addressListOrNull(), factory,
-                          /*options=*/nullptr, transport_socket_options, shared_from_this());
+    Network::UpstreamTransportSocketFactory& factory,
+    Network::Address::InstanceConstSharedPtr orca_address) const {
+  return createOrcaConnection(dispatcher, std::move(transport_socket_options), factory,
+                              std::move(orca_address), address(), addressListOrNull(),
+                              shared_from_this());
+}
+
+Host::CreateConnectionData HostImplBase::createOrcaConnection(
+    Event::Dispatcher& dispatcher,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+    Network::UpstreamTransportSocketFactory& factory,
+    Network::Address::InstanceConstSharedPtr orca_address,
+    const Network::Address::InstanceConstSharedPtr& host_address,
+    const SharedConstAddressVector& address_list, HostDescriptionConstSharedPtr host) const {
+  // The original-port address list applies only when dialing the host's own address. Compare
+  // by value: pointer identity doesn't survive LogicalHost re-resolution.
+  const bool use_address_list = *orca_address == *host_address;
+  return createConnection(dispatcher, cluster(), orca_address,
+                          use_address_list ? address_list : SharedConstAddressVector{}, factory,
+                          /*options=*/nullptr, transport_socket_options, std::move(host));
 }
 
 std::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetProxyRedirectAddress(
@@ -713,6 +749,15 @@ Host::CreateConnectionData HostImplBase::createConnection(
         address, upstream_local_address.address_,
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
+  }
+
+  // `createClientConnection` can return nullptr, for example when binding the upstream connection
+  // to a configured network namespace fails (e.g. the namespace was removed at runtime). Returning
+  // a null connection lets the caller (connection pools) treat this as a connection failure rather
+  // than crashing on a null dereference below.
+  if (connection == nullptr) {
+    ENVOY_LOG(debug, "Failed to create upstream connection to host {}", address->asString());
+    return {nullptr, host};
   }
 
   connection->connectionInfoSetter().enableSettingInterfaceName(
@@ -1144,6 +1189,9 @@ ClusterInfoImpl::ClusterInfoImpl(
               : nullptr),
       extension_protocol_options_(THROW_OR_RETURN_VALUE(
           parseExtensionProtocolOptions(config, factory_context), ProtocolOptionsHashMap)),
+      upstream_client_codec_factory_(
+          THROW_OR_RETURN_VALUE(findUpstreamHttpClientCodecFactory(extension_protocol_options_),
+                                std::shared_ptr<const Http::ClientCodecFactory>)),
       http_protocol_options_(THROW_OR_RETURN_VALUE(
           createOptions(config,
                         extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
@@ -2385,8 +2433,14 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
     if (active_health_check_flag_changed) {
       hosts_with_active_health_check_flag_changed.emplace(existing_host->first);
     }
-    const bool skip_inplace_host_update =
-        health_check_address_changed || locality_changed || active_health_check_flag_changed;
+    const bool endpoint_hostname_changed =
+        (existing_host_found && host->hostname() != existing_host->second->hostname());
+    const bool health_check_hostname_changed =
+        (existing_host_found && health_checker_ != nullptr &&
+         host->hostnameForHealthChecks() != existing_host->second->hostnameForHealthChecks());
+    const bool hostname_changed = endpoint_hostname_changed || health_check_hostname_changed;
+    const bool skip_inplace_host_update = health_check_address_changed || locality_changed ||
+                                          active_health_check_flag_changed || hostname_changed;
 
     // When there is a match and we decided to do in-place update, we potentially update the
     // host's health check flag and metadata. Afterwards, the host is pushed back into the

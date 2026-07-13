@@ -195,7 +195,7 @@ bool RoleBasedAccessControlFilter::evaluateShadowEngine(const Http::RequestHeade
 
 // Evaluates the enforced engine policy and returns the appropriate filter status
 Http::FilterHeadersStatus
-RoleBasedAccessControlFilter::evaluateEnforcedEngine(Http::RequestHeaderMap& headers,
+RoleBasedAccessControlFilter::evaluateEnforcedEngine(const Http::RequestHeaderMap& headers,
                                                      Protobuf::Struct& metrics) const {
   const auto engine = config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Enforced);
   if (engine == nullptr) {

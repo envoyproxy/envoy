@@ -48,7 +48,7 @@ public:
   JsonTranscoderConfig(
       const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
           proto_config,
-      Api::Api& api);
+      Api::Api& api, absl::Status& creation_status);
 
   // grpc by default doesn't like a frame larger than 4MB. Splitting streamed data
   // into 1MB pieces should keep that threshold from being exceeded when data comes
@@ -106,7 +106,7 @@ public:
   std::optional<uint32_t> max_request_body_size_;
   std::optional<uint32_t> max_response_body_size_;
 
-  void addBuiltinSymbolDescriptor(const std::string& symbol_name);
+  absl::Status addBuiltinSymbolDescriptor(const std::string& symbol_name);
 
 private:
   /**
@@ -115,7 +115,7 @@ private:
   absl::Status methodToRequestInfo(const MethodInfoSharedPtr& method_info,
                                    google::grpc::transcoding::RequestInfo* info) const;
 
-  void addFileDescriptor(const Protobuf::FileDescriptorProto& file);
+  absl::Status addFileDescriptor(const Protobuf::FileDescriptorProto& file);
   absl::Status resolveField(const Protobuf::Descriptor* descriptor,
                             const std::string& field_path_str,
                             std::vector<const Protobuf::Field*>* field_path, bool* is_http_body);

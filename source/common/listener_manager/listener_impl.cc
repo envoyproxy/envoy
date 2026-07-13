@@ -764,6 +764,11 @@ void ListenerImpl::buildListenSocketOptions(
     if (reuse_port_) {
       addListenSocketOptions(listen_socket_options_list_[i],
                              Network::SocketOptionFactory::buildReusePortOptions());
+      if (reusePortBpfCpuSteeringEnabled(config)) {
+        addListenSocketOptions(listen_socket_options_list_[i],
+                               Network::SocketOptionFactory::buildReusePortBpfCpuSteeringOptions(
+                                   parent_.workerCpus()));
+      }
     }
     if (!address_opts_list[i]->empty()) {
       addListenSocketOptions(listen_socket_options_list_[i], address_opts_list[i]);
@@ -879,6 +884,18 @@ absl::Status ListenerImpl::buildFilterChains(const envoy::config::listener::v3::
       *filter_chain_manager_);
 }
 
+bool ListenerImpl::reusePortBpfCpuSteeringEnabled(
+    const envoy::config::listener::v3::Listener& config) const {
+  // Steering maps each receiving CPU to the worker pinned to it. The listener manager tracks the
+  // global prerequisites (worker CPU affinity and kernel support) once for all workers. The mapping
+  // is fixed at startup, so a listener added later via LDS can steer too.
+  return socket_type_ == Network::Socket::Type::Stream && reuse_port_ &&
+         config.has_connection_balance_config() &&
+         config.connection_balance_config().balance_type_case() ==
+             envoy::config::listener::v3::Listener_ConnectionBalanceConfig::kCpuLocalityBalance &&
+         parent_.reusePortBpfCpuSteeringSupported();
+}
+
 absl::Status
 ListenerImpl::buildConnectionBalancer(const envoy::config::listener::v3::Listener& config,
                                       const Network::Address::Instance& address) {
@@ -922,6 +939,21 @@ ListenerImpl::buildConnectionBalancer(const envoy::config::listener::v3::Listene
                 config.connection_balance_config().extend_balance(), *listener_factory_context_));
         break;
       }
+      case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::kCpuLocalityBalance:
+        // CPU locality balancing is performed by the kernel reuse port BPF program installed as a
+        // listen socket option, so no user space balancer is needed and the no-op balancer is
+        // always used. When steering is not available the kernel distributes connections with its
+        // default reuse port hashing instead.
+        if (!reusePortBpfCpuSteeringEnabled(config)) {
+          ENVOY_LOG(warn,
+                    "the CPU locality connection balancer is configured for TCP listener '{}' but "
+                    "reuse port BPF CPU steering is not active, so new connections are not steered "
+                    "to CPU-local workers.",
+                    config.name());
+        }
+        connection_balancers_.emplace(address.asString(),
+                                      std::make_shared<Network::NopConnectionBalancerImpl>());
+        break;
       case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::BALANCE_TYPE_NOT_SET: {
         return absl::InvalidArgumentError("No valid balance type for connection balance");
       }
