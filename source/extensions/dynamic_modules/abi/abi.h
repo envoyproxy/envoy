@@ -10727,6 +10727,40 @@ uint64_t envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
     envoy_dynamic_module_type_host_stat stat);
 
 /**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number sets the number
+ * value of the request's dynamic metadata under the given namespace and key, overwriting any
+ * existing value. This lets a dynamic-module cluster annotate the current request so the value is
+ * observable in the access log via %DYNAMIC_METADATA(namespace:key)%.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
+ * @param value is the number value to set.
+ * @return true if the value was set, false if the request has no stream info.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string sets the string
+ * value of the request's dynamic metadata under the given namespace and key, overwriting any
+ * existing value. This lets a dynamic-module cluster annotate the current request so the value is
+ * observable in the access log via %DYNAMIC_METADATA(namespace:key)%.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
+ * @param value is the string value to set.
+ * @return true if the value was set, false if the request has no stream info.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
  * envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called by the module
  * to deliver the result of an asynchronous host selection. This must be called exactly once for
  * each async handle returned from envoy_dynamic_module_on_cluster_lb_choose_host, unless
