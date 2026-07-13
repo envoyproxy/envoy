@@ -5,6 +5,9 @@
 
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/bool_accessor_impl.h"
+
+#include "absl/strings/numbers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -41,6 +44,19 @@ public:
 };
 
 REGISTER_FACTORY(GenericHashableStringObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
+class GenericBoolObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.bool"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    bool value = false;
+    (void)absl::SimpleAtob(data, &value);
+    return std::make_unique<StreamInfo::BoolAccessorImpl>(value);
+  }
+};
+
+REGISTER_FACTORY(GenericBoolObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
 std::vector<Value>
 Config::parse(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_values,

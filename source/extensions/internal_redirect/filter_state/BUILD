@@ -15,7 +15,7 @@ envoy_cc_library(
     hdrs = ["filter_state.h"],
     deps = [
         "//envoy/router:internal_redirect_interface",
-        "//envoy/router:string_accessor_interface",
+        "//envoy/stream_info:bool_accessor_interface",
         "//envoy/stream_info:filter_state_interface",
     ],
 )

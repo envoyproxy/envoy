@@ -11,19 +11,15 @@ namespace Envoy {
 namespace Extensions {
 namespace InternalRedirect {
 
-// Predicate that follows a redirect based on a string comparison against a
-// filter-state object set earlier in the request. See filter_state_config.proto
-// for semantics.
+// Predicate that follows a redirect based on a boolean filter-state object
+// set earlier in the request. See filter_state_config.proto for semantics.
 //
-// Polarity is fixed at construction by which value was configured:
-// * allow_value set  -> follow iff the object's value equals it (follow_on_match = true).
-// * deny_value set   -> follow unless the object's value equals it (follow_on_match = false).
+// If the boolean value is true, the redirect is followed; if false, it is not.
+// If the object is absent, redirect_if_absent_ determines the behavior.
 class FilterStatePredicate : public Router::InternalRedirectPredicate {
 public:
-  FilterStatePredicate(absl::string_view filter_state_key, absl::string_view compare_value,
-                       bool follow_on_match, bool allow_if_absent)
-      : filter_state_key_(filter_state_key), compare_value_(compare_value),
-        follow_on_match_(follow_on_match), allow_if_absent_(allow_if_absent) {}
+  FilterStatePredicate(absl::string_view redirect_enabled_key, bool redirect_if_absent)
+      : redirect_enabled_key_(redirect_enabled_key), redirect_if_absent_(redirect_if_absent) {}
 
   bool acceptTargetRoute(StreamInfo::FilterState& filter_state, absl::string_view route_name,
                          bool downstream_is_https, bool target_is_https) override;
@@ -33,12 +29,8 @@ public:
   }
 
 private:
-  const std::string filter_state_key_;
-  const std::string compare_value_;
-  // Whether a value match means "follow the redirect": true for allow_value,
-  // false for deny_value.
-  const bool follow_on_match_;
-  const bool allow_if_absent_;
+  const std::string redirect_enabled_key_;
+  const bool redirect_if_absent_;
 };
 
 } // namespace InternalRedirect

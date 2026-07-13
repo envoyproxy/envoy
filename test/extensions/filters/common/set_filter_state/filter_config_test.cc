@@ -1,4 +1,5 @@
 #include "envoy/common/hashable.h"
+#include "envoy/stream_info/bool_accessor.h"
 
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/common/set_filter_state/filter_config.h"
@@ -275,6 +276,62 @@ TEST_F(ConfigTest, SetValueUpstreamSharedTransitive) {
   EXPECT_EQ(StreamSharing::SharedWithUpstreamConnection, objects->at(0).stream_sharing_);
   EXPECT_EQ("foo", objects->at(0).name_);
   EXPECT_EQ(foo, objects->at(0).data_.get());
+}
+
+TEST_F(ConfigTest, SetBoolValueTrue) {
+  initialize({R"YAML(
+    object_key: my_key
+    factory_key: envoy.bool
+    format_string:
+      text_format_source:
+        inline_string: "true"
+  )YAML"});
+  update();
+  const auto* value = info_.filterState()->getDataReadOnly<StreamInfo::BoolAccessor>("my_key");
+  ASSERT_NE(nullptr, value);
+  EXPECT_TRUE(value->value());
+}
+
+TEST_F(ConfigTest, SetBoolValueFalse) {
+  initialize({R"YAML(
+    object_key: my_key
+    factory_key: envoy.bool
+    format_string:
+      text_format_source:
+        inline_string: "false"
+  )YAML"});
+  update();
+  const auto* value = info_.filterState()->getDataReadOnly<StreamInfo::BoolAccessor>("my_key");
+  ASSERT_NE(nullptr, value);
+  EXPECT_FALSE(value->value());
+}
+
+TEST_F(ConfigTest, SetBoolValueFromNumber) {
+  initialize({R"YAML(
+    object_key: my_key
+    factory_key: envoy.bool
+    format_string:
+      text_format_source:
+        inline_string: "1"
+  )YAML"});
+  update();
+  const auto* value = info_.filterState()->getDataReadOnly<StreamInfo::BoolAccessor>("my_key");
+  ASSERT_NE(nullptr, value);
+  EXPECT_TRUE(value->value());
+}
+
+TEST_F(ConfigTest, SetBoolValueInvalid) {
+  initialize({R"YAML(
+    object_key: my_key
+    factory_key: envoy.bool
+    format_string:
+      text_format_source:
+        inline_string: "invalid"
+  )YAML"});
+  update();
+  const auto* value = info_.filterState()->getDataReadOnly<StreamInfo::BoolAccessor>("my_key");
+  ASSERT_NE(nullptr, value);
+  EXPECT_FALSE(value->value());
 }
 
 } // namespace
