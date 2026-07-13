@@ -61,10 +61,42 @@ static int Configure(SSL_CTX* ctx) {
 
 } // namespace fips202205
 
+namespace cnsa1_202603 {
+
+// Approximates CNSA 1.0 (RFC 9151).
+
+// CNSA1 allows ML-KEM-1024 or P-384 for key agreement, preferring ML-KEM-1024.
+// OpenSSL does not support standalone ML-KEM-1024 as a TLS group, so only P-384
+// is configured here.
+static const int kGroups[] = {NID_secp384r1};
+
+static const char* kSigAlgs = {
+    "ecdsa_secp384r1_sha384"
+    ":rsa_pss_rsae_sha384"
+    ":rsa_pkcs1_sha384"
+};
+
+static const char kTLS12Ciphers[] = "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384:"
+                                    "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384";
+
+static int Configure(SSL_CTX* ctx) {
+  return
+      ossl.ossl_SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION) &&
+      ossl.ossl_SSL_CTX_set_max_proto_version(ctx, TLS1_3_VERSION) &&
+      SSL_CTX_set_strict_cipher_list(ctx, kTLS12Ciphers) &&
+      ossl.ossl_SSL_CTX_set1_groups(ctx, kGroups, OPENSSL_ARRAY_SIZE(kGroups)) &&
+      ossl.ossl_SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE) &&
+      ossl.ossl_SSL_CTX_set1_sigalgs_list(ctx, kSigAlgs);
+}
+
+} // namespace cnsa1_202603
+
 int SSL_CTX_set_compliance_policy(SSL_CTX* ctx, enum ssl_compliance_policy_t policy) {
   switch (policy) {
   case ssl_compliance_policy_fips_202205:
     return fips202205::Configure(ctx);
+  case ssl_compliance_policy_cnsa1_202603:
+    return cnsa1_202603::Configure(ctx);
   default:
     return 0;
   }
