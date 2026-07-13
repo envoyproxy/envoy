@@ -7,7 +7,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CustomResponse {
 
-::Envoy::Http::FilterFactoryCb CustomResponseFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<::Envoy::Http::FilterFactoryCb>
+CustomResponseFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
     const std::string& stats_prefix, Envoy::Server::Configuration::FactoryContext& context) {
   Stats::StatNameManagedStorage prefix(stats_prefix, context.scope().symbolTable());

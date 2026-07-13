@@ -8,7 +8,7 @@
 namespace Envoy {
 
 // This is a workaround to allow an exceptionless Envoy Mobile build while we
-// have not finished plumbing Satus/StatusOr<> based error handling, so
+// have not finished plumbing Status/StatusOr<> based error handling, so
 // hard-failing instead. See
 // (https://github.com/envoyproxy/envoy-mobile/issues/176)
 // for example error handling PRs.

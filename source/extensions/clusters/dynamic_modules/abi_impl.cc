@@ -9,6 +9,7 @@
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/common/thread.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
@@ -922,6 +923,47 @@ uint64_t envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
   }
   const auto* host = static_cast<const Envoy::Upstream::Host*>(host_envoy_ptr);
   return readHostStat(host->stats(), stat);
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value) {
+  if (context_envoy_ptr == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  Envoy::Protobuf::Struct metadata_value;
+  (*metadata_value.mutable_fields())[key_view].set_number_value(value);
+  stream_info->setDynamicMetadata(std::string(ns.ptr, ns.length), metadata_value);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value) {
+  if (context_envoy_ptr == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  absl::string_view value_view(value.ptr, value.length);
+  Envoy::Protobuf::Struct metadata_value;
+  (*metadata_value.mutable_fields())[key_view].set_string_value(value_view);
+  stream_info->setDynamicMetadata(std::string(ns.ptr, ns.length), metadata_value);
+  return true;
 }
 
 envoy_dynamic_module_type_cluster_scheduler_module_ptr
