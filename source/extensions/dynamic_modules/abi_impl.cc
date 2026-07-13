@@ -67,6 +67,12 @@ void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level
   }
 }
 
+envoy_dynamic_module_type_log_level envoy_dynamic_module_callback_get_log_level() {
+  // The ABI log level enum mirrors spdlog::level::level_enum, so the cast is a direct mapping.
+  return static_cast<envoy_dynamic_module_type_log_level>(
+      Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules).level());
+}
+
 uint32_t envoy_dynamic_module_callback_get_concurrency() {
   using namespace Envoy;
   // The previous `ASSERT_IS_MAIN_OR_TEST_THREAD` is compiled out under NDEBUG and the
@@ -784,6 +790,24 @@ __attribute__((weak)) uint64_t envoy_dynamic_module_callback_cluster_lb_context_
   IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_context_get_host_stat: "
                "not implemented in this context");
   return 0;
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, double) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string: "
+               "not implemented in this context");
+  return false;
 }
 
 __attribute__((weak)) envoy_dynamic_module_type_cluster_scheduler_module_ptr

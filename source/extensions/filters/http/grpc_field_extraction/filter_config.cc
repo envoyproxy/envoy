@@ -14,9 +14,13 @@ using ::google::grpc::transcoding::TypeHelper;
 } // namespace
 
 FilterConfig::FilterConfig(const GrpcFieldExtractionConfig& proto_config,
-                           std::unique_ptr<ExtractorFactory> extractor_factory, Api::Api& api)
+                           std::unique_ptr<ExtractorFactory> extractor_factory, Api::Api& api,
+                           absl::Status& creation_status)
     : proto_config_(proto_config) {
-  initDescriptorPool(api);
+  creation_status = initDescriptorPool(api);
+  if (!creation_status.ok()) {
+    return;
+  }
 
   type_helper_ =
       std::make_unique<const TypeHelper>(Protobuf::util::NewTypeResolverForDescriptorPool(
@@ -26,14 +30,14 @@ FilterConfig::FilterConfig(const GrpcFieldExtractionConfig& proto_config,
         return type_helper_->Info()->GetTypeByTypeUrl(type_url);
       });
 
-  initExtractors(*extractor_factory);
+  creation_status = initExtractors(*extractor_factory);
 }
 
-void FilterConfig::initExtractors(ExtractorFactory& extractor_factory) {
+absl::Status FilterConfig::initExtractors(ExtractorFactory& extractor_factory) {
   for (const auto& it : proto_config_.extractions_by_method()) {
     auto* method = descriptor_pool_->FindMethodByName(it.first);
     if (method == nullptr) {
-      throw EnvoyException(fmt::format(
+      return absl::InvalidArgumentError(fmt::format(
           "couldn't find the gRPC method `{}` defined in the proto descriptor", it.first));
     }
 
@@ -42,16 +46,17 @@ void FilterConfig::initExtractors(ExtractorFactory& extractor_factory) {
         absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/", method->input_type()->full_name()),
         it.second);
     if (!extractor.ok()) {
-      throw EnvoyException(fmt::format("couldn't init extractor for method `{}`: {}", it.first,
-                                       extractor.status().message()));
+      return absl::InvalidArgumentError(fmt::format("couldn't init extractor for method `{}`: {}",
+                                                    it.first, extractor.status().message()));
     }
 
     ENVOY_LOG_MISC(debug, "registered field extraction for gRPC method `{}`", it.first);
     proto_path_to_extractor_.emplace(it.first, std::move(extractor.value()));
   }
+  return absl::OkStatus();
 }
 
-void FilterConfig::initDescriptorPool(Api::Api& api) {
+absl::Status FilterConfig::initDescriptorPool(Api::Api& api) {
   Protobuf::FileDescriptorSet descriptor_set;
   auto& descriptor_config = proto_config_.descriptor_set();
 
@@ -61,21 +66,21 @@ void FilterConfig::initDescriptorPool(Api::Api& api) {
   case envoy::config::core::v3::DataSource::SpecifierCase::kFilename: {
     auto file_or_error = api.fileSystem().fileReadToEnd(descriptor_config.filename());
     if (!file_or_error.status().ok() || !descriptor_set.ParseFromString(file_or_error.value())) {
-      throw Envoy::EnvoyException(fmt::format("unable to parse proto descriptor from file `{}`",
-                                              descriptor_config.filename()));
+      return absl::InvalidArgumentError(fmt::format(
+          "unable to parse proto descriptor from file `{}`", descriptor_config.filename()));
     }
     break;
   }
   case envoy::config::core::v3::DataSource::SpecifierCase::kInlineBytes: {
     if (!descriptor_set.ParseFromString(descriptor_config.inline_bytes())) {
-      throw Envoy::EnvoyException(
+      return absl::InvalidArgumentError(
           fmt::format("unable to parse proto descriptor from inline bytes: {}",
                       descriptor_config.inline_bytes()));
     }
     break;
   }
   default: {
-    throw Envoy::EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("unsupported DataSource case `{}` for configuring `descriptor_set`",
                     static_cast<int>(descriptor_config.specifier_case())));
   }
@@ -85,6 +90,7 @@ void FilterConfig::initDescriptorPool(Api::Api& api) {
     pool->BuildFile(file);
   }
   descriptor_pool_ = std::move(pool);
+  return absl::OkStatus();
 }
 
 const Extractor* FilterConfig::findExtractor(absl::string_view proto_path) const {

@@ -345,6 +345,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/common/ext_authz @esmet @tyxia @ggreenway @antoniovleonti @yanjunxiang-google
 /*/extensions/filters/http/ext_authz @esmet @tyxia @ggreenway @antoniovleonti @yanjunxiang-google
 /*/extensions/filters/network/ext_authz @esmet @tyxia @ggreenway @antoniovleonti @yanjunxiang-google
+/*/extensions/filters/udp/udp_proxy/session_filters/ext_authz @antonkanug @yanavlasov
 # original dst
 /*/extensions/filters/listener/original_dst @kyessenov @cpakulski @lambdai @nezdolik
 # mongo proxy

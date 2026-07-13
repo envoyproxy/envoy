@@ -295,3 +295,16 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "prefix_utility_lib",
+    srcs = ["prefix_utility.cc"],
+    hdrs = ["prefix_utility.h"],
+    deps = [
+        ":utility_lib",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:tag_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/config:well_known_names",
+    ],
+)

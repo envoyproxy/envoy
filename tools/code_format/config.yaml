@@ -229,6 +229,7 @@ paths:
     - source/extensions/http/cache/file_system_http_cache/config.cc
     - source/extensions/http/custom_response
     - source/extensions/http/early_header_mutation
+    - source/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/mapped_attribute_builder_factory.cc
     - source/extensions/http/injected_credentials
     - source/extensions/http/stateful_session
     - source/extensions/io_socket/user_space

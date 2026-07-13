@@ -20,24 +20,22 @@ namespace {
 
 TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(GrpcJsonReverseTranscoderFactory()
+  EXPECT_FALSE(GrpcJsonReverseTranscoderFactory()
                    .createFilterFactoryFromProto(
                        envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
                            GrpcJsonReverseTranscoder(),
                        "stats", context)
-                   .value(),
-               ProtoValidationException);
+                   .ok());
 }
 
 TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFailWithServerContext) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_THROW(GrpcJsonReverseTranscoderFactory()
+  EXPECT_FALSE(GrpcJsonReverseTranscoderFactory()
                    .createHttpFilterFactoryFromProto(
                        envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
                            GrpcJsonReverseTranscoder(),
                        "stats", context)
-                   .value(),
-               ProtoValidationException);
+                   .ok());
 }
 
 class GrpcJsonReverseTranscoderFilterFactoryTest : public testing::Test {

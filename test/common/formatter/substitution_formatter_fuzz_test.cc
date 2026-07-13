@@ -64,10 +64,9 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
     Formatter::FormatterPtr formatter_keep_empty;
     Formatter::FormatterPtr formatter_omit_empty;
 
-    try {
-      // Create struct for JSON formatter.
-      Protobuf::Struct struct_for_json_formatter;
-      TestUtility::loadFromYaml(fmt::format(R"EOF(
+    // Create struct for JSON formatter.
+    Protobuf::Struct struct_for_json_formatter;
+    TestUtility::loadFromYaml(fmt::format(R"EOF(
       may_empty_a: '%REQ(may_empty)%'
       raw_bool_value: true
       raw_nummber_value: 6
@@ -93,18 +92,24 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
       request_key: '%REQ(key_1)%_@!!!_"_%REQ(key_2)%'
       may_empty_b: '%REQ(may_empty)%'
       )EOF",
-                                            input.format(), input.format()),
-                                struct_for_json_formatter);
+                                          input.format(), input.format()),
+                              struct_for_json_formatter);
 
-      // Create JSON formatter.
-      formatter_keep_empty =
-          std::make_unique<Formatter::JsonFormatterImpl>(struct_for_json_formatter, false);
-      formatter_omit_empty =
-          std::make_unique<Formatter::JsonFormatterImpl>(struct_for_json_formatter, true);
-    } catch (const EnvoyException& e) {
-      ENVOY_LOG_MISC(debug, "JSON formatter failed, EnvoyException: {}", e.what());
+    // Create JSON formatter.
+    auto formatter_keep_empty_or =
+        Formatter::JsonFormatterImpl::create(struct_for_json_formatter, false);
+    if (!formatter_keep_empty_or.ok()) {
+      ENVOY_LOG_MISC(debug, "JSON formatter failed: {}", formatter_keep_empty_or.status());
       return;
     }
+    formatter_keep_empty = std::move(formatter_keep_empty_or).value();
+    auto formatter_omit_empty_or =
+        Formatter::JsonFormatterImpl::create(struct_for_json_formatter, true);
+    if (!formatter_omit_empty_or.ok()) {
+      ENVOY_LOG_MISC(debug, "JSON formatter failed: {}", formatter_omit_empty_or.status());
+      return;
+    }
+    formatter_omit_empty = std::move(formatter_omit_empty_or).value();
 
     // This should never throw.
     const std::string keep_empty_result =

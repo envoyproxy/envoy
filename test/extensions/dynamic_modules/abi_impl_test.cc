@@ -1,5 +1,6 @@
 #include <thread>
 
+#include "source/common/common/logger.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
 #include "test/mocks/server/server_factory_context.h"
@@ -94,6 +95,33 @@ TEST(CommonAbiImplTest, GetConcurrencyBeforeServerContextFailsClosed) {
   EXPECT_ENVOY_BUG(EXPECT_EQ(0u, envoy_dynamic_module_callback_get_concurrency()),
                    "envoy_dynamic_module_callback_get_concurrency called before the server "
                    "context was initialized");
+}
+
+// =============================================================================
+// Log Level Tests
+// =============================================================================
+
+// Verifies that `get_log_level` reflects the level configured on the dynamic modules logger for
+// every level in the enum.
+TEST(CommonAbiImplTest, GetLogLevelReflectsConfiguredLevel) {
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+
+  const std::pair<spdlog::level::level_enum, envoy_dynamic_module_type_log_level> cases[] = {
+      {spdlog::level::trace, envoy_dynamic_module_type_log_level_Trace},
+      {spdlog::level::debug, envoy_dynamic_module_type_log_level_Debug},
+      {spdlog::level::info, envoy_dynamic_module_type_log_level_Info},
+      {spdlog::level::warn, envoy_dynamic_module_type_log_level_Warn},
+      {spdlog::level::err, envoy_dynamic_module_type_log_level_Error},
+      {spdlog::level::critical, envoy_dynamic_module_type_log_level_Critical},
+      {spdlog::level::off, envoy_dynamic_module_type_log_level_Off},
+  };
+  for (const auto& [spdlog_level, abi_level] : cases) {
+    logger.set_level(spdlog_level);
+    EXPECT_EQ(abi_level, envoy_dynamic_module_callback_get_log_level());
+  }
+
+  logger.set_level(original_level);
 }
 
 // =============================================================================
