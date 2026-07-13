@@ -98,7 +98,8 @@ public:
 
   ItemPtrType remove(PendingStream& item) override { return item.removeFromList(this->items_); }
 
-  const ItemPtrType& next() const override { return this->items_.front(); }
+  // Use LIFO ordering so connection-pool tests exercise policy-defined ordering.
+  const ItemPtrType& next() const override { return this->items_.back(); }
   bool isOverloaded() const override { return this->items_.size() > 1; }
 
   Iterator begin() override {
@@ -257,6 +258,29 @@ TEST_F(ConnPoolImplBaseQueuePolicyTest, QueueOverloadedGaugeTracksTransitions) {
 
   first->cancel(ConnectionPool::CancelPolicy::Default);
   EXPECT_EQ(0, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+}
+
+TEST_F(ConnPoolImplBaseQueuePolicyTest, PurgeRespectsQueuePolicyOrder) {
+  pool_.newPendingStream(context_, /*can_send_early_data=*/false);
+  AttachContext second_context;
+  pool_.newPendingStream(second_context, /*can_send_early_data=*/false);
+  AttachContext third_context;
+  pool_.newPendingStream(third_context, /*can_send_early_data=*/false);
+
+  testing::InSequence sequence;
+  EXPECT_CALL(pool_, onPoolFailure(testing::_, testing::_,
+                                   ConnectionPool::PoolFailureReason::RemoteConnectionFailure,
+                                   testing::Ref(third_context)));
+  EXPECT_CALL(pool_, onPoolFailure(testing::_, testing::_,
+                                   ConnectionPool::PoolFailureReason::RemoteConnectionFailure,
+                                   testing::Ref(second_context)));
+  EXPECT_CALL(pool_, onPoolFailure(testing::_, testing::_,
+                                   ConnectionPool::PoolFailureReason::RemoteConnectionFailure,
+                                   testing::Ref(context_)));
+
+  pool_.purgePendingStreams(nullptr, "failure",
+                            ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  EXPECT_EQ(0, state_.pending_streams_);
 }
 
 class ConnPoolImplDispatcherBaseTest : public testing::Test {

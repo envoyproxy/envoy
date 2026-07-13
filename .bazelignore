@@ -7,8 +7,3 @@ tools/dev/src
 .project
 envoy-filter-example
 target
-
-bazel-bin
-bazel-out
-bazel-testlogs
-bazel-envoy

@@ -761,8 +761,10 @@ void ConnPoolImplBase::purgePendingStreams(
   //       if retry logic submits a new stream to the pool, we don't fail it inline.
   cluster_connectivity_state_.decrPendingStreams(pending_streams_->size());
   clearQueueOverloadedGauge();
-  pending_streams_to_purge_ = pending_streams_->takeItems();
-  pending_streams_ = createPendingStreamQueue(host_->cluster().queuePolicyConfig());
+  while (!pending_streams_->empty()) {
+    LinkedList::moveIntoListBack(pending_streams_->remove(*pending_streams_->next()),
+                                 pending_streams_to_purge_);
+  }
   while (!pending_streams_to_purge_.empty()) {
     PendingStreamPtr stream =
         pending_streams_to_purge_.front()->removeFromList(pending_streams_to_purge_);

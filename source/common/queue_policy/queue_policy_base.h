@@ -41,8 +41,6 @@ public:
 
   virtual ItemPtrType remove(ItemType& item) PURE;
 
-  ListType takeItems() { return std::move(items_); }
-
   virtual const ItemPtrType& next() const PURE;
   virtual bool isOverloaded() const PURE;
 
