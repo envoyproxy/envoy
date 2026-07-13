@@ -19,8 +19,8 @@ UpstreamRoleBasedAccessControlFilterConfigFactory::createFilterFactoryFromProto(
       MessageUtil::downcastAndValidate<const envoy::extensions::filters::http::rbac::v3::RBAC&>(
           proto_config, server_context.messageValidationVisitor());
 
-  // Use stats_prefix (e.g. "http.<stat_prefix>." from a router, or "" from a cluster whose
-  // scope already carries "cluster.<name>.") so RBAC counters land under the parent's namespace.
+  // stats_prefix carries the parent's namespace ("http.<stat_prefix>." from a router,
+  // "cluster.<name>." from a cluster) so RBAC counters land in the right place.
   auto config = std::make_shared<RBACFilter::RoleBasedAccessControlFilterConfig>(
       typed_config, stats_prefix, context.scope(), server_context,
       server_context.messageValidationVisitor());
