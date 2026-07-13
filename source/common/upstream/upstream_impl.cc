@@ -42,6 +42,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
+#include "source/common/conn_pool/pending_stream.h"
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/utility.h"
@@ -69,9 +70,6 @@
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
-namespace ConnectionPool {
-class PendingStream;
-}
 namespace Upstream {
 namespace {
 const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
@@ -95,8 +93,13 @@ validateQueuePolicyConfig(const envoy::config::core::v3::TypedExtensionConfig& q
   TRY_ASSERT_MAIN_THREAD {
     PendingStreamQueueFactory& factory =
         Config::Utility::getAndCheckFactory<PendingStreamQueueFactory>(queue_policy_config);
-    std::ignore = Config::Utility::translateToFactoryConfig(
+    ProtobufTypes::MessagePtr factory_config = Config::Utility::translateToFactoryConfig(
         queue_policy_config, server_context.messageValidationVisitor(), factory);
+    auto queue = factory.createQueuePolicy(*factory_config, "cluster." + factory.name(),
+                                           server_context.messageValidationVisitor());
+    if (!queue.ok()) {
+      resolve_status = queue.status();
+    }
   }
   END_TRY
   CATCH(EnvoyException & e, { resolve_status = absl::InvalidArgumentError(e.what()); });

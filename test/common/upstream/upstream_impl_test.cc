@@ -21,11 +21,13 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/config/metadata.h"
+#include "source/common/conn_pool/pending_stream.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/queue_policy/queue_policy_base.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/dns/dns_cluster.h"
@@ -55,6 +57,7 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/status.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -6634,6 +6637,24 @@ TEST_F(ClusterInfoImplTest, MaxRequestsPerConnectionValidation) {
                             "HttpProtocolOptions can be specified");
 }
 
+using PendingStreamQueueFactory =
+    Extensions::QueuePolicy::QueuePolicyFactory<ConnectionPool::PendingStream>;
+
+class RejectingQueuePolicyFactory : public PendingStreamQueueFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  absl::StatusOr<Extensions::QueuePolicy::QueuePolicyUniquePtr<ConnectionPool::PendingStream>>
+  createQueuePolicy(const Protobuf::Message&, const std::string&,
+                    ProtobufMessage::ValidationVisitor&) override {
+    return absl::InvalidArgumentError("queue policy creation failed");
+  }
+
+  std::string name() const override { return "envoy.queue_policy.rejecting"; }
+};
+
 TEST_F(ClusterInfoImplTest, InvalidQueuePolicyConfig) {
   const std::string yaml = R"EOF(
   name: cluster1
@@ -6649,6 +6670,23 @@ TEST_F(ClusterInfoImplTest, InvalidQueuePolicyConfig) {
       makeCluster(yaml), EnvoyException,
       "Didn't find a registered implementation for 'envoy.queue_policy.invalid' with type URL: "
       "'google.protobuf.Struct'");
+}
+
+TEST_F(ClusterInfoImplTest, QueuePolicyCreationFailure) {
+  RejectingQueuePolicyFactory factory;
+  Registry::InjectFactory<PendingStreamQueueFactory> registered_factory(factory);
+
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  queue_policy_config:
+    name: envoy.queue_policy.rejecting
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException, "queue policy creation failed");
 }
 
 TEST_F(ClusterInfoImplTest, DeprecatedMaxRequestsPerConnection) {

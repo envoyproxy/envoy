@@ -21,9 +21,9 @@ namespace QueuePolicy {
 // Base class that handles queuing for objects.
 template <class ItemType> class QueueBase {
 
-  static_assert(std::is_base_of<ConnectionPool::Cancellable, ItemType>::value,
+  static_assert(std::is_base_of_v<ConnectionPool::Cancellable, ItemType>,
                 "Queue item type must inherit from ConnectionPool::Cancellable");
-  static_assert(std::is_base_of<LinkedObject<ItemType>, ItemType>::value,
+  static_assert(std::is_base_of_v<LinkedObject<ItemType>, ItemType>,
                 "Queue item type must inherit from LinkedObject");
 
   using ItemPtrType = std::unique_ptr<ItemType>;
@@ -48,8 +48,8 @@ public:
 
   class Iterator {
   public:
-    Iterator(QueueBase::ListType::iterator&& itor) : itor_(std::move(itor)) {}
-    Iterator(QueueBase::ListType::reverse_iterator&& itor) : itor_(std::move(itor)) {}
+    Iterator(typename ListType::iterator itor) : itor_(itor) {}
+    Iterator(typename ListType::reverse_iterator itor) : itor_(itor) {}
 
     Iterator& operator++() {
       if (auto* it = absl::get_if<typename QueueBase::ListType::iterator>(&itor_)) {
@@ -115,8 +115,8 @@ public:
    * Create a particular queue policy implementation.
    * @param config supplies the configuration for the queue policy.
    * @param stat_prefix prefix for stat logging
-   * @param context supplies the context for queue policy.
-   * @return FilterFactoryCb the factory creation function.
+   * @param validation_visitor validation visitor for config validation.
+   * @return the queue policy unique pointer or an error status.
    */
   virtual absl::StatusOr<QueuePolicyUniquePtr<ItemType>>
   createQueuePolicy(const Protobuf::Message& config, const std::string& stat_prefix,

@@ -28,15 +28,9 @@ public:
 
   bool isOverloaded() const override { return false; }
 
-  Iterator begin() override {
-    auto it = this->items_.begin();
-    return Iterator(std::move(it));
-  }
+  Iterator begin() override { return Iterator(this->items_.begin()); }
 
-  Iterator end() override {
-    auto it = this->items_.end();
-    return Iterator(std::move(it));
-  }
+  Iterator end() override { return Iterator(this->items_.end()); }
 };
 
 } // namespace QueuePolicy

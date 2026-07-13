@@ -416,6 +416,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
+        "//source/common/conn_pool:pending_stream_lib",
         "//source/common/http/http1:codec_stats_lib",
         "//source/common/http/http2:codec_stats_lib",
         "//source/common/http:utility_lib",

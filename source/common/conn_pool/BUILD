@@ -9,16 +9,23 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "pending_stream_lib",
+    hdrs = ["pending_stream.h"],
+    deps = [
+        "//envoy/common:conn_pool_interface",
+        "//source/common/common:linked_object",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_pool_base_lib",
     srcs = [
         "conn_pool_base.cc",
         "pending_stream.cc",
     ],
-    hdrs = [
-        "conn_pool_base.h",
-        "pending_stream.h",
-    ],
+    hdrs = ["conn_pool_base.h"],
     deps = [
+        ":pending_stream_lib",
         "//envoy/stats:timespan_interface",
         "//source/common/common:debug_recursion_checker_lib",
         "//source/common/common:linked_object",
