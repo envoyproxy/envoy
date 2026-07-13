@@ -1451,9 +1451,8 @@ ClusterInfoImpl::ClusterInfoImpl(
         return;
       }
 
-      // upstream_context_ uses the server root scope (empty prefix). Pass "cluster.<name>."
-      // explicitly as stats_prefix so upstream HTTP filters emit stats under "cluster.<name>.*",
-      // mirroring the router case where the HCM stat prefix is passed as stats_prefix.
+      // upstream_context_ uses the server root scope (empty prefix), so pass "cluster.<name>."
+      // explicitly as stats_prefix to scope upstream HTTP filter stats under "cluster.<name>.*".
       const std::string stats_prefix = absl::StrCat("cluster.", name_, ".");
       Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                               Server::Configuration::UpstreamHttpFilterConfigFactory>
