@@ -229,7 +229,7 @@ public:
   // FilterConfigProviderManagerImpl::createDynamicFilterConfigProvider so the ECDS path also passes
   // "cluster.<name>." rather than "" here.
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                                const std::string& stats_prefix,
+                                                                const std::string& /*stats_prefix*/,
                                                                 UpstreamFactoryContext& context) {
     return createFilterFactoryFromProto(config, context);
   }

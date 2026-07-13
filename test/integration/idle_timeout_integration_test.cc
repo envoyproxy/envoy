@@ -652,6 +652,14 @@ public:
 class UpstreamIdleTimeoutVerifierFilterFactory
     : public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
 public:
+  // The 2-arg form is pure; the production call path uses the stats_prefix overload below, so this
+  // simply delegates with an empty prefix (stats then land directly under context.scope()).
+  Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& config,
+                               Server::Configuration::UpstreamFactoryContext& context) override {
+    return createFilterFactoryFromProto(config, EMPTY_STRING, context);
+  }
+
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string& stats_prefix,
                                Server::Configuration::UpstreamFactoryContext& context) override {
