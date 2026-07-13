@@ -40,7 +40,7 @@ protected:
           dynamic_module_config;
       dynamic_module_config.mutable_dynamic_module_config()->set_name("listener_integration_test");
       dynamic_module_config.set_filter_name(filter_name);
-      filter->mutable_typed_config()->PackFrom(dynamic_module_config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(dynamic_module_config);
     });
 
     BaseIntegrationTest::initialize();
@@ -61,6 +61,18 @@ INSTANTIATE_TEST_SUITE_P(SdkLanguages, DynamicModulesListenerSdkIntegrationTest,
 
 TEST_P(DynamicModulesListenerSdkIntegrationTest, WriteToSocket) {
   initializeFilter("write_to_socket");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write("ping"));
+  tcp_client->waitForData("ping");
+  tcp_client->close();
+}
+
+TEST_P(DynamicModulesListenerSdkIntegrationTest, ReadAttributes) {
+  if (GetParam() != "rust") {
+    GTEST_SKIP() << "the read_attributes filter is only in the rust test module";
+  }
+  initializeFilter("read_attributes");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->write("ping"));

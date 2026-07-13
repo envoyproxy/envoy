@@ -87,6 +87,11 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     },
     "streaming_terminal_filter" => Some(Box::new(StreamingTerminalFilterConfig {})),
     "streaming_response_reentry" => Some(Box::new(StreamingResponseReentryFilterConfig {})),
+    "reentrant_stream_complete" => Some(Box::new(ReentrantStreamCompleteFilterConfig {
+      stream_complete_total: envoy_filter_config
+        .define_counter("reentrant_stream_complete_total")
+        .unwrap(),
+    })),
     "buffer_limit_filter" => Some(Box::new(BufferLimitFilterConfig {})),
     "http_stream_basic" => Some(Box::new(HttpStreamBasicConfig {
       cluster_name: String::from_utf8(config.to_owned()).unwrap(),
@@ -148,6 +153,9 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
       Some(Box::new(ConfigStreamConfig { stream_done }))
     },
     "list_metadata_callbacks" => Some(Box::new(ListMetadataCallbacksFilterConfig {})),
+    "filter_state_object_recreate" => Some(Box::new(FilterStateObjectRecreateFilterConfig {})),
+    "upstream_connection_id" => Some(Box::new(UpstreamConnectionIdFilterConfig {})),
+    "log_level" => Some(Box::new(LogLevelFilterConfig {})),
     _ => panic!("Unknown filter name: {name}"),
   }
 }
@@ -158,6 +166,82 @@ fn new_http_filter_per_route_config_fn(name: &str, config: &[u8]) -> Option<Box<
       value: String::from_utf8(config.to_owned()).unwrap(),
     })),
     _ => panic!("Unknown filter name: {name}"),
+  }
+}
+
+/// A live, non-serializable object: the endpoints of an in-flight async exchange. Live channel
+/// handles cannot be reduced to bytes, so the byte-oriented filter state API cannot carry them;
+/// they must survive recreate_stream as a live object.
+struct LiveExchange {
+  sender: std::sync::mpsc::Sender<u64>,
+  receiver: std::sync::mpsc::Receiver<u64>,
+}
+
+const LIVE_OBJECT_KEY: &[u8] = b"envoy.dynamic_modules.test.live_object";
+
+/// Frees the boxed [`LiveExchange`] exactly once when Envoy destroys the filter state entry.
+extern "C" fn drop_live_exchange(object: *mut std::ffi::c_void) {
+  drop(unsafe { Box::from_raw(object as *mut LiveExchange) });
+}
+
+/// A HTTP filter that keeps a live object alive across recreate_stream, the way a filter holding the
+/// endpoints of an async exchange would. The first instance queues a token on the live channel and
+/// parks it in filter state at Request lifespan, then recreates the stream, which destroys the
+/// instance. The rebuilt instance re-attaches to the same live object and drains the queued token,
+/// proving the live handles survived the recreate (a serialized copy would not carry the message).
+struct FilterStateObjectRecreateFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for FilterStateObjectRecreateFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(FilterStateObjectRecreateFilter {})
+  }
+}
+
+struct FilterStateObjectRecreateFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateObjectRecreateFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    match envoy_filter.get_filter_state_object(LIVE_OBJECT_KEY) {
+      None => {
+        let (sender, receiver) = std::sync::mpsc::channel::<u64>();
+        // Queue a token on the live channel before this instance is destroyed by the recreate.
+        sender.send(0xABCD).unwrap();
+        let object =
+          Box::into_raw(Box::new(LiveExchange { sender, receiver })) as *mut std::ffi::c_void;
+        // SAFETY: `object` is a freshly boxed LiveExchange and `drop_live_exchange` frees exactly
+        // that type without unwinding.
+        assert!(unsafe {
+          envoy_filter.set_filter_state_object(
+            LIVE_OBJECT_KEY,
+            object,
+            drop_live_exchange,
+            abi::envoy_dynamic_module_type_filter_state_life_span::Request,
+          )
+        });
+        assert!(envoy_filter.recreate_stream(None));
+        abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+      },
+      Some(object) => {
+        // The rebuilt instance re-attaches to the same live object and drains the token the
+        // destroyed instance queued, then round-trips it to show both endpoints are still live.
+        let exchange = unsafe { &*(object as *const LiveExchange) };
+        let token = exchange.receiver.recv().unwrap();
+        exchange.sender.send(token).unwrap();
+        let token = exchange.receiver.recv().unwrap();
+        let token_str = format!("{token:#x}");
+        envoy_filter.send_response(
+          200,
+          &[("x-live-object-value", token_str.as_bytes())],
+          None,
+          None,
+        );
+        abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+      },
+    }
   }
 }
 
@@ -331,6 +415,53 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PassthroughHttpFilter {
     envoy_log_error!("on_request_headers called");
     envoy_log_critical!("on_request_headers called");
     envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+}
+
+struct UpstreamConnectionIdFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for UpstreamConnectionIdFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(UpstreamConnectionIdFilter {})
+  }
+}
+
+struct UpstreamConnectionIdFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamConnectionIdFilter {
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    assert!(envoy_filter.get_upstream_connection_id() > 0);
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+}
+
+struct LogLevelFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for LogLevelFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(LogLevelFilter {})
+  }
+}
+
+struct LogLevelFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for LogLevelFilter {
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    let level = (get_log_level() as u32).to_string();
+    envoy_filter.set_response_header("x-log-level", level.as_bytes());
+    let info_enabled = is_log_enabled(envoy_dynamic_module_type_log_level::Info).to_string();
+    envoy_filter.set_response_header("x-log-info-enabled", info_enabled.as_bytes());
+    let error_enabled = is_log_enabled(envoy_dynamic_module_type_log_level::Error).to_string();
+    envoy_filter.set_response_header("x-log-error-enabled", error_enabled.as_bytes());
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }
 
@@ -1525,6 +1656,61 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingResponseReentryHttpFilte
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
     envoy_filter.set_response_header("x-reentered", b"yes");
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+}
+
+// =============================================================================
+// Reentrant on_stream_complete Test Filter
+// =============================================================================
+
+// Completes its response with end-of-stream from on_scheduled. Completing with eos drives
+// FilterManager::onStreamComplete inline (before the scheduled callback returns), which synchronously
+// re-enters the same CatchUnwind-wrapped filter's on_stream_complete. If the filter isn't kept
+// alive across the re-entry, on_stream_complete is skipped and the counter isn't incremented.
+struct ReentrantStreamCompleteFilterConfig {
+  stream_complete_total: EnvoyCounterId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for ReentrantStreamCompleteFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    // The bug under test only manifests through the CatchUnwind panic guard, so the filter must be
+    // wrapped here rather than returned bare.
+    Box::new(CatchUnwind::new(ReentrantStreamCompleteFilter {
+      stream_complete_total: self.stream_complete_total,
+    }))
+  }
+}
+
+struct ReentrantStreamCompleteFilter {
+  stream_complete_total: EnvoyCounterId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ReentrantStreamCompleteFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    // Defer the response so it is completed from inside a callback rather than inline here.
+    let scheduler = envoy_filter.new_scheduler();
+    _ = std::thread::spawn(move || {
+      scheduler.commit(1);
+    });
+    envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  }
+
+  fn on_scheduled(&mut self, envoy_filter: &mut EHF, _event_id: u64) {
+    // Completing the response with eos re-enters on_stream_complete before this returns. Use the
+    // streaming response ABI (headers then eos data) rather than a local reply so the only re-entry
+    // is into on_stream_complete (the encode hooks are gated by sent_local_reply_).
+    envoy_filter.send_response_headers(&[(":status", b"200"), ("x-done", b"yes")], false);
+    envoy_filter.send_response_data(b"body", true);
+  }
+
+  fn on_stream_complete(&mut self, envoy_filter: &mut EHF) {
+    envoy_filter
+      .increment_counter(self.stream_complete_total, 1)
+      .unwrap();
   }
 }
 

@@ -44,7 +44,7 @@ public:
   }
 
   Grpc::MockAsyncClient* async_client_;
-  absl::optional<std::chrono::milliseconds> timeout_;
+  std::optional<std::chrono::milliseconds> timeout_;
   GrpcExternalAuthClientPtr client_;
   Grpc::MockAsyncRequest async_request_;
   Tracing::MockSpan span_;

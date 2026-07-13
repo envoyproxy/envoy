@@ -19,6 +19,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/mongo_proxy:bson_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

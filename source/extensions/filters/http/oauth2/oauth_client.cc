@@ -45,6 +45,16 @@ constexpr const char* UrlBodyTemplateWithoutSecretForAuthCode =
 constexpr const char* UrlBodyTemplateWithoutSecretForRefreshToken =
     "grant_type=refresh_token&refresh_token={0}&client_id={1}";
 
+constexpr const char* UrlBodyTemplateWithAssertionForAuthCode =
+    "grant_type=authorization_code&code={0}&client_id={1}"
+    "&client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-assertion-type%3Ajwt-bearer"
+    "&client_assertion={2}&redirect_uri={3}&code_verifier={4}";
+
+constexpr const char* UrlBodyTemplateWithAssertionForRefreshToken =
+    "grant_type=refresh_token&refresh_token={0}&client_id={1}"
+    "&client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-assertion-type%3Ajwt-bearer"
+    "&client_assertion={2}";
+
 } // namespace
 
 void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
@@ -83,6 +93,14 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
     body = fmt::format(
         UrlBodyTemplateWithoutSecretForAuthCode, auth_code,
         Http::Utility::PercentEncoding::encode(client_id, WwwFormUrlEncodedReservedCharacters),
+        encoded_cb_url, code_verifier);
+    break;
+  case AuthType::PrivateKeyJwt:
+    // For private_key_jwt, the secret parameter contains the pre-built JWT assertion.
+    body = fmt::format(
+        UrlBodyTemplateWithAssertionForAuthCode, auth_code,
+        Http::Utility::PercentEncoding::encode(client_id, WwwFormUrlEncodedReservedCharacters),
+        Http::Utility::PercentEncoding::encode(secret, WwwFormUrlEncodedReservedCharacters),
         encoded_cb_url, code_verifier);
     break;
   }
@@ -128,6 +146,14 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
         Http::Utility::PercentEncoding::encode(refresh_token, WwwFormUrlEncodedReservedCharacters),
         Http::Utility::PercentEncoding::encode(client_id, WwwFormUrlEncodedReservedCharacters));
     break;
+  case AuthType::PrivateKeyJwt:
+    // For private_key_jwt, the secret parameter contains the pre-built JWT assertion.
+    body = fmt::format(
+        UrlBodyTemplateWithAssertionForRefreshToken,
+        Http::Utility::PercentEncoding::encode(refresh_token, WwwFormUrlEncodedReservedCharacters),
+        Http::Utility::PercentEncoding::encode(client_id, WwwFormUrlEncodedReservedCharacters),
+        Http::Utility::PercentEncoding::encode(secret, WwwFormUrlEncodedReservedCharacters));
+    break;
   }
 
   request->body().add(body);
@@ -135,6 +161,17 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
   ENVOY_STREAM_LOG(debug, "Dispatching OAuth request for update access token by refresh token.",
                    *decoder_callbacks_);
   dispatchRequest(std::move(request));
+}
+
+void OAuth2ClientImpl::cancel() {
+  parent_ = nullptr;
+  decoder_callbacks_ = nullptr;
+  Http::AsyncClient::Request* in_flight = in_flight_request_;
+  in_flight_request_ = nullptr;
+  if (in_flight != nullptr) {
+    in_flight->cancel();
+  }
+  state_ = OAuthState::Idle;
 }
 
 void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
@@ -186,6 +223,11 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   // token request. Set state_ for the caller to check instead of calling continueDecoding.
   const bool is_request_dispatched = (in_flight_request_ != nullptr);
   in_flight_request_ = nullptr;
+
+  if (parent_ == nullptr) {
+    state_ = OAuthState::Idle;
+    return;
+  }
 
   ASSERT(state_ == OAuthState::PendingAccessToken ||
          state_ == OAuthState::PendingAccessTokenByRefreshToken);
@@ -265,11 +307,17 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
 
 void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
                                  Http::AsyncClient::FailureReason) {
-  ENVOY_STREAM_LOG(debug, "OAuth request failed.", *decoder_callbacks_);
   // If not yet dispatched, onFailure was called synchronously during decodeHeaders rather than in
   // an async token request. Set state_ for the caller to check instead of calling continueDecoding.
   const bool is_request_dispatched = (in_flight_request_ != nullptr);
   in_flight_request_ = nullptr;
+
+  if (parent_ == nullptr) {
+    state_ = OAuthState::Idle;
+    return;
+  }
+
+  ENVOY_STREAM_LOG(debug, "OAuth request failed.", *decoder_callbacks_);
   const OAuthState oldState = state_;
   state_ = OAuthState::Idle;
 

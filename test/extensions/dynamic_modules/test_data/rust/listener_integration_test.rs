@@ -19,6 +19,7 @@ fn new_listener_filter_config_fn<EC: EnvoyListenerFilterConfig, ELF: EnvoyListen
     "buffer_read" => Some(Box::new(BufferReadFilterConfig)),
     "http_callout_on_accept" => Some(Box::new(HttpCalloutOnAcceptFilterConfig)),
     "dynamic_metadata" => Some(Box::new(DynamicMetadataFilterConfig)),
+    "read_attributes" => Some(Box::new(ReadAttributesFilterConfig)),
     _ => panic!("unknown filter name: {name}"),
   }
 }
@@ -197,6 +198,50 @@ impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for DynamicMetadataFilter {
       .get_dynamic_metadata_string("dynamic_modules.empty", "batch_key1")
       .is_none());
 
+    // Set a non-UTF-8 byte value and read it back to prove set_dynamic_metadata_bytes preserves it.
+    envoy_filter.set_dynamic_metadata_bytes(
+      "dynamic_modules.test",
+      "bytes_key",
+      &[0xff, 0x00, 0xfe],
+    );
+    assert_eq!(
+      envoy_filter
+        .get_dynamic_metadata_string("dynamic_modules.test", "bytes_key")
+        .map(|value| value.as_slice().to_vec()),
+      Some(vec![0xff, 0x00, 0xfe])
+    );
+
+    abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+  }
+}
+
+// =============================================================================
+// Read Attributes Test Filter
+// =============================================================================
+
+// Reads connection stream info attributes through the generic attribute getters and asserts the
+// downstream addresses resolve at accept time.
+struct ReadAttributesFilterConfig;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for ReadAttributesFilterConfig {
+  fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+    Box::new(ReadAttributesFilter)
+  }
+}
+
+struct ReadAttributesFilter;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for ReadAttributesFilter {
+  fn on_accept(
+    &mut self,
+    envoy_filter: &mut ELF,
+  ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+    assert!(envoy_filter
+      .get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::SourceAddress)
+      .is_some());
+    assert!(envoy_filter
+      .get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::DestinationAddress)
+      .is_some());
     abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
   }
 }

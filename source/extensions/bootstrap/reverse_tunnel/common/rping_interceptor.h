@@ -11,7 +11,7 @@ class RpingInterceptor : public virtual Network::IoSocketHandleImpl {
 public:
   // Intercept reads to handle reverse connection keep-alive pings.
   Api::IoCallUint64Result read(Buffer::Instance& buffer,
-                               absl::optional<uint64_t> max_length) override;
+                               std::optional<uint64_t> max_length) override;
 
   virtual void onPingMessage() PURE;
 

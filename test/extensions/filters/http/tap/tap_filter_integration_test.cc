@@ -1,8 +1,13 @@
+#include <fstream>
+
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "test/extensions/common/tap/common.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/utility.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
@@ -1325,6 +1330,306 @@ tap_config:
             trace.http_buffered_trace().response().body().as_string().find("response"));
 
   admin_client_->close();
+}
+
+// Below are integration tests for the tap_enabled fractional-percent sampling
+// path. These exercise the filter end-to-end using the real RandomGenerator;
+// finer-grained semantics are covered in unit tests for TapConfigBaseImpl.
+
+// Build a static file_per_tap filter config with an any_match and a configured
+// tap_enabled fractional percent (optionally driven by a runtime key).
+std::string samplingFilterConfig(uint32_t numerator,
+                                 envoy::type::v3::FractionalPercent::DenominatorType denominator,
+                                 const std::string& path_prefix,
+                                 envoy::config::tap::v3::OutputSink::Format format,
+                                 const std::string& runtime_key) {
+  constexpr absl::string_view kTemplate = R"EOF(
+name: tap
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
+  common_config:
+    static_config:
+      match:
+        any_match: true
+      output_config:
+        sinks:
+        - format: {0}
+          file_per_tap:
+            path_prefix: {1}
+      tap_enabled:
+        default_value:
+          numerator: {2}
+          denominator: {3}
+        runtime_key: "{4}"
+)EOF";
+
+  return fmt::format(
+      kTemplate, envoy::config::tap::v3::OutputSink::Format_Name(format), path_prefix, numerator,
+      envoy::type::v3::FractionalPercent::DenominatorType_Name(denominator), runtime_key);
+}
+
+// Load a TraceWrapper from a file whose extension reflects the configured
+// output format.
+envoy::data::tap::v3::TraceWrapper
+parseTraceFile(const std::string& filename, envoy::config::tap::v3::OutputSink::Format format) {
+  envoy::data::tap::v3::TraceWrapper wrapper;
+  std::ifstream stream(filename, std::ios::binary);
+  EXPECT_TRUE(stream.is_open()) << filename;
+  switch (format) {
+  case envoy::config::tap::v3::OutputSink::PROTO_BINARY:
+    EXPECT_TRUE(wrapper.ParseFromIstream(&stream)) << filename;
+    break;
+  case envoy::config::tap::v3::OutputSink::PROTO_BINARY_LENGTH_DELIMITED: {
+    Protobuf::io::IstreamInputStream raw(&stream);
+    Protobuf::io::CodedInputStream coded(&raw);
+    uint32_t size = 0;
+    EXPECT_TRUE(coded.ReadVarint32(&size)) << filename;
+    auto limit = coded.PushLimit(size);
+    EXPECT_TRUE(wrapper.ParseFromCodedStream(&coded)) << filename;
+    coded.PopLimit(limit);
+    break;
+  }
+  default: {
+    std::string contents((std::istreambuf_iterator<char>(stream)),
+                         std::istreambuf_iterator<char>());
+    TestUtility::loadFromJson(contents, wrapper);
+    break;
+  }
+  }
+  return wrapper;
+}
+
+// Verify that tap_enabled = 0/100 produces no trace files and rq_sampled_out
+// counts every request.
+TEST_P(TapIntegrationTest, ZeroPercentSamplingProducesNoTraces) {
+  const std::string path_prefix = getTempPathPrefix();
+  const auto format = envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES;
+  initializeFilter(samplingFilterConfig(0, envoy::type::v3::FractionalPercent::HUNDRED, path_prefix,
+                                        format, ""));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  constexpr int num_requests = 50;
+  for (int i = 0; i < num_requests; i++) {
+    makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
+  }
+  codec_client_->close();
+  test_server_->waitForCounter("http.config_test.tap.rq_sampled_out", Eq(num_requests));
+
+  auto files = TestUtility::listFiles(path_prefix, false);
+  // No tap files should have been emitted.
+  for (const auto& f : files) {
+    EXPECT_FALSE(absl::EndsWith(f, ".json")) << f;
+    EXPECT_FALSE(absl::EndsWith(f, ".pb")) << f;
+    EXPECT_FALSE(absl::EndsWith(f, ".pb_length_delimited")) << f;
+  }
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
+  EXPECT_EQ(num_requests, test_server_->counter("http.config_test.tap.rq_sampled_out")->value());
+}
+
+// Verify that tap_enabled = 100/100 taps every request and stamps each emitted
+// TraceWrapper with the configured configured_sample_rate.
+TEST_P(TapIntegrationTest, FullPercentSamplingProducesAllTraces) {
+  const std::string path_prefix = getTempPathPrefix();
+  const auto format = envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES;
+  initializeFilter(samplingFilterConfig(100, envoy::type::v3::FractionalPercent::HUNDRED,
+                                        path_prefix, format, ""));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  constexpr int num_requests = 50;
+  for (int i = 0; i < num_requests; i++) {
+    makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
+  }
+  codec_client_->close();
+  test_server_->waitForCounter("http.config_test.tap.rq_tapped", Eq(num_requests));
+
+  auto files = TestUtility::listFiles(path_prefix, false);
+  int json_files = 0;
+  for (const auto& f : files) {
+    if (!absl::EndsWith(f, ".json")) {
+      continue;
+    }
+    ++json_files;
+    auto wrapper = parseTraceFile(f, format);
+    EXPECT_TRUE(wrapper.has_http_buffered_trace()) << f;
+    EXPECT_TRUE(wrapper.has_configured_sample_rate()) << f;
+    EXPECT_EQ(100u, wrapper.configured_sample_rate().numerator()) << f;
+    EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
+              wrapper.configured_sample_rate().denominator())
+        << f;
+  }
+  EXPECT_EQ(num_requests, json_files);
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.tap.rq_sampled_out")->value());
+}
+
+// Verify that with tap_enabled = 10/100 every request is either tapped or
+// counted as sampled out, and that every emitted trace carries the configured
+// configured_sample_rate. The exact split is intentionally not asserted: it
+// depends on the runtime layer's RNG and any bound would be nondeterministic
+// in CI. Exact-rate semantics are covered deterministically by the unit tests
+// and the 0%/100%/runtime-override integration tests.
+TEST_P(TapIntegrationTest, PartialPercentSamplingCountsConsistently) {
+  const std::string path_prefix = getTempPathPrefix();
+  const auto format = envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES;
+  initializeFilter(samplingFilterConfig(10, envoy::type::v3::FractionalPercent::HUNDRED,
+                                        path_prefix, format, ""));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  constexpr int num_requests = 50;
+  for (int i = 0; i < num_requests; i++) {
+    makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
+  }
+  codec_client_->close();
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
+
+  const uint64_t tapped = test_server_->counter("http.config_test.tap.rq_tapped")->value();
+  const uint64_t sampled_out =
+      test_server_->counter("http.config_test.tap.rq_sampled_out")->value();
+  EXPECT_EQ(num_requests, tapped + sampled_out);
+
+  auto files = TestUtility::listFiles(path_prefix, false);
+  int json_files = 0;
+  for (const auto& f : files) {
+    if (!absl::EndsWith(f, ".json")) {
+      continue;
+    }
+    ++json_files;
+    auto wrapper = parseTraceFile(f, format);
+    EXPECT_TRUE(wrapper.has_configured_sample_rate()) << f;
+    EXPECT_EQ(10u, wrapper.configured_sample_rate().numerator()) << f;
+    EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
+              wrapper.configured_sample_rate().denominator())
+        << f;
+  }
+  EXPECT_EQ(static_cast<uint64_t>(json_files), tapped);
+}
+
+// Verify that flipping the runtime key from 0 to 100 promotes a request from
+// rq_sampled_out to rq_tapped without re-initializing the filter.
+TEST_P(TapIntegrationTest, RuntimeOverrideChangesSampling) {
+  const std::string path_prefix = getTempPathPrefix();
+  const auto format = envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES;
+  const std::string runtime_key = "tap.integration.sampling";
+  // Start with default 0/100 so the static configuration would never sample,
+  // but the runtime layer can lift the rate to 100% later in the test.
+  config_helper_.addRuntimeOverride(runtime_key, "0");
+  initializeFilter(samplingFilterConfig(0, envoy::type::v3::FractionalPercent::HUNDRED, path_prefix,
+                                        format, runtime_key));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  // With runtime value 0, no trace should be emitted.
+  makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
+  test_server_->waitForCounter("http.config_test.tap.rq_sampled_out", Eq(1));
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
+
+  // Flip the runtime override to 100 via the admin endpoint.
+  BufferingStreamDecoderPtr admin_modify = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", fmt::format("/runtime_modify?{}=100", runtime_key), "",
+      downstreamProtocol(), version_);
+  ASSERT_TRUE(admin_modify->complete());
+  EXPECT_EQ("200", admin_modify->headers().getStatusValue());
+
+  // With runtime value 100 the next request must be tapped.
+  makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
+  codec_client_->close();
+  test_server_->waitForCounter("http.config_test.tap.rq_tapped", Eq(1));
+
+  auto files = TestUtility::listFiles(path_prefix, false);
+  int json_files = 0;
+  for (const auto& f : files) {
+    if (!absl::EndsWith(f, ".json")) {
+      continue;
+    }
+    ++json_files;
+    auto wrapper = parseTraceFile(f, format);
+    EXPECT_TRUE(wrapper.has_configured_sample_rate()) << f;
+    // The stamp records the configured default_value (0/100). Consumers must
+    // consult runtime separately for the effective rate -- this is documented
+    // on the configured_sample_rate field.
+    EXPECT_EQ(0u, wrapper.configured_sample_rate().numerator()) << f;
+  }
+  EXPECT_EQ(1, json_files);
+}
+
+// Verify binary proto file output round-trips with configured_sample_rate
+// stamped. PROTO_BINARY_LENGTH_DELIMITED exercises the most involved parse
+// path; the JSON round-trip is covered by the other sampling tests above.
+TEST_P(TapIntegrationTest, ProtoBinaryLengthDelimitedFormatWithSampling) {
+  const auto format = envoy::config::tap::v3::OutputSink::PROTO_BINARY_LENGTH_DELIMITED;
+  const std::string path_prefix = getTempPathPrefix();
+  initializeFilter(samplingFilterConfig(100, envoy::type::v3::FractionalPercent::HUNDRED,
+                                        path_prefix, format, ""));
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  constexpr int num_requests = 5;
+  for (int i = 0; i < num_requests; i++) {
+    makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
+  }
+  codec_client_->close();
+  test_server_->waitForCounter("http.config_test.tap.rq_tapped", Eq(num_requests));
+
+  auto files = TestUtility::listFiles(path_prefix, false);
+  int matched = 0;
+  for (const auto& f : files) {
+    if (!absl::EndsWith(f, MessageUtil::FileExtensions::get().ProtoBinaryLengthDelimited)) {
+      continue;
+    }
+    ++matched;
+    auto wrapper = parseTraceFile(f, format);
+    EXPECT_TRUE(wrapper.has_http_buffered_trace()) << f;
+    EXPECT_TRUE(wrapper.has_configured_sample_rate()) << f;
+    EXPECT_EQ(100u, wrapper.configured_sample_rate().numerator()) << f;
+    EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
+              wrapper.configured_sample_rate().denominator())
+        << f;
+  }
+  EXPECT_EQ(num_requests, matched);
+}
+
+// Verify that with streamed output and sampling configured, configured_sample_rate
+// is stamped on the first emitted segment of the stream only.
+TEST_P(TapIntegrationTest, StreamedOutputStampsFirstSegmentOnly) {
+  constexpr absl::string_view filter_config =
+      R"EOF(
+name: tap
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
+  common_config:
+    static_config:
+      match:
+        any_match: true
+      output_config:
+        streaming: true
+        sinks:
+          - format: PROTO_BINARY_LENGTH_DELIMITED
+            file_per_tap:
+              path_prefix: {}
+      tap_enabled:
+        default_value:
+          numerator: 100
+          denominator: HUNDRED
+)EOF";
+
+  const std::string path_prefix = getTempPathPrefix();
+  initializeFilter(fmt::format(filter_config, path_prefix));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  makeRequest(request_headers_tap_, {"hello"}, &request_trailers_, response_headers_no_tap_,
+              {"world"}, &response_trailers_);
+  codec_client_->close();
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
+
+  std::vector<envoy::data::tap::v3::TraceWrapper> traces =
+      Extensions::Common::Tap::readTracesFromPath(path_prefix);
+  ASSERT_EQ(6, traces.size());
+  EXPECT_TRUE(traces[0].http_streamed_trace_segment().has_request_headers());
+  EXPECT_TRUE(traces[0].has_configured_sample_rate());
+  EXPECT_EQ(100u, traces[0].configured_sample_rate().numerator());
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
+            traces[0].configured_sample_rate().denominator());
+  for (size_t i = 1; i < traces.size(); i++) {
+    EXPECT_FALSE(traces[i].has_configured_sample_rate()) << "segment " << i;
+  }
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
 }
 
 } // namespace

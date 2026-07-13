@@ -103,6 +103,11 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       "", "skip-deprecated-logs",
       "Skips the logging of deprecated field warnings during Protobuf message validation", cmd,
       false);
+  TCLAP::SwitchArg log_stacktrace_single_entry(
+      "", "log-stacktrace-single-entry",
+      "Emit the entire stack trace in a single log entry instead of one "
+      "log call per frame. Useful for log aggregation systems.",
+      cmd, false);
 
   TCLAP::ValueArg<std::string> admin_address_path("", "admin-address-path", "Admin address path",
                                                   false, "", "string", cmd);
@@ -289,6 +294,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   reject_unknown_dynamic_fields_ = reject_unknown_dynamic_fields.getValue();
   ignore_unknown_dynamic_fields_ = ignore_unknown_dynamic_fields.getValue();
   skip_deprecated_logs_ = skip_deprecated_logs.getValue();
+  log_stacktrace_single_entry_ = log_stacktrace_single_entry.getValue();
   admin_address_path_ = admin_address_path.getValue();
   log_path_ = log_path.getValue();
   service_cluster_ = service_cluster.getValue();
@@ -412,6 +418,7 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_reject_unknown_dynamic_fields(reject_unknown_dynamic_fields_);
   command_line_options->set_ignore_unknown_dynamic_fields(ignore_unknown_dynamic_fields_);
   command_line_options->set_skip_deprecated_logs(skip_deprecated_logs_);
+  command_line_options->set_log_stacktrace_single_entry(log_stacktrace_single_entry_);
   command_line_options->set_admin_address_path(adminAddressPath());
   command_line_options->set_component_log_level(component_log_level_str_);
   command_line_options->set_log_level(spdlog::level::to_string_view(logLevel()).data(),

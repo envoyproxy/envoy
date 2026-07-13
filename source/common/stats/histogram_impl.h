@@ -25,15 +25,15 @@ public:
 
   // HistogramSettings
   const ConstSupportedBuckets& buckets(absl::string_view stat_name) const override;
-  absl::optional<uint32_t> bins(absl::string_view stat_name) const override;
+  std::optional<uint32_t> bins(absl::string_view stat_name) const override;
 
   static ConstSupportedBuckets& defaultBuckets();
 
 private:
   struct Config {
     Matchers::StringMatcherImpl matcher_;
-    absl::optional<ConstSupportedBuckets> buckets_;
-    absl::optional<uint32_t> bins_;
+    std::optional<ConstSupportedBuckets> buckets_;
+    std::optional<uint32_t> bins_;
   };
   const std::vector<Config> configs_;
 };

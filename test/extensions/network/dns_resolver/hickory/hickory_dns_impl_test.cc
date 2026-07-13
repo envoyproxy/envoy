@@ -49,7 +49,7 @@ public:
   initialize(const envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig&
                  config = {}) {
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-    typed_dns_resolver_config.mutable_typed_config()->PackFrom(config);
+    std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(config);
     typed_dns_resolver_config.set_name(std::string("envoy.network.dns_resolver.hickory"));
 
     Network::DnsResolverFactory& dns_resolver_factory =
@@ -85,7 +85,7 @@ public:
 TEST_F(HickoryDnsImplTest, FactoryRegistration) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig config;
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(config);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(config);
   typed_dns_resolver_config.set_name(std::string("envoy.network.dns_resolver.hickory"));
 
   Network::DnsResolverFactory& factory =
@@ -903,7 +903,7 @@ TEST_F(HickoryDnsConfigFailureTest, FactoryReturnsErrorOnInvalidTypedConfig) {
   // Pack a wholly different message type so ``MessageUtil::unpackTo`` reports a type mismatch.
   envoy::config::core::v3::Address unrelated_message;
   unrelated_message.mutable_socket_address()->set_address("0.0.0.0");
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(unrelated_message);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(unrelated_message);
 
   auto result = factory->createDnsResolver(*dispatcher, *api, typed_dns_resolver_config);
   ASSERT_FALSE(result.ok());
@@ -932,7 +932,7 @@ TEST_F(HickoryDnsConfigFailureTest, FactoryReturnsErrorWhenConfigCreateFails) {
 
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   typed_dns_resolver_config.set_name("envoy.network.dns_resolver.hickory");
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(proto_config);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(proto_config);
 
   auto result = factory->createDnsResolver(*dispatcher, *api, typed_dns_resolver_config);
   ASSERT_FALSE(result.ok());

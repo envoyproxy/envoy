@@ -388,6 +388,18 @@ TEST_F(TestUpstreamSocketManager, HandoffAndCloseLogsUseLifecycleMetadata) {
   socket_manager_->markSocketDead(fd);
 }
 
+TEST_F(TestUpstreamSocketManager, GetClusterForNode) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket),
+                                       std::chrono::seconds(30));
+
+  EXPECT_EQ(socket_manager_->getClusterForNode(node_id), cluster_id);
+  EXPECT_EQ(socket_manager_->getClusterForNode("unknown-node"), "");
+}
+
 TEST_F(TestUpstreamSocketManager, AddAndGetMultipleSocketsSameNode) {
   auto socket1 = createMockSocket(123);
   auto socket2 = createMockSocket(456);
@@ -801,7 +813,7 @@ TEST_F(TestUpstreamSocketManager, OnPingResponseValidResponse) {
 
   const std::string ping_response = "RPING";
   EXPECT_CALL(*mock_io_handle, read(_, _))
-      .WillOnce([&](Buffer::Instance& buffer, absl::optional<uint64_t>) -> Api::IoCallUint64Result {
+      .WillOnce([&](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
         buffer.add(ping_response);
         return Api::IoCallUint64Result{ping_response.size(), Api::IoError::none()};
       });
@@ -866,7 +878,7 @@ TEST_F(TestUpstreamSocketManager, OnPingResponseInvalidData) {
 
   const std::string invalid_response = "INVALID_DATA";
   EXPECT_CALL(*mock_io_handle, read(_, _))
-      .WillOnce([&](Buffer::Instance& buffer, absl::optional<uint64_t>) -> Api::IoCallUint64Result {
+      .WillOnce([&](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
         buffer.add(invalid_response);
         return Api::IoCallUint64Result{invalid_response.size(), Api::IoError::none()};
       });
@@ -1309,7 +1321,7 @@ TEST_F(TestUpstreamSocketManager, MarkSocketDeadCallsReportDisconnection) {
   auto* reporter_cfg = config_with_reporter.mutable_reporter_config();
   reporter_cfg->set_name(MOCK_REPORTER);
   Protobuf::StringValue noop_config;
-  reporter_cfg->mutable_typed_config()->PackFrom(noop_config);
+  std::ignore = reporter_cfg->mutable_typed_config()->PackFrom(noop_config);
 
   NiceMock<MockReporterFactory> reporter_factory;
   Registry::InjectFactory<ReverseTunnelReporterFactory> reporter_injector(reporter_factory);
@@ -1721,7 +1733,7 @@ TEST_F(TestUpstreamSocketManager, PingAckEmitsIdlePingAckEvent) {
 
   const std::string ping_response = "RPING";
   EXPECT_CALL(*mock_io_handle, read(_, _))
-      .WillOnce([&](Buffer::Instance& buffer, absl::optional<uint64_t>) -> Api::IoCallUint64Result {
+      .WillOnce([&](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
         buffer.add(ping_response);
         return Api::IoCallUint64Result{ping_response.size(), Api::IoError::none()};
       });

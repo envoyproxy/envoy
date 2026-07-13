@@ -145,7 +145,7 @@ protected:
       : version_(GetParam()), api_(Api::createApiForTest(simulated_time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getAnyAddress(version_, true)),
-        connection_handler_(*dispatcher_, absl::nullopt),
+        connection_handler_(*dispatcher_, std::nullopt),
         transport_socket_factory_(*Quic::QuicServerTransportSocketFactory::create(
             /*enable_early_data=*/true, /*enable_resumption=*/true, *store_.rootScope(),
             std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(), ssl_context_manager_)),
@@ -640,7 +640,7 @@ TEST_P(ActiveQuicListenerTest, QuicRejectsAllAndResumes) {
 TEST_P(ActiveQuicListenerTest, EcnReportingIsEnabled) {
   initialize();
   Network::Socket& socket = ActiveQuicListenerPeer::socket(*quic_listener_);
-  absl::optional<Network::Address::IpVersion> version = socket.ipVersion();
+  std::optional<Network::Address::IpVersion> version = socket.ipVersion();
   EXPECT_TRUE(version.has_value());
   int optval = 0;
   socklen_t optlen = sizeof(optval);
@@ -778,8 +778,9 @@ TEST_F(ActiveQuicListenerFactoryTest, DebugVisitorConfigured) {
   envoy::config::listener::v3::QuicProtocolOptions quic_config;
   quic_config.mutable_connection_debug_visitor_config()->set_name(
       "envoy.quic.connection_debug_visitor.mock");
-  quic_config.mutable_connection_debug_visitor_config()->mutable_typed_config()->PackFrom(
-      test::common::config::DummyConfig());
+  std::ignore =
+      quic_config.mutable_connection_debug_visitor_config()->mutable_typed_config()->PackFrom(
+          test::common::config::DummyConfig());
   auto listener_factory = createQuicListenerFactory(quic_config);
   auto debug_visitor_factory =
       ActiveQuicListenerFactoryPeer::debugVisitorFactory(*listener_factory);

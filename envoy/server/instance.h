@@ -107,7 +107,7 @@ public:
    * @param options - if provided, options are passed through to shutdownListener.
    */
   virtual void
-  drainListeners(OptRef<const Network::ExtraShutdownListenerOptions> options = absl::nullopt) PURE;
+  drainListeners(OptRef<const Network::ExtraShutdownListenerOptions> options = std::nullopt) PURE;
 
   /**
    * @return DrainManager& singleton for use by the entire server.
@@ -269,7 +269,7 @@ public:
   virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
 
   /**
-   * @return ProtobufMessage::ValidationVistior& validation visitor for configuration
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration
    *         messages.
    */
   virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;

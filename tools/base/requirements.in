@@ -4,23 +4,24 @@ aio.core>=0.11.1
 aiohttp>=3.14.1
 aioquic>=0.9.21
 dependatool>=0.3.1
-envoy.base.utils>=0.6.7
+envoy.base.utils>=0.6.9
 envoy.ci.report>=0.1.1
-envoy.code.check>=0.6.6
+envoy.code.check>=0.6.7
 envoy.dependency.check>=0.2.1
 envoy.distribution.release>=0.1.2
 envoy.distribution.verify>=0.1.1
 envoy.gpg.sign>=0.3.1
 gitpython
-icalendar>=6.1.1
+icalendar>=7.1.1
 orjson>=3.10.15
 pep8-naming
 # Upgrading beyond 4.21.x doesnt currently work. 4.23+ might work when the following is resolved
 # `MessageFactory class is deprecated. Please use GetMessageClass() instead of MessageFactory.GetPrototype`
-protobuf<7.35.0
+protobuf<7.36.0
 ply
 pygithub
 pyjwt[crypto]==2.13.0
+cryptography==49.0.0
 pyyaml
 setuptools
 slack_sdk

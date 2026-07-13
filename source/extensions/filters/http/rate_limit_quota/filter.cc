@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
 #include "envoy/grpc/status.h"
@@ -24,7 +25,6 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -60,14 +60,14 @@ Envoy::Http::Code getDenyResponseCode(const DenyResponseSettings& settings) {
 }
 
 // Helper function to determine the gRPC status based on settings
-absl::optional<Grpc::Status::GrpcStatus> getGrpcStatus(const DenyResponseSettings& settings) {
+std::optional<Grpc::Status::GrpcStatus> getGrpcStatus(const DenyResponseSettings& settings) {
   // If explicit gRPC status is set, use it
   if (settings.has_grpc_status()) {
     return static_cast<Grpc::Status::GrpcStatus>(settings.grpc_status().code());
   }
 
   // Default behavior - let Envoy determine gRPC status from HTTP status
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 // Helper function to get the response body text (gRPC message for gRPC requests,

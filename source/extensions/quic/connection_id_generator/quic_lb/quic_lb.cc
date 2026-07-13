@@ -22,7 +22,7 @@ QuicLbConnectionIdGenerator::QuicLbConnectionIdGenerator(
          "worker id constraint should have been validated in Factory::create");
 }
 
-absl::optional<quic::QuicConnectionId>
+std::optional<quic::QuicConnectionId>
 QuicLbConnectionIdGenerator::GenerateNextConnectionId(const quic::QuicConnectionId&) {
   // Encoder doesn't allow generating connection IDs when not using encryption to prevent making
   // a new linkable connection ID.
@@ -33,7 +33,7 @@ QuicLbConnectionIdGenerator::GenerateNextConnectionId(const quic::QuicConnection
   return appendRoutingId(new_cid);
 }
 
-absl::optional<quic::QuicConnectionId>
+std::optional<quic::QuicConnectionId>
 QuicLbConnectionIdGenerator::MaybeReplaceConnectionId(const quic::QuicConnectionId& original,
                                                       const quic::ParsedQuicVersion& version) {
   auto new_cid = tls_slot_->encoder_.MaybeReplaceConnectionId(original, version);
@@ -41,14 +41,14 @@ QuicLbConnectionIdGenerator::MaybeReplaceConnectionId(const quic::QuicConnection
     return appendRoutingId(new_cid.value());
   }
 
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 uint8_t QuicLbConnectionIdGenerator::ConnectionIdLength(uint8_t first_byte) const {
   return tls_slot_->encoder_.ConnectionIdLength(first_byte) + sizeof(WorkerRoutingIdValue);
 }
 
-absl::optional<quic::QuicConnectionId>
+std::optional<quic::QuicConnectionId>
 QuicLbConnectionIdGenerator::appendRoutingId(quic::QuicConnectionId& new_connection_id) {
   // TODO(ggreenway): the thread ID should be encoded and protected in such a way that the value
   // does not require decrypting the CID, but that a passive observer can not easily link
@@ -104,7 +104,7 @@ QuicLbConnectionIdGenerator::ThreadLocalData::create(
 absl::Status
 QuicLbConnectionIdGenerator::ThreadLocalData::updateKeyAndVersion(absl::string_view key,
                                                                   uint8_t version) {
-  absl::optional<quic::LoadBalancerConfig> lb_config;
+  std::optional<quic::LoadBalancerConfig> lb_config;
   if (unencrypted_mode_) {
     lb_config = quic::LoadBalancerConfig::CreateUnencrypted(version, server_id_.length(),
                                                             nonce_length_bytes_);

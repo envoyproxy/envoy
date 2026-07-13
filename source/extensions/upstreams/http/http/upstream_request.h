@@ -23,7 +23,7 @@ public:
   HttpConnPool(Upstream::HostConstSharedPtr host,
                Upstream::ThreadLocalCluster& thread_local_cluster,
                Upstream::ResourcePriority priority,
-               absl::optional<Envoy::Http::Protocol> downstream_protocol,
+               std::optional<Envoy::Http::Protocol> downstream_protocol,
                Upstream::LoadBalancerContext* ctx) {
     pool_data_ = thread_local_cluster.httpConnPool(host, priority, downstream_protocol, ctx);
   }
@@ -44,11 +44,11 @@ public:
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(Envoy::Http::RequestEncoder& callbacks_encoder,
                    Upstream::HostDescriptionConstSharedPtr host, StreamInfo::StreamInfo& info,
-                   absl::optional<Envoy::Http::Protocol> protocol) override;
+                   std::optional<Envoy::Http::Protocol> protocol) override;
 
 protected:
   // Points to the actual connection pool to create streams from.
-  absl::optional<Envoy::Upstream::HttpPoolData> pool_data_;
+  std::optional<Envoy::Upstream::HttpPoolData> pool_data_;
   Envoy::Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
   Router::GenericConnectionPoolCallbacks* callbacks_{};
 };

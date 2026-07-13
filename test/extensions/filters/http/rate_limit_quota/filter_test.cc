@@ -362,7 +362,7 @@ TEST_F(FilterTest, RequestMatchingSucceededWithCelMatcher) {
     }
   )pb";
   google::api::expr::v1alpha1::CheckedExpr checked_expr;
-  Protobuf::TextFormat::ParseFromString(cel_expr_str, &checked_expr);
+  std::ignore = Protobuf::TextFormat::ParseFromString(cel_expr_str, &checked_expr);
 
   xds::type::matcher::v3::CelMatcher cel_matcher;
   cel_matcher.mutable_expr_match()->mutable_checked_expr()->MergeFrom(checked_expr);
@@ -373,10 +373,11 @@ TEST_F(FilterTest, RequestMatchingSucceededWithCelMatcher) {
 
   xds::type::matcher::v3::HttpAttributesCelMatchInput cel_match_input;
   single_predicate->mutable_input()->set_name("envoy.matching.inputs.cel_data_input");
-  single_predicate->mutable_input()->mutable_typed_config()->PackFrom(cel_match_input);
+  std::ignore =
+      single_predicate->mutable_input()->mutable_typed_config()->PackFrom(cel_match_input);
 
   auto* custom_matcher = single_predicate->mutable_custom_match();
-  custom_matcher->mutable_typed_config()->PackFrom(cel_matcher);
+  std::ignore = custom_matcher->mutable_typed_config()->PackFrom(cel_matcher);
 
   std::string on_match_str = R"pb(
     action {
@@ -410,7 +411,7 @@ TEST_F(FilterTest, RequestMatchingSucceededWithCelMatcher) {
     }
   )pb";
   xds::type::matcher::v3::Matcher::OnMatch on_match;
-  Protobuf::TextFormat::ParseFromString(on_match_str, &on_match);
+  std::ignore = Protobuf::TextFormat::ParseFromString(on_match_str, &on_match);
   inner_matcher->mutable_on_match()->MergeFrom(on_match);
   config_.mutable_bucket_matchers()->MergeFrom(matcher);
   addMatcherConfig(matcher);
@@ -1023,7 +1024,7 @@ bucket_matchers:
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
       .WillOnce(Invoke(
           [](Http::Code, absl::string_view body_text, std::function<void(Http::ResponseHeaderMap&)>,
-             const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view) {
+             const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view) {
             EXPECT_EQ(grpc_status, Grpc::Status::WellKnownGrpcStatus::Unavailable);
             EXPECT_EQ(body_text, "Service temporarily unavailable");
           }));
@@ -1065,12 +1066,12 @@ TEST_F(FilterTest, DenyResponseDefaultBehavior) {
 
   EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(bucket));
 
-  // Should use default behavior (absl::nullopt for gRPC status)
+  // Should use default behavior (std::nullopt for gRPC status)
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
       .WillOnce(
           Invoke([](Http::Code, absl::string_view, std::function<void(Http::ResponseHeaderMap&)>,
-                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                    absl::string_view) { EXPECT_EQ(grpc_status, absl::nullopt); }));
+                    const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                    absl::string_view) { EXPECT_EQ(grpc_status, std::nullopt); }));
 
   Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);
@@ -1196,17 +1197,16 @@ matcher_list:
 
   // Expect sendLocalReply to be called with custom gRPC message in body_text parameter
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
-      .WillOnce(Invoke([](Http::Code, absl::string_view body,
-                          std::function<void(Http::ResponseHeaderMap&)>,
-                          const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                          absl::string_view details) {
-        // Check that the custom message is in the body_text parameter (for gRPC message)
-        EXPECT_EQ(body, "Custom rate limit message from test");
-        // Check that the gRPC status is RESOURCE_EXHAUSTED
-        EXPECT_EQ(grpc_status, Grpc::Status::WellKnownGrpcStatus::ResourceExhausted);
-        // Check that details contains our debug info
-        EXPECT_EQ(details, "rate_limited_by_quota");
-      }));
+      .WillOnce(Invoke(
+          [](Http::Code, absl::string_view body, std::function<void(Http::ResponseHeaderMap&)>,
+             const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+            // Check that the custom message is in the body_text parameter (for gRPC message)
+            EXPECT_EQ(body, "Custom rate limit message from test");
+            // Check that the gRPC status is RESOURCE_EXHAUSTED
+            EXPECT_EQ(grpc_status, Grpc::Status::WellKnownGrpcStatus::ResourceExhausted);
+            // Check that details contains our debug info
+            EXPECT_EQ(details, "rate_limited_by_quota");
+          }));
 
   Http::FilterHeadersStatus status = filter_->decodeHeaders(headers, false);
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);

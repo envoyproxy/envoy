@@ -6,6 +6,7 @@
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -19,6 +20,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace FilterChain {
 namespace {
+
+using StatusHelpers::HasStatus;
 
 TEST(FilterChainFilterFactoryTest, FilterChainFilterCorrectYaml) {
   const std::string yaml_string = R"EOF(
@@ -64,9 +67,9 @@ TEST(FilterChainFilterFactoryTest, FilterChainFilterRecursiveConfig) {
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FilterChainFilterFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(
-      { auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context); },
-      EnvoyException, "FilterChain filter cannot be configured recursively.");
+  auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_THAT(status_or, HasStatus(absl::StatusCode::kInvalidArgument,
+                                   "FilterChain filter cannot be configured recursively."));
 }
 
 TEST(FilterChainFilterFactoryTest, FilterChainFilterEmptyConfig) {
@@ -134,12 +137,10 @@ TEST(FilterChainFilterFactoryTest,
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(yaml_string, *proto_config);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      {
-        auto route_config = factory.createRouteSpecificFilterConfig(
-            *proto_config, factory_context, ProtobufMessage::getNullValidationVisitor());
-      },
-      EnvoyException, "FilterChain filter cannot be configured recursively.");
+  auto route_config = factory.createRouteSpecificFilterConfig(
+      *proto_config, factory_context, ProtobufMessage::getNullValidationVisitor());
+  EXPECT_THAT(route_config, HasStatus(absl::StatusCode::kInvalidArgument,
+                                      "FilterChain filter cannot be configured recursively."));
 }
 
 } // namespace
