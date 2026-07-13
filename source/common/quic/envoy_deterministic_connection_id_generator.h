@@ -27,10 +27,10 @@ public:
                            const quic::ParsedQuicVersion& version) override;
 };
 
-class EnvoyDeterministicConnectionIdGeneratorContext
-    : public EnvoyQuicConnectionIdGeneratorContext {
+class EnvoyDeterministicConnectionIdGeneratorFactory
+    : public EnvoyQuicConnectionIdGeneratorFactory {
 public:
-  // EnvoyQuicConnectionIdGeneratorContext.
+  // EnvoyQuicConnectionIdGeneratorFactory.
   QuicConnectionIdGeneratorPtr createQuicConnectionIdGenerator(uint32_t worker_index) override;
   absl::StatusOr<Network::Socket::OptionConstSharedPtr>
   createCompatibleLinuxBpfSocketOption(uint32_t concurrency) override;
@@ -44,11 +44,11 @@ private:
 #endif
 };
 
-class EnvoyDeterministicConnectionIdGeneratorFactory
-    : public EnvoyQuicConnectionIdGeneratorFactory {
+class EnvoyDeterministicConnectionIdGeneratorContext
+    : public EnvoyQuicConnectionIdGeneratorContext {
 public:
-  // EnvoyQuicConnectionIdGeneratorFactory.
-  EnvoyQuicConnectionIdGeneratorContextPtr createQuicConnectionIdGeneratorContext() override;
+  // EnvoyQuicConnectionIdGeneratorContext.
+  EnvoyQuicConnectionIdGeneratorFactoryPtr createQuicConnectionIdGeneratorFactory() override;
 };
 
 } // namespace Quic

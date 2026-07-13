@@ -21,9 +21,9 @@ namespace {
 
 const absl::string_view kSecretName = "test";
 
-std::unique_ptr<QuicLbConnectionIdGenerator> createTypedIdGenerator(Context& context,
+std::unique_ptr<QuicLbConnectionIdGenerator> createTypedIdGenerator(Factory& factory,
                                                                     uint32_t worker_index = 0) {
-  QuicConnectionIdGeneratorPtr generator = context.createQuicConnectionIdGenerator(worker_index);
+  QuicConnectionIdGeneratorPtr generator = factory.createQuicConnectionIdGenerator(worker_index);
   return std::unique_ptr<QuicLbConnectionIdGenerator>(
       static_cast<QuicLbConnectionIdGenerator*>(generator.release()));
 }
@@ -55,8 +55,8 @@ encryptionParamaters(uint8_t version_int = 0, std::string key_str = "0123456789a
 class KernelBpfTester {
 public:
   static absl::StatusOr<KernelBpfTester> create(uint32_t concurrency,
-                                                EnvoyQuicConnectionIdGeneratorContext& context) {
-    auto opt_or_error = context.createCompatibleLinuxBpfSocketOption(concurrency);
+                                                EnvoyQuicConnectionIdGeneratorFactory& factory) {
+    auto opt_or_error = factory.createCompatibleLinuxBpfSocketOption(concurrency);
     RETURN_IF_NOT_OK_REF(opt_or_error.status());
     return KernelBpfTester(concurrency, std::move(opt_or_error.value()));
   }
@@ -161,9 +161,9 @@ TEST(QuicLbTest, InvalidConfig) {
 
   // Missing static secret.
   cfg.mutable_encryption_parameters()->set_name(kSecretName);
-  absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
-      Factory::create(cfg, factory_context);
-  EXPECT_EQ(factory_or_status.status().message(), "invalid encryption_parameters config");
+  absl::StatusOr<std::unique_ptr<Context>> context_or_status =
+      Context::create(cfg, factory_context);
+  EXPECT_EQ(context_or_status.status().message(), "invalid encryption_parameters config");
 
   // Missing encryption key.
   envoy::extensions::transport_sockets::tls::v3::Secret encryption_parameters;
@@ -172,8 +172,8 @@ TEST(QuicLbTest, InvalidConfig) {
   auto status = factory_context.server_factory_context_.secretManager().addStaticSecret(
       encryption_parameters);
   EXPECT_TRUE(status.ok());
-  factory_or_status = Factory::create(cfg, factory_context);
-  EXPECT_EQ(factory_or_status.status().message(), "Missing 'encryption_key'");
+  context_or_status = Context::create(cfg, factory_context);
+  EXPECT_EQ(context_or_status.status().message(), "Missing 'encryption_key'");
 
   // Invalid key length.
   auto& secrets = *encryption_parameters.mutable_generic_secret()->mutable_secrets();
@@ -184,8 +184,8 @@ TEST(QuicLbTest, InvalidConfig) {
   status = factory_context.server_factory_context_.secretManager().addStaticSecret(
       encryption_parameters);
   EXPECT_TRUE(status.ok());
-  factory_or_status = Factory::create(cfg, factory_context);
-  EXPECT_EQ(factory_or_status.status().message(),
+  context_or_status = Context::create(cfg, factory_context);
+  EXPECT_EQ(context_or_status.status().message(),
             "'encryption_key' length was 3, but it must be length 16");
 
   // Missing version.
@@ -195,8 +195,8 @@ TEST(QuicLbTest, InvalidConfig) {
   status = factory_context.server_factory_context_.secretManager().addStaticSecret(
       encryption_parameters);
   EXPECT_TRUE(status.ok());
-  factory_or_status = Factory::create(cfg, factory_context);
-  EXPECT_EQ(factory_or_status.status().message(), "Missing 'configuration_version'");
+  context_or_status = Context::create(cfg, factory_context);
+  EXPECT_EQ(context_or_status.status().message(), "Missing 'configuration_version'");
 
   // Bad version length.
   envoy::config::core::v3::DataSource version;
@@ -208,8 +208,8 @@ TEST(QuicLbTest, InvalidConfig) {
   status = factory_context.server_factory_context_.secretManager().addStaticSecret(
       encryption_parameters);
   EXPECT_TRUE(status.ok());
-  factory_or_status = Factory::create(cfg, factory_context);
-  EXPECT_EQ(factory_or_status.status().message(),
+  context_or_status = Context::create(cfg, factory_context);
+  EXPECT_EQ(context_or_status.status().message(),
             "'configuration_version' length was 2, but it must be length 1 byte");
 
   // Bad version value.
@@ -221,8 +221,8 @@ TEST(QuicLbTest, InvalidConfig) {
   status = factory_context.server_factory_context_.secretManager().addStaticSecret(
       encryption_parameters);
   EXPECT_TRUE(status.ok());
-  factory_or_status = Factory::create(cfg, factory_context);
-  EXPECT_EQ(factory_or_status.status().message(),
+  context_or_status = Context::create(cfg, factory_context);
+  EXPECT_EQ(context_or_status.status().message(),
             "'configuration_version' was 7, but must be less than 7");
 
   // Valid config.
@@ -233,26 +233,26 @@ TEST(QuicLbTest, InvalidConfig) {
   status = factory_context.server_factory_context_.secretManager().addStaticSecret(
       encryption_parameters);
   EXPECT_TRUE(status.ok());
-  factory_or_status = Factory::create(cfg, factory_context);
-  EXPECT_TRUE(factory_or_status.ok());
+  context_or_status = Context::create(cfg, factory_context);
+  EXPECT_TRUE(context_or_status.ok());
 
   // Server ID length mismatch
   cfg.set_expected_server_id_length(3);
-  factory_or_status = Factory::create(cfg, factory_context);
-  EXPECT_EQ(factory_or_status.status().message(),
+  context_or_status = Context::create(cfg, factory_context);
+  EXPECT_EQ(context_or_status.status().message(),
             "'expected_server_id_length' 3 does not match actual 'server_id' length 6");
 
   // Valid config with expected length set.
   cfg.set_expected_server_id_length(6);
-  factory_or_status = Factory::create(cfg, factory_context);
-  EXPECT_TRUE(factory_or_status.ok());
+  context_or_status = Context::create(cfg, factory_context);
+  EXPECT_TRUE(context_or_status.ok());
 
   // Invalid concurrency.
   EXPECT_CALL(factory_context.server_factory_context_.options_, concurrency())
       .WillOnce(testing::Return(257))
       .WillRepeatedly(testing::Return(8)); // To make subsequent tests pass.
-  factory_or_status = Factory::create(cfg, factory_context);
-  EXPECT_EQ(factory_or_status.status().message(),
+  context_or_status = Context::create(cfg, factory_context);
+  EXPECT_EQ(context_or_status.status().message(),
             "envoy.quic.connection_id_generator.quic_lb cannot be used "
             "with a concurrency greater than 256");
 
@@ -260,9 +260,9 @@ TEST(QuicLbTest, InvalidConfig) {
   cfg.set_nonce_length_bytes(12);
   cfg.mutable_server_id()->set_inline_string("1234567");
   cfg.set_expected_server_id_length(0);
-  factory_or_status = Factory::create(cfg, factory_context);
+  context_or_status = Context::create(cfg, factory_context);
   EXPECT_EQ(
-      factory_or_status.status().message(),
+      context_or_status.status().message(),
       "'server_id' length (7) and 'nonce_length_bytes' (12) combined must be 18 bytes or less.");
 }
 
@@ -280,10 +280,10 @@ TEST(QuicLbTest, Unencrypted) {
 
   auto status = factory_context.server_factory_context_.secretManager().addStaticSecret(
       encryptionParamaters(0));
-  absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
-      Factory::create(cfg, factory_context);
-  auto context = factory_or_status.value()->createQuicConnectionIdGeneratorContext();
-  auto generator = createTypedIdGenerator(dynamic_cast<Context&>(*context));
+  absl::StatusOr<std::unique_ptr<Context>> context_or_status =
+      Context::create(cfg, factory_context);
+  auto factory = context_or_status.value()->createQuicConnectionIdGeneratorFactory();
+  auto generator = createTypedIdGenerator(dynamic_cast<Factory&>(*factory));
   auto new_cid = generator->GenerateNextConnectionId(quic::QuicConnectionId{});
   EXPECT_TRUE(new_cid.has_value());
   uint8_t expected[1 + sizeof(id_data)];
@@ -313,10 +313,10 @@ TEST(QuicLbTest, Base64ServerId) {
 
   auto status = factory_context.server_factory_context_.secretManager().addStaticSecret(
       encryptionParamaters(0));
-  absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
-      Factory::create(cfg, factory_context);
-  auto context = factory_or_status.value()->createQuicConnectionIdGeneratorContext();
-  auto generator = createTypedIdGenerator(dynamic_cast<Context&>(*context));
+  absl::StatusOr<std::unique_ptr<Context>> context_or_status =
+      Context::create(cfg, factory_context);
+  auto factory = context_or_status.value()->createQuicConnectionIdGeneratorFactory();
+  auto generator = createTypedIdGenerator(dynamic_cast<Factory&>(*factory));
   auto new_cid = generator->GenerateNextConnectionId(quic::QuicConnectionId{});
   EXPECT_TRUE(new_cid.has_value());
   uint8_t expected[1 + id_data.size()];
@@ -341,10 +341,10 @@ TEST(QuicLbTest, TooLong) {
 
   auto status = factory_context.server_factory_context_.secretManager().addStaticSecret(
       encryptionParamaters(0));
-  absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
-      Factory::create(cfg, factory_context);
-  auto context = factory_or_status.value()->createQuicConnectionIdGeneratorContext();
-  auto generator = createTypedIdGenerator(dynamic_cast<Context&>(*context));
+  absl::StatusOr<std::unique_ptr<Context>> context_or_status =
+      Context::create(cfg, factory_context);
+  auto factory = context_or_status.value()->createQuicConnectionIdGeneratorFactory();
+  auto generator = createTypedIdGenerator(dynamic_cast<Factory&>(*factory));
   quic::QuicConnectionId id;
   id.set_length(21);
   EXPECT_ENVOY_BUG(generator->appendRoutingId(id), "Connection id long");
@@ -361,14 +361,14 @@ TEST(QuicLbTest, WorkerSelector) {
 
   auto status = factory_context.server_factory_context_.secretManager().addStaticSecret(
       encryptionParamaters(0));
-  absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
-      Factory::create(cfg, factory_context);
-  auto context = factory_or_status.value()->createQuicConnectionIdGeneratorContext();
+  absl::StatusOr<std::unique_ptr<Context>> context_or_status =
+      Context::create(cfg, factory_context);
+  auto factory = context_or_status.value()->createQuicConnectionIdGeneratorFactory();
   constexpr uint32_t concurrency = 8;
   QuicConnectionIdWorkerSelector selector =
-      context->getCompatibleConnectionIdWorkerSelector(concurrency);
+      factory->getCompatibleConnectionIdWorkerSelector(concurrency);
 
-  auto bpf_tester = KernelBpfTester::create(concurrency, *context);
+  auto bpf_tester = KernelBpfTester::create(concurrency, *factory);
   if (absl::IsUnimplemented(bpf_tester.status())) {
     ENVOY_LOG_MISC(error, "Cannot test BPF filter on this OS/kernel");
   } else {
@@ -471,9 +471,9 @@ TEST(QuicLbTest, EmptySecretCallback) {
       }));
   EXPECT_CALL(*secret_provider, secret()).WillRepeatedly(testing::Return(nullptr));
 
-  absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
-      Factory::create(cfg, factory_context);
-  EXPECT_TRUE(factory_or_status.ok());
+  absl::StatusOr<std::unique_ptr<Context>> context_or_status =
+      Context::create(cfg, factory_context);
+  EXPECT_TRUE(context_or_status.ok());
 
   auto status = update_callback();
   EXPECT_EQ(status.message(), "secret update callback called with empty secret");

@@ -13,7 +13,7 @@ namespace Extensions {
 namespace ConnectionIdGenerator {
 namespace Deterministic {
 
-using Matcher::ContextFunctions;
+using Matcher::FactoryFunctions;
 using Matcher::GivenPacket;
 using ::quic::QuicConnectionId;
 using ::quic::test::QuicTest;
@@ -87,37 +87,37 @@ TEST_F(EnvoyDeterministicConnectionIdGeneratorTest, NextConnectionIdPersistsWork
   }
 }
 
-class EnvoyDeterministicConnectionIdGeneratorContextTest : public ::testing::Test {
+class EnvoyDeterministicConnectionIdGeneratorFactoryTest : public ::testing::Test {
 protected:
-  EnvoyDeterministicConnectionIdGeneratorContext context_;
+  EnvoyDeterministicConnectionIdGeneratorFactory factory_;
 };
 
-TEST_F(EnvoyDeterministicConnectionIdGeneratorContextTest,
+TEST_F(EnvoyDeterministicConnectionIdGeneratorFactoryTest,
        ConnectionIdWorkerSelectorReturnsCurrentWorkerForShortHeaderPacketsTooShort) {
   Buffer::OwnedImpl buffer("aaaaaa");
-  EXPECT_THAT(ContextFunctions(context_, 256), GivenPacket(buffer).ReturnsDefaultWorkerId());
-  EXPECT_THAT(ContextFunctions(context_, 65536), GivenPacket(buffer).ReturnsDefaultWorkerId());
+  EXPECT_THAT(FactoryFunctions(factory_, 256), GivenPacket(buffer).ReturnsDefaultWorkerId());
+  EXPECT_THAT(FactoryFunctions(factory_, 65536), GivenPacket(buffer).ReturnsDefaultWorkerId());
 }
 
-TEST_F(EnvoyDeterministicConnectionIdGeneratorContextTest,
+TEST_F(EnvoyDeterministicConnectionIdGeneratorFactoryTest,
        ConnectionIdWorkerSelectorReturnsCurrentWorkerForLongHeaderPacketsTooShort) {
   Buffer::OwnedImpl buffer("\x80xxxxxxxxxxx");
-  EXPECT_THAT(ContextFunctions(context_, 256), GivenPacket(buffer).ReturnsDefaultWorkerId());
-  EXPECT_THAT(ContextFunctions(context_, 65536), GivenPacket(buffer).ReturnsDefaultWorkerId());
+  EXPECT_THAT(FactoryFunctions(factory_, 256), GivenPacket(buffer).ReturnsDefaultWorkerId());
+  EXPECT_THAT(FactoryFunctions(factory_, 65536), GivenPacket(buffer).ReturnsDefaultWorkerId());
 }
 
-TEST_F(EnvoyDeterministicConnectionIdGeneratorContextTest,
+TEST_F(EnvoyDeterministicConnectionIdGeneratorFactoryTest,
        ConnectionIdWorkerSelectorReturnsBytesOneToFourModConcurrencyForShortPackets) {
   Buffer::OwnedImpl buffer("x\x12\x34\x56\x78xxxxxxxxx");
-  EXPECT_THAT(ContextFunctions(context_, 256), GivenPacket(buffer).ReturnsWorkerId(0x78));
-  EXPECT_THAT(ContextFunctions(context_, 65536), GivenPacket(buffer).ReturnsWorkerId(0x5678));
+  EXPECT_THAT(FactoryFunctions(factory_, 256), GivenPacket(buffer).ReturnsWorkerId(0x78));
+  EXPECT_THAT(FactoryFunctions(factory_, 65536), GivenPacket(buffer).ReturnsWorkerId(0x5678));
 }
 
-TEST_F(EnvoyDeterministicConnectionIdGeneratorContextTest,
+TEST_F(EnvoyDeterministicConnectionIdGeneratorFactoryTest,
        ConnectionIdWorkerSelectorReturnsBytesSixToNineModConcurrencyForLongPackets) {
   Buffer::OwnedImpl buffer("\x80xxxxx\x12\x34\x56\x78xxxxxxxxx");
-  EXPECT_THAT(ContextFunctions(context_, 256), GivenPacket(buffer).ReturnsWorkerId(0x78));
-  EXPECT_THAT(ContextFunctions(context_, 65536), GivenPacket(buffer).ReturnsWorkerId(0x5678));
+  EXPECT_THAT(FactoryFunctions(factory_, 256), GivenPacket(buffer).ReturnsWorkerId(0x78));
+  EXPECT_THAT(FactoryFunctions(factory_, 65536), GivenPacket(buffer).ReturnsWorkerId(0x5678));
 }
 
 } // namespace Deterministic

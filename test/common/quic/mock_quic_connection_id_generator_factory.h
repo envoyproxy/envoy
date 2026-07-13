@@ -13,7 +13,7 @@
 namespace Envoy {
 namespace Quic {
 
-class MockEnvoyQuicConnectionIdGeneratorContext : public EnvoyQuicConnectionIdGeneratorContext {
+class MockEnvoyQuicConnectionIdGeneratorFactory : public EnvoyQuicConnectionIdGeneratorFactory {
 public:
   MOCK_METHOD(QuicConnectionIdGeneratorPtr, createQuicConnectionIdGenerator,
               (uint32_t worker_index), (override));
@@ -23,9 +23,9 @@ public:
               (uint32_t concurrency), (override));
 };
 
-class MockEnvoyQuicConnectionIdGeneratorFactory : public EnvoyQuicConnectionIdGeneratorFactory {
+class MockEnvoyQuicConnectionIdGeneratorContext : public EnvoyQuicConnectionIdGeneratorContext {
 public:
-  MOCK_METHOD(EnvoyQuicConnectionIdGeneratorContextPtr, createQuicConnectionIdGeneratorContext, (),
+  MOCK_METHOD(EnvoyQuicConnectionIdGeneratorFactoryPtr, createQuicConnectionIdGeneratorFactory, (),
               (override));
 };
 
@@ -38,7 +38,7 @@ public:
     return std::make_unique<test::common::config::DummyConfig>();
   }
 
-  MOCK_METHOD(EnvoyQuicConnectionIdGeneratorFactoryPtr, createQuicConnectionIdGeneratorFactory,
+  MOCK_METHOD(EnvoyQuicConnectionIdGeneratorContextPtr, createQuicConnectionIdGeneratorContext,
               (const Protobuf::Message&, ProtobufMessage::ValidationVisitor&,
                Server::Configuration::FactoryContext&),
               (override));

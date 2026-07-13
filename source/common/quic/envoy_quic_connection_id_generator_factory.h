@@ -19,9 +19,9 @@ using QuicConnectionIdWorkerSelector =
  * A factory interface to provide QUIC connection IDs and compatible BPF code for stable packet
  * routing.
  */
-class EnvoyQuicConnectionIdGeneratorContext {
+class EnvoyQuicConnectionIdGeneratorFactory {
 public:
-  virtual ~EnvoyQuicConnectionIdGeneratorContext() = default;
+  virtual ~EnvoyQuicConnectionIdGeneratorFactory() = default;
 
   /**
    * Create a connection ID generator object.
@@ -47,28 +47,35 @@ public:
   getCompatibleConnectionIdWorkerSelector(uint32_t concurrency) PURE;
 };
 
-using EnvoyQuicConnectionIdGeneratorContextPtr =
-    std::unique_ptr<EnvoyQuicConnectionIdGeneratorContext>;
-
-class EnvoyQuicConnectionIdGeneratorFactory {
-public:
-  virtual ~EnvoyQuicConnectionIdGeneratorFactory() = default;
-
-  virtual EnvoyQuicConnectionIdGeneratorContextPtr createQuicConnectionIdGeneratorContext() PURE;
-};
-
 using EnvoyQuicConnectionIdGeneratorFactoryPtr =
     std::unique_ptr<EnvoyQuicConnectionIdGeneratorFactory>;
+
+/**
+ * Context created during configuration load and shared by the connection ID generator factories
+ * created from it.
+ */
+class EnvoyQuicConnectionIdGeneratorContext {
+public:
+  virtual ~EnvoyQuicConnectionIdGeneratorContext() = default;
+
+  /**
+   * Create a connection ID generator factory. Called after the listen sockets are created.
+   */
+  virtual EnvoyQuicConnectionIdGeneratorFactoryPtr createQuicConnectionIdGeneratorFactory() PURE;
+};
+
+using EnvoyQuicConnectionIdGeneratorContextPtr =
+    std::unique_ptr<EnvoyQuicConnectionIdGeneratorContext>;
 
 class EnvoyQuicConnectionIdGeneratorConfigFactory : public Config::TypedFactory {
 public:
   std::string category() const override { return "envoy.quic.connection_id_generator"; }
 
   /**
-   * Returns a connection ID factory based on the given config.
+   * Returns a connection ID generator context based on the given config.
    */
-  virtual EnvoyQuicConnectionIdGeneratorFactoryPtr
-  createQuicConnectionIdGeneratorFactory(const Protobuf::Message& config,
+  virtual EnvoyQuicConnectionIdGeneratorContextPtr
+  createQuicConnectionIdGeneratorContext(const Protobuf::Message& config,
                                          ProtobufMessage::ValidationVisitor& validation_visitor,
                                          Server::Configuration::FactoryContext& context) PURE;
 };

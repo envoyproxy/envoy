@@ -44,13 +44,13 @@ EnvoyDeterministicConnectionIdGenerator::MaybeReplaceConnectionId(
 }
 
 QuicConnectionIdGeneratorPtr
-EnvoyDeterministicConnectionIdGeneratorContext::createQuicConnectionIdGenerator(uint32_t) {
+EnvoyDeterministicConnectionIdGeneratorFactory::createQuicConnectionIdGenerator(uint32_t) {
   return std::make_unique<EnvoyDeterministicConnectionIdGenerator>(
       quic::kQuicDefaultConnectionIdLength);
 }
 
 absl::StatusOr<Network::Socket::OptionConstSharedPtr>
-EnvoyDeterministicConnectionIdGeneratorContext::createCompatibleLinuxBpfSocketOption(
+EnvoyDeterministicConnectionIdGeneratorFactory::createCompatibleLinuxBpfSocketOption(
     uint32_t concurrency) {
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   // This BPF filter reads the 1st word of QUIC connection id in the UDP payload and mods it by the
@@ -131,16 +131,16 @@ static uint32_t bpfEquivalentFunction(const Buffer::Instance& packet, uint32_t c
 }
 
 QuicConnectionIdWorkerSelector
-EnvoyDeterministicConnectionIdGeneratorContext::getCompatibleConnectionIdWorkerSelector(
+EnvoyDeterministicConnectionIdGeneratorFactory::getCompatibleConnectionIdWorkerSelector(
     uint32_t concurrency) {
   return [concurrency](const Buffer::Instance& packet, uint32_t default_value) {
     return bpfEquivalentFunction(packet, concurrency, default_value);
   };
 }
 
-EnvoyQuicConnectionIdGeneratorContextPtr
-EnvoyDeterministicConnectionIdGeneratorFactory::createQuicConnectionIdGeneratorContext() {
-  return std::make_unique<EnvoyDeterministicConnectionIdGeneratorContext>();
+EnvoyQuicConnectionIdGeneratorFactoryPtr
+EnvoyDeterministicConnectionIdGeneratorContext::createQuicConnectionIdGeneratorFactory() {
+  return std::make_unique<EnvoyDeterministicConnectionIdGeneratorFactory>();
 }
 
 } // namespace Quic

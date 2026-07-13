@@ -59,12 +59,12 @@ private:
   const WorkerRoutingIdValue worker_id_;
 };
 
-class Context : public Envoy::Quic::EnvoyQuicConnectionIdGeneratorContext {
+class Factory : public Envoy::Quic::EnvoyQuicConnectionIdGeneratorFactory {
 public:
-  explicit Context(ThreadLocal::TypedSlot<QuicLbConnectionIdGenerator::ThreadLocalData>& tls_slot)
+  explicit Factory(ThreadLocal::TypedSlot<QuicLbConnectionIdGenerator::ThreadLocalData>& tls_slot)
       : tls_slot_(tls_slot) {}
 
-  // EnvoyQuicConnectionIdGeneratorContext.
+  // EnvoyQuicConnectionIdGeneratorFactory.
   QuicConnectionIdGeneratorPtr createQuicConnectionIdGenerator(uint32_t worker_index) override;
   absl::StatusOr<Network::Socket::OptionConstSharedPtr>
   createCompatibleLinuxBpfSocketOption(uint32_t concurrency) override;
@@ -80,17 +80,17 @@ private:
 #endif
 };
 
-class Factory : public Envoy::Quic::EnvoyQuicConnectionIdGeneratorFactory {
+class Context : public Envoy::Quic::EnvoyQuicConnectionIdGeneratorContext {
 public:
-  static absl::StatusOr<std::unique_ptr<Factory>>
+  static absl::StatusOr<std::unique_ptr<Context>>
   create(const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config& config,
          Server::Configuration::FactoryContext& context);
 
-  // EnvoyQuicConnectionIdGeneratorFactory.
-  EnvoyQuicConnectionIdGeneratorContextPtr createQuicConnectionIdGeneratorContext() override;
+  // EnvoyQuicConnectionIdGeneratorContext.
+  EnvoyQuicConnectionIdGeneratorFactoryPtr createQuicConnectionIdGeneratorFactory() override;
 
 private:
-  Factory(const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config& config);
+  Context(const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config& config);
   absl::Status updateSecret(Api::Api& api);
 
   const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config config_;

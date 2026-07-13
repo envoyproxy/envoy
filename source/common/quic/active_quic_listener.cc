@@ -368,7 +368,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   auto& cid_generator_config_factory =
       Config::Utility::getAndCheckFactory<EnvoyQuicConnectionIdGeneratorConfigFactory>(
           cid_generator_config);
-  quic_cid_generator_factory_ = cid_generator_config_factory.createQuicConnectionIdGeneratorFactory(
+  quic_cid_generator_context_ = cid_generator_config_factory.createQuicConnectionIdGeneratorContext(
       *Config::Utility::translateToFactoryConfig(cid_generator_config, validation_visitor,
                                                  cid_generator_config_factory),
       validation_visitor, context_);
@@ -390,15 +390,15 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
 
 absl::Status ActiveQuicListenerFactory::doFinalPreWorkerInit(
     absl::Span<const Network::ListenSocketFactoryPtr> socket_factories) {
-  ASSERT(quic_cid_generator_factory_ != nullptr);
-  quic_cid_generator_context_ =
-      quic_cid_generator_factory_->createQuicConnectionIdGeneratorContext();
+  ASSERT(quic_cid_generator_context_ != nullptr);
+  quic_cid_generator_factory_ =
+      quic_cid_generator_context_->createQuicConnectionIdGeneratorFactory();
   worker_selector_ =
-      quic_cid_generator_context_->getCompatibleConnectionIdWorkerSelector(concurrency_);
+      quic_cid_generator_factory_->getCompatibleConnectionIdWorkerSelector(concurrency_);
   if (!disable_kernel_bpf_packet_routing_for_test_) {
     if (concurrency_ > 1) {
       auto opt_or_status =
-          quic_cid_generator_context_->createCompatibleLinuxBpfSocketOption(concurrency_);
+          quic_cid_generator_factory_->createCompatibleLinuxBpfSocketOption(concurrency_);
       switch (opt_or_status.status().code()) {
       case absl::StatusCode::kOk:
         kernel_worker_routing_ = true;
@@ -442,7 +442,7 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
     Network::SocketSharedPtr&& listen_socket_ptr, Event::Dispatcher& dispatcher,
     Network::ListenerConfig& config) {
   ASSERT(crypto_server_stream_factory_.has_value());
-  ASSERT(quic_cid_generator_context_ != nullptr);
+  ASSERT(quic_cid_generator_factory_ != nullptr);
   if (server_preferred_address_config_ != nullptr) {
     const EnvoyQuicServerPreferredAddressConfig::Addresses addresses =
         server_preferred_address_config_->getServerPreferredAddresses(
@@ -483,7 +483,7 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
       quic_config_, kernel_worker_routing_, enabled_, quic_stat_names_,
       packets_to_read_to_connection_count_ratio_, crypto_server_stream_factory_.value(),
       proof_source_factory_.value(),
-      quic_cid_generator_context_->createQuicConnectionIdGenerator(worker_index));
+      quic_cid_generator_factory_->createQuicConnectionIdGenerator(worker_index));
 }
 
 Network::ConnectionHandler::ActiveUdpListenerPtr
