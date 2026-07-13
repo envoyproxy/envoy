@@ -30,13 +30,13 @@ public:
   MOCK_METHOD(const PrioritySet&, prioritySet, ());
   MOCK_METHOD(ClusterInfoConstSharedPtr, info, ());
   MOCK_METHOD(LoadBalancer&, loadBalancer, ());
-  MOCK_METHOD(absl::optional<HttpPoolData>, httpConnPool,
+  MOCK_METHOD(std::optional<HttpPoolData>, httpConnPool,
               (HostConstSharedPtr host, ResourcePriority priority,
-               absl::optional<Http::Protocol> downstream_protocol, LoadBalancerContext* context));
+               std::optional<Http::Protocol> downstream_protocol, LoadBalancerContext* context));
   MOCK_METHOD(HostSelectionResponse, chooseHost, (LoadBalancerContext * context));
-  MOCK_METHOD(absl::optional<TcpPoolData>, tcpConnPool,
+  MOCK_METHOD(std::optional<TcpPoolData>, tcpConnPool,
               (HostConstSharedPtr host, ResourcePriority priority, LoadBalancerContext* context));
-  MOCK_METHOD(absl::optional<TcpPoolData>, tcpConnPool,
+  MOCK_METHOD(std::optional<TcpPoolData>, tcpConnPool,
               (ResourcePriority priority, LoadBalancerContext* context));
   MOCK_METHOD(MockHost::MockCreateConnectionData, tcpConn_, (LoadBalancerContext * context));
   MOCK_METHOD(Http::AsyncClient&, httpAsyncClient, ());

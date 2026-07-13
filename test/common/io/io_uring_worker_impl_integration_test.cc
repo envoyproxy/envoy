@@ -292,13 +292,13 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketRead) {
   initialize();
   createListenerAndConnectedSocketPair();
 
-  absl::optional<int32_t> result = absl::nullopt;
+  std::optional<int32_t> result = std::nullopt;
   OptRef<IoUringSocket> socket;
   socket = io_uring_worker_->addServerSocket(
       server_socket_,
       [&socket, &result](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Read);
-        EXPECT_NE(absl::nullopt, socket->getReadParam());
+        EXPECT_NE(std::nullopt, socket->getReadParam());
         result = socket->getReadParam()->result_;
         return absl::OkStatus();
       },
@@ -330,14 +330,14 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketMultishotRead) {
   }
   createListenerAndConnectedSocketPair();
 
-  absl::optional<int32_t> result = absl::nullopt;
+  std::optional<int32_t> result = std::nullopt;
   std::string read_data;
   OptRef<IoUringSocket> socket;
   socket = io_uring_worker_->addServerSocket(
       server_socket_,
       [&socket, &result, &read_data](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Read);
-        EXPECT_NE(absl::nullopt, socket->getReadParam());
+        EXPECT_NE(std::nullopt, socket->getReadParam());
         result = socket->getReadParam()->result_;
         read_data += socket->getReadParam()->buf_.toString();
         socket->getReadParam()->buf_.drain(socket->getReadParam()->buf_.length());
@@ -356,7 +356,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketMultishotRead) {
   EXPECT_EQ(read_data, write_data);
 
   // The read stays armed, so a second write is delivered without resubmitting a read request.
-  result = absl::nullopt;
+  result = std::nullopt;
   std::string second_write = "second chunk";
   Api::OsSysCallsSingleton::get().write(client_socket_, second_write.data(), second_write.size());
   while (!result.has_value()) {
@@ -373,13 +373,13 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketMultishotRead) {
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketReadError) {
   initialize();
 
-  absl::optional<int32_t> result = absl::nullopt;
+  std::optional<int32_t> result = std::nullopt;
   OptRef<IoUringSocket> socket;
   socket = io_uring_worker_->addServerSocket(
       -1,
       [&socket, &result](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Read);
-        EXPECT_NE(absl::nullopt, socket->getReadParam());
+        EXPECT_NE(std::nullopt, socket->getReadParam());
         result = socket->getReadParam()->result_;
         socket->close(false);
         return absl::OkStatus();
@@ -403,13 +403,13 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketRemoteClose) {
   initialize();
   createListenerAndConnectedSocketPair();
 
-  absl::optional<int32_t> result = absl::nullopt;
+  std::optional<int32_t> result = std::nullopt;
   OptRef<IoUringSocket> socket;
   socket = io_uring_worker_->addServerSocket(
       server_socket_,
       [&socket, &result](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Read);
-        EXPECT_NE(absl::nullopt, socket->getReadParam());
+        EXPECT_NE(std::nullopt, socket->getReadParam());
         result = socket->getReadParam()->result_;
         socket->close(false);
         return absl::OkStatus();
@@ -437,14 +437,14 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketDisable) {
   initialize();
   createListenerAndConnectedSocketPair();
 
-  absl::optional<int32_t> result = absl::nullopt;
+  std::optional<int32_t> result = std::nullopt;
   OptRef<IoUringSocket> socket;
   bool drained = false;
   socket = io_uring_worker_->addServerSocket(
       server_socket_,
       [&socket, &result, &drained](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Read);
-        EXPECT_NE(absl::nullopt, socket->getReadParam());
+        EXPECT_NE(std::nullopt, socket->getReadParam());
         result = socket->getReadParam()->result_;
         if (!drained) {
           socket->getReadParam()->buf_.drain(5);
@@ -524,13 +524,13 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketWrite) {
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketWriteError) {
   initialize();
 
-  absl::optional<int32_t> result = absl::nullopt;
+  std::optional<int32_t> result = std::nullopt;
   OptRef<IoUringSocket> socket;
   socket = io_uring_worker_->addServerSocket(
       -1,
       [&socket, &result](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Write);
-        EXPECT_NE(absl::nullopt, socket->getWriteParam());
+        EXPECT_NE(std::nullopt, socket->getWriteParam());
         result = socket->getWriteParam()->result_;
         socket->close(false);
         return absl::OkStatus();
@@ -740,7 +740,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseWithoutEnableCloseEvent) {
       server_socket_,
       [&socket, &is_closed](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Read);
-        EXPECT_NE(socket->getReadParam(), absl::nullopt);
+        EXPECT_NE(socket->getReadParam(), std::nullopt);
         EXPECT_EQ(socket->getReadParam()->result_, 0);
         is_closed = true;
         return absl::OkStatus();
@@ -769,7 +769,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterDisabledWithoutEnable
       server_socket_,
       [&socket, &is_closed](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Write);
-        EXPECT_NE(socket->getWriteParam(), absl::nullopt);
+        EXPECT_NE(socket->getWriteParam(), std::nullopt);
         EXPECT_EQ(socket->getWriteParam()->result_, 0);
         is_closed = true;
         return absl::OkStatus();
@@ -869,7 +869,7 @@ TEST_F(IoUringWorkerIntegrationTest, AddServerSocketWithBuffer) {
   initialize();
   createListenerAndConnectedSocketPair();
 
-  absl::optional<int32_t> result = absl::nullopt;
+  std::optional<int32_t> result = std::nullopt;
   OptRef<IoUringSocket> socket;
   std::string data = "hello";
   Buffer::OwnedImpl buffer;
@@ -878,7 +878,7 @@ TEST_F(IoUringWorkerIntegrationTest, AddServerSocketWithBuffer) {
       server_socket_, buffer,
       [&socket, &result](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Read);
-        EXPECT_NE(absl::nullopt, socket->getReadParam());
+        EXPECT_NE(std::nullopt, socket->getReadParam());
         result = socket->getReadParam()->result_;
         return absl::OkStatus();
       },
@@ -924,7 +924,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketUpdateFileEventCb) {
   initialize();
   createListenerAndConnectedSocketPair();
 
-  absl::optional<int32_t> result = absl::nullopt;
+  std::optional<int32_t> result = std::nullopt;
   OptRef<IoUringSocket> socket;
   socket = io_uring_worker_->addServerSocket(
       server_socket_,
@@ -937,7 +937,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketUpdateFileEventCb) {
 
   socket->setFileReadyCb([&socket, &result](uint32_t events) {
     ASSERT(events == Event::FileReadyType::Read);
-    EXPECT_NE(absl::nullopt, socket->getReadParam());
+    EXPECT_NE(std::nullopt, socket->getReadParam());
     result = socket->getReadParam()->result_;
     return absl::OkStatus();
   });
@@ -961,13 +961,13 @@ TEST_F(IoUringWorkerIntegrationTest, ClientSocketConnect) {
   initialize();
   createListenerAndSocketPair();
 
-  absl::optional<int32_t> result = absl::nullopt;
+  std::optional<int32_t> result = std::nullopt;
   OptRef<IoUringSocket> socket;
   socket = io_uring_worker_->addClientSocket(
       client_socket_,
       [&socket, &result](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Write);
-        EXPECT_NE(absl::nullopt, socket->getWriteParam());
+        EXPECT_NE(std::nullopt, socket->getWriteParam());
         result = socket->getWriteParam()->result_;
         return absl::OkStatus();
       },
@@ -998,13 +998,13 @@ TEST_F(IoUringWorkerIntegrationTest, ClientSocketConnectError) {
   initialize();
   createListenerAndSocketPair();
 
-  absl::optional<int32_t> result = absl::nullopt;
+  std::optional<int32_t> result = std::nullopt;
   OptRef<IoUringSocket> socket;
   socket = io_uring_worker_->addClientSocket(
       client_socket_,
       [&socket, &result](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Write);
-        EXPECT_NE(absl::nullopt, socket->getWriteParam());
+        EXPECT_NE(std::nullopt, socket->getWriteParam());
         result = socket->getWriteParam()->result_;
         return absl::OkStatus();
       },

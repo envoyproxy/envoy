@@ -4,8 +4,10 @@
 #include "source/extensions/filters/http/cache_v2/config.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -13,6 +15,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CacheV2 {
 namespace {
+
+using StatusHelpers::HasStatus;
 
 class CacheFilterFactoryTest : public ::testing::Test {
 protected:
@@ -46,17 +50,18 @@ TEST_F(CacheFilterFactoryTest, Disabled) {
 }
 
 TEST_F(CacheFilterFactoryTest, NoTypedConfig) {
-  EXPECT_THROW(
-      factory_.createFilterFactoryFromProto(config_, "stats", context_).status().IgnoreError(),
-      EnvoyException);
+  auto status_or = factory_.createFilterFactoryFromProto(config_, "stats", context_);
+  EXPECT_THAT(status_or, HasStatus(absl::StatusCode::kInvalidArgument,
+                                   "at least one of typed_config or disabled must be set"));
 }
 
 TEST_F(CacheFilterFactoryTest, UnregisteredTypedConfig) {
   std::ignore = config_.mutable_typed_config()->PackFrom(
       envoy::extensions::filters::http::cache_v2::v3::CacheV2Config());
-  EXPECT_THROW(
-      factory_.createFilterFactoryFromProto(config_, "stats", context_).status().IgnoreError(),
-      EnvoyException);
+  auto status_or = factory_.createFilterFactoryFromProto(config_, "stats", context_);
+  EXPECT_THAT(status_or, HasStatus(absl::StatusCode::kInvalidArgument,
+                                   "Didn't find a registered implementation for type: "
+                                   "'envoy.extensions.filters.http.cache_v2.v3.CacheV2Config'"));
 }
 
 class FailToCreateCacheFactory : public HttpCacheFactory {
@@ -76,9 +81,10 @@ static Registry::RegisterFactory<FailToCreateCacheFactory, HttpCacheFactory> reg
 
 TEST_F(CacheFilterFactoryTest, FactoryFailsToCreateCache) {
   std::ignore = config_.mutable_typed_config()->PackFrom(Key());
-  EXPECT_THROW(
-      factory_.createFilterFactoryFromProto(config_, "stats", context_).status().IgnoreError(),
-      EnvoyException);
+  auto status_or = factory_.createFilterFactoryFromProto(config_, "stats", context_);
+  EXPECT_THAT(status_or,
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "Couldn't initialize cache: INVALID_ARGUMENT: intentional fail"));
 }
 
 } // namespace

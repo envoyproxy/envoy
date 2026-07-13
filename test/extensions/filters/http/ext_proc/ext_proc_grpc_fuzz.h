@@ -122,9 +122,9 @@ public:
     setDownstreamProtocol(Http::CodecType::HTTP2);
   }
 
-  IntegrationStreamDecoderPtr sendDownstreamRequest(
-      absl::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
-      absl::string_view http_method = "GET") {
+  IntegrationStreamDecoderPtr
+  sendDownstreamRequest(std::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
+                        absl::string_view http_method = "GET") {
     Http::TestRequestHeaderMapImpl headers{{":method", std::string(http_method)}};
     if (modify_headers) {
       (*modify_headers)(headers);
@@ -135,7 +135,7 @@ public:
 
   IntegrationStreamDecoderPtr sendDownstreamRequestWithBody(
       absl::string_view body,
-      absl::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
+      std::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
       absl::string_view http_method = "POST") {
     Http::TestRequestHeaderMapImpl headers{{":method", std::string(http_method)}};
     HttpTestUtility::addDefaultHeaders(headers, false);
@@ -147,7 +147,7 @@ public:
 
   IntegrationStreamDecoderPtr sendDownstreamRequestWithChunks(
       FuzzedDataProvider* fdp,
-      absl::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
+      std::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
       absl::string_view http_method = "POST") {
     Http::TestRequestHeaderMapImpl headers{{":method", std::string(http_method)}};
     HttpTestUtility::addDefaultHeaders(headers, false);
@@ -191,16 +191,16 @@ public:
     switch (fdp->ConsumeEnum<HttpMethod>()) {
     case HttpMethod::GET:
       ENVOY_LOG_MISC(trace, "Sending GET request");
-      return sendDownstreamRequest(absl::nullopt);
+      return sendDownstreamRequest(std::nullopt);
     case HttpMethod::POST:
       if (fdp->ConsumeBool()) {
         ENVOY_LOG_MISC(trace, "Sending POST request with body");
         const uint32_t data_size = fdp->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxDataSize);
         const std::string data = std::string(data_size, 'a');
-        return sendDownstreamRequestWithBody(data, absl::nullopt);
+        return sendDownstreamRequestWithBody(data, std::nullopt);
       } else {
         ENVOY_LOG_MISC(trace, "Sending POST request with chunked body");
-        return sendDownstreamRequestWithChunks(fdp, absl::nullopt);
+        return sendDownstreamRequestWithChunks(fdp, std::nullopt);
       }
       break;
     default:

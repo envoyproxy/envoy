@@ -13,7 +13,7 @@ namespace Network {
 class IoSocketHandleBaseImpl : public IoHandle, protected Logger::Loggable<Logger::Id::io> {
 public:
   IoSocketHandleBaseImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
-                         absl::optional<int> domain = absl::nullopt);
+                         std::optional<int> domain = std::nullopt);
   ~IoSocketHandleBaseImpl() override;
 
   // TODO(sbelair2)  To be removed when the fd is fully abstracted from clients.
@@ -28,17 +28,17 @@ public:
   Api::SysCallIntResult ioctl(unsigned long, void*, unsigned long, void*, unsigned long,
                               unsigned long*) override;
   Api::SysCallIntResult setBlocking(bool blocking) override;
-  absl::optional<int> domain() override;
+  std::optional<int> domain() override;
   absl::StatusOr<Address::InstanceConstSharedPtr> localAddress() override;
   absl::StatusOr<Address::InstanceConstSharedPtr> peerAddress() override;
-  absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
-  absl::optional<uint64_t> congestionWindowInBytes() const override;
-  absl::optional<std::string> interfaceName() override;
+  std::optional<std::chrono::milliseconds> lastRoundTripTime() override;
+  std::optional<uint64_t> congestionWindowInBytes() const override;
+  std::optional<std::string> interfaceName() override;
 
 protected:
   os_fd_t fd_;
   int socket_v6only_;
-  const absl::optional<int> domain_;
+  const std::optional<int> domain_;
   bool was_connected_ = false;
 };
 

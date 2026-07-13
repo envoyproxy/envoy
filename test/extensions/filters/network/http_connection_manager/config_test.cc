@@ -233,14 +233,14 @@ http_filters:
 
 #ifdef ENVOY_ENABLE_QUIC
   {
-    EXPECT_CALL(listener_info_, isQuic()).WillOnce(Return(false));
+    EXPECT_CALL(context_.listener_info_, isQuic()).WillOnce(Return(false));
 
     EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
                               "HTTP/3 codec configured on non-QUIC listener.");
   }
   {
     creation_status_ = absl::OkStatus();
-    EXPECT_CALL(listener_info_, isQuic()).WillOnce(Return(true));
+    EXPECT_CALL(context_.listener_info_, isQuic()).WillOnce(Return(true));
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                        date_provider_, route_config_provider_manager_,
                                        &scoped_routes_config_provider_manager_, tracer_manager_,
@@ -274,7 +274,7 @@ http_filters:
     "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(listener_info_, isQuic()).WillOnce(Return(true));
+  EXPECT_CALL(context_.listener_info_, isQuic()).WillOnce(Return(true));
 
   EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
                             "Non-HTTP/3 codec configured on QUIC listener.");
@@ -2700,11 +2700,11 @@ public:
 
   void set(Http::RequestHeaderMap&, bool, bool) override {}
   void setInResponse(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&) override {}
-  absl::optional<absl::string_view> get(const Http::RequestHeaderMap&) const override {
-    return absl::nullopt;
+  std::optional<absl::string_view> get(const Http::RequestHeaderMap&) const override {
+    return std::nullopt;
   }
-  absl::optional<uint64_t> getInteger(const Http::RequestHeaderMap&) const override {
-    return absl::nullopt;
+  std::optional<uint64_t> getInteger(const Http::RequestHeaderMap&) const override {
+    return std::nullopt;
   }
   Tracing::Reason getTraceReason(const Http::RequestHeaderMap&) override {
     return Tracing::Reason::Sampling;

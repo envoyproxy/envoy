@@ -64,9 +64,9 @@ public:
    */
   FilterConfig(Server::Configuration::ServerFactoryContext& context,
                std::shared_ptr<TokenBucketSingleton> bucket_singleton,
-               absl::optional<absl::string_view> request_bucket_id,
-               absl::optional<absl::string_view> response_bucket_id,
-               absl::optional<absl::string_view> response_trailer_prefix,
+               std::optional<absl::string_view> request_bucket_id,
+               std::optional<absl::string_view> response_bucket_id,
+               std::optional<absl::string_view> response_trailer_prefix,
                HttpMatchTreePtr tenant_name_selector,
                absl::flat_hash_map<std::string, TenantConfig>&& tenant_configs,
                TenantConfig default_tenant_config);
@@ -88,14 +88,14 @@ public:
   TimeSource& timeSource() const { return time_source_; }
 
 private:
-  std::shared_ptr<FairTokenBucket::Client> getBucketById(const absl::optional<std::string>& id,
+  std::shared_ptr<FairTokenBucket::Client> getBucketById(const std::optional<std::string>& id,
                                                          absl::string_view tenant) const;
   TimeSource& time_source_;
   const std::shared_ptr<TokenBucketSingleton> bucket_singleton_;
-  const absl::optional<std::string> request_bucket_id_;
-  const absl::optional<std::string> response_bucket_id_;
+  const std::optional<std::string> request_bucket_id_;
+  const std::optional<std::string> response_bucket_id_;
   // Unset means don't do response trailers.
-  const absl::optional<ResponseTrailers> response_trailers_;
+  const std::optional<ResponseTrailers> response_trailers_;
   const HttpMatchTreePtr tenant_name_selector_;
   const absl::flat_hash_map<std::string, TenantConfig> tenant_configs_;
   const TenantConfig default_tenant_config_;

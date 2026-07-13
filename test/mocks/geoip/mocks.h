@@ -2,17 +2,15 @@
 
 #include "envoy/geoip/geoip_provider_driver.h"
 
-#include "test/extensions/filters/http/geoip/dummy.pb.h"
-#include "test/extensions/filters/http/geoip/dummy.pb.validate.h"
+#include "test/mocks/geoip/dummy.pb.h"
+#include "test/mocks/geoip/dummy.pb.validate.h"
 
 #include "gmock/gmock.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace HttpFilters {
-namespace Geoip {
+namespace Geolocation {
 
-class MockDriver : public Geolocation::Driver {
+class MockDriver : public Driver {
 public:
   MOCK_METHOD(void, lookup,
               (Geolocation::LookupRequest && request, Geolocation::LookupGeoHeadersCallback&&),
@@ -21,7 +19,7 @@ public:
 
 using MockDriverSharedPtr = std::shared_ptr<MockDriver>;
 
-class DummyGeoipProviderFactory : public Geolocation::GeoipProviderFactory {
+class DummyGeoipProviderFactory : public GeoipProviderFactory {
 public:
   DummyGeoipProviderFactory() : driver_(new MockDriver()) {}
   Geolocation::DriverSharedPtr
@@ -35,14 +33,12 @@ public:
   std::string name() const override { return "envoy.geoip_providers.dummy"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::extensions::filters::http::geoip::DummyProvider>();
+    return std::make_unique<test::mocks::geoip::DummyProvider>();
   }
 
 private:
   MockDriverSharedPtr driver_;
 };
 
-} // namespace Geoip
-} // namespace HttpFilters
-} // namespace Extensions
+} // namespace Geolocation
 } // namespace Envoy

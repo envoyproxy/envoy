@@ -28,7 +28,7 @@ public:
     if (metadata_map.contains("should_continue")) {
       return Http::FilterMetadataStatus::ContinueAll;
     } else if (metadata_map.contains("local_reply")) {
-      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "baaaad", nullptr, absl::nullopt,
+      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "baaaad", nullptr, std::nullopt,
                                          "reallybad");
       return Http::FilterMetadataStatus::StopIterationForLocalReply;
     }
@@ -47,7 +47,7 @@ public:
     if (metadata_map.contains("should_continue")) {
       return Http::FilterMetadataStatus::ContinueAll;
     } else if (metadata_map.contains("local_reply")) {
-      encoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "baaaad", nullptr, absl::nullopt,
+      encoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "baaaad", nullptr, std::nullopt,
                                          "reallybad");
       return Http::FilterMetadataStatus::StopIterationForLocalReply;
     }

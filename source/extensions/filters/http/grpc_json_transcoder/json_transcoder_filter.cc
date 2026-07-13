@@ -112,7 +112,7 @@ private:
 JsonTranscoderConfig::JsonTranscoderConfig(
     const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
         proto_config,
-    Api::Api& api) {
+    Api::Api& api, absl::Status& creation_status) {
 
   disabled_ = proto_config.services().empty();
   if (disabled_) {
@@ -125,31 +125,45 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       DescriptorSetCase::kProtoDescriptor: {
     auto file_or_error = api.fileSystem().fileReadToEnd(proto_config.proto_descriptor());
-    THROW_IF_NOT_OK_REF(file_or_error.status());
+    SET_AND_RETURN_IF_NOT_OK(file_or_error.status(), creation_status);
     if (!descriptor_set.ParseFromString(file_or_error.value())) {
-      throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");
+      creation_status =
+          absl::InvalidArgumentError("transcoding_filter: Unable to parse proto descriptor");
+      return;
     }
     break;
   }
   case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       DescriptorSetCase::kProtoDescriptorBin:
     if (!descriptor_set.ParseFromString(proto_config.proto_descriptor_bin())) {
-      throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");
+      creation_status =
+          absl::InvalidArgumentError("transcoding_filter: Unable to parse proto descriptor");
+      return;
     }
     break;
   case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       DescriptorSetCase::DESCRIPTOR_SET_NOT_SET:
-    throw EnvoyException("transcoding_filter: descriptor not set");
+    creation_status = absl::InvalidArgumentError("transcoding_filter: descriptor not set");
+    return;
   }
 
   for (const auto& file : descriptor_set.file()) {
-    addFileDescriptor(file);
+    creation_status = addFileDescriptor(file);
+    if (!creation_status.ok()) {
+      return;
+    }
   }
 
   convert_grpc_status_ = proto_config.convert_grpc_status();
   if (convert_grpc_status_) {
-    addBuiltinSymbolDescriptor("google.protobuf.Any");
-    addBuiltinSymbolDescriptor("google.rpc.Status");
+    creation_status = addBuiltinSymbolDescriptor("google.protobuf.Any");
+    if (!creation_status.ok()) {
+      return;
+    }
+    creation_status = addBuiltinSymbolDescriptor("google.rpc.Status");
+    if (!creation_status.ok()) {
+      return;
+    }
   }
 
   type_helper_ = std::make_unique<google::grpc::transcoding::TypeHelper>(
@@ -169,8 +183,9 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   for (const auto& service_name : proto_config.services()) {
     auto service = descriptor_pool_.FindServiceByName(service_name);
     if (service == nullptr) {
-      throw EnvoyException("transcoding_filter: Could not find '" + service_name +
-                           "' in the proto descriptor");
+      creation_status = absl::InvalidArgumentError("transcoding_filter: Could not find '" +
+                                                   service_name + "' in the proto descriptor");
+      return;
     }
     for (int i = 0; i < service->method_count(); ++i) {
       auto method = service->method(i);
@@ -187,14 +202,16 @@ JsonTranscoderConfig::JsonTranscoderConfig(
       MethodInfoSharedPtr method_info;
       Status status = createMethodInfo(method, http_rule, method_info);
       if (!status.ok()) {
-        throw EnvoyException(absl::StrCat("transcoding_filter: Cannot register '",
-                                          method->full_name(), "': ", status.message()));
+        creation_status = absl::InvalidArgumentError(absl::StrCat(
+            "transcoding_filter: Cannot register '", method->full_name(), "': ", status.message()));
+        return;
       }
 
       if (!PathMatcherUtility::RegisterByHttpRule(pmb, http_rule, ignored_query_parameters,
                                                   method_info)) {
-        throw EnvoyException(absl::StrCat("transcoding_filter: Cannot register '",
-                                          method->full_name(), "' to path matcher"));
+        creation_status = absl::InvalidArgumentError(absl::StrCat(
+            "transcoding_filter: Cannot register '", method->full_name(), "' to path matcher"));
+        return;
       }
     }
   }
@@ -245,26 +262,27 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   }
 }
 
-void JsonTranscoderConfig::addFileDescriptor(const Protobuf::FileDescriptorProto& file) {
+absl::Status JsonTranscoderConfig::addFileDescriptor(const Protobuf::FileDescriptorProto& file) {
   if (descriptor_pool_.BuildFile(file) == nullptr) {
-    throw EnvoyException("transcoding_filter: Unable to build proto descriptor pool");
+    return absl::InvalidArgumentError("transcoding_filter: Unable to build proto descriptor pool");
   }
+  return absl::OkStatus();
 }
 
-void JsonTranscoderConfig::addBuiltinSymbolDescriptor(const std::string& symbol_name) {
+absl::Status JsonTranscoderConfig::addBuiltinSymbolDescriptor(const std::string& symbol_name) {
   if (descriptor_pool_.FindFileContainingSymbol(symbol_name) != nullptr) {
-    return;
+    return absl::OkStatus();
   }
 
   auto* builtin_pool = Protobuf::DescriptorPool::generated_pool();
   if (!builtin_pool) {
-    return;
+    return absl::OkStatus();
   }
 
   Protobuf::DescriptorPoolDatabase pool_database(*builtin_pool);
   Protobuf::FileDescriptorProto file_proto;
   std::ignore = pool_database.FindFileContainingSymbol(symbol_name, &file_proto);
-  addFileDescriptor(file_proto);
+  return addFileDescriptor(file_proto);
 }
 
 Status JsonTranscoderConfig::resolveField(const Protobuf::Descriptor* descriptor,
@@ -511,7 +529,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
                      *decoder_callbacks_);
     error_ = true;
     decoder_callbacks_->sendLocalReply(
-        static_cast<Http::Code>(http_code), status.message(), nullptr, absl::nullopt,
+        static_cast<Http::Code>(http_code), status.message(), nullptr, std::nullopt,
         absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{",
                      StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(status.code())),
                      "}"));
@@ -536,7 +554,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
           *decoder_callbacks_);
       error_ = true;
       decoder_callbacks_->sendLocalReply(
-          Http::Code::BadRequest, "Bad request", nullptr, absl::nullopt,
+          Http::Code::BadRequest, "Bad request", nullptr, std::nullopt,
           absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{BAD_REQUEST}"));
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -796,7 +814,7 @@ void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_
 
   response_in_.finish();
 
-  const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
+  const std::optional<Grpc::Status::GrpcStatus> grpc_status =
       Grpc::Common::getGrpcStatus(headers_or_trailers, true);
   if (grpc_status && maybeConvertGrpcStatus(*grpc_status, headers_or_trailers)) {
     return;
@@ -872,7 +890,7 @@ bool JsonTranscoderFilter::checkAndRejectIfRequestTranscoderFailed(const std::st
     decoder_callbacks_->sendLocalReply(
         Http::Code::BadRequest,
         absl::string_view(request_status.message().data(), request_status.message().size()),
-        nullptr, absl::nullopt,
+        nullptr, std::nullopt,
         absl::StrCat(
             details, "{",
             StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(request_status.code())),
@@ -892,7 +910,7 @@ bool JsonTranscoderFilter::checkAndRejectIfResponseTranscoderFailed() {
     encoder_callbacks_->sendLocalReply(
         Http::Code::BadGateway,
         absl::string_view(response_status.message().data(), response_status.message().size()),
-        nullptr, absl::nullopt,
+        nullptr, std::nullopt,
         absl::StrCat(
             RcDetails::get().GrpcTranscodeFailed, "{",
             StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(response_status.code())),
@@ -1075,7 +1093,7 @@ bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
         Http::Code::PayloadTooLarge,
         "Request rejected because the transcoder's internal buffer size exceeds the configured "
         "limit.",
-        nullptr, absl::nullopt,
+        nullptr, std::nullopt,
         absl::StrCat(RcDetails::get().GrpcTranscodeFailed, "{request_buffer_size_limit_reached}"));
     return true;
   }
@@ -1098,7 +1116,7 @@ bool JsonTranscoderFilter::encoderBufferLimitReached(uint64_t buffer_length) {
         Http::Code::InternalServerError,
         "Response not transcoded because the transcoder's internal buffer size exceeds the "
         "configured limit.",
-        nullptr, absl::nullopt,
+        nullptr, std::nullopt,
         absl::StrCat(RcDetails::get().GrpcTranscodeFailed, "{response_buffer_size_limit_reached}"));
     return true;
   }

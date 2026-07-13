@@ -39,7 +39,7 @@ public:
 
   void onResourceLoadFailed(const Config::XdsSourceId& /*source_id*/,
                             const std::string& resource_name,
-                            const absl::optional<EnvoyException>& /*exception*/) override {
+                            const std::optional<EnvoyException>& /*exception*/) override {
     failed_resource_names_.push_back(resource_name);
   }
 

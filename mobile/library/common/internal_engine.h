@@ -10,7 +10,7 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/notification.h"
-#include "absl/types/optional.h"
+#include <optional>
 #include "extension_registry.h"
 #include "library/common/engine_common.h"
 #include "library/common/engine_types.h"
@@ -34,8 +34,8 @@ public:
    */
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
                  std::unique_ptr<EnvoyEventTracker> event_tracker,
-                 absl::optional<int> thread_priority = absl::nullopt,
-                 absl::optional<size_t> high_watermark = absl::nullopt, bool enable_logger = true,
+                 std::optional<int> thread_priority = std::nullopt,
+                 std::optional<size_t> high_watermark = std::nullopt, bool enable_logger = true,
                  bool use_worker_thread = false);
 
   /**
@@ -193,6 +193,7 @@ public:
    * Dumps Envoy stats into string. Returns an empty string when an error occurred.
    */
   std::string dumpStats();
+  void drainConnectionsBySocketTag(uint32_t tag);
 
   /**
    * Get cluster manager from the Engine.
@@ -217,7 +218,7 @@ private:
 
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
                  std::unique_ptr<EnvoyEventTracker> event_tracker,
-                 absl::optional<int> thread_priority, absl::optional<size_t> high_watermark,
+                 std::optional<int> thread_priority, std::optional<size_t> high_watermark,
                  Thread::PosixThreadFactoryPtr thread_factory, bool enable_logger = true,
                  bool use_worker_thread = false);
 
@@ -254,8 +255,8 @@ private:
   std::unique_ptr<EngineCallbacks> callbacks_;
   std::unique_ptr<EnvoyLogger> logger_;
   std::unique_ptr<EnvoyEventTracker> event_tracker_;
-  absl::optional<int> thread_priority_;
-  absl::optional<size_t> high_watermark_;
+  std::optional<int> thread_priority_;
+  std::optional<size_t> high_watermark_;
   Assert::ActionRegistrationPtr assert_handler_registration_;
   Assert::ActionRegistrationPtr bug_handler_registration_;
   Thread::MutexBasicLockable mutex_;

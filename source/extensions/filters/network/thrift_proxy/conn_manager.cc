@@ -111,11 +111,11 @@ void ConnectionManager::dispatch() {
   resetAllRpcs(true);
 }
 
-absl::optional<DirectResponse::ResponseType>
+std::optional<DirectResponse::ResponseType>
 ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response,
                                   bool end_stream) {
   if (read_callbacks_->connection().state() == Network::Connection::State::Closed) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   DirectResponse::ResponseType result = DirectResponse::ResponseType::Exception;
@@ -869,7 +869,7 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
   }
 
   FilterStatus result = FilterStatus::StopIteration;
-  absl::optional<std::string> error;
+  std::optional<std::string> error;
   TRY_NEEDS_AUDIT { result = applyDecoderFilters(DecoderEvent::MessageBegin, metadata); }
   END_TRY catch (const std::bad_function_call& e) { error = std::string(e.what()); }
 
@@ -1028,7 +1028,7 @@ Router::RouteConstSharedPtr ConnectionManager::ActiveRpc::route() {
           parent_.config_->routerConfig().route(*metadata_, stream_id_);
       cached_route_ = std::move(route);
     } else {
-      cached_route_ = absl::nullopt;
+      cached_route_ = std::nullopt;
     }
   }
 
@@ -1108,7 +1108,7 @@ ThriftFilters::ResponseStatus ConnectionManager::ActiveRpc::upstreamData(Buffer:
   }
 }
 
-void ConnectionManager::ActiveRpc::clearRouteCache() { cached_route_ = absl::nullopt; }
+void ConnectionManager::ActiveRpc::clearRouteCache() { cached_route_ = std::nullopt; }
 
 void ConnectionManager::ActiveRpc::resetDownstreamConnection() {
   ENVOY_CONN_LOG(debug, "resetting downstream connection", parent_.read_callbacks_->connection());

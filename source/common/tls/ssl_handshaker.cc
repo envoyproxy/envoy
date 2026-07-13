@@ -157,12 +157,13 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
     switch (err) {
     case SSL_ERROR_WANT_READ:
     case SSL_ERROR_WANT_WRITE:
+      state_ = Ssl::SocketState::HandshakeWaitingForConnectionData;
       return PostIoAction::KeepOpen;
     case SSL_ERROR_PENDING_CERTIFICATE:
     case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
     case SSL_ERROR_WANT_CERTIFICATE_VERIFY:
     case SSL_ERROR_WANT_X509_LOOKUP:
-      state_ = Ssl::SocketState::HandshakeInProgress;
+      state_ = Ssl::SocketState::HandshakeBlockedOnAsyncOperation;
       return PostIoAction::KeepOpen;
     default:
       handshake_callbacks_->onFailure();

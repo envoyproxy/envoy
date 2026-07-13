@@ -217,6 +217,29 @@ TEST_P(DynamicModuleClusterIntegrationTest, LifecycleCallbacks) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Drives the per-worker timer ABI end to end. The first request arms a 50ms repeating worker timer
+// from choose_host (which exercises enable/enabled/disable and increments timer_armed_total). The
+// timer then fires repeatedly on the worker dispatcher and re-arms itself, so timer_fired_total
+// keeps climbing without further requests — proving the timer is created on the worker dispatcher,
+// fires on the worker thread, and re-arms.
+TEST_P(DynamicModuleClusterIntegrationTest, WorkerTimerArmsFiresAndReArms) {
+  initializeWithDecCluster("worker_timer");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  // The first request runs choose_host, which captures the worker dispatcher and arms the timer.
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // The timer is armed exactly once, with enabled()/disable() observed as expected.
+  test_server_->waitForCounter("dynamicmodulescustom.timer_armed_total", testing::Eq(1));
+
+  // The timer fires on the worker dispatcher and re-arms, so the counter keeps climbing.
+  test_server_->waitForCounter("dynamicmodulescustom.timer_fired_total", testing::Ge(3));
+}
+
 // =============================================================================
 // Filter-state read ABI: an upstream HTTP filter writes filter state on the
 // request path; the dynamic-module cluster reads it back during host selection.
@@ -294,6 +317,75 @@ TEST_P(DynamicModuleClusterFilterStateIntegrationTest, ReadsFilterStateProducedB
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// =============================================================================
+// Dynamic-metadata set ABI: the dynamic-module cluster annotates the request
+// during host selection; the values are read back from the access log.
+// =============================================================================
+class DynamicModuleClusterDynamicMetadataIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  DynamicModuleClusterDynamicMetadataIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void initializeWithMetadataWriter() {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
+
+    // Log the two dynamic-metadata values the cluster writes during host selection.
+    useAccessLog("%DYNAMIC_METADATA(dynamic_modules.test:number_key)% "
+                 "%DYNAMIC_METADATA(dynamic_modules.test:string_key)%");
+
+    // Replace cluster_0 with a dynamic-module cluster whose Rust load balancer
+    // sets dynamic metadata on the request during host selection.
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      const std::string upstream_address = fake_upstreams_[0]->localAddress()->asString();
+
+      cluster->set_name("cluster_0");
+      cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+      cluster->clear_load_assignment();
+
+      envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig writer_config;
+      writer_config.mutable_dynamic_module_config()->set_name("cluster_dynamic_metadata_test");
+      writer_config.set_cluster_name("dynamic_metadata_writer");
+
+      Protobuf::StringValue config_proto;
+      config_proto.set_value(upstream_address);
+      std::ignore = writer_config.mutable_cluster_config()->PackFrom(config_proto);
+
+      cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
+      std::ignore =
+          cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(writer_config);
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterDynamicMetadataIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verifies that dynamic metadata set by the dynamic-module cluster during host
+// selection is attached to the request's stream info and observable in the
+// access log via %DYNAMIC_METADATA(namespace:key)%.
+TEST_P(DynamicModuleClusterDynamicMetadataIntegrationTest, SetsDynamicMetadataDuringHostSelection) {
+  initializeWithMetadataWriter();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  const std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_EQ("1234 test_value", log);
 }
 
 } // namespace DynamicModules

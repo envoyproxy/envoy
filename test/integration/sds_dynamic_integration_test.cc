@@ -260,6 +260,10 @@ public:
       });
     }
 
+    if (configure_keylog_) {
+      config_helper_.addRuntimeOverride("envoy.restart_features.quic_keylog_support", "true");
+    }
+
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Add a static SDS cluster as the first cluster in the list.
       // The SDS cluster needs to appear before the cluster that uses it for secrets, so that it
@@ -353,6 +357,14 @@ resources:
       config_source->mutable_path_config_source()->set_path(sds_path);
       config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
     }
+
+    if (configure_keylog_) {
+      ConfigHelper::ServerSslOptions options;
+      options.setTlsKeyLogFilter(/*local=*/false, /*remote=*/false, /*local_negative=*/false,
+                                 /*remote_negative=*/false, keylog_path_, /*multiple_ips=*/false,
+                                 version_);
+      ConfigHelper::initializeTlsKeyLog(common_tls_context, options);
+    }
   }
 
   void createUpstreams() override {
@@ -434,6 +446,8 @@ protected:
   const std::string session_ticket_keys_secret_{"session_ticket_keys"};
   const std::string session_ticket_keys_sds_path_{
       TestEnvironment::temporaryPath("session_ticket_keys.sds.yaml")};
+  bool configure_keylog_{false};
+  const std::string keylog_path_{TestEnvironment::temporaryPath(TestUtility::uniqueFilename())};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
@@ -528,6 +542,79 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, EmptyRotation) {
   testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 }
 
+// Validate that key logging keeps working across key-cert rotations, including
+// a rotation that races a connection's handshake:
+//   - A connection established before a rotation stays usable afterwards (its
+//     handshaker pinned the pre-rotation context).
+//   - A second rotation is kicked off and the next connection is opened
+//     immediately, so its handshake progresses in parallel with the context
+//     swap. The handshaker pins whichever context sslCtx() returns at
+//     construction time; both the pre- and post-rotation contexts are complete
+//     and valid (the swap is atomic under the factory mutex), so the handshake
+//     succeeds and key log lines are written no matter how the two interleave.
+// The test asserts only on those race-independent outcomes (request succeeds,
+// key log grows), so it is deterministic regardless of the interleaving.
+TEST_P(SdsDynamicKeyRotationIntegrationTest, KeyLogRotation) {
+  v3_resource_api_ = true;
+  configure_keylog_ = true;
+  TestEnvironment::exec(
+      {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
+
+  on_server_init_function_ = [this]() {
+    createSdsStream(*sdsUpstream());
+    sendSdsResponse(getCurrentServerSecret());
+  };
+  initialize();
+
+  // Initial update from filesystem.
+  waitForSdsUpdateStats(1);
+
+  // The first connection handshakes against the initial context and writes
+  // key log lines.
+  codec_client_ = makeHttpConnection(makeSslClientConnection());
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0,
+                                dataPlaneUpstreamIndex());
+  waitForAccessLogEntries(keylog_path_, /*client_connection=*/nullptr, /*min_entries=*/1);
+
+  // Rotate while the first connection stays open.
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("root/new"),
+                              TestEnvironment::temporaryPath("root/current"));
+  waitForSdsUpdateStats(2);
+
+  // The pre-rotation connection still serves requests after the swap.
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0,
+                                dataPlaneUpstreamIndex());
+  cleanupUpstreamAndDownstream();
+
+  // No handshake ran since the wait above, so the file holds only the first
+  // connection's lines (their number varies with the negotiated TLS version).
+  const auto entries_before = static_cast<uint32_t>(
+      waitForAccessLogEntries(keylog_path_, /*client_connection=*/nullptr, /*min_entries=*/1)
+          .size());
+
+  // Stage a symlink back to the RSA key/cert. After the first rotation
+  // root/current points at the ECDSA key/cert, so rotating to the RSA key/cert
+  // is a real cert change that triggers another SDS reload rather than a no-op.
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("root/server"),
+                                 TestEnvironment::temporaryPath("root/next"));
+
+  // Trigger the second rotation and immediately open the next connection so its
+  // handshake races the context swap. Either order is valid (see the test
+  // comment), so assert only that the request succeeds and the key log grows.
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("root/next"),
+                              TestEnvironment::temporaryPath("root/current"));
+  codec_client_ = makeHttpConnection(makeSslClientConnection());
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0,
+                                dataPlaneUpstreamIndex());
+  waitForAccessLogEntries(keylog_path_, /*client_connection=*/nullptr,
+                          /*min_entries=*/entries_before + 1);
+
+  // Confirm the second rotation eventually applied, so the race above really
+  // exercised an in-flight context swap.
+  waitForSdsUpdateStats(3);
+  cleanupUpstreamAndDownstream();
+}
+
 // A test that SDS server send a good server secret for a static listener.
 // The first ssl request should be OK.
 TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
@@ -615,7 +702,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, MultipleCerts) {
           .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"}),
       context_manager_, *api_);
   auto ssl_client1 = makeSslClientConnection();
-  codec_client_ = makeRawHttpConnection(std::move(ssl_client1), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(std::move(ssl_client1), std::nullopt);
   EXPECT_TRUE(codec_client_->connected());
   codec_client_->connection()->close(Network::ConnectionCloseType::NoFlush);
   // peer certificate is not present when using QUIC
@@ -633,7 +720,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, MultipleCerts) {
           .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"}),
       context_manager_, *api_);
   auto ssl_client2 = makeSslClientConnection();
-  codec_client_ = makeRawHttpConnection(std::move(ssl_client2), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(std::move(ssl_client2), std::nullopt);
   EXPECT_TRUE(codec_client_->connected());
   codec_client_->connection()->close(Network::ConnectionCloseType::NoFlush);
   // peer certificate is not present when using QUIC
@@ -662,7 +749,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
   };
   initialize();
 
-  codec_client_ = makeRawHttpConnection(makeSslClientConnection(), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeSslClientConnection(), std::nullopt);
   // the connection state is not connected.
   EXPECT_FALSE(codec_client_->connected());
   codec_client_->connection()->close(Network::ConnectionCloseType::NoFlush);

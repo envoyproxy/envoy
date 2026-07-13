@@ -39,7 +39,6 @@ envoy_basic_cc_library(
     hdrs = [
         "optref.h",
     ],
-    deps = ["@abseil-cpp//absl/types:optional"],
 )
 
 envoy_cc_library(

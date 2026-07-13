@@ -282,7 +282,7 @@ on_no_match:
   void setLocalAddressWithNetworkNamespace(const std::string& network_namespace_path,
                                            uint16_t port = 123) {
     address_ = std::make_shared<Network::Address::Ipv4Instance>(
-        "127.0.0.1", port, nullptr, absl::make_optional(std::string(network_namespace_path)));
+        "127.0.0.1", port, nullptr, std::make_optional(std::string(network_namespace_path)));
 
     req_info_.downstream_connection_info_provider_->setLocalAddress(address_);
     ON_CALL(connection_.stream_info_, downstreamAddressProvider())
@@ -1224,8 +1224,8 @@ public:
       port_range_ = port_range;
     }
 
-    absl::optional<std::string> ip_;
-    absl::optional<envoy::type::v3::Int64Range> port_range_;
+    std::optional<std::string> ip_;
+    std::optional<envoy::type::v3::Int64Range> port_range_;
   };
 
   void upstreamIpTestsBasicPolicySetup(const std::vector<UpstreamIpPortMatcherConfig>& configs,

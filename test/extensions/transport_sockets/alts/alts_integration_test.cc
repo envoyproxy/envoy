@@ -540,7 +540,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestClientInvalidPeer,
 // any account in config, the handshake will fail and client closes connection.
 TEST_P(AltsIntegrationTestClientInvalidPeer, ClientValidationFail) {
   initialize();
-  codec_client_ = makeRawHttpConnection(makeAltsConnection(), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeAltsConnection(), std::nullopt);
   EXPECT_FALSE(codec_client_->connected());
 }
 
@@ -588,7 +588,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestClientWrongHandshaker,
 // and connection closes.
 TEST_P(AltsIntegrationTestClientWrongHandshaker, ConnectToWrongHandshakerAddress) {
   initialize();
-  codec_client_ = makeRawHttpConnection(makeAltsConnection(), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeAltsConnection(), std::nullopt);
   EXPECT_FALSE(codec_client_->connected());
 }
 
@@ -608,7 +608,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestCapturingHandshaker,
 // Verifies that handshake request should include ALTS version.
 TEST_P(AltsIntegrationTestCapturingHandshaker, CheckAltsVersion) {
   initialize();
-  codec_client_ = makeRawHttpConnection(makeAltsConnection(), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeAltsConnection(), std::nullopt);
   EXPECT_FALSE(codec_client_->connected());
   EXPECT_EQ(capturing_handshaker_service_->client_versions.max_rpc_version().major(),
             capturing_handshaker_service_->server_versions.max_rpc_version().major());
@@ -627,7 +627,7 @@ TEST_P(AltsIntegrationTestCapturingHandshaker, CheckAltsVersion) {
 // Verifies that handshake request should include max frame size.
 TEST_P(AltsIntegrationTestCapturingHandshaker, CheckMaxFrameSize) {
   initialize();
-  codec_client_ = makeRawHttpConnection(makeAltsConnection(), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeAltsConnection(), std::nullopt);
   EXPECT_FALSE(codec_client_->connected());
   EXPECT_EQ(capturing_handshaker_service_->client_max_frame_size, 1024 * 1024);
   EXPECT_EQ(capturing_handshaker_service_->server_max_frame_size, 1024 * 1024);

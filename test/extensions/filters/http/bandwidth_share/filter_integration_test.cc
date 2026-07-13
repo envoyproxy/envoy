@@ -71,7 +71,7 @@ public:
                                ->mutable_virtual_hosts(0)
                                ->mutable_routes(0)
                                ->mutable_typed_per_filter_config();
-      (*typed_config)["bwshare"].PackFrom(per_route_config);
+      std::ignore = (*typed_config)["bwshare"].PackFrom(per_route_config);
     });
     initializeFilter(filter_config);
   }

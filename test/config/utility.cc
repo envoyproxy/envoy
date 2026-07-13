@@ -603,8 +603,8 @@ ConfigHelper::buildLbEndpoint(const std::string& address_str, uint32_t port) {
 envoy::config::listener::v3::Listener
 ConfigHelper::buildBaseListener(const std::string& name, const std::string& address,
                                 const std::string& filter_chains) {
-  API_NO_BOOST(envoy::config::listener::v3::Listener) listener;
 #ifdef ENVOY_ENABLE_YAML
+  API_NO_BOOST(envoy::config::listener::v3::Listener) listener;
   TestUtility::loadFromYaml(fmt::format(
                                 R"EOF(
       name: {}
@@ -654,8 +654,8 @@ envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::str
 envoy::config::route::v3::RouteConfiguration
 ConfigHelper::buildRouteConfig(const std::string& name, const std::string& cluster,
                                bool header_mutations) {
-  API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
 #ifdef ENVOY_ENABLE_YAML
+  API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
   TestUtility::loadFromYaml(fmt::format(R"EOF(
       name: "{}"
       virtual_hosts:
@@ -698,8 +698,8 @@ ConfigHelper::buildRouteConfig(const std::string& name, const std::string& clust
 
 envoy::config::route::v3::RouteConfiguration
 ConfigHelper::buildRouteConfigWithVhdsOverAds(const std::string& name) {
-  API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
 #ifdef ENVOY_ENABLE_YAML
+  API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
   TestUtility::loadFromYaml(fmt::format(R"EOF(
       name: "{}"
       vhds:
@@ -719,8 +719,8 @@ envoy::config::route::v3::VirtualHost ConfigHelper::buildVirtualHost(const std::
                                                                      const std::string& domain,
                                                                      const std::string& prefix,
                                                                      const std::string& cluster) {
-  API_NO_BOOST(envoy::config::route::v3::VirtualHost) vhost;
 #ifdef ENVOY_ENABLE_YAML
+  API_NO_BOOST(envoy::config::route::v3::VirtualHost) vhost;
   TestUtility::loadFromYaml(fmt::format(R"EOF(
         name: {}
         domains: [{}]
@@ -857,7 +857,7 @@ void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
 void ConfigHelper::setConnectConfig(
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm,
     bool terminate_connect, bool allow_post, bool http3,
-    absl::optional<envoy::config::core::v3::ProxyProtocolConfig::Version> proxy_protocol_version) {
+    std::optional<envoy::config::core::v3::ProxyProtocolConfig::Version> proxy_protocol_version) {
   auto* route_config = hcm.mutable_route_config();
   ASSERT_EQ(1, route_config->virtual_hosts_size());
   auto* route = route_config->mutable_virtual_hosts(0)->mutable_routes(0);
@@ -928,7 +928,7 @@ void ConfigHelper::applyConfigModifiers() {
 
 void ConfigHelper::configureUpstreamTls(
     bool use_alpn, bool http3,
-    absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+    std::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
         alternate_protocol_cache_config,
     std::function<void(envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext&)>
         configure_tls_context) {

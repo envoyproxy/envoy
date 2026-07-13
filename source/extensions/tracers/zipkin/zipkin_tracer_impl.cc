@@ -136,7 +136,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
 
   // W3C fallback extraction is only enabled when USE_B3_WITH_W3C_PROPAGATION is configured
   SpanContextExtractor extractor(trace_context, w3cFallbackEnabled());
-  const absl::optional<bool> sampled = extractor.extractSampled();
+  const std::optional<bool> sampled = extractor.extractSampled();
   bool use_local_decision = !sampled.has_value();
   TRY_NEEDS_AUDIT {
     auto ret_span_context = extractor.extractSpanContext(sampled.value_or(tracing_decision.traced));

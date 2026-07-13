@@ -577,7 +577,7 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, CreateSuccess) {
   auto config = createProtoConfig();
   auto pool = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
   EXPECT_NE(pool, nullptr);
 }
 
@@ -592,7 +592,7 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, CreateSuccessWithLocalFile) {
 
   auto pool = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
   EXPECT_NE(pool, nullptr);
 }
 
@@ -600,12 +600,12 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, CacheHit) {
   auto config = createProtoConfig();
   auto pool1 = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
   EXPECT_NE(pool1, nullptr);
 
   auto pool2 = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
   EXPECT_NE(pool2, nullptr);
 }
 
@@ -615,7 +615,7 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, ModuleLoadFailure) {
 
   auto pool = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
   EXPECT_EQ(pool, nullptr);
 }
 
@@ -625,7 +625,7 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, BridgeConfigCreateFailure) {
 
   auto pool = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
   EXPECT_EQ(pool, nullptr);
 }
 
@@ -635,7 +635,7 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, NoBridgeConfig) {
 
   auto pool = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
   EXPECT_NE(pool, nullptr);
 }
 
@@ -649,7 +649,7 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, BridgeConfigParseFailure) {
 
   auto pool = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
   EXPECT_EQ(pool, nullptr);
 }
 
@@ -671,7 +671,7 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, BridgeConfigWithStruct) {
 
   auto pool = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
   EXPECT_NE(pool, nullptr);
 }
 
@@ -688,14 +688,14 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, CreateEmptyConfigProto) {
 TEST_F(DynamicModuleGenericConnPoolFactoryTest, InvalidTcpPool) {
   NiceMock<Upstream::MockClusterManager> cm2;
   cm2.initializeThreadLocalClusters({"fake_cluster"});
-  EXPECT_CALL(cm2.thread_local_cluster_, tcpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(cm2.thread_local_cluster_, tcpConnPool(_, _, _)).WillOnce(Return(std::nullopt));
 
   auto config = createProtoConfig();
   config.set_bridge_name("invalid_pool_test");
 
   auto pool = factory_.createGenericConnPool(
       host_, cm2.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
   EXPECT_EQ(pool, nullptr);
 }
 
