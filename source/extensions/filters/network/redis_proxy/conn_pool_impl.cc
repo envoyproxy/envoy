@@ -849,11 +849,20 @@ SubscriptionRegistryPtr InstanceImpl::subscriptionRegistryShared() {
   }
   if (!tls_pool.subscription_registry_) {
     // Thread the pub/sub tuning knobs from ConnPoolSettings.pubsub_settings (A-7); each getter
-    // returns the historical default when the config omits the field.
+    // returns the historical default when the config omits the field. ``subscription_placement`` is
+    // passed AS CONFIGURED (§7 P3): the SHARD_MEMBERS -> PRIMARY degrade for a non-cluster upstream
+    // is decided PER-PLACEMENT in shardCandidatesForChannel / hostServesChannelSlot, NOT baked in
+    // here. This registry is built lazily on the first subscribe, which can land during CDS warm-up
+    // while the target cluster is still absent (cluster_ == nullptr, is_redis_cluster_ == false) —
+    // resolving the degrade at that instant would pin the whole worker's pub/sub to PRIMARY for the
+    // process lifetime even after the Redis Cluster appears. Deciding per placement re-evaluates
+    // the actual upstream each time, so SHARD_MEMBERS begins working as soon as the cluster loads,
+    // and a genuinely non-cluster upstream is warned once from shardCandidatesForChannel.
     tls_pool.subscription_registry_ = std::make_shared<RedisProxy::SubscriptionRegistry>(
         tls_pool, tls_pool.api_.randomGenerator(), tls_pool.dispatcher_,
         tls_pool.config_->subscribeAckTimeout(), tls_pool.config_->resubscribeBackoffBaseInterval(),
-        tls_pool.config_->resubscribeBackoffMaxInterval());
+        tls_pool.config_->resubscribeBackoffMaxInterval(),
+        tls_pool.config_->subscriptionPlacement());
   }
   return tls_pool.subscription_registry_;
 }
@@ -907,6 +916,83 @@ InstanceImpl::ThreadLocalPool::chooseUpstreamHostForChannel(const std::string& c
       cluster_->loadBalancer().chooseHost(&lb_context));
 }
 
+bool InstanceImpl::ThreadLocalPool::shardCandidatesForChannel(
+    const std::string& channel, std::vector<Upstream::HostConstSharedPtr>& out) {
+  if (cluster_ == nullptr) {
+    return false;
+  }
+  // The cluster LB implements ShardMembershipResolver only for a Redis Cluster upstream; a
+  // non-cluster LB (ring-hash / maglev on a standalone) has no shard-membership model, so the
+  // registry degrades this channel to PRIMARY. is_redis_cluster_ upstreams force hashtagging, so
+  // ``redisSlotForKey`` (hashtag always on) resolves the SAME slot chooseUpstreamHostForChannel /
+  // SPUBLISH route to — the placement lands on the shard that receives the channel's messages.
+  const auto* resolver =
+      dynamic_cast<const Clusters::Redis::ShardMembershipResolver*>(&cluster_->loadBalancer());
+  if (resolver == nullptr) {
+    // Genuine non-cluster upstream (the cluster is present but its load balancer exposes no
+    // shard-membership model) configured with SHARD_MEMBERS: warn once per worker, then degrade
+    // this placement to PRIMARY. The cluster_ == nullptr case above is CDS warm-up rather than a
+    // config error, so it is intentionally not warned — SHARD_MEMBERS starts working once the
+    // cluster loads.
+    if (!warned_shard_members_non_cluster_) {
+      ENVOY_LOG(warn,
+                "redis: pub/sub subscription_placement SHARD_MEMBERS requires a Redis Cluster "
+                "upstream; this cluster is not one — homing subscriptions on the slot primary");
+      warned_shard_members_non_cluster_ = true;
+    }
+    return false;
+  }
+  const auto members = resolver->membersForSlot(Clusters::Redis::redisSlotForKey(channel));
+  if (!members.has_value() || members->all_hosts.empty()) {
+    return false; // no shard snapshot yet (transient) — degrade this placement to PRIMARY
+  }
+  // Health filters a NEW placement (D2): offer only healthy members. If NONE is healthy (whole
+  // shard momentarily down) fall back to the full membership so the channel can still be placed
+  // rather than failing — the record then re-places once a member recovers via the normal
+  // validity/topology path.
+  const size_t before = out.size();
+  for (const auto& host : members->all_hosts) {
+    if (host->coarseHealth() == Upstream::Host::Health::Healthy) {
+      out.push_back(host);
+    }
+  }
+  if (out.size() == before) {
+    out.insert(out.end(), members->all_hosts.begin(), members->all_hosts.end());
+  }
+  return true;
+}
+
+bool InstanceImpl::ThreadLocalPool::hostServesChannelSlot(const std::string& channel,
+                                                          const Upstream::HostConstSharedPtr& host,
+                                                          bool as_primary) {
+  if (cluster_ == nullptr) {
+    return false;
+  }
+  const auto* resolver =
+      dynamic_cast<const Clusters::Redis::ShardMembershipResolver*>(&cluster_->loadBalancer());
+  if (resolver == nullptr) {
+    // No membership model. A SHARD_MEMBERS registry is degraded to PRIMARY at construction for a
+    // non-cluster upstream, so this is defensively unreachable; report "still serves" so a record
+    // is KEPT rather than churned (matching the transient no-snapshot case below).
+    return true;
+  }
+  const auto members = resolver->membersForSlot(Clusters::Redis::redisSlotForKey(channel));
+  if (!members.has_value()) {
+    return true; // no shard snapshot yet (transient) — keep the record (PRIMARY-null parity, G4)
+  }
+  if (as_primary) {
+    return host == members->primary;
+  }
+  // Membership is health-AGNOSTIC (D2): a momentarily-unhealthy member still "serves" the slot, so
+  // a flap does not re-home its subscriptions. all_hosts is the primary + all replicas.
+  for (const auto& member : members->all_hosts) {
+    if (member == host) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool InstanceImpl::ThreadLocalPool::sendUpstreamSsubscribeToHost(
     const std::string& channel, Common::Redis::Client::PushMessageCallbacks& push_callbacks,
     const Upstream::HostConstSharedPtr& host) {
@@ -924,19 +1010,6 @@ bool InstanceImpl::ThreadLocalPool::sendUpstreamSsubscribeToHost(
   Common::Redis::RespValue cmd = Common::Redis::Utility::makeRequest("SSUBSCRIBE", {channel});
   client->redis_client_->sendCommand(cmd);
   return true;
-}
-
-Upstream::HostConstSharedPtr InstanceImpl::ThreadLocalPool::sendUpstreamSsubscribe(
-    const std::string& channel, Common::Redis::Client::PushMessageCallbacks& push_callbacks) {
-  Upstream::HostConstSharedPtr host = chooseUpstreamHostForChannel(channel);
-  if (!host) {
-    ENVOY_LOG(debug, "redis: no upstream host available for ``SSUBSCRIBE`` '{}'", channel);
-    return nullptr;
-  }
-  if (!sendUpstreamSsubscribeToHost(channel, push_callbacks, host)) {
-    return nullptr;
-  }
-  return host;
 }
 
 UpstreamSubscriptionCallbacks::SunsubscribeResult

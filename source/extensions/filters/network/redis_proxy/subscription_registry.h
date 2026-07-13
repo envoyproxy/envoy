@@ -221,30 +221,45 @@ public:
   chooseUpstreamHostForChannel(const std::string& channel) PURE;
 
   /**
-   * Send ``SSUBSCRIBE`` for a single channel routed to the correct shard.
-   * Unlike SUBSCRIBE (any node), ``SSUBSCRIBE`` must go to the shard
-   * that owns the channel's hash slot.
-   * @param channel the channel to subscribe to (used for hash-slot routing).
-   * @param push_callbacks the push message handler.
-   * @return the upstream host the ``SSUBSCRIBE`` was sent to (which the caller records as the
-   *         channel's owner), or nullptr if no host was available for the slot or the send failed.
-   *         A non-null return therefore always identifies the chosen shard — the caller needs no
-   *         separate success flag.
+   * SHARD_MEMBERS placement candidates for ``channel``: the members (primary + replicas) of the
+   * shard that owns the channel's hash slot, appended to ``out``. HEALTHY members first, and when
+   * at least one member is healthy only the healthy ones are offered — health filters a NEW
+   * placement (D2), it never re-homes an existing one. The registry picks the least-loaded of
+   * these.
+   * @param channel the channel whose slot shard's members to enumerate.
+   * @param out receives the candidate hosts (only appended to; existing entries are left intact).
+   * @return false when the upstream has no shard-membership model (a non-cluster load balancer) or
+   * the slot has no shard snapshot yet (transient). The registry then degrades this channel's
+   * placement to ``chooseUpstreamHostForChannel`` (the slot primary).
    */
-  virtual Upstream::HostConstSharedPtr
-  sendUpstreamSsubscribe(const std::string& channel,
-                         Common::Redis::Client::PushMessageCallbacks& push_callbacks) PURE;
+  virtual bool shardCandidatesForChannel(const std::string& channel,
+                                         std::vector<Upstream::HostConstSharedPtr>& out) PURE;
 
   /**
-   * Send ``SSUBSCRIBE`` for a single channel to an ALREADY-resolved host, skipping the internal
-   * slot resolve that ``sendUpstreamSsubscribe`` performs. Used by the topology-change reroute
-   * (E-8): ``onClusterTopologyChange`` already resolved the channel's new owner synchronously to
-   * decide the reroute, so re-resolving inside the send would repeat a CRC16 + LB-context lookup
-   * for no gain. Safe only when the caller holds a host resolved with no intervening dispatcher
-   * yield.
+   * Whether ``host`` still serves ``channel``'s hash slot — the SHARD_MEMBERS record-validity
+   * check.
+   * ``as_primary`` true asks "is ``host`` the slot's current PRIMARY?"; false asks "is ``host``
+   * still a MEMBER (primary or replica) of the slot's shard?". The membership answer is
+   * health-AGNOSTIC, so a momentarily-unhealthy member keeps its subscriptions rather than churning
+   * them on a flap (D2).
+   * @return true when ``host`` serves the slot as asked, AND true when the slot has no shard
+   * snapshot yet (transient — keep the record, matching the PRIMARY policy's null-resolution
+   * tolerance, G4). False means the record is stale and the channel must be re-placed.
+   */
+  virtual bool hostServesChannelSlot(const std::string& channel,
+                                     const Upstream::HostConstSharedPtr& host,
+                                     bool as_primary) PURE;
+
+  /**
+   * Send ``SSUBSCRIBE`` for a single channel to an ALREADY-resolved host. The registry resolves the
+   * placement target itself (chooseUpstreamHostForChannel for the PRIMARY policy — §7 P1) and hands
+   * it here, so a fresh subscribe, a connection-loss reissue, and a topology reroute all send
+   * through this one primitive with no internal slot resolve. Unlike SUBSCRIBE (any node),
+   * ``SSUBSCRIBE`` must reach the shard that owns the channel's hash slot — the caller's ``host``
+   * is that shard.
    * @param channel the channel to subscribe to.
    * @param push_callbacks the push message handler.
-   * @param host the pre-resolved upstream host to send to.
+   * @param host the pre-resolved upstream host to send to (the channel's placement target).
    * @return true if sent successfully.
    */
   virtual bool
@@ -326,8 +341,9 @@ class SubscriptionRegistry : public Common::Redis::Client::PushMessageCallbacks,
 public:
   // ``subscribe_ack_timeout`` / ``resubscribe_backoff_base`` / ``resubscribe_backoff_max`` are the
   // pub/sub tuning knobs (A-7), threaded from ConnPoolSettings.pubsub_settings by the conn pool.
-  // They default to the historical hardcoded values so unit tests (and any caller that omits them)
-  // keep the original behavior.
+  // ``placement`` is the channel homing policy (§7 P3): the conn pool passes the EFFECTIVE value
+  // (SHARD_MEMBERS already degraded to Primary for a non-cluster upstream). All default to the
+  // historical values so unit tests (and any caller that omits them) keep the original behavior.
   SubscriptionRegistry(UpstreamSubscriptionCallbacks& upstream_callbacks,
                        Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
                        std::chrono::milliseconds subscribe_ack_timeout =
@@ -335,7 +351,9 @@ public:
                        std::chrono::milliseconds resubscribe_backoff_base =
                            std::chrono::milliseconds(kInitialResubscribeBackoffMs),
                        std::chrono::milliseconds resubscribe_backoff_max =
-                           std::chrono::milliseconds(kMaxResubscribeBackoffMs));
+                           std::chrono::milliseconds(kMaxResubscribeBackoffMs),
+                       Common::Redis::Client::SubscriptionPlacement placement =
+                           Common::Redis::Client::SubscriptionPlacement::Primary);
   ~SubscriptionRegistry() override = default;
 
   /**
@@ -610,12 +628,92 @@ private:
   // downstream ack bucket / per-bucket timer, so a silently-lost ack would otherwise stall it
   // forever; this re-resolves the unacked channels on the escalating backoff.
   void handleResubscribeGenerationTimeout();
+  // --- Subscription PLACEMENT seam (§7 P1) ---
+  // A channel's home is the RECORD (``channel_hosts_[channel]``); placement policy is consulted
+  // only when a channel is first placed or must be re-placed, and stability comes from the record,
+  // not the policy. These two helpers are the only seams a non-PRIMARY placement policy (P3)
+  // touches.
+  //
+  // Is the recorded owner still valid to keep serving this channel?
+  //   PRIMARY: validity is "matches the current slot-owner resolution, OR that resolution is
+  //     transiently null (resharding-window / momentary-master-absence blip — G4)". The resolution
+  //     is returned via ``resolved_out`` so a subsequent re-placement can reuse it (E-8).
+  //   SHARD_MEMBERS: validity is shard MEMBERSHIP — is ``recorded`` still a member of the slot's
+  //     shard? Health-AGNOSTIC (D2), so a momentarily-unhealthy member keeps its channels rather
+  //     than churning on a flap. A membership query is NOT a placement resolution, so leave
+  //     ``resolved_out`` null — an invalid record re-places through resolvePlacement (which
+  //     resolves once). hostServesChannelSlot reports true on a transient no-shard-snapshot, giving
+  //     the same keep-the-record tolerance PRIMARY has for a null resolution (G4).
+  //
+  // ``health_aware`` distinguishes the two callers. A topology event (onClusterTopologyChange)
+  // passes false: membership is health-agnostic there so a momentarily-unhealthy member is not
+  // re-homed on a flap (D2). A FAILURE-driven re-issue (reissueSsubscribe from a lost connection /
+  // failed send) passes true: an owner that is still a shard member but UNHEALTHY has no escape
+  // under pure membership validity — it would be retried forever while healthy siblings sit idle —
+  // so treat it as invalid and re-place onto a healthy member. A real retry is not a flap. (No
+  // effect under PRIMARY, whose only candidate is the slot primary regardless of health.)
+  bool recordedOwnerValid(const std::string& channel, const Upstream::HostConstSharedPtr& recorded,
+                          Upstream::HostConstSharedPtr& resolved_out, bool health_aware = false) {
+    if (placement_ == Common::Redis::Client::SubscriptionPlacement::ShardMembers) {
+      resolved_out = nullptr;
+      if (!upstream_callbacks_.hostServesChannelSlot(channel, recorded, /*as_primary=*/false)) {
+        return false; // left the shard -> re-place
+      }
+      if (health_aware && recorded != nullptr &&
+          recorded->coarseHealth() != Upstream::Host::Health::Healthy) {
+        return false; // persistent-failure escape -> re-place onto a healthy member
+      }
+      return true;
+    }
+    resolved_out = upstream_callbacks_.chooseUpstreamHostForChannel(channel);
+    return resolved_out == nullptr || resolved_out == recorded;
+  }
+  // Resolve a placement target for a channel that has no valid record (fresh subscribe, or a record
+  // that just went invalid). PRIMARY: the slot-owner resolve. SHARD_MEMBERS: the least-loaded of
+  // the slot shard's candidate members, degrading to the slot primary when the upstream has no
+  // membership model (non-cluster — normally caught at construction) or the slot has no shard yet
+  // (transient) — D3.
+  Upstream::HostConstSharedPtr resolvePlacement(const std::string& channel) {
+    if (placement_ == Common::Redis::Client::SubscriptionPlacement::ShardMembers) {
+      std::vector<Upstream::HostConstSharedPtr> candidates;
+      if (upstream_callbacks_.shardCandidatesForChannel(channel, candidates) &&
+          !candidates.empty()) {
+        return leastLoadedOf(candidates);
+      }
+      return upstream_callbacks_.chooseUpstreamHostForChannel(channel); // degrade (D3)
+    }
+    return upstream_callbacks_.chooseUpstreamHostForChannel(channel);
+  }
+  // SHARD_MEMBERS tie-break: pick the candidate carrying the FEWEST channels in THIS registry
+  // (absent = 0), uniformly random among ties (D4). Subscription placement is a durable state
+  // registration, not a per-request pick, so balancing at placement time accumulates; a freshly
+  // added replica starts at 0 and wins subsequent placements until it catches up — passive
+  // rebalance without moving any live subscription (D1/D7). ``candidates`` must be non-empty.
+  Upstream::HostConstSharedPtr
+  leastLoadedOf(const std::vector<Upstream::HostConstSharedPtr>& candidates) {
+    std::vector<Upstream::HostConstSharedPtr> best;
+    size_t best_count = 0;
+    for (const auto& host : candidates) {
+      auto it = host_channels_.find(host);
+      const size_t count = (it == host_channels_.end()) ? 0 : it->second.size();
+      if (best.empty() || count < best_count) {
+        best_count = count;
+        best.assign(1, host);
+      } else if (count == best_count) {
+        best.push_back(host);
+      }
+    }
+    return best.size() == 1 ? best.front() : best[random_.random() % best.size()];
+  }
+
   // Re-issue an SSUBSCRIBE for an already-active channel and enroll it in the CURRENT resubscribe
   // generation: seed ``pending_resubscribe_channels_`` (so a lost ack keeps the generation
-  // incomplete) and, on success, record the chosen host as the channel's expected ack owner and its
-  // outstanding control command. Shared by the connection-loss (doResubscribe) and slot-move
-  // (onClusterTopologyChange) reissue paths so BOTH register the generation identically (Issue 4).
-  // Returns whether the upstream send succeeded.
+  // incomplete) and, on success, record the target host as the channel's expected ack owner and its
+  // outstanding control command. Placement (§7 P1): if the RECORD is still valid, re-target the
+  // recorded host (a retry is not a move); only a channel with no valid record is re-placed. Shared
+  // by the connection-loss (doResubscribe) and slot-move (onClusterTopologyChange) reissue paths so
+  // BOTH register the generation identically (Issue 4). Returns whether the upstream send
+  // succeeded.
   bool reissueSsubscribe(const std::string& channel,
                          const Upstream::HostConstSharedPtr& pre_resolved_host = nullptr);
   // Arm the generation ack timeout for the channels just enrolled via reissueSsubscribe, if any and
@@ -881,6 +979,10 @@ private:
   // ConnPoolSettings.pubsub_settings (A-7). Used for both the per-bucket subscribe-ack deadline and
   // the re-subscribe generation timeout.
   const std::chrono::milliseconds subscribe_ack_timeout_;
+  // Channel homing policy (§7 P3). The conn pool passes the EFFECTIVE value — SHARD_MEMBERS is
+  // already degraded to Primary here for a non-cluster upstream — so recordedOwnerValid /
+  // resolvePlacement branch on it without re-checking the upstream kind.
+  const Common::Redis::Client::SubscriptionPlacement placement_;
   // Jittered exponential backoff (default 100ms .. 30s; tunable via pubsub_settings — A-7) for
   // re-subscribing after an upstream connection loss. Reset when the re-subscribe retry scope
   // empties (forgetPendingResubscribe): the last outstanding channel's current-attempt SSUBSCRIBE

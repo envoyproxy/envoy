@@ -98,6 +98,18 @@ ConfigImpl::ConfigImpl(
     break;
   }
 
+  switch (config.pubsub_settings().subscription_placement()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::
+      PubsubSettings::PRIMARY:
+    subscription_placement_ = SubscriptionPlacement::Primary;
+    break;
+  case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::
+      PubsubSettings::SHARD_MEMBERS:
+    subscription_placement_ = SubscriptionPlacement::ShardMembers;
+    break;
+  }
+
   if (config.has_connection_rate_limit()) {
     connection_rate_limit_enabled_ = true;
     connection_rate_limit_per_sec_ = config.connection_rate_limit().connection_rate_limit_per_sec();

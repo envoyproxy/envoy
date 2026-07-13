@@ -701,10 +701,14 @@ TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestSubscribeRoutesUsingFirs
   // same host for the registry to treat it as the current attempt (S-4 made the ack's source host
   // mandatory).
   auto pubsub_ack_host = std::make_shared<NiceMock<Upstream::MockHost>>();
-  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribe("sports", _))
-      .WillOnce(
-          Invoke([pubsub_ack_host](const std::string&, Common::Redis::Client::PushMessageCallbacks&)
-                     -> Upstream::HostConstSharedPtr { return pubsub_ack_host; }));
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("sports"))
+      .WillOnce(Invoke([pubsub_ack_host](const std::string&) -> Upstream::HostConstSharedPtr {
+        return pubsub_ack_host;
+      }));
+  // §7 P1: subscribe RESOLVES via chooseUpstreamHostForChannel then SENDS via
+  // sendUpstreamSsubscribeToHost; stub the send success (in InSequence order: resolve then send).
+  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("sports", _, _))
+      .WillOnce(Return(true));
 
   handle_ = splitter_.makeRequest(std::move(request), callbacks, dispatcher_, stream_info_);
 
@@ -744,10 +748,12 @@ TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestBareUnsubscribeUsesSubsc
   // sharding is transparent. The mock captures a host so the registry can route the
   // eventual ``SUNSUBSCRIBE`` to the same shard.
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
-  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribe("alpha", _))
-      .WillOnce(
-          Invoke([&mock_host](const std::string&, Common::Redis::Client::PushMessageCallbacks&)
-                     -> Upstream::HostConstSharedPtr { return mock_host; }));
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("alpha"))
+      .WillOnce(Invoke(
+          [&mock_host](const std::string&) -> Upstream::HostConstSharedPtr { return mock_host; }));
+  // §7 P1: subscribe resolves then sends via sendUpstreamSsubscribeToHost — stub the send success.
+  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("alpha", _, _))
+      .WillOnce(Return(true));
   EXPECT_EQ(1UL, registry->subscribe({"alpha"}, subscriber).subscription_count);
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
@@ -801,11 +807,16 @@ TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestMultiChannelAcks) {
   EXPECT_CALL(*route_, pubsubUpstream()).WillRepeatedly(Return(subscription_conn_pool_shared));
   // Both channels land on the same owning host; the two acks below arrive FROM it (S-4).
   auto pubsub_ack_host = std::make_shared<NiceMock<Upstream::MockHost>>();
-  auto set_ack_host = [pubsub_ack_host](const std::string&,
-                                        Common::Redis::Client::PushMessageCallbacks&)
-      -> Upstream::HostConstSharedPtr { return pubsub_ack_host; };
-  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribe("one", _)).WillOnce(Invoke(set_ack_host));
-  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribe("two", _)).WillOnce(Invoke(set_ack_host));
+  auto set_ack_host = [pubsub_ack_host](const std::string&) -> Upstream::HostConstSharedPtr {
+    return pubsub_ack_host;
+  };
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("one"))
+      .WillOnce(Invoke(set_ack_host));
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("two"))
+      .WillOnce(Invoke(set_ack_host));
+  // §7 P1: each channel resolves then sends via sendUpstreamSsubscribeToHost — stub both successes.
+  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("one", _, _)).WillOnce(Return(true));
+  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("two", _, _)).WillOnce(Return(true));
 
   handle_ = splitter_.makeRequest(std::move(request), callbacks, dispatcher_, stream_info_);
 
@@ -945,12 +956,11 @@ TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestSubscribeUpstreamSendFai
   EXPECT_CALL(router(), upstreamPool(_, _))
       .WillOnce(Invoke([this](std::string&, const StreamInfo::StreamInfo&) { return route_; }));
   // After rewrite the registry lookup goes through ``spublish()`` and the upstream
-  // send is ``sendUpstreamSsubscribe``. Inline-error wording stays in terms of the
+  // send is ``sendUpstreamSsubscribeToHost``. Inline-error wording stays in terms of the
   // client-facing verb (``subscribe``) because that is what the user typed.
   EXPECT_CALL(*route_, pubsubUpstream()).WillOnce(Return(subscription_conn_pool_shared));
-  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribe("chan", _))
-      .WillOnce(Invoke([](const std::string&, Common::Redis::Client::PushMessageCallbacks&)
-                           -> Upstream::HostConstSharedPtr { return nullptr; }));
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("chan"))
+      .WillOnce(Invoke([](const std::string&) -> Upstream::HostConstSharedPtr { return nullptr; }));
   // Single-channel failure: the -ERR is the request's sole frame, delivered via respond({err})
   // (routed to onResponse_ for a one-frame batch; see
   // SubscriptionRequestSubscribeNoRouteDeliversInlineError for the rationale).
@@ -1034,19 +1044,21 @@ TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestSubscribeMixedRouteResul
       .WillRepeatedly(
           Invoke([this](std::string&, const StreamInfo::StreamInfo&) { return route_; }));
   // After rewrite the registry lookup keys off ``spublish()`` and upstream sends use
-  // ``sendUpstreamSsubscribe`` (one per channel). Inline-error wording stays in terms
+  // ``sendUpstreamSsubscribeToHost`` (one per channel). Inline-error wording stays in terms
   // of the client-facing ``subscribe`` verb.
   EXPECT_CALL(*route_, pubsubUpstream()).WillRepeatedly(Return(subscription_conn_pool_shared));
   // "ok" lands on this host; its ack below arrives FROM it (S-4). "fail" never sends, so it needs
   // no owner.
   auto pubsub_ack_host = std::make_shared<NiceMock<Upstream::MockHost>>();
-  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribe("ok", _))
-      .WillOnce(
-          Invoke([pubsub_ack_host](const std::string&, Common::Redis::Client::PushMessageCallbacks&)
-                     -> Upstream::HostConstSharedPtr { return pubsub_ack_host; }));
-  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribe("fail", _))
-      .WillOnce(Invoke([](const std::string&, Common::Redis::Client::PushMessageCallbacks&)
-                           -> Upstream::HostConstSharedPtr { return nullptr; }));
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("ok"))
+      .WillOnce(Invoke([pubsub_ack_host](const std::string&) -> Upstream::HostConstSharedPtr {
+        return pubsub_ack_host;
+      }));
+  // "ok" resolves to a host and SENDs OK (§7 P1). "fail" resolves to null (no host for the slot),
+  // which short-circuits before the send — the source of its "subscribe send failed" -ERR.
+  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("ok", _, _)).WillOnce(Return(true));
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("fail"))
+      .WillOnce(Invoke([](const std::string&) -> Upstream::HostConstSharedPtr { return nullptr; }));
 
   // The "ok" channel's subscribe ack arrives later via subscriber->deliver — the only
   // connection.write expected here.

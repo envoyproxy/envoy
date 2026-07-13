@@ -117,9 +117,13 @@ public:
 
   const std::string& clientZone() const override { return client_zone_; }
 
-private:
-  absl::string_view hashtag(absl::string_view v, bool enabled);
+  // Extract the Redis Cluster hash tag ({...}) from a key, or return the whole key when hashtagging
+  // is disabled or no well-formed tag is present. Stateless; exposed as a public static so
+  // ``redisSlotForKey`` (and any other key/channel -> slot mapping) reuses the exact algorithm the
+  // data-path LB context applies rather than re-deriving it.
+  static absl::string_view hashtag(absl::string_view v, bool enabled);
 
+private:
   static bool isReadRequest(const NetworkFilters::Common::Redis::RespValue& request);
 
   const std::optional<uint64_t> hash_key_;
@@ -148,6 +152,34 @@ public:
 
 private:
   const std::optional<uint64_t> shard_index_;
+};
+
+// Map a Redis key (or a pub/sub channel name) to its cluster hash slot with the same
+// crc16(hashtag(key)) % 16384 rule the data-path LB context applies. Free function so the pub/sub
+// conn pool can resolve a channel's slot without building a full load-balancer context/request.
+inline uint64_t redisSlotForKey(absl::string_view key) {
+  return Crc16::crc16(RedisLoadBalancerContextImpl::hashtag(key, true)) % MaxSlot;
+}
+
+// A read-only snapshot of the shard (slot primary + all members) that owns a given slot. Exposed
+// via ShardMembershipResolver so the pub/sub conn pool can home SHARD_MEMBERS-placed subscriptions
+// across a slot shard's replicas without depending on the load balancer's internal shard type.
+struct ShardMembers {
+  Upstream::HostConstSharedPtr primary;
+  Upstream::HostVector all_hosts; // primary first, then replicas — the LB snapshot's order.
+};
+
+// Implemented by RedisClusterLoadBalancer so a caller holding an Upstream::LoadBalancer& can
+// dynamic_cast to it and query shard membership off the LB's immutable per-instance topology
+// snapshot. Non-cluster load balancers do not implement it (the dynamic_cast yields nullptr, which
+// the caller reads as "no membership model" and degrades to primary-only placement).
+class ShardMembershipResolver {
+public:
+  virtual ~ShardMembershipResolver() = default;
+
+  // The shard owning `slot`, or std::nullopt when the slot is unassigned or no topology snapshot
+  // exists yet. Cold path — consulted only on subscription placement / re-placement.
+  virtual std::optional<ShardMembers> membersForSlot(uint64_t slot) const PURE;
 };
 
 class ClusterSlotUpdateCallBack {
@@ -268,7 +300,7 @@ private:
    * cost and provide a fast lookup constant time lookup similar to Maglev. This will be used by the
    * redis proxy filter for load balancing purpose.
    */
-  class RedisClusterLoadBalancer : public Upstream::LoadBalancer {
+  class RedisClusterLoadBalancer : public Upstream::LoadBalancer, public ShardMembershipResolver {
   public:
     RedisClusterLoadBalancer(std::shared_ptr<RedisClusterLoadBalancerFactory> factory,
                              const Upstream::PrioritySet& priority_set);
@@ -288,6 +320,26 @@ private:
     // Lifetime tracking not implemented.
     OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
       return {};
+    }
+
+    // ShardMembershipResolver: read the shard owning `slot` off this LB instance's immutable
+    // topology snapshot (same snapshot chooseHost() routes against, so a channel's placement and
+    // its data-path routing agree). Returns std::nullopt when no snapshot exists or the slot is
+    // unassigned / maps past the shard vector.
+    std::optional<ShardMembers> membersForSlot(uint64_t slot) const override {
+      if (slot_array_ == nullptr || shard_vector_ == nullptr || slot >= MaxSlot) {
+        return std::nullopt;
+      }
+      const uint64_t idx = (*slot_array_)[slot];
+      if (idx >= shard_vector_->size()) {
+        return std::nullopt;
+      }
+      const RedisShardSharedPtr& shard = (*shard_vector_)[idx];
+      ShardMembers members;
+      members.primary = shard->primary();
+      const Upstream::HostVector& hosts = shard->allHosts().hosts();
+      members.all_hosts.assign(hosts.begin(), hosts.end());
+      return members;
     }
 
   private:

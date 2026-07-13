@@ -34,9 +34,12 @@ public:
 
   MOCK_METHOD(Upstream::HostConstSharedPtr, chooseUpstreamHostForChannel,
               (const std::string& channel), (override));
-  MOCK_METHOD(Upstream::HostConstSharedPtr, sendUpstreamSsubscribe,
-              (const std::string& channel,
-               Common::Redis::Client::PushMessageCallbacks& push_callbacks),
+  MOCK_METHOD(bool, shardCandidatesForChannel,
+              (const std::string& channel, std::vector<Upstream::HostConstSharedPtr>& out),
+              (override));
+  MOCK_METHOD(bool, hostServesChannelSlot,
+              (const std::string& channel, const Upstream::HostConstSharedPtr& host,
+               bool as_primary),
               (override));
   MOCK_METHOD(bool, sendUpstreamSsubscribeToHost,
               (const std::string& channel,

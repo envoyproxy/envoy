@@ -235,9 +235,10 @@ private:
 
     // UpstreamSubscriptionCallbacks
     Upstream::HostConstSharedPtr chooseUpstreamHostForChannel(const std::string& channel) override;
-    Upstream::HostConstSharedPtr
-    sendUpstreamSsubscribe(const std::string& channel,
-                           Common::Redis::Client::PushMessageCallbacks& push_callbacks) override;
+    bool shardCandidatesForChannel(const std::string& channel,
+                                   std::vector<Upstream::HostConstSharedPtr>& out) override;
+    bool hostServesChannelSlot(const std::string& channel, const Upstream::HostConstSharedPtr& host,
+                               bool as_primary) override;
     bool sendUpstreamSsubscribeToHost(const std::string& channel,
                                       Common::Redis::Client::PushMessageCallbacks& push_callbacks,
                                       const Upstream::HostConstSharedPtr& host) override;
@@ -310,6 +311,11 @@ private:
      */
     Event::TimerPtr drain_timer_;
     bool is_redis_cluster_{false};
+    // Latches the one-time warning that ``subscription_placement`` SHARD_MEMBERS was configured on
+    // a non-cluster upstream (which has no shard-membership model, so it degrades to PRIMARY).
+    // Warned from shardCandidatesForChannel on the first genuine non-cluster placement (§7 P3,
+    // finding 1).
+    bool warned_shard_members_non_cluster_{false};
     Common::Redis::Client::ClientFactory& client_factory_;
     Common::Redis::Client::ConfigSharedPtr config_;
     Stats::ScopeSharedPtr stats_scope_;

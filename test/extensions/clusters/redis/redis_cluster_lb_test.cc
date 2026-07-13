@@ -231,6 +231,155 @@ TEST_F(RedisClusterLoadBalancerTest, Shard) {
   }
 }
 
+// --- §7 P2: shard membership exposure (ShardMembershipResolver / redisSlotForKey) ---
+
+// membersForSlot returns the shard owning an assigned slot: primary first, then replicas, in the
+// snapshot's order. This is what SHARD_MEMBERS subscription placement fans a channel across.
+TEST_F(RedisClusterLoadBalancerTest, MembersForSlotReturnsShardOfAssignedSlot) {
+  Upstream::HostVector hosts{
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"), // shard 0 primary
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:91"), // shard 1 primary
+      Upstream::makeTestHost(info_, "tcp://127.0.0.2:90"), // shard 0 replica
+      Upstream::makeTestHost(info_, "tcp://127.0.0.2:91"), // shard 1 replica
+  };
+  ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
+      ClusterSlot(0, 2000, hosts[0]->address()),
+      ClusterSlot(2001, 16383, hosts[1]->address()),
+  });
+  slots->at(0).addReplica(hosts[2]->address());
+  slots->at(1).addReplica(hosts[3]->address());
+  Upstream::HostMap all_hosts;
+  std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
+  init();
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+
+  Upstream::LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+  auto* resolver = dynamic_cast<ShardMembershipResolver*>(lb.get());
+  ASSERT_NE(nullptr, resolver);
+
+  // Slot in shard 0's range: primary hosts[0], members {hosts[0], hosts[2]}.
+  auto s0 = resolver->membersForSlot(1000);
+  ASSERT_TRUE(s0.has_value());
+  EXPECT_EQ(hosts[0]->address()->asString(), s0->primary->address()->asString());
+  ASSERT_EQ(2, s0->all_hosts.size());
+  EXPECT_EQ(hosts[0]->address()->asString(),
+            s0->all_hosts[0]->address()->asString()); // primary 1st
+  EXPECT_EQ(hosts[2]->address()->asString(), s0->all_hosts[1]->address()->asString());
+
+  // Slot in shard 1's range: primary hosts[1], members {hosts[1], hosts[3]}.
+  auto s1 = resolver->membersForSlot(10000);
+  ASSERT_TRUE(s1.has_value());
+  EXPECT_EQ(hosts[1]->address()->asString(), s1->primary->address()->asString());
+  ASSERT_EQ(2, s1->all_hosts.size());
+  EXPECT_EQ(hosts[1]->address()->asString(), s1->all_hosts[0]->address()->asString());
+  EXPECT_EQ(hosts[3]->address()->asString(), s1->all_hosts[1]->address()->asString());
+}
+
+// membersForSlot yields nullopt before any topology snapshot exists and for an out-of-range slot.
+TEST_F(RedisClusterLoadBalancerTest, MembersForSlotNullWithoutSnapshotOrOutOfRange) {
+  init();
+  // No onClusterSlotUpdate yet -> the freshly created LB carries no snapshot.
+  Upstream::LoadBalancerPtr lb_no_snapshot = lb_->factory()->create(lb_params_);
+  auto* resolver_empty = dynamic_cast<ShardMembershipResolver*>(lb_no_snapshot.get());
+  ASSERT_NE(nullptr, resolver_empty);
+  EXPECT_FALSE(resolver_empty->membersForSlot(0).has_value());
+
+  // Assign one shard over the whole keyspace, then probe in-range vs out-of-range slots.
+  Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90")};
+  ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(
+      std::vector<ClusterSlot>{ClusterSlot(0, 16383, hosts[0]->address())});
+  Upstream::HostMap all_hosts{{hosts[0]->address()->asString(), hosts[0]}};
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+
+  Upstream::LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+  auto* resolver = dynamic_cast<ShardMembershipResolver*>(lb.get());
+  ASSERT_NE(nullptr, resolver);
+  EXPECT_TRUE(resolver->membersForSlot(0).has_value());        // in range
+  EXPECT_FALSE(resolver->membersForSlot(MaxSlot).has_value()); // == 16384, out of range
+  EXPECT_FALSE(resolver->membersForSlot(MaxSlot + 5).has_value());
+}
+
+// A newly created LB reflects the latest factory snapshot: after a reshard moves a slot's range to
+// a different primary, membersForSlot on a fresh LB returns the new owner.
+TEST_F(RedisClusterLoadBalancerTest, MembersForSlotReflectsUpdatedSnapshot) {
+  Upstream::HostVector hosts{
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:91"),
+  };
+  Upstream::HostMap all_hosts;
+  std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
+  init();
+
+  // First snapshot: hosts[0] owns the whole keyspace.
+  factory_->onClusterSlotUpdate(std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
+                                    ClusterSlot(0, 16383, hosts[0]->address())}),
+                                all_hosts);
+  {
+    Upstream::LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+    auto* resolver = dynamic_cast<ShardMembershipResolver*>(lb.get());
+    ASSERT_NE(nullptr, resolver);
+    auto m = resolver->membersForSlot(1234);
+    ASSERT_TRUE(m.has_value());
+    EXPECT_EQ(hosts[0]->address()->asString(), m->primary->address()->asString());
+  }
+
+  // Reshard: hosts[1] takes over slot 1234's range. A newly created LB must see the new owner.
+  factory_->onClusterSlotUpdate(std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
+                                    ClusterSlot(0, 1000, hosts[0]->address()),
+                                    ClusterSlot(1001, 16383, hosts[1]->address())}),
+                                all_hosts);
+  {
+    Upstream::LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+    auto* resolver = dynamic_cast<ShardMembershipResolver*>(lb.get());
+    ASSERT_NE(nullptr, resolver);
+    auto m = resolver->membersForSlot(1234);
+    ASSERT_TRUE(m.has_value());
+    EXPECT_EQ(hosts[1]->address()->asString(), m->primary->address()->asString());
+  }
+}
+
+// redisSlotForKey maps a channel/key to the SAME slot the data path routes it to (so a channel's
+// subscription placement and its SPUBLISH land on one shard), and applies Redis hash-tag isolation.
+TEST_F(RedisClusterLoadBalancerTest, RedisSlotForKeyMatchesDataPathRouting) {
+  Upstream::HostVector hosts{
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:91"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:92"),
+  };
+  ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
+      ClusterSlot(0, 1000, hosts[0]->address()),
+      ClusterSlot(1001, 2000, hosts[1]->address()),
+      ClusterSlot(2001, 16383, hosts[2]->address()),
+  });
+  Upstream::HostMap all_hosts;
+  std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
+  init();
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+
+  Upstream::LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+  auto* resolver = dynamic_cast<ShardMembershipResolver*>(lb.get());
+  ASSERT_NE(nullptr, resolver);
+
+  // Hash-tag isolation: {foo} governs the slot regardless of surrounding text.
+  EXPECT_EQ(redisSlotForKey("foo"), redisSlotForKey("{foo}bar"));
+  EXPECT_EQ(redisSlotForKey("foo"), redisSlotForKey("prefix{foo}suffix"));
+
+  // For several channel names, the slot resolver's primary agrees with the data path's Primary
+  // routing for the same key hash.
+  for (const std::string& key : {"channel-a", "news.sports", "{tag}x", "42"}) {
+    const uint64_t slot = redisSlotForKey(key);
+    EXPECT_LT(slot, MaxSlot);
+    const uint64_t hash = Crc16::crc16(RedisLoadBalancerContextImpl::hashtag(key, true));
+    TestLoadBalancerContext ctx(hash, /*is_read=*/true,
+                                NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
+    auto routed = lb->chooseHost(&ctx).host;
+    ASSERT_NE(nullptr, routed);
+    auto members = resolver->membersForSlot(slot);
+    ASSERT_TRUE(members.has_value());
+    EXPECT_EQ(routed->address()->asString(), members->primary->address()->asString());
+  }
+}
+
 TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesHealthy) {
   Upstream::HostVector hosts{
       Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),

@@ -239,8 +239,8 @@ struct SupportedCommands {
         "geosearchstore", "zdiffstore", "bitop", "renamenx",
         // Only the sharded ``SPUBLISH`` verb is write-classified, so it shares the
         // write-side upstream with the rewritten ``SUBSCRIBE`` path under
-        // ``read_command_policy`` — see the explicit ``spublish()``-keyed
-        // ``route->upstream(...)`` lookup in ``SubscriptionRequest::create``. Classic
+        // ``read_command_policy`` — see the ``route->pubsubUpstream()`` lookup in
+        // ``SubscriptionRequest::create``, which resolves the write-side conn pool. Classic
         // ``PUBLISH`` is intentionally NOT here: when ``enable_sharded_publish`` is off the
         // client verb is forwarded unchanged and must keep the read/mirror routing it had
         // before sharded pub/sub existed (``PUBLISH`` was never write-classified). When the

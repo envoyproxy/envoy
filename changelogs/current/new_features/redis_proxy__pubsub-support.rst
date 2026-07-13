@@ -30,4 +30,11 @@ configurations are unaffected. For a RESP3-speaking upstream that does not imple
 :ref:`pubsub_settings.sharded_subscription_mode <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.PubsubSettings.sharded_subscription_mode>`
 to ``DISABLED`` to reject ``SUBSCRIBE`` / ``UNSUBSCRIBE`` with ``ERR unknown command`` (the
 pre-sharded behavior) instead of rewriting them to an ``SSUBSCRIBE`` the upstream cannot answer; it
-defaults to ``SHARDED``, preserving the transparent rewrite described above.
+defaults to ``SHARDED``, preserving the transparent rewrite described above. Where each channel's
+upstream ``SSUBSCRIBE`` is homed within its slot's shard is controlled by the new
+:ref:`pubsub_settings.subscription_placement <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.PubsubSettings.subscription_placement>`:
+it defaults to ``PRIMARY`` (the slot primary, as before), while ``SHARD_MEMBERS`` spreads channels
+across the slot shard's primary and replicas (least-loaded first) to offload the primary's
+cluster-bus fan-out egress — Redis Cluster upstreams only; a non-cluster upstream logs a warning and
+behaves as ``PRIMARY``. A replica-homed subscription receives each message via a fire-and-forget
+cluster-bus hop (at-most-once, within the pub/sub delivery contract).

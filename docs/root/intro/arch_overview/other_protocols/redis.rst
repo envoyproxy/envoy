@@ -263,11 +263,32 @@ to use the client-facing verbs: a ``SUBSCRIBE`` is acknowledged as
 ``["subscribe", channel, count]``, sharded messages arrive as
 ``["message", ...]`` (not ``smessage``), and clients never observe ``ssubscribe``.
 
-Sharded pub/sub requires Redis 7.0 or newer on the upstream cluster. The ``SUBSCRIBE`` /
-``UNSUBSCRIBE`` rewrite is applied unconditionally on a ``RESP3`` listener; the ``PUBLISH``
-→ ``SPUBLISH`` rewrite is opt-in via :ref:`enable_sharded_publish
+Within the slot-owning shard, where each channel's ``SSUBSCRIBE`` is homed is controlled by
+:ref:`pubsub_settings.subscription_placement
+<envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.PubsubSettings.subscription_placement>`.
+The default, ``PRIMARY``, homes every channel on the shard's primary — matching the data path so a
+channel's subscription and its ``SPUBLISH`` share one node, but giving replicas no pub/sub capacity.
+``SHARD_MEMBERS`` instead spreads channels across the shard's primary and replicas, least-loaded
+member first (so a newly added replica draws new subscriptions until it catches up, without moving
+any live subscription), to offload the primary's cluster-bus fan-out egress: each shard node pays one
+cluster-bus frame per published message regardless of how many subscribers it serves, so moving
+subscriptions onto replicas cuts the primary's egress at no extra delivery cost. ``SHARD_MEMBERS``
+requires a Redis Cluster upstream (the only kind that exposes shard membership); on any other upstream
+the proxy logs a warning once and behaves as ``PRIMARY``. A replica-homed subscription receives each
+message over a fire-and-forget cluster-bus hop — at-most-once, the same best-effort delivery the
+pub/sub contract already provides (a message can be missed across a resharding window or on
+slow-subscriber eviction). The subscription stays on its chosen member while that member remains in
+the shard; if the member leaves the shard the proxy re-places the channel onto a current member
+without disturbing the downstream subscriber.
+
+Sharded pub/sub requires Redis 7.0 or newer on the upstream cluster. On a ``RESP3`` listener the
+``SUBSCRIBE`` / ``UNSUBSCRIBE`` rewrite is the default (:ref:`sharded_subscription_mode
+<envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.PubsubSettings.sharded_subscription_mode>`
+``SHARDED``); setting it to ``DISABLED`` instead rejects ``SUBSCRIBE`` / ``UNSUBSCRIBE`` with
+``ERR unknown command`` — for a RESP3 upstream that does not implement ``SSUBSCRIBE`` (e.g. Redis
+6.x). The ``PUBLISH`` → ``SPUBLISH`` rewrite is opt-in via :ref:`enable_sharded_publish
 <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.enable_sharded_publish>`
-(default off). Because ``SUBSCRIBE`` is always sharded, a ``PUBLISH`` left classic (the
+(default off). Because a ``SHARDED``-mode ``SUBSCRIBE`` is sharded, a ``PUBLISH`` left classic (the
 default) is not delivered to subscribers that subscribed through this proxy — enable the
 option whenever the listener serves sharded pub/sub subscribers, and only against Redis 7.0+
 upstreams (older upstreams have no ``SPUBLISH`` and every rewritten publish would fail).

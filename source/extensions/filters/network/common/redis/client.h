@@ -177,6 +177,20 @@ enum class ReadPolicy {
   LocalZoneAffinityReplicasAndPrimary
 };
 
+/**
+ * Where the RESP3 sharded pub/sub proxy homes each channel's upstream ``SSUBSCRIBE`` within the
+ * shard that owns the channel's hash slot (``pubsub_settings.subscription_placement``). Distinct
+ * from ReadPolicy, which governs the DATA path — placement governs the SUBSCRIBE path only.
+ */
+enum class SubscriptionPlacement {
+  // Home every channel on its slot's primary (the default; the v1 behavior).
+  Primary,
+  // Spread channels across the slot shard's members (primary + replicas), least-loaded first, to
+  // offload the primary's cluster-bus fan-out. Redis Cluster upstreams only; a non-cluster upstream
+  // has no shard-membership model and the conn pool degrades it to Primary (with a one-time warning).
+  ShardMembers
+};
+
 // Historical hardcoded defaults for the RESP3 pub/sub tuning knobs (``pubsub_settings``), the
 // SINGLE source of truth for all three consumers so a change here can never drift them apart (§6):
 // the connection-pool config (ConfigImpl) reads them via PROTOBUF_GET_MS_OR_DEFAULT to build the
@@ -276,6 +290,13 @@ public:
    * @return the maximum interval the pub/sub re-subscribe backoff escalates to.
    */
   virtual std::chrono::milliseconds resubscribeBackoffMaxInterval() const PURE;
+
+  /**
+   * @return where the proxy homes each pub/sub channel's upstream ``SSUBSCRIBE`` within its slot's
+   * shard (RESP3 sharded pub/sub). ``ShardMembers`` on a non-cluster upstream is degraded to
+   * ``Primary`` by the conn pool.
+   */
+  virtual SubscriptionPlacement subscriptionPlacement() const PURE;
 };
 
 using ConfigSharedPtr = std::shared_ptr<const Config>;

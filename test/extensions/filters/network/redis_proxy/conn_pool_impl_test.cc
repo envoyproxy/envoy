@@ -1985,8 +1985,11 @@ TEST_F(RedisConnPoolImplTest, SubscriptionUsesSeparateConnectionFromData) {
   EXPECT_CALL(*data_client, setPushCallbacks(_)).Times(0);
   EXPECT_CALL(*data_client, sendCommand(_)).Times(0);
   NiceMock<Common::Redis::Client::MockPushMessageCallbacks> push_cb;
-  // A non-null return is the chosen shard host (there is no separate out-param now).
-  EXPECT_NE(nullptr, threadLocalPool().sendUpstreamSsubscribe("chan", push_cb));
+  // §7 P1: the resolve+send composite is gone — resolve the placement, then send to it. The resolve
+  // returns the chosen shard host and the send routes to the subscription client.
+  Upstream::HostConstSharedPtr chosen = threadLocalPool().chooseUpstreamHostForChannel("chan");
+  EXPECT_NE(nullptr, chosen);
+  EXPECT_TRUE(threadLocalPool().sendUpstreamSsubscribeToHost("chan", push_cb, chosen));
 
   EXPECT_CALL(active_request, cancel());
   req->cancel();
@@ -2172,8 +2175,11 @@ TEST_F(RedisConnPoolImplTest, RateLimitedSubscriptionErasesNullPlaceholder) {
   // The subscription send to the SAME host is now rate-limited: no subscription client is created,
   // the send reports failure, and the null placeholder must not be left behind.
   NiceMock<Common::Redis::Client::MockPushMessageCallbacks> push_cb;
-  // Rate-limited: no subscription client is created, so the send reports failure as a null return.
-  EXPECT_EQ(nullptr, threadLocalPool().sendUpstreamSsubscribe("chan", push_cb));
+  // §7 P1: the resolve succeeds (a host owns the slot), but the rate-limited send to it creates no
+  // subscription client and reports failure — and must not leave a null placeholder behind.
+  Upstream::HostConstSharedPtr chosen = threadLocalPool().chooseUpstreamHostForChannel("chan");
+  ASSERT_NE(nullptr, chosen);
+  EXPECT_FALSE(threadLocalPool().sendUpstreamSsubscribeToHost("chan", push_cb, chosen));
 
   // Teardown must not dereference a null subscription-client placeholder.
   EXPECT_CALL(active_request, cancel());
@@ -2203,8 +2209,9 @@ TEST_F(RedisConnPoolImplTest, PlannedHostRemovalDoesNotDoubleDriveResubscribe) {
 
   // Establish a SHARDED subscription THROUGH the registry so BOTH resubscribe drivers are live on a
   // host removal — an empty registry fires neither (onClusterTopologyChange needs a non-null
-  // registry; onEvent's post needs a non-empty one). ssubscribe → the pool's sendUpstreamSsubscribe
-  // creates the dedicated subscription client on the chosen host and records the channel→host map.
+  // registry; onEvent's post needs a non-empty one). ssubscribe → the pool's
+  // sendUpstreamSsubscribeToHost creates the dedicated subscription client on the chosen host and
+  // records the channel→host map.
   auto registry = conn_pool_->subscriptionRegistryShared();
   ASSERT_NE(nullptr, registry);
   EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
@@ -2280,6 +2287,107 @@ TEST_F(RedisConnPoolImplTest, SlotOnlyRebalancePostsResubscribe) {
 
   // The topology-change resubscribe is posted despite the empty host delta.
   EXPECT_EQ(1UL, posted.size());
+
+  tls_.shutdownThread();
+}
+
+// --- §7 P3: SHARD_MEMBERS pool-side glue (shardCandidatesForChannel / hostServesChannelSlot) ---
+
+// A load balancer that ALSO implements ShardMembershipResolver, so the conn pool's SHARD_MEMBERS
+// callbacks (which dynamic_cast the cluster LB to that interface) can be driven against a
+// controllable shard snapshot. NiceMock<MockLoadBalancer> supplies the LoadBalancer surface.
+class FakeShardMembershipResolverLb : public NiceMock<Upstream::MockLoadBalancer>,
+                                      public Clusters::Redis::ShardMembershipResolver {
+public:
+  std::optional<Clusters::Redis::ShardMembers> membersForSlot(uint64_t slot) const override {
+    for (const auto& [s, members] : members_) {
+      if (s == slot) {
+        return members;
+      }
+    }
+    return std::nullopt;
+  }
+  std::vector<std::pair<uint64_t, Clusters::Redis::ShardMembers>> members_;
+};
+
+namespace {
+Upstream::HostSharedPtr makeHealthHost(Upstream::Host::Health health) {
+  auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  ON_CALL(*host, coarseHealth()).WillByDefault(Return(health));
+  return host;
+}
+} // namespace
+
+// shardCandidatesForChannel offers only the HEALTHY shard members (health filters a new placement),
+// but falls back to the full membership when none is healthy so a channel can still be placed.
+TEST_F(RedisConnPoolImplTest, ShardCandidatesForChannelHealthyFirstThenFallback) {
+  setup();
+  FakeShardMembershipResolverLb fake_lb;
+  ON_CALL(cm_.thread_local_cluster_, loadBalancer()).WillByDefault(ReturnRef(fake_lb));
+
+  auto primary = makeHealthHost(Upstream::Host::Health::Healthy);
+  auto replica_healthy = makeHealthHost(Upstream::Host::Health::Healthy);
+  auto replica_unhealthy = makeHealthHost(Upstream::Host::Health::Unhealthy);
+  fake_lb.members_.push_back(
+      {Clusters::Redis::redisSlotForKey("chan"),
+       Clusters::Redis::ShardMembers{primary, {primary, replica_healthy, replica_unhealthy}}});
+
+  std::vector<Upstream::HostConstSharedPtr> out;
+  EXPECT_TRUE(threadLocalPool().shardCandidatesForChannel("chan", out));
+  ASSERT_EQ(2, out.size()); // only the two healthy members, in snapshot order
+  EXPECT_EQ(primary, out[0]);
+  EXPECT_EQ(replica_healthy, out[1]);
+
+  // No member healthy -> fall back to ALL members.
+  auto p2 = makeHealthHost(Upstream::Host::Health::Unhealthy);
+  auto r2 = makeHealthHost(Upstream::Host::Health::Unhealthy);
+  fake_lb.members_.push_back(
+      {Clusters::Redis::redisSlotForKey("other"), Clusters::Redis::ShardMembers{p2, {p2, r2}}});
+  std::vector<Upstream::HostConstSharedPtr> out2;
+  EXPECT_TRUE(threadLocalPool().shardCandidatesForChannel("other", out2));
+  ASSERT_EQ(2, out2.size());
+  EXPECT_EQ(p2, out2[0]);
+  EXPECT_EQ(r2, out2[1]);
+
+  tls_.shutdownThread();
+}
+
+// Without a ShardMembershipResolver (an ordinary non-cluster LB), shardCandidatesForChannel returns
+// false so the registry degrades that placement to PRIMARY; repeated calls are safe (the
+// non-cluster warning latches to fire once).
+TEST_F(RedisConnPoolImplTest, ShardCandidatesForChannelDegradesWithoutClusterResolver) {
+  setup(); // default cm_.thread_local_cluster_.lb_ is a plain MockLoadBalancer, not a resolver
+  std::vector<Upstream::HostConstSharedPtr> out;
+  EXPECT_FALSE(threadLocalPool().shardCandidatesForChannel("chan", out));
+  EXPECT_TRUE(out.empty());
+  EXPECT_FALSE(
+      threadLocalPool().shardCandidatesForChannel("chan", out)); // warn-once path, no crash
+  tls_.shutdownThread();
+}
+
+// hostServesChannelSlot answers "is this host the slot PRIMARY?" (as_primary=true) vs "is it still
+// a shard MEMBER?" (as_primary=false), and keeps the record (returns true) when no shard snapshot
+// exists yet (transient).
+TEST_F(RedisConnPoolImplTest, HostServesChannelSlotPrimaryMemberAndTransient) {
+  setup();
+  FakeShardMembershipResolverLb fake_lb;
+  ON_CALL(cm_.thread_local_cluster_, loadBalancer()).WillByDefault(ReturnRef(fake_lb));
+
+  auto primary = makeHealthHost(Upstream::Host::Health::Healthy);
+  auto replica = makeHealthHost(Upstream::Host::Health::Healthy);
+  auto stranger = makeHealthHost(Upstream::Host::Health::Healthy);
+  fake_lb.members_.push_back({Clusters::Redis::redisSlotForKey("chan"),
+                              Clusters::Redis::ShardMembers{primary, {primary, replica}}});
+
+  auto& pool = threadLocalPool();
+  EXPECT_TRUE(pool.hostServesChannelSlot("chan", primary, /*as_primary=*/true));
+  EXPECT_FALSE(pool.hostServesChannelSlot("chan", replica, /*as_primary=*/true));
+  EXPECT_TRUE(pool.hostServesChannelSlot("chan", primary, /*as_primary=*/false));
+  EXPECT_TRUE(pool.hostServesChannelSlot("chan", replica, /*as_primary=*/false));
+  EXPECT_FALSE(pool.hostServesChannelSlot("chan", stranger, /*as_primary=*/false));
+  // A channel whose slot has no snapshot -> keep the record (transient tolerance).
+  EXPECT_TRUE(
+      pool.hostServesChannelSlot("channel-with-no-snapshot", primary, /*as_primary=*/false));
 
   tls_.shutdownThread();
 }

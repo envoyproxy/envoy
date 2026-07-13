@@ -251,6 +251,9 @@ class ConfigBufferSizeGTSingleRequest : public Config {
   std::chrono::milliseconds resubscribeBackoffMaxInterval() const override {
     return std::chrono::milliseconds(30000);
   }
+  SubscriptionPlacement subscriptionPlacement() const override {
+    return SubscriptionPlacement::Primary;
+  }
 };
 
 TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
@@ -419,6 +422,9 @@ class ConfigEnableCommandStats : public Config {
   }
   std::chrono::milliseconds resubscribeBackoffMaxInterval() const override {
     return std::chrono::milliseconds(30000);
+  }
+  SubscriptionPlacement subscriptionPlacement() const override {
+    return SubscriptionPlacement::Primary;
   }
 };
 
@@ -698,6 +704,30 @@ TEST_F(RedisClientImplTest, InitializedWithLocalZoneAffinityReplicasAndPrimaryRe
                                ConnPoolSettings::LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY);
 }
 
+// §7 P3: ConfigImpl maps pubsub_settings.subscription_placement to the internal enum, defaulting to
+// Primary when unset (configs predating the field are unaffected). Standalone (no client fixture) —
+// this exercises only the config value mapping.
+TEST(RedisConfigImplTest, SubscriptionPlacement) {
+  using ProtoPubsub = envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
+      ConnPoolSettings::PubsubSettings;
+  {
+    ConfigImpl config(createConnPoolSettings());
+    EXPECT_EQ(SubscriptionPlacement::Primary, config.subscriptionPlacement()); // unset default
+  }
+  {
+    auto settings = createConnPoolSettings();
+    settings.mutable_pubsub_settings()->set_subscription_placement(ProtoPubsub::PRIMARY);
+    ConfigImpl config(settings);
+    EXPECT_EQ(SubscriptionPlacement::Primary, config.subscriptionPlacement());
+  }
+  {
+    auto settings = createConnPoolSettings();
+    settings.mutable_pubsub_settings()->set_subscription_placement(ProtoPubsub::SHARD_MEMBERS);
+    ConfigImpl config(settings);
+    EXPECT_EQ(SubscriptionPlacement::ShardMembers, config.subscriptionPlacement());
+  }
+}
+
 TEST_F(RedisClientImplTest, Cancel) {
   InSequence s;
 
@@ -915,6 +945,9 @@ class ConfigOutlierDisabled : public Config {
   }
   std::chrono::milliseconds resubscribeBackoffMaxInterval() const override {
     return std::chrono::milliseconds(30000);
+  }
+  SubscriptionPlacement subscriptionPlacement() const override {
+    return SubscriptionPlacement::Primary;
   }
 };
 

@@ -165,9 +165,10 @@ SubscriptionRegistry::SubscriptionRegistry(UpstreamSubscriptionCallbacks& upstre
                                            Event::Dispatcher& dispatcher,
                                            std::chrono::milliseconds subscribe_ack_timeout,
                                            std::chrono::milliseconds resubscribe_backoff_base,
-                                           std::chrono::milliseconds resubscribe_backoff_max)
+                                           std::chrono::milliseconds resubscribe_backoff_max,
+                                           Common::Redis::Client::SubscriptionPlacement placement)
     : upstream_callbacks_(upstream_callbacks), random_(random), dispatcher_(dispatcher),
-      subscribe_ack_timeout_(subscribe_ack_timeout),
+      subscribe_ack_timeout_(subscribe_ack_timeout), placement_(placement),
       resubscribe_backoff_(resubscribe_backoff_base.count(), resubscribe_backoff_max.count(),
                            random_),
       ack_scheduler_(
@@ -319,9 +320,13 @@ SubscriptionRegistry::subscribe(const std::string& channel,
     // First subscriber for this channel on this thread — issue the sharded upstream subscribe and
     // park the downstream ack until the upstream confirms.
     ENVOY_LOG(debug, "redis: ssubscribing channel '{}' to correct shard", channel);
-    const Upstream::HostConstSharedPtr chosen_host =
-        upstream_callbacks_.sendUpstreamSsubscribe(channel, *this);
-    if (!chosen_host) {
+    // Placement (§7 P1): resolve the slot owner, then send to it — the fresh-subscribe equivalent
+    // of reissueSsubscribe's re-place branch (the former ``sendUpstreamSsubscribe`` resolve+send
+    // composite is gone — §6 out-param cleanup completed). A null resolve OR a failed send rolls
+    // the optimistic subscription back, exactly as the composite's null return did.
+    const Upstream::HostConstSharedPtr chosen_host = resolvePlacement(channel);
+    if (chosen_host == nullptr ||
+        !upstream_callbacks_.sendUpstreamSsubscribeToHost(channel, *this, chosen_host)) {
       ENVOY_LOG(warn, "redis: upstream ssubscribe failed for '{}', rolling back", channel);
       removeSubscriptions(absl::MakeConstSpan(&channel, 1), subscriber);
       return {/*success=*/false, subscriber->totalSubscriptionCount(), /*ack_deferred=*/false};
@@ -742,42 +747,55 @@ bool SubscriptionRegistry::reissueSsubscribe(
   // disarming the generation timer (Issue 3) while it is still failing.
   pending_resubscribe_channels_.insert(channel);
 
-  // E-8: when the caller already resolved this channel's owner in the SAME synchronous iteration
-  // (onClusterTopologyChange's dry-resolve), send straight to that host instead of paying a second
-  // CRC16 + LB-context resolve inside the conn pool. The two would resolve identically — no
-  // dispatcher yield separates them — so this is a pure work saving, not a semantic change.
-  if (pre_resolved_host != nullptr) {
-    if (!upstream_callbacks_.sendUpstreamSsubscribeToHost(channel, *this, pre_resolved_host)) {
-      return false;
+  // Placement (§7 P1): choose the target host, resolving the slot AT MOST once per reissue.
+  Upstream::HostConstSharedPtr target = pre_resolved_host;
+  if (target == nullptr) {
+    // No caller-provided placement. E-8: onClusterTopologyChange hands its dry-resolved host in
+    // ``pre_resolved_host``; a null here is the connection-loss (doResubscribe) path, which decides
+    // placement now. A retry is NOT a move: if the RECORD is still valid, re-target the recorded
+    // home; only a channel with no valid record is re-placed.
+    auto it = channel_hosts_.find(channel);
+    Upstream::HostConstSharedPtr resolved;
+    // This is the FAILURE-driven re-issue path (lost connection / failed send), so validity is
+    // checked health-aware: a still-member but unhealthy SHARD_MEMBERS owner is re-placed onto a
+    // healthy sibling rather than retried forever (topology reroutes stay health-agnostic — D2).
+    if (it != channel_hosts_.end() &&
+        recordedOwnerValid(channel, it->second.host, resolved, /*health_aware=*/true)) {
+      target = it->second.host; // record valid -> re-target the recorded home (retry, not move)
+    } else {
+      // No valid record: re-place. For PRIMARY, recordedOwnerValid already resolved the new owner
+      // of an INVALID record, so reuse it (E-8 — no second CRC16 + LB-context lookup). For
+      // SHARD_MEMBERS a membership check does NOT resolve a placement (``resolved`` stays null), so
+      // resolve fresh here; an owner-less channel (no record at all) also resolves fresh.
+      target = (it != channel_hosts_.end() && resolved != nullptr) ? resolved
+                                                                   : resolvePlacement(channel);
+      // E-1: if a LIVE old owner is being left for a DIFFERENT host, that old host still carries
+      // the upstream shard subscription. recordSsubscribeAttempt below would silently drop its last
+      // owner reference (its internal forgetChannelHost) WITHOUT the SUNSUBSCRIBE — leaking the old
+      // subscription (duplicate delivery + a forever-idle connection on a standalone / ring-hash
+      // upstream with no Redis migration-invalidation). Pair it here exactly as the topology
+      // reroute does (forget + courtesy SUNSUBSCRIBE, find-only so a dead old connection is a
+      // harmless no-op).
+      if (it != channel_hosts_.end() && target != nullptr && target != it->second.host) {
+        if (auto old = forgetChannelHost(channel)) {
+          sendSunsubscribe(channel, old);
+        }
+      }
     }
-    recordSsubscribeAttempt(channel, pre_resolved_host);
-    return true;
   }
-
-  const Upstream::HostConstSharedPtr host =
-      upstream_callbacks_.sendUpstreamSsubscribe(channel, *this);
-  if (!host) {
+  if (target == nullptr) {
+    // No host available for the slot (no cluster / all hosts down). The channel stays enrolled in
+    // pending_resubscribe_channels_, so the escalating backoff retries it.
     return false;
   }
-  // E-1: if the channel had a KEPT owner (D1) on a DIFFERENT host than the one we just re-resolved
-  // to, that old host still carries the upstream shard subscription. recordSsubscribeAttempt below
-  // would silently drop its last owner reference (its internal forgetChannelHost) WITHOUT sending
-  // the SUNSUBSCRIBE or retiring it — leaking the old subscription: duplicate delivery on a
-  // standalone / ring-hash upstream that has no Redis migration-invalidation, plus a forever-idle
-  // connection. Pair it here exactly as the topology reroute does (forget + courtesy SUNSUBSCRIBE,
-  // which is find-only so a dead old connection is a harmless no-op) before recording the new
-  // owner.
-  const auto owner_it = channel_hosts_.find(channel);
-  if (owner_it != channel_hosts_.end() && owner_it->second.host != host) {
-    const Upstream::HostConstSharedPtr old_host = owner_it->second.host;
-    forgetChannelHost(channel);
-    sendSunsubscribe(channel, old_host);
+  if (!upstream_callbacks_.sendUpstreamSsubscribeToHost(channel, *this, target)) {
+    return false;
   }
-  // Record the host we sent to AND a fresh generation as the channel's current attempt (the
-  // non-null return is that host): onPushMessage correlates the SSUBSCRIBE ack against both (Issue
-  // 2/3) so an ack from a superseded host OR a superseded same-host attempt (A -> B -> A) neither
-  // completes a pending downstream subscribe nor advances this generation.
-  recordSsubscribeAttempt(channel, host);
+  // Record the target host AND a fresh generation as the channel's current attempt: onPushMessage
+  // correlates the SSUBSCRIBE ack against both (Issue 2/3) so an ack from a superseded host OR a
+  // superseded same-host attempt (A -> B -> A) neither completes a pending downstream subscribe nor
+  // advances this generation.
+  recordSsubscribeAttempt(channel, target);
   return true;
 }
 
@@ -829,45 +847,36 @@ void SubscriptionRegistry::onClusterTopologyChange() {
   // the gap-free choice is the expected one. Reviewers asking about strict no-duplicate
   // delivery should see this comment.
   for (const auto& [channel, _] : subscriptions_) {
-    auto old_it = channel_hosts_.find(channel);
-    const Upstream::HostConstSharedPtr old_host =
-        (old_it != channel_hosts_.end()) ? old_it->second.host : nullptr;
-
-    // Dry-resolve the channel's CURRENT slot owner without sending anything. If it is unchanged,
-    // leave the subscription untouched: re-issuing SUNSUBSCRIBE+SSUBSCRIBE on an unmoved channel
-    // wastes upstream control traffic AND opens a needless message gap / duplicate window on a
-    // channel nothing moved. A slot-only rebalance moves only some slots, so most active channels
-    // are unaffected and must be a no-op here.
-    const Upstream::HostConstSharedPtr new_host =
-        upstream_callbacks_.chooseUpstreamHostForChannel(channel);
-    // A TRANSIENT nullptr resolve (resharding window, momentary master absence) is not proof the
-    // owner moved — a genuine ownership loss arrives separately as Redis's unsolicited
-    // SUNSUBSCRIBE. So when the channel still has a healthy old owner, leave it untouched on an
-    // UNKNOWN resolve as well as an unchanged one; only a resolve to a DIFFERENT known host tears
-    // the old owner down (G4). Without this, a momentary resolve failure would SUNSUBSCRIBE a live
-    // owner, fail the reissue, and cascade (any_failed -> onUpstreamConnectionClose) into a
-    // whole-registry re-resolution. An owner-less channel (old_host == nullptr) still falls through
-    // to (re)resolve.
-    if (old_host != nullptr && (new_host == nullptr || new_host == old_host)) {
+    auto it = channel_hosts_.find(channel);
+    Upstream::HostConstSharedPtr resolved;
+    // Record still valid — the recorded home matches the current slot owner, OR the resolve is a
+    // TRANSIENT null (resharding window / momentary master absence — a genuine ownership loss
+    // arrives separately as Redis's unsolicited SUNSUBSCRIBE). Leave it untouched: re-issuing
+    // SUNSUBSCRIBE+SSUBSCRIBE on an unmoved channel wastes upstream control traffic AND opens a
+    // needless message gap / duplicate window (G4). A slot-only rebalance moves only some slots, so
+    // most active channels take this skip. ``recordedOwnerValid`` returns the resolution via
+    // ``resolved`` so the re-place branch below does not resolve a second time (E-8).
+    if (it != channel_hosts_.end() && recordedOwnerValid(channel, it->second.host, resolved)) {
       continue;
     }
-
-    // Owner moved (or old/new unknown): drop the stale mapping, SUNSUBSCRIBE the old owner, then
-    // re-SSUBSCRIBE the new one. forgetChannelHost erases the old mapping BEFORE the SUNSUBSCRIBE
-    // so any subscription-mode cleanup along the send path observes the up-to-date map and tears
-    // down push_callbacks_ on the old upstream client. (C4)
-    if (auto forgotten = forgetChannelHost(channel)) {
-      sendSunsubscribe(channel, forgotten);
+    // Record invalid (slot moved to a DIFFERENT known host) or owner-less: (re)place the channel. A
+    // LIVE old owner is dropped + SUNSUBSCRIBEd BEFORE the reissue so any subscription-mode cleanup
+    // along the send path observes the up-to-date map and tears down push_callbacks_ on the old
+    // client (C4). recordedOwnerValid already resolved the new owner for an invalid record (reused
+    // as reissueSsubscribe's pre_resolved_host — E-8); an owner-less channel resolves once here.
+    if (it != channel_hosts_.end()) {
+      if (auto old = forgetChannelHost(channel)) {
+        sendSunsubscribe(channel, old);
+      }
+    } else {
+      resolved = resolvePlacement(channel);
     }
     any_reissued = true;
-
     // Reissue via the shared helper so the rerouted channel is enrolled in the resubscribe
-    // generation (and records its new expected ack owner) exactly like the connection-loss path —
-    // previously this reroute had no ack timeout, so a silently-lost SSUBSCRIBE ack stranded the
-    // channel with no retry (Issue 4). Hand off the host we just dry-resolved (E-8) so the send
-    // does not re-resolve; a null new_host (owner-less re-resolve) falls back to the resolving
-    // send.
-    if (!reissueSsubscribe(channel, new_host)) {
+    // generation (and records its new expected ack owner) exactly like the connection-loss path — a
+    // silently-lost SSUBSCRIBE ack is then retried (Issue 4). Hand off the already-resolved host so
+    // the send does not re-resolve (E-8).
+    if (!reissueSsubscribe(channel, resolved)) {
       ENVOY_LOG(warn, "redis: topology change: failed to re-route ssubscribe for '{}'", channel);
       any_failed = true;
     }

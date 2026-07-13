@@ -66,6 +66,7 @@ public:
   std::chrono::milliseconds resubscribeBackoffMaxInterval() const override {
     return resubscribe_backoff_max_interval_;
   }
+  SubscriptionPlacement subscriptionPlacement() const override { return subscription_placement_; }
 
 private:
   const std::chrono::milliseconds op_timeout_;
@@ -81,6 +82,7 @@ private:
   const std::chrono::milliseconds subscribe_ack_timeout_;
   const std::chrono::milliseconds resubscribe_backoff_base_interval_;
   const std::chrono::milliseconds resubscribe_backoff_max_interval_;
+  SubscriptionPlacement subscription_placement_;
 };
 
 class ClientImpl : public Client,

@@ -295,13 +295,22 @@ private:
     uint32_t connectionRateLimitPerSec() const override { return 0; }
     // Pub/sub is never driven over this internal cluster-topology client; report the defaults.
     std::chrono::milliseconds subscribeAckTimeout() const override {
-      return std::chrono::milliseconds(10000);
+      return std::chrono::milliseconds(
+          Extensions::NetworkFilters::Common::Redis::Client::kDefaultSubscribeAckTimeoutMs);
     }
     std::chrono::milliseconds resubscribeBackoffBaseInterval() const override {
-      return std::chrono::milliseconds(100);
+      return std::chrono::milliseconds(
+          Extensions::NetworkFilters::Common::Redis::Client::kDefaultResubscribeBackoffBaseMs);
     }
     std::chrono::milliseconds resubscribeBackoffMaxInterval() const override {
-      return std::chrono::milliseconds(30000);
+      return std::chrono::milliseconds(
+          Extensions::NetworkFilters::Common::Redis::Client::kDefaultResubscribeBackoffMaxMs);
+    }
+    // Not a pub/sub connection pool (topology-discovery client), so subscription placement is moot;
+    // report the default.
+    Extensions::NetworkFilters::Common::Redis::Client::SubscriptionPlacement
+    subscriptionPlacement() const override {
+      return Extensions::NetworkFilters::Common::Redis::Client::SubscriptionPlacement::Primary;
     }
     // For any readPolicy other than Primary, the RedisClientFactory will send a READONLY command
     // when establishing a new connection. Since we're only using this for making the "cluster

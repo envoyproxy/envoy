@@ -225,6 +225,34 @@ message RedisProxy {
       // a compatibility switch.
       ShardedSubscriptionMode sharded_subscription_mode = 4
           [(validate.rules).enum = {defined_only: true}];
+
+      // Where the proxy homes each channel's upstream ``SSUBSCRIBE``. The shard that owns a
+      // channel's hash slot is fixed, but a shard has a primary and (optionally) replicas.
+      enum SubscriptionPlacement {
+        // Home every channel on its slot's PRIMARY (the default; the v1 behavior). Every
+        // subscription and the messages it receives share the primary, so adding replicas gives
+        // pub/sub no extra capacity (each replica only adds one more cluster-bus frame per message).
+        PRIMARY = 0;
+
+        // Spread channels across the slot shard's members (primary + replicas), least-loaded
+        // first, to offload the primary's cluster-bus fan-out egress. Redis Cluster upstreams only
+        // — a non-cluster upstream has no shard-membership model, so it logs a warning once and
+        // behaves as ``PRIMARY``. A replica-homed subscription receives each message via a
+        // fire-and-forget cluster-bus hop (at-most-once), which is within the pub/sub delivery
+        // contract — the same best-effort guarantee a primary-homed sharded subscription already
+        // carries across a resharding window.
+        SHARD_MEMBERS = 1;
+      }
+
+      // Where each channel's upstream ``SSUBSCRIBE`` is homed within its slot's shard (see
+      // :ref:`SubscriptionPlacement
+      // <envoy_v3_api_enum_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.PubsubSettings.SubscriptionPlacement>`).
+      // Leave unset (``PRIMARY``) for the historical primary-only behavior; set ``SHARD_MEMBERS``
+      // to offload subscription fan-out onto replicas on a Redis Cluster upstream. ``defined_only``
+      // so an out-of-range numeric value is rejected at config load rather than silently treated
+      // as ``PRIMARY``.
+      SubscriptionPlacement subscription_placement = 5
+          [(validate.rules).enum = {defined_only: true}];
     }
 
     // RESP3 sharded pub/sub tuning. See :ref:`PubsubSettings

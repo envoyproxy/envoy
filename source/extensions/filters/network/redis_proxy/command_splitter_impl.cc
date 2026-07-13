@@ -1374,8 +1374,8 @@ SplitRequestPtr SubscriptionRequest::create(Router& router,
       const auto upstream = route->pubsubUpstream();
       if (!upstream) {
         // Route matched but has no conn pool for the write-side verb (mirror-only or otherwise
-        // partially-configured route). The spublish()-keyed lookup is new on this path, so a null
-        // upstream that older key lookups never hit could surface here.
+        // partially-configured route). The ``pubsubUpstream()`` (write-side) lookup is new on this
+        // path, so a null upstream that older key lookups never hit could surface here.
         ENVOY_LOG(warn, "redis: no upstream pool for pub/sub target '{}'", subscription_arg);
       } else {
         registry = upstream->subscriptionRegistryShared();

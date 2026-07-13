@@ -99,13 +99,21 @@ private:
     uint32_t connectionRateLimitPerSec() const override { return 0; }
     // The health-check client never drives pub/sub; report the defaults.
     std::chrono::milliseconds subscribeAckTimeout() const override {
-      return std::chrono::milliseconds(10000);
+      return std::chrono::milliseconds(
+          NetworkFilters::Common::Redis::Client::kDefaultSubscribeAckTimeoutMs);
     }
     std::chrono::milliseconds resubscribeBackoffBaseInterval() const override {
-      return std::chrono::milliseconds(100);
+      return std::chrono::milliseconds(
+          NetworkFilters::Common::Redis::Client::kDefaultResubscribeBackoffBaseMs);
     }
     std::chrono::milliseconds resubscribeBackoffMaxInterval() const override {
-      return std::chrono::milliseconds(30000);
+      return std::chrono::milliseconds(
+          NetworkFilters::Common::Redis::Client::kDefaultResubscribeBackoffMaxMs);
+    }
+    // Health-check client, not a pub/sub connection pool; subscription placement is moot.
+    NetworkFilters::Common::Redis::Client::SubscriptionPlacement
+    subscriptionPlacement() const override {
+      return NetworkFilters::Common::Redis::Client::SubscriptionPlacement::Primary;
     }
 
     const std::chrono::milliseconds parent_timeout_;
