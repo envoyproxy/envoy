@@ -38,7 +38,7 @@ class ReverseTunnelUpstreamLifecycleConfigFactory
     : public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
 public:
   Network::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+  createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::UpstreamFactoryContext&) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override {

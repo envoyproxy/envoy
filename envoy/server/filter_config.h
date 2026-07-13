@@ -220,15 +220,18 @@ public:
    * the case of general error. The returned callback should always be initialized.
    */
   virtual Network::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stats_prefix,
+  createFilterFactoryFromProto(const Protobuf::Message& config,
                                UpstreamFactoryContext& context) PURE;
 
-  // TODO: thread stats_prefix through FilterConfigProviderManagerImpl::createDynamicFilterConfigProvider
-  // so the ECDS path also receives "cluster.<name>." rather than "". Until then this overload
-  // keeps dynamic filter instantiation compiling while falling back to context.scope() for scoping.
-  Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                        UpstreamFactoryContext& context) {
-    return createFilterFactoryFromProto(config, "", context);
+  // Overload with explicit stats_prefix. Implementations that emit stats should override this;
+  // the default delegates to the 2-arg form so existing implementations need not change.
+  // TODO: thread stats_prefix through
+  // FilterConfigProviderManagerImpl::createDynamicFilterConfigProvider so the ECDS path also passes
+  // "cluster.<name>." rather than "" here.
+  virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                                const std::string& stats_prefix,
+                                                                UpstreamFactoryContext& context) {
+    return createFilterFactoryFromProto(config, context);
   }
 
   std::string category() const override { return "envoy.filters.upstream_network"; }
