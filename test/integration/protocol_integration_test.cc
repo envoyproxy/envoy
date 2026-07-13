@@ -161,6 +161,13 @@ TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetricHandshakeFail
 // configured network namespace fails at connection time (the namespace file cannot be opened),
 // the request fails gracefully with a 503 instead of crashing on a null connection.
 TEST_P(ProtocolIntegrationTest, UpstreamConnectionCreationFailure) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    // QUIC upstream connections are created through a different code path which does not support
+    // binding to a network namespace, so the connection-time failure exercised here does not
+    // apply.
+    return;
+  }
+
   // This test intentionally fails to create the upstream connection, so bypass the check that
   // the test used upstream connections.
   testing_upstream_intentionally_ = true;
