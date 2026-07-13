@@ -420,6 +420,22 @@ WEAK_STUB(ClusterLbContextGetOverrideHost,
 WEAK_STUB(ClusterLbContextGetDownstreamConnectionSni,
           envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(nullptr,
                                                                                          nullptr))
+WEAK_STUB(ClusterLbContextGetFilterStateBytes,
+          envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(nullptr,
+                                                                                  {nullptr, 0},
+                                                                                  nullptr))
+WEAK_STUB(ClusterLbContextGetFilterStateTyped,
+          envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(nullptr,
+                                                                                  {nullptr, 0},
+                                                                                  nullptr))
+WEAK_STUB(ClusterLbContextSetFilterStateBytes,
+          envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes(nullptr,
+                                                                                  {nullptr, 0},
+                                                                                  {nullptr, 0}))
+WEAK_STUB(ClusterLbContextSetFilterStateTyped,
+          envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(nullptr,
+                                                                                  {nullptr, 0},
+                                                                                  {nullptr, 0}))
 WEAK_STUB(ClusterLbGetClusterName,
           envoy_dynamic_module_callback_cluster_lb_get_cluster_name(nullptr, nullptr))
 WEAK_STUB(ClusterLbGetHostsCount,
