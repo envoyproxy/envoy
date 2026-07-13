@@ -292,8 +292,8 @@ TEST_F(UpstreamRbacFilterTest, OnUpstreamConnectionEstablishedIsNoOp) {
   filter_->onUpstreamConnectionEstablished();
 }
 
-// When the filter is used as a router upstream filter, stats_prefix carries the parent namespace
-// (e.g. "http.ingress."). RBAC counters must land under that prefix: "http.ingress.rbac.*".
+// Router context (flag on): root scope with "http.<stat_prefix>." as stats_prefix.
+// RBAC counters must land under that prefix.
 TEST_F(UpstreamRbacFilterTest, RouterContextStatPrefixScopesStats) {
   auto config = std::make_shared<RBACFilter::RoleBasedAccessControlFilterConfig>(
       envoy::extensions::filters::http::rbac::v3::RBAC{}, "http.ingress.",
@@ -303,9 +303,36 @@ TEST_F(UpstreamRbacFilterTest, RouterContextStatPrefixScopesStats) {
   EXPECT_TRUE(stats_store_.findCounterByString("http.ingress.rbac.denied").has_value());
 }
 
-// When used as a cluster upstream filter, the scope already carries the "cluster.<name>." prefix
-// so stats_prefix is empty. RBAC counters must appear as "cluster.cluster_0.rbac.*" and must NOT
-// be double-prefixed as "cluster.cluster_0.cluster.cluster_0.rbac.*".
+// Cluster context (flag on): root scope with "cluster.<name>." as stats_prefix.
+// This is the approach used by upstream_impl.cc when the correct-stats-prefix flag is enabled.
+// Stats must appear under "cluster.<name>.rbac.*" with no double-prefix.
+TEST_F(UpstreamRbacFilterTest, ClusterContextRootScopeWithClusterPrefix) {
+  auto config = std::make_shared<RBACFilter::RoleBasedAccessControlFilterConfig>(
+      envoy::extensions::filters::http::rbac::v3::RBAC{}, "cluster.cluster_0.",
+      *stats_store_.rootScope(), context_, ProtobufMessage::getStrictValidationVisitor());
+
+  EXPECT_TRUE(stats_store_.findCounterByString("cluster.cluster_0.rbac.allowed").has_value());
+  EXPECT_TRUE(stats_store_.findCounterByString("cluster.cluster_0.rbac.denied").has_value());
+  EXPECT_FALSE(stats_store_.findCounterByString("cluster.cluster_0.cluster.cluster_0.rbac.allowed")
+                   .has_value());
+}
+
+// Cluster context (flag off / legacy): cluster scope with the scope prefix re-passed as
+// stats_prefix. The filter receives both the scope prefix and the same string as stats_prefix,
+// producing double-prefixed stat names.
+TEST_F(UpstreamRbacFilterTest, ClusterContextLegacyScopePrefix) {
+  auto cluster_scope = stats_store_.rootScope()->createScope("cluster.cluster_0");
+  auto config = std::make_shared<RBACFilter::RoleBasedAccessControlFilterConfig>(
+      envoy::extensions::filters::http::rbac::v3::RBAC{}, "cluster.cluster_0.", *cluster_scope,
+      context_, ProtobufMessage::getStrictValidationVisitor());
+
+  // Double-prefix is the legacy behavior: both the scope and stats_prefix carry the cluster name.
+  EXPECT_TRUE(stats_store_.findCounterByString("cluster.cluster_0.cluster.cluster_0.rbac.allowed")
+                  .has_value());
+  EXPECT_FALSE(stats_store_.findCounterByString("cluster.cluster_0.rbac.allowed").has_value());
+}
+
+// Verifies the filter handles an empty stats_prefix correctly regardless of scope prefix.
 TEST_F(UpstreamRbacFilterTest, ClusterContextEmptyPrefixNoDoublePrefix) {
   auto cluster_scope = stats_store_.rootScope()->createScope("cluster.cluster_0");
   auto config = std::make_shared<RBACFilter::RoleBasedAccessControlFilterConfig>(

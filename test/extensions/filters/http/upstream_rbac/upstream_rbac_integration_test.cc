@@ -113,10 +113,8 @@ TEST_P(UpstreamRbacIntegrationTest, AllowsNonMatchingUpstreamIp) {
   cleanupUpstreamAndDownstream();
 }
 
-// Stats emitted by the upstream RBAC filter in a cluster context must be scoped under
-// "cluster.<name>.rbac.*". They must NOT appear under "cluster.<name>.cluster.<name>.rbac.*"
-// (which would indicate that the stats_prefix string is being applied on top of a scope that
-// already carries the cluster prefix).
+// With the correct-stats-prefix flag enabled (default), upstream RBAC filter stats in a cluster
+// context are scoped under "cluster.<name>.rbac.*" and NOT double-prefixed.
 TEST_P(UpstreamRbacIntegrationTest, ClusterContextStatsNotDoublePrefixed) {
   addUpstreamRbacFilter(loopbackCidr(), loopbackPrefixLen());
   initialize();
@@ -131,6 +129,29 @@ TEST_P(UpstreamRbacIntegrationTest, ClusterContextStatsNotDoublePrefixed) {
   test_server_->waitForCounter("cluster.cluster_0.rbac.denied", testing::Eq(1));
   // It must not be double-prefixed.
   EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.cluster.cluster_0.rbac.denied"));
+
+  cleanupUpstreamAndDownstream();
+}
+
+// With the correct-stats-prefix flag disabled (legacy behavior), upstream RBAC filter stats land
+// at the double-prefixed location because the cluster scope prefix string was re-passed as
+// stats_prefix on top of a scope that already carried the cluster prefix.
+TEST_P(UpstreamRbacIntegrationTest, ClusterContextLegacyStatsAreDoublePrefixed) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix", "false");
+  addUpstreamRbacFilter(loopbackCidr(), loopbackPrefixLen());
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+
+  // With the legacy behavior the counter is double-prefixed.
+  test_server_->waitForCounter("cluster.cluster_0.cluster.cluster_0.rbac.denied", testing::Eq(1));
+  // The correctly-prefixed counter must not exist.
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.rbac.denied"));
 
   cleanupUpstreamAndDownstream();
 }

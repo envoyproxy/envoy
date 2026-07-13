@@ -1451,22 +1451,41 @@ ClusterInfoImpl::ClusterInfoImpl(
         return;
       }
 
-      // The scope passed via upstream_context_ already carries the "cluster.<name>." prefix,
-      // so pass an empty stats_prefix string. Upstream filters qualify their own stats by
-      // prepending the stats_prefix string to their metric names; passing the scope prefix
-      // again here would produce double-prefixed names (e.g. "cluster.X.cluster.X.rbac.").
-      // Use a named variable: FilterChainHelper stores stats_prefix by reference, so a temporary
-      // (e.g. "") would dangle after the constructor returns.
-      const std::string empty_stats_prefix;
-      Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
-                              Server::Configuration::UpstreamHttpFilterConfigFactory>
-          helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
-                 factory_context.serverFactoryContext().clusterManager(), upstream_context_,
-                 empty_stats_prefix);
-      SET_AND_RETURN_IF_NOT_OK(helper.processFilters(http_protocol_options_->http_filters_,
-                                                     "upstream http", "upstream http",
-                                                     http_filter_factories_),
-                               creation_status);
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix")) {
+        // Use the server root scope (empty prefix) as the filter context scope and pass
+        // "cluster.<name>." explicitly as stats_prefix. This mirrors the router case where
+        // the HCM stat prefix string is passed as stats_prefix with an empty-prefix scope,
+        // and avoids double-prefixed stat names (e.g. "cluster.X.cluster.X.rbac.denied") that
+        // occurred when the scope's own prefix string was redundantly passed as stats_prefix.
+        const std::string cluster_stats_prefix = absl::StrCat("cluster.", name_, ".");
+        UpstreamFactoryContextImpl http_filter_ctx(
+            upstream_context_.serverFactoryContext(), upstream_context_.initManager(),
+            upstream_context_.serverFactoryContext().serverScope());
+        Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
+                                Server::Configuration::UpstreamHttpFilterConfigFactory>
+            helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
+                   factory_context.serverFactoryContext().clusterManager(), http_filter_ctx,
+                   cluster_stats_prefix);
+        SET_AND_RETURN_IF_NOT_OK(helper.processFilters(http_protocol_options_->http_filters_,
+                                                       "upstream http", "upstream http",
+                                                       http_filter_factories_),
+                                 creation_status);
+      } else {
+        // Legacy behavior: pass the scope's prefix string as stats_prefix. Because
+        // upstream_context_ also uses the cluster scope (which already carries the same prefix),
+        // this produces double-prefixed stat names (e.g. "cluster.X.cluster.X.rbac.denied").
+        std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
+        Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
+                                Server::Configuration::UpstreamHttpFilterConfigFactory>
+            helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
+                   factory_context.serverFactoryContext().clusterManager(), upstream_context_,
+                   prefix);
+        SET_AND_RETURN_IF_NOT_OK(helper.processFilters(http_protocol_options_->http_filters_,
+                                                       "upstream http", "upstream http",
+                                                       http_filter_factories_),
+                                 creation_status);
+      }
     }
   }
 }
