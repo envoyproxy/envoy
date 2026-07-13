@@ -132,6 +132,8 @@ void LoadBalancerBase::processDirtyPriorities() {
     return;
   }
   for (uint32_t priority : dirty_priorities_) {
+    // re-partition from current coarseHealth() flags before recalculating load.
+    priority_set_.refreshPartition(priority);
     recalculatePerPriorityState(priority, priority_set_, per_priority_load_, per_priority_health_,
                                 per_priority_degraded_, total_healthy_hosts_);
   }

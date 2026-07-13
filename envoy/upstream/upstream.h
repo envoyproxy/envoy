@@ -676,6 +676,14 @@ public:
    * @param callback callback to use to add hosts.
    */
   virtual void batchHostUpdate(BatchUpdateCb& callback) PURE;
+
+  /**
+   * Re-partitions the host set at the given priority level in-place by re-reading each host's
+   * current coarseHealth() flags and rebuilding the healthy/degraded/excluded vectors.
+   *
+   * @param priority the priority level whose host set should be re-partitioned.
+   */
+  virtual void refreshPartition(uint32_t priority) const PURE;
 };
 
 /**
