@@ -223,9 +223,9 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stats_prefix,
                                UpstreamFactoryContext& context) PURE;
 
-  // Convenience overload for callers that have not yet been updated to pass an explicit
-  // stats_prefix (e.g. ECDS dynamic filter instantiation). Delegates to the 3-arg form
-  // with an empty prefix; the factory falls back to context.scope() for stat scoping.
+  // TODO: thread stats_prefix through FilterConfigProviderManagerImpl::createDynamicFilterConfigProvider
+  // so the ECDS path also receives "cluster.<name>." rather than "". Until then this overload
+  // keeps dynamic filter instantiation compiling while falling back to context.scope() for scoping.
   Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                         UpstreamFactoryContext& context) {
     return createFilterFactoryFromProto(config, "", context);
