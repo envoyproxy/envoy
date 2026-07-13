@@ -91,6 +91,7 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   Event::TimerPtr delay_timer_ = nullptr;
   bool is_rejected_{false};
+  bool is_incremented_{false};
 };
 
 } // namespace ConnectionLimitFilter

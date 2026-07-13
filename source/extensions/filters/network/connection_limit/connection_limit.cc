@@ -65,6 +65,9 @@ Network::FilterStatus Filter::onNewConnection() {
   }
 
   config_->stats().active_connections_.inc();
+  // Both the accepted and the rejected paths below increment the connection counter, so from
+  // this point on the close event must decrement the accounting.
+  is_incremented_ = true;
 
   if (!config_->incrementConnectionWithinLimit()) {
     config_->stats().limited_connections_.inc();
@@ -98,8 +101,15 @@ void Filter::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     resetTimerState();
-    config_->decrementConnection();
-    config_->stats().active_connections_.dec();
+    // Only decrement the accounting if onNewConnection() incremented it. A close event can
+    // arrive without the accounting having been incremented, e.g. when the filter is runtime
+    // disabled (onNewConnection() returns early) or an earlier filter in the chain stopped
+    // iteration so onNewConnection() never ran, and the unsigned counters would underflow.
+    // See https://github.com/envoyproxy/envoy/issues/22127.
+    if (is_incremented_) {
+      config_->decrementConnection();
+      config_->stats().active_connections_.dec();
+    }
   }
 }
 
