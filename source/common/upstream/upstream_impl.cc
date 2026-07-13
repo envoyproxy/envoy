@@ -1451,41 +1451,33 @@ ClusterInfoImpl::ClusterInfoImpl(
         return;
       }
 
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix")) {
-        // Use the server root scope (empty prefix) as the filter context scope and pass
-        // "cluster.<name>." explicitly as stats_prefix. This mirrors the router case where
-        // the HCM stat prefix string is passed as stats_prefix with an empty-prefix scope,
-        // and avoids double-prefixed stat names (e.g. "cluster.X.cluster.X.rbac.denied") that
-        // occurred when the scope's own prefix string was redundantly passed as stats_prefix.
-        const std::string cluster_stats_prefix = absl::StrCat("cluster.", name_, ".");
-        UpstreamFactoryContextImpl http_filter_ctx(
-            upstream_context_.serverFactoryContext(), upstream_context_.initManager(),
-            upstream_context_.serverFactoryContext().serverScope());
-        Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
-                                Server::Configuration::UpstreamHttpFilterConfigFactory>
-            helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
-                   factory_context.serverFactoryContext().clusterManager(), http_filter_ctx,
-                   cluster_stats_prefix);
-        SET_AND_RETURN_IF_NOT_OK(helper.processFilters(http_protocol_options_->http_filters_,
-                                                       "upstream http", "upstream http",
-                                                       http_filter_factories_),
-                                 creation_status);
-      } else {
-        // Legacy behavior: pass the scope's prefix string as stats_prefix. Because
-        // upstream_context_ also uses the cluster scope (which already carries the same prefix),
-        // this produces double-prefixed stat names (e.g. "cluster.X.cluster.X.rbac.denied").
-        std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
-        Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
-                                Server::Configuration::UpstreamHttpFilterConfigFactory>
-            helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
-                   factory_context.serverFactoryContext().clusterManager(), upstream_context_,
-                   prefix);
-        SET_AND_RETURN_IF_NOT_OK(helper.processFilters(http_protocol_options_->http_filters_,
-                                                       "upstream http", "upstream http",
-                                                       http_filter_factories_),
-                                 creation_status);
+      // With the flag enabled (default): use the server root scope (empty prefix) and pass
+      // "cluster.<name>." as stats_prefix, mirroring the router case. This avoids the legacy
+      // double-prefix bug where the scope's own prefix string was re-passed as stats_prefix,
+      // producing names like "cluster.X.cluster.X.rbac.denied".
+      const bool correct_prefix = Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix");
+      const std::string stats_prefix =
+          correct_prefix ? absl::StrCat("cluster.", name_, ".")
+                         : stats_scope_->symbolTable().toString(stats_scope_->prefix());
+      std::optional<UpstreamFactoryContextImpl> new_ctx;
+      if (correct_prefix) {
+        new_ctx.emplace(upstream_context_.serverFactoryContext(), upstream_context_.initManager(),
+                        upstream_context_.serverFactoryContext().serverScope());
       }
+      Server::Configuration::UpstreamFactoryContext* filter_ctx = &upstream_context_;
+      if (new_ctx.has_value()) {
+        filter_ctx = &new_ctx.value();
+      }
+      Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
+                              Server::Configuration::UpstreamHttpFilterConfigFactory>
+          helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
+                 factory_context.serverFactoryContext().clusterManager(), *filter_ctx,
+                 stats_prefix);
+      SET_AND_RETURN_IF_NOT_OK(helper.processFilters(http_protocol_options_->http_filters_,
+                                                     "upstream http", "upstream http",
+                                                     http_filter_factories_),
+                               creation_status);
     }
   }
 }
