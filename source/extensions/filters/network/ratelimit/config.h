@@ -15,13 +15,13 @@ namespace RateLimitFilter {
 /**
  * Config registration for the rate limit filter. @see NamedNetworkFilterConfigFactory.
  */
-class RateLimitConfigFactory
-    : public Common::FactoryBase<envoy::extensions::filters::network::ratelimit::v3::RateLimit> {
+class RateLimitConfigFactory : public Common::ExceptionFreeFactoryBase<
+                                   envoy::extensions::filters::network::ratelimit::v3::RateLimit> {
 public:
-  RateLimitConfigFactory() : FactoryBase(NetworkFilterNames::get().RateLimit) {}
+  RateLimitConfigFactory() : ExceptionFreeFactoryBase(NetworkFilterNames::get().RateLimit) {}
 
 private:
-  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::ratelimit::v3::RateLimit& proto_config,
       Server::Configuration::FactoryContext& context) override;
 };
