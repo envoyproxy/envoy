@@ -1,1 +1,0 @@
-Added support to fetch and inject unbound Access Tokens from the GCE Metadata Server. Configured via the ``access_token`` field in the :ref:`Audience proto <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Audience>`.
