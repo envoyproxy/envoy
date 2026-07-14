@@ -25,8 +25,11 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::NiceMock;
+using ::testing::Not;
 
 namespace Envoy {
 namespace Upstream {
@@ -210,7 +213,7 @@ TEST_F(TestStaticClusterImplTest, UnsupportedClusterName) {
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, server_context_, dns_resolver_fn_, std::move(outlier_event_logger_), false);
-  EXPECT_FALSE(create_result.ok());
+  EXPECT_THAT(create_result, Not(IsOk()));
   EXPECT_EQ(create_result.status().message(),
             "Didn't find a registered cluster factory implementation for name: "
             "'envoy.clusters.bad_cluster_name'");
@@ -238,7 +241,7 @@ TEST_F(TestStaticClusterImplTest, UnsupportedClusterType) {
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, server_context_, dns_resolver_fn_, std::move(outlier_event_logger_), false);
-  EXPECT_FALSE(create_result.ok());
+  EXPECT_THAT(create_result, Not(IsOk()));
   EXPECT_EQ(create_result.status().message(),
             "Didn't find a registered cluster factory implementation for type: "
             "'envoy.config.cluster.v3.Cluster'");
@@ -267,7 +270,7 @@ TEST_F(TestStaticClusterImplTest, HostnameWithoutDNS) {
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, server_context_, dns_resolver_fn_, std::move(outlier_event_logger_), false);
-  EXPECT_FALSE(create_result.ok());
+  EXPECT_THAT(create_result, Not(IsOk()));
   EXPECT_EQ(create_result.status().message(),
             "Cannot use hostname for consistent hashing loadbalancing for cluster of type: "
             "'envoy.clusters.custom_static'");

@@ -4,6 +4,7 @@
 #include "test/mocks/upstream/cluster_update_callbacks.h"
 #include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/load_balancer_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
@@ -151,21 +152,18 @@ TEST_P(ClusterManagerLifecycleTest, InitializeOrder) {
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster3, nullptr)));
   ON_CALL(*cluster3, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
-  ASSERT_TRUE(
-      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster3"), "version1").ok());
+  ASSERT_OK(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster3"), "version1"));
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster4, nullptr)));
   ON_CALL(*cluster4, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster4, initialize(_));
-  ASSERT_TRUE(
-      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster4"), "version2").ok());
+  ASSERT_OK(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster4"), "version2"));
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster5, nullptr)));
   ON_CALL(*cluster5, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
-  ASSERT_TRUE(
-      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster5"), "version3").ok());
+  ASSERT_OK(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster5"), "version3"));
 
   cds->initialized_callback_();
   EXPECT_CALL(*cds, versionInfo()).WillOnce(Return("version3"));
@@ -328,7 +326,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicRemoveWithLocalCluster) {
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize(_));
-  ASSERT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster1"), "").ok());
+  ASSERT_OK(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster1"), ""));
 
   // Add another update callback on foo so we make sure callbacks keep working.
   ReadyWatcher membership_updated;
@@ -612,8 +610,8 @@ TEST_P(ClusterManagerLifecycleTest, TestRevertWarmingCluster) {
   EXPECT_CALL(*cluster1, initialize(_));
   checkStats(0 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 0 /*warming*/);
 
-  ASSERT_TRUE(
-      cluster_manager_->addOrUpdateCluster(parseClusterFromV3Json(cluster_json1), "version1").ok());
+  ASSERT_OK(
+      cluster_manager_->addOrUpdateCluster(parseClusterFromV3Json(cluster_json1), "version1"));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
 
   cluster1->initialize_callback_();
@@ -623,16 +621,16 @@ TEST_P(ClusterManagerLifecycleTest, TestRevertWarmingCluster) {
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster2, nullptr)));
   EXPECT_CALL(*cluster2, initialize(_));
-  ASSERT_TRUE(
-      cluster_manager_->addOrUpdateCluster(parseClusterFromV3Json(cluster_json2), "version2").ok());
+  ASSERT_OK(
+      cluster_manager_->addOrUpdateCluster(parseClusterFromV3Json(cluster_json2), "version2"));
   checkStats(1 /*added*/, 1 /*modified*/, 0 /*removed*/, 1 /*active*/, 1 /*warming*/);
 
   // Start warming version3 instead, which is the same as version1.
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster3, nullptr)));
   EXPECT_CALL(*cluster3, initialize(_));
-  ASSERT_TRUE(
-      cluster_manager_->addOrUpdateCluster(parseClusterFromV3Json(cluster_json1), "version3").ok());
+  ASSERT_OK(
+      cluster_manager_->addOrUpdateCluster(parseClusterFromV3Json(cluster_json1), "version3"));
   checkStats(1 /*added*/, 2 /*modified*/, 0 /*removed*/, 1 /*active*/, 1 /*warming*/);
 
   // Finish warming version3.

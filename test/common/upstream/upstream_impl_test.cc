@@ -52,12 +52,14 @@
 #include "test/mocks/upstream/typed_load_balancer_factory.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusCode;
 using testing::_;
 using testing::AnyNumber;
 using testing::ContainerEq;
@@ -1419,8 +1421,7 @@ TEST_P(StrictDnsClusterImplParamTest, CustomResolverFails) {
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
     auto cluster_or_error = createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
-    EXPECT_FALSE(cluster_or_error.ok());
-    EXPECT_EQ(cluster_or_error.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(cluster_or_error, HasStatusCode(absl::StatusCode::kInvalidArgument));
     EXPECT_EQ(cluster_or_error.status().message(),
               "STRICT_DNS clusters must NOT have a custom resolver name set");
   } else {
