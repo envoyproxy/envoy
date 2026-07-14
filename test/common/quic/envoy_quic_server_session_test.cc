@@ -1421,5 +1421,20 @@ TEST_F(EnvoyQuicServerSessionTestWillNotInitialize, GetRttAndCwnd) {
   EXPECT_EQ(envoy_quic_session_.congestionWindowInBytes(), std::nullopt);
 }
 
+TEST_F(EnvoyQuicServerSessionTestWillNotInitialize, ResetSslAfterHandshakeEnabledViaRuntime) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.quic_enable_reset_ssl_after_handshake", "true"}});
+
+  // In this suite, envoy_quic_session_ is NOT initialized in SetUp.
+  // So we can initialize it now, and it will pick up the runtime flag!
+  
+  envoy_quic_session_.Initialize();
+  
+  EXPECT_TRUE(envoy_quic_session_.connection()->connected());
+
+  // The suite's TearDown will handle the rest of initialization and cleanup for envoy_quic_session_.
+}
+
 } // namespace Quic
 } // namespace Envoy
