@@ -23,7 +23,9 @@ namespace GrpcFieldExtraction {
 namespace {
 
 using ::apikeys::CreateApiKeyRequest;
+using ::Envoy::StatusHelpers::IsOk;
 using ::google::grpc::transcoding::kGrpcDelimiterByteSize;
+using ::testing::Not;
 
 CreateApiKeyRequest getCreateApiKeyRequest() {
   CreateApiKeyRequest req;
@@ -195,7 +197,7 @@ TEST(ParseGrpcMessage, ParseZeroLengthMessage) {
 
 TEST(SizeToDelimiter, Oversize) {
   auto delimiter = sizeToDelimiter(std::numeric_limits<uint64_t>::max());
-  ASSERT_FALSE(delimiter.ok());
+  ASSERT_THAT(delimiter, Not(IsOk()));
   EXPECT_EQ(delimiter.status().ToString(),
             "FAILED_PRECONDITION: Current input message size 18446744073709551615 is larger than "
             "max allowed gRPC message length of 4294967295");

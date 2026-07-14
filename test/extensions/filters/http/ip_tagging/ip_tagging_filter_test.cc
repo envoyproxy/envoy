@@ -15,11 +15,14 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 using testing::Return;
 
 namespace Envoy {
@@ -268,11 +271,11 @@ public:
         IpTaggingFilterConfig::create(config, "prefix.", *singleton_manager_, *scope_, runtime_,
                                       *api_, tls_, *dispatcher_, validation_visitor_);
     if (expected_error.has_value()) {
-      EXPECT_FALSE(config_or.ok());
+      EXPECT_THAT(config_or, Not(IsOk()));
       EXPECT_TRUE(absl::StrContains(absl::StrCat(config_or.status()), expected_error.value()));
       return;
     }
-    EXPECT_TRUE(config_or.ok());
+    EXPECT_OK(config_or);
     config_ = std::move(config_or.value());
     filter_ = std::make_unique<IpTaggingFilter>(config_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
@@ -426,7 +429,7 @@ TEST_F(IpTaggingFilterTest, RecreatesProviderWhenWeakPtrExpired) {
   absl::StatusOr<IpTaggingFilterConfigSharedPtr> config1_result =
       IpTaggingFilterConfig::create(proto_config1, "prefix.", *singleton_manager_, *scope_,
                                     runtime_, *api_, tls_, *dispatcher_, validation_visitor_);
-  EXPECT_TRUE(config1_result.ok());
+  EXPECT_OK(config1_result);
   auto config1 = config1_result.value();
   auto provider1 = IpTaggingFilterConfigPeer::ipTagsProvider(*config1);
   EXPECT_NE(nullptr, provider1);
@@ -443,7 +446,7 @@ TEST_F(IpTaggingFilterTest, RecreatesProviderWhenWeakPtrExpired) {
   absl::StatusOr<IpTaggingFilterConfigSharedPtr> config2_result =
       IpTaggingFilterConfig::create(proto_config2, "prefix.", *singleton_manager_, *scope_,
                                     runtime_, *api_, tls_, *dispatcher_, validation_visitor_);
-  EXPECT_TRUE(config2_result.ok());
+  EXPECT_OK(config2_result);
   auto config2 = config2_result.value();
   auto provider2 = IpTaggingFilterConfigPeer::ipTagsProvider(*config2);
   EXPECT_NE(nullptr, provider2);
@@ -456,7 +459,7 @@ TEST_F(IpTaggingFilterTest, ReusesIpTagsProviderInstanceForSameFilePath) {
   absl::StatusOr<IpTaggingFilterConfigSharedPtr> config1_result =
       IpTaggingFilterConfig::create(proto_config1, "prefix.", *singleton_manager_, *scope_,
                                     runtime_, *api_, tls_, *dispatcher_, validation_visitor_);
-  EXPECT_TRUE(config1_result.ok());
+  EXPECT_OK(config1_result);
   auto config1 = config1_result.value();
   envoy::extensions::filters::http::ip_tagging::v3::IPTagging proto_config2;
   TestUtility::loadFromYaml(TestEnvironment::substitute(internal_request_with_json_file_config),
@@ -464,7 +467,7 @@ TEST_F(IpTaggingFilterTest, ReusesIpTagsProviderInstanceForSameFilePath) {
   absl::StatusOr<IpTaggingFilterConfigSharedPtr> config2_result =
       IpTaggingFilterConfig::create(proto_config2, "prefix.", *singleton_manager_, *scope_,
                                     runtime_, *api_, tls_, *dispatcher_, validation_visitor_);
-  EXPECT_TRUE(config2_result.ok());
+  EXPECT_OK(config2_result);
   auto config2 = config2_result.value();
   auto ip_tags_registry1 = IpTaggingFilterConfigPeer::ipTagsRegistry(*config1);
   auto ip_tags_registry2 = IpTaggingFilterConfigPeer::ipTagsRegistry(*config2);
@@ -483,7 +486,7 @@ TEST_F(IpTaggingFilterTest, DifferentIpTagsProviderInstanceForDifferentFilePath)
   absl::StatusOr<IpTaggingFilterConfigSharedPtr> config1_result =
       IpTaggingFilterConfig::create(proto_config1, "prefix.", *singleton_manager_, *scope_,
                                     runtime_, *api_, tls_, *dispatcher_, validation_visitor_);
-  EXPECT_TRUE(config1_result.ok());
+  EXPECT_OK(config1_result);
   auto config1 = config1_result.value();
   envoy::extensions::filters::http::ip_tagging::v3::IPTagging proto_config2;
   TestUtility::loadFromYaml(TestEnvironment::substitute(external_request_with_json_file_config),
@@ -491,7 +494,7 @@ TEST_F(IpTaggingFilterTest, DifferentIpTagsProviderInstanceForDifferentFilePath)
   absl::StatusOr<IpTaggingFilterConfigSharedPtr> config2_result =
       IpTaggingFilterConfig::create(proto_config2, "prefix.", *singleton_manager_, *scope_,
                                     runtime_, *api_, tls_, *dispatcher_, validation_visitor_);
-  EXPECT_TRUE(config2_result.ok());
+  EXPECT_OK(config2_result);
   auto config2 = config2_result.value();
   auto ip_tags_registry1 = IpTaggingFilterConfigPeer::ipTagsRegistry(*config1);
   auto ip_tags_registry2 = IpTaggingFilterConfigPeer::ipTagsRegistry(*config2);
