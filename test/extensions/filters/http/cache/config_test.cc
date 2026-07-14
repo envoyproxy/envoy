@@ -4,6 +4,7 @@
 #include "source/extensions/filters/http/cache/config.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -14,6 +15,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 namespace {
+
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 
 class CacheFilterFactoryTest : public ::testing::Test {
 protected:
@@ -48,15 +53,14 @@ TEST_F(CacheFilterFactoryTest, Disabled) {
 
 TEST_F(CacheFilterFactoryTest, NoTypedConfig) {
   auto status_or = factory_.createFilterFactoryFromProto(config_, "stats", context_);
-  EXPECT_FALSE(status_or.ok());
-  EXPECT_EQ(status_or.status().message(), "at least one of typed_config or disabled must be set");
+  EXPECT_THAT(status_or, HasStatusMessage("at least one of typed_config or disabled must be set"));
 }
 
 TEST_F(CacheFilterFactoryTest, UnregisteredTypedConfig) {
   std::ignore = config_.mutable_typed_config()->PackFrom(
       envoy::extensions::filters::http::cache::v3::CacheConfig());
   auto status_or = factory_.createFilterFactoryFromProto(config_, "stats", context_);
-  EXPECT_FALSE(status_or.ok());
+  EXPECT_THAT(status_or, Not(IsOk()));
   EXPECT_THAT(status_or.status().message(),
               testing::HasSubstr("Didn't find a registered implementation for type"));
 }

@@ -9,6 +9,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -20,9 +21,11 @@ namespace HttpFilters {
 namespace McpRouter {
 namespace {
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::AnyNumber;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::ReturnRef;
 
 // Verifies parseMethodString correctly maps MCP method strings to enum values.
@@ -254,7 +257,7 @@ TEST_F(SessionCodecTest, BuildCompositeSessionId) {
 
   EXPECT_TRUE(absl::StrContains(composite, "route1@"));
   auto parsed = SessionCodec::parseCompositeSessionId(composite);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
   EXPECT_EQ(parsed->subject, "user1");
   EXPECT_TRUE(absl::StrContains(composite, "backend1:"));
   EXPECT_TRUE(absl::StrContains(composite, "backend2:"));
@@ -270,7 +273,7 @@ TEST_F(SessionCodecTest, ParseCompositeSessionId) {
   std::string composite = SessionCodec::buildCompositeSessionId("myroute", "myuser", sessions);
 
   auto parsed = SessionCodec::parseCompositeSessionId(composite);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
 
   EXPECT_EQ(parsed->route, "myroute");
   EXPECT_EQ(parsed->subject, "myuser");
@@ -281,10 +284,10 @@ TEST_F(SessionCodecTest, ParseCompositeSessionId) {
 
 // Verifies parsing rejects malformed session IDs.
 TEST_F(SessionCodecTest, ParseCompositeSessionIdRejectsMalformedInput) {
-  EXPECT_FALSE(SessionCodec::parseCompositeSessionId("no-at-signs").ok());
-  EXPECT_FALSE(SessionCodec::parseCompositeSessionId("one@part").ok());
-  EXPECT_FALSE(SessionCodec::parseCompositeSessionId("route@user@backend-no-colon").ok());
-  EXPECT_FALSE(SessionCodec::parseCompositeSessionId("route@user@:session").ok());
+  EXPECT_THAT(SessionCodec::parseCompositeSessionId("no-at-signs"), Not(IsOk()));
+  EXPECT_THAT(SessionCodec::parseCompositeSessionId("one@part"), Not(IsOk()));
+  EXPECT_THAT(SessionCodec::parseCompositeSessionId("route@user@backend-no-colon"), Not(IsOk()));
+  EXPECT_THAT(SessionCodec::parseCompositeSessionId("route@user@:session"), Not(IsOk()));
 }
 
 // Verifies full encode-decode-parse round-trip.
@@ -299,7 +302,7 @@ TEST_F(SessionCodecTest, FullRoundTrip) {
   std::string decoded = SessionCodec::decode(encoded);
 
   auto parsed = SessionCodec::parseCompositeSessionId(decoded);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
 
   EXPECT_EQ(parsed->route, "route");
   EXPECT_EQ(parsed->subject, "subject");
@@ -318,7 +321,7 @@ TEST_F(SessionCodecTest, SpecialCharactersInSessionId) {
   std::string decoded = SessionCodec::decode(encoded);
 
   auto parsed = SessionCodec::parseCompositeSessionId(decoded);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
 
   EXPECT_EQ(parsed->backend_sessions["backend"], "sess+with/special=chars");
 }
@@ -766,13 +769,13 @@ TEST(AggregateToolsListTest, PreservesAllToolAttributes) {
   })";
 
   auto parsed = Json::Factory::loadFromString(backend_response);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
 
   auto result = (*parsed)->getObject("result");
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
 
   auto tools = (*result)->getObjectArray("tools");
-  ASSERT_TRUE(tools.ok());
+  ASSERT_OK(tools);
   ASSERT_EQ(tools->size(), 1);
 
   const auto& tool = (*tools)[0];
@@ -780,30 +783,30 @@ TEST(AggregateToolsListTest, PreservesAllToolAttributes) {
 
   // Verify all attributes are present.
   auto name = tool->getString("name");
-  EXPECT_TRUE(name.ok());
+  EXPECT_OK(name);
   EXPECT_EQ(*name, "get_weather");
 
   auto title = tool->getString("title");
-  EXPECT_TRUE(title.ok());
+  EXPECT_OK(title);
   EXPECT_EQ(*title, "Weather Tool");
 
   auto desc = tool->getString("description");
-  EXPECT_TRUE(desc.ok());
+  EXPECT_OK(desc);
   EXPECT_EQ(*desc, "Get weather information");
 
   auto input_schema = tool->getObject("inputSchema");
-  EXPECT_TRUE(input_schema.ok());
+  EXPECT_OK(input_schema);
   EXPECT_TRUE(*input_schema != nullptr);
 
   // Verify nested inputSchema properties are present.
   auto props = (*input_schema)->getObject("properties");
-  EXPECT_TRUE(props.ok());
+  EXPECT_OK(props);
 
   auto output_schema = tool->getObject("outputSchema");
-  EXPECT_TRUE(output_schema.ok());
+  EXPECT_OK(output_schema);
 
   auto annotations = tool->getObject("annotations");
-  EXPECT_TRUE(annotations.ok());
+  EXPECT_OK(annotations);
 }
 
 // Verifies tool JSON serialization preserves nested inputSchema.
@@ -821,29 +824,29 @@ TEST(AggregateToolsListTest, SerializationPreservesNestedInputSchema) {
   })";
 
   auto parsed = Json::Factory::loadFromString(tool_json);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
 
   // Serialize and re-parse to verify round-trip.
   std::string serialized = (*parsed)->asJsonString();
 
   auto reparsed = Json::Factory::loadFromString(serialized);
-  ASSERT_TRUE(reparsed.ok());
+  ASSERT_OK(reparsed);
 
   auto input_schema = (*reparsed)->getObject("inputSchema");
-  ASSERT_TRUE(input_schema.ok());
+  ASSERT_OK(input_schema);
 
   auto props = (*input_schema)->getObject("properties");
-  ASSERT_TRUE(props.ok());
+  ASSERT_OK(props);
 
   auto query_prop = (*props)->getObject("query");
-  EXPECT_TRUE(query_prop.ok());
+  EXPECT_OK(query_prop);
 
   auto count_prop = (*props)->getObject("count");
-  EXPECT_TRUE(count_prop.ok());
+  EXPECT_OK(count_prop);
 
   // Verify the nested properties are preserved.
   auto count_type = (*count_prop)->getString("type");
-  EXPECT_TRUE(count_type.ok());
+  EXPECT_OK(count_type);
   EXPECT_EQ(*count_type, "integer");
 }
 
@@ -2117,7 +2120,7 @@ TEST_F(SessionCodecTest, EmptyBackendSessions) {
   std::string composite = SessionCodec::buildCompositeSessionId("route", "user", empty_sessions);
 
   auto parsed = SessionCodec::parseCompositeSessionId(composite);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
   EXPECT_EQ(parsed->route, "route");
   EXPECT_EQ(parsed->subject, "user");
   EXPECT_TRUE(parsed->backend_sessions.empty());
@@ -2138,10 +2141,10 @@ TEST(AggregateToolsListTest, IconsArrayPreserved) {
   })";
 
   auto parsed = Json::Factory::loadFromString(tool_json);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
 
   auto icons = (*parsed)->getObjectArray("icons");
-  ASSERT_TRUE(icons.ok());
+  ASSERT_OK(icons);
   EXPECT_EQ(icons->size(), 2);
 }
 

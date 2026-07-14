@@ -11,6 +11,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
@@ -113,7 +114,7 @@ TEST(OrcaLoadReportHandlerTest, CalculateWeightFromOrcaReport_Valid) {
   report.set_application_utilization(0.5);
   auto result =
       OrcaLoadReportHandler::calculateWeightFromOrcaReport(report, {"named_metrics.foo"}, 0.0);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_EQ(result.value(), 2000);
 }
 
@@ -138,7 +139,7 @@ TEST(OrcaLoadReportHandlerTest, CalculateWeightFromOrcaReport_MaxWeight) {
   report.set_application_utilization(0.0000001);
   auto result =
       OrcaLoadReportHandler::calculateWeightFromOrcaReport(report, {"named_metrics.foo"}, 0.0);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_EQ(result.value(), std::numeric_limits<uint32_t>::max());
 }
 
@@ -149,7 +150,7 @@ TEST(OrcaLoadReportHandlerTest, CalculateWeightFromOrcaReport_ErrorPenalty) {
   report.set_application_utilization(0.5);
   auto result =
       OrcaLoadReportHandler::calculateWeightFromOrcaReport(report, {"named_metrics.foo"}, 2.0);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_EQ(result.value(), 1428);
 }
 
@@ -443,7 +444,7 @@ TEST_F(OrcaWeightManagerTest, Initialize_AttachesHostDataToExistingHosts) {
 
   EXPECT_CALL(*timer, enableTimer(config_.weight_update_period, nullptr));
   auto status = manager->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 
   // Verify all hosts now have LB data attached.
   for (const auto& host : hosts) {
@@ -460,7 +461,7 @@ TEST_F(OrcaWeightManagerTest, Initialize_StartsWeightCalculationTimer) {
 
   EXPECT_CALL(*timer, enableTimer(config_.weight_update_period, nullptr));
   auto status = manager->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 }
 
 TEST_F(OrcaWeightManagerTest, Initialize_PriorityUpdateCallbackAttachesDataToNewHosts) {
@@ -470,7 +471,7 @@ TEST_F(OrcaWeightManagerTest, Initialize_PriorityUpdateCallbackAttachesDataToNew
 
   EXPECT_CALL(*timer, enableTimer(config_.weight_update_period, nullptr));
   auto status = manager->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 
   // Add new hosts via priority update callback.
   auto* host_set = priority_set_.getMockHostSet(0);
@@ -496,7 +497,7 @@ TEST_F(OrcaWeightManagerTest, TimerCallback_UpdatesWeightsAndReenablesTimer) {
 
   EXPECT_CALL(*timer, enableTimer(config_.weight_update_period, nullptr));
   auto status = manager->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 
   // Set up hosts with valid weights so the callback fires on change.
   auto* host_set = priority_set_.getMockHostSet(0);
@@ -616,7 +617,7 @@ TEST_F(OrcaWeightManagerTest, AddLbPolicyDataToHosts_SkipsHostsWithExistingData)
 
   EXPECT_CALL(*timer, enableTimer(config_.weight_update_period, nullptr));
   auto status = manager->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 
   // h1's existing data should be preserved (weight=42).
   auto typed_h1 = h1->typedLbPolicyData<OrcaHostLbPolicyData>();
