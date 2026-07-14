@@ -44,11 +44,14 @@ namespace {
 using ::Envoy::Extensions::HttpFilters::RateLimitQuota::FilterConfig;
 using envoy::service::rate_limit_quota::v3::BucketId;
 using envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse;
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
 using ::Envoy::StatusHelpers::StatusIs;
 using envoy::type::v3::RateLimitStrategy;
 using envoy::type::v3::TokenBucket;
 using Server::Configuration::MockFactoryContext;
 using ::testing::NiceMock;
+using ::testing::Not;
 
 enum class MatcherConfigType {
   Valid,
@@ -156,7 +159,7 @@ public:
     // Asserts that the request matching succeeded.
     // OK status is expected to be returned even if the exact request matching
     // failed. It is because `on_no_match` field is configured.
-    ASSERT_TRUE(match_result.ok());
+    ASSERT_OK(match_result);
     // Retrieve the matched action.
     const RateLimitOnMatchAction* match_action =
         dynamic_cast<const RateLimitOnMatchAction*>(match_result.value().get());
@@ -166,7 +169,7 @@ public:
     auto ret = match_action->generateBucketId(filter_->matchingData(), context_, visitor);
     // Asserts that the bucket id generation succeeded and then retrieve the
     // bucket ids.
-    ASSERT_TRUE(ret.ok());
+    ASSERT_OK(ret);
     auto bucket_ids = ret.value().bucket();
     auto serialized_bucket_ids =
         absl::flat_hash_map<std::string, std::string>(bucket_ids.begin(), bucket_ids.end());
@@ -199,7 +202,7 @@ TEST_F(FilterTest, EmptyMatcherConfig) {
   addMatcherConfig(MatcherConfigType::Empty);
   createFilter();
   auto match_result = filter_->requestMatching(default_headers_);
-  EXPECT_FALSE(match_result.ok());
+  EXPECT_THAT(match_result, Not(IsOk()));
   EXPECT_THAT(match_result, StatusIs(absl::StatusCode::kInternal));
   EXPECT_EQ(match_result.status().message(), "Matcher tree has not been initialized yet.");
 }
@@ -230,7 +233,7 @@ TEST_F(FilterTest, RequestMatchingFailed) {
   auto match = filter_->requestMatching(default_headers_);
   // Not_OK status is expected to be returned because the matching failed due to
   // mismatched inputs.
-  EXPECT_FALSE(match.ok());
+  EXPECT_THAT(match, Not(IsOk()));
   EXPECT_THAT(match, StatusIs(absl::StatusCode::kNotFound));
   EXPECT_EQ(match.status().message(), "Matching completed but no match result was found.");
 }
@@ -243,7 +246,7 @@ TEST_F(FilterTest, RequestMatchingFailedWithEmptyHeader) {
   auto match = filter_->requestMatching(empty_header);
   // Not_OK status is expected to be returned because the matching failed due to
   // empty headers.
-  EXPECT_FALSE(match.ok());
+  EXPECT_THAT(match, Not(IsOk()));
   EXPECT_EQ(match.status().message(),
             "Unable to match due to the required data not being available.");
 }
@@ -253,7 +256,7 @@ TEST_F(FilterTest, RequestMatchingFailedWithNoCallback) {
   createFilter(/*set_callback*/ false);
 
   auto match = filter_->requestMatching(default_headers_);
-  EXPECT_FALSE(match.ok());
+  EXPECT_THAT(match, Not(IsOk()));
   EXPECT_THAT(match, StatusIs(absl::StatusCode::kInternal));
   EXPECT_EQ(match.status().message(), "Filter callback has not been initialized successfully yet.");
 }
@@ -283,7 +286,7 @@ TEST_F(FilterTest, RequestMatchingWithInvalidOnNoMatch) {
   // Asserts that the request matching succeeded.
   // OK status is expected to be returned even if the exact request matching
   // failed. It is because `on_no_match` field is configured.
-  ASSERT_TRUE(match_result.ok());
+  ASSERT_OK(match_result);
   // Retrieve the matched action.
   const RateLimitOnMatchAction* match_action =
       dynamic_cast<const RateLimitOnMatchAction*>(match_result.value().get());
@@ -293,8 +296,7 @@ TEST_F(FilterTest, RequestMatchingWithInvalidOnNoMatch) {
   auto ret = match_action->generateBucketId(filter_->matchingData(), context_, visitor);
   // Bucket id generation is expected to fail, which is due to no support for
   // dynamic id generation (i.e., via custom_value with for on_no_match case.
-  EXPECT_FALSE(ret.ok());
-  EXPECT_EQ(ret.status().message(), "Failed to generate the id from custom value config.");
+  EXPECT_THAT(ret, HasStatusMessage("Failed to generate the id from custom value config."));
 }
 
 TEST_F(FilterTest, DecodeHeaderWithInValidConfig) {
