@@ -17,13 +17,13 @@ namespace NetworkFilters {
 namespace RedisProxy {
 
 /**
- * A single shared timeout timer over many per-channel subscribe-ack deadlines (E4). Every pending
+ * A single shared timeout timer over many per-channel subscribe-ack deadlines. Every pending
  * SUBSCRIBE that awaits its upstream ack registers a deadline here; because the timeout is
  * constant, deadlines are pushed in monotonically non-decreasing order, so ONE timer armed for the
  * earliest outstanding deadline suffices — replacing the former one-timer-per-channel scheme (a
  * 1000-channel subscribe armed 1000 libevent timers).
  *
- * Extracted from SubscriptionRegistry (D3) as an independently unit-testable component. It owns
+ * Extracted from SubscriptionRegistry as an independently unit-testable component. It owns
  * only the deadline queue + timer; the registry supplies two predicates so the scheduler carries no
  * bucket state:
  *   - ``is_live(channel, seq)``: is the entry's pending bucket still the one that registered this
@@ -64,7 +64,7 @@ public:
 
   /**
    * Drop now-dead leading entries and re-arm for the earliest LIVE deadline (or disable the timer
-   * if none remain). Call after an ack delivery drains a bucket (eager prune — G14) so the timer
+   * if none remain). Call after an ack delivery drains a bucket (eager prune) so the timer
    * never wakes to a token-miss no-op.
    */
   void pruneAndRearm() {

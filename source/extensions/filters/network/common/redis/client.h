@@ -1,12 +1,14 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 #include "envoy/common/optref.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/singleton/const_singleton.h"
 #include "source/extensions/filters/network/common/redis/aws_iam_authenticator_impl.h"
 #include "source/extensions/filters/network/common/redis/codec_impl.h"
 #include "source/extensions/filters/network/common/redis/redis_command_stats.h"
@@ -17,6 +19,20 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 namespace Client {
+
+// The Redis error-code tokens that signal a stale local cluster topology: MOVED/ASK redirections
+// and CLUSTERDOWN. Kept here in the client INTERFACE (not the impl) so both the client — which
+// matches the tokenized first word of a redirect reply (client_impl.cc) — and the subscription
+// registry — which prefix-matches a control-command error line to trigger a slot-map refresh
+// (subscription_registry.cc) — share one definition of the wire constants instead of duplicating
+// the literals.
+struct RedirectionValues {
+  const std::string ASK = "ASK";
+  const std::string MOVED = "MOVED";
+  const std::string CLUSTER_DOWN = "CLUSTERDOWN";
+};
+
+using RedirectionResponse = ConstSingleton<RedirectionValues>;
 
 /**
  * A handle to an outbound request.
@@ -81,8 +97,8 @@ public:
   virtual ~PushMessageCallbacks() = default;
   // @param value the RESP3 Push frame (pub/sub message, or a subscribe/unsubscribe ack).
   // @param host the upstream host this subscription connection is pinned to. Lets the registry
-  //        correlate control-command acks to the per-host outstanding-command FIFO (see
-  //        onUpstreamControlError) and match a SUNSUBSCRIBE ack to its exact (host, channel).
+  //  correlate control-command acks to the per-host outstanding-command FIFO (see
+  //  onUpstreamControlError) and match a SUNSUBSCRIBE ack to its exact (host, channel).
   virtual void onPushMessage(RespValuePtr&& value, const Upstream::HostConstSharedPtr& host) PURE;
 
   /**
@@ -187,17 +203,18 @@ enum class SubscriptionPlacement {
   Primary,
   // Spread channels across the slot shard's members (primary + replicas), least-loaded first, to
   // offload the primary's cluster-bus fan-out. Redis Cluster upstreams only; a non-cluster upstream
-  // has no shard-membership model and the conn pool degrades it to Primary (with a one-time warning).
+  // has no shard-membership model and the conn pool degrades it to Primary (with a one-time
+  // warning).
   ShardMembers
 };
 
 // Historical hardcoded defaults for the RESP3 pub/sub tuning knobs (``pubsub_settings``), the
-// SINGLE source of truth for all three consumers so a change here can never drift them apart (§6):
+// SINGLE source of truth for all three consumers so a change here can never drift them apart:
 // the connection-pool config (ConfigImpl) reads them via PROTOBUF_GET_MS_OR_DEFAULT to build the
 // runtime values, the redis_proxy filter config validates the EFFECTIVE durations against the same
 // defaults, and SubscriptionRegistry's ctor default arguments (test/omit-caller convenience) alias
 // them. Each knob falls back to its default when unset, so configs predating ``pubsub_settings``
-// are unaffected (A-7).
+// are unaffected.
 constexpr uint32_t kDefaultSubscribeAckTimeoutMs = 10000;
 constexpr uint32_t kDefaultResubscribeBackoffBaseMs = 100;
 constexpr uint32_t kDefaultResubscribeBackoffMaxMs = 30000;

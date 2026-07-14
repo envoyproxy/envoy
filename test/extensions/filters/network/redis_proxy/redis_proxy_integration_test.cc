@@ -1059,7 +1059,7 @@ public:
   // ack. On return ``upstream_conn`` is the established subscription connection and both the client
   // and upstream buffers are cleared, so the caller can drive the message / failover behavior it is
   // actually testing. Extracted from the SUBSCRIBE-and-smessage and resubscribe end-to-end tests,
-  // which inlined the same ~20-line driver (R-8).
+  // which inlined the same ~20-line driver.
   void establishSubscription(IntegrationTcpClientPtr& client, FakeRawConnectionPtr& upstream_conn,
                              const std::string& channel) {
     ASSERT_TRUE(client->write(makeBulkStringArray({"HELLO", "3"})));
@@ -1617,7 +1617,7 @@ TEST_P(RedisProxyResp3UpstreamIntegrationTest, SubscribeAndSmessageEndToEnd) {
 // subscription on a FRESH upstream connection — a new HELLO 3 handshake followed by the same
 // SSUBSCRIBE, driven by the registry's resubscribe timer — so pub/sub delivery resumes without the
 // downstream client re-subscribing. End-to-end regression for the dedicated-subscription-connection
-// + resubscribe path (blocker ② / B-3 / B-5): the resubscribe re-issues SSUBSCRIBE but registers no
+// + resubscribe path (blocker ②): the resubscribe re-issues SSUBSCRIBE but registers no
 // new pending ack, so the client sees no duplicate subscribe ack, only continued message delivery.
 TEST_P(RedisProxyResp3UpstreamIntegrationTest,
        SubscriptionResubscribesAfterUpstreamConnectionLoss) {
@@ -1840,13 +1840,13 @@ TEST_P(RedisProxyResp3ListenerIntegrationTest, GetBeforeHelloRejectedNoproto) {
 }
 
 // RESP3 listener positive path — full HELLO 3 + GET round trip:
-//   * downstream HELLO 3 → proxy answers locally with the HELLO Map (proto=3);
-//   * downstream GET foo → proxy opens an upstream connection and sends HELLO 3 first
-//     (the upstream init pipeline);
-//   * upstream replies with a HELLO Map containing proto=3, which the proxy's
-//     ``isHello3SuccessResponse`` check accepts;
-//   * proxy then ships the held GET foo to upstream;
-//   * upstream replies ``$5\r\nhello\r\n`` and the proxy forwards it to the downstream client.
+//  * downstream HELLO 3 → proxy answers locally with the HELLO Map (proto=3);
+//  * downstream GET foo → proxy opens an upstream connection and sends HELLO 3 first
+//  (the upstream init pipeline);
+//  * upstream replies with a HELLO Map containing proto=3, which the proxy's
+//  ``isHello3SuccessResponse`` check accepts;
+//  * proxy then ships the held GET foo to upstream;
+//  * upstream replies ``$5\r\nhello\r\n`` and the proxy forwards it to the downstream client.
 // The proxy HELLO Map bytes mirror ``buildHelloReply(3)`` in command_splitter_impl.cc; the
 // upstream HELLO Map only needs ``proto:3`` to be accepted by Hello3InitCallbacks.
 TEST_P(RedisProxyResp3ListenerIntegrationTest,
@@ -1999,9 +1999,9 @@ TEST_P(RedisProxyResp3ListenerIntegrationTest, UpstreamHello3FailureIncrementsSt
   EXPECT_EQ(upstream_hello_request, proxy_to_server);
 
   // Upstream answers HELLO 3 with proto=2 — negotiation fails. The proxy then, in order:
-  //   (1) increments upstream_resp3_hello_failure,
-  //   (2) fails the held GET downstream with ``-upstream failure``,
-  //   (3) closes the failed upstream connection (ClientImpl::onInitFailure -> connection close).
+  //  (1) increments upstream_resp3_hello_failure,
+  //  (2) fails the held GET downstream with ``-upstream failure``,
+  //  (3) closes the failed upstream connection (ClientImpl::onInitFailure -> connection close).
   EXPECT_TRUE(fake_upstream_connection->write("%1\r\n$5\r\nproto\r\n:2\r\n"));
 
   // (1) The failure counter must increment.

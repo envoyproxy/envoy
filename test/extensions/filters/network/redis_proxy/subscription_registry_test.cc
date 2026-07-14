@@ -32,7 +32,7 @@ using SunsubscribeResult = UpstreamSubscriptionCallbacks::SunsubscribeResult;
 
 // Test-only multi-channel subscribe. Production drives ONE channel per call (the splitter), so this
 // used to be SubscriptionRegistry::subscribeChannels — a public method retained only for tests.
-// Moved out of the production interface (§6): it needs no registry internals, just the public
+// Moved out of the production interface: it needs no registry internals, just the public
 // single-channel subscribe() looped per channel. Callers ignore the per-call result.
 void subscribeChannels(SubscriptionRegistry& registry, absl::Span<const std::string> channels,
                        const DownstreamSubscriberPtr& subscriber) {
@@ -48,18 +48,18 @@ protected:
         mock_host_(std::make_shared<NiceMock<Upstream::MockHost>>()),
         mock_host_2_(std::make_shared<NiceMock<Upstream::MockHost>>()) {
     // The topology-change reroute now sends via sendUpstreamSsubscribeToHost with the host it
-    // already dry-resolved (E-8), rather than re-resolving inside sendUpstreamSsubscribe. Default
+    // already dry-resolved, rather than re-resolving inside sendUpstreamSsubscribe. Default
     // it to a successful send so tests that only care about the SUNSUBSCRIBE/ack bookkeeping around
     // a reroute need no per-test wiring; the reroute still records the dry-resolved host as the
     // channel's new owner via recordSsubscribeAttempt. Tests asserting a FAILED reroute override.
     ON_CALL(upstream_callbacks_, sendUpstreamSsubscribeToHost(_, _, _)).WillByDefault(Return(true));
-    // §7 P1: subscribe/reissue now RESOLVE the placement target via chooseUpstreamHostForChannel
+    // subscribe/reissue now RESOLVE the placement target via chooseUpstreamHostForChannel
     // and then SEND via sendUpstreamSsubscribeToHost (the sendUpstreamSsubscribe resolve+send
     // composite was removed). Default the resolve to the primary mock_host_ so a channel any test
     // subscribes routes there with no explicit expectation; routing / topology / failure tests
     // override chooseUpstreamHostForChannel per channel (a null return is "no host for the slot").
     ON_CALL(upstream_callbacks_, chooseUpstreamHostForChannel(_)).WillByDefault(Return(mock_host_));
-    // Model the real conn pool's retire decision (ALT-1): retireSubscriptionConnectionIfIdle
+    // Model the real conn pool's retire decision: retireSubscriptionConnectionIfIdle
     // retires — and reports true, telling the registry to drop the host's control ledger — exactly
     // when the host has no remaining subscriptions (the pool's own hostHasSubscriptions check). The
     // registry clears the ledger off this REPORTED decision rather than re-deriving the predicate,
@@ -69,7 +69,7 @@ protected:
         .WillByDefault(Invoke([this](const Upstream::HostConstSharedPtr& host) {
           return !registry_.hostHasSubscriptions(host);
         }));
-    // The registry now takes a mandatory dispatcher (S-4) and lazily creates its subscribe-ack and
+    // The registry now takes a mandatory dispatcher and lazily creates its subscribe-ack and
     // resubscribe-generation timers. Hand every createTimer_ a throwaway mock timer so the default
     // tests — which never fire these timers — exercise the same scheduling path production does
     // with no per-test wiring; the dedicated timeout tests below build their own dispatcher +
@@ -80,7 +80,7 @@ protected:
   }
 
   // Action for chooseUpstreamHostForChannel: resolves the channel's placement to mock_host_ (the
-  // primary). §7 P1 pairs this resolve with the default sendUpstreamSsubscribeToHost success, so a
+  // primary). Pairs this resolve with the default sendUpstreamSsubscribeToHost success, so a
   // fresh subscribe / reissue routes to mock_host_. A null resolve would be "no host for the slot".
   auto ssubscribeReturnsHost() {
     return [this](const std::string&) -> Upstream::HostConstSharedPtr { return mock_host_; };
@@ -90,7 +90,19 @@ protected:
     return [this](const std::string&) -> Upstream::HostConstSharedPtr { return mock_host_2_; };
   }
 
-  // A registry running the SHARD_MEMBERS placement policy (§7 P3) rather than the fixture's default
+  // Mirror the production connection-loss sequence the conn-pool's onEvent open-codes: forget the
+  // host's control ledger, mark its channels for re-subscribe, arm the backoff. onEvent DEFERS the
+  // arm under a weak registry capture; tests drive all three synchronously. (The previous
+  // onUpstreamConnectionClose() convenience wrapper had no production caller — its whole-registry
+  // null-host path was dead surface — so tests now exercise the real primitives.)
+  void simulateUpstreamConnectionClose(SubscriptionRegistry& reg,
+                                       const Upstream::HostConstSharedPtr& host) {
+    reg.forgetHostConnectionLedger(host);
+    reg.markHostChannelsForResubscribe(host);
+    reg.armResubscribeBackoff();
+  }
+
+  // A registry running the SHARD_MEMBERS placement policy rather than the fixture's default
   // PRIMARY ``registry_``. Same knobs otherwise, so only the placement seam differs.
   std::unique_ptr<SubscriptionRegistry> makeShardMembersRegistry() {
     return std::make_unique<SubscriptionRegistry>(
@@ -101,7 +113,7 @@ protected:
         Common::Redis::Client::SubscriptionPlacement::ShardMembers);
   }
   // Action for shardCandidatesForChannel: append a fixed candidate list and report success (the
-  // channel's slot shard has members). Models the conn pool's P2-backed enumeration.
+  // channel's slot shard has members). Models the conn pool's membership enumeration.
   static auto shardCandidates(std::vector<Upstream::HostConstSharedPtr> hosts) {
     return [hosts](const std::string&, std::vector<Upstream::HostConstSharedPtr>& out) {
       out.insert(out.end(), hosts.begin(), hosts.end());
@@ -117,8 +129,8 @@ protected:
     return std::make_shared<DownstreamSubscriber>(*raw, throwaway_stats_);
   }
 
-  // Subscriber wired with the ack-time subscribe success/error counters (Issue 6); the push/gauge
-  // stats it does not assert on come from the fixture's throwaway store (S-4 made all four
+  // Subscriber wired with the ack-time subscribe success/error counters; the push/gauge
+  // stats it does not assert on come from the fixture's throwaway store (made all four
   // mandatory).
   DownstreamSubscriberPtr makeSubscriberWithAckCounters(Stats::Counter& success,
                                                         Stats::Counter& error) {
@@ -133,7 +145,7 @@ protected:
   NiceMock<Envoy::Random::MockRandomGenerator> random_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<MockUpstreamSubscriptionCallbacks> upstream_callbacks_;
-  // Throwaway pub/sub stats for subscribers whose telemetry a test does not assert on (S-4 made the
+  // Throwaway pub/sub stats for subscribers whose telemetry a test does not assert on (made the
   // four DownstreamSubscriber stats mandatory). Tests that DO assert on the gauge / ack counters
   // build their own DownstreamSubscriberStats with the stat under assertion. These MUST be declared
   // before ``registry_``: the registry holds its subscribers by strong ref (SubsMap), so their
@@ -210,7 +222,7 @@ TEST_F(SubscriptionRegistryTest, SunsubscribeOneOfTwoDoesNotSendUpstream) {
   EXPECT_EQ(1, registry_.subscriptionCount());
 }
 
-// P3 regression: unsubscribing a channel on a registry that does NOT own it (a multi-cluster
+// Unsubscribing a channel on a registry that does NOT own it (a multi-cluster
 // subscriber whose UNSUBSCRIBE walks every tracked registry) must not touch the subscriber's shared
 // channel set — otherwise the owning registry is skipped (the splitter stops once the count drops)
 // and the real subscription is stranded with no upstream SUNSUBSCRIBE.
@@ -310,7 +322,7 @@ TEST_F(SubscriptionRegistryTest, UpstreamConnectionCloseResubscribesWithBackoff)
   // timer that later drives registry_.doResubscribe()).
   EXPECT_CALL(upstream_callbacks_, scheduleResubscribe(_));
 
-  registry_.onUpstreamConnectionClose();
+  simulateUpstreamConnectionClose(registry_, mock_host_);
 
   // Drive the deferred re-subscribe (what the pool's timer does) — re-issues each sharded channel.
   registry_.doResubscribe();
@@ -329,10 +341,10 @@ TEST_F(SubscriptionRegistryTest, ResubscribeRetriesWhenUpstreamSendFails) {
   registry_.subscribe({"ch"}, sub);
 
   EXPECT_CALL(upstream_callbacks_, scheduleResubscribe(_));
-  registry_.onUpstreamConnectionClose();
+  simulateUpstreamConnectionClose(registry_, mock_host_);
 
   // First re-subscribe attempt: the record (A) is still valid, but the SEND to it fails → registry
-  // reschedules (§7 P1: a failed send is sendUpstreamSsubscribeToHost returning false, not a null
+  // reschedules (a failed send is sendUpstreamSsubscribeToHost returning false, not a null
   // resolve — a null resolve is a transient blip that KEEPS the record).
   EXPECT_CALL(upstream_callbacks_, chooseUpstreamHostForChannel("ch"))
       .WillRepeatedly(Invoke(ssubscribeReturnsHost()));
@@ -351,9 +363,9 @@ TEST_F(SubscriptionRegistryTest, ResubscribeRetriesWhenUpstreamSendFails) {
 }
 
 TEST_F(SubscriptionRegistryTest, UpstreamConnectionCloseNoSubscriptions) {
-  // No subscriptions active — onUpstreamConnectionClose is a no-op.
+  // No subscriptions active — the connection-close resubscribe is a no-op.
   EXPECT_CALL(upstream_callbacks_, scheduleResubscribe(_)).Times(0);
-  registry_.onUpstreamConnectionClose();
+  simulateUpstreamConnectionClose(registry_, mock_host_);
 }
 
 // --- Edge cases ---
@@ -440,7 +452,7 @@ TEST_F(SubscriptionRegistryTest, PendingAckEmitsSubscribeVerbOnSsubscribeAck) {
 // that channel (a→1, b→2), not one end-of-batch snapshot shared by both. The splitter drives one
 // channel per call, but the registry's running-step count keeps a direct multi-channel subscribe()
 // correct too. The upstream ack's own echoed count (99) is intentionally ignored — the downstream
-// ack always carries the snapshot recorded at subscribe-call time. Regression for C-8.
+// ack always carries the snapshot recorded at subscribe-call time.
 TEST_F(SubscriptionRegistryTest, SubscribeAcksCarryPerChannelStepCount) {
   auto sub = makeSubscriber();
   EXPECT_CALL(upstream_callbacks_, chooseUpstreamHostForChannel(_))
@@ -456,10 +468,10 @@ TEST_F(SubscriptionRegistryTest, SubscribeAcksCarryPerChannelStepCount) {
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "b", 99), mock_host_);
 }
 
-// Issue 4 (round-4/5): a client that pipelines SUBSCRIBE foo then UNSUBSCRIBE foo before the
+// A client that pipelines SUBSCRIBE foo then UNSUBSCRIBE foo before the
 // upstream ssubscribe ack lands must still receive the ``subscribe`` ack — Redis replies
 // ``subscribe foo 1`` then ``unsubscribe foo 0``. The registry PRESERVES it by APPENDING to the
-// caller's buffer — it does NOT write downstream (F1: the splitter flushes it after its terminal
+// caller's buffer — it does NOT write downstream (the splitter flushes it after its terminal
 // respond(), reentrancy-safe) — and drains the pending bucket so a late upstream ack yields no
 // duplicate.
 TEST_F(SubscriptionRegistryTest, UnsubscribeBeforeAckPreservesSubscribeAck) {
@@ -509,10 +521,10 @@ TEST_F(SubscriptionRegistryTest, TopologyChangeReroutesSharded) {
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSunsubscribe("s2", _))
       .WillOnce(Return(SunsubscribeResult::AckExpected));
   // The reroute SSUBSCRIBEs the new owner via sendUpstreamSsubscribeToHost, handed the host the
-  // registry already dry-resolved (mock_host_2_) rather than re-resolving in the send (E-8).
+  // registry already dry-resolved (mock_host_2_) rather than re-resolving in the send.
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSsubscribeToHost("s1", _, _)).WillOnce(Return(true));
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSsubscribeToHost("s2", _, _)).WillOnce(Return(true));
-  // The reroute fires only on a genuine owner change (G4): the dry-resolve must return a host
+  // The reroute fires only on a genuine owner change: the dry-resolve must return a host
   // different from the current owner (mock_host_). A null / unchanged resolve now correctly leaves
   // the channel in place.
   EXPECT_CALL(upstream_callbacks_, chooseUpstreamHostForChannel("s1"))
@@ -632,12 +644,11 @@ TEST_F(SubscriptionRegistryTest, TopologyChangeSunsubscribeAckDoesNotForgetNewHo
       .WillRepeatedly(Invoke(ssubscribeReturnsHost()));
   registry_.subscribe({"ch"}, sub);
   // Ack the initial SSUBSCRIBE so it leaves mock_host_'s control FIFO (Redis acks in order),
-  // leaving the topology reroute's SUNSUBSCRIBE at the head when its advisory ack arrives below
-  // (A-4/S-1).
+  // leaving the topology reroute's SUNSUBSCRIBE at the head when its advisory ack arrives below.
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_);
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSunsubscribe("ch", _))
       .WillOnce(Return(SunsubscribeResult::AckExpected));
-  // Genuine owner change so the reroute fires (G4: a null resolve now leaves the channel put).
+  // Genuine owner change so the reroute fires (a null resolve now leaves the channel put).
   EXPECT_CALL(upstream_callbacks_, chooseUpstreamHostForChannel("ch"))
       .WillRepeatedly(Return(mock_host_2_));
   registry_.onClusterTopologyChange(); // SUNSUBSCRIBE old (expected ack) + SSUBSCRIBE new owner
@@ -686,13 +697,13 @@ TEST_F(SubscriptionRegistryTest, SunsubscribeExpectedAckClearedWhenHostConnectio
   registry_.subscribe({"ch"}, sub);
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSunsubscribe("ch", _))
       .WillOnce(Return(SunsubscribeResult::AckExpected));
-  // Genuine owner change so the reroute fires (G4: a null resolve now leaves the channel put).
+  // Genuine owner change so the reroute fires (a null resolve now leaves the channel put).
   EXPECT_CALL(upstream_callbacks_, chooseUpstreamHostForChannel("ch"))
       .WillRepeatedly(Return(mock_host_2_));
   registry_.onClusterTopologyChange(); // leaves an expected SUNSUBSCRIBE ack for mock_host_
 
-  registry_.onUpstreamConnectionClose(
-      mock_host_); // host drops before acking -> expectation cleared
+  simulateUpstreamConnectionClose(registry_,
+                                  mock_host_); // host drops before acking -> expectation cleared
 
   registry_.onPushMessage(makeSubscribeAckPush("sunsubscribe", "ch", 0),
                           mock_host_2_); // now genuinely unsolicited (from the new owner)
@@ -702,8 +713,9 @@ TEST_F(SubscriptionRegistryTest, SunsubscribeExpectedAckClearedWhenHostConnectio
 
 // Blocker regression: a SUNSUBSCRIBE of a host's LAST channel makes the conn pool retire that
 // host's dedicated subscription connection inline (maybeCleanupSubscriptionMode reports
-// ConnectionRetired), and that planned retire deliberately skips onUpstreamConnectionClose. So the
-// ack never comes back — recording (or keeping) an expectation for it would be stale, and a later
+// ConnectionRetired), and that planned retire deliberately skips the connection-loss resubscribe.
+// So the ack never comes back — recording (or keeping) an expectation for it would be stale, and a
+// later
 // genuine unsolicited SUNSUBSCRIBE (slot invalidation) would be wrongly swallowed by that stale
 // entry, re-stranding the channel. On ConnectionRetired the registry must drop ALL of the host's
 // expected acks — including one still pending for an EARLIER channel on the same host. Mirror of
@@ -743,12 +755,12 @@ TEST_F(SubscriptionRegistryTest, ConnectionRetiredSunsubscribeDropsHostExpectedA
   EXPECT_EQ(1, registry_.subscriptionCount());
 }
 
-// G1 regression: the UNSOLICITED-invalidation retire path must drop the host's expected acks too,
+// The UNSOLICITED-invalidation retire path must drop the host's expected acks too,
 // exactly like the ConnectionRetired send path above. When an unsolicited SUNSUBSCRIBE empties a
 // host, the registry retires its (now idle) connection — and a SUNSUBSCRIBE ack still pending for
 // an EARLIER channel on that host will never arrive, since the connection is gone. Leaving it
 // recorded lets a later stale ack be swallowed, re-stranding a re-subscribed channel (same host-ack
-// blackout as F2). This is the unsolicited-path mirror of
+// blackout). This is the unsolicited-path mirror of
 // ConnectionRetiredSunsubscribeDropsHostExpectedAcks.
 TEST_F(SubscriptionRegistryTest, UnsolicitedSunsubscribeRetireDropsHostExpectedAcks) {
   auto sub = makeSubscriber();
@@ -775,7 +787,7 @@ TEST_F(SubscriptionRegistryTest, UnsolicitedSunsubscribeRetireDropsHostExpectedA
   EXPECT_EQ(1, registry_.channelHosts().count("a"));
 
   // A genuine unsolicited SUNSUBSCRIBE for "a" must be an invalidation, NOT swallowed by the stale
-  // "a" expected-ack the retire above should have dropped (count stays 1 if G1 leaked it).
+  // "a" expected-ack the retire above should have dropped (count stays 1 if it leaked).
   registry_.onPushMessage(makeSubscribeAckPush("sunsubscribe", "a", 0), mock_host_);
   EXPECT_EQ(0, registry_.channelHosts().count("a"));
 }
@@ -802,12 +814,12 @@ TEST_F(SubscriptionRegistryTest, TopologyChangeSkipsChannelWithUnchangedOwner) {
   EXPECT_EQ(1, registry_.subscriptionCount());
 }
 
-// B1: an out-of-band control error (Redis's normal error reply to a fire-and-forget SSUBSCRIBE,
+// an out-of-band control error (Redis's normal error reply to a fire-and-forget SSUBSCRIBE,
 // e.g. -MOVED / -CROSSSLOT / -NOPERM) must NOT tear the shared subscription connection down, and it
 // must KEEP this host's expected SUNSUBSCRIBE acks: the connection is still open and can still
 // deliver them, so a subsequent SUNSUBSCRIBE ack is still OUR advisory ack (mapping preserved), not
 // an unsolicited invalidation. Here the redirect correlates to a SUPERSEDED attempt (the channel
-// already moved on), so S6-6 additionally ignores it rather than scheduling a redundant
+// already moved on), so it is additionally ignored rather than scheduling a redundant
 // re-subscribe. This is the mirror of SunsubscribeExpectedAckClearedWhenHostConnectionCloses.
 TEST_F(SubscriptionRegistryTest,
        UpstreamControlErrorForSupersededAttemptIsIgnoredButKeepsSunsubscribeAcks) {
@@ -817,7 +829,7 @@ TEST_F(SubscriptionRegistryTest,
   registry_.subscribe({"ch"}, sub);
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSunsubscribe("ch", _))
       .WillOnce(Return(SunsubscribeResult::AckExpected));
-  // Genuine owner change so the reroute fires (G4: a null resolve now leaves the channel put).
+  // Genuine owner change so the reroute fires (a null resolve now leaves the channel put).
   EXPECT_CALL(upstream_callbacks_, chooseUpstreamHostForChannel("ch"))
       .WillRepeatedly(Return(mock_host_2_));
   registry_.onClusterTopologyChange(); // leaves an expected SUNSUBSCRIBE ack for mock_host_
@@ -825,7 +837,7 @@ TEST_F(SubscriptionRegistryTest,
 
   // Control error for the OLD attempt: the topology move above already re-resolved "ch" to
   // mock_host_2_ (generation 2), so this MOVED — whose FIFO head is the stale generation-1
-  // SSUBSCRIBE still outstanding on mock_host_ — is for a SUPERSEDED attempt. S6-6 consumes that
+  // SSUBSCRIBE still outstanding on mock_host_ — is for a SUPERSEDED attempt, consuming that
   // FIFO head (so the sunsubscribe below is left at the head as our advisory ack) but does NOT
   // schedule a pointless re-subscribe of a channel that already moved (and is already pending on
   // mock_host_2_). The connection and its expected acks stay intact.
@@ -838,15 +850,15 @@ TEST_F(SubscriptionRegistryTest,
 
   // The expected ack survived: this SUNSUBSCRIBE ack (from mock_host_, where it was sent) is our
   // advisory ack — the MOVED error above popped the initial SSUBSCRIBE off the FIFO, leaving the
-  // sunsubscribe at the head — so the mapping is kept (A-4/S-1).
+  // sunsubscribe at the head — so the mapping is kept.
   registry_.onPushMessage(makeSubscribeAckPush("sunsubscribe", "ch", 0), mock_host_);
   EXPECT_EQ(1, registry_.channelHosts().count("ch")); // NOT forgotten (contrast: close forgets it)
   EXPECT_EQ(1, registry_.subscriptionCount());
 }
 
-// B2: a normal -ERR to a fire-and-forget SSUBSCRIBE is correlated (via the per-host outstanding-
+// a normal -ERR to a fire-and-forget SSUBSCRIBE is correlated (via the per-host outstanding-
 // control FIFO recorded on send) to the channel that failed, so its pending downstream subscriber
-// is failed IMMEDIATELY — connection closed (F3) and subscription rolled back — with no waiting for
+// is failed IMMEDIATELY — connection closed and subscription rolled back — with no waiting for
 // the subscribe-ack timeout.
 TEST_F(SubscriptionRegistryTest, UpstreamSsubscribeErrorFailsPendingSubscriberImmediately) {
   auto sub = makeSubscriber();
@@ -856,7 +868,7 @@ TEST_F(SubscriptionRegistryTest, UpstreamSsubscribeErrorFailsPendingSubscriberIm
   EXPECT_EQ(1, registry_.subscriptionCount());
 
   // The correlated error fails the pending subscriber: instead of a desyncing out-of-band -ERR
-  // (F3), the subscriber's connection is closed and the subscription is rolled back. No topology
+  // the subscriber's connection is closed and the subscription is rolled back. No topology
   // refresh (not a redirect) and no host-scoped re-subscribe (the connection's other channels are
   // healthy).
   EXPECT_CALL(*connections_[0], close(Network::ConnectionCloseType::NoFlush));
@@ -868,9 +880,9 @@ TEST_F(SubscriptionRegistryTest, UpstreamSsubscribeErrorFailsPendingSubscriberIm
   EXPECT_EQ(0, registry_.subscriptionCount()); // rolled back
 }
 
-// B2: a -MOVED on a subscription connection means the local slot map is stale. Instead of a plain
+// a -MOVED on a subscription connection means the local slot map is stale. Instead of a plain
 // re-subscribe (which would just draw the same redirect), request a cluster topology refresh, then
-// re-resolve this host's channels on backoff.
+// re-resolve the redirected channel on backoff.
 TEST_F(SubscriptionRegistryTest, UpstreamControlErrorMovedRequestsTopologyRefresh) {
   auto sub = makeSubscriber();
   EXPECT_CALL(upstream_callbacks_, chooseUpstreamHostForChannel("ch"))
@@ -885,7 +897,55 @@ TEST_F(SubscriptionRegistryTest, UpstreamControlErrorMovedRequestsTopologyRefres
   registry_.onUpstreamControlError(std::move(err), mock_host_);
 }
 
-// Finding 2: an anomalous non-Error non-Push reply on a subscription connection still occupies the
+// A -MOVED for one channel's CURRENT SSUBSCRIBE attempt re-marks ONLY that channel, not every
+// channel sharing the host. During a slot migration the redirect arrives before the throttled
+// slot-map refresh lands, so re-marking the whole host would needlessly re-SSUBSCRIBE its unmoved
+// channels each backoff cycle. Two channels share mock_host_; a -MOVED correlated to the first must
+// leave the second's subscription untouched on the backoff re-resolve.
+TEST_F(SubscriptionRegistryTest, MovedReMarksOnlyCorrelatedChannelNotWholeHost) {
+  auto sub = makeSubscriber();
+  EXPECT_CALL(upstream_callbacks_, chooseUpstreamHostForChannel(_))
+      .WillRepeatedly(Invoke(ssubscribeReturnsHost())); // both channels -> mock_host_
+  // Subscribe both, leaving BOTH SSUBSCRIBEs outstanding (no acks) so the per-host control FIFO
+  // head is moved-ch's attempt when the -MOVED arrives.
+  registry_.subscribe({"moved-ch"}, sub);
+  registry_.subscribe({"stay-ch"}, sub);
+
+  // -MOVED correlated to moved-ch's current attempt (the FIFO head): refresh + backoff, and enroll
+  // ONLY moved-ch in the re-subscribe scope.
+  EXPECT_CALL(upstream_callbacks_, requestTopologyRefresh());
+  EXPECT_CALL(upstream_callbacks_, scheduleResubscribe(_));
+  auto err = std::make_unique<Common::Redis::RespValue>();
+  err->type(Common::Redis::RespType::Error);
+  err->asString() = "MOVED 1234 127.0.0.1:6380";
+  registry_.onUpstreamControlError(std::move(err), mock_host_);
+
+  // The backoff re-resolve re-issues ONLY moved-ch; stay-ch (never redirected) keeps its mapping
+  // and is not re-SSUBSCRIBEd.
+  EXPECT_CALL(upstream_callbacks_, sendUpstreamSsubscribeToHost("moved-ch", _, _)).Times(1);
+  EXPECT_CALL(upstream_callbacks_, sendUpstreamSsubscribeToHost("stay-ch", _, _)).Times(0);
+  registry_.doResubscribe();
+}
+
+// The redirect classifier matches the leading error-code TOKEN (code + space/end), not a
+// bare prefix, so a hypothetical "MOVEDX ..." code is NOT treated as a -MOVED redirect — no
+// topology refresh; it takes the generic SSUBSCRIBE-error path instead.
+TEST_F(SubscriptionRegistryTest, NonRedirectErrorWithRedirectPrefixIsNotTreatedAsRedirect) {
+  auto sub = makeSubscriber();
+  EXPECT_CALL(upstream_callbacks_, chooseUpstreamHostForChannel("ch"))
+      .WillRepeatedly(Invoke(ssubscribeReturnsHost()));
+  registry_.subscribe({"ch"}, sub);
+
+  // "MOVEDX ..." starts with "MOVED" but is not the MOVED token — must NOT trigger the redirect
+  // path (topology refresh). It falls through to the generic ssubscribe-error handling.
+  EXPECT_CALL(upstream_callbacks_, requestTopologyRefresh()).Times(0);
+  auto err = std::make_unique<Common::Redis::RespValue>();
+  err->type(Common::Redis::RespType::Error);
+  err->asString() = "MOVEDX 1234 foo";
+  registry_.onUpstreamControlError(std::move(err), mock_host_);
+}
+
+// an anomalous non-Error non-Push reply on a subscription connection still occupies the
 // oldest outstanding control command's reply slot (Redis answers pipelined commands in order), so
 // onUpstreamControlError must POP the per-host FIFO head for it too — not only for a real -ERR.
 // Without the pop the FIFO desyncs by one: the channel's genuine SSUBSCRIBE ack head-mismatches and
@@ -914,6 +974,24 @@ TEST_F(SubscriptionRegistryTest, NonErrorControlReplyConsumesFifoHeadSoLaterAckC
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_);
 }
 
+// A host-scoped re-subscribe signal whose host carries NO channels (its subscription connection was
+// retired at its last channel) must NOT arm the backoff / pool timer:
+// markHostChannelsForResubscribe seeds nothing, so there is nothing for doResubscribe to re-issue.
+TEST_F(SubscriptionRegistryTest, HostScopedSignalWithNoChannelsDoesNotArmBackoff) {
+  auto sub = makeSubscriber();
+  EXPECT_CALL(upstream_callbacks_, chooseUpstreamHostForChannel("ch"))
+      .WillRepeatedly(Invoke(ssubscribeReturnsHost())); // ch is owned by mock_host_
+  registry_.subscribe({"ch"}, sub);
+
+  // A non-Error control reply arrives on a DIFFERENT host (mock_host_2_) that carries no channels.
+  // Its host-scoped re-subscribe seeds no entries, so the backoff/timer is not armed.
+  EXPECT_CALL(upstream_callbacks_, scheduleResubscribe(_)).Times(0);
+  auto reply = std::make_unique<Common::Redis::RespValue>();
+  reply->type(Common::Redis::RespType::SimpleString);
+  reply->asString() = "OK";
+  registry_.onUpstreamControlError(std::move(reply), mock_host_2_);
+}
+
 // Blocker regression: onPushMessage carries the source host, and the SUNSUBSCRIBE advisory-ack
 // check must use it. A channel that just moved A -> B can have an ack still pending on A while B,
 // having lost the slot, sends a GENUINE unsolicited SUNSUBSCRIBE. A host-agnostic (channel-only)
@@ -923,9 +1001,8 @@ TEST_F(SubscriptionRegistryTest, NonErrorControlReplyConsumesFifoHeadSoLaterAckC
 TEST_F(SubscriptionRegistryTest, UnsolicitedSunsubscribeFromNewHostNotSwallowedByOldHostAck) {
   auto sub = makeSubscriber();
   EXPECT_CALL(upstream_callbacks_, chooseUpstreamHostForChannel("ch"))
-      .WillOnce(
-          Invoke(ssubscribeReturnsHost())); // initial subscribe -> A; the topology reroute
-                                            // -> B goes via sendUpstreamSsubscribeToHost (E-8)
+      .WillOnce(Invoke(ssubscribeReturnsHost())); // initial subscribe -> A; the topology reroute
+                                                  // -> B goes via sendUpstreamSsubscribeToHost
   registry_.subscribe({"ch"}, sub);
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_); // active on A
 
@@ -959,7 +1036,7 @@ TEST_F(SubscriptionRegistryTest, ResubscribeSsubscribeErrorReResolvesActiveChann
 
   // Connection lost -> doResubscribe re-issues SSUBSCRIBE ch (recording it in the host's control
   // FIFO again). A resubscribe creates NO fresh pending_subscribe_acks_ bucket.
-  registry_.onUpstreamConnectionClose(mock_host_);
+  simulateUpstreamConnectionClose(registry_, mock_host_);
   registry_.doResubscribe();
   EXPECT_EQ(1, registry_.channelHosts().count("ch"));
 
@@ -975,7 +1052,7 @@ TEST_F(SubscriptionRegistryTest, ResubscribeSsubscribeErrorReResolvesActiveChann
   EXPECT_EQ(1, registry_.subscriptionCount());  // still subscribed, just re-resolving
 }
 
-// #1 (a): a re-issued SSUBSCRIBE that errors while the channel has BOTH an existing active
+// A re-issued SSUBSCRIBE that errors while the channel has BOTH an existing active
 // subscriber AND a fresh joiner that dedup-parked during the resubscribe window must fail the
 // joiner AND STILL re-resolve the live channel immediately (scheduleResubscribe) — not return early
 // after the joiner rollback, leaving the active subscription stalled until the generation timeout.
@@ -989,7 +1066,7 @@ TEST_F(SubscriptionRegistryTest, ReissuedSsubscribeErrorWithJoinerStillReResolve
                           mock_host_); // active_sub live
 
   // Connection lost -> ch enters the resubscribe window; doResubscribe re-issues it.
-  registry_.onUpstreamConnectionClose(mock_host_);
+  simulateUpstreamConnectionClose(registry_, mock_host_);
   registry_.doResubscribe();
 
   // A NEW subscriber joins during the window -> dedup parks it (deferred ack).
@@ -1008,8 +1085,8 @@ TEST_F(SubscriptionRegistryTest, ReissuedSsubscribeErrorWithJoinerStillReResolve
   EXPECT_EQ(1, registry_.subscriptionCount());        // active_sub still subscribed
 }
 
-// #1 (b): a DUPLICATE SUBSCRIBE from a subscriber that already holds the channel STILL parks behind
-// an in-flight re-subscribe (so it is never acked prematurely — F1/G5), but its pending entry is
+// A DUPLICATE SUBSCRIBE from a subscriber that already holds the channel STILL parks behind
+// an in-flight re-subscribe (so it is never acked prematurely), but its pending entry is
 // tagged newly_added=false: a failed re-subscribe must NOT roll back (and close) the live
 // subscription the duplicate merely echoes. On that failure the subscriber stays subscribed AND —
 // since real Redis acks a duplicate SUBSCRIBE unconditionally — receives an immediate echo-ack.
@@ -1020,10 +1097,10 @@ TEST_F(SubscriptionRegistryTest, DuplicateSubscribeDuringResubscribeWindowSurviv
   registry_.subscribe({"ch"}, sub);
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_); // sub live
 
-  registry_.onUpstreamConnectionClose(mock_host_);
+  simulateUpstreamConnectionClose(registry_, mock_host_);
   registry_.doResubscribe(); // ch in the resubscribe window
 
-  // sub sends a DUPLICATE SUBSCRIBE ch: it still PARKS (so it is never acked prematurely — F1/G5),
+  // sub sends a DUPLICATE SUBSCRIBE ch: it still PARKS (so it is never acked prematurely),
   // but its pending entry is tagged newly_added=false because sub already held the channel.
   const auto dup_result = registry_.subscribe({"ch"}, sub);
   EXPECT_TRUE(dup_result.ack_deferred);
@@ -1051,7 +1128,7 @@ TEST_F(SubscriptionRegistryTest, LateSunsubscribeFromOldOwnerDoesNotForgetNewHos
   auto sub = makeSubscriber();
   EXPECT_CALL(upstream_callbacks_, chooseUpstreamHostForChannel("ch"))
       .WillOnce(Invoke(ssubscribeReturnsHost())); // initial -> A; topology reroute -> B goes via
-                                                  // sendUpstreamSsubscribeToHost (E-8)
+                                                  // sendUpstreamSsubscribeToHost
   registry_.subscribe({"ch"}, sub);
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_); // active on A
 
@@ -1071,7 +1148,7 @@ TEST_F(SubscriptionRegistryTest, LateSunsubscribeFromOldOwnerDoesNotForgetNewHos
   EXPECT_EQ(1, registry_.subscriptionCount());
 }
 
-// A1-1: a re-issued SSUBSCRIBE for an already-active channel that errors (no pending bucket) on the
+// a re-issued SSUBSCRIBE for an already-active channel that errors (no pending bucket) on the
 // host's LAST channel must RETIRE the now-idle dedicated subscription connection. Every other
 // last-channel path closes it, so skipping the retire here leaks an idle connection + Redis-side
 // subscription state. (ResubscribeSsubscribeErrorReResolvesActiveChannel covers the re-resolve;
@@ -1084,11 +1161,11 @@ TEST_F(SubscriptionRegistryTest, ReissuedSsubscribeErrorRetiresIdleLastChannelCo
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1),
                           mock_host_); // active on host
 
-  registry_.onUpstreamConnectionClose(mock_host_);
+  simulateUpstreamConnectionClose(registry_, mock_host_);
   registry_.doResubscribe(); // re-issues SSUBSCRIBE ch, recording a fresh control-FIFO entry
 
   // ch is the host's ONLY channel; when its re-issued SSUBSCRIBE errors, the connection is now idle
-  // and must be retired (A1-1) in addition to re-resolving the channel.
+  // and must be retired in addition to re-resolving the channel.
   EXPECT_CALL(upstream_callbacks_, scheduleResubscribe(_));
   EXPECT_CALL(upstream_callbacks_, retireSubscriptionConnectionIfIdle(_));
   auto err = std::make_unique<Common::Redis::RespValue>();
@@ -1097,7 +1174,7 @@ TEST_F(SubscriptionRegistryTest, ReissuedSsubscribeErrorRetiresIdleLastChannelCo
   registry_.onUpstreamControlError(std::move(err), mock_host_);
 }
 
-// A1-2: after ch re-resolves A -> B, a late/duplicate unsolicited SUNSUBSCRIBE STILL arriving from
+// after ch re-resolves A -> B, a late/duplicate unsolicited SUNSUBSCRIBE STILL arriving from
 // the OLD owner A (past its consumed advisory ack) proves A no longer owns ch. If ch was A's last
 // channel, A's dedicated subscription connection is now idle and must be retired — the stale-ignore
 // branch previously returned without retiring, leaking A's zombie connection.
@@ -1108,8 +1185,7 @@ TEST_F(SubscriptionRegistryTest, StaleUnsolicitedSunsubscribeRetiresIdleSourceHo
   registry_.subscribe({"ch"}, sub);
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_); // active on A
 
-  // Reroute ch A -> B: SUNSUBSCRIBE A (expected ack) + SSUBSCRIBE B (via the dry-resolved host,
-  // E-8).
+  // Reroute ch A -> B: SUNSUBSCRIBE A (expected ack) + SSUBSCRIBE B (via the dry-resolved host).
   EXPECT_CALL(upstream_callbacks_, chooseUpstreamHostForChannel("ch"))
       .WillOnce(Return(mock_host_2_));
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSunsubscribe("ch", _))
@@ -1120,18 +1196,17 @@ TEST_F(SubscriptionRegistryTest, StaleUnsolicitedSunsubscribeRetiresIdleSourceHo
   // A's first SUNSUBSCRIBE is our advisory ack — consumed, no retire.
   registry_.onPushMessage(makeSubscribeAckPush("sunsubscribe", "ch", 0), mock_host_);
   // A's SECOND, late SUNSUBSCRIBE (A is no longer the owner) hits the stale-ignore branch, which
-  // must retire A's now-idle connection (A1-2) while leaving B's mapping intact.
+  // must retire A's now-idle connection while leaving B's mapping intact.
   EXPECT_CALL(upstream_callbacks_, retireSubscriptionConnectionIfIdle(_));
   registry_.onPushMessage(makeSubscribeAckPush("sunsubscribe", "ch", 0), mock_host_);
   EXPECT_EQ(1, registry_.channelHosts().count("ch")); // B still owns ch
 }
 
-// S6-2: a single send failure during doResubscribe (a rate-limited / no-host channel) must
+// a single send failure during doResubscribe (a rate-limited / no-host channel) must
 // reschedule ONLY via scheduleResubscribe — the failed channel stays in the pending set — and must
-// NOT fall back to the whole-registry owner-less nuke (the old onUpstreamConnectionClose ->
-// forgetHostChannels(null) that cleared EVERY healthy channel's owner and re-SSUBSCRIBE'd them each
-// backoff, re-opening the S6-1/S6-3 windows). The channel that re-subscribed fine must keep its
-// owner.
+// NOT nuke the whole registry: clearing EVERY healthy channel's owner and re-SSUBSCRIBE-ing them
+// each backoff would re-open those windows. The channel that re-subscribed fine must keep
+// its owner.
 TEST_F(SubscriptionRegistryTest, PartialResubscribeSendFailureDoesNotNukeSucceededChannelOwner) {
   auto sub = makeSubscriber();
   EXPECT_CALL(upstream_callbacks_, chooseUpstreamHostForChannel("keep"))
@@ -1144,7 +1219,7 @@ TEST_F(SubscriptionRegistryTest, PartialResubscribeSendFailureDoesNotNukeSucceed
   // expectation exists.
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSsubscribeToHost("keep", _, _))
       .WillRepeatedly(Return(true));
-  // "fail"'s initial subscribe SENDs OK, but every re-subscribe SEND fails (§7 P1: a failed send is
+  // "fail"'s initial subscribe SENDs OK, but every re-subscribe SEND fails (a failed send is
   // sendUpstreamSsubscribeToHost returning false, not a null resolve — a null resolve keeps the
   // record).
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSsubscribeToHost("fail", _, _))
@@ -1154,8 +1229,8 @@ TEST_F(SubscriptionRegistryTest, PartialResubscribeSendFailureDoesNotNukeSucceed
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "keep", 1), mock_host_);
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "fail", 2), mock_host_);
 
-  // Connection lost: both channels are marked for re-subscribe with their owner KEPT (D1).
-  registry_.onUpstreamConnectionClose(mock_host_);
+  // Connection lost: both channels are marked for re-subscribe with their owner KEPT.
+  simulateUpstreamConnectionClose(registry_, mock_host_);
   // doResubscribe re-issues both; "fail"'s send fails -> scheduleResubscribe (retry the failed
   // one), NOT a whole-registry nuke.
   EXPECT_CALL(upstream_callbacks_, scheduleResubscribe(_)).Times(testing::AtLeast(1));
@@ -1166,10 +1241,10 @@ TEST_F(SubscriptionRegistryTest, PartialResubscribeSendFailureDoesNotNukeSucceed
   EXPECT_EQ(2, registry_.subscriptionCount()); // both still subscribed
 }
 
-// S6-4: an unsolicited SUNSUBSCRIBE that invalidates ONE channel (x) of a host must never tear down
+// an unsolicited SUNSUBSCRIBE that invalidates ONE channel (x) of a host must never tear down
 // the connection still carrying that host's OTHER channels (y, z). The dangerous window only opens
 // if y/z are OWNER-LESS — hostHasSubscriptions then reads false and the retire gate wrongly nukes
-// the connection carrying them. Under D1 a kept-connection control-error KEEPS their owner, so
+// the connection carrying them. A kept-connection control-error KEEPS their owner, so
 // hostHasSubscriptions stays true and the gate never fires. The DISCRIMINATOR (a check that fails
 // on the pre-fix owner-less-ing) is the hostHasSubscriptions assertion right after the
 // control-error; asserting only the post-invalidation state would pass on pre-fix code too (with
@@ -1186,7 +1261,7 @@ TEST_F(SubscriptionRegistryTest,
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "z", 3), mock_host_);
 
   // A kept-connection control-error (a non-Error, non-Push reply mid-reshard — middlebox/desync
-  // noise): pre-D1 this owner-less-ed the host's channels; post-D1 it KEEPS their owner and just
+  // noise): earlier this owner-less-ed the host's channels; now it KEEPS their owner and just
   // re-resolves the host on backoff (scheduleResubscribeForHost).
   EXPECT_CALL(upstream_callbacks_, scheduleResubscribe(_)).Times(testing::AtLeast(1));
   auto non_error = std::make_unique<Common::Redis::RespValue>();
@@ -1209,7 +1284,7 @@ TEST_F(SubscriptionRegistryTest,
   EXPECT_EQ(3, registry_.subscriptionCount()); // all three still subscribed (x re-resolving)
 }
 
-// A1-3: forgetHostConnectionLedger must clear a host's outstanding control-FIFO even when the
+// forgetHostConnectionLedger must clear a host's outstanding control-FIFO even when the
 // registry is momentarily EMPTY — the exact state the conn_pool now calls it in on an involuntary
 // close (the pre-fix ``!empty()`` gate skipped it). A surviving stale FIFO head head-mismatches —
 // and thus BLACKS OUT — the host's NEXT subscribe epoch: the new channel's ssubscribe ack is not
@@ -1232,7 +1307,7 @@ TEST_F(SubscriptionRegistryTest,
   registry_.unsubscribe({"stale"}, sub);
   ASSERT_TRUE(registry_.empty()); // registry momentarily empty, yet the stale FIFO head survives
 
-  // The conn_pool's involuntary-close hook clears the host's ledger UNCONDITIONALLY (A1-3), even
+  // The conn_pool's involuntary-close hook clears the host's ledger UNCONDITIONALLY, even
   // with an empty registry.
   registry_.forgetHostConnectionLedger(mock_host_);
 
@@ -1256,7 +1331,7 @@ TEST_F(SubscriptionRegistryTest, SunsubscribeErrorDropsExpectedAckSoLaterUnsolic
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_); // active on A
 
   // Reroute ch A -> B: SUNSUBSCRIBE the OLD owner A (recording an expected ack for A) and
-  // SSUBSCRIBE the new owner B. With E-8 the reissue sends to the dry-resolved host, so ch
+  // SSUBSCRIBE the new owner B. The reissue sends to the dry-resolved host, so ch
   // genuinely maps to B (the old mock trick of reporting A from the send no longer applies).
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSunsubscribe("ch", _))
       .WillRepeatedly(Return(SunsubscribeResult::AckExpected));
@@ -1285,7 +1360,7 @@ TEST_F(SubscriptionRegistryTest, SunsubscribeErrorDropsExpectedAckSoLaterUnsolic
   EXPECT_EQ(1, registry_.subscriptionCount());
 }
 
-// Issue 1 (round-4): an unsolicited SUNSUBSCRIBE from the current owner (it lost the slot) must not
+// An unsolicited SUNSUBSCRIBE from the current owner (it lost the slot) must not
 // just forget the mapping and wait for an unrelated topology event — it must proactively request a
 // topology refresh AND schedule a backoff re-resolve so the channel re-subscribes to its new owner
 // promptly instead of sitting subscribed-but-not-upstream-subscribed.
@@ -1304,7 +1379,7 @@ TEST_F(SubscriptionRegistryTest, UnsolicitedSunsubscribeRequestsRefreshAndReReso
   EXPECT_EQ(1, registry_.subscriptionCount());
 }
 
-// Issue 2 (round-4): pending subscribe acks are host-correlated. After ch moves A -> B (downstream
+// Pending subscribe acks are host-correlated. After ch moves A -> B (downstream
 // subscribe still pending), a LATE ssubscribe ack from the OLD owner A must NOT hand the client a
 // premature ``subscribe`` success — only the CURRENT owner B's ack completes it.
 TEST_F(SubscriptionRegistryTest, LateOldHostSsubscribeAckDoesNotPrematurelySucceedSubscribe) {
@@ -1312,7 +1387,7 @@ TEST_F(SubscriptionRegistryTest, LateOldHostSsubscribeAckDoesNotPrematurelySucce
   EXPECT_CALL(upstream_callbacks_, chooseUpstreamHostForChannel("ch"))
       .WillOnce(Invoke(ssubscribeReturnsHost())); // initial -> A (downstream ack pending); topology
                                                   // reroute -> B via sendUpstreamSsubscribeToHost
-                                                  // (E-8)
+                                                  //
   registry_.subscribe({"ch"}, sub);
   EXPECT_CALL(upstream_callbacks_, chooseUpstreamHostForChannel("ch"))
       .WillOnce(Return(mock_host_2_));
@@ -1330,7 +1405,7 @@ TEST_F(SubscriptionRegistryTest, LateOldHostSsubscribeAckDoesNotPrematurelySucce
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_2_);
 }
 
-// Issue 2 (round-5): the OWNER-LESS gap. If an unsolicited SUNSUBSCRIBE (slot moved off the owner)
+// The OWNER-LESS gap. If an unsolicited SUNSUBSCRIBE (slot moved off the owner)
 // forgets the mapping while a fresh subscribe is still pending, a late ack from the DEPARTED owner
 // must be rejected — accepting it (there is no owner to compare against) would hand the client a
 // ``subscribe`` success with no live upstream subscription until re-resolution.
@@ -1349,7 +1424,7 @@ TEST_F(SubscriptionRegistryTest, OwnerlessGapSsubscribeAckDoesNotSucceedSubscrib
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_);
 }
 
-// Issue 3 (round-5): a re-subscribe generation's ack is host-correlated. A stale ack from a
+// A re-subscribe generation's ack is host-correlated. A stale ack from a
 // SUPERSEDED host must NOT clear the channel and disarm the generation timer while the current
 // attempt is still unacked. Needs a dispatcher for the timer.
 TEST_F(SubscriptionRegistryTest, StaleHostSsubscribeAckDoesNotDisarmGenerationTimer) {
@@ -1368,7 +1443,7 @@ TEST_F(SubscriptionRegistryTest, StaleHostSsubscribeAckDoesNotDisarmGenerationTi
   registry.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_); // active on A
 
   // A's connection drops -> doResubscribe re-resolves ch to B and arms the generation timeout.
-  registry.onUpstreamConnectionClose(mock_host_);
+  simulateUpstreamConnectionClose(registry, mock_host_);
   EXPECT_CALL(*gen_timer, enableTimer(std::chrono::milliseconds(10000), _));
   registry.doResubscribe(); // ch now expected on B; pending_resubscribe_channels_ = {ch} //
                             // createTimer #2
@@ -1383,7 +1458,7 @@ TEST_F(SubscriptionRegistryTest, StaleHostSsubscribeAckDoesNotDisarmGenerationTi
   registry.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_2_);
 }
 
-// Issue 3 (round-5, SAME-HOST stale generation) — the case host-only correlation could NOT catch,
+// The case host-only correlation could NOT catch,
 // and the reason each SSUBSCRIBE attempt carries a generation. ch is re-issued A -> B -> A across
 // two connection losses; A's ORIGINAL (gen1) SSUBSCRIBE ack then arrives while ch is mapped back to
 // A (gen3). Its host equals the current owner, but its generation is stale, so it must be rejected
@@ -1396,7 +1471,7 @@ TEST_F(SubscriptionRegistryTest, SameHostStaleGenerationAckRejected) {
       .WillOnce(Invoke(ssubscribeReturnsHost())); // subscribe -> A (gen1); the two topology
                                                   // reroutes (-> B gen2, -> A gen3) now send via
                                                   // sendUpstreamSsubscribeToHost with the
-                                                  // dry-resolved host (E-8 fixture default)
+                                                  // dry-resolved host (fixture default)
   registry_.subscribe({"ch"}, sub);               // pending on A (gen1), no ack yet
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSunsubscribe("ch", _))
       .WillRepeatedly(Return(SunsubscribeResult::AckExpected));
@@ -1436,7 +1511,7 @@ TEST_F(SubscriptionRegistryTest, StaleSsubscribeErrorDoesNotFailPendingSubscribe
       .WillOnce(Invoke(ssubscribeReturnsHost())); // subscribe -> A (gen1); the two topology
                                                   // reroutes (-> B gen2, -> A gen3) now send via
                                                   // sendUpstreamSsubscribeToHost with the
-                                                  // dry-resolved host (E-8 fixture default)
+                                                  // dry-resolved host (fixture default)
   registry_.subscribe({"ch"}, sub);               // pending on A (gen1)
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSunsubscribe("ch", _))
       .WillRepeatedly(Return(SunsubscribeResult::AckExpected));
@@ -1447,7 +1522,7 @@ TEST_F(SubscriptionRegistryTest, StaleSsubscribeErrorDoesNotFailPendingSubscribe
   registry_.onClusterTopologyChange(); // ch -> A (gen3); A's FIFO head is still the gen1 SSUBSCRIBE
 
   // A's stale (gen1) SSUBSCRIBE error correlates to the gen1 FIFO head but its generation is stale:
-  // it must be ignored entirely — neither closing the subscriber's connection (the F3 fail action)
+  // it must be ignored entirely — neither closing the subscriber's connection (the fail action)
   // nor writing anything downstream, and not rolling the subscription back.
   EXPECT_CALL(*connections_[0], close(_)).Times(0);
   EXPECT_CALL(*connections_[0], write(_, _)).Times(0);
@@ -1474,7 +1549,7 @@ TEST_F(SubscriptionRegistryTest, StaleSsubscribeErrorDoesNotForgetCurrentMapping
       .WillOnce(Invoke(ssubscribeReturnsHost())); // subscribe -> A (gen1); the two topology
                                                   // reroutes (-> B gen2, -> A gen3) now send via
                                                   // sendUpstreamSsubscribeToHost with the
-                                                  // dry-resolved host (E-8 fixture default)
+                                                  // dry-resolved host (fixture default)
   registry_.subscribe({"ch"}, sub);
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_); // active on A
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSunsubscribe("ch", _))
@@ -1494,7 +1569,7 @@ TEST_F(SubscriptionRegistryTest, StaleSsubscribeErrorDoesNotForgetCurrentMapping
   EXPECT_EQ(1, registry_.channelHosts().count("ch")); // preserved (would be 0 if wrongly forgotten)
 }
 
-// Issue 4 (round-5): the topology-reroute path arms the generation timeout too, not only
+// The topology-reroute path arms the generation timeout too, not only
 // doResubscribe — so a silently-lost SSUBSCRIBE ack on a rerouted channel is retried on backoff
 // rather than stranding it. Needs a dispatcher for the timer.
 TEST_F(SubscriptionRegistryTest, TopologyRerouteArmsGenerationTimeout) {
@@ -1506,7 +1581,7 @@ TEST_F(SubscriptionRegistryTest, TopologyRerouteArmsGenerationTimeout) {
   auto sub = makeSubscriber();
   EXPECT_CALL(upstream_callbacks_, chooseUpstreamHostForChannel("ch"))
       .WillOnce(Invoke(ssubscribeReturnsHost())); // initial -> A; topology reroute -> B via
-                                                  // sendUpstreamSsubscribeToHost (E-8)
+                                                  // sendUpstreamSsubscribeToHost
   registry.subscribe({"ch"}, sub);                // createTimer #1
   registry.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_); // active on A
 
@@ -1523,11 +1598,11 @@ TEST_F(SubscriptionRegistryTest, TopologyRerouteArmsGenerationTimeout) {
   gen_timer->invokeCallback();
 }
 
-// Finding 3 (under D1's keep-owner model): a resubscribe-generation timeout must re-resolve ONLY
+// A resubscribe-generation timeout must re-resolve ONLY
 // the still-unacked channels of the generation, not every subscribed channel. The retry scope IS
 // pending_resubscribe_channels_ — a channel leaves it when its current-attempt ack lands — so the
 // timeout re-issues exactly the leftover unacked channel and the acked sibling is untouched.
-// Neither owner is cleared (D1): reissueSsubscribe refreshes the owner when doResubscribe re-sends.
+// Neither owner is cleared: reissueSsubscribe refreshes the owner when doResubscribe re-sends.
 TEST_F(SubscriptionRegistryTest, GenerationTimeoutReResolvesOnlyUnackedChannels) {
   NiceMock<Event::MockDispatcher> dispatcher;
   auto* gen_timer = new NiceMock<Event::MockTimer>(&dispatcher);
@@ -1550,7 +1625,7 @@ TEST_F(SubscriptionRegistryTest, GenerationTimeoutReResolvesOnlyUnackedChannels)
   registry.onPushMessage(makeSubscribeAckPush("ssubscribe", "b", 2), mock_host_);
 
   // Connection loss re-issues the generation {a, b} and arms the generation timer.
-  registry.onUpstreamConnectionClose(mock_host_);
+  simulateUpstreamConnectionClose(registry, mock_host_);
   resent.clear();
   registry.doResubscribe();
   ASSERT_EQ(2, resent.size());
@@ -1567,15 +1642,14 @@ TEST_F(SubscriptionRegistryTest, GenerationTimeoutReResolvesOnlyUnackedChannels)
   // reissueSsubscribe refreshes the owner when doResubscribe re-sends. Both mappings stay, and the
   // next doResubscribe re-issues just the unacked channel.
   resent.clear();
-  gen_timer->invokeCallback();                        // handleResubscribeGenerationTimeout
-  EXPECT_EQ(1, registry.channelHosts().count(acked)); // acked: untouched
-  EXPECT_EQ(
-      1, registry.channelHosts().count(unacked)); // unacked: owner KEPT (D1), re-resolved on send
+  gen_timer->invokeCallback();                          // handleResubscribeGenerationTimeout
+  EXPECT_EQ(1, registry.channelHosts().count(acked));   // acked: untouched
+  EXPECT_EQ(1, registry.channelHosts().count(unacked)); // unacked: owner KEPT, re-resolved on send
   registry.doResubscribe();
   EXPECT_THAT(resent, testing::ElementsAre(unacked)); // ONLY the unacked channel re-issued
 }
 
-// S6-1 (D1 keep-owner): a re-subscribe signal on a KEPT connection seeds the channel for
+// A re-subscribe signal on a KEPT connection seeds the channel for
 // re-subscribe but leaves its owner intact through the backoff window, so a last-subscriber
 // UNSUBSCRIBE arriving in that window still finds the owner and sends the upstream SUNSUBSCRIBE —
 // the subscription is not silently leaked on the live connection (the former owner-less-at-signal
@@ -1589,23 +1663,23 @@ TEST_F(SubscriptionRegistryTest, KeptConnectionSignalKeepsOwnerSoWindowUnsubscri
   EXPECT_EQ(1, registry_.channelHosts().count("ch"));
 
   // A non-Error control reply keeps the connection open and seeds "ch" for re-subscribe — WITHOUT
-  // clearing its owner (D1).
+  // clearing its owner.
   EXPECT_CALL(upstream_callbacks_, scheduleResubscribe(_));
   auto reply = std::make_unique<Common::Redis::RespValue>();
   reply->type(Common::Redis::RespType::SimpleString);
   reply->asString() = "OK";
   registry_.onUpstreamControlError(std::move(reply), mock_host_);
-  EXPECT_EQ(1, registry_.channelHosts().count("ch")); // owner KEPT during the window (D1)
+  EXPECT_EQ(1, registry_.channelHosts().count("ch")); // owner KEPT during the window
 
   // In the window the last subscriber unsubscribes: because the owner is still mock_host_, the
-  // registry sends the upstream SUNSUBSCRIBE rather than skipping it (S6-1).
+  // registry sends the upstream SUNSUBSCRIBE rather than skipping it.
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSunsubscribe("ch", _))
       .WillOnce(Return(SunsubscribeResult::AckExpected));
   registry_.unsubscribe({"ch"}, sub);
   EXPECT_EQ(0, registry_.channelHosts().count("ch")); // forgotten by the unsubscribe itself
 }
 
-// S6-3 (D1): a new subscriber that joins a channel while it is in the re-subscribe window (seeded
+// a new subscriber that joins a channel while it is in the re-subscribe window (seeded
 // in pending_resubscribe_channels_ at signal time, its new-owner ack not yet re-confirmed) is
 // DEFERRED and ack-timeout-protected, not handed a premature success ack.
 TEST_F(SubscriptionRegistryTest, DedupJoinDuringResubscribeWindowIsDeferred) {
@@ -1617,17 +1691,17 @@ TEST_F(SubscriptionRegistryTest, DedupJoinDuringResubscribeWindowIsDeferred) {
 
   // Connection loss seeds "ch" into the re-subscribe window (owner kept).
   EXPECT_CALL(upstream_callbacks_, scheduleResubscribe(_));
-  registry_.onUpstreamConnectionClose(mock_host_);
+  simulateUpstreamConnectionClose(registry_, mock_host_);
 
   // A second subscriber joins "ch" DURING the window: it must defer, not get an immediate success —
   // the channel is not upstream-confirmed on its new owner yet.
   auto sub2 = makeSubscriber();
   const auto result = registry_.subscribe({"ch"}, sub2);
   EXPECT_TRUE(result.success);
-  EXPECT_TRUE(result.ack_deferred); // S6-3: deferred, not premature success
+  EXPECT_TRUE(result.ack_deferred); // deferred, not premature success
 }
 
-// MISC-2: a duplicate pipelined SUBSCRIBE (``SUBSCRIBE ch ch``) parks two pending entries for the
+// a duplicate pipelined SUBSCRIBE (``SUBSCRIBE ch ch``) parks two pending entries for the
 // SAME subscriber on one channel, but on upstream failure the rollback counts
 // pubsub_subscribe_ack_error ONCE (matching the single gauge decrement), not once per entry — else
 // the documented identity active = subscribe_total − unsubscribe_total − ack_error drifts by −1.
@@ -1649,11 +1723,11 @@ TEST_F(SubscriptionRegistryTest, DuplicateSubscribeFailureCountsAckErrorOnce) {
   err->type(Common::Redis::RespType::Error);
   err->asString() = "ERR no such command";
   registry_.onUpstreamControlError(std::move(err), mock_host_);
-  EXPECT_EQ(1U, error.value());   // MISC-2: once, not twice
+  EXPECT_EQ(1U, error.value());   // once, not twice
   EXPECT_EQ(0U, success.value()); // never confirmed
 }
 
-// Issue 6 (round-4): ack-time subscribe counters reflect the REAL async outcome — success when the
+// Ack-time subscribe counters reflect the REAL async outcome — success when the
 // upstream ack lands, error when the upstream rejects it — unlike the send-time command.subscribe
 // stat.
 TEST_F(SubscriptionRegistryTest, SubscribeAckCountersRecordAsyncOutcome) {
@@ -1747,7 +1821,7 @@ TEST_F(SubscriptionRegistryTest, SubscribeAckAfterSubscriberDisconnect) {
   EXPECT_NO_THROW(registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_));
 }
 
-// F1: a second subscriber to a channel whose first upstream ssubscribe ack has NOT yet arrived must
+// a second subscriber to a channel whose first upstream ssubscribe ack has NOT yet arrived must
 // not be handed a premature success (the upstream could still reject). It joins the still-open
 // pending bucket (ack_deferred), issues no fresh upstream send, and the single upstream ack then
 // delivers the downstream ``subscribe`` ack to BOTH subscribers.
@@ -1775,8 +1849,8 @@ TEST_F(SubscriptionRegistryTest, DedupWhileSubscribingDefersAckUntilUpstreamAck)
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 7), mock_host_);
 }
 
-// F4: a subscribe whose upstream ack never arrives has its connection closed and its subscription
-// rolled back when the timeout fires (F3), instead of hanging the SUBSCRIBE forever. The timer is
+// a subscribe whose upstream ack never arrives has its connection closed and its subscription
+// rolled back when the timeout fires, instead of hanging the SUBSCRIBE forever. The timer is
 // armed only when a dispatcher is present (production), so this test constructs a registry with a
 // mock dispatcher/timer.
 TEST_F(SubscriptionRegistryTest, SubscribeAckTimeoutClosesSubscriberAndRollsBack) {
@@ -1790,7 +1864,7 @@ TEST_F(SubscriptionRegistryTest, SubscribeAckTimeoutClosesSubscriberAndRollsBack
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(10000), _));
   registry.subscribe({"ch"}, sub);
 
-  // Firing the timeout closes the subscriber's connection (F3, instead of a desyncing out-of-band
+  // Firing the timeout closes the subscriber's connection (instead of a desyncing out-of-band
   // -ERR) and rolls the channel back (SUNSUBSCRIBE, since this was the last subscriber on it).
   EXPECT_CALL(*connections_[0], close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSunsubscribe("ch", _))
@@ -1800,7 +1874,7 @@ TEST_F(SubscriptionRegistryTest, SubscribeAckTimeoutClosesSubscriberAndRollsBack
   EXPECT_EQ(0, registry.subscriptionCount());
 }
 
-// Issue 3 (round-4): a re-issued SSUBSCRIBE for an already-active channel has no per-bucket ack
+// A re-issued SSUBSCRIBE for an already-active channel has no per-bucket ack
 // timer, so doResubscribe arms a generation timeout. If a re-sent channel never acks (silent loss /
 // a wedged connection), firing the timeout re-resolves it on backoff instead of stalling forever.
 TEST_F(SubscriptionRegistryTest, ResubscribeGenerationTimeoutRetries) {
@@ -1818,7 +1892,7 @@ TEST_F(SubscriptionRegistryTest, ResubscribeGenerationTimeoutRetries) {
   registry.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_); // active on A
 
   // Connection lost -> doResubscribe re-sends ch and arms the generation timeout (createTimer #2).
-  registry.onUpstreamConnectionClose(mock_host_);
+  simulateUpstreamConnectionClose(registry, mock_host_);
   EXPECT_CALL(*gen_timer, enableTimer(std::chrono::milliseconds(10000), _));
   registry.doResubscribe();
 
@@ -1827,7 +1901,7 @@ TEST_F(SubscriptionRegistryTest, ResubscribeGenerationTimeoutRetries) {
   gen_timer->invokeCallback();
 }
 
-// #1 regression: when an UNSUBSCRIBE (or downstream disconnect) empties the re-subscribe retry
+// When an UNSUBSCRIBE (or downstream disconnect) empties the re-subscribe retry
 // scope, the backoff must reset AND the generation timer must disarm — the same cleanup the
 // current-attempt ack path does. Before the fix only the ack path cleaned up; the unsubscribe /
 // orphan erase site dropped the entry but left the backoff escalated and the generation timer armed
@@ -1851,7 +1925,7 @@ TEST_F(SubscriptionRegistryTest, UnsubscribeEmptyingResubscribeScopeDisarmsGener
   registry.onPushMessage(makeSubscribeAckPush("ssubscribe", "b", 2), mock_host_);
 
   // Connection lost -> doResubscribe re-sends a, b and ARMS the generation timer (createTimer #2).
-  registry.onUpstreamConnectionClose(mock_host_);
+  simulateUpstreamConnectionClose(registry, mock_host_);
   EXPECT_CALL(*gen_timer, enableTimer(std::chrono::milliseconds(10000), _));
   registry.doResubscribe();
 
@@ -1866,7 +1940,31 @@ TEST_F(SubscriptionRegistryTest, UnsubscribeEmptyingResubscribeScopeDisarmsGener
   ::testing::Mock::VerifyAndClearExpectations(gen_timer);
 }
 
-// F1 regression: the subscribe-ack timeout rollback must undo the optimistic
+// when the re-subscribe retry scope empties (the generation is resolved by acks), the registry
+// cancels the conn pool's re-subscribe timer. Otherwise the coalesce would attach an unrelated
+// later failure to this resolved cycle's stale — possibly escalated — backoff delay instead of the
+// floor. Pre-fix code reset the backoff but left the pool timer armed.
+TEST_F(SubscriptionRegistryTest, EmptyingResubscribeScopeCancelsPoolResubscribeTimer) {
+  auto sub = makeSubscriber();
+  EXPECT_CALL(upstream_callbacks_, chooseUpstreamHostForChannel(_))
+      .WillRepeatedly(Invoke(ssubscribeReturnsHost()));
+  registry_.subscribe({"ch"}, sub);
+  registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_);
+
+  // Connection lost -> "ch" enrolled in the retry scope; re-issued on the new connection so the ack
+  // below is the CURRENT attempt (single channel avoids the per-host FIFO ack-ordering concern).
+  simulateUpstreamConnectionClose(registry_, mock_host_);
+  registry_.doResubscribe();
+
+  // The re-subscribe ack empties the scope and must cancel the pool timer. Setting the
+  // expectation here (after the re-issue) and verifying it forces the check at the empty transition
+  // rather than deferring to teardown — the pre-fix code never called it.
+  EXPECT_CALL(upstream_callbacks_, cancelResubscribeTimer());
+  registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_);
+  ::testing::Mock::VerifyAndClearExpectations(&upstream_callbacks_);
+}
+
+// The subscribe-ack timeout rollback must undo the optimistic
 // pubsub_active_subscriptions gauge increment the splitter records at subscribe time — otherwise
 // the gauge leaks (the later disconnect can only decrement channels still in subscribedChannels(),
 // which this rollback already removed).
@@ -1887,7 +1985,7 @@ TEST_F(SubscriptionRegistryTest, SubscribeAckTimeoutDecrementsActiveSubscription
       .WillOnce(Invoke(ssubscribeReturnsHost()));
   registry.subscribe({"ch"}, sub);
 
-  // Timeout rolls back the one channel -> removeChannel decrements the gauge by exactly 1 (A-2: the
+  // Timeout rolls back the one channel -> removeChannel decrements the gauge by exactly 1 (the
   // gauge moves per set mutation via dec(), not a batched sub()).
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSunsubscribe("ch", _))
       .WillOnce(Return(SunsubscribeResult::AckExpected));
@@ -1927,7 +2025,7 @@ TEST_F(SubscriptionRegistryTest, SubscribeAckTimeoutFailsAllPendingSubscribersWi
   registry.subscribe({"ch"}, sub_b);
 
   // The single timeout fails BOTH subscribers: two rollbacks (removeChannel decrements the gauge
-  // once each — A-2), and SUNSUBSCRIBE fires once, when the last subscriber leaves the channel.
+  // once each), and SUNSUBSCRIBE fires once, when the last subscriber leaves the channel.
   EXPECT_CALL(gauge, dec()).Times(2);
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSunsubscribe("ch", _))
       .WillOnce(Return(SunsubscribeResult::AckExpected));
@@ -1949,16 +2047,16 @@ TEST_F(SubscriptionRegistryTest, BackoffEscalatesWithoutSuccessfulResubscribe) {
   // backoff keeps escalating. Delays are jittered, so this asserts only that a reschedule is armed
   // each time; BackoffResetsOnUpstreamAckNotSend pins the reset semantics numerically.
   EXPECT_CALL(upstream_callbacks_, scheduleResubscribe(_));
-  registry_.onUpstreamConnectionClose();
+  simulateUpstreamConnectionClose(registry_, mock_host_);
 
   EXPECT_CALL(upstream_callbacks_, scheduleResubscribe(_));
-  registry_.onUpstreamConnectionClose();
+  simulateUpstreamConnectionClose(registry_, mock_host_);
 
   EXPECT_CALL(upstream_callbacks_, scheduleResubscribe(_));
-  registry_.onUpstreamConnectionClose();
+  simulateUpstreamConnectionClose(registry_, mock_host_);
 }
 
-// P8: the re-subscribe backoff is reset only by a genuine upstream ssubscribe *ack*, not by a
+// The re-subscribe backoff is reset only by a genuine upstream ssubscribe *ack*, not by a
 // successful fire-and-forget *send*. A permanently-rejecting upstream (whose SSUBSCRIBE send
 // "succeeds" but is async-rejected, closing the connection) must keep escalating instead of
 // resetting to the floor on every reconnect. The random generator is pinned so the jittered delay
@@ -1976,24 +2074,24 @@ TEST_F(SubscriptionRegistryTest, BackoffResetsOnUpstreamAckNotSend) {
       .WillRepeatedly(Invoke(ssubscribeReturnsHost()));
   registry_.subscribe({"ch"}, sub);
 
-  // Each loss is host-scoped (S-4: the closing host is known), clearing that host's control FIFO so
+  // Each loss is host-scoped (the closing host is known), clearing that host's control FIFO so
   // the re-issued SSUBSCRIBE records a fresh generation the ack below correlates against — rather
   // than a stale pre-loss entry that would look like a superseded attempt.
-  registry_.onUpstreamConnectionClose(mock_host_); // interval 100 -> delay 99
+  simulateUpstreamConnectionClose(registry_, mock_host_); // interval 100 -> delay 99
   // A successful *send* must NOT reset the backoff (send-success != ack-success).
   registry_.doResubscribe();
-  registry_.onUpstreamConnectionClose(
-      mock_host_);           // interval 200 -> delay 199 (escalated despite send)
+  simulateUpstreamConnectionClose(registry_,
+                                  mock_host_); // interval 200 -> delay 199 (escalated despite send)
   registry_.doResubscribe(); // re-issue on the new connection so the ack is the CURRENT attempt
 
   // A real upstream ssubscribe ack (for the current attempt) resets the backoff.
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_);
-  registry_.onUpstreamConnectionClose(mock_host_); // interval back to 100 -> delay 99
+  simulateUpstreamConnectionClose(registry_, mock_host_); // interval back to 100 -> delay 99
 
   EXPECT_THAT(delays, testing::ElementsAre(99, 199, 99));
 }
 
-// F2: after a connection loss re-subscribes several channels, the backoff resets only when the
+// after a connection loss re-subscribes several channels, the backoff resets only when the
 // WHOLE generation acks. A single channel's ack while another is still pending must NOT reset it —
 // otherwise a partial failure (one channel keeps failing) hot-loops at the floor. Pinned random
 // makes the jittered delay reveal the interval (interval-1); see BackoffResetsOnUpstreamAckNotSend.
@@ -2018,15 +2116,15 @@ TEST_F(SubscriptionRegistryTest, BackoffResetsOnlyWhenResubscribeGenerationFully
   auto sub = makeSubscriber();
   subscribeChannels(registry_, {"a", "b"}, sub);
 
-  registry_.onUpstreamConnectionClose(mock_host_); // interval 100 -> delay 99
+  simulateUpstreamConnectionClose(registry_, mock_host_); // interval 100 -> delay 99
   resent.clear();
   registry_.doResubscribe(); // resubscribe generation = {a, b}
   ASSERT_EQ(2, resent.size());
   // Only ONE channel of the generation acks — the generation is not complete, so the backoff must
   // NOT reset.
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", resent[0], 1), mock_host_);
-  registry_.onUpstreamConnectionClose(
-      mock_host_); // interval 200 -> delay 199 (partial ack did not reset)
+  simulateUpstreamConnectionClose(
+      registry_, mock_host_); // interval 200 -> delay 199 (partial ack did not reset)
   // The second loss re-subscribes the WHOLE generation again (the host-scoped close cleared
   // ownership of both channels, so the earlier ack is a superseded attempt); the backoff resets
   // only once BOTH channels of this fresh generation ack, in re-issue (FIFO) order.
@@ -2036,12 +2134,12 @@ TEST_F(SubscriptionRegistryTest, BackoffResetsOnlyWhenResubscribeGenerationFully
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", resent[0], 1),
                           mock_host_); // incomplete
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", resent[1], 1), mock_host_); // complete
-  registry_.onUpstreamConnectionClose(mock_host_); // interval back to 100 -> delay 99
+  simulateUpstreamConnectionClose(registry_, mock_host_); // interval back to 100 -> delay 99
 
   EXPECT_THAT(delays, testing::ElementsAre(99, 199, 99));
 }
 
-// F2 (partial SEND failure): a channel whose re-SSUBSCRIBE send FAILS never acks, so it must keep
+// A channel whose re-SSUBSCRIBE send FAILS never acks, so it must keep
 // the generation incomplete — a sibling channel's ack must not reset the backoff to the floor while
 // the failing channel is still down.
 TEST_F(SubscriptionRegistryTest, BackoffDoesNotResetWhenAResubscribeSendFailed) {
@@ -2061,7 +2159,7 @@ TEST_F(SubscriptionRegistryTest, BackoffDoesNotResetWhenAResubscribeSendFailed) 
   // PartialResubscribe...).
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSsubscribeToHost("a", _, _))
       .WillRepeatedly(Return(true));
-  // "b"'s initial subscribe SENDs OK, its re-subscribe SEND fails (§7 P1: a failed send is
+  // "b"'s initial subscribe SENDs OK, its re-subscribe SEND fails (a failed send is
   // sendUpstreamSsubscribeToHost returning false, not a null resolve — a null resolve keeps
   // record).
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSsubscribeToHost("b", _, _))
@@ -2069,19 +2167,19 @@ TEST_F(SubscriptionRegistryTest, BackoffDoesNotResetWhenAResubscribeSendFailed) 
       .WillRepeatedly(Return(false));
   subscribeChannels(registry_, {"a", "b"}, sub);
 
-  registry_.onUpstreamConnectionClose(mock_host_); // interval 100 -> delay 99
+  simulateUpstreamConnectionClose(registry_, mock_host_); // interval 100 -> delay 99
   registry_
       .doResubscribe(); // a OK (fresh generation on the cleared FIFO), b send FAILS; b keeps the
-                        // generation incomplete (F2) and the failed send reschedules -> delay 199
+                        // generation incomplete and the failed send reschedules -> delay 199
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "a", 1),
                           mock_host_); // a acks, b still down
-  registry_.onUpstreamConnectionClose(
-      mock_host_); // interval 400 -> delay 399: a's ack did NOT reset (F2)
+  simulateUpstreamConnectionClose(registry_,
+                                  mock_host_); // interval 400 -> delay 399: a's ack did NOT reset
 
   EXPECT_THAT(delays, testing::ElementsAre(99, 199, 399));
 }
 
-// F3: a single host's subscription-connection loss re-subscribes ONLY that host's channels, not
+// a single host's subscription-connection loss re-subscribes ONLY that host's channels, not
 // every channel on every other still-connected host.
 TEST_F(SubscriptionRegistryTest, HostScopedResubscribeOnlyReissuesThatHostsChannels) {
   auto host_a = mock_host_;
@@ -2102,7 +2200,7 @@ TEST_F(SubscriptionRegistryTest, HostScopedResubscribeOnlyReissuesThatHostsChann
   // host_a's subscription connection drops -> doResubscribe re-issues ONLY ch_a (ch_b stays on its
   // still-connected host).
   EXPECT_CALL(upstream_callbacks_, scheduleResubscribe(_));
-  registry_.onUpstreamConnectionClose(host_a);
+  simulateUpstreamConnectionClose(registry_, host_a);
   registry_.doResubscribe();
 
   EXPECT_THAT(resent, testing::ElementsAre("ch_a"));
@@ -2129,7 +2227,7 @@ TEST_F(SubscriptionRegistryTest, RemoveSubscriberCleansUpSharded) {
   EXPECT_EQ(0, registry_.subscriptionCount());
 }
 
-// --- dropHost forgets removed-host mappings so no SUNSUBSCRIBE targets a dead endpoint (C-4) ---
+// --- dropHost forgets removed-host mappings so no SUNSUBSCRIBE targets a dead endpoint ---
 
 TEST_F(SubscriptionRegistryTest, DropHostForgetsShardedMappingAndSkipsSunsubscribe) {
   auto sub = makeSubscriber();
@@ -2150,7 +2248,7 @@ TEST_F(SubscriptionRegistryTest, DropHostForgetsShardedMappingAndSkipsSunsubscri
   EXPECT_EQ(0, registry_.subscriptionCount());
 }
 
-// --- Fan-out that re-enters removeSubscriber must not invalidate the set (B-4) ---
+// --- Fan-out that re-enters removeSubscriber must not invalidate the set ---
 
 TEST_F(SubscriptionRegistryTest, MessageDeliverReentrantRemoveSubscriberDoesNotCrash) {
   auto sub1 = makeSubscriber();
@@ -2190,7 +2288,7 @@ TEST_F(SubscriptionRegistryTest, SsubscribeFailureRollsBack) {
 // --- clear() empties registry-side state and closes subscribers ---
 //
 // clear() empties the registry-side maps but intentionally does NOT touch each subscriber's own
-// ``subscribed_channels_`` set: under the A-2 gauge model that set is what ~DownstreamSubscriber
+// ``subscribed_channels_`` set: under the gauge model that set is what ~DownstreamSubscriber
 // drains the pubsub_active_subscriptions_ gauge by at destruction, so it must survive clear() (see
 // ClearClosesAffectedDownstreamConnections). In this registry-only unit test there is no
 // ProxyFilter and no destructor driven here, so the subscriber's set simply survives — the expected
@@ -2212,7 +2310,7 @@ TEST_F(SubscriptionRegistryTest, ClearEmptiesRegistryAndClosesSubscriber) {
 // Pins the cluster-removal teardown contract: after clear() the downstream is gone, mirroring
 // real Redis dropping subscribers when topology changes invalidate their state.
 //
-// Also pins the A-2 gauge contract: the pubsub_active_subscriptions_ gauge is owned by
+// Also pins the gauge contract: the pubsub_active_subscriptions_ gauge is owned by
 // DownstreamSubscriber (removeChannel / ~DownstreamSubscriber), NOT recomputed by
 // ProxyFilter::onEvent (which only drives the per-registry unsubscribe COUNTER cleanup). clear()
 // empties the registry maps but must leave each subscriber's ``subscribed_channels_`` intact, so
@@ -2237,7 +2335,7 @@ TEST_F(SubscriptionRegistryTest, ClearClosesAffectedDownstreamConnections) {
 
   // Each connection close must see its channel entry still present: clear() must NOT pre-empty the
   // subscriber's set, or the later ~DownstreamSubscriber drain would decrement the gauge by 0 and
-  // leak it (A-2). ProxyFilter::onEvent does not touch the gauge here.
+  // leak it. ProxyFilter::onEvent does not touch the gauge here.
   EXPECT_CALL(*connections_[0], close(Network::ConnectionCloseType::NoFlush))
       .WillOnce(Invoke(
           [&](Network::ConnectionCloseType) { EXPECT_EQ(1, sub_a->subscribedChannels().size()); }));
@@ -2271,9 +2369,9 @@ TEST_F(SubscriptionRegistryTest, ClearDropsPendingSubscribeAcks) {
   EXPECT_TRUE(registry_.empty());
 }
 
-// E-7: a subscriber's disconnect drops only ITS OWN parked pending acks. dropPendingForSubscriber
+// a subscriber's disconnect drops only ITS OWN parked pending acks. dropPendingForSubscriber
 // sweeps the (small, ≤10s-window) pending map and scrubs just this subscriber from each bucket
-// (S-5: no per-subscriber key mirror), so another subscriber's pending ack on a different channel
+// (no per-subscriber key mirror), so another subscriber's pending ack on a different channel
 // must survive and still deliver when its upstream ack arrives.
 TEST_F(SubscriptionRegistryTest, DropPendingForSubscriberLeavesOtherSubscribersPending) {
   auto sub_a = makeSubscriber();
@@ -2309,12 +2407,12 @@ TEST_F(SubscriptionRegistryTest, TopologyChangeRetryOnFailure) {
   registry_.subscribe({"ch1"}, sub);
 
   // Topology change: ``SUNSUBSCRIBE`` succeeds, ``SSUBSCRIBE`` fails -> triggers retry. A genuine
-  // owner change makes the reroute fire (G4: a null resolve now leaves the channel put).
+  // owner change makes the reroute fire (a null resolve now leaves the channel put).
   EXPECT_CALL(upstream_callbacks_, chooseUpstreamHostForChannel("ch1"))
       .WillRepeatedly(Return(mock_host_2_));
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSunsubscribe("ch1", _))
       .WillOnce(Return(SunsubscribeResult::AckExpected));
-  // The reroute sends to the dry-resolved host via sendUpstreamSsubscribeToHost (E-8); make it fail
+  // The reroute sends to the dry-resolved host via sendUpstreamSsubscribeToHost; make it fail
   // to exercise the retry path (overrides the fixture's success default).
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSsubscribeToHost("ch1", _, _))
       .WillOnce(Return(false));
@@ -2369,7 +2467,7 @@ TEST_F(SubscriptionRegistryTest, DoResubscribeWhenEmptyStopsRetry) {
 
   // Trigger connection close — schedules resubscribe.
   EXPECT_CALL(upstream_callbacks_, scheduleResubscribe(_));
-  registry_.onUpstreamConnectionClose();
+  simulateUpstreamConnectionClose(registry_, mock_host_);
 
   // Clear all subscriptions before the timer fires.
   registry_.clear();
@@ -2403,7 +2501,7 @@ TEST_F(SubscriptionRegistryTest, MalformedMessagePushTooFewElements) {
 
 // --- Round-4 full-review regression tests ---
 
-// A1-f1: removeSubscriber must SKIP a channel that is present in THIS registry's subscriptions_ but
+// removeSubscriber must SKIP a channel that is present in THIS registry's subscriptions_ but
 // whose set does NOT contain this subscriber — a multi-registry subscriber whose channel is owned
 // here by a DIFFERENT subscriber (or re-homed to a sibling registry on a listener re-config).
 // Without the ``erase == 0`` guard it decrements the shared subscribed_channels_ / gauge for a
@@ -2413,7 +2511,7 @@ TEST_F(SubscriptionRegistryTest, RemoveSubscriberSkipsChannelItDoesNotOwnForThis
   NiceMock<MockUpstreamSubscriptionCallbacks> other_callbacks;
   SubscriptionRegistry other_registry(other_callbacks, random_, dispatcher_);
   // The second registry's callbacks are a fresh mock — give it the same send-succeeds default the
-  // fixture gives upstream_callbacks_ so a subscribe on other_registry actually lands (§7 P1:
+  // fixture gives upstream_callbacks_ so a subscribe on other_registry actually lands (
   // subscribe resolves then sends via sendUpstreamSsubscribeToHost, whose bool default would
   // otherwise be false).
   ON_CALL(other_callbacks, sendUpstreamSsubscribeToHost(_, _, _)).WillByDefault(Return(true));
@@ -2441,8 +2539,8 @@ TEST_F(SubscriptionRegistryTest, RemoveSubscriberSkipsChannelItDoesNotOwnForThis
   EXPECT_EQ(1, registry_.subscriptionCount());    // sub_here still owns "ch" here
 }
 
-// E-1: when the backoff doResubscribe re-resolves a channel to a DIFFERENT host than its kept owner
-// (D1), the old owner still carries the upstream shard subscription. reissueSsubscribe must pair
+// when the backoff doResubscribe re-resolves a channel to a DIFFERENT host than its kept owner
+// the old owner still carries the upstream shard subscription. reissueSsubscribe must pair
 // the reroute exactly like a topology change — forget the old owner and send it a courtesy
 // SUNSUBSCRIBE (find-only, harmless if that connection is already gone) — before recording the new
 // owner. Without it the old host keeps a leaked subscription: duplicate delivery + a forever-idle
@@ -2455,9 +2553,8 @@ TEST_F(SubscriptionRegistryTest, ReissueToDifferentHostSunsubscribesOldOwner) {
   registry_.subscribe({"ch"}, sub);
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_); // active on A
 
-  // A's subscription connection drops: ch enters the resubscribe scope with its owner (A) KEPT
-  // (D1).
-  registry_.onUpstreamConnectionClose(mock_host_);
+  // A's subscription connection drops: ch enters the resubscribe scope with its owner (A) KEPT.
+  simulateUpstreamConnectionClose(registry_, mock_host_);
 
   // doResubscribe re-resolves ch to B; the kept owner A differs, so A is forgotten AND sent a
   // courtesy SUNSUBSCRIBE before B is recorded.
@@ -2470,15 +2567,16 @@ TEST_F(SubscriptionRegistryTest, ReissueToDifferentHostSunsubscribesOldOwner) {
   EXPECT_EQ(mock_host_2_, registry_.channelHosts().at("ch").host); // now owned by B
 }
 
-// §7 P1: a reissue resolves the placement EXACTLY once per pass. recordedOwnerValid does the single
+// a reissue resolves the placement EXACTLY once per pass. recordedOwnerValid does the single
 // slot resolve; a VALID record then re-targets the recorded home (a retry is not a move) with no
-// second resolve, and an invalid record reuses that same resolution (E-8). Pin the count so a
+// second resolve, and an invalid record reuses that same resolution. Pin the count so a
 // future placement policy cannot silently double-resolve on the hot reissue path.
 TEST_F(SubscriptionRegistryTest, ReissueResolvesExactlyOnce) {
   auto sub = makeSubscriber();
   registry_.subscribe({"ch"}, sub); // fresh subscribe -> A (fixture-default resolve)
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_); // active on A
-  registry_.onUpstreamConnectionClose(mock_host_); // ch enters the resubscribe scope, owner A KEPT
+  simulateUpstreamConnectionClose(registry_,
+                                  mock_host_); // ch enters the resubscribe scope, owner A KEPT
 
   // doResubscribe re-issues ch. The record (A) is still valid, so recordedOwnerValid resolves ONCE
   // and re-targets A — no re-place, no second resolve.
@@ -2491,11 +2589,11 @@ TEST_F(SubscriptionRegistryTest, ReissueResolvesExactlyOnce) {
   EXPECT_EQ(mock_host_, registry_.channelHosts().at("ch").host); // still on A (retry, not move)
 }
 
-// B-1: a burst of re-subscribe signals in one dispatch cycle COALESCES onto the single
+// a burst of re-subscribe signals in one dispatch cycle COALESCES onto the single
 // already-armed backoff timer. The first signal arms; while the pool timer is still pending
 // (resubscribeTimerPending() == true) later signals ride it — no per-signal backoff advance, no
 // re-arm. Otherwise a K-signal burst would jump the FIRST retry from ~100ms toward the 30s cap and
-// each enableTimer would push the pending deadline out (A1-f2's defer).
+// each enableTimer would push the pending deadline out (the generation-timeout re-arm's defer).
 TEST_F(SubscriptionRegistryTest, ResubscribeSignalBurstCoalescesOntoOnePendingTimer) {
   ON_CALL(random_, random()).WillByDefault(Return(99999999ULL)); // jitter reveals the interval (99)
   std::vector<int64_t> delays;
@@ -2513,14 +2611,14 @@ TEST_F(SubscriptionRegistryTest, ResubscribeSignalBurstCoalescesOntoOnePendingTi
   EXPECT_CALL(upstream_callbacks_, resubscribeTimerPending())
       .WillOnce(Return(false))
       .WillRepeatedly(Return(true));
-  registry_.onUpstreamConnectionClose(mock_host_);
-  registry_.onUpstreamConnectionClose(mock_host_);
-  registry_.onUpstreamConnectionClose(mock_host_);
+  simulateUpstreamConnectionClose(registry_, mock_host_);
+  simulateUpstreamConnectionClose(registry_, mock_host_);
+  simulateUpstreamConnectionClose(registry_, mock_host_);
 
   EXPECT_THAT(delays, testing::ElementsAre(99)); // one arm at the floor — not three escalating arms
 }
 
-// A1-f2: a no-reroute topology change (every active channel's owner unchanged — the common
+// a no-reroute topology change (every active channel's owner unchanged — the common
 // slot-only rebalance) must NOT arm the resubscribe-generation timer over channels an UNRELATED
 // prior signal parked in the retry scope. Asserted via the timer-creation count: only the
 // subscribe-ack timer is ever created; arming a generation timer here would be a SECOND createTimer
@@ -2537,9 +2635,9 @@ TEST_F(SubscriptionRegistryTest, TopologyChangeWithNoRerouteDoesNotArmGeneration
   registry_.subscribe({"ch"}, sub); // createTimer #1: the shared subscribe-ack timer
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_); // active on A
 
-  // A prior UNRELATED connection loss parks ch in the retry scope (owner A KEPT, D1); the pool
+  // A prior UNRELATED connection loss parks ch in the retry scope (owner A KEPT); the pool
   // backoff is scheduled but doResubscribe has not run yet.
-  registry_.onUpstreamConnectionClose(mock_host_);
+  simulateUpstreamConnectionClose(registry_, mock_host_);
 
   // An unrelated rebalance fires a topology change where ch's owner is UNCHANGED -> ch is skipped,
   // nothing is reissued -> no generation timer is armed (no second createTimer).
@@ -2548,7 +2646,7 @@ TEST_F(SubscriptionRegistryTest, TopologyChangeWithNoRerouteDoesNotArmGeneration
   registry_.onClusterTopologyChange();
 }
 
-// A1-f3: a -MOVED reply correlated to a SUNSUBSCRIBE (not an SSUBSCRIBE) is STRUCTURALLY always
+// a -MOVED reply correlated to a SUNSUBSCRIBE (not an SSUBSCRIBE) is STRUCTURALLY always
 // stale — we forget a channel's owner BEFORE sending its SUNSUBSCRIBE, so the redirect only
 // confirms the slot moved. It must refresh the topology but must NOT re-mark this host's healthy
 // channels for re-subscribe (which would needlessly re-SSUBSCRIBE them and open a duplicate/gap
@@ -2578,10 +2676,10 @@ TEST_F(SubscriptionRegistryTest, SunsubscribeCorrelatedMovedRefreshesButDoesNotR
   registry_.onUpstreamControlError(std::move(err), mock_host_);
 }
 
-// SW-4: a duplicate pipelined ``SUBSCRIBE dup dup`` parks TWO entries for the same (subscriber,
+// a duplicate pipelined ``SUBSCRIBE dup dup`` parks TWO entries for the same (subscriber,
 // channel). When the upstream ack lands, real Redis delivers an ack PER entry (delivery stays
 // per-entry), but the SUCCESS counter must fire ONCE per (subscriber, channel) — symmetric with the
-// error path's MISC-2 gate — so success/error stay in the same unit and a success-rate dashboard
+// error path's dedup gate — so success/error stay in the same unit and a success-rate dashboard
 // does not drift under duplicates.
 TEST_F(SubscriptionRegistryTest, DuplicateSubscribeSuccessCountsAckSuccessOnce) {
   Stats::IsolatedStoreImpl store;
@@ -2600,11 +2698,11 @@ TEST_F(SubscriptionRegistryTest, DuplicateSubscribeSuccessCountsAckSuccessOnce) 
               write(BufferString(">3\r\n$9\r\nsubscribe\r\n$3\r\ndup\r\n:1\r\n"), false))
       .Times(2);
   registry_.onPushMessage(makeSubscribeAckPush("ssubscribe", "dup", 1), mock_host_);
-  EXPECT_EQ(1U, success.value()); // SW-4: once, not twice
+  EXPECT_EQ(1U, success.value()); // once, not twice
   EXPECT_EQ(0U, error.value());
 }
 
-// --- §7 P3: SHARD_MEMBERS subscription placement ---
+// --- SHARD_MEMBERS subscription placement ---
 
 // With no shard-membership model (non-cluster upstream: shardCandidatesForChannel returns false) a
 // SHARD_MEMBERS registry degrades placement to the slot primary via chooseUpstreamHostForChannel.
@@ -2619,7 +2717,7 @@ TEST_F(SubscriptionRegistryTest, ShardMembersDegradesToPrimaryWhenNoShardCandida
 }
 
 // SHARD_MEMBERS places a channel on the shard member carrying the FEWEST channels in this registry
-// (D1) — a freshly added replica (count 0) wins.
+// — a freshly added replica (count 0) wins.
 TEST_F(SubscriptionRegistryTest, ShardMembersPlacementPicksLeastLoadedMember) {
   auto host_c = std::make_shared<NiceMock<Upstream::MockHost>>();
   auto sm = makeShardMembersRegistry();
@@ -2642,27 +2740,28 @@ TEST_F(SubscriptionRegistryTest, ShardMembersPlacementPicksLeastLoadedMember) {
   EXPECT_EQ(host_c, sm->channelHosts().at("test").host);
 }
 
-// A tie in load is broken uniformly at random over the tied members (D4): random() % size indexes
-// the candidate order, so a nonzero RNG value selects a later candidate rather than always the
-// first.
+// A tie in load is broken uniformly at random over the tied members via reservoir sampling:
+// the k-th equally-least candidate replaces the running pick with probability 1/k, so with two tied
+// candidates the SECOND replaces the first iff ``random() % 2 == 0``. Both RNG values are exercised
+// to show each tied member can win (still uniform, just not modulo-indexed).
 TEST_F(SubscriptionRegistryTest, ShardMembersPlacementTieBreaksUniformlyAtRandom) {
   {
     auto sm = makeShardMembersRegistry();
     auto sub = makeSubscriber();
-    ON_CALL(random_, random()).WillByDefault(Return(0)); // % 2 == 0 -> first tied candidate
-    EXPECT_CALL(upstream_callbacks_, shardCandidatesForChannel("ch", _))
-        .WillOnce(Invoke(shardCandidates({mock_host_, mock_host_2_})));
-    sm->subscribe({"ch"}, sub);
-    EXPECT_EQ(mock_host_, sm->channelHosts().at("ch").host);
-  }
-  {
-    auto sm = makeShardMembersRegistry();
-    auto sub = makeSubscriber();
-    ON_CALL(random_, random()).WillByDefault(Return(1)); // % 2 == 1 -> second tied candidate
+    ON_CALL(random_, random()).WillByDefault(Return(0)); // 0 % 2 == 0 -> second candidate replaces
     EXPECT_CALL(upstream_callbacks_, shardCandidatesForChannel("ch", _))
         .WillOnce(Invoke(shardCandidates({mock_host_, mock_host_2_})));
     sm->subscribe({"ch"}, sub);
     EXPECT_EQ(mock_host_2_, sm->channelHosts().at("ch").host);
+  }
+  {
+    auto sm = makeShardMembersRegistry();
+    auto sub = makeSubscriber();
+    ON_CALL(random_, random()).WillByDefault(Return(1)); // 1 % 2 != 0 -> first candidate kept
+    EXPECT_CALL(upstream_callbacks_, shardCandidatesForChannel("ch", _))
+        .WillOnce(Invoke(shardCandidates({mock_host_, mock_host_2_})));
+    sm->subscribe({"ch"}, sub);
+    EXPECT_EQ(mock_host_, sm->channelHosts().at("ch").host);
   }
 }
 
@@ -2679,8 +2778,8 @@ TEST_F(SubscriptionRegistryTest, ShardMembersValidityKeepsChannelOnStillMemberHo
   sm->onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_); // active on A
   ASSERT_EQ(mock_host_, sm->channelHosts().at("ch").host);
 
-  // A is still a member of ch's shard (membership is health-agnostic — D2).
-  EXPECT_CALL(upstream_callbacks_, hostServesChannelSlot("ch", _, false)).WillOnce(Return(true));
+  // A is still a member of ch's shard (membership is health-agnostic).
+  EXPECT_CALL(upstream_callbacks_, hostServesChannelSlot("ch", _)).WillOnce(Return(true));
   EXPECT_CALL(upstream_callbacks_, sendUpstreamSunsubscribe(_, _)).Times(0); // not rerouted
   sm->onClusterTopologyChange();
   EXPECT_EQ(mock_host_, sm->channelHosts().at("ch").host); // kept on A
@@ -2699,11 +2798,10 @@ TEST_F(SubscriptionRegistryTest, ShardMembersResubscribeReplacesRecordWhoseHostL
   sm->subscribe({"ch"}, sub);
   sm->onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_);
 
-  // Connection lost: record KEPT (D1). doResubscribe re-validates: A is no longer a member, so the
+  // Connection lost: record KEPT. doResubscribe re-validates: A is no longer a member, so the
   // record is invalid and SHARD_MEMBERS resolves a fresh placement (B).
-  sm->onUpstreamConnectionClose(mock_host_);
-  EXPECT_CALL(upstream_callbacks_, hostServesChannelSlot("ch", _, false))
-      .WillRepeatedly(Return(false));
+  simulateUpstreamConnectionClose(*sm, mock_host_);
+  EXPECT_CALL(upstream_callbacks_, hostServesChannelSlot("ch", _)).WillRepeatedly(Return(false));
   EXPECT_CALL(upstream_callbacks_, shardCandidatesForChannel("ch", _))
       .WillOnce(Invoke(shardCandidates({host_b})));
   sm->doResubscribe();
@@ -2711,10 +2809,12 @@ TEST_F(SubscriptionRegistryTest, ShardMembersResubscribeReplacesRecordWhoseHostL
             sm->channelHosts().at("ch").host); // re-placed on B, not stranded on a null target
 }
 
-// A SHARD_MEMBERS owner that stays a shard member but goes UNHEALTHY must not be retried forever:
-// the failure-driven re-issue is health-aware, so the channel escapes onto a healthy sibling.
-// (Topology events stay health-agnostic — D2 flap tolerance — which the
-// ...KeepsChannelOnStillMemberHost test pins.)
+// A SHARD_MEMBERS owner that stays a shard member but is no longer a placement candidate (it went
+// unhealthy while a sibling is healthy) must not be retried forever: the failure-driven re-issue
+// escapes onto a healthy sibling. The escape is driven by the owner being absent from
+// shardCandidatesForChannel (which offers healthy members first), not a coarseHealth re-check.
+// (Topology events stay health-agnostic — which the ...KeepsChannelOnStillMemberHost test
+// pins.)
 TEST_F(SubscriptionRegistryTest, ShardMembersResubscribeEscapesUnhealthyOwnerToHealthySibling) {
   auto host_b = std::make_shared<NiceMock<Upstream::MockHost>>();
   auto sm = makeShardMembersRegistry();
@@ -2724,15 +2824,40 @@ TEST_F(SubscriptionRegistryTest, ShardMembersResubscribeEscapesUnhealthyOwnerToH
   sm->subscribe({"ch"}, sub);
   sm->onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_);
 
-  // A is STILL a member (hostServesChannelSlot true) but is now UNHEALTHY.
-  ON_CALL(*mock_host_, coarseHealth()).WillByDefault(Return(Upstream::Host::Health::Unhealthy));
-  sm->onUpstreamConnectionClose(mock_host_);
-  EXPECT_CALL(upstream_callbacks_, hostServesChannelSlot("ch", _, false))
-      .WillRepeatedly(Return(true));
+  // A is STILL a member (hostServesChannelSlot true) but is no longer offered as a candidate — only
+  // the healthy sibling B is. The failure-driven validity query sees {B}, finds the owner absent,
+  // and hands B back as the re-placement, so the channel escapes onto B without a second
+  // query.
+  simulateUpstreamConnectionClose(*sm, mock_host_);
+  EXPECT_CALL(upstream_callbacks_, hostServesChannelSlot("ch", _)).WillRepeatedly(Return(true));
   EXPECT_CALL(upstream_callbacks_, shardCandidatesForChannel("ch", _))
-      .WillOnce(Invoke(shardCandidates({host_b}))); // healthy sibling offered
+      .WillRepeatedly(Invoke(shardCandidates({host_b}))); // healthy sibling; owner excluded
   sm->doResubscribe();
   EXPECT_EQ(host_b, sm->channelHosts().at("ch").host); // escaped onto the healthy sibling
+}
+
+// when the WHOLE shard is unhealthy, shardCandidatesForChannel falls back to ALL members
+// (including the current owner). The owner is then still a candidate, so the failure-driven
+// re-issue KEEPS the channel in place rather than ping-ponging it between dead members every
+// backoff cycle.
+TEST_F(SubscriptionRegistryTest, ShardMembersResubscribeKeepsOwnerWhenWholeShardUnhealthy) {
+  auto host_b = std::make_shared<NiceMock<Upstream::MockHost>>();
+  auto sm = makeShardMembersRegistry();
+  auto sub = makeSubscriber();
+  EXPECT_CALL(upstream_callbacks_, shardCandidatesForChannel("ch", _))
+      .WillOnce(Invoke(shardCandidates({mock_host_})));
+  sm->subscribe({"ch"}, sub);
+  sm->onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), mock_host_);
+
+  // Whole shard unhealthy -> the fallback offers every member INCLUDING the owner mock_host_. The
+  // owner is still a candidate, so validity keeps the record; no SUNSUBSCRIBE of the old owner.
+  simulateUpstreamConnectionClose(*sm, mock_host_);
+  EXPECT_CALL(upstream_callbacks_, hostServesChannelSlot("ch", _)).WillRepeatedly(Return(true));
+  EXPECT_CALL(upstream_callbacks_, shardCandidatesForChannel("ch", _))
+      .WillRepeatedly(Invoke(shardCandidates({mock_host_, host_b})));
+  EXPECT_CALL(upstream_callbacks_, sendUpstreamSunsubscribe(_, _)).Times(0); // not moved
+  sm->doResubscribe();
+  EXPECT_EQ(mock_host_, sm->channelHosts().at("ch").host); // kept in place
 }
 
 } // namespace RedisProxy

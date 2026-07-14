@@ -203,7 +203,7 @@ private:
       return version;
     }
 
-    // The pub/sub session is the CONNECTION-scoped ProxyFilter, not this per-request object (D5):
+    // The pub/sub session is the CONNECTION-scoped ProxyFilter, not this per-request object:
     // returning &parent_ decouples the session's lifetime from a single request's terminal
     // respond() (which destroys the PendingRequest), so a future handler edit that calls a session
     // op after respond() cannot dereference a freed PendingRequest. The session methods themselves
@@ -229,14 +229,14 @@ private:
     // push never overtakes a reply that preceded it on a subscribed-and-publishing client (FIFO).
     // Bytes here are counted in ProxyFilter::held_push_bytes_ for backpressure. See
     // ProxyFilter::enqueueOrderedPush.
-    // Lazily allocated (EFF-3): a Buffer::OwnedImpl carries a slice ring, so embedding one in EVERY
+    // Lazily allocated: a Buffer::OwnedImpl carries a slice ring, so embedding one in EVERY
     // PendingRequest paid a per-command construct/destruct on the whole-traffic hot path even
     // though only a subscribed-and-publishing client ever parks a push. Created on the first park
     // (enqueueOrderedPush); a null pointer means "no parked pushes".
     std::unique_ptr<Buffer::OwnedImpl> trailing_pushes_;
     // Count of MESSAGE push frames parked in ``trailing_pushes_``. flushReadyResponses adds it to
     // ``pubsub_push_messages_delivered`` when the frames actually reach the wire, so parked frames
-    // dropped on slow-subscriber eviction / disconnect (never flushed) are not overcounted (D3).
+    // dropped on slow-subscriber eviction / disconnect (never flushed) are not overcounted.
     uint32_t trailing_push_count_{0};
     // Set to true exactly once, when the splitter calls respond() (the one-shot terminal) with the
     // request's full frame batch. The flush loop pops from the front of pending_requests_ only when
@@ -290,11 +290,11 @@ private:
   DownstreamSubscriberPtr getOrCreateSubscriber();
 
   // CommandSplitter::PubsubSession — the pub/sub session is CONNECTION-scoped, so it lives on the
-  // filter (D5), not on a per-request PendingRequest whose lifetime ends at respond(). Reached via
+  // filter, not on a per-request PendingRequest whose lifetime ends at respond(). Reached via
   // SplitCallbacks::pubsub() (PendingRequest::pubsub() returns &parent_).
   DownstreamSubscriberPtr downstreamSubscriber() override { return getOrCreateSubscriber(); }
   void setSubscriptionRegistry(const SubscriptionRegistryPtr& registry) override {
-    // Add if not already tracked, and prune expired weak refs while scanning (D-1). The tracked
+    // Add if not already tracked, and prune expired weak refs while scanning. The tracked
     // registries are conn-pool-scoped WEAK refs; a cluster-update × resubscribe cycle tears down
     // and replaces conn pools, expiring their registries. The former dedup (existing.lock() ==
     // registry) never matches an expired entry (its lock() is null, the incoming registry is not),
@@ -329,7 +329,7 @@ private:
       }
       // Client-facing UNSUBSCRIBE drives the sharded path (the matching SUBSCRIBE was rewritten to
       // SSUBSCRIBE), so only subscriptions_/subscribed_channels_ carry state to clean up. Passing
-      // ``preserved_acks`` buffers any still-pending ``subscribe`` ack (Issue 4) for the splitter
+      // ``preserved_acks`` buffers any still-pending ``subscribe`` ack for the splitter
       // to flush after its terminal respond(), never mid-teardown (reentrancy/UAF).
       count = reg->unsubscribe(absl::MakeConstSpan(&channel, 1), subscriber, &preserved_acks);
       // A channel lives in exactly one registry: once a registry actually drops the subscriber's
@@ -343,7 +343,7 @@ private:
   }
   void onPubsubSubscriptionChange(int64_t delta) override {
     // Cumulative subscribe/unsubscribe event counters only. The pubsub_active_subscriptions GAUGE
-    // is owned by DownstreamSubscriber::addChannel/removeChannel (A-2) and must NOT be touched here
+    // is owned by DownstreamSubscriber::addChannel/removeChannel and must NOT be touched here
     // — doing both would double-count.
     if (delta > 0) {
       config_->stats_.pubsub_subscribe_total_.add(delta);
@@ -361,13 +361,13 @@ private:
   //
   // ``encoded`` is MOVED out (no copy), left empty on return: every caller (deliverMessage,
   // deliverSharedFrame) owns a throwaway encode buffer, so there is a single ownership-transfer
-  // overload — the former copying const& overload was dropped once E-2 gave fan-out its own
-  // per-subscriber buffers (S-3).
+  // overload — the former copying const& overload was dropped once fan-out got its own
+  // per-subscriber buffers.
   void enqueueOrderedPush(Buffer::Instance& encoded);
   // Evict a slow pub/sub subscriber: mark it closed (idempotency guard is the caller's), bump
   // ``pubsub_slow_subscriber_closed``, log ``reason``, and close the connection (NoFlush). Shared
   // by the two backpressure triggers — the connection write-buffer high watermark and the
-  // parked-push byte bound (R-4).
+  // parked-push byte bound.
   void closeSlowSubscriber(const std::string& reason);
 
   Common::Redis::DecoderPtr decoder_;
@@ -379,14 +379,14 @@ private:
   // RESP3 permits subscribed clients to continue issuing ordinary commands. Ordinary command
   // replies flow through pending_requests_ (FIFO). MESSAGE Push frames are ordered AGAINST them
   // too: DownstreamSubscriber routes each via enqueueOrderedPush, which parks the push behind any
-  // in-flight command reply so a self-publish cannot overtake the publisher's own reply (B2). Only
+  // in-flight command reply so a self-publish cannot overtake the publisher's own reply. Only
   // the out-of-band subscription CONTROL acks (subscribe / unsubscribe) bypass this ordering —
   // delivered directly through DownstreamSubscriber, so a dedup/immediate ack CAN precede a
   // still-pending command reply. That reversal is intentional and safe: control acks are RESP3 Push
   // frames (they never break the client's request/reply matching), and a deferred ack cannot
   // preserve strict Redis wire-order in this model anyway (see the ControlAck* ordering test).
   //
-  // A2-1 — a SECOND, related consequence of the same bypass: an ``unsubscribe`` ack can also
+  // A SECOND, related consequence of the same bypass: an ``unsubscribe`` ack can also
   // overtake a MESSAGE push that is PARKED behind a pending reply for the same channel. If a
   // subscribed client pipelines a slow ``GET`` (FIFO non-empty), a ``message ch`` for it parks
   // behind the GET entry; a concurrent ``UNSUBSCRIBE ch`` acks straight to the wire, then the GET
@@ -397,9 +397,9 @@ private:
   // violation. This is the accepted trade-off of the bypass; the structural alternative (route
   // control acks through enqueueOrderedPush too, parking them at their own request position) would
   // restore Redis-faithful ordering AND close the joiner message-before-ack edge, but reopens the
-  // F-series ordering decisions and is deferred. Pub/sub already permits best-effort delivery, so
-  // the gap-free bypass is the chosen behavior; strict-ordering clients should not pipeline
-  // commands with an in-flight UNSUBSCRIBE.
+  // ordering trade-offs settled above and is deferred. Pub/sub already permits best-effort
+  // delivery, so the gap-free bypass is the chosen behavior; strict-ordering clients should not
+  // pipeline commands with an in-flight UNSUBSCRIBE.
   std::list<PendingRequest> pending_requests_;
   bool connection_allowed_;
   // Per-connection negotiated downstream RESP version, held as the wire integer (2 or 3) so

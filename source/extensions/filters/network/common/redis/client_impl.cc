@@ -60,7 +60,7 @@ ConfigImpl::ConfigImpl(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_upstream_unknown_connections, 100)),
       enable_command_stats_(config.enable_command_stats()),
       // RESP3 pub/sub tuning. Each falls back to the historical hardcoded default when unset, so
-      // configs predating ``pubsub_settings`` are unaffected (A-7).
+      // configs predating ``pubsub_settings`` are unaffected.
       subscribe_ack_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(
           config.pubsub_settings(), subscribe_ack_timeout, kDefaultSubscribeAckTimeoutMs)),
       resubscribe_backoff_base_interval_(
@@ -283,13 +283,13 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
 void ClientImpl::sendCommand(const RespValue& request) {
   // Fire-and-forget command (e.g. SUBSCRIBE). No PendingRequest, no ClientCallbacks, no
   // pending_requests_ entry. Two gates apply:
-  //   1. Init gate: while a HELLO/AUTH/READONLY/IAM-token step is in flight, park behind the
-  //      held queue alongside any held user requests so the wire order matches submission
-  //      order on replay (e.g. user GET → SUBSCRIBE → user SET stays in that order on the
-  //      wire even though the GET and SET take different code paths).
-  //   2. Batch gate (queue_enabled_): replay path raises this so the post-init flush emits as
-  //      one write. Even outside that window, if some other caller raised the gate we must
-  //      respect it — encode but defer the flush.
+  //  1. Init gate: while a HELLO/AUTH/READONLY/IAM-token step is in flight, park behind the
+  //  held queue alongside any held user requests so the wire order matches submission
+  //  order on replay (e.g. user GET → SUBSCRIBE → user SET stays in that order on the
+  //  wire even though the GET and SET take different code paths).
+  //  2. Batch gate (queue_enabled_): replay path raises this so the post-init flush emits as
+  //  one write. Even outside that window, if some other caller raised the gate we must
+  //  respect it — encode but defer the flush.
   if (isUserTrafficGated(init_state_)) {
     // Same idle→work op-timer rule as the makeRequest hold path: only the first outstanding
     // piece of work starts the op clock (relevant when WaitingForAwsToken has queued nothing),
@@ -449,19 +449,19 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   }
   // A non-Push frame with no outstanding request arrives in three distinct situations:
   // 1. An init callback (e.g. Hello3InitCallbacks::onResponse on a HELLO 3 failure) closed the
-  //    connection from within this very call while the decoder was still draining the same
-  //    buffer. The connection is already tearing down (state != Open): drop the surplus frame
-  //    quietly — a second close would double-fire close-time stats, and front() on the empty
-  //    list is undefined behavior in release builds.
+  //  connection from within this very call while the decoder was still draining the same
+  //  buffer. The connection is already tearing down (state != Open): drop the surplus frame
+  //  quietly — a second close would double-fire close-time stats, and front() on the empty
+  //  list is undefined behavior in release builds.
   // 2. The connection is Open and carries subscriptions (push_callbacks_ installed): this is an
-  //    out-of-band control reply to a fire-and-forget SSUBSCRIBE/SUNSUBSCRIBE (SSUBSCRIBE is
-  //    dispatched without a tracked PendingRequest, see conn_pool_impl.cc), e.g. a normal -ERR
-  //    from ACL/CLUSTERDOWN or a -MOVED/-ASK observed mid-reshard. Route it to the subscription
-  //    registry so it can reconcile subscription state (host-scoped re-subscribe) WITHOUT tearing
-  //    down the shared connection — every other channel multiplexed on it must stay live. This is
-  //    expected control-plane traffic, so it does NOT bump the protocol-error stat.
+  //  out-of-band control reply to a fire-and-forget SSUBSCRIBE/SUNSUBSCRIBE (SSUBSCRIBE is
+  //  dispatched without a tracked PendingRequest, see conn_pool_impl.cc), e.g. a normal -ERR
+  //  from ACL/CLUSTERDOWN or a -MOVED/-ASK observed mid-reshard. Route it to the subscription
+  //  registry so it can reconcile subscription state (host-scoped re-subscribe) WITHOUT tearing
+  //  down the shared connection — every other channel multiplexed on it must stay live. This is
+  //  expected control-plane traffic, so it does NOT bump the protocol-error stat.
   // 3. The connection is Open with no subscriber (any idle client) and received an unsolicited
-  //    reply. That is anomalous upstream behavior: bump the protocol-error stat and close.
+  //  reply. That is anomalous upstream behavior: bump the protocol-error stat and close.
   if (pending_requests_.empty()) {
     if (connection_->state() != Network::Connection::State::Open) {
       ENVOY_LOG(debug, "redis: dropping upstream frame with no outstanding request");

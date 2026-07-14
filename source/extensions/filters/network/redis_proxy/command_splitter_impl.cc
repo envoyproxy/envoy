@@ -303,7 +303,7 @@ SplitRequestPtr PublishRequest::create(Router& router,
   // ``router.upstreamPool(std::string& key, ...)`` may rewrite ``key`` in place via
   // ``key_formatter`` / ``remove_prefix``. ``channel`` is a reference to the request's channel
   // element, so whether that rewrite reaches the upstream wire depends on WHICH string we route on
-  // — and the two publish modes want opposite things (F4):
+  // — and the two publish modes want opposite things:
   const std::string& channel = incoming_request->asArray()[1].asString();
   // The sharded WIRE path is taken when the client sent ``SPUBLISH`` explicitly OR when
   // ``enable_sharded_publish`` rewrites ``PUBLISH`` to ``SPUBLISH``. An explicit ``SPUBLISH`` is a
@@ -312,7 +312,7 @@ SplitRequestPtr PublishRequest::create(Router& router,
   // ``key_formatter`` route would rewrite its channel, silently sending it to the wrong shard and
   // breaking the shard-channel contract.
   // Case-insensitive compare instead of AsciiStrToLower + == so no lowercased copy is allocated per
-  // PUBLISH (E-4); makeRequest already lowercased the dispatch verb, but that value is not threaded
+  // PUBLISH; makeRequest already lowercased the dispatch verb, but that value is not threaded
   // into the handler factory.
   const bool is_spublish = absl::EqualsIgnoreCase(incoming_request->asArray()[0].asString(),
                                                   Common::Redis::SupportedCommands::spublish());
@@ -341,7 +341,7 @@ SplitRequestPtr PublishRequest::create(Router& router,
     // hashing-parity constraint. Restore the pre-``PublishRequest`` ``simpleCommand`` behavior of
     // passing the request's channel element BY REFERENCE, so ``PrefixRoutes`` rewrites the upstream
     // wire request in place (``remove_prefix`` / ``key_formatter``). ``channel`` then reflects the
-    // rewritten value for hashing too (both alias the same array element). (F4 regression fix.)
+    // rewritten value for hashing too (both alias the same array element).
     route = router.upstreamPool(incoming_request->asArray()[1].asString(), stream_info);
   }
   if (route) {
@@ -873,7 +873,7 @@ SplitRequestPtr ClusterScopeCmdRequest::create(Router& router,
     }
   }
 
-  // Use a default key (empty string) for routing  cluster scope commands
+  // Use a default key (empty string) for routing cluster scope commands
   // are not tied to specific keys. This relies on having a catch_all_route configured and no prefix
   // set as "".
   uint32_t shard_size = 0;
@@ -1154,13 +1154,13 @@ SplitRequestPtr SubscriptionRequest::create(Router& router,
                                             const StreamInfo::StreamInfo& stream_info) {
   // Subscription acks flow out-of-band, so this handler ALWAYS returns nullptr (never handed back
   // to the FIFO). Stack-allocate it and alias a raw pointer, so no per-SUBSCRIBE heap allocation is
-  // made while every ``request_ptr->`` use below stays unchanged (E-7).
+  // made while every ``request_ptr->`` use below stays unchanged.
   SubscriptionRequest request(command_stats, time_source, delay_command_latency);
   SubscriptionRequest* request_ptr = &request;
 
   // This handler serves exactly SUBSCRIBE / UNSUBSCRIBE (subscriptionCommands()) — ``sunsubscribe``
   // (internal-only) and ``punsubscribe`` (unsupported) never reach it. Classify the raw verb
-  // case-insensitively rather than allocating a lowercased copy (E-4 symmetry with PublishRequest),
+  // case-insensitively rather than allocating a lowercased copy (symmetry with PublishRequest),
   // and use the canonical lowercase form as ``command_name``: it is echoed as the downstream ack
   // verb (makeSubscriptionAck), and real Redis always replies lowercase regardless of the request's
   // case.
@@ -1182,7 +1182,7 @@ SplitRequestPtr SubscriptionRequest::create(Router& router,
     // listener is NOT RESP3, HELLO 3 is answered with -NOPROTO (handleHelloCommand exact-matches
     // the listener's protocol_version), so that advice would loop the client between two errors and
     // never surface the real, operator-actionable condition. Report that pub/sub is unavailable on
-    // this listener instead (SW-2), consistent with how a DISABLED subscription mode rejects the
+    // this listener instead, consistent with how a DISABLED subscription mode rejects the
     // command.
     const bool listener_is_resp3 =
         Common::Redis::toWireRespVersion(callbacks.protocolVersion()) == 3;
@@ -1197,7 +1197,7 @@ SplitRequestPtr SubscriptionRequest::create(Router& router,
   // connection's PendingRequest, the sole PubsubSession. It is always present here: only a real
   // ProxyFilter dispatches subscribe/unsubscribe commands to this handler. Guard for real (not just
   // ASSERT): a future handler-registration change, a wrapper that does not forward pubsub(), or a
-  // test double would otherwise null-deref in NDEBUG. Degrade to an inline -ERR instead. (F8)
+  // test double would otherwise null-deref in NDEBUG. Degrade to an inline -ERR instead.
   PubsubSession* pubsub = callbacks.pubsub();
   ASSERT(pubsub != nullptr);
   if (pubsub == nullptr) {
@@ -1230,7 +1230,8 @@ SplitRequestPtr SubscriptionRequest::create(Router& router,
       // confirmation is a RESP3 Push frame delivered through subscriber->deliver(), never the
       // in-band FIFO. This lone path previously used the in-band onResponse(), so a bare
       // UNSUBSCRIBE's ack ordering relative to pipelined command replies flipped depending on
-      // whether the subscriber happened to hold channels — the C-2 inconsistency. (A null
+      // whether the subscriber happened to hold channels; routing the ack through deliver() removes
+      // that inconsistency. (A null
       // subscriber only happens once the connection is gone, in which case there is nothing to
       // ack; respond({}) still closes the request's FIFO entry with no frames.)
       //
@@ -1277,7 +1278,7 @@ SplitRequestPtr SubscriptionRequest::create(Router& router,
   // subscriber is owned by ProxyFilter and outlives the request, so flushing after respond() is
   // safe.
   //
-  // E-6: rather than build one ack RespValue tree per channel and hand a vector to deliverBatch, a
+  // rather than build one ack RespValue tree per channel and hand a vector to deliverBatch, a
   // single ``ack_skeleton`` (``["<verb>", <channel>, <count>]`` Push) is reused across every
   // channel — only its channel string ([1]) and count ([2]) are mutated per iteration before
   // appendAck encodes it. ``command_name`` is invariant for the whole command (one verb, N
@@ -1293,12 +1294,12 @@ SplitRequestPtr SubscriptionRequest::create(Router& router,
   // whose channels share a prefix route resolves it once, not per channel (a null mapped value is
   // the "resolved, unavailable" sentinel). Unused on the UNSUBSCRIBE path (which routes via
   // trackedRegistries below). The pub/sub upstream itself is now resolved via
-  // Route::pubsubUpstream() (A-3) rather than a hand-picked write verb string.
+  // Route::pubsubUpstream() rather than a hand-picked write verb string.
   absl::flat_hash_map<const Route*, SubscriptionRegistryPtr> route_registry;
   // Two per-channel snippets the subscribe and unsubscribe arms below both use, factored to lambdas
   // over the loop's shared state: emit the reused ack skeleton for a (channel, count), and report a
   // net per-subscriber delta to the cumulative subscribe/unsubscribe counters (the active-
-  // subscriptions gauge already moved via add/removeChannel — A-2).
+  // subscriptions gauge already moved via add/removeChannel).
   const auto emit_ack = [&](const std::string& channel, uint64_t count) {
     ack_skeleton.asArray()[1].asString() = channel;
     ack_skeleton.asArray()[2].asInteger() = static_cast<int64_t>(count);
@@ -1314,7 +1315,7 @@ SplitRequestPtr SubscriptionRequest::create(Router& router,
   // request array with no per-channel copy. A per-channel skip is a ``return`` from this lambda.
   const auto process_channel = [&](const std::string& subscription_arg) {
     if (is_unsubscribe) {
-      // Cross-registry unsubscribe is a session concern, not a routing one (A-8): the session walks
+      // Cross-registry unsubscribe is a session concern, not a routing one: the session walks
       // every registry that might own the channel (routing may have moved it since the SUBSCRIBE)
       // and buffers any preserved ``subscribe`` ack into ``preserved_acks``. Per-subscriber count
       // (not registry-wide distinct count) is what the ack and gauge track, so shared-channel
@@ -1353,7 +1354,7 @@ SplitRequestPtr SubscriptionRequest::create(Router& router,
       // request already completed, so no FIFO entry is left to carry an error in band; rather than
       // write an unsolicited out-of-band -ERR — which a pipelining client would misattribute to an
       // earlier in-flight command — the registry rolls the subscription back and CLOSES the
-      // subscriber's connection (F3). See SubscriptionRegistry::handleSubscribeAckTimeout.)
+      // subscriber's connection. See SubscriptionRegistry::handleSubscribeAckTimeout.)
       frames.push_back(Common::Redis::Utility::makeError(
           fmt::format("ERR no route for pub/sub target '{}'", subscription_arg)));
       any_failed = true;
@@ -1405,7 +1406,7 @@ SplitRequestPtr SubscriptionRequest::create(Router& router,
     }
 
     // Snapshot the pre-subscribe count for the subscribe/unsubscribe COUNTERS below. The
-    // active-subscriptions GAUGE is not computed from this delta — addChannel owns it (A-2).
+    // active-subscriptions GAUGE is not computed from this delta — addChannel owns it.
     const uint64_t prev_subscriber_count = subscriber->totalSubscriptionCount();
     // command_name is always "subscribe" on this branch: is_unsubscribe is false and the only
     // client-exposed subscribe-family verbs that reach this handler are subscribe / unsubscribe
@@ -1418,7 +1419,7 @@ SplitRequestPtr SubscriptionRequest::create(Router& router,
     // channel, count]`` — cluster sharding is transparent. SUBSCRIBE is the only client-exposed
     // subscribe verb (PSUBSCRIBE is unsupported — see subscriptionCommands()).
     //
-    // B-3 trade-off: a multi-channel ``SUBSCRIBE a b`` whose channels hash to DIFFERENT shards
+    // Trade-off: a multi-channel ``SUBSCRIBE a b`` whose channels hash to DIFFERENT shards
     // issues one SSUBSCRIBE per shard, and each shard acks independently. So the downstream acks
     // can arrive out of command order — if b's shard acks first the client sees ``subscribe b 2``
     // before
@@ -1554,7 +1555,7 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
   // The subscribe family owns its per-channel arity checks, is forbidden inside MULTI, and bypasses
   // fault injection (acks are out-of-band RESP3 Push frames). These capabilities live on the
   // handler registration so makeRequest() stays free of pub/sub command-name special cases. The
-  // handlers are registered UNCONDITIONALLY even when sharded subscription is disabled (D2): the
+  // handlers are registered UNCONDITIONALLY even when sharded subscription is disabled: the
   // disable is enforced in makeRequest, which rejects SUBSCRIBE/UNSUBSCRIBE as unknown commands
   // BEFORE the handler lookup. Registering anyway keeps that lookup's ``handler != nullptr``
   // invariant intact for the enabled path.
@@ -1759,7 +1760,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
-  // D2: when sharded subscription is disabled (PubsubSettings mode DISABLED — the Redis 6.x escape
+  // when sharded subscription is disabled (PubsubSettings mode DISABLED — the Redis 6.x escape
   // hatch), reject client SUBSCRIBE/UNSUBSCRIBE as unknown commands too, ahead of auth exactly like
   // PSUBSCRIBE and the internal sharded verbs above. The client gets a clean ``-ERR unknown
   // command`` (the pre-sharded-pubsub behavior) rather than the proxy rewriting it into an

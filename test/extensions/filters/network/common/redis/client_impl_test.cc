@@ -704,7 +704,7 @@ TEST_F(RedisClientImplTest, InitializedWithLocalZoneAffinityReplicasAndPrimaryRe
                                ConnPoolSettings::LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY);
 }
 
-// §7 P3: ConfigImpl maps pubsub_settings.subscription_placement to the internal enum, defaulting to
+// ConfigImpl maps pubsub_settings.subscription_placement to the internal enum, defaulting to
 // Primary when unset (configs predating the field are unaffected). Standalone (no client fixture) —
 // this exercises only the config value mapping.
 TEST(RedisConfigImplTest, SubscriptionPlacement) {
@@ -1228,11 +1228,11 @@ TEST_F(RedisClientImplTest, RedirectionFailure) {
 // pending_requests_ (which would mismatch every subsequent reply) and NEVER close the connection
 // (Push is in-spec RESP3 framing, and future Push-producing features may use it; closing here
 // would unnecessarily kill the connection before any owner can route the frame). Verify that:
-//   1. An unexpected Push does NOT invoke the pending request's callback.
-//   2. No close occurs.
-//   3. The protocol_error counter does NOT increment.
-//   4. A subsequent ordinary reply still matches the original pending request — proving the
-//      pending_requests_ FIFO was not misaligned by the Push.
+//  1. An unexpected Push does NOT invoke the pending request's callback.
+//  2. No close occurs.
+//  3. The protocol_error counter does NOT increment.
+//  4. A subsequent ordinary reply still matches the original pending request — proving the
+//  pending_requests_ FIFO was not misaligned by the Push.
 TEST_F(RedisClientImplTest, UpstreamPushIsDroppedAndPipelineSurvives) {
   InSequence s;
   setup();
@@ -2889,7 +2889,7 @@ TEST_F(RedisClientImplTest, Resp3ConnectionCloseDuringAwaitingReadonlyFailsInit)
 }
 
 namespace {
-// MockPushMessageCallbacks now lives in test/extensions/filters/network/common/redis/mocks.h (R-6).
+// MockPushMessageCallbacks now lives in test/extensions/filters/network/common/redis/mocks.h.
 } // namespace
 
 // Rule 1: sendCommand issued while init_state_ == AwaitingHello must be parked behind the held

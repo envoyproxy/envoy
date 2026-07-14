@@ -33,7 +33,7 @@ pre-sharded behavior) instead of rewriting them to an ``SSUBSCRIBE`` the upstrea
 defaults to ``SHARDED``, preserving the transparent rewrite described above. Where each channel's
 upstream ``SSUBSCRIBE`` is homed within its slot's shard is controlled by the new
 :ref:`pubsub_settings.subscription_placement <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.PubsubSettings.subscription_placement>`:
-it defaults to ``PRIMARY`` (the slot primary, as before), while ``SHARD_MEMBERS`` spreads channels
+it defaults to ``PRIMARY`` (the slot primary), while ``SHARD_MEMBERS`` spreads channels
 across the slot shard's primary and replicas (least-loaded first) to offload the primary's
 cluster-bus fan-out egress — Redis Cluster upstreams only; a non-cluster upstream logs a warning and
 behaves as ``PRIMARY``. A replica-homed subscription receives each message via a fire-and-forget

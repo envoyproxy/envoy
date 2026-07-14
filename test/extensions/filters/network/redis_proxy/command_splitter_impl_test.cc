@@ -46,7 +46,7 @@ public:
   RedisCommandSplitterImplTest(bool latency_in_macro, Common::Redis::FaultSharedPtr fault_ptr)
       : latency_in_micros_(latency_in_macro) {
     ON_CALL(*getFaultManager(), getFaultForCommand(_)).WillByDefault(Return(fault_ptr.get()));
-    // The subscription registries these tests build now take a mandatory dispatcher (S-4) and
+    // The subscription registries these tests build now take a mandatory dispatcher and
     // lazily create a subscribe-ack timer on subscribe(); hand each createTimer_ a throwaway mock
     // timer so that scheduling path runs as in production without per-test wiring (none of these
     // tests fire the timer).
@@ -113,7 +113,7 @@ public:
   SplitRequestPtr handle_;
 };
 
-// MockUpstreamSubscriptionCallbacks now lives in redis_proxy/mocks.h (R-5); unqualified uses below
+// MockUpstreamSubscriptionCallbacks now lives in redis_proxy/mocks.h; unqualified uses below
 // resolve to it via nested-namespace lookup.
 
 class TestSubscriptionConnPool : public ConnPool::MockInstance {
@@ -698,14 +698,14 @@ TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestSubscribeRoutesUsingFirs
   // sees this — the verb shows up only in the route's upstream selector.
   EXPECT_CALL(*route_, pubsubUpstream()).WillOnce(Return(subscription_conn_pool_shared));
   // The send records this host as the channel's owner; the upstream ack below must arrive FROM that
-  // same host for the registry to treat it as the current attempt (S-4 made the ack's source host
+  // same host for the registry to treat it as the current attempt (made the ack's source host
   // mandatory).
   auto pubsub_ack_host = std::make_shared<NiceMock<Upstream::MockHost>>();
   EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("sports"))
       .WillOnce(Invoke([pubsub_ack_host](const std::string&) -> Upstream::HostConstSharedPtr {
         return pubsub_ack_host;
       }));
-  // §7 P1: subscribe RESOLVES via chooseUpstreamHostForChannel then SENDS via
+  // subscribe RESOLVES via chooseUpstreamHostForChannel then SENDS via
   // sendUpstreamSsubscribeToHost; stub the send success (in InSequence order: resolve then send).
   EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("sports", _, _))
       .WillOnce(Return(true));
@@ -751,7 +751,7 @@ TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestBareUnsubscribeUsesSubsc
   EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("alpha"))
       .WillOnce(Invoke(
           [&mock_host](const std::string&) -> Upstream::HostConstSharedPtr { return mock_host; }));
-  // §7 P1: subscribe resolves then sends via sendUpstreamSsubscribeToHost — stub the send success.
+  // subscribe resolves then sends via sendUpstreamSsubscribeToHost — stub the send success.
   EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("alpha", _, _))
       .WillOnce(Return(true));
   EXPECT_EQ(1UL, registry->subscribe({"alpha"}, subscriber).subscription_count);
@@ -764,9 +764,9 @@ TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestBareUnsubscribeUsesSubsc
   // Bare ``UNSUBSCRIBE`` enumerates ``subscribedChannels()`` and drives ``sunsubscribe`` on the
   // registry, which sends ``SUNSUBSCRIBE`` upstream for the now-orphaned channel. ``alpha``'s
   // SUBSCRIBE is still awaiting its upstream ack, so its preserved ``subscribe alpha 1`` ack is
-  // COLLECTED (not written from inside the registry — F1) and, together with the ``unsubscribe
+  // COLLECTED (not written from inside the registry) and, together with the ``unsubscribe
   // alpha 0`` ack, flushed only AFTER the terminal respond(). Both acks flush in a SINGLE batched
-  // write (E5), Redis-compatibly ordered ``subscribe`` before ``unsubscribe``. Hence the InSequence
+  // write, Redis-compatibly ordered ``subscribe`` before ``unsubscribe``. Hence the InSequence
   // order: the upstream SUNSUBSCRIBE precedes the one downstream write carrying both frames.
   EXPECT_CALL(upstream_callbacks, sendUpstreamSunsubscribe("alpha", _))
       .WillOnce(Return(RedisProxy::UpstreamSubscriptionCallbacks::SunsubscribeResult::AckExpected));
@@ -805,7 +805,7 @@ TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestMultiChannelAcks) {
   // Registry lookup is keyed off ``spublish()`` for the SUBSCRIBE rewrite (see
   // ``SubscriptionRequestSubscribeRoutesUsingFirstChannel``).
   EXPECT_CALL(*route_, pubsubUpstream()).WillRepeatedly(Return(subscription_conn_pool_shared));
-  // Both channels land on the same owning host; the two acks below arrive FROM it (S-4).
+  // Both channels land on the same owning host; the two acks below arrive FROM it.
   auto pubsub_ack_host = std::make_shared<NiceMock<Upstream::MockHost>>();
   auto set_ack_host = [pubsub_ack_host](const std::string&) -> Upstream::HostConstSharedPtr {
     return pubsub_ack_host;
@@ -814,7 +814,7 @@ TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestMultiChannelAcks) {
       .WillOnce(Invoke(set_ack_host));
   EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("two"))
       .WillOnce(Invoke(set_ack_host));
-  // §7 P1: each channel resolves then sends via sendUpstreamSsubscribeToHost — stub both successes.
+  // each channel resolves then sends via sendUpstreamSsubscribeToHost — stub both successes.
   EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("one", _, _)).WillOnce(Return(true));
   EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("two", _, _)).WillOnce(Return(true));
 
@@ -875,7 +875,7 @@ TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestRejectsResp2Client) {
       connection, testDownstreamSubscriberStats());
   TestSplitCallbacks callbacks(subscriber);
   // RESP3 listener (so HELLO 3 is achievable), but the client has NOT upgraded yet —
-  // downstream_resp_version_ stays at its default 2 (RESP2 client). On a RESP3 listener the SW-2
+  // downstream_resp_version_ stays at its default 2 (RESP2 client). On a RESP3 listener the
   // branch advises the un-upgraded client to send HELLO 3 first; a RESP2 listener would instead
   // report "not enabled on this listener" (covered by the splitter's Resp2-listener tests).
   callbacks.protocol_version_ = Common::Redis::RespProtocolVersion::Resp3;
@@ -1047,14 +1047,14 @@ TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestSubscribeMixedRouteResul
   // ``sendUpstreamSsubscribeToHost`` (one per channel). Inline-error wording stays in terms
   // of the client-facing ``subscribe`` verb.
   EXPECT_CALL(*route_, pubsubUpstream()).WillRepeatedly(Return(subscription_conn_pool_shared));
-  // "ok" lands on this host; its ack below arrives FROM it (S-4). "fail" never sends, so it needs
+  // "ok" lands on this host; its ack below arrives FROM it. "fail" never sends, so it needs
   // no owner.
   auto pubsub_ack_host = std::make_shared<NiceMock<Upstream::MockHost>>();
   EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("ok"))
       .WillOnce(Invoke([pubsub_ack_host](const std::string&) -> Upstream::HostConstSharedPtr {
         return pubsub_ack_host;
       }));
-  // "ok" resolves to a host and SENDs OK (§7 P1). "fail" resolves to null (no host for the slot),
+  // "ok" resolves to a host and SENDs OK. "fail" resolves to null (no host for the slot),
   // which short-circuits before the send — the source of its "subscribe send failed" -ERR.
   EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("ok", _, _)).WillOnce(Return(true));
   EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("fail"))
@@ -1130,7 +1130,7 @@ TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestBareUnsubscribeNoActiveS
   EXPECT_CALL(callbacks, connectionAllowed()).WillOnce(Return(true));
   // A bare UNSUBSCRIBE with no active subscriptions delivers its ack out-of-band via the
   // subscriber (RESP3 Push ``[unsubscribe, nil, 0]``), consistent with the active-channel
-  // unsubscribe path and with subscribe acks — NOT via an in-band reply frame. C-2 regression:
+  // unsubscribe path and with subscribe acks — NOT via an in-band reply frame. Regression:
   // this path used to route through onResponse while the active-channel path used deliver(), so a
   // bare UNSUBSCRIBE's ack ordering vs pipelined replies flipped based on subscription state. The
   // request completes via respond({}) (an empty, zero-frame terminal — silent in the mock, like the
@@ -1211,8 +1211,9 @@ TEST_F(RedisCommandSplitterImplTest, PublishTransformsToSpublishOnWire) {
         return route_;
       }));
   // The rewritten ``spublish`` verb is write-classified, so the same upstream is selected as
-  // the SUBSCRIBE rewrite path's registry lookup (``spublish()``-keyed) — keeping published
-  // messages and their sharded subscribers on one conn pool under ``read_command_policy``.
+  // the SUBSCRIBE rewrite path's registry lookup (``route->pubsubUpstream()``, the write-side pool)
+  // — keeping published messages and their sharded subscribers on one conn pool under
+  // ``read_command_policy``.
   EXPECT_CALL(*route_, upstream("spublish"));
   // Capture the pool callbacks so the response is delivered through the same lifecycle
   // path the upstream client would use, rather than reaching through the
@@ -2010,10 +2011,10 @@ TEST_F(RedisSingleServerRequestTest, HelloWithUnsupportedProtocolVersion) {
 // version negotiation is exact-matched against the listener's ``protocol_version``.
 //
 // Covers:
-//   - Bare HELLO inherits ``currentDownstreamRespVersion()`` and exact-matches.
-//   - Explicit HELLO N is rejected ``-NOPROTO`` when N != listener required version.
-//   - Bare HELLO on a fresh RESP3 listener is rejected (default 2 != 3).
-//   - Shape of the reply (Map of 14 entries when stored).
+//  - Bare HELLO inherits ``currentDownstreamRespVersion()`` and exact-matches.
+//  - Explicit HELLO N is rejected ``-NOPROTO`` when N != listener required version.
+//  - Bare HELLO on a fresh RESP3 listener is rejected (default 2 != 3).
+//  - Shape of the reply (Map of 14 entries when stored).
 // =============================================================================
 
 TEST_F(RedisSingleServerRequestTest, HelloLocalBarePreservesVersion) {
@@ -2218,9 +2219,9 @@ TEST_F(RedisSingleServerRequestTest, Resp2ListenerRejectsHello3) {
 // HELLO 3 AUTH <user> <pass>: client authenticates inline as part of the
 // HELLO handshake (the lettuce / node-redis v4+ / redis-py protocol=3
 // pattern). The mock returns AuthAttempt::Allowed, so the splitter must:
-//   - parse the AUTH option (3 tokens after protover);
-//   - call attemptDownstreamAuthInline with the supplied credentials;
-//   - emit a single Map reply (not an extra +OK from a separate AUTH).
+//  - parse the AUTH option (3 tokens after protover);
+//  - call attemptDownstreamAuthInline with the supplied credentials;
+//  - emit a single Map reply (not an extra +OK from a separate AUTH).
 TEST_F(RedisSingleServerRequestTest, HelloAuthInlineAllowed) {
   InSequence s;
   callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp3;
@@ -2590,7 +2591,7 @@ TEST_F(RedisSingleServerRequestTest, ClientSetnameRejectedInsideTransaction) {
   EXPECT_EQ(nullptr, handle_);
 }
 
-// SW-2: on a RESP2 listener (the fixture default — protocol_version_ == Resp2), a client SUBSCRIBE
+// on a RESP2 listener (the fixture default — protocol_version_ == Resp2), a client SUBSCRIBE
 // is rejected with "pub/sub is not enabled on this listener", NOT "Send HELLO 3 first". The latter
 // would be unachievable advice: HELLO 3 on a RESP2 listener is answered with -NOPROTO
 // (handleHelloCommand exact-matches the listener's protocol_version), so the client would loop
@@ -2610,7 +2611,7 @@ TEST_F(RedisSingleServerRequestTest, SubscribeOnResp2ListenerRejectedAsNotEnable
   EXPECT_EQ(nullptr, handle_);
 }
 
-// SW-2 (other branch): on a RESP3 listener, a client that has not yet upgraded (still RESP2) IS
+// On a RESP3 listener, a client that has not yet upgraded (still RESP2) IS
 // told to "Send HELLO 3 first" — here the advice is achievable, because HELLO 3 matches the
 // listener's protocol_version and upgrades the connection.
 TEST_F(RedisSingleServerRequestTest, SubscribeOnResp3ListenerBeforeUpgradeAdvisesHello) {
@@ -2652,7 +2653,7 @@ TEST_F(RedisSingleServerRequestTest, PsubscribeRejectedAsUnknownCommand) {
   EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.unsupported_command").value());
 }
 
-// D2: when sharded subscription is DISABLED (PubsubSettings mode DISABLED — a RESP3 upstream
+// when sharded subscription is DISABLED (PubsubSettings mode DISABLED — a RESP3 upstream
 // without SSUBSCRIBE, e.g. Redis 6.x), makeRequest rejects a client SUBSCRIBE as an unknown command
 // (the pre-sharded-pubsub behavior) — the handlers stay registered, but the reject runs ahead of
 // the handler lookup — instead of rewriting it into an SSUBSCRIBE the upstream would answer with
@@ -2681,7 +2682,7 @@ TEST_F(RedisSingleServerRequestTest, SubscribeRejectedWhenShardedSubscriptionDis
   EXPECT_EQ(nullptr, handle_);
 }
 
-// SW-2: same RESP2-listener branch for UNSUBSCRIBE (the fixture default listener is RESP2).
+// same RESP2-listener branch for UNSUBSCRIBE (the fixture default listener is RESP2).
 TEST_F(RedisSingleServerRequestTest, UnsubscribeOnResp2ListenerRejectedAsNotEnabled) {
   InSequence s;
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
@@ -3906,7 +3907,7 @@ TEST_F(ClusterScopeRoleTest, RoleNormal) {
   Common::Redis::RespValue expected_response;
   expected_response.type(Common::Redis::RespType::Array);
   std::vector<Common::Redis::RespValue> elements(2);
-  // elements[0] corresponds to pool_callbacks_[0] (master)
+  // elements[0] corresponds to pool_callbacks_[0] (primary)
   elements[0].type(Common::Redis::RespType::Array);
   std::vector<Common::Redis::RespValue> master_elements(3);
   master_elements[0].type(Common::Redis::RespType::BulkString);

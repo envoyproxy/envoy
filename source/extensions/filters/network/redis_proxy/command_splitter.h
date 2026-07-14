@@ -25,8 +25,7 @@ namespace CommandSplitter {
 
 // Terminal response payload handed to SplitCallbacks::respond(). The overwhelmingly common case is
 // a single reply frame, so an InlinedVector<,1> keeps that frame inline and avoids a per-command
-// heap allocation on ALL traffic (multi-frame pub/sub acks spill to the heap, as a vector would)
-// (E-1).
+// heap allocation on ALL traffic (multi-frame pub/sub acks spill to the heap, as a vector would).
 using RespValueFrames = absl::InlinedVector<Common::Redis::RespValuePtr, 1>;
 
 struct ResponseValues {
@@ -80,10 +79,10 @@ public:
   /**
    * Unsubscribe ``subscriber`` from a single ``channel`` across every subscription registry this
    * connection tracks (routing may have moved the channel since the original SUBSCRIBE), buffering
-   * any preserved ``subscribe`` ack (Issue 4) into ``preserved_acks`` for the splitter to flush
+   * any preserved ``subscribe`` ack into ``preserved_acks`` for the splitter to flush
    * after its terminal respond(). Owns the cross-registry ownership rule — a channel lives in
    * exactly one registry, so the scan stops at the first that actually drops the subscriber's count
-   * — so the splitter never walks trackedRegistries() itself (A-8: cross-registry semantics belong
+   * — so the splitter never walks trackedRegistries() itself (cross-registry semantics belong
    * to the session, the splitter only parses the verb).
    * @return the subscriber's total subscription count after the unsubscribe (the downstream ack
    *         count; unchanged from before when no tracked registry owned the channel).
@@ -97,7 +96,7 @@ public:
    * Report a net pub/sub subscription-count change for the cumulative subscribe/unsubscribe event
    * COUNTERS (``pubsub_subscribe_total`` / ``pubsub_unsubscribe_total``). The
    * ``pubsub_active_subscriptions`` GAUGE is NOT touched here — it is owned solely by
-   * DownstreamSubscriber::addChannel/removeChannel and is correct by construction (A-2).
+   * DownstreamSubscriber::addChannel/removeChannel and is correct by construction.
    */
   virtual void onPubsubSubscriptionChange(int64_t delta) PURE;
 };

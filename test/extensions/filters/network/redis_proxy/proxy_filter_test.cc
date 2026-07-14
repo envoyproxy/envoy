@@ -388,7 +388,8 @@ public:
   }
 
   // Simulate active pub/sub work (parked message-push bytes) on the filter, so the slow-subscriber
-  // watermark path treats the attached subscriber as an active consumer (see Issue 5 guard).
+  // watermark path treats the attached subscriber as an active consumer (see the slow-subscriber
+  // guard).
   void setHeldPushBytesForTest(uint64_t n) { filter_->held_push_bytes_ = n; }
 
   // Create a subscriber through the production path (getOrCreateSubscriber), which also wires the
@@ -480,15 +481,15 @@ TEST_F(RedisProxyFilterTestWithTwoCallbacks, OutOfOrderResponseWithDrainClose) {
   EXPECT_EQ(1UL, config_->stats_.downstream_cx_drain_close_.value());
 }
 
-// H1 (the report's only HIGH, "merge-blocking + behavior-reproduction required"): within a SINGLE
+// Within a SINGLE
 // decode() loop, an earlier frame can synchronously close the downstream connection — a reply/ack
 // write tripping the slow-subscriber high-watermark (onAboveWriteBufferHighWatermark →
 // closeSlowSubscriber), or a splitter-driven error close — which runs onEvent(LocalClose) inline
 // and cancels every pending request. The decoder keeps looping over the buffer, so a LATER frame in
 // the same loop MUST be dropped at the Open-state guard: turning it into a PendingRequest would
 // leak a live upstream handle no future close can cancel (~PendingRequest ASSERT in debug /
-// freed-callback UAF in release — H1a), and a SUBSCRIBE would re-create a subscriber on the closed
-// connection (zombie upstream subscription + leaked gauge — H1b). This reproduces the
+// freed-callback UAF in release), and a SUBSCRIBE would re-create a subscriber on the closed
+// connection (zombie upstream subscription + leaked gauge). This reproduces the
 // two-pipelined-frame case: frame 1 processed → connection closed → frame 2 dropped before the
 // splitter.
 TEST_F(RedisProxyFilterTest, H1DropsFrameDispatchedAfterConnectionClosedMidDecode) {
@@ -2858,7 +2859,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, HelloAuthExternalAuthExpir
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
 
-// B4: a pub/sub subscriber whose downstream write buffer overflows the high watermark is a slow
+// a pub/sub subscriber whose downstream write buffer overflows the high watermark is a slow
 // consumer (it cannot pace unsolicited Push frames). Close it — matching Redis's
 // client-output-buffer-limit pubsub eviction — rather than buffer unboundedly; a non-subscriber
 // connection is left alone, and the close happens exactly once.
@@ -2882,7 +2883,7 @@ TEST_F(RedisProxyFilterTest, SlowSubscriberClosedOnWriteBufferHighWatermark) {
   EXPECT_EQ(1UL, config_->stats_.pubsub_slow_subscriber_closed_.value());
 }
 
-// Issue 5 (round-4): the slow-subscriber watermark eviction only applies to a connection with
+// The slow-subscriber watermark eviction only applies to a connection with
 // ACTIVE pub/sub work. ``subscriber_`` lingers after the last UNSUBSCRIBE (and a bare UNSUBSCRIBE
 // can create it), so a plain request/reply connection that merely once subscribed — now with no
 // live subscriptions and no parked push bytes — must NOT be evicted on its own reply backlog.
@@ -2893,7 +2894,7 @@ TEST_F(RedisProxyFilterTest, SlowSubscriberNotClosedWithNoActiveSubscriptions) {
   EXPECT_EQ(0UL, config_->stats_.pubsub_slow_subscriber_closed_.value());
 }
 
-// B2: a MESSAGE push must not overtake an in-flight ordinary reply on a client that is both
+// a MESSAGE push must not overtake an in-flight ordinary reply on a client that is both
 // subscribed and issuing commands (self-``PUBLISH`` being the canonical case). With a GET in flight
 // the push is parked behind it; when the GET reply lands, flushReadyResponses writes the reply and
 // THEN the parked push, in one ordered batch — reply bytes strictly before push bytes on the wire.
@@ -2940,7 +2941,7 @@ TEST_F(RedisProxyFilterTest, MessagePushHeldBehindPendingReplyThenFlushedInOrder
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-// #2 (intentional control-ack ordering reversal): UNLIKE a MESSAGE push (parked behind an in-flight
+// UNLIKE a MESSAGE push (parked behind an in-flight
 // reply — see MessagePushHeldBehindPendingReplyThenFlushedInOrder), an out-of-band subscription
 // CONTROL ack is delivered directly via DownstreamSubscriber::deliver and therefore BYPASSES the
 // pending-request FIFO — it is written to the wire immediately even while an ordinary command reply
@@ -2989,7 +2990,7 @@ TEST_F(RedisProxyFilterTest, ControlAckBypassesPendingReplyFifoAndWritesImmediat
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-// A2-1 (accepted ordering trade-off, distinct axis from ControlAckBypasses* above): the out-of-band
+// Accepted ordering trade-off (distinct axis from ControlAckBypasses* above): the out-of-band
 // control-ack bypass lets an UNSUBSCRIBE ack overtake a MESSAGE push already PARKED behind an
 // in-flight reply for the SAME channel. A slow GET keeps the FIFO non-empty; a ``message chan``
 // parks behind it; a concurrent UNSUBSCRIBE ack (deliver(), bypasses the FIFO) writes straight to
@@ -3041,7 +3042,7 @@ TEST_F(RedisProxyFilterTest, UnsubscribeAckOvertakesParkedMessagePushForSameChan
   get_reply->asString() = "OK";
   get_callbacks->onResponse(std::move(get_reply));
 
-  // The unsubscribe ack reached the wire BEFORE the message push — the accepted A2-1 reversal.
+  // The unsubscribe ack reached the wire BEFORE the message push — the accepted reversal.
   ASSERT_NE(std::string::npos, written.find("unsubscribe"));
   ASSERT_NE(std::string::npos, written.find("message"));
   EXPECT_LT(written.find("unsubscribe"), written.find("message"));
@@ -3050,7 +3051,7 @@ TEST_F(RedisProxyFilterTest, UnsubscribeAckOvertakesParkedMessagePushForSameChan
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-// B2 fast path: with no ordinary reply in flight, a MESSAGE push goes straight to the wire in
+// Fast path: with no ordinary reply in flight, a MESSAGE push goes straight to the wire in
 // arrival order (nothing to order behind).
 TEST_F(RedisProxyFilterTest, MessagePushWrittenImmediatelyWithNoPendingReply) {
   DownstreamSubscriberPtr subscriber = getWiredSubscriberForTest();
@@ -3066,7 +3067,7 @@ TEST_F(RedisProxyFilterTest, MessagePushWrittenImmediatelyWithNoPendingReply) {
   EXPECT_EQ(1UL, config_->stats_.pubsub_push_messages_delivered_.value());
 }
 
-// B2 backpressure: parked push bytes live in an app buffer the connection high-watermark cannot
+// Backpressure: parked push bytes live in an app buffer the connection high-watermark cannot
 // see, so enqueueOrderedPush bounds them by the same per-connection limit. A subscriber whose FIFO
 // stalls while pushes pile up past the limit is evicted (closed) — the app-queue analog of the
 // watermark path — instead of buffering without limit.

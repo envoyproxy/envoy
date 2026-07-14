@@ -231,7 +231,7 @@ TEST_F(RedisClusterLoadBalancerTest, Shard) {
   }
 }
 
-// --- §7 P2: shard membership exposure (ShardMembershipResolver / redisSlotForKey) ---
+// --- shard membership exposure (ShardMembershipResolver / redisSlotForKey) ---
 
 // membersForSlot returns the shard owning an assigned slot: primary first, then replicas, in the
 // snapshot's order. This is what SHARD_MEMBERS subscription placement fans a channel across.
@@ -260,19 +260,19 @@ TEST_F(RedisClusterLoadBalancerTest, MembersForSlotReturnsShardOfAssignedSlot) {
   // Slot in shard 0's range: primary hosts[0], members {hosts[0], hosts[2]}.
   auto s0 = resolver->membersForSlot(1000);
   ASSERT_TRUE(s0.has_value());
-  EXPECT_EQ(hosts[0]->address()->asString(), s0->primary->address()->asString());
-  ASSERT_EQ(2, s0->all_hosts.size());
+  EXPECT_EQ(hosts[0]->address()->asString(), s0->all_hosts->front()->address()->asString());
+  ASSERT_EQ(2, s0->all_hosts->size());
   EXPECT_EQ(hosts[0]->address()->asString(),
-            s0->all_hosts[0]->address()->asString()); // primary 1st
-  EXPECT_EQ(hosts[2]->address()->asString(), s0->all_hosts[1]->address()->asString());
+            (*s0->all_hosts)[0]->address()->asString()); // primary 1st
+  EXPECT_EQ(hosts[2]->address()->asString(), (*s0->all_hosts)[1]->address()->asString());
 
   // Slot in shard 1's range: primary hosts[1], members {hosts[1], hosts[3]}.
   auto s1 = resolver->membersForSlot(10000);
   ASSERT_TRUE(s1.has_value());
-  EXPECT_EQ(hosts[1]->address()->asString(), s1->primary->address()->asString());
-  ASSERT_EQ(2, s1->all_hosts.size());
-  EXPECT_EQ(hosts[1]->address()->asString(), s1->all_hosts[0]->address()->asString());
-  EXPECT_EQ(hosts[3]->address()->asString(), s1->all_hosts[1]->address()->asString());
+  EXPECT_EQ(hosts[1]->address()->asString(), s1->all_hosts->front()->address()->asString());
+  ASSERT_EQ(2, s1->all_hosts->size());
+  EXPECT_EQ(hosts[1]->address()->asString(), (*s1->all_hosts)[0]->address()->asString());
+  EXPECT_EQ(hosts[3]->address()->asString(), (*s1->all_hosts)[1]->address()->asString());
 }
 
 // membersForSlot yields nullopt before any topology snapshot exists and for an out-of-range slot.
@@ -320,7 +320,7 @@ TEST_F(RedisClusterLoadBalancerTest, MembersForSlotReflectsUpdatedSnapshot) {
     ASSERT_NE(nullptr, resolver);
     auto m = resolver->membersForSlot(1234);
     ASSERT_TRUE(m.has_value());
-    EXPECT_EQ(hosts[0]->address()->asString(), m->primary->address()->asString());
+    EXPECT_EQ(hosts[0]->address()->asString(), m->all_hosts->front()->address()->asString());
   }
 
   // Reshard: hosts[1] takes over slot 1234's range. A newly created LB must see the new owner.
@@ -334,7 +334,7 @@ TEST_F(RedisClusterLoadBalancerTest, MembersForSlotReflectsUpdatedSnapshot) {
     ASSERT_NE(nullptr, resolver);
     auto m = resolver->membersForSlot(1234);
     ASSERT_TRUE(m.has_value());
-    EXPECT_EQ(hosts[1]->address()->asString(), m->primary->address()->asString());
+    EXPECT_EQ(hosts[1]->address()->asString(), m->all_hosts->front()->address()->asString());
   }
 }
 
@@ -376,7 +376,7 @@ TEST_F(RedisClusterLoadBalancerTest, RedisSlotForKeyMatchesDataPathRouting) {
     ASSERT_NE(nullptr, routed);
     auto members = resolver->membersForSlot(slot);
     ASSERT_TRUE(members.has_value());
-    EXPECT_EQ(routed->address()->asString(), members->primary->address()->asString());
+    EXPECT_EQ(routed->address()->asString(), members->all_hosts->front()->address()->asString());
   }
 }
 

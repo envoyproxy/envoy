@@ -49,7 +49,7 @@ public:
   std::optional<uint32_t> takePendingHelloAuthVersion() override { return std::nullopt; }
   CommandSplitter::PubsubSession* pubsub() override { return this; }
   // downstreamSubscriber / setSubscriptionRegistry / unsubscribeChannelAcrossRegistries /
-  // onPubsubSubscriptionChange are inherited from CommandSplitter::NoOpPubsubSession (R-7).
+  // onPubsubSubscriptionChange are inherited from CommandSplitter::NoOpPubsubSession.
 
 private:
   Common::Redis::Client::NoOpTransaction transaction_;

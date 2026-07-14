@@ -17,7 +17,7 @@ MockRouter::~MockRouter() = default;
 MockRoute::MockRoute(ConnPool::InstanceSharedPtr conn_pool) : conn_pool_(std::move(conn_pool)) {
   ON_CALL(*this, upstream(_)).WillByDefault(Return(conn_pool_));
   // Mirror the upstream() default so subscribe tests that don't pin an explicit pub/sub pool still
-  // resolve the registry to the same mock conn pool (A-3: the SUBSCRIBE registry lookup now goes
+  // resolve the registry to the same mock conn pool (the SUBSCRIBE registry lookup now goes
   // through pubsubUpstream() instead of upstream("spublish")).
   ON_CALL(*this, pubsubUpstream()).WillByDefault(Return(conn_pool_));
   ON_CALL(*this, mirrorPolicies()).WillByDefault(ReturnRef(policies_));

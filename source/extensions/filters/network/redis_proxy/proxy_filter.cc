@@ -160,7 +160,7 @@ void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& ca
 }
 
 void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {
-  // Drop any frame dispatched after the connection has left Open (H1). onData feeds the whole
+  // Drop any frame dispatched after the connection has left Open. onData feeds the whole
   // readable buffer to decoder_->decode(), which dispatches EVERY complete frame in a loop. An
   // earlier frame in that same loop can synchronously close the downstream connection — a reply or
   // ack write tripping the slow-subscriber high-watermark (onAboveWriteBufferHighWatermark →
@@ -168,9 +168,9 @@ void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {
   // it cancels every pending request and resets the subscriber. The decoder loop, however, keeps
   // going. Processing a later frame now would create a fresh PendingRequest + live upstream handle
   // that no future close event will ever cancel (the filter is deferred-deleted with a non-empty
-  // queue → ~PendingRequest/handle ASSERT in debug, freed-callback UAF in release — H1a), and a
+  // queue → ~PendingRequest/handle ASSERT in debug, freed-callback UAF in release), and a
   // SUBSCRIBE would re-create a subscriber on the closed connection via getOrCreateSubscriber
-  // (zombie upstream subscription + leaked gauge that no disconnect will reclaim — H1b). Bailing
+  // (zombie upstream subscription + leaked gauge that no disconnect will reclaim). Bailing
   // here keeps close on the decode boundary, matching the Envoy filter convention.
   if (callbacks_->connection().state() != Network::Connection::State::Open) {
     return;
@@ -221,7 +221,7 @@ void ProxyFilter::processRespValue(Common::Redis::RespValuePtr&& value, PendingR
 }
 
 DownstreamSubscriberPtr ProxyFilter::getOrCreateSubscriber() {
-  // Never CREATE a subscriber on a connection that has left Open (H1b, defense-in-depth behind the
+  // Never CREATE a subscriber on a connection that has left Open (defense-in-depth behind the
   // onRespValue guard): a SUBSCRIBE decoded after a mid-decode-loop close must not install a fresh
   // subscriber + upstream subscription that no disconnect event will ever reclaim (leaked gauge +
   // zombie upstream connection). An already-existing subscriber is still returned (teardown reads
@@ -283,7 +283,7 @@ void ProxyFilter::onEvent(Network::ConnectionEvent event) {
         }
       }
       // Count the disconnect as an unsubscribe of every channel the subscriber still held. The
-      // active-subscriptions GAUGE is NOT decremented here (A-2): removeSubscriber above dropped
+      // active-subscriptions GAUGE is NOT decremented here: removeSubscriber above dropped
       // each channel through removeChannel (which decrements it), and any channels stranded by a
       // concurrent cluster-removal clear() are drained by ~DownstreamSubscriber. A subtract here
       // would double-count.
@@ -496,9 +496,9 @@ ProxyFilter::attemptDownstreamAuthInline(PendingRequest& request, const std::str
 
 bool ProxyFilter::checkCredentials(const std::string& username, const std::string& password) {
   // Single policy for both auth entry points (``AUTH`` and ``HELLO N AUTH``):
-  //   - no configured username: the default user may be named "default" (Redis 6 ACL synonym)
-  //     or left empty; only the password is checked.
-  //   - configured username: exact match.
+  //  - no configured username: the default user may be named "default" (Redis 6 ACL synonym)
+  //  or left empty; only the password is checked.
+  //  - configured username: exact match.
   if (config_->downstream_auth_username_.empty()) {
     return (username.empty() || username == "default") && checkPassword(password);
   }
@@ -526,7 +526,7 @@ void ProxyFilter::respond(PendingRequest& request, CommandSplitter::RespValueFra
   // channels); one is the common single-reply case (via the onResponse sugar); several is a
   // multi-channel SUBSCRIBE's per-channel -ERR batch. Move-assign the whole vector (respond() is
   // the one-shot terminal, so pending_responses_ is empty here): steals the splitter's buffer
-  // instead of allocating a container node per frame (E1 — the previous std::list added a malloc to
+  // instead of allocating a container node per frame (the previous std::list added a malloc to
   // every response on the hot path).
   request.pending_responses_ = std::move(frames);
   request.complete_ = true;
@@ -562,7 +562,7 @@ void ProxyFilter::flushReadyResponses() {
     if (front.trailing_pushes_ != nullptr && front.trailing_pushes_->length() > 0) {
       held_push_bytes_ -= front.trailing_pushes_->length();
       encoder_buffer_.move(*front.trailing_pushes_);
-      // The parked frames are now on the wire: count them as delivered here (D3), so frames that
+      // The parked frames are now on the wire: count them as delivered here, so frames that
       // were instead dropped on eviction/disconnect (never reaching this flush) are not counted.
       config_->stats_.pubsub_push_messages_delivered_.add(front.trailing_push_count_);
     }
@@ -599,7 +599,7 @@ void ProxyFilter::enqueueOrderedPush(Buffer::Instance& encoded) {
     return;
   }
   // In-order fast path: nothing is queued ahead, so the push goes straight to the wire in the order
-  // it arrived — delivered now, so count it (D3: the message counter reflects ACTUAL delivery, not
+  // it arrived — delivered now, so count it (the message counter reflects ACTUAL delivery, not
   // enqueue, so evicted/dropped parked frames are not overcounted). write() drains ``encoded``.
   if (pending_requests_.empty()) {
     // Count BEFORE the write: write() can in principle synchronously drive a downstream close that
@@ -614,12 +614,11 @@ void ProxyFilter::enqueueOrderedPush(Buffer::Instance& encoded) {
   // flushes at its correct FIFO position: after every request that preceded it, and without waiting
   // on requests that arrive after it (each request releases its own parked pushes in
   // flushReadyResponses). Count it there, at flush — not here — so a parked frame dropped on
-  // eviction/disconnect is not counted as delivered (D3). move() transfers the slices out of
+  // eviction/disconnect is not counted as delivered. move() transfers the slices out of
   // ``encoded`` (no copy), leaving it empty.
   PendingRequest& back = pending_requests_.back();
   if (back.trailing_pushes_ == nullptr) {
-    back.trailing_pushes_ =
-        std::make_unique<Buffer::OwnedImpl>(); // EFF-3: allocate only on first park
+    back.trailing_pushes_ = std::make_unique<Buffer::OwnedImpl>(); // allocate only on first park
   }
   back.trailing_pushes_->move(encoded);
   ++back.trailing_push_count_;

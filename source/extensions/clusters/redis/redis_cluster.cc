@@ -594,6 +594,18 @@ void RedisCluster::RedisDiscoverySession::onResponse(
       return;
     }
 
+    // Range-check the slot bounds before they index the fixed-size (16384-entry) slot array in the
+    // load balancer. A buggy or malicious upstream (or a middlebox) returning start/end outside
+    // [0, 16383], or start > end, would otherwise throw std::out_of_range from std::array::at on
+    // the cluster-discovery callback — which runs on the main thread with no handler — aborting the
+    // whole proxy. Reject the malformed response instead.
+    const int64_t start_slot = slot_range[SlotRangeStart].asInteger();
+    const int64_t end_slot = slot_range[SlotRangeEnd].asInteger();
+    if (start_slot < 0 || start_slot > end_slot || end_slot >= static_cast<int64_t>(MaxSlot)) {
+      onUnexpectedResponse(value);
+      return;
+    }
+
     // Row 3: Primary slot address
     if (!validateCluster(slot_range[SlotPrimary])) {
       onUnexpectedResponse(value);
@@ -603,7 +615,7 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     // It may fail in case the address is a hostname. If this is the case - we'll come back later
     // and try to resolve hostnames asynchronously. For example, AWS ElastiCache returns hostname
     // instead of IP address.
-    ClusterSlot slot(slot_range[SlotRangeStart].asInteger(), slot_range[SlotRangeEnd].asInteger(),
+    ClusterSlot slot(start_slot, end_slot,
                      ipAddressFromClusterEntry(slot_range[SlotPrimary].asArray()));
     if (slot.primary() == nullptr) {
       // Primary address is potentially a hostname, save it for async DNS resolution.

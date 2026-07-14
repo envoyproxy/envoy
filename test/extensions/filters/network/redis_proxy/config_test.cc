@@ -95,7 +95,7 @@ settings:
   cb(connection);
 }
 
-// G2: custom_commands must not override the built-in pub/sub handlers — that would silently defeat
+// Custom_commands must not override the built-in pub/sub handlers — that would silently defeat
 // the sharded PUBLISH rewrite or hang a raw SUBSCRIBE on a data connection. Config load must fail,
 // mirroring the hard rejection of the internal sharded verbs. Case-insensitive.
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyRejectsPubsubCustomCommand) {
@@ -118,7 +118,7 @@ settings:
       "redis_proxy: custom_commands cannot override the built-in pub/sub command 'PUBLISH'");
 }
 
-// MISC-1: the pub/sub NACK covers the PATTERN verbs (PSUBSCRIBE/PUNSUBSCRIBE) too, not just the
+// The pub/sub NACK covers the PATTERN verbs (PSUBSCRIBE/PUNSUBSCRIBE) too, not just the
 // client-exposed SUBSCRIBE/UNSUBSCRIBE/PUBLISH/SPUBLISH. A ``custom_commands: [psubscribe]`` would
 // otherwise register a generic pass-through that sends a raw PSUBSCRIBE down a DATA connection,
 // where it hangs with no Push reply until the op timeout closes the shared connection.
@@ -142,7 +142,7 @@ settings:
       "redis_proxy: custom_commands cannot override the built-in pub/sub command 'psubscribe'");
 }
 
-// MISC-1: the NACK also covers the INTERNAL sharded verbs (SSUBSCRIBE/SUNSUBSCRIBE) the proxy
+// The NACK also covers the INTERNAL sharded verbs (SSUBSCRIBE/SUNSUBSCRIBE) the proxy
 // issues upstream — a client must never be able to reintroduce them as a generic pass-through.
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyRejectsInternalShardedVerbCustomCommand) {
   const std::string yaml = R"EOF(
@@ -164,7 +164,7 @@ settings:
       "redis_proxy: custom_commands cannot override the built-in pub/sub command 'ssubscribe'");
 }
 
-// A-7: a pub/sub resubscribe backoff whose base exceeds its max must be rejected at config load.
+// A pub/sub resubscribe backoff whose base exceeds its max must be rejected at config load.
 // The proto's ``gt`` rule bounds each interval below only (> 0), but
 // JitteredExponentialBackOffStrategy requires ``base <= max``, so an inverted pair would otherwise
 // load fine and abort a worker on the first RESP3 subscription.
@@ -191,7 +191,7 @@ settings:
       "resubscribe_backoff_max_interval (1000ms)");
 }
 
-// A-7: a pub/sub duration that rounds to 0ms (sub-millisecond) must be rejected. The proto's ``gt``
+// A pub/sub duration that rounds to 0ms (sub-millisecond) must be rejected. The proto's ``gt``
 // rule only bounds the Duration above zero, but the millisecond conversion floors 500us to 0ms,
 // which would hit JitteredExponentialBackOffStrategy's ASSERT(base > 0) / a ``% 0`` at runtime.
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyRejectsSubMillisecondResubscribeBackoff) {
@@ -216,7 +216,7 @@ settings:
       "10000ms, resubscribe_backoff_base_interval=0ms, resubscribe_backoff_max_interval=30000ms)");
 }
 
-// SW-3: a pub/sub duration far above any sane value must be rejected. The PGV ``gt`` rule bounds
+// A pub/sub duration far above any sane value must be rejected. The PGV ``gt`` rule bounds
 // each Duration only above zero (its upper bound is ~292 years), but these feed deadline arithmetic
 // — the subscribe-ack scheduler computes ``monotonicTime() + timeout_`` (a MonotonicTime point) —
 // so an extreme value would overflow the signed nanosecond representation (UB) and could wrap to a
@@ -245,7 +245,7 @@ settings:
       "resubscribe_backoff_max_interval=30000ms)");
 }
 
-// Finding 1: sharded_subscription_mode is a ``defined_only`` enum, so an out-of-range numeric value
+// Sharded_subscription_mode is a ``defined_only`` enum, so an out-of-range numeric value
 // is rejected at config load rather than silently treated as SHARDED (config.cc enables the sharded
 // rewrite for any value != DISABLED) — a dangerous silent fallback for a Redis 6.x compatibility
 // switch. A numeric ``2`` is a valid proto3 enum wire value but not a defined

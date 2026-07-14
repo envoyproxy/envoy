@@ -223,6 +223,17 @@ subscription. The proxy maintains a per-thread subscription registry that manage
 reference-counted upstream subscriptions — the first subscriber triggers an upstream
 subscribe, and the last unsubscribe triggers an upstream unsubscribe.
 
+A subscribed RESP3 client may continue issuing ordinary commands. The proxy orders pub/sub
+``message`` frames against those command replies — a message never overtakes the reply of a command
+the client issued before it — but the subscription control acks (``subscribe`` / ``unsubscribe``)
+are delivered out of band and are **not** ordered against pipelined command replies. One consequence:
+if a client pipelines a slow command (for example ``GET``), a ``message`` for a channel can be
+buffered behind that command's reply while a concurrent ``UNSUBSCRIBE`` for the same channel acks
+immediately — so the client can observe a ``message`` for a channel *after* that channel's
+``unsubscribe`` ack. This is within pub/sub's best-effort delivery contract, but a client that
+drives a strict per-channel state machine off the unsubscribe ack should not pipeline ordinary
+commands while an ``UNSUBSCRIBE`` is in flight.
+
 A subscriber that cannot keep up with its channels' message rate is a slow consumer: unlike a
 request/response client, which self-paces by withholding requests, it has no flow control over the
 unsolicited Push frames sent to it. To bound memory the proxy closes such a subscriber's downstream
@@ -280,6 +291,14 @@ pub/sub contract already provides (a message can be missed across a resharding w
 slow-subscriber eviction). The subscription stays on its chosen member while that member remains in
 the shard; if the member leaves the shard the proxy re-places the channel onto a current member
 without disturbing the downstream subscriber.
+
+A member that remains in the shard but becomes unreachable is re-placed onto a healthy sibling on the
+next re-subscribe — but only after Envoy marks that host unhealthy. A subscription connection's
+``SSUBSCRIBE`` is fire-and-forget, so it does not by itself drive a health signal; this escape
+therefore depends on the member actually being marked unhealthy by upstream active health checking,
+outlier detection, or (for a replica that also serves reads) data-path traffic. Configure active
+health checking on a cluster used with ``SHARD_MEMBERS`` so a persistently-unreachable member does
+not hold its channels indefinitely.
 
 Sharded pub/sub requires Redis 7.0 or newer on the upstream cluster. On a ``RESP3`` listener the
 ``SUBSCRIBE`` / ``UNSUBSCRIBE`` rewrite is the default (:ref:`sharded_subscription_mode

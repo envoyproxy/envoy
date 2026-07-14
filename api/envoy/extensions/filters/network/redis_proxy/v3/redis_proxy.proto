@@ -229,7 +229,7 @@ message RedisProxy {
       // Where the proxy homes each channel's upstream ``SSUBSCRIBE``. The shard that owns a
       // channel's hash slot is fixed, but a shard has a primary and (optionally) replicas.
       enum SubscriptionPlacement {
-        // Home every channel on its slot's PRIMARY (the default; the v1 behavior). Every
+        // Home every channel on its slot's PRIMARY (the default). Every
         // subscription and the messages it receives share the primary, so adding replicas gives
         // pub/sub no extra capacity (each replica only adds one more cluster-bus frame per message).
         PRIMARY = 0;
@@ -247,7 +247,7 @@ message RedisProxy {
       // Where each channel's upstream ``SSUBSCRIBE`` is homed within its slot's shard (see
       // :ref:`SubscriptionPlacement
       // <envoy_v3_api_enum_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.PubsubSettings.SubscriptionPlacement>`).
-      // Leave unset (``PRIMARY``) for the historical primary-only behavior; set ``SHARD_MEMBERS``
+      // Leave unset (``PRIMARY``) for primary-only placement; set ``SHARD_MEMBERS``
       // to offload subscription fan-out onto replicas on a Redis Cluster upstream. ``defined_only``
       // so an out-of-range numeric value is rejected at config load rather than silently treated
       // as ``PRIMARY``.

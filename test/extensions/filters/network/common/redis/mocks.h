@@ -115,7 +115,7 @@ public:
                bool ask_redirection));
 };
 
-// Shared double for the RESP3 Push callback sink (R-5/R-6 dedup: was hand-rolled as a mock in
+// Shared double for the RESP3 Push callback sink (dedup: was hand-rolled as a mock in
 // client_impl_test and as a separate no-op in conn_pool_impl_test). gmock cannot match the
 // move-only RespValuePtr directly, so the virtuals forward to by-ref MOCK_METHODs; wrap in NiceMock
 // for a no-op sink. onUpstreamControlError already defaults to a no-op on the interface but is

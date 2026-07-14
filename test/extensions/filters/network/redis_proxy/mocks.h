@@ -26,7 +26,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
-// Shared mock for the registry <-> conn-pool upstream subscription interface (R-5: was defined
+// Shared mock for the registry <-> conn-pool upstream subscription interface (was defined
 // verbatim in both subscription_registry_test and command_splitter_impl_test).
 class MockUpstreamSubscriptionCallbacks : public UpstreamSubscriptionCallbacks {
 public:
@@ -38,9 +38,7 @@ public:
               (const std::string& channel, std::vector<Upstream::HostConstSharedPtr>& out),
               (override));
   MOCK_METHOD(bool, hostServesChannelSlot,
-              (const std::string& channel, const Upstream::HostConstSharedPtr& host,
-               bool as_primary),
-              (override));
+              (const std::string& channel, const Upstream::HostConstSharedPtr& host), (override));
   MOCK_METHOD(bool, sendUpstreamSsubscribeToHost,
               (const std::string& channel,
                Common::Redis::Client::PushMessageCallbacks& push_callbacks,
@@ -50,6 +48,7 @@ public:
               (const std::string& channel, Upstream::HostConstSharedPtr host), (override));
   MOCK_METHOD(void, scheduleResubscribe, (std::chrono::milliseconds delay), (override));
   MOCK_METHOD(bool, resubscribeTimerPending, (), (const, override));
+  MOCK_METHOD(void, cancelResubscribeTimer, (), (override));
   MOCK_METHOD(void, requestTopologyRefresh, (), (override));
   MOCK_METHOD(bool, retireSubscriptionConnectionIfIdle, (const Upstream::HostConstSharedPtr& host),
               (override));
@@ -152,7 +151,7 @@ public:
   MOCK_METHOD(void, cancel, ());
 };
 
-// No-op implementation of the PubsubSession hooks (R-7): a SplitCallbacks double that carries no
+// No-op implementation of the PubsubSession hooks: a SplitCallbacks double that carries no
 // subscription state. The command-lookup speed test's NoOpSplitCallbacks and MockSplitCallbacks
 // inherit these hooks instead of re-stubbing the block in each file.
 class NoOpPubsubSession : public PubsubSession {
@@ -173,14 +172,15 @@ public:
   ~MockSplitCallbacks() override;
 
   // respond() is the single virtual terminal (gmock can't match a move-only vector directly, so
-  // forward to by-ref mocks). Route by frame count to preserve the pre-A-1 assertion surfaces:
-  //   * one frame  -> onResponse_ — the overwhelmingly common single-reply path (the splitter's
-  //     onResponse() sugar; also a single-channel pub/sub error, which after A-1 is genuinely
-  //     indistinguishable from any other single reply at this seam).
-  //   * >= 2 frames -> respond_ — a multi-channel SUBSCRIBE emitting several per-channel -ERRs.
-  //   * zero frames -> silent, matching the old completePendingRequest() no-op, so bare-UNSUBSCRIBE
-  //     and all-out-of-band subscribe tests (which pin onResponse_ Times(0)) need no expectation;
-  //     TestSplitCallbacks still records the completion via completed_pending_request_.
+  // forward to by-ref mocks). Route by frame count to preserve the older by-value assertion
+  // surfaces:
+  //  * one frame -> onResponse_ — the overwhelmingly common single-reply path (the splitter's
+  //  onResponse() sugar; also a single-channel pub/sub error, which is genuinely
+  //  indistinguishable from any other single reply at this seam).
+  //  * >= 2 frames -> respond_ — a multi-channel SUBSCRIBE emitting several per-channel -ERRs.
+  //  * zero frames -> silent, matching the old completePendingRequest() no-op, so bare-UNSUBSCRIBE
+  //  and all-out-of-band subscribe tests (which pin onResponse_ Times(0)) need no expectation;
+  //  TestSplitCallbacks still records the completion via completed_pending_request_.
   void respond(CommandSplitter::RespValueFrames&& frames) override {
     if (frames.size() == 1) {
       onResponse_(frames[0]);
@@ -235,9 +235,9 @@ public:
 
   // MockSplitCallbacks is itself the pub/sub session for tests that drive subscribe/unsubscribe.
   // downstreamSubscriber / setSubscriptionRegistry / onPubsubSubscriptionChange are the inherited
-  // NoOpPubsubSession no-ops (R-7); only pubsub() and the real cross-registry unsubscribe differ.
+  // NoOpPubsubSession no-ops; only pubsub() and the real cross-registry unsubscribe differ.
   PubsubSession* pubsub() override { return this; }
-  // Mirrors ProxyFilter's cross-registry unsubscribe (A-8): scan the tracked registries, stopping
+  // Mirrors ProxyFilter's cross-registry unsubscribe: scan the tracked registries, stopping
   // at the first that drops the subscriber's count.
   uint64_t unsubscribeChannelAcrossRegistries(
       const std::string& channel, const RedisProxy::DownstreamSubscriberPtr& subscriber,

@@ -161,12 +161,13 @@ inline uint64_t redisSlotForKey(absl::string_view key) {
   return Crc16::crc16(RedisLoadBalancerContextImpl::hashtag(key, true)) % MaxSlot;
 }
 
-// A read-only snapshot of the shard (slot primary + all members) that owns a given slot. Exposed
-// via ShardMembershipResolver so the pub/sub conn pool can home SHARD_MEMBERS-placed subscriptions
-// across a slot shard's replicas without depending on the load balancer's internal shard type.
+// A read-only snapshot of the members (primary + replicas) of the shard that owns a given slot,
+// exposed via ShardMembershipResolver so the pub/sub conn pool can home SHARD_MEMBERS-placed
+// subscriptions across a slot shard's replicas without depending on the load balancer's internal
+// shard type. Shares the LB snapshot's host vector rather than copying it; the slot primary is
+// ``all_hosts->front()`` when a caller needs it, so no separate field is carried.
 struct ShardMembers {
-  Upstream::HostConstSharedPtr primary;
-  Upstream::HostVector all_hosts; // primary first, then replicas — the LB snapshot's order.
+  Upstream::HostVectorConstSharedPtr all_hosts; // primary first, then replicas — LB snapshot order.
 };
 
 // Implemented by RedisClusterLoadBalancer so a caller holding an Upstream::LoadBalancer& can
@@ -335,11 +336,10 @@ private:
         return std::nullopt;
       }
       const RedisShardSharedPtr& shard = (*shard_vector_)[idx];
-      ShardMembers members;
-      members.primary = shard->primary();
-      const Upstream::HostVector& hosts = shard->allHosts().hosts();
-      members.all_hosts.assign(hosts.begin(), hosts.end());
-      return members;
+      // Share the shard's immutable host-vector snapshot (primary first, then replicas) rather than
+      // copying it — the RedisShard is itself an immutable per-epoch snapshot, so its hostsPtr() is
+      // safe to hand out by shared_ptr.
+      return ShardMembers{shard->allHosts().hostsPtr()};
     }
 
   private:

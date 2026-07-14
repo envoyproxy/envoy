@@ -303,6 +303,36 @@ protected:
     return response;
   }
 
+  // Like singleSlotPrimary but with caller-chosen slot bounds, for range-validation tests.
+  NetworkFilters::Common::Redis::RespValuePtr singleSlotPrimaryWithRange(const std::string& primary,
+                                                                         int64_t port,
+                                                                         int64_t start,
+                                                                         int64_t end) const {
+    std::vector<NetworkFilters::Common::Redis::RespValue> primary_1(2);
+    primary_1[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+    primary_1[0].asString() = primary;
+    primary_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    primary_1[1].asInteger() = port;
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> slot_1(3);
+    slot_1[0].type(NetworkFilters::Common::Redis::RespType::Integer);
+    slot_1[0].asInteger() = start;
+    slot_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    slot_1[1].asInteger() = end;
+    slot_1[2].type(NetworkFilters::Common::Redis::RespType::Array);
+    slot_1[2].asArray().swap(primary_1);
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> slots(1);
+    slots[0].type(NetworkFilters::Common::Redis::RespType::Array);
+    slots[0].asArray().swap(slot_1);
+
+    NetworkFilters::Common::Redis::RespValuePtr response(
+        new NetworkFilters::Common::Redis::RespValue());
+    response->type(NetworkFilters::Common::Redis::RespType::Array);
+    response->asArray().swap(slots);
+    return response;
+  }
+
   NetworkFilters::Common::Redis::RespValuePtr singleSlotPrimaryReplica(const std::string& primary,
                                                                        const std::string& replica,
                                                                        int64_t port) const {
@@ -1418,6 +1448,38 @@ TEST_F(RedisClusterTest, RedisErrorResponsePortOverflow) {
   resolve_timer_->invokeCallback();
   EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(0);
   expectClusterSlotResponse(singleSlotPrimary("127.0.0.1", 70000));
+  EXPECT_EQ(2U, cluster_->info()->configUpdateStats().update_attempt_.value());
+  EXPECT_EQ(1U, cluster_->info()->configUpdateStats().update_failure_.value());
+}
+
+// A CLUSTER SLOTS reply whose slot end is outside [0, 16383] must be rejected rather than used
+// to index the fixed-size (16384-entry) slot array — which would throw std::out_of_range from
+// std::array::at on the discovery callback and abort the proxy. Modeled on the port-overflow test.
+TEST_F(RedisClusterTest, RedisResponseSlotRangeOutOfBounds) {
+  setupFromV3Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  expectRedisResolve(true);
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() {
+    initialized_.ready();
+    return absl::OkStatus();
+  });
+
+  // A valid response to initialize.
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  std::bitset<ResponseFlagSize> single_slot_primary(0xfff);
+  std::bitset<ResponseReplicaFlagSize> no_replica(0);
+  expectClusterSlotResponse(createResponse(single_slot_primary, no_replica));
+  expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
+
+  // end == 16384 is one past the last valid slot -> reject, no topology update, no crash.
+  expectRedisResolve();
+  resolve_timer_->invokeCallback();
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(0);
+  expectClusterSlotResponse(singleSlotPrimaryWithRange("127.0.0.1", 22120, 0, 16384));
   EXPECT_EQ(2U, cluster_->info()->configUpdateStats().update_attempt_.value());
   EXPECT_EQ(1U, cluster_->info()->configUpdateStats().update_failure_.value());
 }

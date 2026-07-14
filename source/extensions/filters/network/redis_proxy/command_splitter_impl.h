@@ -604,7 +604,7 @@ struct InstanceStats {
 
 class InstanceImpl : public Instance, Logger::Loggable<Logger::Id::redis> {
 public:
-  // ``enable_sharded_subscribe`` (D2): when false (PubsubSettings mode DISABLED), the subscribe
+  // ``enable_sharded_subscribe``: when false (PubsubSettings mode DISABLED), the subscribe
   // handlers remain registered (registration is unconditional — it preserves the
   // ``ASSERT(handler != nullptr)`` invariant makeRequest relies on), but makeRequest rejects
   // SUBSCRIBE/UNSUBSCRIBE as unknown commands ahead of the handler lookup rather than rewriting
@@ -630,12 +630,12 @@ private:
     std::reference_wrapper<CommandHandler> handler_;
     // Per-handler dispatch capabilities, set once at registration (single source of truth) so the
     // generic dispatcher in makeRequest() needs no pub/sub command-name special-casing:
-    //   owns_arity_check         - handler does its own arity validation; skip the generic <2-arg
-    //                              guard (PublishRequest and the subscribe family).
-    //   forbidden_in_transaction - reject inside MULTI instead of routing to the transaction
-    //                              handler (the subscribe family; Redis forbids pub/sub in MULTI).
-    //   bypasses_fault_injection - dispatch directly, never through DelayFault/ErrorFault (the
-    //                              subscribe family, whose acks flow out-of-band as RESP3 Push).
+    //  owns_arity_check - handler does its own arity validation; skip the generic <2-arg
+    //  guard (PublishRequest and the subscribe family).
+    //  forbidden_in_transaction - reject inside MULTI instead of routing to the transaction
+    //  handler (the subscribe family; Redis forbids pub/sub in MULTI).
+    //  bypasses_fault_injection - dispatch directly, never through DelayFault/ErrorFault (the
+    //  subscribe family, whose acks flow out-of-band as RESP3 Push).
     bool owns_arity_check{false};
     bool forbidden_in_transaction{false};
     bool bypasses_fault_injection{false};
@@ -649,7 +649,7 @@ private:
   void onInvalidRequest(SplitCallbacks& callbacks);
   // Emit the standard ``ERR unknown command`` reply and bump the unsupported-command stat for a
   // command the splitter refuses. Shared by the hard-reject of the internal sharded verbs (before
-  // the custom_commands lookup) and the generic unsupported-command gate (after it) (R-1).
+  // the custom_commands lookup) and the generic unsupported-command gate (after it).
   void rejectUnknownCommand(SplitCallbacks& callbacks, const Common::Redis::RespValue& request);
   // Handle a downstream ``HELLO`` command: protocol-version exact-match, AUTH/SETNAME option
   // parsing, inline-auth dispatch, and the local HELLO reply. Always terminal (returns nullptr);
@@ -677,7 +677,7 @@ private:
   InstanceStats stats_;
   TimeSource& time_source_;
   Common::Redis::FaultManagerPtr fault_manager_;
-  // D2: false (PubsubSettings mode DISABLED) makes makeRequest reject SUBSCRIBE/UNSUBSCRIBE as
+  // false (PubsubSettings mode DISABLED) makes makeRequest reject SUBSCRIBE/UNSUBSCRIBE as
   // unknown commands instead of rewriting them to the sharded verbs — the Redis 6.x escape hatch.
   const bool enable_sharded_subscribe_;
   // HELLO is answered locally (handleHelloCommand) and does not route through

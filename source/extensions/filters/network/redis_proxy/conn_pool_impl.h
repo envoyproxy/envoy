@@ -117,11 +117,11 @@ private:
     ThreadLocalPool& parent_;
     Upstream::HostConstSharedPtr host_;
     Common::Redis::Client::ClientPtr redis_client_;
-    // A-5: why this connection is being torn down, stamped on the wrapper by the caller rather than
+    // why this connection is being torn down, stamped on the wrapper by the caller rather than
     // reconstructed in onEvent from a separate per-thread container. A PLANNED subscription-host
     // removal (onHostsRemoved) sets this true so the close-driven onEvent can tell it apart from a
     // genuine connection loss and skip its redundant resubscribe (the onClusterTopologyChange the
-    // member-update posts already re-routes the moved channels — C-6). Only meaningful for a
+    // member-update posts already re-routes the moved channels). Only meaningful for a
     // subscription connection; the data path ignores it.
     bool planned_removal_{false};
   };
@@ -163,6 +163,16 @@ private:
     bool ask_redirection_;
     Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr
         cache_load_handle_;
+    // True only during an in-flight async DNS-redirect (the ``Loading`` window):
+    // ``request_handler_`` has been cleared (the client-side request was already popped) but
+    // the request is NOT complete; ``cache_load_handle_`` is the live continuation. Marks the entry
+    // "pending but not poppable" so onRequestCompleted does not destroy it out from under the DNS
+    // callback (hang). Both cancel() and the dtor cancel the DNS lookup via cache_load_handle_
+    // so its continuation can never fire into freed callbacks (UAF); they differ on the terminal
+    // callback: cancel() clears this flag and delivers NONE (the caller abandoned the request),
+    // whereas the dtor with the flag still set (cluster removal / pool teardown, no cancel)
+    // delivers onFailure so a still-alive downstream is not left hanging.
+    bool in_dns_redirect_{false};
   };
 
   struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject,
@@ -237,8 +247,8 @@ private:
     Upstream::HostConstSharedPtr chooseUpstreamHostForChannel(const std::string& channel) override;
     bool shardCandidatesForChannel(const std::string& channel,
                                    std::vector<Upstream::HostConstSharedPtr>& out) override;
-    bool hostServesChannelSlot(const std::string& channel, const Upstream::HostConstSharedPtr& host,
-                               bool as_primary) override;
+    bool hostServesChannelSlot(const std::string& channel,
+                               const Upstream::HostConstSharedPtr& host) override;
     bool sendUpstreamSsubscribeToHost(const std::string& channel,
                                       Common::Redis::Client::PushMessageCallbacks& push_callbacks,
                                       const Upstream::HostConstSharedPtr& host) override;
@@ -249,6 +259,11 @@ private:
     bool resubscribeTimerPending() const override {
       return resubscribe_timer_ != nullptr && resubscribe_timer_->enabled();
     }
+    void cancelResubscribeTimer() override {
+      if (resubscribe_timer_ != nullptr) {
+        resubscribe_timer_->disableTimer();
+      }
+    }
     void requestTopologyRefresh() override;
     bool retireSubscriptionConnectionIfIdle(const Upstream::HostConstSharedPtr& host) override;
     // Retire ``host``'s now-idle subscription connection when its last channel unsubscribes.
@@ -256,7 +271,7 @@ private:
     // caller can report ConnectionRetired to the registry — a retired connection never acks the
     // SUNSUBSCRIBE. ``client_it`` is the caller's already-resolved subscription_client_map_ entry
     // for ``host`` (both call sites just looked it up to send/guard); reusing it avoids a second
-    // lookup (§6). Precondition: ``client_it`` points to a live (non-null) client and is not
+    // lookup. Precondition: ``client_it`` points to a live (non-null) client and is not
     // dereferenced by the caller after this returns. It stays valid across the
     // hostHasSubscriptions() query below — that reads the registry's channel index, never
     // subscription_client_map_, so no insert/rehash intervenes — and subscription_client_map_ is a
@@ -266,7 +281,7 @@ private:
                                       SubscriptionClientMap::iterator client_it);
 
     // Post ``fn`` to run against ``registry`` on the next event-loop iteration, capturing the
-    // registry WEAKLY (MISC-3): on worker shutdown a still-pending post must not hold the last
+    // registry WEAKLY: on worker shutdown a still-pending post must not hold the last
     // registry ref, or its destruction while the dispatcher is being torn down would deregister the
     // registry's subscribe-ack timer against an already-freed dispatcher (UAF). If the pool
     // released the registry first, the post simply no-ops. Centralizes the weak-post boilerplate
@@ -294,7 +309,7 @@ private:
     // hits.)
     SubscriptionClientMap subscription_client_map_;
     // (A planned subscription-host removal is now flagged on the closing wrapper itself —
-    // ThreadLocalActiveClient::planned_removal_ — instead of a separate host set here; A-5.)
+    // ThreadLocalActiveClient::planned_removal_ — instead of a separate host set here.)
     absl::node_hash_map<Upstream::HostConstSharedPtr, TokenBucketPtr> cx_rate_limiter_map_;
     Envoy::Common::CallbackHandlePtr host_set_member_update_cb_handle_;
     absl::node_hash_map<std::string, Upstream::HostConstSharedPtr> host_address_map_;
@@ -311,10 +326,16 @@ private:
      */
     Event::TimerPtr drain_timer_;
     bool is_redis_cluster_{false};
+    // The cluster load balancer's shard-membership interface, resolved once per cluster
+    // add/update alongside is_redis_cluster_ and cleared on removal, so the SHARD_MEMBERS placement
+    // callbacks are a pointer test instead of a per-call dynamic_cast. Null for a non-cluster
+    // load balancer or before the cluster is present. Safe to cache because the LB is not
+    // re-created on host changes (RedisClusterLoadBalancerFactory::recreateOnHostChangeDeprecated()
+    // is false).
+    const Clusters::Redis::ShardMembershipResolver* shard_membership_resolver_{nullptr};
     // Latches the one-time warning that ``subscription_placement`` SHARD_MEMBERS was configured on
     // a non-cluster upstream (which has no shard-membership model, so it degrades to PRIMARY).
-    // Warned from shardCandidatesForChannel on the first genuine non-cluster placement (§7 P3,
-    // finding 1).
+    // Warned from shardCandidatesForChannel on the first genuine non-cluster placement.
     bool warned_shard_members_non_cluster_{false};
     Common::Redis::Client::ClientFactory& client_factory_;
     Common::Redis::Client::ConfigSharedPtr config_;

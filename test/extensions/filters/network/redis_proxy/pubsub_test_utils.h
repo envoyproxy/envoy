@@ -14,7 +14,7 @@ namespace NetworkFilters {
 namespace RedisProxy {
 
 // Shared throwaway pub/sub subscriber stats for tests that construct a DownstreamSubscriber but do
-// not assert on its telemetry (S-4 made the four stats mandatory). Backed by a function-local
+// not assert on its telemetry (made the four stats mandatory). Backed by a function-local
 // IsolatedStore so every caller shares one set of counters and no test needs to plumb its own.
 inline DownstreamSubscriberStats& testDownstreamSubscriberStats() {
   static Stats::IsolatedStoreImpl store;

@@ -22,10 +22,10 @@ namespace RedisProxy {
  * connection's pipelined control commands IN ORDER, so the head of a host's FIFO is always the
  * oldest command still awaiting a reply. That is how the registry correlates an out-of-band
  * upstream Push (a subscribe/unsubscribe ack) or a non-Push reply (an ``-ERR``) back to the exact
- * (verb, channel, generation) attempt that produced it — the single ledger (A-4/S-1) that replaced
+ * (verb, channel, generation) attempt that produced it — the single ledger that replaced
  * the former separate expected-ack bookkeeping.
  *
- * Extracted from SubscriptionRegistry (D3) as an independently unit-testable component. The ledger
+ * Extracted from SubscriptionRegistry as an independently unit-testable component. The ledger
  * only orders commands; the registry owns SSUBSCRIBE-attempt GENERATION assignment and passes the
  * generation in, so this class carries no policy — just the FIFO discipline.
  */

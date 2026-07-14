@@ -11,7 +11,6 @@
 #include "source/common/common/hash.h"
 #include "source/common/network/filter_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/singleton/const_singleton.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/filters/network/common/redis/aws_iam_authenticator_impl.h"
@@ -30,13 +29,8 @@ namespace Client {
 // TODO(mattklein123): Circuit breaking
 // TODO(rshriram): Fault injection
 
-struct RedirectionValues {
-  const std::string ASK = "ASK";
-  const std::string MOVED = "MOVED";
-  const std::string CLUSTER_DOWN = "CLUSTERDOWN";
-};
-
-using RedirectionResponse = ConstSingleton<RedirectionValues>;
+// RedirectionValues / RedirectionResponse moved to client.h so the subscription registry can share
+// the MOVED/ASK/CLUSTERDOWN wire constants (still visible here via that include).
 
 class ConfigImpl : public Config {
 public:

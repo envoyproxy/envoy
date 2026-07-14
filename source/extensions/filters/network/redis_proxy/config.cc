@@ -67,7 +67,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
     throw EnvoyException("cannot configure a redis-proxy without any upstream");
   }
 
-  // Validate the pub/sub resubscribe backoff and subscribe-ack timeout at config load (A-7). These
+  // Validate the pub/sub resubscribe backoff and subscribe-ack timeout at config load. These
   // feed JitteredExponentialBackOffStrategy and the subscribe-ack timer, which require strictly-
   // positive millisecond values with ``base <= max``. The proto only bounds each Duration below
   // (> 0), but a SUB-millisecond value rounds to 0ms here and an inverted base/max pair passes
@@ -75,7 +75,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   // ASSERT, or a ``% 0``) on the first RESP3 subscription. Compare the EFFECTIVE values, defaulting
   // via the SAME shared constexprs Common::Redis::Client::ConfigImpl uses (kDefault*Ms) so the
   // validator can never drift from the runtime. Same fail-at-config-load posture as the
-  // custom_commands pub/sub guard (G2) below.
+  // custom_commands pub/sub guard below.
   const auto& pubsub_settings = proto_config.settings().pubsub_settings();
   const int64_t subscribe_ack_timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(
       pubsub_settings, subscribe_ack_timeout, Common::Redis::Client::kDefaultSubscribeAckTimeoutMs);
@@ -98,7 +98,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
         "resubscribe_backoff_max_interval ({}ms)",
         resubscribe_backoff_base_ms, resubscribe_backoff_max_ms));
   }
-  // SW-3: cap each duration at 1 hour. These feed deadline arithmetic — the subscribe-ack scheduler
+  // cap each duration at 1 hour. These feed deadline arithmetic — the subscribe-ack scheduler
   // computes ``monotonicTime() + timeout_`` (a MonotonicTime point), and the generation / backoff
   // timers arm on these values — so an extreme value (PGV's Duration validator allows up to ~292
   // years) would overflow the time-point's signed nanosecond representation (UB) and could wrap to
@@ -175,8 +175,8 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   absl::flat_hash_set<std::string> custom_commands;
   for (const auto& cmd : proto_config.custom_commands()) {
-    // Reject custom_commands that would silently shadow the proxy's built-in pub/sub handlers (G2 /
-    // MISC-1). The command registry overwrites on insert and custom commands register last, so an
+    // Reject custom_commands that would silently shadow the proxy's built-in pub/sub handlers. The
+    // command registry overwrites on insert and custom commands register last, so an
     // entry like ``custom_commands: [publish]`` would replace the pub/sub handler with the generic
     // pass-through — defeating the sharded rewrite so a PUBLISH no longer reaches SSUBSCRIBE
     // subscribers — while ``[subscribe]`` (or the pattern verb ``[psubscribe]``, or an internal
@@ -195,13 +195,13 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
     custom_commands.insert(cmd);
   }
 
-  // D2: the sharded SUBSCRIBE rewrite is on unless the operator explicitly disables it for a RESP3
+  // the sharded SUBSCRIBE rewrite is on unless the operator explicitly disables it for a RESP3
   // upstream that lacks SSUBSCRIBE (Redis 6.x). ``pubsub_settings`` was read above for the backoff
   // validation.
   const bool enable_sharded_subscribe = pubsub_settings.sharded_subscription_mode() !=
                                         envoy::extensions::filters::network::redis_proxy::v3::
                                             RedisProxy::ConnPoolSettings::PubsubSettings::DISABLED;
-  // SW-1: the PUBLISH -> SPUBLISH rewrite is gated ONLY by the listener flag
+  // the PUBLISH -> SPUBLISH rewrite is gated ONLY by the listener flag
   // enable_sharded_publish, independent of the subscription mode. So DISABLED sharded subscribe
   // (the Redis 6.x escape hatch: the upstream has no SSUBSCRIBE) combined with
   // enable_sharded_publish rewrites every PUBLISH to an SPUBLISH the 6.x upstream then rejects. A

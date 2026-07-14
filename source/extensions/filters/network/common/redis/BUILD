@@ -77,6 +77,7 @@ envoy_cc_library(
         "//envoy/common:optref_lib",
         "//envoy/stats:stats_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/singleton:const_singleton",
         "//source/extensions/common/aws/signers:sigv4_signer_impl_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
