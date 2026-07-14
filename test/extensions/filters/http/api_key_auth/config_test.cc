@@ -4,6 +4,7 @@
 #include "source/extensions/filters/http/api_key_auth/config.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -13,6 +14,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ApiKeyAuth {
 namespace {
+
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 
 TEST(ApiKeyAuthFilterFactoryTest, DuplicateApiKey) {
   const std::string yaml = R"(
@@ -33,7 +37,7 @@ TEST(ApiKeyAuthFilterFactoryTest, DuplicateApiKey) {
 
   auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
 
-  EXPECT_FALSE(status_or.ok());
+  EXPECT_THAT(status_or, Not(IsOk()));
   EXPECT_EQ("Duplicated credential key: 'key1'", status_or.status().message());
 }
 
@@ -56,7 +60,7 @@ TEST(ApiKeyAuthFilterFactoryTest, EmptyKeySource) {
 
   auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
 
-  EXPECT_FALSE(status_or.ok());
+  EXPECT_THAT(status_or, Not(IsOk()));
   EXPECT_EQ("One of 'header'/'query'/'cookie' must be set.", status_or.status().message());
 }
 
@@ -88,7 +92,7 @@ TEST(ApiKeyAuthFilterFactoryTest, NormalFactory) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_TRUE(status_or.ok());
+  EXPECT_OK(status_or);
 
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
