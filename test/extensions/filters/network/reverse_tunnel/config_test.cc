@@ -3,6 +3,7 @@
 #include "source/extensions/filters/network/reverse_tunnel/config.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -13,6 +14,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ReverseTunnel {
 namespace {
+
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 
 TEST(ReverseTunnelFilterConfigFactoryTest, ValidConfiguration) {
   ReverseTunnelFilterConfigFactory factory;
@@ -30,7 +34,7 @@ request_method: PUT
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -50,7 +54,7 @@ TEST(ReverseTunnelFilterConfigFactoryTest, DefaultConfiguration) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -88,7 +92,7 @@ request_method: POST
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -111,7 +115,7 @@ request_method: POST
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -144,7 +148,7 @@ request_method: PUT
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -176,7 +180,7 @@ validation:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -202,7 +206,7 @@ validation:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -230,7 +234,7 @@ validation:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -257,7 +261,7 @@ validation:
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_FALSE(result.ok());
+  ASSERT_THAT(result, Not(IsOk()));
   EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to parse node_id_format"));
 }
 
@@ -276,7 +280,7 @@ validation:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -301,7 +305,7 @@ validation:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -326,7 +330,7 @@ validation:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -354,7 +358,7 @@ validation:
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_FALSE(result.ok());
+  ASSERT_THAT(result, Not(IsOk()));
   EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to parse tenant_id_format"));
 }
 
@@ -368,7 +372,7 @@ TEST(ReverseTunnelFilterConfigFactoryTest, ConfigurationSkipRebalancingEnabled) 
   ReverseTunnelFilterConfigFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
   EXPECT_TRUE(cb != nullptr);
 
