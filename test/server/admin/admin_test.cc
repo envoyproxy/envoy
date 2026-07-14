@@ -22,6 +22,7 @@
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -341,7 +342,7 @@ TEST_P(AdminInstanceTest, Overrides) {
   peer.routeConfigProvider().config();
   peer.routeConfigProvider().configInfo();
   peer.routeConfigProvider().lastUpdated();
-  ASSERT_TRUE(peer.routeConfigProvider().onConfigUpdate().ok());
+  ASSERT_OK(peer.routeConfigProvider().onConfigUpdate());
 
   peer.scopedRouteConfigProvider().lastUpdated();
   peer.scopedRouteConfigProvider().getConfig();
@@ -358,7 +359,7 @@ TEST_P(AdminInstanceTest, Overrides) {
 
   peer.socketFactory().clone();
   peer.socketFactory().closeAllSockets();
-  ASSERT_TRUE(peer.socketFactory().doFinalPreWorkerInit().ok());
+  ASSERT_OK(peer.socketFactory().doFinalPreWorkerInit());
 
   peer.listener().name();
   peer.listener().udpListenerConfig();

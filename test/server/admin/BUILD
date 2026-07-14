@@ -69,6 +69,7 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -188,6 +189,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/server/admin:utils_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
