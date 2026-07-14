@@ -1253,11 +1253,13 @@ ClusterInfoImpl::ClusterInfoImpl(
               server_context)),
       network_filter_config_provider_manager_(
           createSingletonUpstreamNetworkFilterConfigProviderManager(server_context)),
-      upstream_context_(server_context, init_manager,
-                        Runtime::runtimeFeatureEnabled(
-                            "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix")
-                            ? server_context.serverScope()
-                            : *stats_scope_),
+      upstream_context_(server_context, init_manager, *stats_scope_),
+      http_upstream_context_(
+          server_context, init_manager,
+          Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix")
+              ? server_context.serverScope()
+              : *stats_scope_),
       happy_eyeballs_config_(
           config.upstream_connection_options().has_happy_eyeballs_config()
               ? std::make_unique<
@@ -1407,15 +1409,16 @@ ClusterInfoImpl::ClusterInfoImpl(
   // early validation of sanity of fields that we should catch at config ingestion.
   DurationUtil::durationToMilliseconds(common_lb_config_->update_merge_window());
 
-  // When the flag is enabled, upstream_context_ uses the server root scope and both the upstream
-  // network and HTTP filter chains receive an explicit "cluster.<name>." stats_prefix. When
-  // disabled, upstream_context_ keeps the cluster-scoped stats_scope_ and we reproduce the legacy
-  // stats_prefix (the stringified scope prefix) so existing stat names are unchanged.
-  const bool correct_stats_prefix = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix");
-  const std::string cluster_stats_prefix =
-      correct_stats_prefix ? absl::StrCat("cluster.", name_, ".")
-                           : stats_scope_->symbolTable().toString(stats_scope_->prefix());
+  // stats_prefix passed to the upstream HTTP filter chain. When the correct-stats-prefix flag is
+  // enabled, http_upstream_context_ is scoped to the server root, so pass an explicit
+  // "cluster.<name>." prefix (mirroring the router, which passes the HCM stat prefix). When
+  // disabled, http_upstream_context_ keeps the cluster-scoped stats_scope_, so reproduce the legacy
+  // stringified scope prefix to keep existing stat names unchanged.
+  const std::string http_stats_prefix =
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix")
+          ? absl::StrCat("cluster.", name_, ".")
+          : stats_scope_->symbolTable().toString(stats_scope_->prefix());
 
   // Create upstream network filter factories
   const auto& filters = config.filters();
@@ -1451,7 +1454,7 @@ ClusterInfoImpl::ClusterInfoImpl(
             proto_config.typed_config(), factory_context.messageValidationVisitor(), *message),
         creation_status);
     Network::FilterFactoryCb callback =
-        factory.createFilterFactoryFromProto(*message, cluster_stats_prefix, upstream_context_);
+        factory.createFilterFactoryFromProto(*message, upstream_context_);
     filter_factories_.push_back(
         network_filter_config_provider_manager_->createStaticFilterConfigProvider(
             callback, proto_config.name()));
@@ -1465,15 +1468,12 @@ ClusterInfoImpl::ClusterInfoImpl(
         return;
       }
 
-      // With the flag on, upstream_context_ uses the server root scope (empty prefix), so pass
-      // "cluster.<name>." explicitly as stats_prefix and HTTP filter stats land under
-      // "cluster.<name>.*", mirroring the router case where the HCM stat prefix is the
-      // stats_prefix.
       Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                               Server::Configuration::UpstreamHttpFilterConfigFactory>
-          helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
-                 factory_context.serverFactoryContext().clusterManager(), upstream_context_,
-                 cluster_stats_prefix);
+          helper(*http_filter_config_provider_manager_,
+                 http_upstream_context_.serverFactoryContext(),
+                 factory_context.serverFactoryContext().clusterManager(), http_upstream_context_,
+                 http_stats_prefix);
       SET_AND_RETURN_IF_NOT_OK(helper.processFilters(http_protocol_options_->http_filters_,
                                                      "upstream http", "upstream http",
                                                      http_filter_factories_),

@@ -1147,7 +1147,13 @@ private:
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
+  // Context for upstream network filters. Always scoped to stats_scope_ ("cluster.<name>."), since
+  // network filters scope stats via context.scope() and have no stats_prefix parameter.
   UpstreamFactoryContextImpl upstream_context_;
+  // Context for upstream HTTP filters. Scoped to the server root when the correct-stats-prefix flag
+  // is enabled (the explicit "cluster.<name>." stats_prefix is then passed via FilterChainHelper),
+  // otherwise scoped to stats_scope_ to preserve legacy stat names.
+  UpstreamFactoryContextImpl http_upstream_context_;
   const std::unique_ptr<
       const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
       happy_eyeballs_config_;
