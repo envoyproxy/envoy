@@ -1,6 +1,7 @@
 #include "source/common/config/utility.h"
 #include "source/extensions/path/rewrite/uri_template/config.h"
 
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -9,6 +10,9 @@ namespace Envoy {
 namespace Extensions {
 namespace UriTemplate {
 namespace Rewrite {
+
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 
 TEST(ConfigTest, TestEmptyConfig) {
   const std::string yaml_string = R"EOF(
@@ -62,7 +66,7 @@ TEST(ConfigTest, InvalidConfigSetup) {
   absl::StatusOr<Router::PathRewriterSharedPtr> config_or_error =
       factory->createPathRewriter(*message);
 
-  EXPECT_FALSE(config_or_error.ok());
+  EXPECT_THAT(config_or_error, Not(IsOk()));
   EXPECT_EQ(config_or_error.status().message(),
             "path_rewrite_policy.path_template_rewrite /bar/{lang}/{country is invalid");
 }
@@ -92,7 +96,7 @@ TEST(ConfigTest, TestConfigSetup) {
   absl::StatusOr<Router::PathRewriterSharedPtr> config_or_error =
       factory->createPathRewriter(*message);
 
-  EXPECT_TRUE(config_or_error.ok());
+  EXPECT_OK(config_or_error);
 }
 
 TEST(ConfigTest, TestInvalidConfigSetup) {
@@ -120,7 +124,7 @@ TEST(ConfigTest, TestInvalidConfigSetup) {
   absl::StatusOr<Router::PathRewriterSharedPtr> config_or_error =
       factory->createPathRewriter(*message);
 
-  EXPECT_FALSE(config_or_error.ok());
+  EXPECT_THAT(config_or_error, Not(IsOk()));
   EXPECT_EQ(config_or_error.status().message(),
             "path_rewrite_policy.path_template_rewrite /bar/{lang}/country} is invalid");
 }

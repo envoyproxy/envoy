@@ -20,5 +20,6 @@ envoy_extension_cc_test(
         "//source/common/network:transport_socket_options_lib",
         "//source/common/stream_info:filter_state_lib",
         "//source/extensions/local_address_selectors/filter_state_override:config",
+        "//test/test_common:status_utility_lib",
     ],
 )

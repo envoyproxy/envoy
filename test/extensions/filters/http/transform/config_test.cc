@@ -5,6 +5,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -14,6 +15,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Transform {
 namespace {
+
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 
 TEST(FactoryTest, FactoryTest) {
   testing::NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context;
@@ -95,7 +99,7 @@ clear_cluster_cache: true
 
     auto cb_or_error =
         factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context);
-    EXPECT_FALSE(cb_or_error.status().ok());
+    EXPECT_THAT(cb_or_error.status(), Not(IsOk()));
     EXPECT_EQ("Only one of clear_cluster_cache and clear_route_cache can be set to true",
               cb_or_error.status().message());
   }
