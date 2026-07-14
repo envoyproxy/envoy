@@ -260,6 +260,10 @@ public:
    * scope implementations. Legacy scope implementations intentionally drop tag metadata on that
    * path (they cannot compose tag-extracted names with their prefix in general), so they
    * override this to honor the components, which arrive fully resolved.
+   *
+   * This assumes the parent and child processes use the same scope implementation across the hot
+   * restart: full_name is taken verbatim as the child's cache key rather than being re-derived,
+   * so a mismatch in how the two processes compose flat names is not supported.
    * @param full_name the complete flat stat name (with tag values) recovered from the parent,
    *                  matching what the child independently creates for the same stat.
    * @param tag_extracted_name the stat name with tag values removed.
