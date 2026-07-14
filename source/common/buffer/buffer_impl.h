@@ -137,12 +137,7 @@ public:
     return *this;
   }
 
-  ~Slice() {
-    callAndClearDrainTrackersAndCharges();
-    if (releasor_) {
-      releasor_();
-    }
-  }
+  ~Slice();
 
   /**
    * @return true if the data in the slice is mutable
@@ -642,6 +637,7 @@ private:
  */
 class OwnedImpl : public LibEventInstance {
 public:
+  friend class Slice;
   OwnedImpl();
   OwnedImpl(absl::string_view data);
   OwnedImpl(const Instance& data);
@@ -777,6 +773,16 @@ private:
       }
     }
 
+    /**
+     * Recycle a storage block back to the thread-local freelist if it matches the default size
+     * and the freelist has capacity.
+     */
+    static void recycle(Slice::StoragePtr storage, size_t size) {
+      if (size == Slice::default_slice_size_ && free_list_.size() < free_list_max_) {
+        free_list_.push_back(std::move(storage));
+      }
+    }
+
     Slice::SizedStorage newStorage() {
       ASSERT(Slice::sliceSize(Slice::default_slice_size_) == Slice::default_slice_size_);
 
@@ -857,6 +863,17 @@ private:
 };
 
 using OwnedBufferFragmentImplPtr = std::unique_ptr<OwnedBufferFragmentImpl>;
+
+// Define Slice destructor after OwnedImpl is fully defined
+inline Slice::~Slice() {
+  callAndClearDrainTrackersAndCharges();
+  if (releasor_) {
+    releasor_();
+  }
+  if (storage_) {
+    OwnedImpl::OwnedImplReservationSlicesOwnerMultiple::recycle(std::move(storage_), capacity_);
+  }
+}
 
 } // namespace Buffer
 } // namespace Envoy
