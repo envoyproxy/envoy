@@ -739,7 +739,7 @@ envoy.filters.http.rate_limit_quota:
   categories:
   - envoy.filters.http
   security_posture: unknown
-  status: wip
+  status: stable
   type_urls:
   - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig
   - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaOverride
