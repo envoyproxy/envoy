@@ -61,6 +61,7 @@ envoy_cc_library(
         "//source/common/config:resource_type_helper_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:watched_directory_lib",
+        "//source/common/config:well_known_names",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",

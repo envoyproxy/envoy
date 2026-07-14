@@ -363,7 +363,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcInvalid) {
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
   initialize();
-  EXPECT_CALL(scope_, createScope_("grpc.foo."));
+  EXPECT_CALL(scope_, createScope_("grpc", "grpc.foo."));
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
 
@@ -379,7 +379,7 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalCharsInKey) {
   initialize();
-  EXPECT_CALL(scope_, createScope_("grpc.foo."));
+  EXPECT_CALL(scope_, createScope_("grpc", "grpc.foo."));
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
 
@@ -400,7 +400,7 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalCharsInKey) {
 
 TEST_F(AsyncClientManagerImplTest, LegalGoogleGrpcChar) {
   initialize();
-  EXPECT_CALL(scope_, createScope_("grpc.foo."));
+  EXPECT_CALL(scope_, createScope_("grpc", "grpc.foo."));
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
 
@@ -420,7 +420,7 @@ TEST_F(AsyncClientManagerImplTest, LegalGoogleGrpcChar) {
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalCharsInValue) {
   initialize();
-  EXPECT_CALL(scope_, createScope_("grpc.foo."));
+  EXPECT_CALL(scope_, createScope_("grpc", "grpc.foo."));
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
 

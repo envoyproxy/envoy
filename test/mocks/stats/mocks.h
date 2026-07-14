@@ -298,21 +298,23 @@ public:
   MockScope(StatName prefix, MockStore& store);
 
   ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name, TagStringViewSpan,
-                                           absl::string_view, bool evictable,
+                                           absl::string_view tagged_name, bool evictable,
                                            const ScopeStatsLimitSettings& limits,
                                            StatsMatcherSharedPtr) override {
     checkCreateScopeArgs(evictable, limits);
-    return ScopeSharedPtr(createScope_(std::string(base_name)));
+    return ScopeSharedPtr(createScope_(std::string(base_name), std::string(tagged_name)));
   }
-  ScopeSharedPtr scopeFromTaggedName(StatName base_name, StatNameTagSpan, StatName, bool evictable,
-                                     const ScopeStatsLimitSettings& limits,
+  ScopeSharedPtr scopeFromTaggedName(StatName base_name, StatNameTagSpan, StatName tagged_name,
+                                     bool evictable, const ScopeStatsLimitSettings& limits,
                                      StatsMatcherSharedPtr) override {
     checkCreateScopeArgs(evictable, limits);
-    return createScope_(symbolTable().toString(base_name));
+    return createScope_(symbolTable().toString(base_name),
+                        tagged_name.empty() ? std::string() : symbolTable().toString(tagged_name));
   }
 
   MOCK_METHOD(void, checkCreateScopeArgs, (bool, const ScopeStatsLimitSettings&));
-  MOCK_METHOD(ScopeSharedPtr, createScope_, (const std::string& name));
+  MOCK_METHOD(ScopeSharedPtr, createScope_,
+              (const std::string& base_name, const std::string& tagged_name));
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));
   MOCK_METHOD(HistogramOptConstRef, findHistogram, (StatName), (const));
