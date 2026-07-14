@@ -1715,7 +1715,8 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         std::optional<uint64_t>(std::nullopt)));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _))
+              putResult(Upstream::Outlier::Result::ExtOriginRequestFailed,
+                        std::optional<uint64_t>(503)))
       .Times(0);
   // The reset will be converted into a local reply.
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, testing::Eq(""), _, _,
@@ -2306,7 +2307,8 @@ TEST_F(RouterTest, GrpcReset) {
   response_decoder->decodeHeaders(std::move(response_headers), false);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+              putResult(Upstream::Outlier::Result::ExtOriginRequestFailed,
+                        std::optional<uint64_t>(503)));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
   EXPECT_EQ(1UL, stats_store_.counter("test.rq_reset_after_downstream_response_started").value());
@@ -4049,7 +4051,8 @@ TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
 
   // First is reset
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+              putResult(Upstream::Outlier::Result::ExtOriginRequestFailed,
+                        std::optional<uint64_t>(503)));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         std::optional<uint64_t>(std::nullopt)))
@@ -4282,7 +4285,8 @@ TEST_F(RouterTest, RetryUpstreamReset) {
         return RetryStatus::Yes;
       }));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+              putResult(Upstream::Outlier::Result::ExtOriginRequestFailed,
+                        std::optional<uint64_t>(503)));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 
   // We expect this reset to kick off a new request.
@@ -4355,7 +4359,8 @@ TEST_F(RouterTest, RetryHttp3UpstreamReset) {
       }));
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+              putResult(Upstream::Outlier::Result::ExtOriginRequestFailed,
+                        std::optional<uint64_t>(503)));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 
   // We expect this reset to kick off a new request.
@@ -4710,7 +4715,8 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
               putResult(_, std::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers), false);
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+              putResult(Upstream::Outlier::Result::ExtOriginRequestFailed,
+                        std::optional<uint64_t>(503)));
   // Normally, sendLocalReply will actually send the reply, but in this case the
   // HCM will detect the headers have already been sent and not route through
   // the encoder again.
@@ -4749,7 +4755,8 @@ TEST_F(RouterTest, RetryUpstreamReset1xxResponseStarted) {
       1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+              putResult(Upstream::Outlier::Result::ExtOriginRequestFailed,
+                        std::optional<uint64_t>(503)));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_EQ(1U,
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
