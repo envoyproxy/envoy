@@ -40,8 +40,8 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
   }
 
   auto factory_or_error = QuicServerTransportSocketFactory::create(
-      enable_early_data, enable_resumption, context.statsScope(),
-      std::move(server_config), context.serverFactoryContext().sslContextManager());
+      enable_early_data, enable_resumption, context.statsScope(), std::move(server_config),
+      context.serverFactoryContext().sslContextManager());
   RETURN_IF_NOT_OK(factory_or_error.status());
   (*factory_or_error)->initialize();
   return std::move(*factory_or_error);
@@ -112,9 +112,8 @@ QuicServerTransportSocketFactory::create(bool enable_early_data, bool enable_res
                                          Stats::Scope& store, Ssl::ServerContextConfigPtr config,
                                          Envoy::Ssl::ContextManager& manager) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<QuicServerTransportSocketFactory>(
-      new QuicServerTransportSocketFactory(enable_early_data, enable_resumption, store,
-                                           std::move(config), manager, creation_status));
+  auto ret = std::unique_ptr<QuicServerTransportSocketFactory>(new QuicServerTransportSocketFactory(
+      enable_early_data, enable_resumption, store, std::move(config), manager, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
