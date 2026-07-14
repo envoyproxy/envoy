@@ -2,6 +2,7 @@
 #include "source/extensions/filters/http/mcp/mcp_filter.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -33,7 +34,7 @@ TEST_F(McpFilterConfigTest, CreateFilterWithEmptyConfig) {
 
   absl::StatusOr<Http::FilterFactoryCb> cb =
       factory_->createFilterFactoryFromProto(proto_config, "stats", context_);
-  ASSERT_TRUE(cb.ok());
+  ASSERT_OK(cb);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
@@ -48,7 +49,7 @@ TEST_F(McpFilterConfigTest, CreateRouteSpecificConfig) {
   auto config_or = factory_->createRouteSpecificFilterConfig(
       proto_config, server_context, ProtobufMessage::getNullValidationVisitor());
 
-  EXPECT_TRUE(config_or.ok());
+  EXPECT_OK(config_or);
   EXPECT_NE(nullptr, config_or.value());
 }
 
