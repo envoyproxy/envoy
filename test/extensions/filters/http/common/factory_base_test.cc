@@ -6,6 +6,7 @@
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -17,6 +18,8 @@ namespace HttpFilters {
 namespace Common {
 namespace {
 
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 using RouterProto = envoy::extensions::filters::http::router::v3::Router;
 
 // A minimal concrete filter factory used to test the default (non-overridden) behavior of
@@ -76,7 +79,7 @@ TEST(FactoryBaseTest, CommonBehavior) {
   // The default route-specific config implementation returns a nullptr config.
   auto route_config = factory.createRouteSpecificFilterConfig(
       proto_config, server_context, server_context.messageValidationVisitor());
-  ASSERT_TRUE(route_config.ok());
+  ASSERT_OK(route_config);
   EXPECT_EQ(nullptr, route_config.value());
 }
 
@@ -105,7 +108,7 @@ TEST(FactoryBaseTest, FactoryContextCreation) {
   RouterProto proto_config;
 
   auto cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  ASSERT_TRUE(cb.ok());
+  ASSERT_OK(cb);
   EXPECT_NE(nullptr, cb.value());
 }
 
@@ -119,7 +122,7 @@ TEST(FactoryBaseTest, ExceptionFreeServerContextNotSupported) {
   EXPECT_EQ("test.exception_free_factory_base", factory.name());
 
   auto result = factory.createHttpFilterFactoryFromProto(proto_config, "stats", server_context);
-  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result, Not(IsOk()));
   EXPECT_EQ(absl::StatusCode::kInvalidArgument, result.status().code());
   EXPECT_EQ("Creating HTTP filter factory from server factory context is not supported",
             result.status().message());
@@ -132,7 +135,7 @@ TEST(FactoryBaseTest, ExceptionFreeFactoryContextCreation) {
   RouterProto proto_config;
 
   auto cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  ASSERT_TRUE(cb.ok());
+  ASSERT_OK(cb);
   EXPECT_NE(nullptr, cb.value());
 }
 
@@ -146,12 +149,12 @@ TEST(FactoryBaseTest, DualFactoryContextCreation) {
   testing::NiceMock<Server::Configuration::MockFactoryContext> downstream_context;
   auto downstream_cb =
       factory.createFilterFactoryFromProto(proto_config, "stats", downstream_context);
-  ASSERT_TRUE(downstream_cb.ok());
+  ASSERT_OK(downstream_cb);
   EXPECT_NE(nullptr, downstream_cb.value());
 
   testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_context;
   auto upstream_cb = factory.createFilterFactoryFromProto(proto_config, "stats", upstream_context);
-  ASSERT_TRUE(upstream_cb.ok());
+  ASSERT_OK(upstream_cb);
   EXPECT_NE(nullptr, upstream_cb.value());
 }
 
