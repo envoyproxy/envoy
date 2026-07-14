@@ -43,11 +43,13 @@ namespace Envoy {
 namespace Formatter {
 namespace {
 
+using ::Envoy::StatusHelpers::IsOk;
 using StatusHelpers::HasStatus;
 using testing::Const;
 using testing::HasSubstr;
 using testing::Invoke;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
@@ -5535,7 +5537,7 @@ TEST(SubstitutionFormatterTest, ParserSuccesses) {
                                          "%DOWNSTREAM_PEER_FINGERPRINT_256%"};
 
   for (const std::string& test_case : test_cases) {
-    EXPECT_TRUE(parser.parse(test_case).status().ok());
+    EXPECT_OK(parser.parse(test_case).status());
   }
 }
 
@@ -5703,9 +5705,9 @@ TEST(SubstitutionFormatParser, SyntaxVerifierFail) {
       };
 
   for (const auto& test_case : test_cases) {
-    EXPECT_FALSE(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
-                                                    std::get<1>(test_case), std::get<2>(test_case))
-                     .ok());
+    EXPECT_THAT(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
+                                                   std::get<1>(test_case), std::get<2>(test_case)),
+                Not(IsOk()));
   }
 }
 
@@ -5734,9 +5736,8 @@ TEST(SubstitutionFormatParser, SyntaxVerifierPass) {
            std::nullopt}};
 
   for (const auto& test_case : test_cases) {
-    EXPECT_TRUE(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
-                                                   std::get<1>(test_case), std::get<2>(test_case))
-                    .ok());
+    EXPECT_OK(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
+                                                 std::get<1>(test_case), std::get<2>(test_case)));
   }
 }
 
@@ -6048,7 +6049,7 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterWithOtherCommands) {
 
   auto formatter_or_error = FormatterImpl::create(
       R"(protocol=%PROTOCOL% host=%COALESCE({"operators": ["REQUESTED_SERVER_NAME", {"command": "REQ", "param": ":authority"}]})%)");
-  ASSERT_TRUE(formatter_or_error.ok());
+  ASSERT_OK(formatter_or_error);
   auto& formatter = *formatter_or_error.value();
 
   std::string result = formatter.format({&request_headers}, stream_info);

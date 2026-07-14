@@ -25,10 +25,12 @@ namespace Envoy {
 namespace Config {
 namespace {
 using ::Envoy::StatusHelpers::HasStatus;
+using ::Envoy::StatusHelpers::IsOk;
 using ::testing::_;
 using ::testing::AtLeast;
 using ::testing::HasSubstr;
 using ::testing::NiceMock;
+using ::testing::Not;
 using ::testing::Return;
 
 class AsyncDataSourceTest : public testing::Test {
@@ -351,7 +353,7 @@ TEST(DataSourceProviderTest, FileDataSourceNoWatchWithFailedDataTransformCb) {
   auto provider_or_error =
       DataSource::DataSourceProvider<typename absl::flat_hash_set<std::string>>::create(
           config, *dispatcher, tls, *api, false, data_transform_cb, 0);
-  EXPECT_FALSE(provider_or_error.ok());
+  EXPECT_THAT(provider_or_error, Not(IsOk()));
   EXPECT_EQ("Failed to transform data", provider_or_error.status().message());
 
   // Remove the file.
@@ -741,7 +743,7 @@ TEST(DataSourceProviderTest, FileDataSourceAndWatchDirectoryCreationFailure) {
   auto provider_or_error = DataSource::DataSourceProvider<std::string>::create(
       config, *dispatcher, tls, *api, false,
       [](absl::string_view data) { return std::make_shared<std::string>(data); }, 0);
-  EXPECT_FALSE(provider_or_error.ok());
+  EXPECT_THAT(provider_or_error, Not(IsOk()));
   EXPECT_THAT(provider_or_error.status().message(),
               testing::HasSubstr("/non/existent/directory/path"));
 
@@ -898,9 +900,9 @@ TEST(DataSourceProviderTest, Singleton) {
                                          TestEnvironment::temporaryPath(filename));
     TestUtility::loadFromYamlAndValidate(yaml, config);
     auto provider1 = singleton->getOrCreate(config);
-    EXPECT_TRUE(provider1.ok());
+    EXPECT_OK(provider1);
     auto provider2 = singleton->getOrCreate(config);
-    EXPECT_TRUE(provider2.ok());
+    EXPECT_OK(provider2);
     EXPECT_NE(provider1->get(), provider2->get());
     dispatcher->run(Event::Dispatcher::RunType::Block);
   }
@@ -918,9 +920,9 @@ TEST(DataSourceProviderTest, Singleton) {
   {
     // Dynamic sources should share providers.
     auto provider1 = singleton->getOrCreate(config);
-    EXPECT_TRUE(provider1.ok());
+    EXPECT_OK(provider1);
     auto provider2 = singleton->getOrCreate(config);
-    EXPECT_TRUE(provider2.ok());
+    EXPECT_OK(provider2);
     EXPECT_EQ(provider1->get(), provider2->get());
     provider1->reset();
     provider2->reset();
@@ -929,7 +931,7 @@ TEST(DataSourceProviderTest, Singleton) {
 
   // Destruction of the singleton is handled correctly.
   auto provider = singleton->getOrCreate(config);
-  EXPECT_TRUE(provider.ok());
+  EXPECT_OK(provider);
   singleton.reset();
   unlink(TestEnvironment::temporaryPath(filename).c_str());
   provider->reset();

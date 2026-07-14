@@ -10,13 +10,16 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::HasSubstr;
 using testing::Invoke;
+using ::testing::Not;
 using testing::Return;
 
 namespace Envoy {
@@ -335,7 +338,7 @@ TEST(LoggerTest, TestJsonFormatError) {
 
   // This scenario shouldn't happen in production, the test is added mainly for coverage.
   auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
-  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status, Not(IsOk()));
   EXPECT_FALSE(Envoy::Logger::Registry::jsonLogFormatSet());
   EXPECT_EQ("INVALID_ARGUMENT: Provided struct cannot be serialized as JSON string",
             status.ToString());
@@ -350,7 +353,7 @@ TEST(LoggerTest, TestJsonFormatNonEscapedThrows) {
     (*log_struct.mutable_fields())["NullField"].set_null_value(Protobuf::NULL_VALUE);
 
     auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
-    EXPECT_FALSE(status.ok());
+    EXPECT_THAT(status, Not(IsOk()));
     EXPECT_FALSE(Envoy::Logger::Registry::jsonLogFormatSet());
     EXPECT_EQ("INVALID_ARGUMENT: Usage of %v is unavailable for JSON log formats",
               status.ToString());
@@ -362,7 +365,7 @@ TEST(LoggerTest, TestJsonFormatNonEscapedThrows) {
     (*log_struct.mutable_fields())["NullField"].set_null_value(Protobuf::NULL_VALUE);
 
     auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
-    EXPECT_FALSE(status.ok());
+    EXPECT_THAT(status, Not(IsOk()));
     EXPECT_FALSE(Envoy::Logger::Registry::jsonLogFormatSet());
     EXPECT_EQ("INVALID_ARGUMENT: Usage of %_ is unavailable for JSON log formats",
               status.ToString());
@@ -372,7 +375,7 @@ TEST(LoggerTest, TestJsonFormatNonEscapedThrows) {
 TEST(LoggerTest, TestJsonFormatEmptyStruct) {
   Protobuf::Struct log_struct;
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
-  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
+  EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
@@ -390,12 +393,12 @@ TEST(LoggerTest, TestJsonFormatNullAndFixedField) {
   (*log_struct.mutable_fields())["FixedValue"].set_string_value("Fixed");
   (*log_struct.mutable_fields())["NullField"].set_null_value(Protobuf::NULL_VALUE);
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
-  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
+  EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto&) {
-    EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+    EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
     EXPECT_THAT(msg, HasSubstr("\"Message\":\"hello\""));
     EXPECT_THAT(msg, HasSubstr("\"FixedValue\":\"Fixed\""));
     EXPECT_THAT(msg, HasSubstr("\"NullField\":null"));
@@ -409,25 +412,25 @@ TEST(LoggerTest, TestJsonFormat) {
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
-  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
+  EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _))
       .WillOnce(Invoke([](auto msg, auto& log) {
-        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+        EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"hello\""));
         EXPECT_EQ(log.logger_name, "misc");
       }))
       .WillOnce(Invoke([](auto msg, auto& log) {
-        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+        EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"hel\\nlo\""));
         EXPECT_EQ(log.logger_name, "misc");
       }))
       .WillOnce(Invoke([](auto msg, auto& log) {
-        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+        EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"hel\\\"lo\""));
         EXPECT_EQ(log.logger_name, "misc");
@@ -444,12 +447,12 @@ TEST(LoggerTest, TestJsonFormatWithNestedJsonMessage) {
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   (*log_struct.mutable_fields())["FixedValue"].set_string_value("Fixed");
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
-  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
+  EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
-    EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+    EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
     EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
     EXPECT_THAT(msg, HasSubstr("\"Message\":\"{\\\"nested_message\\\":\\\"hello\\\"}\""));
     EXPECT_THAT(msg, HasSubstr("\"FixedValue\":\"Fixed\""));
@@ -640,7 +643,7 @@ TEST(TaggedLogTest, TestConnEventLogWithJsonFormat) {
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
-  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
+  EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
@@ -650,7 +653,7 @@ TEST(TaggedLogTest, TestConnEventLogWithJsonFormat) {
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+        EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message val\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
@@ -724,7 +727,7 @@ TEST(TaggedLogTest, TestTaggedLogWithJsonFormat) {
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
-  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
+  EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
@@ -734,13 +737,13 @@ TEST(TaggedLogTest, TestTaggedLogWithJsonFormat) {
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+        EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message val\""));
         EXPECT_THAT(msg, HasSubstr("\"key\":\"val\""));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+        EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake me\\\"ssage val\""));
         EXPECT_THAT(msg, HasSubstr("\"ke\\\"y\":\"v\\\"al\""));
@@ -757,7 +760,7 @@ TEST(TaggedLogTest, TestTaggedConnLogWithJsonFormat) {
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
-  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
+  EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
@@ -767,20 +770,20 @@ TEST(TaggedLogTest, TestTaggedConnLogWithJsonFormat) {
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+        EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+        EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"key\":\"val\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+        EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"key_inline\":\"val\""));
@@ -801,7 +804,7 @@ TEST(TaggedLogTest, TestConnLogWithJsonFormat) {
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
-  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
+  EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
@@ -811,7 +814,7 @@ TEST(TaggedLogTest, TestConnLogWithJsonFormat) {
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+        EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message val\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
@@ -826,7 +829,7 @@ TEST(TaggedLogTest, TestTaggedStreamLogWithJsonFormat) {
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
-  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
+  EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
@@ -836,14 +839,14 @@ TEST(TaggedLogTest, TestTaggedStreamLogWithJsonFormat) {
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+        EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"StreamId\":\"300\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+        EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"key\":\"val\""));
@@ -851,7 +854,7 @@ TEST(TaggedLogTest, TestTaggedStreamLogWithJsonFormat) {
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+        EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"key_inline\":\"val\""));
@@ -873,7 +876,7 @@ TEST(TaggedLogTest, TestStreamLogWithJsonFormat) {
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
-  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
+  EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
@@ -883,7 +886,7 @@ TEST(TaggedLogTest, TestStreamLogWithJsonFormat) {
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+        EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message val\""));
         EXPECT_THAT(msg, HasSubstr("\"StreamId\":\"300\""));
@@ -900,7 +903,7 @@ TEST(TaggedLogTest, TestTaggedLogWithJsonFormatMultipleJFlags) {
   (*log_struct.mutable_fields())["Message1"].set_string_value("%j");
   (*log_struct.mutable_fields())["Message2"].set_string_value("%j");
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
-  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
+  EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
@@ -910,7 +913,7 @@ TEST(TaggedLogTest, TestTaggedLogWithJsonFormatMultipleJFlags) {
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+        EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message1\":\"fake message val\""));
         EXPECT_THAT(msg, HasSubstr("\"Message2\":\"fake message val\""));
