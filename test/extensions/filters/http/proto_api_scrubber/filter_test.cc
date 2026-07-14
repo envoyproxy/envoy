@@ -22,6 +22,7 @@
 #include "test/proto/bookstore.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/log/log.h"
@@ -127,7 +128,7 @@ public:
   void initializeRealConfig(const ProtoApiScrubberConfig& proto_config,
                             Server::Configuration::FactoryContext& context) {
     auto config_or_status = ProtoApiScrubberFilterConfig::create(proto_config, context);
-    ASSERT_TRUE(config_or_status.ok());
+    ASSERT_OK(config_or_status);
     real_config_ = config_or_status.value();
   }
 
@@ -880,7 +881,7 @@ TEST_F(ProtoApiScrubberPathValidationTest, ValidateMethodNameScenarios) {
 
 TEST_F(ProtoApiScrubberFilterTest, UnknownGrpcMethod_RequestFlow) {
   ProtoApiScrubberConfig config;
-  ASSERT_TRUE(reloadFilter(config).ok());
+  ASSERT_OK(reloadFilter(config));
 
   // Prepare request.
   TestRequestHeaderMapImpl req_headers =
@@ -971,7 +972,7 @@ TEST_F(ProtoApiScrubberScrubbingTest, ScrubRequestSimpleField) {
                  kRemoveFieldActionType);
 
   // Reload the filter with the above config.
-  ASSERT_TRUE(reloadFilter(proto_config).ok());
+  ASSERT_OK(reloadFilter(proto_config));
 
   // Prepare the request.
   TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
@@ -1006,7 +1007,7 @@ TEST_F(ProtoApiScrubberScrubbingTest, ScrubRequestNestedField) {
                  kRemoveFieldActionType);
 
   // Reload the filter with the above config.
-  ASSERT_TRUE(reloadFilter(proto_config).ok());
+  ASSERT_OK(reloadFilter(proto_config));
 
   // Prepare the request.
   TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
@@ -1038,7 +1039,7 @@ TEST_F(ProtoApiScrubberScrubbingTest, RequestScrubbingFailsOnTruncatedNestedMess
   // Target 'key' (Field 2) in the Request
   addRestriction(proto_config, method_name, "key.display_name", FieldType::Request, true,
                  kRemoveFieldActionType);
-  ASSERT_TRUE(reloadFilter(proto_config).ok());
+  ASSERT_OK(reloadFilter(proto_config));
 
   TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
@@ -1055,7 +1056,7 @@ TEST_F(ProtoApiScrubberScrubbingTest, RequestScrubbingFailsOnTruncatedNestedMess
   // Verify Fail-Open (data matches expected payload unmodified)
   Envoy::Grpc::Decoder decoder;
   std::vector<Envoy::Grpc::Frame> frames;
-  ASSERT_TRUE(decoder.decode(bad_data, frames).ok());
+  ASSERT_OK(decoder.decode(bad_data, frames));
 
   EXPECT_EQ(createTruncatedPayload(0x12), frames[0].data_->toString());
 
@@ -1080,7 +1081,7 @@ TEST_F(ProtoApiScrubberScrubbingTest, ScrubRequestAnyField) {
 
   // Reload the filter with the config and descriptor set containing ScrubberTestMessage and
   // SensitiveMessage
-  ASSERT_TRUE(reloadFilter(proto_config, kScrubberTestDescriptorRelativePath).ok());
+  ASSERT_OK(reloadFilter(proto_config, kScrubberTestDescriptorRelativePath));
 
   // Prepare request
   TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
@@ -1103,7 +1104,7 @@ TEST_F(ProtoApiScrubberScrubbingTest, ScrubRequestAnyField) {
   ScrubRequest scrubbed_request;
   std::vector<Envoy::Grpc::Frame> frames;
   Envoy::Grpc::Decoder decoder;
-  EXPECT_TRUE(decoder.decode(*request_data, frames).ok());
+  EXPECT_OK(decoder.decode(*request_data, frames));
   EXPECT_EQ(frames.size(), 1);
   EXPECT_TRUE(scrubbed_request.ParseFromString(frames[0].data_->toString()));
 
@@ -1187,7 +1188,7 @@ TEST_F(ProtoApiScrubberResponseScrubbingTest, ScrubResponseSimpleField) {
   addRestriction(proto_config, method_name, field_path, FieldType::Response, true,
                  kRemoveFieldActionType);
 
-  ASSERT_TRUE(reloadFilter(proto_config).ok());
+  ASSERT_OK(reloadFilter(proto_config));
 
   TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
@@ -1222,7 +1223,7 @@ TEST_F(ProtoApiScrubberResponseScrubbingTest, ScrubResponseNestedField) {
   addRestriction(proto_config, method_name, field_path, FieldType::Response, true,
                  kRemoveFieldActionType);
 
-  ASSERT_TRUE(reloadFilter(proto_config).ok());
+  ASSERT_OK(reloadFilter(proto_config));
 
   TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
@@ -1256,7 +1257,7 @@ TEST_F(ProtoApiScrubberResponseScrubbingTest, ResponseScrubbingFailsOnTruncatedN
   // Target 'create_time' (Field 4) in the Response
   addRestriction(proto_config, method_name, "create_time.seconds", FieldType::Response, true,
                  kRemoveFieldActionType);
-  ASSERT_TRUE(reloadFilter(proto_config).ok());
+  ASSERT_OK(reloadFilter(proto_config));
 
   TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
@@ -1276,7 +1277,7 @@ TEST_F(ProtoApiScrubberResponseScrubbingTest, ResponseScrubbingFailsOnTruncatedN
   // Verify that data matches expected payload (unmodified)
   Envoy::Grpc::Decoder decoder;
   std::vector<Envoy::Grpc::Frame> frames;
-  ASSERT_TRUE(decoder.decode(bad_data, frames).ok());
+  ASSERT_OK(decoder.decode(bad_data, frames));
 
   EXPECT_EQ(createTruncatedPayload(0x22), frames[0].data_->toString());
 
@@ -1459,7 +1460,7 @@ TEST_F(ProtoApiScrubberBufferConversionTest, RequestBufferConversionFailure) {
   // Configure a simple scrubbing rule
   addRestriction(proto_config, method_name, "key.display_name", FieldType::Request, true,
                  kRemoveFieldActionType);
-  ASSERT_TRUE(reloadFilter(proto_config).ok());
+  ASSERT_OK(reloadFilter(proto_config));
 
   // Trigger conversion failure in test.
   filter_->fail_conversion_ = true;
@@ -1491,7 +1492,7 @@ TEST_F(ProtoApiScrubberBufferConversionTest, ResponseBufferConversionFailure) {
 
   addRestriction(proto_config, method_name, "create_time.seconds", FieldType::Response, true,
                  kRemoveFieldActionType);
-  ASSERT_TRUE(reloadFilter(proto_config).ok());
+  ASSERT_OK(reloadFilter(proto_config));
 
   // Trigger conversion failure in test.
   filter_->fail_conversion_ = true;
