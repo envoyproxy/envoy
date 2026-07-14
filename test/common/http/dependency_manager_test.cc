@@ -1,5 +1,7 @@
 #include "source/common/http/dependency_manager.h"
 
+#include "test/test_common/status_utility.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -9,7 +11,9 @@ namespace {
 
 using envoy::extensions::filters::common::dependency::v3::Dependency;
 using envoy::extensions::filters::common::dependency::v3::FilterDependencies;
+using ::Envoy::StatusHelpers::IsOk;
 using testing::HasSubstr;
+using ::testing::Not;
 
 TEST(DependencyManagerTest, RegisterFilter) {
   DependencyManager manager;
@@ -27,7 +31,7 @@ TEST(DependencyManagerTest, RegisterFilterWithDependency) {
   provided->set_name("potato");
   manager.registerFilter("ingredient", dependencies);
   auto result = manager.validDecodeDependencies();
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 }
 
 TEST(DependencyManagerTest, Valid) {
@@ -47,7 +51,7 @@ TEST(DependencyManagerTest, Valid) {
   manager.registerFilter("chef", d2);
 
   auto result = manager.validDecodeDependencies();
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 }
 
 TEST(DependencyManagerTest, MissingProvidencyInvalid) {
@@ -60,7 +64,7 @@ TEST(DependencyManagerTest, MissingProvidencyInvalid) {
   manager.registerFilter("chef", dependencies);
 
   auto result = manager.validDecodeDependencies();
-  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result, Not(IsOk()));
   EXPECT_THAT(result.message(),
               HasSubstr("filter 'chef' requires a FILTER_STATE_KEY named 'potato'"));
 }
@@ -82,7 +86,7 @@ TEST(DependencyManagerTest, WrongProvidencyTypeInvalid) {
   manager.registerFilter("chef", d2);
 
   auto result = manager.validDecodeDependencies();
-  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result, Not(IsOk()));
   EXPECT_THAT(result.message(),
               HasSubstr("filter 'chef' requires a FILTER_STATE_KEY named 'potato'"));
 }
@@ -104,7 +108,7 @@ TEST(DependencyManagerTest, WrongProvidencyNameInvalid) {
   manager.registerFilter("chef", d2);
 
   auto result = manager.validDecodeDependencies();
-  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result, Not(IsOk()));
   EXPECT_THAT(result.message(),
               HasSubstr("filter 'chef' requires a FILTER_STATE_KEY named 'potato'"));
 }
@@ -126,7 +130,7 @@ TEST(DependencyManagerTest, MisorderedFiltersInvalid) {
   manager.registerFilter("ingredient", d1);
 
   auto result = manager.validDecodeDependencies();
-  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result, Not(IsOk()));
   EXPECT_THAT(result.message(),
               HasSubstr("filter 'chef' requires a FILTER_STATE_KEY named 'potato'"));
 }
