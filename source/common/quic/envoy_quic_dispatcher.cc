@@ -137,21 +137,12 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
       quic::ParsedQuicVersionVector{version}, std::move(connection_socket), connection_id_generator,
       std::move(listener_filter_manager));
 
-  bool enable_reset_ssl = false;
-  if (filter_chain != nullptr) {
-    const auto& factory = filter_chain->transportSocketFactory();
-    const auto* quic_factory = dynamic_cast<const QuicServerTransportSocketFactory*>(&factory);
-    if (quic_factory != nullptr) {
-      enable_reset_ssl = quic_factory->resetSslEnabled();
-    }
-  }
-
   auto quic_session = std::make_unique<EnvoyQuicServerSession>(
       quic_config, quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
       listener_config_->perConnectionBufferLimitBytes(), quic_stat_names_,
       listener_config_->listenerScope(), crypto_server_stream_factory_, std::move(stream_info),
-      connection_stats_, debug_visitor_factory_, session_idle_list_.get(), enable_reset_ssl);
+      connection_stats_, debug_visitor_factory_, session_idle_list_.get());
   if (filter_chain != nullptr) {
     // Setup filter chain before Initialize().
     const bool has_filter_initialized =

@@ -31,11 +31,6 @@ message QuicDownstreamTransport {
   // If false, TLS session tickets are not issued and accepted by QUIC.
   // Default to true.
   google.protobuf.BoolValue enable_resumption = 3;
-
-  // If true, enables memory optimization by resetting the internal SSL object
-  // after the handshake finishes.
-  // Default to false.
-  google.protobuf.BoolValue enable_reset_ssl = 4;
 }
 
 // Configuration for Upstream QUIC transport socket. This provides Google's implementation of Google QUIC and IETF QUIC to Envoy.

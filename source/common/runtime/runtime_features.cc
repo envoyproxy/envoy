@@ -104,6 +104,8 @@ RUNTIME_GUARD(envoy_reloadable_features_propagate_upstream_rst_through_tunneled_
 RUNTIME_GUARD(envoy_reloadable_features_proxy_protocol_allow_duplicate_tlvs);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_protocol_remove_too_long_tlvs);
 RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
+// TODO(panting): Default to true after ssl fix.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_enable_reset_ssl_after_handshake);
 RUNTIME_GUARD(envoy_reloadable_features_quic_fix_defer_logging_miss_for_half_closed_stream);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @danzh2010 or @RyanTheOptimist before removing.

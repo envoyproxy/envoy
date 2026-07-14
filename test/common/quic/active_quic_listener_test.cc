@@ -135,9 +135,8 @@ protected:
         local_address_(Network::Test::getAnyAddress(version_, true)),
         connection_handler_(*dispatcher_, std::nullopt),
         transport_socket_factory_(*Quic::QuicServerTransportSocketFactory::create(
-            /*enable_early_data=*/true, /*enable_resumption=*/true, /*enable_reset_ssl=*/false,
-            *store_.rootScope(), std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(),
-            ssl_context_manager_)),
+            /*enable_early_data=*/true, /*enable_resumption=*/true, *store_.rootScope(),
+            std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(), ssl_context_manager_)),
         quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
 
@@ -256,6 +255,7 @@ protected:
           .InSequence(seq)
           .WillOnce(ReturnRef(filter_factories_.back()));
       EXPECT_CALL(*filter_chain_, transportSocketFactory())
+          .InSequence(seq)
           .WillRepeatedly(ReturnRef(*transport_socket_factory_));
     }
   }

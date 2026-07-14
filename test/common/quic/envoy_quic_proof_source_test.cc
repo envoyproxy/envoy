@@ -167,8 +167,7 @@ public:
         .WillRepeatedly(SaveArg<0>(&secret_update_callback_));
     EXPECT_CALL(*mock_context_config_, alpnProtocols()).WillRepeatedly(ReturnRef(alpn_));
     transport_socket_factory_ = *QuicServerTransportSocketFactory::create(
-        /*enable_early_data=*/true, /*enable_resumption=*/true, /*enable_reset_ssl=*/false,
-        listener_config_.listenerScope(),
+        /*enable_early_data=*/true, /*enable_resumption=*/true, listener_config_.listenerScope(),
         std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_), ssl_context_manager_);
     transport_socket_factory_->initialize();
     EXPECT_CALL(filter_chain_, name()).WillRepeatedly(Return(""));
