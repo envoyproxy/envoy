@@ -266,10 +266,10 @@ TEST_F(ReverseBridgeTest, GrpcRequest) {
   }
 
   Http::TestResponseHeaderMapImpl headers(
-      {{":status", "200"}, {"content-length", "30"}, {"content-type", "application/x-protobuf"}});
+      {{":status", "200"}, {"content-length", "12"}, {"content-type", "application/x-protobuf"}});
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().ContentType, "application/grpc"));
-  EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().ContentLength, "35"));
+  EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().ContentLength, "17"));
 
   {
     // With Content-Length available, the response is streamed. The first chunk gets the gRPC
@@ -702,10 +702,10 @@ TEST_F(ReverseBridgeTest, FilterConfigPerRouteEnabled) {
   }
 
   Http::TestResponseHeaderMapImpl headers(
-      {{":status", "200"}, {"content-length", "30"}, {"content-type", "application/x-protobuf"}});
+      {{":status", "200"}, {"content-length", "12"}, {"content-type", "application/x-protobuf"}});
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().ContentType, "application/grpc"));
-  EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().ContentLength, "35"));
+  EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().ContentLength, "17"));
 
   {
     // With Content-Length, the response is streamed. First chunk gets gRPC frame header.
