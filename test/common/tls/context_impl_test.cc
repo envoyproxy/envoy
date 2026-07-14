@@ -32,6 +32,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -170,8 +171,8 @@ TEST_F(SslContextImplTest, TestCipherSuitesDeduplication) {
   EXPECT_EQ(cfg1->cipherSuites(), "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256");
   EXPECT_EQ(cfg2->cipherSuites(), "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256");
 
-  EXPECT_TRUE(manager_.createSslClientContext(*store_.rootScope(), *cfg1).ok());
-  EXPECT_TRUE(manager_.createSslClientContext(*store_.rootScope(), *cfg2).ok());
+  EXPECT_OK(manager_.createSslClientContext(*store_.rootScope(), *cfg1));
+  EXPECT_OK(manager_.createSslClientContext(*store_.rootScope(), *cfg2));
 }
 
 // Validates that TLS contexts referencing identical CRL content share a single
@@ -1229,7 +1230,7 @@ session_ticket_keys:
 )EOF";
 
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
-  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_OK(factory_context_.server_context_.secretManager().addStaticSecret(secret_config));
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
@@ -1612,7 +1613,7 @@ TEST_F(ClientContextConfigImplTest, RSA2048Cert) {
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
   auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
-  EXPECT_TRUE(context_or.ok());
+  EXPECT_OK(context_or);
   auto cleanup = cleanUpHelper(*context_or);
 }
 
@@ -1679,7 +1680,7 @@ TEST_F(ClientContextConfigImplTest, RSA3072Cert) {
   ContextManagerImpl manager(server_factory_context_);
   Stats::IsolatedStoreImpl store;
   auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
-  EXPECT_TRUE(context_or.ok());
+  EXPECT_OK(context_or);
   auto cleanup = cleanUpHelper(*context_or);
 }
 
@@ -1697,7 +1698,7 @@ TEST_F(ClientContextConfigImplTest, RSA4096Cert) {
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
   auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
-  EXPECT_TRUE(context_or.ok());
+  EXPECT_OK(context_or);
   auto cleanup = cleanUpHelper(*context_or);
 }
 
@@ -1715,7 +1716,7 @@ TEST_F(ClientContextConfigImplTest, P256EcdsaCert) {
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
   auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
-  EXPECT_TRUE(context_or.ok());
+  EXPECT_OK(context_or);
   auto cleanup = cleanUpHelper(*context_or);
 }
 
@@ -1733,7 +1734,7 @@ TEST_F(ClientContextConfigImplTest, P384EcdsaCert) {
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
   auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
-  EXPECT_TRUE(context_or.ok());
+  EXPECT_OK(context_or);
   auto cleanup = cleanUpHelper(*context_or);
 }
 
@@ -1763,7 +1764,7 @@ TEST_F(ClientContextConfigImplTest, P521EcdsaCert) {
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
   auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
-  EXPECT_TRUE(context_or.ok());
+  EXPECT_OK(context_or);
   auto cleanup = cleanUpHelper(*context_or);
 }
 
@@ -1901,7 +1902,7 @@ tls_certificate:
       ->Add()
       ->set_name("abc.com");
 
-  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_OK(factory_context_.server_context_.secretManager().addStaticSecret(secret_config));
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem";
@@ -1935,7 +1936,7 @@ TEST_F(ClientContextConfigImplTest, PasswordProtectedTlsCertificates) {
       ->Add()
       ->set_name("abc.com");
 
-  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_OK(factory_context_.server_context_.secretManager().addStaticSecret(secret_config));
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
   const std::string cert_pem = "{{ test_rundir "
@@ -1972,7 +1973,7 @@ TEST_F(ClientContextConfigImplTest, PasswordProtectedPkcs12) {
       ->Add()
       ->set_name("abc.com");
 
-  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_OK(factory_context_.server_context_.secretManager().addStaticSecret(secret_config));
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
   const std::string cert_p12 = "{{ test_rundir "
@@ -2004,7 +2005,7 @@ TEST_F(ClientContextConfigImplTest, PasswordWrongPkcs12) {
       ->Add()
       ->set_name("abc.com");
 
-  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_OK(factory_context_.server_context_.secretManager().addStaticSecret(secret_config));
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
   Stats::IsolatedStoreImpl store;
@@ -2033,7 +2034,7 @@ TEST_F(ClientContextConfigImplTest, PasswordNotSuppliedPkcs12) {
       ->Add()
       ->set_name("abc.com");
 
-  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_OK(factory_context_.server_context_.secretManager().addStaticSecret(secret_config));
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
   Stats::IsolatedStoreImpl store;
@@ -2065,7 +2066,7 @@ TEST_F(ClientContextConfigImplTest, PasswordNotSuppliedTlsCertificates) {
       ->Add()
       ->set_name("abc.com");
 
-  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_OK(factory_context_.server_context_.secretManager().addStaticSecret(secret_config));
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
   Stats::IsolatedStoreImpl store;
@@ -2090,9 +2091,8 @@ TEST_F(ClientContextConfigImplTest, StaticCertificateValidationContext) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             tls_certificate_secret_config);
-  EXPECT_TRUE(factory_context_.server_context_.secretManager()
-                  .addStaticSecret(tls_certificate_secret_config)
-                  .ok());
+  EXPECT_OK(factory_context_.server_context_.secretManager().addStaticSecret(
+      tls_certificate_secret_config));
   envoy::extensions::transport_sockets::tls::v3::Secret
       certificate_validation_context_secret_config;
   const std::string certificate_validation_context_yaml = R"EOF(
@@ -2103,9 +2103,8 @@ TEST_F(ClientContextConfigImplTest, StaticCertificateValidationContext) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(certificate_validation_context_yaml),
                             certificate_validation_context_secret_config);
-  EXPECT_TRUE(factory_context_.server_context_.secretManager()
-                  .addStaticSecret(certificate_validation_context_secret_config)
-                  .ok());
+  EXPECT_OK(factory_context_.server_context_.secretManager().addStaticSecret(
+      certificate_validation_context_secret_config));
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()
@@ -2138,7 +2137,7 @@ tls_certificate:
 
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
 
-  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_OK(factory_context_.server_context_.secretManager().addStaticSecret(secret_config));
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()
@@ -2164,9 +2163,8 @@ TEST_F(ClientContextConfigImplTest, MissingStaticCertificateValidationContext) {
     )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             tls_certificate_secret_config);
-  EXPECT_TRUE(factory_context_.server_context_.secretManager()
-                  .addStaticSecret(tls_certificate_secret_config)
-                  .ok());
+  EXPECT_OK(factory_context_.server_context_.secretManager().addStaticSecret(
+      tls_certificate_secret_config));
   envoy::extensions::transport_sockets::tls::v3::Secret
       certificate_validation_context_secret_config;
   const std::string certificate_validation_context_yaml = R"EOF(
@@ -2177,9 +2175,8 @@ TEST_F(ClientContextConfigImplTest, MissingStaticCertificateValidationContext) {
     )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(certificate_validation_context_yaml),
                             certificate_validation_context_secret_config);
-  EXPECT_TRUE(factory_context_.server_context_.secretManager()
-                  .addStaticSecret(certificate_validation_context_secret_config)
-                  .ok());
+  EXPECT_OK(factory_context_.server_context_.secretManager().addStaticSecret(
+      certificate_validation_context_secret_config));
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()
@@ -2797,7 +2794,7 @@ protected:
     absl::Status creation_status = absl::OkStatus();
     context_ = std::make_unique<TestContextImpl>(*store_.rootScope(), *client_context_config_,
                                                  server_factory_context_, creation_status);
-    EXPECT_TRUE(creation_status.ok());
+    EXPECT_OK(creation_status);
   }
 
   Stats::TestUtil::TestStore store_;
@@ -2939,7 +2936,7 @@ common_tls_context:
   absl::Status creation_status = absl::OkStatus();
   TestContextImpl context(*store.rootScope(), *server_context_config, server_factory_context_,
                           creation_status);
-  ASSERT_TRUE(creation_status.ok());
+  ASSERT_OK(creation_status);
 
   std::string expected_metric_name =
       absl::StrCat("ssl.certificate.", actual_cert_name, ".expiration_unix_time_seconds");
@@ -2972,7 +2969,7 @@ common_tls_context:
   absl::Status creation_status = absl::OkStatus();
   TestContextImpl context(*store.rootScope(), *client_context_config, server_factory_context_,
                           creation_status);
-  ASSERT_TRUE(creation_status.ok());
+  ASSERT_OK(creation_status);
 
   std::string expected_metric_name =
       absl::StrCat("ssl.certificate.", actual_cert_name, ".expiration_unix_time_seconds");

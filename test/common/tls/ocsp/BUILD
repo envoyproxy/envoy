@@ -27,6 +27,7 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -40,5 +41,6 @@ envoy_cc_test(
     deps = [
         "//source/common/tls/ocsp:asn1_utility_lib",
         "//test/common/tls:ssl_test_utils",
+        "//test/test_common:status_utility_lib",
     ],
 )

@@ -22,6 +22,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -77,7 +78,7 @@ tls_certificate:
 )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
   SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
-  EXPECT_TRUE(secret_manager->addStaticSecret(secret_config).ok());
+  EXPECT_OK(secret_manager->addStaticSecret(secret_config));
 
   ASSERT_EQ(secret_manager->findStaticTlsCertificateProvider("undefined"), nullptr);
   const auto provider = secret_manager->findStaticTlsCertificateProvider("abc.com");
@@ -119,7 +120,7 @@ TEST_F(SecretManagerImplTest, DuplicateStaticTlsCertificateSecret) {
     )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
   SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
-  EXPECT_TRUE(secret_manager->addStaticSecret(secret_config).ok());
+  EXPECT_OK(secret_manager->addStaticSecret(secret_config));
 
   ASSERT_NE(secret_manager->findStaticTlsCertificateProvider("abc.com"), nullptr);
   EXPECT_EQ(secret_manager->addStaticSecret(secret_config).message(),
@@ -138,7 +139,7 @@ TEST_F(SecretManagerImplTest, CertificateValidationContextSecretLoadSuccess) {
       )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
-  EXPECT_TRUE(secret_manager->addStaticSecret(secret_config).ok());
+  EXPECT_OK(secret_manager->addStaticSecret(secret_config));
 
   ASSERT_EQ(secret_manager->findStaticCertificateValidationContextProvider("undefined"), nullptr);
   ASSERT_NE(secret_manager->findStaticCertificateValidationContextProvider("abc.com"), nullptr);
@@ -165,7 +166,7 @@ TEST_F(SecretManagerImplTest, DuplicateStaticCertificateValidationContextSecret)
     )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
   SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
-  EXPECT_TRUE(secret_manager->addStaticSecret(secret_config).ok());
+  EXPECT_OK(secret_manager->addStaticSecret(secret_config));
 
   ASSERT_NE(secret_manager->findStaticCertificateValidationContextProvider("abc.com"), nullptr);
   EXPECT_EQ(secret_manager->addStaticSecret(secret_config).message(),
@@ -188,7 +189,7 @@ session_ticket_keys:
 
   SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
 
-  EXPECT_TRUE(secret_manager->addStaticSecret(secret_config).ok());
+  EXPECT_OK(secret_manager->addStaticSecret(secret_config));
 
   ASSERT_EQ(secret_manager->findStaticTlsSessionTicketKeysContextProvider("undefined"), nullptr);
   ASSERT_NE(secret_manager->findStaticTlsSessionTicketKeysContextProvider("abc.com"), nullptr);
@@ -216,7 +217,7 @@ session_ticket_keys:
 
   SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
 
-  EXPECT_TRUE(secret_manager->addStaticSecret(secret_config).ok());
+  EXPECT_OK(secret_manager->addStaticSecret(secret_config));
 
   ASSERT_NE(secret_manager->findStaticTlsSessionTicketKeysContextProvider("abc.com"), nullptr);
   EXPECT_EQ(secret_manager->addStaticSecret(secret_config).message(),
@@ -236,7 +237,7 @@ generic_secret:
     filename: "{{ test_rundir }}/test/common/tls/test_data/aes_128_key"
 )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret);
-  EXPECT_TRUE(secret_manager->addStaticSecret(secret).ok());
+  EXPECT_OK(secret_manager->addStaticSecret(secret));
 
   ASSERT_EQ(secret_manager->findStaticGenericSecretProvider("undefined"), nullptr);
   ASSERT_NE(secret_manager->findStaticGenericSecretProvider("encryption_key"), nullptr);
@@ -260,7 +261,7 @@ generic_secret:
     filename: "{{ test_rundir }}/test/common/tls/test_data/aes_128_key"
 )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret);
-  EXPECT_TRUE(secret_manager->addStaticSecret(secret).ok());
+  EXPECT_OK(secret_manager->addStaticSecret(secret));
 
   ASSERT_NE(secret_manager->findStaticGenericSecretProvider("encryption_key"), nullptr);
   EXPECT_EQ(secret_manager->addStaticSecret(secret).message(),
@@ -388,9 +389,8 @@ tls_certificate:
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
-  EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
-                  ->onConfigUpdate(decoded_resources.refvec_, "")
-                  .ok());
+  EXPECT_OK(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
+                ->onConfigUpdate(decoded_resources.refvec_, ""));
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
   Envoy::Ssl::TlsCertificateConfigImpl tls_config = std::move(
       Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_, "cert_name")
@@ -440,9 +440,8 @@ generic_secret:
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
-  EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
-                  ->onConfigUpdate(decoded_resources.refvec_, "")
-                  .ok());
+  EXPECT_OK(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
+                ->onConfigUpdate(decoded_resources.refvec_, ""));
 
   const envoy::extensions::transport_sockets::tls::v3::GenericSecret generic_secret(
       *secret_provider->secret());
@@ -489,9 +488,8 @@ tls_certificate:
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
-  EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
-                  ->onConfigUpdate(decoded_resources.refvec_, "keycert-v1")
-                  .ok());
+  EXPECT_OK(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
+                ->onConfigUpdate(decoded_resources.refvec_, "keycert-v1"));
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
   Envoy::Ssl::TlsCertificateConfigImpl tls_config = std::move(
       Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_, "cert_name")
@@ -538,9 +536,8 @@ validation_context:
   const auto decoded_resources_2 = TestUtility::decodeResources({typed_secret});
 
   init_target_handle->initialize(init_watcher);
-  EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
-                  ->onConfigUpdate(decoded_resources_2.refvec_, "validation-context-v1")
-                  .ok());
+  EXPECT_OK(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
+                ->onConfigUpdate(decoded_resources_2.refvec_, "validation-context-v1"));
   auto cert_validation_context =
       Ssl::CertificateValidationContextConfigImpl::create(*context_secret_provider->secret(), false,
                                                           *api_, "ca_cert_name")
@@ -595,9 +592,8 @@ session_ticket_keys:
   const auto decoded_resources_3 = TestUtility::decodeResources({typed_secret});
 
   init_target_handle->initialize(init_watcher);
-  EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
-                  ->onConfigUpdate(decoded_resources_3.refvec_, "stek-context-v1")
-                  .ok());
+  EXPECT_OK(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
+                ->onConfigUpdate(decoded_resources_3.refvec_, "stek-context-v1"));
   EXPECT_EQ(stek_secret_provider->secret()->keys()[1].inline_string(), "DUMMY_INLINE_STRING");
 
   const std::string updated_once_more_config_dump = R"EOF(
@@ -660,9 +656,8 @@ generic_secret:
   TestUtility::loadFromYaml(TestEnvironment::substitute(generic_secret_yaml), typed_secret);
   const auto decoded_resources_4 = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
-  EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
-                  ->onConfigUpdate(decoded_resources_4.refvec_, "signing-key-v1")
-                  .ok());
+  EXPECT_OK(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
+                ->onConfigUpdate(decoded_resources_4.refvec_, "signing-key-v1"));
 
   const envoy::extensions::transport_sockets::tls::v3::GenericSecret generic_secret(
       *generic_secret_provider->secret());
@@ -908,7 +903,7 @@ tls_certificate:
 )EOF";
   envoy::extensions::transport_sockets::tls::v3::Secret tls_cert_secret;
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate), tls_cert_secret);
-  EXPECT_TRUE(secret_manager->addStaticSecret(tls_cert_secret).ok());
+  EXPECT_OK(secret_manager->addStaticSecret(tls_cert_secret));
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: "abc.com.nopassword"
 tls_certificate:
@@ -918,7 +913,7 @@ tls_certificate:
     inline_string: "DUMMY_INLINE_BYTES_FOR_PRIVATE_KEY"
 )EOF"),
                             tls_cert_secret);
-  EXPECT_TRUE(secret_manager->addStaticSecret(tls_cert_secret).ok());
+  EXPECT_OK(secret_manager->addStaticSecret(tls_cert_secret));
   const std::string expected_config_dump = R"EOF(
 static_secrets:
 - name: "abc.com.nopassword"
@@ -979,7 +974,7 @@ validation_context:
 )EOF";
   envoy::extensions::transport_sockets::tls::v3::Secret validation_secret;
   TestUtility::loadFromYaml(TestEnvironment::substitute(validation_context), validation_secret);
-  EXPECT_TRUE(secret_manager->addStaticSecret(validation_secret).ok());
+  EXPECT_OK(secret_manager->addStaticSecret(validation_secret));
   const std::string expected_config_dump = R"EOF(
 static_secrets:
 - name: "abc.com.validation"
@@ -1027,7 +1022,7 @@ session_ticket_keys:
 )EOF";
   envoy::extensions::transport_sockets::tls::v3::Secret stek_secret;
   TestUtility::loadFromYaml(TestEnvironment::substitute(stek_context), stek_secret);
-  EXPECT_TRUE(secret_manager->addStaticSecret(stek_secret).ok());
+  EXPECT_OK(secret_manager->addStaticSecret(stek_secret));
   const std::string expected_config_dump = R"EOF(
 static_secrets:
 - name: "abc.com.stek"
@@ -1057,7 +1052,7 @@ generic_secret:
 )EOF";
   envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
-  EXPECT_TRUE(secret_manager->addStaticSecret(typed_secret).ok());
+  EXPECT_OK(secret_manager->addStaticSecret(typed_secret));
 
   const std::string expected_config_dump = R"EOF(
 static_secrets:
@@ -1116,9 +1111,8 @@ tls_certificate:
   EXPECT_FALSE(typed_secret.tls_certificate().has_private_key());
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
-  EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
-                  ->onConfigUpdate(decoded_resources.refvec_, "")
-                  .ok());
+  EXPECT_OK(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
+                ->onConfigUpdate(decoded_resources.refvec_, ""));
   EXPECT_TRUE(secret_provider->secret()->has_private_key_provider());
   EXPECT_FALSE(secret_provider->secret()->has_private_key());
 
@@ -1156,7 +1150,7 @@ TEST_F(SecretManagerImplTest, DeprecatedSanMatcher) {
       )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
-  EXPECT_TRUE(secret_manager->addStaticSecret(secret_config).ok());
+  EXPECT_OK(secret_manager->addStaticSecret(secret_config));
 
   ASSERT_EQ(secret_manager->findStaticCertificateValidationContextProvider("undefined"), nullptr);
   ASSERT_NE(secret_manager->findStaticCertificateValidationContextProvider("abc.com"), nullptr);
