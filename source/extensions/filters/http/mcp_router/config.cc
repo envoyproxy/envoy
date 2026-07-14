@@ -10,7 +10,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace McpRouter {
 
-Http::FilterFactoryCb McpRouterFilterConfigFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+McpRouterFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 
