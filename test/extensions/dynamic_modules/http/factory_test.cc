@@ -4,12 +4,17 @@
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 namespace HttpFilters {
+
+using ::Envoy::StatusHelpers::HasStatusCode;
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 
 TEST(DynamicModuleConfigFactory, Overrides) {
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
@@ -46,7 +51,7 @@ filter_config:
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   auto factory_cb = result.value();
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
 
@@ -125,7 +130,7 @@ filter_config:
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createRouteSpecificFilterConfig(
       proto_config, context.server_factory_context_, context.messageValidationVisitor());
-  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result, Not(IsOk()));
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("envoy_dynamic_module_on_http_filter_per_route_config_new"));
 }
@@ -223,7 +228,7 @@ filter_config:
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   auto factory_cb = result.value();
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
 
@@ -298,7 +303,7 @@ filter_name: foo
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   auto factory_cb = result.value();
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
 
@@ -337,7 +342,7 @@ filter_config:
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   auto factory_cb = result.value();
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
 
@@ -377,7 +382,7 @@ filter_config:
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   auto factory_cb = result.value();
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
 
@@ -411,8 +416,7 @@ filter_config:
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
   EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module:"));
 
   // A module that cannot be loaded at all bumps the module_load_error counter, tagged with the
@@ -452,8 +456,7 @@ filter_config:
     TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
     auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
-    EXPECT_FALSE(result.ok());
-    EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
     EXPECT_THAT(
         result.status().message(),
         testing::HasSubstr(fmt::format("Failed to resolve symbol {}", missing_symbol_name)));
@@ -484,7 +487,7 @@ filter_config:
     TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
     auto result = factory.createFilterFactoryFromProto(proto_config, "", init_fail_context);
-    EXPECT_FALSE(result.ok());
+    EXPECT_THAT(result, Not(IsOk()));
     EXPECT_THAT(result.status().message(),
                 testing::HasSubstr("Failed to initialize dynamic module"));
     auto& server_scope = init_fail_context.server_factory_context_.scope();
@@ -512,8 +515,7 @@ filter_config:
 
     auto result = factory.createRouteSpecificFilterConfig(
         proto_config, context, ProtobufMessage::getNullValidationVisitor());
-    EXPECT_FALSE(result.ok());
-    EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
     EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module:"));
     EXPECT_EQ(1U, failureCounter(context.scope(), "per_route_config_error", "foo"));
   }
@@ -546,8 +548,7 @@ filter_config:
 
     auto result = factory.createRouteSpecificFilterConfig(
         proto_config, context, ProtobufMessage::getNullValidationVisitor());
-    EXPECT_FALSE(result.ok());
-    EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
     EXPECT_THAT(result.status().message(), testing::HasSubstr(expected_error));
     // A fresh context is used per iteration, so the per-route failure counter is exactly one.
     EXPECT_EQ(1U, failureCounter(context.scope(), "per_route_config_error", "foo"));
@@ -581,7 +582,7 @@ TEST(DynamicModuleConfigFactory, MalformedFilterConfig) {
     set_malformed(proto_config);
 
     auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
-    EXPECT_FALSE(result.ok());
+    EXPECT_THAT(result, Not(IsOk()));
     auto& server_scope = context.server_factory_context_.scope();
     EXPECT_EQ(1U, failureCounter(server_scope, "config_init_error", "foo"));
     EXPECT_EQ(0U, failureCounter(server_scope, "module_load_error", "foo"));
@@ -595,7 +596,7 @@ TEST(DynamicModuleConfigFactory, MalformedFilterConfig) {
 
     auto result = factory.createRouteSpecificFilterConfig(
         proto_config, context, ProtobufMessage::getNullValidationVisitor());
-    EXPECT_FALSE(result.ok());
+    EXPECT_THAT(result, Not(IsOk()));
     EXPECT_EQ(1U, failureCounter(context.scope(), "per_route_config_error", "foo"));
   }
 }
