@@ -755,6 +755,7 @@ public:
   COUNTER(upstream_cx_none_healthy)                                                                \
   COUNTER(upstream_cx_overflow)                                                                    \
   COUNTER(upstream_cx_pool_overflow)                                                               \
+  COUNTER(upstream_cx_preconnect_skipped)                                                          \
   COUNTER(upstream_cx_protocol_error)                                                              \
   COUNTER(upstream_cx_rx_bytes_total)                                                              \
   COUNTER(upstream_cx_total)                                                                       \
@@ -1076,6 +1077,13 @@ public:
    * @return how many streams should be anticipated per each current stream.
    */
   virtual float peekaheadRatio() const PURE;
+
+  /**
+   * @param host the upstream host being considered for a preconnect.
+   * @return whether anticipatory connections may be opened to the host, per the cluster's
+   * preconnect_enabled_metadata matcher. Does not affect on-demand connections for requests.
+   */
+  virtual bool shouldPreconnect(const Host& host) const PURE;
 
   /**
    * @return soft limit on size of the cluster's connections read and write buffers.
