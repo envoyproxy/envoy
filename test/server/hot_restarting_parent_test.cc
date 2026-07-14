@@ -411,11 +411,12 @@ TEST_F(HotRestartingParentTest, RetainDynamicStats) {
   }
 }
 
-// Tag metadata is exported only for stats whose tags the child could NOT re-derive from the
-// name: regex-extracted tags are reproduced by the child's own tag extraction during the merge,
-// so re-transmitting them would only bloat the transfer. Programmatic tags (whose values are
-// embedded in the flat name) are the ones that need the metadata.
-TEST_F(HotRestartingParentTest, ExportsTagMetadataOnlyWhenNotRederivable) {
+// Tag metadata is exported only for stats whose tags did not come from tag extraction (tracked
+// via Metric::noTagExtraction()): extracted tags are reproduced by the child's own tag
+// extraction during the merge, so re-transmitting them would only bloat the transfer.
+// Programmatic tags (whose values are embedded in the flat name) are the ones that need the
+// metadata.
+TEST_F(HotRestartingParentTest, ExportsTagMetadataOnlyForProgrammaticTags) {
   MockListenerManager listener_manager;
   EXPECT_CALL(server_, listenerManager()).WillRepeatedly(ReturnRef(listener_manager));
   EXPECT_CALL(listener_manager, numConnections()).WillRepeatedly(Return(0));
@@ -430,11 +431,12 @@ TEST_F(HotRestartingParentTest, ExportsTagMetadataOnlyWhenNotRederivable) {
   store.setTagProducer(std::move(*producer_or));
   EXPECT_CALL(server_, stats()).WillRepeatedly(ReturnRef(store));
 
-  // Tags produced by regex extraction: re-derivable, so no metadata is expected.
+  // Tags produced by regex extraction: the child re-derives them, so no metadata is expected.
   Stats::Counter& extracted_counter =
       store.rootScope()->counterFromString("cluster.foo.upstream_cx_total");
   extracted_counter.inc();
   ASSERT_FALSE(extracted_counter.tags().empty()); // Sanity check: extraction produced tags.
+  EXPECT_FALSE(extracted_counter.noTagExtraction());
 
   // Programmatic tags: not re-derivable, so metadata is expected.
   Stats::StatNamePool pool(symbol_table);
@@ -442,9 +444,11 @@ TEST_F(HotRestartingParentTest, ExportsTagMetadataOnlyWhenNotRederivable) {
   Stats::Counter& programmatic_counter =
       store.rootScope()->counterFromStatNameWithTags(pool.add("custom.requests_total"), tags);
   programmatic_counter.inc();
+  EXPECT_TRUE(programmatic_counter.noTagExtraction());
   Stats::Gauge& programmatic_gauge = store.rootScope()->gaugeFromStatNameWithTags(
       pool.add("custom.active_connections"), tags, Stats::Gauge::ImportMode::Accumulate);
   programmatic_gauge.set(5);
+  EXPECT_TRUE(programmatic_gauge.noTagExtraction());
 
   HotRestartMessage::Reply::Stats stats;
   hot_restarting_parent_.exportStatsToChild(&stats);
@@ -502,6 +506,9 @@ TEST_F(HotRestartingParentTest, TagMetadataAppliedToMergedStats) {
   ASSERT_EQ(1, child_counter.tags().size());
   EXPECT_EQ("source", child_counter.tags()[0].name_);
   EXPECT_EQ("svc-a", child_counter.tags()[0].value_);
+  // The merged stat is marked as carrying programmatic tags, so when this child later becomes
+  // the parent of another hot restart it exports the tag metadata again.
+  EXPECT_TRUE(child_counter.noTagExtraction());
 }
 
 // With the runtime feature disabled the child ignores the transmitted tag metadata and falls

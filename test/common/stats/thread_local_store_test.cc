@@ -378,6 +378,9 @@ TEST_F(StatsThreadLocalStoreTest, MergedStatNameHonorsSuppliedTags) {
   ASSERT_EQ(1, counter.tags().size());
   EXPECT_EQ("source", counter.tags()[0].name_);
   EXPECT_EQ("svc-a", counter.tags()[0].value_);
+  // Merged re-creation counts as programmatic tags, so a subsequent hot restart (this process
+  // becoming the parent) still exports the tag metadata.
+  EXPECT_TRUE(counter.noTagExtraction());
 
   Gauge& gauge = scope_.gaugeFromMergedStatName(pool.add("custom.active.source.svc-a"),
                                                 pool.add("custom.active"), StatNameTagSpan(tags),
@@ -385,6 +388,7 @@ TEST_F(StatsThreadLocalStoreTest, MergedStatNameHonorsSuppliedTags) {
   EXPECT_EQ("custom.active.source.svc-a", gauge.name());
   EXPECT_EQ("custom.active", gauge.tagExtractedName());
   ASSERT_EQ(1, gauge.tags().size());
+  EXPECT_TRUE(gauge.noTagExtraction());
 
   // A caller creating the same stat with programmatic tags resolves to the same object: the
   // flat names (cache keys) match.
@@ -397,11 +401,13 @@ TEST_F(StatsThreadLocalStoreTest, MergedStatNameHonorsSuppliedTags) {
                                                        pool.add("plain.counter"), std::nullopt);
   EXPECT_EQ("plain.counter", untagged.name());
   EXPECT_TRUE(untagged.tags().empty());
+  EXPECT_FALSE(untagged.noTagExtraction());
   Gauge& untagged_gauge =
       scope_.gaugeFromMergedStatName(pool.add("plain.gauge"), pool.add("plain.gauge"), std::nullopt,
                                      Gauge::ImportMode::Accumulate);
   EXPECT_EQ("plain.gauge", untagged_gauge.name());
   EXPECT_TRUE(untagged_gauge.tags().empty());
+  EXPECT_FALSE(untagged_gauge.noTagExtraction());
 }
 
 TEST_F(StatsThreadLocalStoreTest, BasicScope) {
@@ -2840,6 +2846,7 @@ TEST_F(ThreadLocalStoreTagScopeTest, MergedStatNameHonorsSuppliedTags) {
   ASSERT_EQ(1, counter.tags().size());
   EXPECT_EQ("source", counter.tags()[0].name_);
   EXPECT_EQ("svc-a", counter.tags()[0].value_);
+  EXPECT_TRUE(counter.noTagExtraction());
 
   Gauge& gauge = scope_.gaugeFromMergedStatName(
       makeStatName("custom.active.source.svc-a"), makeStatName("custom.active"),
@@ -2847,12 +2854,14 @@ TEST_F(ThreadLocalStoreTagScopeTest, MergedStatNameHonorsSuppliedTags) {
   EXPECT_EQ("custom.active.source.svc-a", gauge.name());
   EXPECT_EQ("custom.active", gauge.tagExtractedName());
   ASSERT_EQ(1, gauge.tags().size());
+  EXPECT_TRUE(gauge.noTagExtraction());
 
   // Empty tags fall back to name-derived creation keyed by the flat name.
   Counter& untagged = scope_.counterFromMergedStatName(makeStatName("plain.counter"),
                                                        makeStatName("plain.counter"), std::nullopt);
   EXPECT_EQ("plain.counter", untagged.name());
   EXPECT_TRUE(untagged.tags().empty());
+  EXPECT_FALSE(untagged.noTagExtraction());
   Gauge& untagged_gauge =
       scope_.gaugeFromMergedStatName(makeStatName("plain.gauge"), makeStatName("plain.gauge"),
                                      std::nullopt, Gauge::ImportMode::Accumulate);

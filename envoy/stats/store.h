@@ -67,12 +67,6 @@ public:
   virtual SymbolTable& symbolTable() PURE;
 
   /**
-   * @return the TagProducer this store uses to extract tags from stat names, or nullptr if the
-   *         store does not perform tag extraction.
-   */
-  virtual const TagProducer* tagProducer() const { return nullptr; }
-
-  /**
    * Deliver an individual histogram value to all registered sinks.
    */
   virtual void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) PURE;

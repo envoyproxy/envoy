@@ -1,7 +1,7 @@
 #include "source/server/hot_restarting_parent.h"
 
 #include "envoy/server/instance.h"
-#include "envoy/stats/tag_producer.h"
+#include "envoy/stats/stats.h"
 
 #include "source/common/memory/stats.h"
 #include "source/common/network/utility.h"
@@ -18,24 +18,19 @@ namespace {
 
 // Records a metric's programmatic tags into the tag map keyed by the metric's fully qualified
 // name, so the hot restart child can re-create the stat with identical labels. Entries are
-// emitted only for tags the child could NOT re-derive from the name: tag extraction on the
-// child reproduces regex-extracted tags (the common case, including the default tag regexes)
-// during the merge, so re-transmitting those would only bloat the transfer. Tags that extraction
-// does not reproduce (programmatic tags, whose values are embedded in the flat name) are the
-// ones that need the metadata.
+// emitted only for metrics whose tags did NOT come from tag extraction: extraction on the child
+// re-derives extracted tags from the name during the merge (the common case, including the
+// default tag regexes), so re-transmitting those would only bloat the transfer. Tags supplied
+// programmatically at creation (whose values are embedded in the flat name) are the ones that
+// need the metadata.
 void recordTags(Protobuf::Map<std::string, HotRestartMessage::Reply::Stats::TaggedMetric>* tag_map,
-                const std::string& name, const Stats::Metric& metric,
-                const Stats::TagProducer* tag_producer) {
+                const std::string& name, const Stats::Metric& metric) {
+  if (!metric.noTagExtraction()) {
+    return;
+  }
   const Stats::TagVector tags = metric.tags();
   if (tags.empty()) {
     return;
-  }
-  if (tag_producer != nullptr) {
-    Stats::TagVector rederived_tags;
-    const std::string tag_extracted_name = tag_producer->produceTags(name, rederived_tags);
-    if (tag_extracted_name == metric.tagExtractedName() && rederived_tags == tags) {
-      return;
-    }
   }
   HotRestartMessage::Reply::Stats::TaggedMetric& tagged = (*tag_map)[name];
   tagged.set_tag_extracted_name(metric.tagExtractedName());
@@ -213,31 +208,28 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
 // magnitude of memory usage that they are meant to avoid, since this map holds full-string
 // names. The problem can be solved by splitting the export up over many chunks.
 void HotRestartingParent::Internal::exportStatsToChild(HotRestartMessage::Reply::Stats* stats) {
-  const Stats::TagProducer* tag_producer = server_->stats().tagProducer();
-  server_->stats().forEachSinkedGauge(
-      nullptr, [this, stats, tag_producer](Stats::Gauge& gauge) mutable {
-        if (gauge.used()) {
-          const std::string name = gauge.name();
-          (*stats->mutable_gauges())[name] = gauge.value();
-          recordDynamics(stats, name, gauge.statName());
-          recordTags(stats->mutable_gauge_tags(), name, gauge, tag_producer);
-        }
-      });
+  server_->stats().forEachSinkedGauge(nullptr, [this, stats](Stats::Gauge& gauge) mutable {
+    if (gauge.used()) {
+      const std::string name = gauge.name();
+      (*stats->mutable_gauges())[name] = gauge.value();
+      recordDynamics(stats, name, gauge.statName());
+      recordTags(stats->mutable_gauge_tags(), name, gauge);
+    }
+  });
 
-  server_->stats().forEachSinkedCounter(
-      nullptr, [this, stats, tag_producer](Stats::Counter& counter) mutable {
-        if (counter.used()) {
-          // The hot restart parent is expected to have stopped its normal stat exporting (and so
-          // latching) by the time it begins exporting to the hot restart child.
-          uint64_t latched_value = counter.latch();
-          if (latched_value > 0) {
-            const std::string name = counter.name();
-            (*stats->mutable_counter_deltas())[name] = latched_value;
-            recordDynamics(stats, name, counter.statName());
-            recordTags(stats->mutable_counter_tags(), name, counter, tag_producer);
-          }
-        }
-      });
+  server_->stats().forEachSinkedCounter(nullptr, [this, stats](Stats::Counter& counter) mutable {
+    if (counter.used()) {
+      // The hot restart parent is expected to have stopped its normal stat exporting (and so
+      // latching) by the time it begins exporting to the hot restart child.
+      uint64_t latched_value = counter.latch();
+      if (latched_value > 0) {
+        const std::string name = counter.name();
+        (*stats->mutable_counter_deltas())[name] = latched_value;
+        recordDynamics(stats, name, counter.statName());
+        recordTags(stats->mutable_counter_tags(), name, counter);
+      }
+    }
+  });
   stats->set_memory_allocated(Memory::Stats::totalCurrentlyAllocated());
   stats->set_num_connections(server_->listenerManager().numConnections());
 }

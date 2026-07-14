@@ -480,7 +480,7 @@ public:
     if (!stat_name_tags) {
       TagVector tags;
       tag_extracted_name_ =
-          pool_.add(tls.tagProducer()->produceTags(tls.symbolTable().toString(name), tags));
+          pool_.add(tls.tagProducer().produceTags(tls.symbolTable().toString(name), tags));
       StatName empty;
       for (const auto& tag : tags) {
         StatName tag_name = tls.wellKnownTags().getBuiltin(tag.name_, empty);
@@ -590,6 +590,12 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     RefcountPtr<StatType> stat = make_stat(
         parent_.alloc_, full_stat_name, tag_helper.tagExtractedName(), tag_helper.statNameTags());
     ASSERT(stat != nullptr);
+    if (stat_name_tags.has_value() && !stat_name_tags->empty()) {
+      // The tags were supplied by the stat's creator rather than derived from the name, so tag
+      // extraction on the flat name cannot re-derive them. Hot restart stat export uses this to
+      // decide which stats need their tags transmitted to the child explicitly.
+      stat->markAsNoTagExtraction();
+    }
     central_ref = &central_cache_map[stat->statName()];
     *central_ref = stat;
   }
@@ -1517,7 +1523,7 @@ void ThreadLocalStoreImpl::extractAndAppendTags(StatName name, StatNamePool& poo
 void ThreadLocalStoreImpl::extractAndAppendTags(absl::string_view name, StatNamePool& pool,
                                                 StatNameTagVector& stat_tags) {
   TagVector tags;
-  tagProducer()->produceTags(name, tags);
+  tagProducer().produceTags(name, tags);
   for (const auto& tag : tags) {
     stat_tags.emplace_back(pool.add(tag.name_), pool.add(tag.value_));
   }
