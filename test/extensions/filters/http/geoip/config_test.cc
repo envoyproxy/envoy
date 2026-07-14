@@ -8,12 +8,15 @@
 #include "test/mocks/geoip/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using ::testing::AllOf;
+using ::testing::Not;
 
 namespace Envoy {
 namespace Extensions {
@@ -196,7 +199,7 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigMutualExclusionXffAndIpAddressHeade
   NiceMock<Server::Configuration::MockFactoryContext> context;
   GeoipFilterFactory factory;
   auto status_or = factory.createFilterFactoryFromProtoTyped(filter_config, "geoip", context);
-  EXPECT_FALSE(status_or.ok());
+  EXPECT_THAT(status_or, Not(IsOk()));
   EXPECT_EQ(status_or.status().message(),
             "Only one of xff_config or custom_header_config can be set in the geoip filter "
             "configuration");
