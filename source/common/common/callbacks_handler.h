@@ -99,20 +99,6 @@ public:
       }
     }
 
-  private:
-    // Re-points `to_move`'s handler back at this wrapper, adopts its link, and empties the source.
-    // Shared by the move constructor and move assignment; assumes any link previously held on this
-    // side is already gone (the constructor starts empty, the assignment calls reset() first).
-    void moveFrom(CallbacksWrapper& to_move) noexcept {
-      if (to_move.handler_.has_value()) {
-        to_move.handler_->wrapper_ = OptRef<CallbacksWrapper>(*this);
-      }
-      handler_ = to_move.handler_;
-      callbacks_ = to_move.callbacks_;
-      to_move.handler_.reset();
-      to_move.callbacks_.reset();
-    }
-
   protected:
     // Called BY the handler when the handler is the one tearing the link down. Only nulls fields;
     // never calls back into the handler (that is what breaks the teardown cycle).
@@ -128,6 +114,20 @@ public:
 
     OptRef<CallbacksHandler<CallbacksType>> handler_;
     OptRef<CallbacksType> callbacks_;
+
+  private:
+    // Re-points `to_move`'s handler back at this wrapper, adopts its link, and empties the source.
+    // Shared by the move constructor and move assignment; assumes any link previously held on this
+    // side is already gone (the constructor starts empty, the assignment calls reset() first).
+    void moveFrom(CallbacksWrapper& to_move) noexcept {
+      if (to_move.handler_.has_value()) {
+        to_move.handler_->wrapper_ = OptRef<CallbacksWrapper>(*this);
+      }
+      handler_ = to_move.handler_;
+      callbacks_ = to_move.callbacks_;
+      to_move.handler_.reset();
+      to_move.callbacks_.reset();
+    }
   };
 
   CallbacksHandler(const CallbacksHandler&) = delete;
@@ -164,6 +164,14 @@ public:
     }
   }
 
+protected:
+  // Called BY the wrapper when the wrapper is the one tearing the link down. Only nulls our
+  // pointer; never calls back into the wrapper. Virtual so a subclass can observe peer-initiated
+  // teardown (this is the hook that DOES run when the wrapper is destroyed first).
+  virtual void onPeerReset() { wrapper_.reset(); }
+
+  OptRef<CallbacksWrapper> wrapper_;
+
 private:
   // Re-points `to_move`'s wrapper back at this handler, adopts its link, and empties the source.
   // Shared by the move constructor and move assignment; assumes any link previously held on this
@@ -175,14 +183,6 @@ private:
     wrapper_ = to_move.wrapper_;
     to_move.wrapper_.reset();
   }
-
-protected:
-  // Called BY the wrapper when the wrapper is the one tearing the link down. Only nulls our
-  // pointer; never calls back into the wrapper. Virtual so a subclass can observe peer-initiated
-  // teardown (this is the hook that DOES run when the wrapper is destroyed first).
-  virtual void onPeerReset() { wrapper_.reset(); }
-
-  OptRef<CallbacksWrapper> wrapper_;
 };
 
 } // namespace Common
